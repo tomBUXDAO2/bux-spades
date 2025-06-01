@@ -6,7 +6,7 @@ export { default as WinnerModal } from './WinnerModal';
 export { default as LoserModal } from './LoserModal';
 
 // Export types
-export * from '../types/game';
+export * from '../../types/game';
 
 // Export hooks
 export * from './hooks/useGameState';

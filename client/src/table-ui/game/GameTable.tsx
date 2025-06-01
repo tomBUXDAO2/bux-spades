@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import type { GameState, Card, Suit, Player, TeamScore, HandSummary, CompletedTrick } from "../types/game";
+import type { GameState, Card, Suit, Player, TeamScore, HandSummary, CompletedTrick } from '../../types/game';
 import { Socket } from "socket.io-client";
 import Chat from './Chat';
 import HandSummaryModal from './HandSummaryModal';

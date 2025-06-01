@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GameState } from '@/types/game';
+import type { GameState } from '../../types/game';
 import Button from '@/components/ui/button';
 
 interface GameCardProps {

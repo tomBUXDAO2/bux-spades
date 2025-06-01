@@ -1,39 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../lib/socket';
-import type { GameState, Player, Card } from '../types/game';
+import type { GameState, Player, Card } from '../../types/game';
 import type { GameRules } from '@/components/lobby/GameRulesModal';
 
 export type GameType = 'REGULAR' | 'WHIZ' | 'SOLO' | 'MIRROR';
-
-export interface GameState {
-  id: string;
-  status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'FINISHED';
-  gameType: GameType;
-  players: Player[];
-  currentPlayer?: string;
-  scores?: { team1: number, team2: number };
-  currentTrick?: Card[];
-  winningTeam?: 'team1' | 'team2';
-  rules?: GameRules;
-  team1Score?: number;
-  team2Score?: number;
-  team1Bags?: number;
-  team2Bags?: number;
-  round?: number;
-  tricks?: any[];
-  // Add other game state properties as needed
-}
-
-export interface Player {
-  id: string;
-  name: string;
-  team: number;
-  hand?: any[];
-  bid?: number;
-  tricks?: number;
-  isConnected?: boolean;
-  // Add other player properties as needed
-}
 
 /**
  * Hook to manage game state with Socket.IO

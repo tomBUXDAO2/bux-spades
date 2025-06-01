@@ -71,4 +71,21 @@ export interface GameRules {
   allowDoubleBlindNil: boolean;
   allowDoubleBlindDoubleNil: boolean;
   allowDoubleBlindDoubleBlindNil: boolean;
+}
+
+export interface Game {
+  id: string;
+  gameMode: BiddingOption;
+  maxPoints: number;
+  minPoints: number;
+  buyIn: number;
+  forcedBid?: 'SUICIDE' | 'NONE';
+  specialRules: {
+    screamer: boolean;
+    assassin: boolean;
+  };
+  players: (Player | null)[];
+  status: 'waiting' | 'in-progress' | 'completed';
+  completedTricks?: any[];
+  rules: GameRules;
 } 

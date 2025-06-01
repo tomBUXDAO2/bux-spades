@@ -6,7 +6,7 @@ import Header from '@/components/common/Header';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
-import type { Game } from '../../../shared/types/game';
+import type { Game } from '../../types/game';
 import { useNavigate } from 'react-router-dom';
 import { io as socketIOClient } from 'socket.io-client';
 
@@ -19,6 +19,7 @@ interface ChatMessage {
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
+  if (!user) return null;
   const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
