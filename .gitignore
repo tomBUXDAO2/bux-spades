@@ -38,4 +38,7 @@ yarn-error.log*
 
 # Prisma
 prisma/*.db
-prisma/migrations/ 
+prisma/migrations/
+
+# Bux Spades
+bux-spades copy 
