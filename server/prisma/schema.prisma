@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  username      String    @unique
+  password      String?   @default("")
+  discordId     String?   @unique
+  avatar        String?   @default("/default-pfp.jpg")
+  coins         Int       @default(5000000)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Game related
+  gamesPlayed   GamePlayer[]
+  gamesCreated  Game[]        @relation("GameCreator")
+  friends       Friend[]      @relation("UserFriends")
+  friendsOf     Friend[]      @relation("FriendsOfUser")
+  blockedUsers  BlockedUser[] @relation("UserBlocked")
+  blockedBy     BlockedUser[] @relation("BlockedByUser")
+
+  // Stats
+  stats         UserStats?
+}
+
+model Game {
+  id            String    @id @default(cuid())
+  creatorId     String
+  creator       User      @relation("GameCreator", fields: [creatorId], references: [id])
+  status        GameStatus @default(WAITING)
+  gameMode      GameMode
+  bidType       BidType
+  specialRules  SpecialRule[]
+  minPoints     Int
+  maxPoints     Int
+  buyIn         Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  players       GamePlayer[]
+  rounds        Round[]
+}
+
+model GamePlayer {
+  id            String    @id @default(cuid())
+  gameId        String
+  game          Game      @relation(fields: [gameId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  position      Int
+  team          Int?
+  bid           Int?
+  bags          Int       @default(0)
+  points        Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([gameId, position])
+}
+
+model Round {
+  id            String    @id @default(cuid())
+  gameId        String
+  game          Game      @relation(fields: [gameId], references: [id])
+  roundNumber   Int
+  tricks        Trick[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([gameId, roundNumber])
+}
+
+model Trick {
+  id            String    @id @default(cuid())
+  roundId       String
+  round         Round     @relation(fields: [roundId], references: [id])
+  leadPlayerId  String
+  winningPlayerId String
+  cards         Card[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Card {
+  id            String    @id @default(cuid())
+  trickId       String
+  trick         Trick     @relation(fields: [trickId], references: [id])
+  playerId      String
+  suit          Suit
+  value         Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model UserStats {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  gamesPlayed   Int       @default(0)
+  gamesWon      Int       @default(0)
+  nilsBid       Int       @default(0)
+  nilsMade      Int       @default(0)
+  blindNilsBid  Int       @default(0)
+  blindNilsMade Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Friend {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("UserFriends", fields: [userId], references: [id])
+  friendId      String
+  friend        User      @relation("FriendsOfUser", fields: [friendId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, friendId])
+}
+
+model BlockedUser {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("UserBlocked", fields: [userId], references: [id])
+  blockedId     String
+  blocked       User      @relation("BlockedByUser", fields: [blockedId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, blockedId])
+}
+
+enum GameStatus {
+  WAITING
+  PLAYING
+  FINISHED
+  CANCELLED
+}
+
+enum GameMode {
+  PARTNERS
+  SOLO
+}
+
+enum BidType {
+  REGULAR
+  WHIZ
+  MIRRORS
+  GIMMICK
+}
+
+enum SpecialRule {
+  SCREAMER
+  ASSASSIN
+}
+
+enum Suit {
+  SPADES
+  HEARTS
+  DIAMONDS
+  CLUBS
+} 
