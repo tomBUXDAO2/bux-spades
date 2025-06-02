@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { GameState, Card, Suit, Player, HandSummary, CompletedTrick } from '../../types/game';
+import type { GameState, Card, Suit, Player, CompletedTrick } from '../../types/game';
 import { Socket } from "socket.io-client";
 import Chat from './Chat';
 import HandSummaryModal from './HandSummaryModal';
@@ -124,7 +124,6 @@ export default function GameTable({
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
-  const [currentHandSummary, setCurrentHandSummary] = useState<HandSummary | null>(null);
   
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
@@ -516,14 +515,6 @@ export default function GameTable({
       console.log('Hand scores calculated:', calculatedScores);
       
       // Set the hand scores and show the modal
-      setCurrentHandSummary({
-        team1Score: calculatedScores.team1Score.score,
-        team2Score: calculatedScores.team2Score.score,
-        totalScores: {
-          team1: (gameState.scores.team1 || 0) + calculatedScores.team1Score.score,
-          team2: (gameState.scores.team2 || 0) + calculatedScores.team2Score.score
-        }
-      });
       setShowHandSummary(true);
     };
     
@@ -567,7 +558,6 @@ export default function GameTable({
     const handleGameOver = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
       console.log('Game over event received:', data);
       setShowHandSummary(false);
-      setCurrentHandSummary(null);
       if (data.winningTeam === 1) {
         setShowWinner(true);
       } else {
@@ -587,7 +577,6 @@ export default function GameTable({
     if (gameState.status === "COMPLETED") {
       const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
       setShowHandSummary(false);
-      setCurrentHandSummary(null);
       if (winningTeam === 1) {
         setShowWinner(true);
       } else {
@@ -700,7 +689,6 @@ export default function GameTable({
     socket.on('game_restarting', () => {
       setCardPlayers({});
       setShowHandSummary(false);
-      setCurrentHandSummary(null);
       setShowWinner(false);
       setShowLoser(false);
       if (socket) {
@@ -1033,11 +1021,11 @@ export default function GameTable({
         </div>
 
         {/* Hand Summary Modal - Pass currentHandSummary */}
-        {showHandSummary && currentHandSummary && (
+        {showHandSummary && (
           <HandSummaryModal
             isOpen={showHandSummary}
             onClose={() => setShowHandSummary(false)}
-            handSummary={currentHandSummary}
+            gameState={gameState}
             onNextHand={() => {
               setShowHandSummary(false);
               // Add any next hand logic here

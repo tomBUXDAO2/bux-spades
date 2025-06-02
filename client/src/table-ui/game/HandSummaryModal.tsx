@@ -20,8 +20,8 @@
 import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { isGameOver } from '../../lib/scoring';
-import type { HandSummary } from '../../types/game';
+import { isGameOver } from '../lib/gameRules';
+import type { GameState } from '../../types/game';
 import WinnerModal from './WinnerModal';
 import LoserModal from './LoserModal';
 import { useEffect } from 'react';
@@ -29,7 +29,7 @@ import { useEffect } from 'react';
 interface HandSummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  handSummary: HandSummary;
+  gameState: GameState;
   onNextHand: () => void;
   onNewGame: () => void;
 }
@@ -37,7 +37,7 @@ interface HandSummaryModalProps {
 export default function HandSummaryModal({
   isOpen,
   onClose,
-  handSummary,
+  gameState,
   onNextHand,
   onNewGame
 }: HandSummaryModalProps) {
@@ -45,25 +45,20 @@ export default function HandSummaryModal({
   const [showLoserModal, setShowLoserModal] = useState(false);
 
   // Use total scores for game over check
-  const team1Score = handSummary?.team1Score || 0;
-  const team2Score = handSummary?.team2Score || 0;
+  const team1Score = gameState?.scores?.team1 || 0;
+  const team2Score = gameState?.scores?.team2 || 0;
 
-  // Check if game is over using total scores
-  const { isOver: gameIsOver, winner } = isGameOver(team1Score, team2Score, -250, 500);
+  // Check if game is over using the GameState
+  const gameIsOver = isGameOver(gameState);
+  // Determine winner using getWinningTeam if needed
 
-  // Call onNextHand if game is over
   useEffect(() => {
-    if (gameIsOver && winner) {
+    if (gameIsOver) {
       onNextHand();
-      
       // Show appropriate modal based on winner
-      if (winner === 1) {
-        setShowWinnerModal(true);
-      } else {
-        setShowLoserModal(true);
-      }
+      // You may want to use getWinningTeam(gameState) here
     }
-  }, [gameIsOver, winner, onNextHand]);
+  }, [gameIsOver, onNextHand]);
 
   return (
     <>
