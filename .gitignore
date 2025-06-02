@@ -42,3 +42,4 @@ prisma/migrations/
 
 # Bux Spades
 bux-spades copy 
+.vercel

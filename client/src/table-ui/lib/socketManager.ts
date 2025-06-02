@@ -39,7 +39,9 @@ export function getSocketManager() {
       }
 
       // Use proxy by setting URL to root
-      const SOCKET_URL = '/';
+      const SOCKET_URL = import.meta.env.PROD 
+        ? import.meta.env.VITE_PROD_API_URL 
+        : '/';
       console.log('Connecting to socket server:', SOCKET_URL);
 
       // Clear any existing connection timeout
