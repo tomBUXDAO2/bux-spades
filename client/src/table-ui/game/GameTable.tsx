@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import type { GameState, Card, Suit, Player, TeamScore, HandSummary, CompletedTrick } from '../../types/game';
+import type { GameState, Card, Suit, Player, HandSummary, CompletedTrick } from '../../types/game';
 import { Socket } from "socket.io-client";
 import Chat from './Chat';
 import HandSummaryModal from './HandSummaryModal';
@@ -13,31 +12,21 @@ import { calculateHandScore } from '../../lib/scoring';
 import LandscapePrompt from '../../LandscapePrompt';
 import { IoExitOutline, IoInformationCircleOutline } from "react-icons/io5";
 import { useWindowSize } from '../../hooks/useWindowSize';
-import { socketApi } from '../../lib/socketApi';
 
 interface GameTableProps {
   game: GameState;
   socket: Socket | null;
-  createGame: (user: { id: string; name?: string | null }) => void;
   joinGame: (gameId: string, userId: string, options?: any) => void;
-  onGamesUpdate: React.Dispatch<React.SetStateAction<GameState[]>>;
   onLeaveTable: () => void;
   startGame: (gameId: string, userId?: string) => Promise<void>;
   user?: any;
 }
 
-// Fallback avatars 
-const GUEST_AVATAR = "/guest-avatar.png";
-const BOT_AVATAR = "/guest-avatar.png";
-
 // Helper function to get card image filename
 function getCardImage(card: Card): string {
   if (!card) return 'back.png';
-  const rankMap: Record<number, string> = {
-    2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
-    11: 'J', 12: 'Q', 13: 'K', 14: 'A'
-  };
-  return `${rankMap[card.rank]}${card.suit}.png`;
+  const suitMap: Record<Suit, string> = { '♠': 'S', '♥': 'H', '♦': 'D', '♣': 'C' };
+  return `${card.rank}${suitMap[card.suit]}.png`;
 }
 
 // Helper function to get card rank value
@@ -55,25 +44,14 @@ function getCardValue(rank: string | number): number {
   return rankMap[rank];
 }
 
-// Helper function to get suit order
-function getSuitOrder(suit: string): number {
-  const suitOrder: { [key: string]: number } = {
-    '♣': 1, // Clubs first
-    '♥': 2, // Hearts second
-    '♦': 3, // Diamonds third
-    '♠': 4  // Spades last
-  };
-  return suitOrder[suit];
-}
-
 // Helper function to sort cards
 function sortCards(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
-    const suitOrder: Record<Suit, number> = { 'D': 0, 'C': 1, 'H': 2, 'S': 3 };
+    const suitOrder: Record<Suit, number> = { '♣': 0, '♥': 1, '♦': 2, '♠': 3 };
     if (a.suit !== b.suit) {
       return suitOrder[a.suit] - suitOrder[b.suit];
     }
-    return a.rank - b.rank;
+    return getCardValue(a.rank) - getCardValue(b.rank);
   });
 }
 
@@ -85,7 +63,7 @@ function getLeadSuit(trick: Card[]): Suit | null {
 function hasSpadeBeenPlayed(game: GameState): boolean {
   // Check if any completed trick contained a spade
   return game.completedTricks?.some((trick: any) =>
-    Array.isArray(trick.cards) && trick.cards.some((card: Card) => card.suit === 'S')
+    Array.isArray(trick.cards) && trick.cards.some((card: Card) => card.suit === '♠')
   ) || false;
 }
 
@@ -93,7 +71,7 @@ function canLeadSpades(game: GameState, hand: Card[]): boolean {
   // Can lead spades if:
   // 1. Spades have been broken, or
   // 2. Player only has spades left
-  return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === 'S');
+  return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === '♠');
 }
 
 function getPlayableCards(game: GameState, hand: Card[], isLeadingTrick: boolean): Card[] {
@@ -103,7 +81,7 @@ function getPlayableCards(game: GameState, hand: Card[], isLeadingTrick: boolean
   if (isLeadingTrick) {
     // If spades haven't been broken, filter out spades unless only spades remain
     if (!canLeadSpades(game, hand)) {
-      const nonSpades = hand.filter(card => card.suit !== 'S');
+      const nonSpades = hand.filter(card => card.suit !== '♠');
       return nonSpades.length > 0 ? nonSpades : hand;
     }
     return hand;
@@ -116,73 +94,6 @@ function getPlayableCards(game: GameState, hand: Card[], isLeadingTrick: boolean
   // Must follow suit if possible
   const suitCards = hand.filter(card => card.suit === leadSuit);
   return suitCards.length > 0 ? suitCards : hand;
-}
-
-function determineWinningCard(trick: Card[]): number {
-  if (!trick.length) return -1;
-
-  const leadSuit = trick[0].suit;
-  
-  console.log("DETERMINING WINNING CARD:", trick.map(c => `${c.rank}${c.suit}`));
-  
-  // Check if any spades were played - spades always trump other suits
-  const spadesPlayed = trick.filter(card => card.suit === 'S');
-  
-  if (spadesPlayed.length > 0) {
-    // Find the highest spade
-    const highestSpade = spadesPlayed.reduce((highest, current) => {
-      const currentValue = getCardValue(current.rank);
-      const highestValue = getCardValue(highest.rank);
-      console.log(`Comparing spades: ${current.rank}${current.suit} (${currentValue}) vs ${highest.rank}${highest.suit} (${highestValue})`);
-      return currentValue > highestValue ? current : highest;
-    }, spadesPlayed[0]);
-    
-    console.log(`Highest spade is ${highestSpade.rank}${highestSpade.suit}`);
-    
-    // Return the index of the highest spade
-    for (let i = 0; i < trick.length; i++) {
-      if (trick[i].suit === 'S' && trick[i].rank === highestSpade.rank) {
-        console.log(`Winning card is at position ${i}: ${trick[i].rank}${trick[i].suit}`);
-        return i;
-      }
-    }
-  }
-  
-  // If no spades, find the highest card of the lead suit
-  const leadSuitCards = trick.filter(card => card.suit === leadSuit);
-  
-  console.log(`Lead suit is ${leadSuit}, cards of this suit:`, leadSuitCards.map(c => `${c.rank}${c.suit}`));
-  
-  // Debug each card's numeric value
-  leadSuitCards.forEach(card => {
-    console.log(`Card ${card.rank}${card.suit} has numeric value: ${getCardValue(card.rank)}`);
-  });
-  
-  const highestLeadSuitCard = leadSuitCards.reduce((highest, current) => {
-    const currentValue = getCardValue(current.rank);
-    const highestValue = getCardValue(highest.rank);
-    console.log(`Comparing: ${current.rank}${current.suit} (${currentValue}) vs ${highest.rank}${highest.suit} (${highestValue})`);
-    return currentValue > highestValue ? current : highest;
-  }, leadSuitCards[0]);
-  
-  console.log(`Highest card of lead suit ${leadSuit} is ${highestLeadSuitCard.rank}${highestLeadSuitCard.suit}`);
-  
-  // Return the index of the highest lead suit card
-  for (let i = 0; i < trick.length; i++) {
-    if (trick[i].suit === leadSuit && trick[i].rank === highestLeadSuitCard.rank) {
-      console.log(`Winning card is at position ${i}: ${trick[i].rank}${trick[i].suit}`);
-      return i;
-    }
-  }
-  
-  // Fallback (should never happen)
-  console.error("Failed to determine winning card - this should never happen", trick);
-  return 0;
-}
-
-// Add a new interface to track which player played each card
-interface TrickCard extends Card {
-  // No need to redefine playedBy since we want to use the same type as Card
 }
 
 // Add this near the top of the file, after imports
@@ -198,32 +109,18 @@ declare global {
 
 // Helper function to count spades in a hand
 const countSpades = (hand: Card[]): number => {
-  return hand.filter(card => card.suit === 'S').length;
+  return hand.filter(card => card.suit === '♠').length;
 };
-
-interface ChatMessage {
-  message: string;
-  playerId: string;
-  timestamp: number;
-}
 
 export default function GameTable({ 
   game, 
   socket, 
-  createGame, 
   joinGame, 
-  onGamesUpdate,
   onLeaveTable,
   startGame,
   user: propUser
 }: GameTableProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const tableRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
-  const [selectedBid, setSelectedBid] = useState<number | null>(null);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
@@ -232,15 +129,8 @@ export default function GameTable({
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
-  // Game configuration constants
-  const WINNING_SCORE = 500; // Score needed to win the game
-  const MODAL_DISPLAY_TIME = 5000; // Time to show modals in milliseconds
-  
   // Add state to directly track which player played which card
   const [cardPlayers, setCardPlayers] = useState<{[key: string]: string}>({});
-  
-  // Add a ref to preserve completed trick card-player mappings
-  const completedTrickCardPlayers = useRef<Record<number, string>>({});
   
   // Add state for tracking the winning card
   const [winningCardIndex, setWinningCardIndex] = useState<number | null>(null); 
@@ -249,50 +139,42 @@ export default function GameTable({
   
   const user = propUser;
   
-  // Initialize currentTrick if it doesn't exist
-  const currentTrick = game.currentTrick || [];
+  // Use gameState for all game data
+  const [gameState, setGameState] = useState(game);
   
-  // Add state to store player positions for the current trick
-  const [trickCardPositions, setTrickCardPositions] = useState<Record<number, number>>({});
-
+  // Use gameState instead of game
+  const currentTrick = gameState.currentTrick || [];
+  
   // Find the current player's ID
   const currentPlayerId = user?.id;
   
   // After getting the players array:
-  const sanitizedPlayers = (game.players || []).filter(Boolean);
-  const isObserver = !sanitizedPlayers.some((p: Player) => p.id === currentPlayerId);
-  console.log('game.players:', game.players); // Debug log to catch nulls
-  sanitizedPlayers.forEach((p: Player, i: number) => {
-    if (!p) throw new Error('Null or undefined player at index ' + i + ' in sanitizedPlayers!');
-  });
-  // Use sanitizedPlayers everywhere instead of game.players
-  // Example:
-  // const currentPlayer = sanitizedPlayers.find(p => p.id === currentPlayerId) || null;
-  // ... and so on for all .find, .map, .filter, etc. on players
+  const sanitizedPlayers = (gameState.players || []);
+  const isObserver = !sanitizedPlayers.some((p: Player | null) => p && p.id === currentPlayerId);
+  console.log('game.players:', gameState.players); // Debug log to catch nulls
 
   // Find the current player's position and team
-  const currentPlayer = sanitizedPlayers.find((p: Player) => p.id === currentPlayerId) || null;
-  const currentTeam = currentPlayer?.team;
-
+  const currentPlayer = sanitizedPlayers.find((p: Player | null) => p && p.id === currentPlayerId) || null;
+  
   // Add state to force component updates when the current player changes
-  const [lastCurrentPlayer, setLastCurrentPlayer] = useState<string>(game.currentPlayer);
+  const [lastCurrentPlayer, setLastCurrentPlayer] = useState<string>(gameState.currentPlayer);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
-    if (lastCurrentPlayer !== game.currentPlayer) {
-      console.log(`Current player changed: ${lastCurrentPlayer} -> ${game.currentPlayer} (my ID: ${currentPlayerId})`);
-      setLastCurrentPlayer(game.currentPlayer);
+    if (lastCurrentPlayer !== gameState.currentPlayer) {
+      console.log(`Current player changed: ${lastCurrentPlayer} -> ${gameState.currentPlayer} (my ID: ${currentPlayerId})`);
+      setLastCurrentPlayer(gameState.currentPlayer);
       
       // Force a component state update to trigger re-renders of children
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('gameStateChanged'));
       }
     }
-  }, [game.currentPlayer, lastCurrentPlayer, currentPlayerId]);
+  }, [gameState.currentPlayer, lastCurrentPlayer, currentPlayerId]);
 
   // Use the explicit position property if available, otherwise fall back to array index
   // @ts-ignore - position property might not be on the type yet
-  const currentPlayerPosition = currentPlayer?.position !== undefined ? currentPlayer.position : sanitizedPlayers.findIndex(p => p.id === currentPlayerId);
+  const currentPlayerPosition = currentPlayer?.position !== undefined ? currentPlayer.position : sanitizedPlayers.findIndex((p: Player | null) => p && p.id === currentPlayerId);
 
   // FIXED ROTATION: Always put current player at bottom (South)
   const rotatePlayersForCurrentView = () => {
@@ -322,240 +204,6 @@ export default function GameTable({
   // Preserve original positions in the array so the server knows where everyone sits
   const orderedPlayers = rotatePlayersForCurrentView();
 
-  // Determine player team color based on their ACTUAL team, not position
-  const getTeamColor = (player: typeof orderedPlayers[number]): 1 | 2 => {
-    if (!player) return 1;
-    return player.team || 1;
-  };
-
-  const isCurrentPlayersTurn = game.currentPlayer === currentPlayerId;
-
-  const handleBid = (bid: number) => {
-    if (!currentPlayerId || !currentPlayer) {
-      console.error('Cannot bid: No current player or player ID');
-      return;
-    }
-    
-    // Validate that it's actually this player's turn
-    if (game.currentPlayer !== currentPlayerId) {
-      console.error(`Cannot bid: Not your turn. Current player is ${game.currentPlayer}`);
-      return;
-    }
-    
-    // Validate game state
-    if (game.status !== 'BIDDING') {
-      console.error(`Cannot bid: Game is not in bidding state (${game.status})`);
-      return;
-    }
-    
-    console.log(`Submitting bid: ${bid} for player ${currentPlayerId} in game ${game.id}`);
-    socket?.emit("make_bid", { gameId: game.id, userId: currentPlayerId, bid });
-    console.log('Game status:', game.status, 'Current player:', game.currentPlayer);
-    console.log('Socket connected:', socket?.connected);
-  };
-
-  // Fix the getLeadPosition function
-  const getLeadPosition = () => {
-    // If it's the first trick, the player after the dealer leads
-    if ((!game as any).tricks?.length === undefined && !game?.currentTrick?.length) {
-      const dealer = sanitizedPlayers.find((p: Player) => p.isDealer);
-      return ((dealer?.position ?? 0) + 1) % 4;
-    }
-    // If it's a new trick (but not the first), use the last trick's winner
-    if (!game?.currentTrick?.length && (game as any).tricks?.length) {
-      const lastTrick = (game as any).tricks[(game as any).tricks.length - 1];
-      const winner = sanitizedPlayers.find((p: Player) => p.id === lastTrick?.winningPlayerId);
-      return winner?.position ?? 0;
-    }
-    // If we're in the middle of a trick, use the first player of the trick
-    const firstPlayer = sanitizedPlayers.find((p: Player) => p.id === cardPlayers?.['0']);
-    return firstPlayer?.position ?? 0;
-  };
-
-  // Effect to track which card was played by which player
-  useEffect(() => {
-    // Only run this effect if the game is actually playing
-    if (game.status !== "PLAYING") return;
-
-    // When a new trick starts, reset our tracking
-    if (currentTrick.length === 0) {
-      console.log("🔄 New trick starting - resetting card players mapping");
-      setCardPlayers({});
-      setShowWinningCardHighlight(false);
-      setWinningCardIndex(null);
-      setWinningPlayerId(null);
-      return;
-    }
-
-    // Map each card to its player
-    currentTrick.forEach((card: Card, index: number) => {
-      if (!card.playedBy) {
-        console.error(`Card at index ${index} has no playedBy information:`, card);
-        return;
-      }
-
-      // Calculate relative position from current player's view
-      const relativePosition = (4 + card.playedBy.position - currentPlayerPosition) % 4;
-      
-      console.log(`Card ${index} (${card.rank}${card.suit}): played by ${card.playedBy.name} at position ${card.playedBy.position}, relative pos ${relativePosition}`);
-      
-      // Update our card players mapping
-      const updatedMapping = { ...cardPlayers };
-      updatedMapping[index.toString()] = card.playedBy.id;
-      setCardPlayers(updatedMapping);
-    });
-  }, [game.status, currentTrick, sanitizedPlayers, currentPlayerPosition, game.completedTricks]);
-
-  // When playing a card, we now rely solely on server data for tracking
-  const handlePlayCard = (card: Card) => {
-    if (!socket || !currentPlayerId || !currentPlayer) return;
-
-    // Validate if it's player's turn
-    if (game.currentPlayer !== currentPlayerId) {
-      console.error(`Cannot play card: Not your turn`);
-      return;
-    }
-
-    // Check if card is playable
-    const isLeadingTrick = currentTrick.length === 0;
-    const playableCards = currentPlayer ? getPlayableCards(game, currentPlayer.hand, isLeadingTrick) : [];
-    if (!playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) {
-      console.error('This card is not playable in the current context');
-      return;
-    }
-
-    console.log(`Playing card: ${card.rank}${card.suit} as player ${currentPlayer?.name ?? 'Unknown'}`);
-    
-    // Update our local tracking immediately to know that current player played this card
-    // This helps prevent the "Unknown" player issue when we play our own card
-    const updatedMapping = { ...cardPlayers };
-    updatedMapping[currentTrick.length.toString()] = currentPlayerId;
-    setCardPlayers(updatedMapping);
-    
-    // Send the play to the server
-    socket.emit("play_card", { 
-      gameId: game.id, 
-      userId: currentPlayerId, 
-      card 
-    });
-  };
-
-  // Inside the GameTable component, add these state variables
-  const [delayedTrick, setDelayedTrick] = useState<Card[] | null>(null);
-  const [delayedWinningIndex, setDelayedWinningIndex] = useState<number | null>(null);
-  const [isShowingTrickResult, setIsShowingTrickResult] = useState(false);
-
-  // Add this useEffect to handle trick completion
-  useEffect(() => {
-    if (!socket) return;
-    
-    console.log("Setting up trick completion delay handler");
-    
-    // Set up the trick completion delay handler
-    const cleanup = socketApi.setupTrickCompletionDelay(socket, game.id, ({ trickCards, winningIndex }) => {
-      console.log("Trick completion callback fired:", trickCards, winningIndex);
-      
-      // Save the trick data
-      setDelayedTrick(trickCards);
-      setDelayedWinningIndex(winningIndex);
-      setIsShowingTrickResult(true);
-      
-      // After delay, clear the trick
-      setTimeout(() => {
-        setIsShowingTrickResult(false);
-        setDelayedTrick(null);
-        setDelayedWinningIndex(null);
-      }, 3000);
-    });
-    
-    return cleanup;
-  }, [socket, game.id]);
-
-  // Add this function at the bottom of the component
-  const getPlayerWhoPlayedCard = (cardIndex: number) => {
-    // Get player ID from our tracking
-    const playerId = cardPlayers[cardIndex.toString()];
-    if (!playerId) return null;
-    
-    // Find the player object
-    return sanitizedPlayers.find((p: Player) => p.id === playerId) || null;
-  };
-  
-  // Add state for trick completion animation
-  const [completedTrick, setCompletedTrick] = useState<CompletedTrick | null>(null);
-  const [showTrickAnimation, setShowTrickAnimation] = useState(false);
-
-  // Effect to handle trick completion
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleTrickComplete = (data: CompletedTrick) => {
-      setCompletedTrick(data);
-      
-      // Clear completed trick after delay
-      const timer = setTimeout(() => {
-        setCompletedTrick(null);
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    };
-
-    socket.on('trick_complete', handleTrickComplete);
-
-    return () => {
-      socket.off('trick_complete', handleTrickComplete);
-    };
-  }, [socket]);
-
-  // Add CSS classes for card animations
-  const cardAnimationClass = (card: Card) => {
-    if (!showTrickAnimation || !completedTrick) return '';
-    
-    return card === completedTrick.winningCard
-      ? 'opacity-100 scale-110 border-2 border-yellow-400 z-10'
-      : 'opacity-40 scale-95';
-  };
-
-  const handleLeaveTable = () => {
-    if (currentPlayerId && socket) {
-      socket.emit("leave_game", { gameId: game.id, userId: currentPlayerId });
-    }
-    setShowWinner(false);
-    setShowLoser(false);
-    setShowHandSummary(false);
-    setCurrentHandSummary(null);
-    onLeaveTable();
-  };
-
-  const handleStartGame = async () => {
-    if (!currentPlayerId) return;
-    
-    // Make sure the game is in the WAITING state
-    if (game.status !== "WAITING") {
-      console.error(`Cannot start game: game is in ${game.status} state, not WAITING`);
-      return;
-    }
-    
-    // Make sure the game has enough players
-    if (sanitizedPlayers.length < 4) {
-      console.error(`Cannot start game: only ${sanitizedPlayers.length}/4 players joined`);
-      return;
-    }
-    
-    // Make sure current user is the creator (first player)
-    if (sanitizedPlayers[0]?.id !== currentPlayerId) {
-      console.error(`Cannot start game: current user ${currentPlayerId} is not the creator ${sanitizedPlayers[0]?.id}`);
-      return;
-    }
-    
-    try {
-      console.log(`Starting game ${game.id} as user ${currentPlayerId}, creator: ${sanitizedPlayers[0]?.id}`);
-      await startGame(game.id, currentPlayerId);
-    } catch (error) {
-      console.error("Failed to start game:", error);
-    }
-  };
-
   // Keep the getScaleFactor function
   const getScaleFactor = () => {
     // Don't scale on mobile
@@ -576,7 +224,31 @@ export default function GameTable({
   useEffect(() => {
     setIsMobile(windowSize.isMobile);
   }, [windowSize.isMobile]);
-  
+
+  const handleBid = (bid: number) => {
+    if (!currentPlayerId || !currentPlayer) {
+      console.error('Cannot bid: No current player or player ID');
+      return;
+    }
+    
+    // Validate that it's actually this player's turn
+    if (gameState.currentPlayer !== currentPlayerId) {
+      console.error(`Cannot bid: Not your turn. Current player is ${gameState.currentPlayer}`);
+      return;
+    }
+    
+    // Validate game state
+    if (gameState.status !== 'BIDDING') {
+      console.error(`Cannot bid: Game is not in bidding state (${gameState.status})`);
+      return;
+    }
+    
+    console.log(`Submitting bid: ${bid} for player ${currentPlayerId} in game ${gameState.id}`);
+    socket?.emit("make_bid", { gameId: gameState.id, userId: currentPlayerId, bid });
+    console.log('Game status:', gameState.status, 'Current player:', gameState.currentPlayer);
+    console.log('Socket connected:', socket?.connected);
+  };
+
   // Scale dimensions for card images - use fixed size on mobile
   const cardWidth = windowSize.width < 640 ? 25 : Math.floor(96 * scaleFactor);
   const cardHeight = windowSize.width < 640 ? 38 : Math.floor(144 * scaleFactor);
@@ -631,7 +303,7 @@ export default function GameTable({
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
           <button
             className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition"
-            onClick={() => joinGame(game.id, user.id, { seat: position, username: user.username, avatar: user.avatar })}
+            onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatar })}
           >
             JOIN
           </button>
@@ -640,17 +312,13 @@ export default function GameTable({
     }
     if (!player) return null;
 
-    const isActive = game.status !== "WAITING" && game.currentPlayer === player.id;
+    const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
     const isWinningTrick = showTrickAnimation && completedTrick?.winningCard.suit === player.hand[0].suit && completedTrick?.winningCard.rank === player.hand[0].rank;
-    
-    // Determine if we're on mobile
-    // const isMobile = screenSize.width < 640;
-    // Use the isMobile state which is derived from windowSize
     
     // Get player avatar
     const getPlayerAvatar = (player: Player | null) => {
       if (!player) return '/guest-avatar.png';
-      return player.image ?? '/guest-avatar.png';
+      return player.avatar ?? '/guest-avatar.png';
     };
 
     // Determine if this is a left/right seat (position 1 or 3)
@@ -672,9 +340,7 @@ export default function GameTable({
     const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
     const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
     const teamGradient = player.team === 1 ? redTeamGradient : blueTeamGradient;
-    const teamLightColor = player.team === 1 ? 'bg-red-400' : 'bg-blue-400';
     const teamAccentColor = player.team === 1 ? 'from-red-400' : 'from-blue-400';
-    const teamTextColor = player.team === 1 ? 'text-red-600' : 'text-blue-600';
 
     return (
       <div className={`absolute ${getPositionClasses(position)} ${isActive ? 'z-10' : 'z-0'}`}>
@@ -730,14 +396,14 @@ export default function GameTable({
                 <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
                      style={{ width: isMobile ? '50px' : '70px' }}>
                   <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
-                    {game.status === "WAITING" ? "0" : madeCount}
+                    {gameState.status === "WAITING" ? "0" : madeCount}
                   </span>
                   <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
                   <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {game.status === "WAITING" ? "0" : bidCount}
+                    {gameState.status === "WAITING" ? "0" : bidCount}
                   </span>
                   <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
-                    {game.status === "WAITING" ? "" : madeStatus}
+                    {gameState.status === "WAITING" ? "" : madeStatus}
                   </span>
                 </div>
               </div>
@@ -788,14 +454,14 @@ export default function GameTable({
                 <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
                      style={{ width: isMobile ? '50px' : '70px' }}>
                   <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
-                    {game.status === "WAITING" ? "0" : madeCount}
+                    {gameState.status === "WAITING" ? "0" : madeCount}
                   </span>
                   <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
                   <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {game.status === "WAITING" ? "0" : bidCount}
+                    {gameState.status === "WAITING" ? "0" : bidCount}
                   </span>
                   <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
-                    {game.status === "WAITING" ? "" : madeStatus}
+                    {gameState.status === "WAITING" ? "" : madeStatus}
                   </span>
                 </div>
               </div>
@@ -828,7 +494,7 @@ export default function GameTable({
     
     // Determine playable cards
     const isLeadingTrick = currentTrick.length === 0;
-    const playableCards = game.status === "PLAYING" && currentPlayer ? getPlayableCards(game, currentPlayer.hand || [], isLeadingTrick) : [];
+    const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
     
     // Calculate card width based on screen size
     const isMobile = windowSize.isMobile;
@@ -840,8 +506,8 @@ export default function GameTable({
       <div className="absolute inset-x-0 bottom-0 flex justify-center">
         <div className="flex">
         {sortedHand.map((card: Card, index: number) => {
-          const isPlayable = game.status === "PLAYING" && 
-            game.currentPlayer === currentPlayerId &&
+          const isPlayable = gameState.status === "PLAYING" && 
+            gameState.currentPlayer === currentPlayerId &&
             playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
 
           return (
@@ -895,11 +561,11 @@ export default function GameTable({
       
       // Set the hand scores and show the modal
       setCurrentHandSummary({
-        team1Score: { ...calculatedScores.team1Score, team: 1 as const },
-        team2Score: { ...calculatedScores.team2Score, team: 2 as const },
+        team1Score: calculatedScores.team1Score.score,
+        team2Score: calculatedScores.team2Score.score,
         totalScores: {
-          team1: (game.scores.team1 || 0) + calculatedScores.team1Score.score,
-          team2: (game.scores.team2 || 0) + calculatedScores.team2Score.score
+          team1: (gameState.scores.team1 || 0) + calculatedScores.team1Score.score,
+          team2: (gameState.scores.team2 || 0) + calculatedScores.team2Score.score
         }
       });
       setShowHandSummary(true);
@@ -909,14 +575,14 @@ export default function GameTable({
     socket.on('hand_completed', handleHandCompleted);
     
     // Handle scoring state change directly in case the server doesn't emit the event
-    if (game.status === "PLAYING" && sanitizedPlayers.every((p: Player) => p.hand.length === 0) && !showHandSummary) {
+    if (gameState.status === "PLAYING" && sanitizedPlayers.every((p: Player) => p.hand.length === 0) && !showHandSummary) {
       handleHandCompleted();
     }
     
     return () => {
       socket.off('hand_completed', handleHandCompleted);
     };
-  }, [socket, game.id, game.status, sanitizedPlayers, showHandSummary]);
+  }, [socket, gameState.id, gameState.status, sanitizedPlayers, showHandSummary]);
 
   // Initialize the global variable
   useEffect(() => {
@@ -925,51 +591,18 @@ export default function GameTable({
     }
   }, []);
 
-  // Fix completed tricks check
-  const hasCompletedTricks = game.completedTricks.length > 0;
-
   // Calculate scores
-  const team1Score = game?.scores?.['team1'] ?? 0;
-  const team2Score = game?.scores?.['team2'] ?? 0;
-  const team1Bags = game?.team1Bags ?? 0;
-  const team2Bags = game?.team2Bags ?? 0;
-
-  // Utility function to get player for a card if the mapping is missing that card
-  const getPlayerForCardIndex = (index: number, existingMapping: Record<string, string>) => {
-    // First, try to get from the existing mapping
-    const playerId = existingMapping[index.toString()];
-    if (playerId) {
-      const player = sanitizedPlayers.find((p: Player) => p.id === playerId);
-      if (player) return player;
-    }
-    
-    // If we don't have a mapping for this card, we need to deduce who played it
-    // We can do this by working backward from the current player (next to play)
-    const currentPlayerInfo = sanitizedPlayers.find((p: Player) => p.id === game.currentPlayer);
-    if (!currentPlayerInfo || currentPlayerInfo.position === undefined) return null;
-    
-    // For a complete trick, we know the player who is due to play next
-    // won the trick with their card
-    if (currentTrick.length === 4) {
-      // Find how many positions back we need to go from current player
-      const stepsBack = currentTrick.length - index;
-      const position = (currentPlayerInfo.position - stepsBack + 4) % 4;
-      return sanitizedPlayers.find((p: Player) => p.position === position) || null;
-    }
-    
-    // For an in-progress trick, the player who played this card is
-    // the player who is (trick.length - index) positions before the current player
-    const stepsBack = currentTrick.length - index;
-    const position = (currentPlayerInfo.position - stepsBack + 4) % 4;
-    return sanitizedPlayers.find((p: Player) => p.position === position) || null;
-  };
+  const team1Score = gameState?.scores?.['team1'] ?? 0;
+  const team2Score = gameState?.scores?.['team2'] ?? 0;
+  const team1Bags = gameState?.team1Bags ?? 0;
+  const team2Bags = gameState?.team2Bags ?? 0;
 
   // Update cardPlayers when game state changes
   useEffect(() => {
-    if (game.cardPlayers) {
-      setCardPlayers(game.cardPlayers);
+    if (gameState.cardPlayers) {
+      setCardPlayers(gameState.cardPlayers);
     }
-  }, [game.cardPlayers]);
+  }, [gameState.cardPlayers]);
 
   // Effect to handle game completion
   useEffect(() => {
@@ -995,8 +628,8 @@ export default function GameTable({
 
   // Effect to handle game status changes
   useEffect(() => {
-    if (game.status === "FINISHED") {
-      const winningTeam = game.winningTeam === "team1" ? 1 : 2;
+    if (gameState.status === "COMPLETED") {
+      const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
       setShowHandSummary(false);
       setCurrentHandSummary(null);
       if (winningTeam === 1) {
@@ -1005,7 +638,7 @@ export default function GameTable({
         setShowLoser(true);
       }
     }
-  }, [game.status, game.winningTeam]);
+  }, [gameState.status, gameState.winningTeam]);
 
   const [showGameInfo, setShowGameInfo] = useState(false);
   const infoRef = useRef<HTMLDivElement>(null);
@@ -1097,11 +730,9 @@ export default function GameTable({
     }).filter(Boolean);
   };
 
-  const [playersWantToPlayAgain, setPlayersWantToPlayAgain] = useState<Set<string>>(new Set());
-
   const handlePlayAgain = () => {
     if (!socket) return;
-    socket.emit('play_again', { gameId: game.id });
+    socket.emit('play_again', { gameId: gameState.id });
   };
 
   useEffect(() => {
@@ -1109,18 +740,17 @@ export default function GameTable({
 
     socket.on('player_wants_to_play_again', (data: { playerId: string }) => {
       const { playerId } = data;
-      setPlayersWantToPlayAgain(prev => new Set([...prev, playerId]));
+      setCardPlayers(prev => ({ ...prev, [data.playerId]: data.playerId }));
     });
 
     socket.on('game_restarting', () => {
-      setPlayersWantToPlayAgain(new Set());
-      // Reset game state
-      setCurrentHandSummary(null);
+      setCardPlayers({});
       setShowHandSummary(false);
+      setCurrentHandSummary(null);
       setShowWinner(false);
       setShowLoser(false);
       if (socket) {
-        socket.emit('leave_game', { gameId: game.id, userId: propUser?.id });
+        socket.emit('leave_game', { gameId: gameState.id, userId: propUser?.id });
       }
       onLeaveTable();
     });
@@ -1130,6 +760,146 @@ export default function GameTable({
       socket.off('game_restarting');
     };
   }, [socket, propUser?.id, onLeaveTable]);
+
+  // Add state for trick completion animation
+  const [completedTrick, setCompletedTrick] = useState<CompletedTrick | null>(null);
+  const [showTrickAnimation, setShowTrickAnimation] = useState(false);
+
+  // Effect to handle trick completion
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTrickComplete = (data: CompletedTrick) => {
+      setCompletedTrick(data);
+      
+      // Clear completed trick after delay
+      const timer = setTimeout(() => {
+        setCompletedTrick(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    };
+
+    socket.on('trick_complete', handleTrickComplete);
+
+    return () => {
+      socket.off('trick_complete', handleTrickComplete);
+    };
+  }, [socket]);
+
+  // When playing a card, we now rely solely on server data for tracking
+  const handlePlayCard = (card: Card) => {
+    if (!socket || !currentPlayerId || !currentPlayer) return;
+
+    // Validate if it's player's turn
+    if (gameState.currentPlayer !== currentPlayerId) {
+      console.error(`Cannot play card: Not your turn`);
+      return;
+    }
+
+    // Check if card is playable
+    const isLeadingTrick = currentTrick.length === 0;
+    const playableCards = currentPlayer ? getPlayableCards(gameState, currentPlayer.hand, isLeadingTrick) : [];
+    if (!playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) {
+      console.error('This card is not playable in the current context');
+      return;
+    }
+
+    console.log(`Playing card: ${card.rank}${card.suit} as player ${currentPlayer?.name ?? 'Unknown'}`);
+    
+    // Update our local tracking immediately to know that current player played this card
+    // This helps prevent the "Unknown" player issue when we play our own card
+    const updatedMapping = { ...cardPlayers };
+    updatedMapping[currentTrick.length.toString()] = currentPlayerId;
+    setCardPlayers(updatedMapping);
+    
+    // Send the play to the server
+    socket.emit("play_card", { 
+      gameId: gameState.id, 
+      userId: currentPlayerId, 
+      card 
+    });
+  };
+
+  const handleLeaveTable = () => {
+    console.log("Leave Table clicked");
+    console.log("Socket connected:", socket?.connected);
+    if (socket) {
+      socket.emit('leave_game', { gameId: gameState.id, userId: currentPlayerId });
+    } else {
+      console.error("Socket is undefined. Cannot emit leave_game event.");
+    }
+    onLeaveTable();
+  };
+
+  const handleStartGame = async () => {
+    if (!currentPlayerId) return;
+    
+    // Make sure the game is in the WAITING state
+    if (gameState.status !== "WAITING") {
+      console.error(`Cannot start game: game is in ${gameState.status} state, not WAITING`);
+      return;
+    }
+    
+    // Make sure the game has enough players
+    if (sanitizedPlayers.length < 4) {
+      console.error(`Cannot start game: only ${sanitizedPlayers.length}/4 players joined`);
+      return;
+    }
+    
+    // Make sure current user is the creator (first player)
+    if (sanitizedPlayers[0]?.id !== currentPlayerId) {
+      console.error(`Cannot start game: current user ${currentPlayerId} is not the creator ${sanitizedPlayers[0]?.id}`);
+      return;
+    }
+    
+    try {
+      console.log(`Starting game ${gameState.id} as user ${currentPlayerId}, creator: ${sanitizedPlayers[0]?.id}`);
+      await startGame(gameState.id, currentPlayerId);
+    } catch (error) {
+      console.error("Failed to start game:", error);
+    }
+  };
+
+  // Listen for game_update and update the UI
+  useEffect(() => {
+    if (!socket) return;
+    const handleGameUpdate = (updatedGame: any) => {
+      setGameState(updatedGame);
+    };
+    socket.on('game_update', handleGameUpdate);
+    return () => {
+      socket.off('game_update', handleGameUpdate);
+    };
+  }, [socket]);
+
+  // Add a useEffect to log the socket connection status when the component mounts
+  useEffect(() => {
+    console.log("Socket connection status on mount:", socket?.connected);
+  }, [socket]);
+
+  // Add a useEffect to log the socket connection status whenever the socket prop changes
+  useEffect(() => {
+    console.log("Socket connection status changed:", socket?.connected);
+  }, [socket]);
+
+  // Add this effect:
+  useEffect(() => {
+    if (!socket || !gameState?.id || !propUser?.id) return;
+
+    const handleAuthenticated = (data: any) => {
+      if (data.success && data.userId === propUser.id) {
+        console.log('Authenticated, now joining game:', gameState.id);
+        socket.emit('join_game', { gameId: gameState.id, userId: propUser.id });
+      }
+    };
+
+    socket.on('authenticated', handleAuthenticated);
+
+    return () => {
+      socket.off('authenticated', handleAuthenticated);
+    };
+  }, [socket, gameState?.id, propUser?.id]);
 
   // Return the JSX for the component
   return (
@@ -1171,22 +941,22 @@ export default function GameTable({
                         Table Details
                       </div>
                       <div className="flex flex-col gap-1">
-                        <div><span className="text-gray-400">Type:</span> {game.rules?.gameType || 'REGULAR'}</div>
-                        <div><span className="text-gray-400">Points:</span> {game.maxPoints ?? 500}/{game.minPoints ?? -150}</div>
-                        {(game.rules?.gameType === 'REGULAR' || game.rules?.gameType === 'SOLO') && (
+                        <div><span className="text-gray-400">Type:</span> {gameState.rules?.gameType || 'REGULAR'}</div>
+                        <div><span className="text-gray-400">Points:</span> {gameState.maxPoints ?? 500}/{gameState.minPoints ?? -150}</div>
+                        {(gameState.rules?.gameType === 'REGULAR' || gameState.rules?.gameType === 'SOLO') && (
                           <>
-                            <div><span className="text-gray-400">Nil:</span> {game.rules?.allowNil ? '✅ Allowed' : '❌ Not allowed'}</div>
-                            <div><span className="text-gray-400">Blind Nil:</span> {game.rules?.allowBlindNil ? '✅ Allowed' : '❌ Not allowed'}</div>
+                            <div><span className="text-gray-400">Nil:</span> {gameState.rules?.allowNil ? '✅ Allowed' : '❌ Not allowed'}</div>
+                            <div><span className="text-gray-400">Blind Nil:</span> {gameState.rules?.allowBlindNil ? '✅ Allowed' : '❌ Not allowed'}</div>
                           </>
                         )}
                         <div className="mt-2 pt-2 border-t border-gray-700">
                           <div className="text-sm">
                             <span className="text-gray-400">Buy-in:</span>
-                            <span className="font-bold text-yellow-400 ml-2">{game.rules?.coinAmount ? `${(game.rules.coinAmount / 1000)}k` : '100k'}</span>
+                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? `${(gameState.rules.coinAmount / 1000)}k` : '100k'}</span>
                           </div>
                           <div className="text-sm">
                             <span className="text-gray-400">Prize Pool:</span>
-                            <span className="font-bold text-yellow-400 ml-2">{game.rules?.coinAmount ? `${((game.rules.coinAmount * 4 * 0.9) / 1000)}k` : '360k'}</span>
+                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? `${((gameState.rules.coinAmount * 4 * 0.9) / 1000)}k` : '360k'}</span>
                           </div>
                         </div>
                       </div>
@@ -1232,7 +1002,7 @@ export default function GameTable({
 
               {/* Overlay the game status buttons/messages on top of the play area */}
               <div className="absolute inset-0 flex items-center justify-center">
-                {game.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
+                {gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all"
@@ -1240,47 +1010,47 @@ export default function GameTable({
                   >
                     Start Game
                   </button>
-                ) : game.status === "WAITING" && sanitizedPlayers.length < 4 ? (
+                ) : gameState.status === "WAITING" && sanitizedPlayers.length < 4 ? (
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Players</div>
                     <div className="text-sm mt-1">{sanitizedPlayers.length}/4 joined</div>
                   </div>
-                ) : game.status === "WAITING" && sanitizedPlayers[0]?.id !== currentPlayerId ? (
+                ) : gameState.status === "WAITING" && sanitizedPlayers[0]?.id !== currentPlayerId ? (
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Host</div>
                     <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.name} can start</div>
                   </div>
-                ) : game.status === "BIDDING" && game.currentPlayer === currentPlayerId ? (
+                ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId ? (
                   <div className="flex items-center justify-center w-full h-full">
                     <BiddingInterface
                       onBid={handleBid}
                       currentBid={orderedPlayers[0]?.bid}
-                      gameId={game.id}
+                      gameId={gameState.id}
                       playerId={currentPlayerId}
-                      currentPlayerTurn={game.currentPlayer}
-                      gameType={game.rules.gameType}
+                      currentPlayerTurn={gameState.currentPlayer}
+                      gameType={gameState.rules.gameType}
                       numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
-                      isCurrentPlayer={game.currentPlayer === currentPlayerId}
-                      allowNil={game.rules.allowNil}
+                      isCurrentPlayer={gameState.currentPlayer === currentPlayerId}
+                      allowNil={gameState.rules.allowNil}
                     />
                   </div>
-                ) : game.status === "BIDDING" && game.currentPlayer !== currentPlayerId ? (
+                ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
-                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === game.currentPlayer);
+                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);
                       return (
                         <div className="font-bold">Waiting for {waitingPlayer ? waitingPlayer.name : "Unknown"} to bid</div>
                       );
                     })()}
                   </div>
-                ) : game.status === "PLAYING" && currentTrick?.length === 0 ? (
+                ) : gameState.status === "PLAYING" && currentTrick?.length === 0 ? (
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
-                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === game.currentPlayer);
+                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);
                       return (
                         <div className="text-sm">Waiting for {waitingPlayer ? waitingPlayer.name : "Unknown"} to play</div>
                       );
@@ -1303,7 +1073,7 @@ export default function GameTable({
           <div className="w-[30%] h-full overflow-hidden">
             <Chat 
               socket={socket}
-              gameId={game.id}
+              gameId={gameState.id}
               userId={currentPlayerId || ''}
               userName={currentPlayer?.name || 'Unknown'}
               players={sanitizedPlayers}
@@ -1320,8 +1090,8 @@ export default function GameTable({
               setCurrentHandSummary(null);
             }}
             handScores={currentHandSummary}
-            minPoints={game.minPoints ?? -150}
-            maxPoints={game.maxPoints ?? 500}
+            minPoints={gameState.minPoints ?? -150}
+            maxPoints={gameState.maxPoints ?? 500}
             onGameOver={(winner) => {
               setShowHandSummary(false);
               setCurrentHandSummary(null);
@@ -1339,8 +1109,8 @@ export default function GameTable({
           <WinnerModal
             isOpen={true}
             onClose={handleLeaveTable}
-            team1Score={game.scores.team1}
-            team2Score={game.scores.team2}
+            team1Score={gameState.scores.team1}
+            team2Score={gameState.scores.team2}
             winningTeam={1}
             onPlayAgain={handlePlayAgain}
           />
@@ -1351,8 +1121,8 @@ export default function GameTable({
           <LoserModal
             isOpen={true}
             onClose={handleLeaveTable}
-            team1Score={game.scores.team1}
-            team2Score={game.scores.team2}
+            team1Score={gameState.scores.team1}
+            team2Score={gameState.scores.team2}
             winningTeam={2}
             onPlayAgain={handlePlayAgain}
           />

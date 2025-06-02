@@ -5,8 +5,8 @@ import NewUserWelcomeModal from '@/components/modals/NewUserWelcomeModal';
 import Header from '@/components/common/Header';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import Picker from '@emoji-mart/react';
-import data from '@emoji-mart/data';
-import type { Game } from '../../types/game';
+import data from '@emoji-mart/data/sets/15/native.json';
+import type { GameState } from '../types/game';
 import { useNavigate } from 'react-router-dom';
 import { io as socketIOClient } from 'socket.io-client';
 
@@ -17,6 +17,28 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Confirmation modal component
+const ConfirmActionModal = ({ open, player, action, onConfirm, onCancel }: any) => {
+  if (!open || !player) return null;
+  const actionText = action === 'add-friend' ? 'Add Friend' :
+                     action === 'remove-friend' ? 'Remove Friend' :
+                     action === 'block' ? 'Block' :
+                     action === 'unblock' ? 'Unblock' : '';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-slate-800 rounded-lg p-6 flex flex-col items-center">
+        <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full mb-2" />
+        <div className="text-lg text-slate-200 font-bold mb-2">{player.username}</div>
+        <div className="text-slate-300 mb-4">Are you sure you want to {actionText.toLowerCase()}?</div>
+        <div className="flex gap-4">
+          <button className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" onClick={onConfirm}>Yes</button>
+          <button className="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700" onClick={onCancel}>No</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   if (!user) return null;
@@ -24,20 +46,13 @@ const HomePage: React.FC = () => {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<GameState[]>([]);
   const [filter, setFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [activeChatTab, setActiveChatTab] = useState<'chat' | 'players'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
-  const onlinePlayers = [
-    { id: '1', username: 'Player1', avatar: '/default-pfp.jpg', online: true, status: 'friend' },
-    { id: '2', username: 'AceKing', avatar: '/default-pfp.jpg', online: true, status: 'blocked' },
-    { id: '3', username: 'QueenBee', avatar: '/default-pfp.jpg', online: true, status: 'other' },
-    { id: '4', username: 'SpadesPro', avatar: '/default-pfp.jpg', online: false, status: 'friend' },
-    { id: '5', username: 'CardShark', avatar: '/default-pfp.jpg', online: false, status: 'blocked' },
-    { id: '6', username: 'Joker', avatar: '/default-pfp.jpg', online: false, status: 'other' },
-  ];
+  const [onlinePlayers, setOnlinePlayers] = useState<any[]>([]);
   const onlineCount = onlinePlayers.filter(p => p.online).length;
   const [isPlayerStatsOpen, setIsPlayerStatsOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
@@ -45,18 +60,34 @@ const HomePage: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const navigate = useNavigate();
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
+  const [selectedPlayerStats, setSelectedPlayerStats] = useState<any[]>([]);
   const socket = useRef<any>(null);
 
   // Check if user is new (has 5M coins and 0 games played)
   useEffect(() => {
-    if (user && user.coins === 5000000 && user.stats?.gamesPlayed === 0) {
+    if (
+      user &&
+      user.coins === 5000000 &&
+      user.stats?.gamesPlayed === 0 &&
+      !localStorage.getItem('welcomeModalDismissed')
+    ) {
       setShowWelcomeModal(true);
     }
   }, [user]);
 
   useEffect(() => {
-    socket.current = socketIOClient('http://localhost:3001');
-    socket.current.on('games_updated', (updatedGames: Game[]) => {
+    socket.current = socketIOClient('http://localhost:3001', {
+      withCredentials: true,
+      transports: ['websocket']
+    });
+    // Authenticate after connecting
+    socket.current.on('connect', () => {
+      if (user?.id) {
+        socket.current.emit('authenticate', { userId: user.id });
+      }
+    });
+    socket.current.on('games_updated', (updatedGames: GameState[]) => {
       setGames(updatedGames);
       setIsLoading(false);
     });
@@ -66,7 +97,7 @@ const HomePage: React.FC = () => {
     return () => {
       socket.current.disconnect();
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -106,7 +137,7 @@ const HomePage: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error('Failed to create game');
-      const game: Game = await res.json();
+      const game: GameState = await res.json();
       navigate(`/table/${game.id}`);
     } catch (err) {
       alert('Failed to create game');
@@ -114,8 +145,8 @@ const HomePage: React.FC = () => {
   };
 
   const filteredGames = games.filter(game => {
-    if (filter === 'waiting') return game.status === 'waiting';
-    if (filter === 'in-progress') return game.status === 'in-progress';
+    if (filter === 'waiting') return game.status === 'WAITING';
+    if (filter === 'in-progress') return game.status === 'PLAYING';
     return true;
   });
 
@@ -147,7 +178,14 @@ const HomePage: React.FC = () => {
     navigate(`/table/${gameId}`);
   };
 
-  const GameTile: React.FC<{ game: Game }> = ({ game }) => {
+  const GameTile: React.FC<{ game: GameState }> = ({ game }) => {
+    const creatorIndex = game.players.findIndex(p => p && p.id === game.creatorId);
+    const seatMap = [
+      { className: "absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 0 }, // South (creator)
+      { className: "absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 1 },    // West
+      { className: "absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 2 },    // North
+      { className: "absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 3 },   // East
+    ];
     return (
       <div className="bg-slate-800 rounded-lg p-4 hover:bg-slate-750 transition relative overflow-visible">
         {/* Game settings header */}
@@ -164,12 +202,12 @@ const HomePage: React.FC = () => {
               SUICIDE
             </div>
           )}
-          {game.specialRules.screamer && (
+          {game.specialRules?.screamer && (
             <div className="inline-block bg-indigo-600 text-white text-xs px-2 py-0.5 rounded font-semibold shadow">
               SCREAMER
             </div>
           )}
-          {game.specialRules.assassin && (
+          {game.specialRules?.assassin && (
             <div className="inline-block bg-green-600 text-white text-xs px-2 py-0.5 rounded font-semibold shadow">
               ASSASSIN
             </div>
@@ -178,7 +216,7 @@ const HomePage: React.FC = () => {
         {/* Coin value, no extra margin or z-index */}
         <div className="flex items-center gap-1 mb-4">
           <span className="text-yellow-500 text-lg font-bold">
-            {(game.buyIn / 1000).toFixed(0)}k
+            {((game.buyIn ?? 100000) / 1000).toFixed(0)}k
           </span>
           <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -188,95 +226,44 @@ const HomePage: React.FC = () => {
         <div className="relative h-44 mb-2">
           {/* Table background */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-28 bg-slate-700 rounded-full" />
-          
           {/* Seats */}
           <div className="absolute inset-0">
-            {/* Top seat */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-              {game.players[0] ? (
-                <div className="text-center flex flex-col items-center">
-                  <img 
-                    src={game.players[0].avatar} 
-                    alt="" 
-                    className="w-16 h-16 rounded-full border-2 border-slate-600" 
-                  />
-                  <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                    {game.players[0].username}
-                  </span>
+            {seatMap.map(({ className, seat }) => {
+              // Always use the player at this seat
+              const player = game.players[seat];
+              if (player) {
+                console.log('GameTile player:', player);
+              }
+              return (
+                <div className={className} key={seat}>
+                  {player ? (
+                    <div className="text-center flex flex-col items-center">
+                      <img
+                        src={player.avatar || player.image || '/default-pfp.jpg'}
+                        alt=""
+                        className="w-16 h-16 rounded-full border-2 border-slate-600"
+                      />
+                      <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
+                        {player.username || player.name || 'Player'}
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition"
+                      onClick={() => handleJoinGame(game.id, seat)}
+                    >
+                      JOIN
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <button className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition" onClick={() => handleJoinGame(game.id, 0)}>
-                  JOIN
-                </button>
-              )}
-            </div>
-            
-            {/* Right seat */}
-            <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center">
-              {game.players[1] ? (
-                <div className="text-center flex flex-col items-center">
-                  <img 
-                    src={game.players[1].avatar} 
-                    alt="" 
-                    className="w-16 h-16 rounded-full border-2 border-slate-600" 
-                  />
-                  <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                    {game.players[1].username}
-                  </span>
-                </div>
-              ) : (
-                <button className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition" onClick={() => handleJoinGame(game.id, 1)}>
-                  JOIN
-                </button>
-              )}
-            </div>
-            
-            {/* Bottom seat */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-              {game.players[2] ? (
-                <div className="text-center flex flex-col items-center">
-                  <img 
-                    src={game.players[2].avatar} 
-                    alt="" 
-                    className="w-16 h-16 rounded-full border-2 border-slate-600" 
-                  />
-                  <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                    {game.players[2].username}
-                  </span>
-                </div>
-              ) : (
-                <button className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition" onClick={() => handleJoinGame(game.id, 2)}>
-                  JOIN
-                </button>
-              )}
-            </div>
-            
-            {/* Left seat */}
-            <div className="absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center">
-              {game.players[3] ? (
-                <div className="text-center flex flex-col items-center">
-                  <img 
-                    src={game.players[3].avatar} 
-                    alt="" 
-                    className="w-16 h-16 rounded-full border-2 border-slate-600" 
-                  />
-                  <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                    {game.players[3].username}
-                  </span>
-                </div>
-              ) : (
-                <button className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition" onClick={() => handleJoinGame(game.id, 3)}>
-                  JOIN
-                </button>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
-
         {/* Footer */}
         <div className="flex justify-between items-center">
           <span className="text-xs text-slate-400">
-            {game.status === 'waiting' ? 'WAITING' : 'IN PROGRESS'}
+            {game.status === 'WAITING' ? 'WAITING' : 'IN PROGRESS'}
           </span>
           <button className="px-3 py-1 bg-slate-700 text-slate-300 text-xs rounded-full hover:bg-slate-600 transition" onClick={() => handleWatchGame(game.id)}>
             Watch
@@ -306,21 +293,18 @@ const HomePage: React.FC = () => {
   };
 
   // Handler to open stats for another player
-  const handleOpenPlayerStats = (player: any) => {
+  const handleOpenPlayerStats = async (player: any) => {
     setSelectedPlayer({
       username: player.username,
       avatar: player.avatar,
-      stats: player.stats || {
-        gamesPlayed: 0,
-        gamesWon: 0,
-        nilsBid: 0,
-        nilsMade: 0,
-        blindNilsBid: 0,
-        blindNilsMade: 0,
-      },
+      stats: player.stats || {},
       status: player.status,
       coins: player.coins,
     });
+    // Fetch stats from backend
+    const res = await fetch(`/api/users/${player.id}/stats`);
+    const stats = await res.json();
+    setSelectedPlayerStats(stats);
     setIsPlayerStatsOpen(true);
   };
 
@@ -341,6 +325,71 @@ const HomePage: React.FC = () => {
       input.focus();
       input.setSelectionRange(start + emojiChar.length, start + emojiChar.length);
     }, 0);
+  };
+
+  // Fetch real users for the lobby
+  useEffect(() => {
+    fetch('/api/users')
+      .then(res => res.json())
+      .then(setOnlinePlayers)
+      .catch(() => setOnlinePlayers([]));
+  }, []);
+
+  // Fetch games as a fallback for loading spinner
+  useEffect(() => {
+    fetch('/api/games')
+      .then(res => res.json())
+      .then((games) => {
+        setGames(games);
+        setIsLoading(false);
+      })
+      .catch(() => setIsLoading(false));
+  }, []);
+
+  // Timeout fallback for loading spinner
+  useEffect(() => {
+    const timeout = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const handleConfirmAction = async () => {
+    if (!confirmModal.player) return;
+    const player = confirmModal.player;
+    let url = '';
+    let body: any = { userId: user.id };
+
+    if (confirmModal.action === 'add-friend') {
+      url = '/api/social/friends/add';
+      body.friendId = player.id;
+    } else if (confirmModal.action === 'remove-friend') {
+      url = '/api/social/friends/remove';
+      body.friendId = player.id;
+    } else if (confirmModal.action === 'block') {
+      url = '/api/social/block';
+      body.blockId = player.id;
+    } else if (confirmModal.action === 'unblock') {
+      url = '/api/social/unblock';
+      body.blockId = player.id;
+    }
+
+    if (url) {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      // Refresh player list
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(setOnlinePlayers);
+    }
+    setConfirmModal({ open: false, player: null, action: '' });
+  };
+
+  // Handler to dismiss welcome modal and persist in localStorage
+  const handleDismissWelcomeModal = () => {
+    setShowWelcomeModal(false);
+    localStorage.setItem('welcomeModalDismissed', 'true');
   };
 
   return (
@@ -483,7 +532,7 @@ const HomePage: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-indigo-400">{msg.username}</span>
                         <span className="text-xs text-slate-400">
-                          {msg.timestamp.toLocaleTimeString()}
+                          {new Date(msg.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
                       <p className="text-slate-200 mt-1">{msg.message}</p>
@@ -594,9 +643,7 @@ const HomePage: React.FC = () => {
                       player.status !== 'blocked'
                     )
                     .sort((a, b) => {
-                      // Always show online first
                       if (b.online !== a.online) return Number(b.online) - Number(a.online);
-                      // For 'all', put blocked at the bottom
                       if (playerFilter === 'all') {
                         if (a.status === 'blocked' && b.status !== 'blocked') return 1;
                         if (b.status === 'blocked' && a.status !== 'blocked') return -1;
@@ -617,26 +664,28 @@ const HomePage: React.FC = () => {
                           )}
                         </span>
                         <div className="flex gap-2 ml-auto items-center">
-                          {player.status === 'blocked' ? (
-                            <>
-                              <span className="text-slate-400 text-xs mr-2 flex items-center h-8">unblock?</span>
-                              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Unblock">
-                                {/* Unblock: circle with slash */}
-                                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
-                                  <path d="M6 18L18 6" stroke="white" strokeWidth="2.5" />
-                                </svg>
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {player.status === 'friend' ? (
+                          {/* Hide action buttons for self */}
+                          {player.id !== user.id && (
+                            player.status === 'blocked' ? (
+                              <>
+                                <span className="text-slate-400 text-xs mr-2 flex items-center h-8">unblock?</span>
+                                <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Unblock"
+                                  onClick={() => setConfirmModal({ open: true, player, action: 'unblock' })}>
+                                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
+                                    <path d="M6 18L18 6" stroke="white" strokeWidth="2.5" />
+                                  </svg>
+                                </button>
+                              </>
+                            ) : (
+                              player.status === 'friend' ? (
                                 <>
-                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend">
+                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
+                                    onClick={() => setConfirmModal({ open: true, player, action: 'remove-friend' })}>
                                     <img src="/remove-friend.svg" alt="Remove Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
                                   </button>
-                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block">
-                                    {/* Block: circle with X, X touches the circle */}
+                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                                    onClick={() => setConfirmModal({ open: true, player, action: 'block' })}>
                                     <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                                       <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                       <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
@@ -645,19 +694,20 @@ const HomePage: React.FC = () => {
                                 </>
                               ) : (
                                 <>
-                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend">
+                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
+                                    onClick={() => setConfirmModal({ open: true, player, action: 'add-friend' })}>
                                     <img src="/add-friend.svg" alt="Add Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
                                   </button>
-                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block">
-                                    {/* Block: circle with X, X touches the circle */}
+                                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                                    onClick={() => setConfirmModal({ open: true, player, action: 'block' })}>
                                     <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                                       <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                       <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
                                     </svg>
                                   </button>
                                 </>
-                              )}
-                            </>
+                              )
+                            )
                           )}
                         </div>
                       </div>
@@ -680,13 +730,22 @@ const HomePage: React.FC = () => {
 
       <NewUserWelcomeModal
         isOpen={showWelcomeModal}
-        onClose={() => setShowWelcomeModal(false)}
+        onClose={handleDismissWelcomeModal}
       />
 
       <PlayerStatsModal
         isOpen={isPlayerStatsOpen}
         onClose={() => setIsPlayerStatsOpen(false)}
         player={selectedPlayer}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmActionModal
+        open={confirmModal.open}
+        player={confirmModal.player}
+        action={confirmModal.action}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmModal({ open: false, player: null, action: '' })}
       />
     </div>
   );

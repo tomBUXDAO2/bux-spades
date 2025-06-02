@@ -39,11 +39,18 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   };
 
   const handleCreate = () => {
-    // Only pass the correct fields to onCreateGame
+    // Pass all necessary settings to onCreateGame
     onCreateGame({
-      mode,
+      gameMode: mode,
       biddingOption,
       gamePlayOption,
+      minPoints,
+      maxPoints,
+      buyIn,
+      specialRules: {
+        screamer: specialRule === 'screamer',
+        assassin: specialRule === 'assassin'
+      }
     });
     onClose();
   };

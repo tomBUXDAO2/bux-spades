@@ -1,37 +1,118 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { getSocketManager } from '../table-ui/lib/socketManager';
 import GameTable from '../table-ui/game/GameTable';
-import type { Game } from '../../../shared/types/game';
+import type { GameState } from '../types/game';
+import type { Socket } from 'socket.io-client';
 
-const TablePage: React.FC = () => {
-  const { gameId } = useParams();
-  const [game, setGame] = useState<Game | null>(null);
-  // TODO: Replace with real user context
-  const user = { id: 'demo-user', username: 'Demo User' };
+export default function TablePage() {
+  const { gameId } = useParams<{ gameId: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [game, setGame] = useState<GameState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const socketManager = getSocketManager();
 
   useEffect(() => {
-    if (!gameId) return;
-    fetch(`/api/games/${gameId}`)
-      .then(res => res.json())
-      .then(setGame);
-  }, [gameId]);
+    if (!user) {
+      navigate('/login');
+      return;
+    }
 
-  if (!game) return <div className="flex items-center justify-center h-screen text-white">Loading table...</div>;
+    const newSocket = socketManager.initialize({ user });
+    if (newSocket) {
+      setSocket(newSocket);
+    }
 
-  // Dummy handlers for now
-  const dummy = () => {};
+    const fetchGame = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/games/${gameId}`);
+        if (response.status === 404) {
+          navigate('/'); // Redirect to lobby if not found
+          return;
+        }
+        if (!response.ok) {
+          throw new Error('Failed to fetch game');
+        }
+        const data = await response.json();
+        setGame(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load game');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGame();
+
+    return () => {
+      socketManager.disconnect();
+      setSocket(null);
+    };
+  }, [gameId, user, navigate]);
+
+  const handleJoinGame = async () => {
+    if (!user || !gameId) return;
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/games/${gameId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: user.id,
+          username: user.username,
+          avatar: user.avatar
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to join game');
+      const updatedGame = await response.json();
+      setGame(updatedGame);
+    } catch (error) {
+      console.error('Error joining game:', error);
+    }
+  };
+
+  const handleLeaveTable = async () => {
+    if (!socket || !gameId || !user) return;
+    try {
+      socket.emit('leave_game', { gameId, userId: user.id });
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error leaving game:', error);
+    }
+  };
+
+  const handleStartGame = async () => {
+    // TODO: Implement start game logic
+    console.log('Start game clicked');
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
+  if (!game) {
+    return <div>Game not found</div>;
+  }
+
   return (
-    <GameTable
-      game={game as any}
-      socket={null}
-      createGame={dummy}
-      joinGame={dummy}
-      onGamesUpdate={dummy}
-      onLeaveTable={dummy}
-      startGame={async () => {}}
-      user={user}
-    />
+    <div className="table-page">
+      <GameTable
+        game={game}
+        socket={socket}
+        joinGame={handleJoinGame}
+        onLeaveTable={handleLeaveTable}
+        startGame={handleStartGame}
+        user={user}
+      />
+    </div>
   );
-};
-
-export default TablePage; 
+} 

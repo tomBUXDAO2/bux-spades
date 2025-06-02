@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
 // Configure axios defaults
+axios.defaults.baseURL = 'http://localhost:3001';
 axios.defaults.withCredentials = true;
 
 // Add request/response interceptors for debugging
@@ -46,6 +47,7 @@ interface User {
   email: string;
   avatar: string | null;
   coins: number;
+  sessionToken?: string;
   stats?: {
     gamesPlayed: number;
     gamesWon: number;
@@ -92,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       console.log('Fetching profile with token:', token);
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/profile`, {
+      const response = await axios.get('/api/auth/profile', {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -118,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       console.log('Attempting login with:', { email });
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/auth/login`,
+        '/api/auth/login',
         { email, password },
         {
           headers: {
@@ -148,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       console.log('Attempting registration with:', { username, email });
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/auth/register`,
+        '/api/auth/register',
         { username, email, password },
         {
           headers: {
@@ -188,7 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('Attempting profile update:', { username, avatar });
       const response = await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/auth/profile`,
+        '/api/auth/profile',
         { username, avatar },
         {
           headers: {

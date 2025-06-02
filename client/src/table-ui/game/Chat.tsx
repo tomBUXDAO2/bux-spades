@@ -143,22 +143,24 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
 
   // Get a player's avatar - updated to match GameTable.tsx logic
   const getPlayerAvatar = (playerId: string): string => {
-    // Find the player in the players array
-    const player = players.find(p => p.id === playerId);
+    if (!playerId) return BOT_AVATAR;
     
-    // Type guard for image property
-    if (player && 'image' in player && player.image) {
-      return player.image as string;
+    // Find the player in the players array
+    const player = players.find(p => p && p.id === playerId);
+    
+    // If player exists and has an avatar, use it
+    if (player?.avatar) {
+      return player.avatar;
     }
     
     // Discord user ID (numeric string)
-    if (playerId && /^\d+$/.test(playerId)) {
+    if (/^\d+$/.test(playerId)) {
       // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
       return `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
     }
     
     // Guest user, use default avatar
-    if (playerId && playerId.startsWith('guest_')) {
+    if (playerId.startsWith('guest_')) {
       return GUEST_AVATAR;
     }
     
@@ -299,9 +301,12 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
     return msg.userId === userId ? 'bg-blue-700 text-white' : 'bg-gray-700 text-white';
   };
 
+  // Update player color mapping to handle null players
   const playerColors: Record<string, string> = {};
   players.forEach(player => {
-    playerColors[player.id] = player.team === 1 ? 'text-red-400' : 'text-blue-400';
+    if (player) {  // Only add colors for non-null players
+      playerColors[player.id] = player.team === 1 ? 'text-red-400' : 'text-blue-400';
+    }
   });
 
   return (
@@ -403,4 +408,4 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
       </form>
     </div>
   );
-} 
+}

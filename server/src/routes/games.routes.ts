@@ -1,20 +1,16 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { Game, GameSettings, GamePlayer } from '../../../shared/types/game';
+import type { Game, GamePlayer } from '../types/game';
 import { io } from '../index';
 
 const router = Router();
 
 // In-memory games store
-const games: Game[] = [];
+export const games: Game[] = [];
 
 // Create a new game
 router.post('/', (req, res) => {
-  const settings: GameSettings = req.body;
-  // Map gameMode casing
-  const modeMap: Record<string, Game['gameMode']> = {
-    regular: 'REG', whiz: 'WHIZ', mirrors: 'MIRRORS', gimmick: 'GIMMICK'
-  };
+  const settings = req.body;
   const creatorPlayer = {
     id: settings.creatorId,
     username: settings.creatorName,
@@ -22,19 +18,19 @@ router.post('/', (req, res) => {
   };
   const newGame: Game = {
     id: uuidv4(),
-    gameMode: modeMap[settings.gameMode],
+    gameMode: settings.gameMode,
     maxPoints: settings.maxPoints,
     minPoints: settings.minPoints,
     buyIn: settings.buyIn,
-    forcedBid: settings.specialRules.screamer ? 'SUICIDE' : 'NONE', // Example logic
-    specialRules: settings.specialRules,
+    forcedBid: settings.specialRules?.screamer ? 'SUICIDE' : 'NONE',
+    specialRules: settings.specialRules || {},
     players: [creatorPlayer, null, null, null],
-    status: 'waiting',
+    status: 'WAITING',
     completedTricks: [],
     rules: {
       gameType: settings.gameMode,
-      allowNil: true, // Set according to your logic or settings
-      allowBlindNil: false, // Set according to your logic or settings
+      allowNil: true,
+      allowBlindNil: false,
       coinAmount: settings.buyIn,
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints
@@ -62,10 +58,13 @@ router.post('/:id/join', (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
 
+  // Use requested seat if provided and available
+  const requestedSeat = typeof req.body.seat === 'number' ? req.body.seat : null;
   const player = {
     id: req.body.id,
-    username: req.body.username,
-    avatar: req.body.avatar || null
+    username: req.body.username || 'Unknown',
+    avatar: req.body.avatar || '/default-pfp.jpg',
+    position: requestedSeat
   };
 
   // Prevent duplicate join
@@ -74,25 +73,23 @@ router.post('/:id/join', (req, res) => {
   }
 
   // Use requested seat if provided and available
-  const requestedSeat = typeof req.body.seat === 'number' ? req.body.seat : null;
   if (
     requestedSeat !== null &&
     requestedSeat >= 0 &&
-    requestedSeat < 4 &&
-    game.players[requestedSeat] === null
+    requestedSeat < 4
   ) {
+    if (game.players[requestedSeat] !== null) {
+      return res.status(400).json({ error: 'Seat is already taken' });
+    }
     game.players[requestedSeat] = player;
   } else {
-    // Fallback: find first available seat
-    const seatIndex = game.players.findIndex(p => p === null);
-    if (seatIndex === -1) {
-      return res.status(400).json({ error: 'Game is full' });
-    }
-    game.players[seatIndex] = player;
+    return res.status(400).json({ error: 'Invalid seat selection' });
   }
 
   res.json(game);
   io.emit('games_updated', games);
+  // Emit game_update to the game room for real-time sync
+  io.to(game.id).emit('game_update', game);
 });
 
 export default router; 
