@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import dotenv from 'dotenv';
+dotenv.config();
 
-const API_URL = process.env.NODE_ENV === 'production'
-  ? process.env.VITE_PROD_API_URL
-  : process.env.VITE_API_URL;
-const WS_URL = process.env.NODE_ENV === 'production'
-  ? process.env.VITE_PROD_WS_URL
-  : process.env.VITE_WS_URL;
+const API_URL = process.env.VITE_API_URL || 'http://localhost:3001';
+const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3001';
 
 export default defineConfig({
   plugins: [react()],
