@@ -7,6 +7,10 @@
     {
       "source": "/ws/:path*",
       "destination": "https://bux-spades-server.fly.dev/ws/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
     }
   ],
   "headers": [
