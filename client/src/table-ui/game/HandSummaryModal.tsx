@@ -43,7 +43,7 @@ export default function HandSummaryModal({
 }: HandSummaryModalProps) {
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showLoserModal, setShowLoserModal] = useState(false);
-
+  
   // Use total scores for game over check
   const team1Score = gameState?.scores?.team1 || 0;
   const team2Score = gameState?.scores?.team2 || 0;
@@ -60,8 +60,8 @@ export default function HandSummaryModal({
     }
   }, [gameIsOver, onNextHand]);
 
-  return (
-    <>
+    return (
+      <>
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog as="div" className="relative z-10" onClose={onClose}>
           <Transition.Child
@@ -126,20 +126,20 @@ export default function HandSummaryModal({
         </Dialog>
       </Transition>
 
-      <WinnerModal
-        isOpen={showWinnerModal}
+          <WinnerModal 
+            isOpen={showWinnerModal} 
         onClose={() => setShowWinnerModal(false)}
-        team1Score={team1Score}
-        team2Score={team2Score}
-        winningTeam={1}
+            team1Score={team1Score} 
+            team2Score={team2Score} 
+            winningTeam={1} 
         onPlayAgain={onNewGame}
-      />
-      <LoserModal
-        isOpen={showLoserModal}
+          />
+          <LoserModal 
+            isOpen={showLoserModal} 
         onClose={() => setShowLoserModal(false)}
-        team1Score={team1Score}
-        team2Score={team2Score}
-        winningTeam={2}
+            team1Score={team1Score} 
+            team2Score={team2Score} 
+            winningTeam={2} 
         onPlayAgain={onNewGame}
       />
     </>
