@@ -1,6 +1,11 @@
 {
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
+  "git": {
+    "deploymentEnabled": {
+      "master": true
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
