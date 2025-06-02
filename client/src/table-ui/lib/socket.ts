@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Manager } from 'socket.io-client';
 import type { GameState, Card, GameRules } from '../../types/game';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+const SOCKET_URL = import.meta.env.PROD ? import.meta.env.VITE_PROD_API_URL : import.meta.env.VITE_API_URL;
 
 // Socket configuration
 const socketConfig = {

@@ -2,6 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const API_URL = process.env.NODE_ENV === 'production'
+  ? process.env.VITE_PROD_API_URL
+  : process.env.VITE_API_URL;
+const WS_URL = process.env.NODE_ENV === 'production'
+  ? process.env.VITE_PROD_WS_URL
+  : process.env.VITE_WS_URL;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,7 +20,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: API_URL,
         changeOrigin: true,
         secure: false,
         ws: true,
@@ -30,11 +37,11 @@ export default defineConfig({
         },
       },
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: WS_URL,
         ws: true,
       },
       '/socket.io': {
-        target: 'http://localhost:3001',
+        target: WS_URL,
         ws: true,
         changeOrigin: true,
         secure: false,

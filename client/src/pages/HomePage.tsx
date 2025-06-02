@@ -76,10 +76,15 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    socket.current = socketIOClient('http://localhost:3001', {
-      withCredentials: true,
-      transports: ['websocket']
-    });
+    socket.current = socketIOClient(
+      import.meta.env.PROD
+        ? import.meta.env.VITE_PROD_API_URL
+        : import.meta.env.VITE_API_URL,
+      {
+        withCredentials: true,
+        transports: ['websocket']
+      }
+    );
     // Authenticate after connecting
     socket.current.on('connect', () => {
       if (user?.id) {
