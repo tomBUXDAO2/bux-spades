@@ -40,7 +40,9 @@ const Login: React.FC = () => {
 
   const handleDiscordLogin = () => {
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = import.meta.env.VITE_DISCORD_REDIRECT_URI;
+    const redirectUri = import.meta.env.PROD
+      ? import.meta.env.VITE_PROD_DISCORD_REDIRECT_URI
+      : import.meta.env.VITE_DISCORD_REDIRECT_URI;
     const scope = 'identify email';
     
     const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
