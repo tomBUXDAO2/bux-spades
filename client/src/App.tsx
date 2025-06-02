@@ -72,6 +72,10 @@ const router = createBrowserRouter(
         {
           path: "table/:gameId",
           element: <ProtectedRoute><TablePage /></ProtectedRoute>
+        },
+        {
+          path: "*",
+          element: <Navigate to="/" />
         }
       ]
     }
