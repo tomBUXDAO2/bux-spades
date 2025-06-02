@@ -82,6 +82,16 @@ export interface CompletedTrick {
   winningCard: Card;
 }
 
+export interface GameRules {
+  gameType: GameType;
+  allowNil: boolean;
+  allowBlindNil: boolean;
+  minPoints: number;
+  maxPoints: number;
+  coinAmount: number;
+  numHands?: number;
+}
+
 export interface GameSettings {
   gameMode: GameMode;
   biddingOption: BiddingOption;

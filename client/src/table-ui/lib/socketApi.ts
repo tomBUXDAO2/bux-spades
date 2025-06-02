@@ -1,15 +1,10 @@
-import { getSocket, initializeSocket } from './socketManager';
-import type { GameRules } from '@/types/game';
+import { getSocket } from './socketManager';
+import type { GameRules } from '../../types/game';
 import type { Socket } from 'socket.io-client';
 
 // Create the socket API object
 export const socketApi = {
   getSocket: (socketOverride?: Socket | null) => socketOverride || getSocket(),
-  
-  initializeSocket: async (userId: string, userName: string, socketOverride?: Socket | null) => {
-    const socket = socketOverride || getSocket();
-    return await initializeSocket({ userId, username: userName });
-  },
   
   joinGame: (socketOverride: Socket | null, gameId: string, userId: string, testPlayer?: { 
     name: string; 

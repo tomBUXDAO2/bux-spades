@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../../lib/socket';
-import io, { Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-import type { Player } from '../types/game';
+import type { Player } from '../../types/game';
 import { socketApi } from '../../lib/socketApi';
 
 interface ChatProps {
@@ -32,13 +32,10 @@ const GUEST_AVATAR = "/guest-avatar.png";
 const BOT_AVATAR = "/guest-avatar.png";
 
 export default function Chat({ socket, gameId, userId, userName, players }: ChatProps) {
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   
   // Add responsive sizing state
   const [screenSize, setScreenSize] = useState({
@@ -94,8 +91,6 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
     
     const onConnect = () => {
       console.log('Chat socket connected to game:', gameId);
-      setIsConnected(true);
-      setError(null);
       
       // Explicitly join the game room when connected
       activeSocket.emit('join_game', {
@@ -108,12 +103,10 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
     
     const onDisconnect = () => {
       console.log('Chat socket disconnected from game:', gameId);
-      setIsConnected(false);
     };
     
     const onError = (err: any) => {
       console.error('Chat socket error:', err);
-      setError(err.message || 'Connection error');
     };
     
     activeSocket.on('connect', onConnect);
@@ -122,8 +115,6 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
     activeSocket.on('error', onError);
     
     // Set initial connection state
-    setIsConnected(activeSocket.connected);
-    
     if (activeSocket.connected) {
       // Explicitly join the game room if already connected
       activeSocket.emit('join_game', {
@@ -275,7 +266,6 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
       setShowEmojiPicker(false);
     } catch (err) {
       console.error('Failed to send chat message:', err);
-      setError('Failed to send message. Please try again.');
     }
   };
 
@@ -285,20 +275,6 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
 
   const formatTime = (timestamp: number): string => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const handleRetry = () => {
-    if (regularSocket) {
-      regularSocket.connect();
-    }
-    setError(null);
-  };
-
-  const getMessageClass = (msg: ChatMessage) => {
-    if (msg.isGameMessage) {
-      return 'bg-gray-700 text-gray-300';
-    }
-    return msg.userId === userId ? 'bg-blue-700 text-white' : 'bg-gray-700 text-white';
   };
 
   // Update player color mapping to handle null players

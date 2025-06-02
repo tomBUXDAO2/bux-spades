@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { GameSettings, GameMode, BiddingOption, GamePlayOption } from '../../types/game';
+import type { GameSettings, GameMode, BiddingOption } from '../../types/game';
 
 interface CreateGameModalProps {
   isOpen: boolean;
@@ -21,7 +21,6 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [biddingOption, setBiddingOption] = useState<BiddingOption>('REG');
   const [gimmickOption, setGimmickOption] = useState('');
-  const [gamePlayOption, setGamePlayOption] = useState<GamePlayOption>('REG');
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
   const [buyIn, setBuyIn] = useState(100000);
@@ -43,7 +42,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onCreateGame({
       gameMode: mode,
       biddingOption,
-      gamePlayOption,
+      gamePlayOption: 'REG',
       minPoints,
       maxPoints,
       buyIn,

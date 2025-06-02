@@ -1,4 +1,4 @@
-import { Player, HandSummary } from '../types/game';
+import { Player } from '../types/game';
 
 export const calculateHandScore = (players: Player[]) => {
   const team1Score = { score: 0, bid: 0, tricks: 0, nilBids: 0, madeNils: 0 };

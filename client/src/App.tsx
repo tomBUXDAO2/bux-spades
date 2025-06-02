@@ -1,9 +1,7 @@
 import React from 'react';
 import { 
-  createBrowserRouter,
   RouterProvider,
-  createRoutesFromElements,
-  Route,
+  createBrowserRouter,
   Navigate,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';

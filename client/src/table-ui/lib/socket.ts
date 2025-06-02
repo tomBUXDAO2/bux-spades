@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Manager } from 'socket.io-client';
-import type { GameState, Card, GameRules } from '@/types/game';
-import { useSession } from 'next-auth/react';
+import type { GameState, Card, GameRules } from '../../types/game';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
@@ -19,13 +18,9 @@ const socketConfig = {
   withCredentials: true,
   path: '/socket.io/',
   forceNew: true,
-  auth: {
-    token: typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-  }
 };
 
 export const useSocket = () => {
-  const { data: session, status } = useSession();
   const [socket, setSocket] = useState<ReturnType<typeof Manager.prototype.socket> | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,48 +29,12 @@ export const useSocket = () => {
   const maxReconnectAttempts = 10;
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Add detailed logging for session state
   useEffect(() => {
-    console.log('Session status:', status);
-    console.log('Session data:', session);
-    
-    if (session?.user) {
-      console.log('User ID:', session.user.id);
-      console.log('User name:', session.user.name);
-    }
-  }, [session, status]);
-
-  useEffect(() => {
-    // Only attempt to connect if we have a session and it's not loading
-    if (status === 'loading') {
-      console.log('Session is loading, waiting...');
-      return;
-    }
-
-    if (status === 'unauthenticated' || !session?.user?.id) {
-      console.log('No user session, skipping socket connection');
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        setSocket(null);
-        setIsConnected(false);
-      }
-      return;
-    }
-
-    // If we already have a socket and it's connected, don't create a new one
-    if (socketRef.current?.connected) {
-      console.log('Socket already connected, skipping connection');
-      return;
-    }
-
-    console.log('Attempting to connect to socket server with user ID:', session.user.id);
-    
+    // Remove session and status checks
+    // Always attempt to connect
     // Create socket instance with updated auth token
-    const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const manager = new Manager(SOCKET_URL, {
       ...socketConfig,
-      auth: { token: authToken }
     });
     const newSocket = manager.socket('/');
     socketRef.current = newSocket;
@@ -85,31 +44,19 @@ export const useSocket = () => {
       setIsConnected(true);
       setError(null);
       reconnectAttemptsRef.current = 0;
-      
-      // Clear any existing connection timeout
       if (connectionTimeoutRef.current) {
         clearTimeout(connectionTimeoutRef.current);
         connectionTimeoutRef.current = null;
       }
-      
-      // Authenticate the socket connection
-      console.log('Authenticating socket with user ID:', session.user.id);
-      newSocket.emit('authenticate', { 
-        userId: session.user.id,
-        token: authToken
-      });
+      // Optionally emit authenticate or join event here if needed
     };
 
     const handleDisconnect = (reason: string) => {
       console.log('Socket disconnected:', reason);
       setIsConnected(false);
-      
-      // Only attempt reconnect if not manually disconnected
       if (reason !== 'io client disconnect' && reconnectAttemptsRef.current < maxReconnectAttempts) {
         reconnectAttemptsRef.current++;
         console.log(`Attempting reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
-        
-        // Exponential backoff for reconnection
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
         setTimeout(() => {
           if (!newSocket.connected) {
@@ -127,7 +74,6 @@ export const useSocket = () => {
       setIsConnected(false);
     };
 
-    // Set a connection timeout
     connectionTimeoutRef.current = setTimeout(() => {
       if (!newSocket.connected) {
         console.log('Socket connection timeout');
@@ -140,7 +86,6 @@ export const useSocket = () => {
     newSocket.on('connect_error', handleError);
     newSocket.on('error', handleError);
 
-    // Connect the socket
     newSocket.connect();
     setSocket(newSocket);
 
@@ -157,7 +102,7 @@ export const useSocket = () => {
         newSocket.disconnect();
       }
     };
-  }, [session, status]);
+  }, []);
 
   return { socket, isConnected, error };
 };

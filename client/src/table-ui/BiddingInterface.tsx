@@ -4,12 +4,10 @@ import { GameType } from "../types/game";
 interface BiddingProps {
   onBid: (bid: number) => void;
   currentBid?: number;
-  gameId: string;
   playerId: string;
   currentPlayerTurn: string;
   gameType: GameType;
   numSpades: number; // Number of spades in player's hand
-  isCurrentPlayer: boolean;
   allowNil?: boolean; // Add allowNil prop
 }
 
@@ -22,17 +20,14 @@ const bottomButtonClass = "bidding-bottom-button";
 export default function BiddingInterface({ 
   onBid, 
   currentBid, 
-  gameId, 
   playerId, 
   currentPlayerTurn,
   gameType,
   numSpades,
-  isCurrentPlayer,
   allowNil = true // Default to true for backward compatibility
 }: BiddingProps) {
   const [selectedBid, setSelectedBid] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showNilConfirmation, setShowNilConfirmation] = useState(false);
   const isMyTurn = playerId === currentPlayerTurn;
 
   // For MIRROR games, automatically bid the number of spades

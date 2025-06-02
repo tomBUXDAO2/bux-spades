@@ -1,11 +1,4 @@
 import { io, Socket } from 'socket.io-client';
-import type { Session } from 'next-auth';
-
-interface SocketConfig {
-  userId: string;
-  username: string;
-  sessionToken?: string;
-}
 
 let socketInstance: Socket | null = null;
 let isInitialized = false;
@@ -16,7 +9,7 @@ let connectionTimeout: NodeJS.Timeout | null = null;
 
 export function getSocketManager() {
   return {
-    initialize(session: Session) {
+    initialize(session: any) {
       if (!session?.user) {
         console.error('Cannot initialize socket: No user in session');
         return;
@@ -145,7 +138,7 @@ export function getSocketManager() {
           isInitialized = false;
         } else {
           // Try polling if websocket fails
-          if (socketInstance?.io.opts.transports.includes('websocket')) {
+          if (Array.isArray(socketInstance?.io.opts.transports) && socketInstance.io.opts.transports.includes('websocket' as any)) {
             console.log('Switching to polling transport');
             socketInstance.io.opts.transports = ['polling'];
             socketInstance.connect();

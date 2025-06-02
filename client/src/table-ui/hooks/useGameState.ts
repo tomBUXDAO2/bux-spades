@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSocket } from '../lib/socket';
-import type { GameState, Player, Card } from '../../types/game';
-import type { GameRules } from '@/components/lobby/GameRulesModal';
+// import { useSocket } from '../lib/socket';
+import type { GameState } from '../../types/game';
+// import type { Player, Card } from '../../types/game';
+// import type { GameRules } from '@/components/lobby/GameRulesModal';
 
 export type GameType = 'REGULAR' | 'WHIZ' | 'SOLO' | 'MIRROR';
 
@@ -12,74 +13,52 @@ export type GameType = 'REGULAR' | 'WHIZ' | 'SOLO' | 'MIRROR';
  * @returns game state and methods to interact with the game
  */
 export function useGameState(
-  gameId: string,
-  userId: string
+  _gameId: string,
+  _userId: string
 ) {
-  const { socket } = useSocket(gameId); // Use our custom socket hook
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // const { socket } = useSocket(gameId); // Use our custom socket hook
+  const [gameState] = useState<GameState | null>(null);
+  const [error] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Join game
   const joinGame = useCallback(() => {
-    if (!socket) return;
+    // if (!socket) return;
     
     setIsLoading(true);
-    socket.emit('join_game', { gameId, userId });
-  }, [socket, gameId, userId]);
+    // socket.emit('join_game', { gameId, userId });
+  }, []);
   
   // Leave game
-  const leaveGame = useCallback(() => {
-    if (!socket) return;
-    
-    socket.emit('leave_game', { gameId, userId });
-  }, [socket, gameId, userId]);
+  const leaveGame = useCallback(() => {}, []);
   
   // Make a bid
-  const makeBid = useCallback((bid: number) => {
-    if (!socket) return;
-    
-    socket.emit('make_bid', { gameId, userId, bid });
-  }, [socket, gameId, userId]);
+  const makeBid = useCallback(() => {}, []);
   
   // Play a card
-  const playCard = useCallback((cardIndex: number) => {
-    if (!socket) return;
-    
-    socket.emit('play_card', { gameId, userId, cardIndex });
-  }, [socket, gameId, userId]);
+  const playCard = useCallback(() => {}, []);
   
   // Listen for game updates
   useEffect(() => {
-    if (!socket) return;
-    
-    const onGameUpdate = (data: GameState) => {
-      setGameState(data);
-      setIsLoading(false);
-    };
-    
-    const onGameError = (err: { message: string }) => {
-      setError(err.message);
-      setIsLoading(false);
-    };
+    // if (!socket) return;
     
     // Join the game when socket is ready
-    if (socket.connected) {
+    // if (socket.connected) {
       joinGame();
-    }
+    // }
     
     // Setup event listeners
-    socket.on('connect', joinGame);
-    socket.on('game_update', onGameUpdate);
-    socket.on('error', onGameError);
+    // socket.on('connect', joinGame);
+    // socket.on('game_update', onGameUpdate);
+    // socket.on('error', onGameError);
     
     // Cleanup
-    return () => {
-      socket.off('connect', joinGame);
-      socket.off('game_update', onGameUpdate);
-      socket.off('error', onGameError);
-    };
-  }, [socket, gameId, userId, joinGame]);
+    // return () => {
+    //   socket.off('connect', joinGame);
+    //   socket.off('game_update', onGameUpdate);
+    //   socket.off('error', onGameError);
+    // };
+  }, []);
   
   return {
     gameState,

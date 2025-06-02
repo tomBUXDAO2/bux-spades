@@ -6,7 +6,7 @@ export const socketApi = {
     socket.emit('chat_message', { gameId, ...message });
   },
 
-  setupTrickCompletionDelay: (socket: Socket, gameId: string, callback: (data: { trickCards: Card[], winningIndex: number }) => void) => {
+  setupTrickCompletionDelay: (socket: Socket, callback: (data: { trickCards: Card[], winningIndex: number }) => void) => {
     const handler = (data: { trickCards: Card[], winningIndex: number }) => {
       callback(data);
     };

@@ -1,6 +1,12 @@
-import React, { useState, Fragment } from 'react';
+import { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import type { GameRules } from '@/types/game';
+import type { GameRules } from '../../types/game';
+
+// Remove unused imports
+// import React, { useState, Fragment } from 'react';
+
+// Remove unused state variables
+// const [gamePlayOption, setGamePlayOption] = useState<GamePlayOption>('REG');
 
 interface CreateGameModalProps {
   isOpen: boolean;

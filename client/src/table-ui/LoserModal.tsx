@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { FaTrophy } from 'react-icons/fa';
-import Image from 'next/image';
 
 interface LoserModalProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, HandSummary, CompletedTrick } from '../../types/game';
 import { Socket } from "socket.io-client";
 import Chat from './Chat';
@@ -132,11 +132,6 @@ export default function GameTable({
   // Add state to directly track which player played which card
   const [cardPlayers, setCardPlayers] = useState<{[key: string]: string}>({});
   
-  // Add state for tracking the winning card
-  const [winningCardIndex, setWinningCardIndex] = useState<number | null>(null); 
-  const [winningPlayerId, setWinningPlayerId] = useState<string | null>(null);
-  const [showWinningCardHighlight, setShowWinningCardHighlight] = useState(false);
-  
   const user = propUser;
   
   // Use gameState for all game data
@@ -249,26 +244,6 @@ export default function GameTable({
     console.log('Socket connected:', socket?.connected);
   };
 
-  // Scale dimensions for card images - use fixed size on mobile
-  const cardWidth = windowSize.width < 640 ? 25 : Math.floor(96 * scaleFactor);
-  const cardHeight = windowSize.width < 640 ? 38 : Math.floor(144 * scaleFactor);
-  const avatarSize = Math.floor(64 * scaleFactor);
-  
-  // Player positions mapping - responsive
-  const playerPositions = useMemo(() => {
-    return isMobile ? {
-      bottom: "bottom-0 left-1/2 transform -translate-x-1/2",
-      left: "left-0 top-1/3 transform -translate-y-1/2",
-      top: "top-0 left-1/2 transform -translate-x-1/2",
-      right: "right-0 top-1/3 transform -translate-y-1/2",
-    } : {
-      bottom: "bottom-3 left-1/2 transform -translate-x-1/2",
-      left: "left-3 top-1/2 transform -translate-y-1/2",
-      top: "top-3 left-1/2 transform -translate-x-1/2",
-      right: "right-3 top-1/2 transform -translate-y-1/2",
-    };
-  }, [isMobile]);
-  
   // Update the player tricks display
   const renderPlayerPosition = (position: number) => {
     // Define getPositionClasses FIRST
@@ -313,7 +288,6 @@ export default function GameTable({
     if (!player) return null;
 
     const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
-    const isWinningTrick = showTrickAnimation && completedTrick?.winningCard.suit === player.hand[0].suit && completedTrick?.winningCard.rank === player.hand[0].rank;
     
     // Get player avatar
     const getPlayerAvatar = (player: Player | null) => {
@@ -347,7 +321,6 @@ export default function GameTable({
         <div className={`
           backdrop-blur-sm bg-white/10 rounded-xl overflow-hidden
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
-          ${isWinningTrick ? 'animate-pulse' : ''}
           transition-all duration-200
         `}>
           {isSideSeat ? (
@@ -465,22 +438,6 @@ export default function GameTable({
                   </span>
                 </div>
               </div>
-              
-              {/* Winning animation with improved animation */}
-              {isWinningTrick && (
-                <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2">
-                  <div className={`
-                    ${player.team === 1 ? 'text-red-400' : 'text-blue-400'} 
-                    font-bold animate-bounce flex items-center gap-0.5
-                  `} style={{ fontSize: isMobile ? '10px' : '12px' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" 
-                         className="w-3 h-3 inline-block">
-                      <path fillRule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.387l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.061l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042-.815a.75.75 0 01-.53-.919z" clipRule="evenodd" />
-                    </svg>
-                    <span>+1</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -497,7 +454,6 @@ export default function GameTable({
     const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
     
     // Calculate card width based on screen size
-    const isMobile = windowSize.isMobile;
     const cardUIWidth = Math.floor(isMobile ? 70 : 84 * scaleFactor);
     const cardUIHeight = Math.floor(isMobile ? 100 : 120 * scaleFactor);
     const overlapOffset = Math.floor(isMobile ? -40 : -32 * scaleFactor); // How much cards overlap
@@ -691,9 +647,8 @@ export default function GameTable({
         card.rank === completedTrick.winningCard.rank;
 
       // Calculate card dimensions using the same approach as player's hand
-      const isMobile = windowSize.width < 640;
-      const trickCardWidth = windowSize.width < 640 ? 25 : Math.floor(96 * getScaleFactor());
-      const trickCardHeight = windowSize.width < 640 ? 38 : Math.floor(144 * getScaleFactor());
+      const cardUIWidth = windowSize.width < 640 ? 25 : Math.floor(96 * getScaleFactor());
+      const cardUIHeight = windowSize.width < 640 ? 38 : Math.floor(144 * getScaleFactor());
 
       return (
         <div
@@ -701,8 +656,8 @@ export default function GameTable({
           className={`${positions[relativePosition]} z-10 transition-all duration-500
             ${isWinningCard ? 'ring-2 ring-yellow-400 scale-110 z-20' : ''}`}
           style={{
-            width: `${trickCardWidth}px`,
-            height: `${trickCardHeight}px`,
+            width: `${cardUIWidth}px`,
+            height: `${cardUIHeight}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -739,7 +694,6 @@ export default function GameTable({
     if (!socket) return;
 
     socket.on('player_wants_to_play_again', (data: { playerId: string }) => {
-      const { playerId } = data;
       setCardPlayers(prev => ({ ...prev, [data.playerId]: data.playerId }));
     });
 
@@ -763,7 +717,6 @@ export default function GameTable({
 
   // Add state for trick completion animation
   const [completedTrick, setCompletedTrick] = useState<CompletedTrick | null>(null);
-  const [showTrickAnimation, setShowTrickAnimation] = useState(false);
 
   // Effect to handle trick completion
   useEffect(() => {
@@ -1027,12 +980,10 @@ export default function GameTable({
                     <BiddingInterface
                       onBid={handleBid}
                       currentBid={orderedPlayers[0]?.bid}
-                      gameId={gameState.id}
-                      playerId={currentPlayerId}
-                      currentPlayerTurn={gameState.currentPlayer}
                       gameType={gameState.rules.gameType}
                       numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
-                      isCurrentPlayer={gameState.currentPlayer === currentPlayerId}
+                      playerId={currentPlayerId}
+                      currentPlayerTurn={gameState.currentPlayer}
                       allowNil={gameState.rules.allowNil}
                     />
                   </div>
@@ -1082,24 +1033,18 @@ export default function GameTable({
         </div>
 
         {/* Hand Summary Modal - Pass currentHandSummary */}
-        {showHandSummary && (
+        {showHandSummary && currentHandSummary && (
           <HandSummaryModal
             isOpen={showHandSummary}
-            onClose={() => {
+            onClose={() => setShowHandSummary(false)}
+            handSummary={currentHandSummary}
+            onNextHand={() => {
               setShowHandSummary(false);
-              setCurrentHandSummary(null);
+              // Add any next hand logic here
             }}
-            handScores={currentHandSummary}
-            minPoints={gameState.minPoints ?? -150}
-            maxPoints={gameState.maxPoints ?? 500}
-            onGameOver={(winner) => {
+            onNewGame={() => {
               setShowHandSummary(false);
-              setCurrentHandSummary(null);
-              if (winner === 1) {
-                setShowWinner(true);
-              } else {
-                setShowLoser(true);
-              }
+              // Add any new game logic here
             }}
           />
         )}

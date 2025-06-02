@@ -61,7 +61,6 @@ const HomePage: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const navigate = useNavigate();
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
-  const [selectedPlayerStats, setSelectedPlayerStats] = useState<any[]>([]);
   const socket = useRef<any>(null);
 
   // Check if user is new (has 5M coins and 0 games played)
@@ -179,7 +178,6 @@ const HomePage: React.FC = () => {
   };
 
   const GameTile: React.FC<{ game: GameState }> = ({ game }) => {
-    const creatorIndex = game.players.findIndex(p => p && p.id === game.creatorId);
     const seatMap = [
       { className: "absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 0 }, // South (creator)
       { className: "absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 1 },    // West
@@ -297,14 +295,9 @@ const HomePage: React.FC = () => {
     setSelectedPlayer({
       username: player.username,
       avatar: player.avatar,
-      stats: player.stats || {},
       status: player.status,
       coins: player.coins,
     });
-    // Fetch stats from backend
-    const res = await fetch(`/api/users/${player.id}/stats`);
-    const stats = await res.json();
-    setSelectedPlayerStats(stats);
     setIsPlayerStatsOpen(true);
   };
 

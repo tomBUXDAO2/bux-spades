@@ -1,4 +1,5 @@
-import { GameType, Card, Suit, Player, GameState } from '../../types/game';
+import type { GameType, Card, Suit, GameState } from '../../types/game';
+// import { Player } from '../../types/game';
 
 /**
  * Determines if a player can bid nil based on the game type and their hand
@@ -38,7 +39,7 @@ export function getValidBidRange(gameType: GameType, numSpades: number): { min: 
  * Validates if a bid is legal for the given game type and player's hand
  */
 export function isValidBid(gameType: GameType, bid: number, numSpades: number): boolean {
-  const { min, max } = getValidBidRange(gameType, numSpades);
+  // const { min, max } = getValidBidRange(gameType, numSpades);
   
   switch (gameType) {
     case 'REGULAR':
@@ -101,7 +102,6 @@ export function calculateGameTypeScore(
  * Determines if a card can be played based on the game type and current state
  */
 export function isPlayableCard(
-  gameType: GameType,
   card: Card,
   hand: Card[],
   leadSuit: Suit | null,
@@ -136,19 +136,16 @@ export function isHandComplete(game: GameState): boolean {
  * Determines if the game is over based on game type and scores
  */
 export function isGameOver(game: GameState): boolean {
-  const { team1Score = 0, team2Score = 0 } = game.scores || {};
-  
+  const team1Score = game.scores?.team1 || 0;
+  const team2Score = game.scores?.team2 || 0;
   switch (game.rules.gameType) {
     case 'REGULAR':
     case 'SOLO':
       return team1Score >= 500 || team2Score >= 500 || team1Score <= -250 || team2Score <= -250;
-    
     case 'WHIZ':
     case 'MIRROR':
-      // Game ends after specified number of hands or when a team reaches the winning score
       return (game.round || 0) >= (game.rules.numHands || 4) || 
              team1Score >= 500 || team2Score >= 500;
-    
     default:
       return false;
   }
@@ -161,13 +158,9 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   if (!isGameOver(game)) {
     return null;
   }
-
-  const { team1Score = 0, team2Score = 0 } = game.scores || {};
-  
-  // If a team has gone below the minimum score, the other team wins
+  const team1Score = game.scores?.team1 || 0;
+  const team2Score = game.scores?.team2 || 0;
   if (team1Score <= -250) return 'team2';
   if (team2Score <= -250) return 'team1';
-  
-  // Otherwise, highest score wins
   return team1Score > team2Score ? 'team1' : 'team2';
 } 

@@ -1,6 +1,4 @@
-import React from 'react';
 import type { GameState } from '../../types/game';
-import Button from '@/components/ui/button';
 
 interface GameCardProps {
   game: GameState;
@@ -38,20 +36,20 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
 
       <div className="flex justify-end gap-2">
         {isPlayerInGame ? (
-          <Button
+          <button
             onClick={() => onSelect(game)}
-            variant="default"
+            className='px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700'
           >
             Return to Game
-          </Button>
+          </button>
         ) : (
-          <Button
+          <button
             onClick={() => onJoin(game.id)}
             disabled={isGameFull || isGameStarted}
-            variant="default"
+            className='px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700'
           >
             {isGameFull ? 'Game Full' : 'Join Game'}
-          </Button>
+          </button>
         )}
       </div>
     </div>
