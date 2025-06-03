@@ -26,7 +26,7 @@ router.post('/', (req, res) => {
       forcedBid: (settings.specialRules?.screamer ? 'SUICIDE' : 'NONE') as 'SUICIDE' | 'NONE',
       specialRules: settings.specialRules || {},
       players: [creatorPlayer, null, null, null],
-      status: 'WAITING',
+      status: 'WAITING' as Game['status'],
       completedTricks: [],
       rules: {
         gameType: settings.gameMode,
