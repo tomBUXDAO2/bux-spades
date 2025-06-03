@@ -1,230 +1,221 @@
 import { io, Socket } from 'socket.io-client';
 
-let socketInstance: Socket | null = null;
-let isInitialized = false;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-let pendingAuth = false;
-let connectionTimeout: NodeJS.Timeout | null = null;
+class SocketManager {
+  private socket: Socket | null = null;
+  private session: any = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private storedToken: string | null = null;
 
-export function getSocketManager() {
-  return {
-    initialize(session: any) {
-      if (!session?.user) {
-        console.error('Cannot initialize socket: No user in session');
-        return;
-      }
+  initialize(session: any): Socket {
+    console.log('Initializing socket with session:', {
+      userId: session.user.id,
+      username: session.user.username,
+      hasSessionToken: !!session.user.sessionToken,
+      token: session.user.sessionToken
+    });
 
-      if (pendingAuth) {
-        console.log('Authentication already in progress, skipping initialization');
-        return;
-      }
+    // Store the token for reconnection attempts
+    if (session.user.sessionToken) {
+      this.storedToken = session.user.sessionToken;
+    }
 
-      console.log('Initializing socket with session:', {
-        userId: session.user.id,
-        username: session.user.username,
-        hasSessionToken: !!session.user.sessionToken,
+    // If we have a stored token but no session token, use the stored token
+    if (!session.user.sessionToken && this.storedToken) {
+      session.user.sessionToken = this.storedToken;
+    }
+
+    if (!session.user.sessionToken) {
+      console.error('No session token available for socket connection');
+      return null;
+    }
+
+    this.session = session;
+
+    if (this.socket?.connected) {
+      console.log('Socket exists and is connected, reusing...');
+      return this.socket;
+    }
+
+    if (this.socket) {
+      console.log('Socket exists but not connected, disconnecting...');
+      this.socket.disconnect();
+    }
+
+    // Use proxy by setting URL to root
+    const SOCKET_URL = import.meta.env.PROD 
+      ? import.meta.env.VITE_PROD_API_URL 
+      : '/';
+    console.log('Connecting to socket server:', SOCKET_URL);
+
+    // Clear any existing connection timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+
+    this.socket = io(SOCKET_URL, {
+      auth: {
         token: session.user.sessionToken
-      });
-
-      if (socketInstance?.connected) {
-        console.log('Socket already connected, skipping initialization');
-        return;
+      },
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      path: '/socket.io',
+      withCredentials: true,
+      forceNew: true,
+      autoConnect: true,
+      extraHeaders: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Authorization': `Bearer ${session.user.sessionToken}`
       }
+    });
 
-      if (socketInstance) {
-        console.log('Socket exists but not connected, disconnecting...');
-        socketInstance.disconnect();
-        socketInstance = null;
-        isInitialized = false;
+    // Set a connection timeout
+    this.connectionTimeout = setTimeout(() => {
+      const socket = this.socket;
+      if (socket && !socket.connected) {
+        console.log('Connection timeout, retrying with polling only');
+        const opts = socket.io.opts;
+        if (opts && Array.isArray(opts.transports)) {
+          opts.transports = ['polling'];
+          socket.connect();
+        }
       }
+    }, 5000);
 
-      // Use proxy by setting URL to root
-      const SOCKET_URL = import.meta.env.PROD 
-        ? import.meta.env.VITE_PROD_API_URL 
-        : '/';
-      console.log('Connecting to socket server:', SOCKET_URL);
-
-      // Clear any existing connection timeout
-      if (connectionTimeout) {
-        clearTimeout(connectionTimeout);
-        connectionTimeout = null;
+    this.socket.on('connect', () => {
+      console.log('Socket connected successfully');
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
       }
-
-      if (!session.user.sessionToken) {
-        console.error('No session token available for socket connection');
-        return;
-      }
-
-      socketInstance = io(SOCKET_URL, {
-        auth: {
+      this.reconnectAttempts = 0;
+      
+      // Emit authenticate event immediately after connection
+      const socket = this.socket;
+      if (socket && session.user.sessionToken) {
+        console.log('Emitting authenticate event with token:', session.user.sessionToken);
+        socket.emit('authenticate', {
           userId: session.user.id,
-          username: session.user.username,
           token: session.user.sessionToken
-        },
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        path: '/socket.io',
-        withCredentials: true,
-        forceNew: true,
-        autoConnect: true,
-        extraHeaders: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Authorization': `Bearer ${session.user.sessionToken}`
-        }
-      });
+        });
+      }
+    });
 
-      // Set a connection timeout
-      connectionTimeout = setTimeout(() => {
-        const socket = socketInstance;
-        if (socket && !socket.connected) {
-          console.log('Connection timeout, retrying with polling only');
-          const opts = socket.io.opts;
-          if (opts && Array.isArray(opts.transports)) {
-            opts.transports = ['polling'];
-            socket.connect();
-          }
+    this.socket.on('authenticated', (data) => {
+      console.log('Socket authenticated:', data);
+      if (data.success && data.userId === session.user.id) {
+        if (data.games && this.socket) {
+          data.games.forEach((gameId: string) => {
+            console.log('Joining existing game:', gameId);
+            this.socket.emit('join_game', { gameId });
+          });
         }
-      }, 5000);
+      } else {
+        console.error('Authentication failed:', data);
+        // Clear invalid token
+        localStorage.removeItem('token');
+        this.socket?.disconnect();
+      }
+    });
 
-      socketInstance.on('connect', () => {
-        console.log('Socket connected successfully');
-        if (connectionTimeout) {
-          clearTimeout(connectionTimeout);
-          connectionTimeout = null;
-        }
-        reconnectAttempts = 0;
-        
-        // Emit authenticate event immediately after connection
-        const socket = socketInstance;
-        if (socket && session.user.sessionToken) {
-          console.log('Emitting authenticate event with token:', session.user.sessionToken);
+    this.socket.on('online_users', (onlineUserIds: string[]) => {
+      console.log('Online users updated:', onlineUserIds);
+      // Dispatch a custom event that components can listen to
+      window.dispatchEvent(new CustomEvent('online_users_updated', { 
+        detail: onlineUserIds 
+      }));
+    });
+
+    this.socket.on('error', (error: { message: string }) => {
+      console.error('Socket error:', error.message);
+      const socket = this.socket;
+      if (error.message === 'Not authenticated' && !this.reconnectAttempts >= this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        console.log('Re-authenticating...');
+        if (session.user.sessionToken) {
           socket.emit('authenticate', {
             userId: session.user.id,
             token: session.user.sessionToken
           });
-        }
-      });
-
-      socketInstance.on('authenticated', (data) => {
-        console.log('Socket authenticated:', data);
-        pendingAuth = false;
-        const socket = socketInstance;
-        if (data.success && data.userId === session.user.id) {
-          isInitialized = true;
-          // Only join games after authenticated
-          if (data.games && socket) {
-            data.games.forEach((gameId: string) => {
-              console.log('Joining existing game:', gameId);
-              socket.emit('join_game', { gameId });
-            });
-          }
         } else {
-          console.error('Authentication failed:', data);
-          // Clear invalid token
+          console.error('No session token available for re-authentication');
           localStorage.removeItem('token');
-          socket?.disconnect();
-        }
-      });
-
-      socketInstance.on('online_users', (onlineUserIds: string[]) => {
-        console.log('Online users updated:', onlineUserIds);
-        // Dispatch a custom event that components can listen to
-        window.dispatchEvent(new CustomEvent('online_users_updated', { 
-          detail: onlineUserIds 
-        }));
-      });
-
-      socketInstance.on('error', (error: { message: string }) => {
-        console.error('Socket error:', error.message);
-        const socket = socketInstance;
-        if (error.message === 'Not authenticated' && !pendingAuth && !isInitialized && socket) {
-          pendingAuth = true;
-          console.log('Re-authenticating...');
-          if (session.user.sessionToken) {
-            socket.emit('authenticate', {
-              userId: session.user.id,
-              token: session.user.sessionToken
-            });
-          } else {
-            console.error('No session token available for re-authentication');
-            localStorage.removeItem('token');
-            socket.disconnect();
-          }
-        }
-      });
-
-      socketInstance.on('connect_error', (error: Error) => {
-        console.error('Socket connection error:', error);
-        const socket = socketInstance;
-        console.log('Current socket state:', {
-          connected: socket?.connected,
-          id: socket?.id,
-          auth: socket?.auth
-        });
-        pendingAuth = false;
-        reconnectAttempts++;
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error('Max reconnection attempts reached');
-          socket?.disconnect();
-          socketInstance = null;
-          isInitialized = false;
-        } else if (socket) {
-          // Try polling if websocket fails
-          const opts = socket.io.opts;
-          if (opts && Array.isArray(opts.transports) && opts.transports.includes('websocket' as any)) {
-            console.log('Switching to polling transport');
-            opts.transports = ['polling'];
-            socket.connect();
-          }
-        }
-      });
-
-      socketInstance.on('disconnect', (reason: string) => {
-        console.log('Socket disconnected:', reason);
-        pendingAuth = false;
-        isInitialized = false;
-        if (reason === 'io server disconnect' || reason === 'transport close') {
-          socketInstance = null;
-          setTimeout(() => {
-            if (!socketInstance) {
-              console.log('Attempting to reconnect...');
-              this.initialize(session);
-            }
-          }, 1000);
-        }
-      });
-
-      return socketInstance;
-    },
-
-    getSocket() {
-      return socketInstance;
-    },
-
-    isInitialized() {
-      return isInitialized && !!socketInstance?.connected;
-    },
-
-    disconnect() {
-      if (socketInstance) {
-        socketInstance.disconnect();
-        socketInstance = null;
-        isInitialized = false;
-        pendingAuth = false;
-        reconnectAttempts = 0;
-        if (connectionTimeout) {
-          clearTimeout(connectionTimeout);
-          connectionTimeout = null;
+          socket.disconnect();
         }
       }
+    });
+
+    this.socket.on('connect_error', (error: Error) => {
+      console.error('Socket connection error:', error);
+      const socket = this.socket;
+      console.log('Current socket state:', {
+        connected: socket?.connected,
+        id: socket?.id,
+        auth: socket?.auth
+      });
+      this.reconnectAttempts++;
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached');
+        socket?.disconnect();
+        this.socket = null;
+      } else if (socket) {
+        // Try polling if websocket fails
+        const opts = socket.io.opts;
+        if (opts && Array.isArray(opts.transports) && opts.transports.includes('websocket' as any)) {
+          console.log('Switching to polling transport');
+          opts.transports = ['polling'];
+          socket.connect();
+        }
+      }
+    });
+
+    this.socket.on('disconnect', (reason: string) => {
+      console.log('Socket disconnected:', reason);
+      if (reason === 'io server disconnect' || reason === 'transport close') {
+        this.socket = null;
+        setTimeout(() => {
+          if (!this.socket) {
+            console.log('Attempting to reconnect...');
+            this.initialize(session);
+          }
+        }, 1000);
+      }
+    });
+
+    return this.socket;
+  }
+
+  getSocket() {
+    return this.socket;
+  }
+
+  isInitialized() {
+    return !!this.socket?.connected;
+  }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+      this.reconnectAttempts = 0;
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
     }
-  };
+  }
 }
+
+export const getSocketManager = () => {
+  return new SocketManager();
+};
 
 export const getSocket = (): Socket | null => {
   return socketInstance;
