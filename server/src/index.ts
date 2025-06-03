@@ -134,7 +134,9 @@ io.use((socket: AuthenticatedSocket, next) => {
   console.log('Socket auth attempt:', {
     hasUserId: !!auth?.userId,
     hasToken: !!auth?.token,
-    socketId: socket.id
+    socketId: socket.id,
+    headers: socket.handshake.headers,
+    auth: auth
   });
 
   if (!auth?.userId || !auth?.token) {
@@ -144,11 +146,20 @@ io.use((socket: AuthenticatedSocket, next) => {
 
   try {
     const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!) as { userId: string };
+    console.log('Token decoded:', {
+      decodedUserId: decoded.userId,
+      authUserId: auth.userId,
+      match: decoded.userId === auth.userId
+    });
+
     if (decoded.userId === auth.userId) {
       socket.userId = auth.userId;
       socket.auth = auth;
       socket.isAuthenticated = true;
-      console.log('Socket authenticated successfully:', socket.userId);
+      console.log('Socket authenticated successfully:', {
+        userId: socket.userId,
+        socketId: socket.id
+      });
       return next();
     }
     console.log('Authentication failed: Token userId mismatch');
@@ -160,14 +171,21 @@ io.use((socket: AuthenticatedSocket, next) => {
 });
 
 io.on('connection', (socket: AuthenticatedSocket) => {
-  console.log('Client connected:', socket.id);
-  console.log('Socket handshake.auth:', socket.handshake.auth);
+  console.log('Client connected:', {
+    socketId: socket.id,
+    userId: socket.userId,
+    isAuthenticated: socket.isAuthenticated,
+    auth: socket.auth
+  });
 
   if (socket.userId) {
     authenticatedSockets.set(socket.userId, socket);
     onlineUsers.add(socket.userId);
     io.emit('online_users', Array.from(onlineUsers));
-    console.log('User connected:', socket.userId);
+    console.log('User connected:', {
+      userId: socket.userId,
+      onlineUsers: Array.from(onlineUsers)
+    });
     socket.emit('authenticated', { 
       success: true, 
       userId: socket.userId,
