@@ -13,10 +13,11 @@ router.post('/friends/add', async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    if (error.code === 'P2002') {
+    const err = error as any;
+    if (err.code === 'P2002') {
       // Unique constraint failed (already friends)
       res.status(409).json({ error: "Already added as a friend." });
-    } else if (error.code === 'P2003') {
+    } else if (err.code === 'P2003') {
       // Foreign key constraint failed (user or friend does not exist)
       res.status(404).json({ error: "User or friend not found." });
     } else {
@@ -34,7 +35,8 @@ router.post('/friends/remove', async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    if (error.code === 'P2025') {
+    const err = error as any;
+    if (err.code === 'P2025') {
       // Record not found
       res.status(404).json({ error: "Friend relationship not found." });
     } else {
