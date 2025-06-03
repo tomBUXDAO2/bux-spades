@@ -29,7 +29,7 @@ export default function TablePage() {
 
     const fetchGame = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/games/${gameId}`);
+        const response = await fetch(`/api/games/${gameId}`);
         if (response.status === 404) {
           navigate('/'); // Redirect to lobby if not found
           return;
@@ -57,7 +57,7 @@ export default function TablePage() {
   const handleJoinGame = async () => {
     if (!user || !gameId) return;
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/games/${gameId}/join`, {
+      const response = await fetch(`/api/games/${gameId}/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
