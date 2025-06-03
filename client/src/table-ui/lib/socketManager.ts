@@ -183,7 +183,6 @@ export function getSocketManager() {
         console.log('Socket disconnected:', reason);
         pendingAuth = false;
         isInitialized = false;
-        const socket = socketInstance;
         if (reason === 'io server disconnect' || reason === 'transport close') {
           socketInstance = null;
           setTimeout(() => {
