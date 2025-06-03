@@ -118,9 +118,18 @@ const HomePage: React.FC = () => {
       };
       window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
 
+      // Listen for friendAdded event and refresh player list
+      const handleFriendAdded = () => {
+        fetch('/api/users')
+          .then(res => res.json())
+          .then(setOnlinePlayers);
+      };
+      socket.current.on('friendAdded', handleFriendAdded);
+
       return () => {
         socket.current?.disconnect();
         window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+        socket.current?.off('friendAdded', handleFriendAdded);
       };
     }
   }, [user]);
