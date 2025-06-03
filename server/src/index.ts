@@ -366,7 +366,7 @@ io.engine.on('upgradeError', (err) => {
   console.error('Upgrade error:', err);
 });
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3000;
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
