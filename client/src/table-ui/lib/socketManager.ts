@@ -120,6 +120,14 @@ export function getSocketManager() {
         }
       });
 
+      socketInstance.on('online_users', (onlineUserIds: string[]) => {
+        console.log('Online users updated:', onlineUserIds);
+        // Dispatch a custom event that components can listen to
+        window.dispatchEvent(new CustomEvent('online_users_updated', { 
+          detail: onlineUserIds 
+        }));
+      });
+
       socketInstance.on('error', (error: { message: string }) => {
         console.error('Socket error:', error.message);
         if (error.message === 'Not authenticated' && !pendingAuth && !isInitialized) {

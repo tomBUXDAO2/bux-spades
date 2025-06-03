@@ -104,8 +104,25 @@ const HomePage: React.FC = () => {
     socket.current.on('lobby_chat_message', (msg: ChatMessage) => {
       setChatMessages(prev => [...prev, msg]);
     });
+    socket.current.on('online_users', (onlineUserIds: string[]) => {
+      setOnlinePlayers(prev => prev.map(player => ({
+        ...player,
+        online: onlineUserIds.includes(player.id)
+      })));
+    });
+
+    // Listen for the custom online_users_updated event
+    const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+      setOnlinePlayers(prev => prev.map(player => ({
+        ...player,
+        online: event.detail.includes(player.id)
+      })));
+    };
+    window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+
     return () => {
       socket.current.disconnect();
+      window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
     };
   }, [user?.id]);
 
