@@ -77,8 +77,10 @@ export function getSocketManager() {
       connectionTimeout = setTimeout(() => {
         if (socketInstance && !socketInstance.connected) {
           console.log('Connection timeout, retrying with polling only');
-          socketInstance.io.opts.transports = ['polling'];
-          socketInstance.connect();
+          if (socketInstance.io.opts.transports) {
+            socketInstance.io.opts.transports = ['polling'];
+            socketInstance.connect();
+          }
         }
       }, 5000);
 
