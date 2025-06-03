@@ -95,9 +95,10 @@ export function getSocketManager() {
         reconnectAttempts = 0;
         
         // Emit authenticate event immediately after connection
-        if (session.user.sessionToken) {
+        const socket = socketInstance;
+        if (socket && session.user.sessionToken) {
           console.log('Emitting authenticate event with token:', session.user.sessionToken);
-          socketInstance.emit('authenticate', {
+          socket.emit('authenticate', {
             userId: session.user.id,
             token: session.user.sessionToken
           });
@@ -107,20 +108,21 @@ export function getSocketManager() {
       socketInstance.on('authenticated', (data) => {
         console.log('Socket authenticated:', data);
         pendingAuth = false;
+        const socket = socketInstance;
         if (data.success && data.userId === session.user.id) {
           isInitialized = true;
           // Only join games after authenticated
-          if (data.games) {
+          if (data.games && socket) {
             data.games.forEach((gameId: string) => {
               console.log('Joining existing game:', gameId);
-              socketInstance?.emit('join_game', { gameId });
+              socket.emit('join_game', { gameId });
             });
           }
         } else {
           console.error('Authentication failed:', data);
           // Clear invalid token
           localStorage.removeItem('token');
-          socketInstance?.disconnect();
+          socket?.disconnect();
         }
       });
 
@@ -134,42 +136,45 @@ export function getSocketManager() {
 
       socketInstance.on('error', (error: { message: string }) => {
         console.error('Socket error:', error.message);
-        if (error.message === 'Not authenticated' && !pendingAuth && !isInitialized) {
+        const socket = socketInstance;
+        if (error.message === 'Not authenticated' && !pendingAuth && !isInitialized && socket) {
           pendingAuth = true;
           console.log('Re-authenticating...');
           if (session.user.sessionToken) {
-            socketInstance?.emit('authenticate', {
+            socket.emit('authenticate', {
               userId: session.user.id,
               token: session.user.sessionToken
             });
           } else {
             console.error('No session token available for re-authentication');
             localStorage.removeItem('token');
-            socketInstance?.disconnect();
+            socket.disconnect();
           }
         }
       });
 
       socketInstance.on('connect_error', (error: Error) => {
         console.error('Socket connection error:', error);
+        const socket = socketInstance;
         console.log('Current socket state:', {
-          connected: socketInstance?.connected,
-          id: socketInstance?.id,
-          auth: socketInstance?.auth
+          connected: socket?.connected,
+          id: socket?.id,
+          auth: socket?.auth
         });
         pendingAuth = false;
         reconnectAttempts++;
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
           console.error('Max reconnection attempts reached');
-          socketInstance?.disconnect();
+          socket?.disconnect();
           socketInstance = null;
           isInitialized = false;
-        } else {
+        } else if (socket) {
           // Try polling if websocket fails
-          if (Array.isArray(socketInstance?.io.opts.transports) && socketInstance.io.opts.transports.includes('websocket' as any)) {
+          const opts = socket.io.opts;
+          if (opts && Array.isArray(opts.transports) && opts.transports.includes('websocket' as any)) {
             console.log('Switching to polling transport');
-            socketInstance.io.opts.transports = ['polling'];
-            socketInstance.connect();
+            opts.transports = ['polling'];
+            socket.connect();
           }
         }
       });
@@ -178,6 +183,7 @@ export function getSocketManager() {
         console.log('Socket disconnected:', reason);
         pendingAuth = false;
         isInitialized = false;
+        const socket = socketInstance;
         if (reason === 'io server disconnect' || reason === 'transport close') {
           socketInstance = null;
           setTimeout(() => {
