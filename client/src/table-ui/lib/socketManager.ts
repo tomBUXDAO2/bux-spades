@@ -1,11 +1,21 @@
 import { io, Socket } from 'socket.io-client';
 
 class SocketManager {
+  private static instance: SocketManager | null = null;
   private socket: Socket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private connectionTimeout: NodeJS.Timeout | null = null;
   private storedToken: string | null = null;
+
+  private constructor() {}
+
+  static getInstance(): SocketManager {
+    if (!SocketManager.instance) {
+      SocketManager.instance = new SocketManager();
+    }
+    return SocketManager.instance;
+  }
 
   initialize(session: any): Socket | null {
     console.log('Initializing socket with session:', {
@@ -209,7 +219,7 @@ class SocketManager {
 }
 
 export const getSocketManager = () => {
-  return new SocketManager();
+  return SocketManager.getInstance();
 };
 
 export const getSocket = (): Socket | null => {
