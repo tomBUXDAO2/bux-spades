@@ -40,6 +40,7 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   'http://localhost:5173',
   'https://bux-spades.pro',
+  'https://www.bux-spades.pro',
   'https://bux-spades.vercel.app'
 ];
 
@@ -128,88 +129,41 @@ app.use('/api/users', usersRoutes);
 app.use('/api/social', socialRoutes);
 
 // Socket.IO connection handling
+io.use((socket: AuthenticatedSocket, next) => {
+  const auth = socket.handshake.auth;
+  if (!auth?.userId || !auth?.token) {
+    return next(new Error('Authentication required'));
+  }
+
+  try {
+    const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!);
+    if (typeof decoded === 'object' && decoded.userId === auth.userId) {
+      socket.userId = auth.userId;
+      socket.auth = auth;
+      socket.isAuthenticated = true;
+      return next();
+    }
+    return next(new Error('Invalid token'));
+  } catch (err) {
+    return next(new Error('Invalid token'));
+  }
+});
+
 io.on('connection', (socket: AuthenticatedSocket) => {
   console.log('Client connected:', socket.id);
   console.log('Socket handshake.auth:', socket.handshake.auth);
-  socket.isAuthenticated = false;
 
-  // Check initial auth data
-  const auth = socket.handshake.auth;
-  if (auth?.userId && auth?.token) {
-    try {
-      const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!);
-      console.log('Decoded JWT:', decoded);
-      if (typeof decoded === 'object' && decoded.userId === auth.userId) {
-        socket.userId = auth.userId;
-        socket.auth = auth;
-        authenticatedSockets.set(auth.userId, socket);
-        socket.isAuthenticated = true;
-        onlineUsers.add(auth.userId);
-        io.emit('online_users', Array.from(onlineUsers));
-        console.log('User auto-authenticated:', auth.userId);
-        socket.emit('authenticated', { 
-          success: true, 
-          userId: auth.userId,
-          games: Array.from(socket.rooms).filter(room => room !== socket.id)
-        });
-      } else {
-        console.log('JWT userId mismatch');
-        socket.disconnect(true);
-        return;
-      }
-    } catch (err) {
-      console.log('JWT verification failed:', err);
-      socket.disconnect(true);
-      return;
-    }
-  } else {
-    console.log('No auth or token in handshake');
-    socket.disconnect(true);
-    return;
+  if (socket.userId) {
+    authenticatedSockets.set(socket.userId, socket);
+    onlineUsers.add(socket.userId);
+    io.emit('online_users', Array.from(onlineUsers));
+    console.log('User connected:', socket.userId);
+    socket.emit('authenticated', { 
+      success: true, 
+      userId: socket.userId,
+      games: Array.from(socket.rooms).filter(room => room !== socket.id)
+    });
   }
-
-  // Listen for authenticate event from client
-  socket.on('authenticate', ({ userId, token }) => {
-    console.log('Authentication attempt:', { userId, hasToken: !!token });
-    if (!userId || !token) {
-      console.log('Authentication failed: No userId or token provided');
-      socket.emit('error', { message: 'No userId or token provided' });
-      return;
-    }
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-      if (typeof decoded === 'object' && decoded.userId === userId) {
-        authenticatedSockets.set(userId, socket);
-        socket.userId = userId;
-        socket.isAuthenticated = true;
-        onlineUsers.add(userId);
-        io.emit('online_users', Array.from(onlineUsers));
-        console.log('User authenticated:', userId);
-        socket.emit('authenticated', { 
-          success: true, 
-          userId,
-          games: Array.from(socket.rooms).filter(room => room !== socket.id)
-        });
-        // Join any existing games for this user
-        const userGames = games.filter((game: Game) => 
-          game.players.some((player: GamePlayer | null) => player?.id === userId)
-        );
-        userGames.forEach((game: Game) => {
-          socket.join(game.id);
-          console.log(`User ${userId} joined existing game ${game.id}`);
-          socket.emit('game_update', game);
-        });
-      } else {
-        console.log('JWT userId mismatch in authenticate');
-        socket.emit('error', { message: 'Invalid token' });
-        socket.disconnect(true);
-      }
-    } catch (err) {
-      console.log('JWT verification failed in authenticate:', err);
-      socket.emit('error', { message: 'Invalid or expired token' });
-      socket.disconnect(true);
-    }
-  });
 
   // Join game room for real-time updates
   socket.on('join_game', ({ gameId }) => {

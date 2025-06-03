@@ -87,16 +87,6 @@ export function getSocketManager() {
           connectionTimeout = null;
         }
         reconnectAttempts = 0;
-        
-        // Only authenticate if not already authenticated
-        if (session.user.id && !pendingAuth && !isInitialized) {
-          pendingAuth = true;
-          console.log('Emitting authenticate event');
-          socketInstance?.emit('authenticate', {
-            userId: session.user.id,
-            token: session.user.sessionToken
-          });
-        }
       });
 
       socketInstance.on('authenticated', (data) => {
