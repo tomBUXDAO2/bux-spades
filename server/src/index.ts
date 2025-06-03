@@ -130,6 +130,7 @@ app.use('/api/social', socialRoutes);
 // Socket.IO connection handling
 io.on('connection', (socket: AuthenticatedSocket) => {
   console.log('Client connected:', socket.id);
+  console.log('Socket handshake.auth:', socket.handshake.auth);
   socket.isAuthenticated = false;
 
   // Check initial auth data
@@ -137,6 +138,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   if (auth?.userId && auth?.token) {
     try {
       const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!);
+      console.log('Decoded JWT:', decoded);
       if (typeof decoded === 'object' && decoded.userId === auth.userId) {
         socket.userId = auth.userId;
         socket.auth = auth;
