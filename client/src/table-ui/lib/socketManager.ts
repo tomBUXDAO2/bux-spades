@@ -23,7 +23,8 @@ export function getSocketManager() {
       console.log('Initializing socket with session:', {
         userId: session.user.id,
         username: session.user.username,
-        hasSessionToken: !!session.user.sessionToken
+        hasSessionToken: !!session.user.sessionToken,
+        token: session.user.sessionToken
       });
 
       if (socketInstance?.connected) {
@@ -67,7 +68,8 @@ export function getSocketManager() {
         forceNew: true,
         autoConnect: true,
         extraHeaders: {
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          'Authorization': `Bearer ${session.user.sessionToken}`
         }
       });
 
@@ -87,6 +89,15 @@ export function getSocketManager() {
           connectionTimeout = null;
         }
         reconnectAttempts = 0;
+        
+        // Emit authenticate event immediately after connection
+        if (session.user.sessionToken) {
+          console.log('Emitting authenticate event');
+          socketInstance.emit('authenticate', {
+            userId: session.user.id,
+            token: session.user.sessionToken
+          });
+        }
       });
 
       socketInstance.on('authenticated', (data) => {
@@ -103,6 +114,8 @@ export function getSocketManager() {
           }
         } else {
           console.error('Authentication failed:', data);
+          // Clear invalid token
+          localStorage.removeItem('token');
           socketInstance?.disconnect();
         }
       });
@@ -112,15 +125,26 @@ export function getSocketManager() {
         if (error.message === 'Not authenticated' && !pendingAuth && !isInitialized) {
           pendingAuth = true;
           console.log('Re-authenticating...');
-          socketInstance?.emit('authenticate', {
-            userId: session.user.id,
-            token: session.user.sessionToken
-          });
+          if (session.user.sessionToken) {
+            socketInstance?.emit('authenticate', {
+              userId: session.user.id,
+              token: session.user.sessionToken
+            });
+          } else {
+            console.error('No session token available for re-authentication');
+            localStorage.removeItem('token');
+            socketInstance?.disconnect();
+          }
         }
       });
 
       socketInstance.on('connect_error', (error: Error) => {
         console.error('Socket connection error:', error);
+        console.log('Current socket state:', {
+          connected: socketInstance?.connected,
+          id: socketInstance?.id,
+          auth: socketInstance?.auth
+        });
         pendingAuth = false;
         reconnectAttempts++;
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -201,9 +225,51 @@ export async function handleAuthenticatedSession() {
   const socketManager = getSocketManager();
   if (!socketManager.isInitialized()) {
     console.log('Socket not initialized, initializing...');
-    const session = await fetch('/api/auth/session').then(res => res.json());
-    if (session?.user) {
-      socketManager.initialize(session);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found in localStorage');
+      return;
+    }
+    
+    try {
+      console.log('Fetching profile with token:', token);
+      const response = await fetch('/api/auth/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch profile: ${response.status}`);
+      }
+      
+      const session = await response.json();
+      
+      if (session?.user) {
+        // Create a proper session object with the token
+        const sessionWithToken = {
+          user: {
+            ...session.user,
+            sessionToken: token
+          }
+        };
+        
+        console.log('Session initialized with token:', {
+          userId: sessionWithToken.user.id,
+          username: sessionWithToken.user.username,
+          hasToken: !!sessionWithToken.user.sessionToken
+        });
+        
+        socketManager.initialize(sessionWithToken);
+      } else {
+        console.error('Invalid session response:', session);
+        // Clear invalid token
+        localStorage.removeItem('token');
+      }
+    } catch (error) {
+      console.error('Error fetching session:', error);
+      // Clear token on error
+      localStorage.removeItem('token');
     }
   }
 } 
