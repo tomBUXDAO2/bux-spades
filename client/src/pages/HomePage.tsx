@@ -120,7 +120,9 @@ const HomePage: React.FC = () => {
 
       // Listen for friendAdded event and refresh player list
       const handleFriendAdded = () => {
-        fetch('/api/users')
+        fetch('/api/users', {
+          headers: { 'x-user-id': user.id }
+        })
           .then(res => res.json())
           .then(setOnlinePlayers);
       };
@@ -358,11 +360,13 @@ const HomePage: React.FC = () => {
 
   // Fetch real users for the lobby
   useEffect(() => {
-    fetch('/api/users')
+    fetch('/api/users', {
+      headers: { 'x-user-id': user.id }
+    })
       .then(res => res.json())
       .then(setOnlinePlayers)
       .catch(() => setOnlinePlayers([]));
-  }, []);
+  }, [user.id]);
 
   // Fetch games as a fallback for loading spinner
   useEffect(() => {
@@ -408,7 +412,9 @@ const HomePage: React.FC = () => {
         body: JSON.stringify(body)
       });
       // Refresh player list
-      fetch('/api/users')
+      fetch('/api/users', {
+        headers: { 'x-user-id': user.id }
+      })
         .then(res => res.json())
         .then(setOnlinePlayers);
     }
