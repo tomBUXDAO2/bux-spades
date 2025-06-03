@@ -51,13 +51,18 @@ export function getSocketManager() {
         connectionTimeout = null;
       }
 
+      if (!session.user.sessionToken) {
+        console.error('No session token available for socket connection');
+        return;
+      }
+
       socketInstance = io(SOCKET_URL, {
         auth: {
           userId: session.user.id,
           username: session.user.username,
           token: session.user.sessionToken
         },
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
         reconnectionDelay: 1000,
