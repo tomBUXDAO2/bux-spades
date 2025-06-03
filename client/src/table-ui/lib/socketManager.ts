@@ -2,10 +2,8 @@ import { io, Socket } from 'socket.io-client';
 
 class SocketManager {
   private socket: Socket | null = null;
-  private session: any = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
   private connectionTimeout: NodeJS.Timeout | null = null;
   private storedToken: string | null = null;
 
@@ -31,8 +29,6 @@ class SocketManager {
       console.error('No session token available for socket connection');
       return null;
     }
-
-    this.session = session;
 
     if (this.socket?.connected) {
       console.log('Socket exists and is connected, reusing...');
