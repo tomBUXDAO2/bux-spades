@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { io } from '../index';
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -11,6 +12,9 @@ router.post('/friends/add', async (req, res) => {
     await prisma.friend.create({
       data: { userId, friendId }
     });
+    // Emit socket event to both users
+    io.to(userId).emit('friendAdded', { friendId });
+    io.to(friendId).emit('friendAdded', { userId });
     res.json({ success: true });
   } catch (error) {
     const err = error as any;
