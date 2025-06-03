@@ -52,11 +52,12 @@ class SocketManager {
       this.connectionTimeout = null;
     }
 
+    const token = session.user.sessionToken;
     this.socket = io(SOCKET_URL, {
       auth: {
         userId: session.user.id,
         username: session.user.username,
-        token: session.user.sessionToken
+        token: token
       },
       transports: ['websocket'],
       reconnection: true,
@@ -69,7 +70,7 @@ class SocketManager {
       forceNew: true,
       autoConnect: true,
       extraHeaders: {
-        'Authorization': `Bearer ${session.user.sessionToken}`
+        'Authorization': `Bearer ${token}`
       }
     });
 
@@ -94,12 +95,12 @@ class SocketManager {
       this.reconnectAttempts = 0;
       
       // Emit authenticate event immediately after connection
-      if (this.socket && session.user.sessionToken) {
-        console.log('Emitting authenticate event with token:', session.user.sessionToken);
+      if (this.socket && token) {
+        console.log('Emitting authenticate event with token:', token);
         this.socket.emit('authenticate', {
           userId: session.user.id,
           username: session.user.username,
-          token: session.user.sessionToken
+          token: token
         });
       }
     });
