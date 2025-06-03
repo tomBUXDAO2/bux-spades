@@ -131,21 +131,24 @@ app.use('/api/social', socialRoutes);
 // Socket.IO connection handling
 io.use((socket: AuthenticatedSocket, next) => {
   const auth = socket.handshake.auth;
+  const authHeader = socket.handshake.headers.authorization;
+  const token = auth?.token || (authHeader && authHeader.split(' ')[1]);
+
   console.log('Socket auth attempt:', {
     hasUserId: !!auth?.userId,
-    hasToken: !!auth?.token,
+    hasToken: !!token,
     socketId: socket.id,
     headers: socket.handshake.headers,
     auth: auth
   });
 
-  if (!auth?.userId || !auth?.token) {
+  if (!auth?.userId || !token) {
     console.log('Authentication failed: Missing userId or token');
     return next(new Error('Authentication required'));
   }
 
   try {
-    const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!) as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
     console.log('Token decoded:', {
       decodedUserId: decoded.userId,
       authUserId: auth.userId,
@@ -154,7 +157,7 @@ io.use((socket: AuthenticatedSocket, next) => {
 
     if (decoded.userId === auth.userId) {
       socket.userId = auth.userId;
-      socket.auth = auth;
+      socket.auth = { ...auth, token };
       socket.isAuthenticated = true;
       console.log('Socket authenticated successfully:', {
         userId: socket.userId,
