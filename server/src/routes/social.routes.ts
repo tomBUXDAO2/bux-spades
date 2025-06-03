@@ -55,9 +55,9 @@ router.post('/block', async (req, res) => {
   if (userId === blockId) return res.status(400).json({ error: "Cannot block yourself." });
   // Remove from friends if currently a friend
   await prisma.friend.deleteMany({ where: { userId, friendId: blockId } });
-  await prisma.user.update({
-    where: { id: userId },
-    data: { blockedUsers: { connect: { id: blockId } } }
+  // Add to BlockedUser table
+  await prisma.blockedUser.create({
+    data: { userId, blockedId: blockId }
   });
   // Emit socket events for real-time update
   io.to(userId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh
@@ -68,10 +68,11 @@ router.post('/block', async (req, res) => {
 // Unblock User
 router.post('/unblock', async (req, res) => {
   const { userId, blockId } = req.body;
-  await prisma.user.update({
-    where: { id: userId },
-    data: { blockedUsers: { disconnect: { id: blockId } } }
+  await prisma.blockedUser.deleteMany({
+    where: { userId, blockedId: blockId }
   });
+  // Emit socket event for real-time update
+  io.to(userId).emit('blockedUser', { blockId });
   res.json({ success: true });
 });
 
