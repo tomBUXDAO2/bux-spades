@@ -23,38 +23,14 @@ const httpServer = createServer(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://bux-spades.pro',
-  'https://bux-spades.vercel.app'
-];
-
-// CORS configuration
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie'],
-  maxAge: 86400 // 24 hours
-}));
-
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie'],
-  maxAge: 86400
-}));
-
+// Universal CORS handler
 app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
   if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
     return res.sendStatus(200);
   }
   next();
