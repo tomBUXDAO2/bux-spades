@@ -12,10 +12,10 @@ router.get('/', async (req, res) => {
     select: { id: true, username: true, avatar: true, coins: true }
   });
 
-  let friends = [], blocked = [];
+  let friends = [], blockedUsers = [];
   if (currentUserId) {
     friends = await prisma.friend.findMany({ where: { userId: currentUserId } });
-    blocked = await prisma.blockedUser.findMany({ where: { userId: currentUserId } });
+    blockedUsers = await prisma.blockedUser.findMany({ where: { userId: currentUserId } });
   }
 
   const usersWithStatus = users.map(u => ({
@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
     online: onlineUsers.has(u.id),
     status: friends.some(f => f.friendId === u.id)
       ? 'friend'
-      : blocked.some(b => b.blockedId === u.id)
+      : blockedUsers.some(b => b.blockedId === u.id)
       ? 'blocked'
       : 'not_friend'
   }));
@@ -31,10 +31,10 @@ router.get('/', async (req, res) => {
   res.json(usersWithStatus);
 });
 
-// GET /api/users/:id/stats - return all UserGameStats for a user
+// GET /api/users/:id/stats - return all UserStats for a user
 router.get('/:id/stats', async (req, res) => {
   const userId = req.params.id;
-  const stats = await prisma.userGameStats.findMany({
+  const stats = await prisma.userStats.findMany({
     where: { userId }
   });
   res.json(stats);

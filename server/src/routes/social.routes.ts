@@ -30,7 +30,7 @@ router.post('/block', async (req, res) => {
   if (userId === blockId) return res.status(400).json({ error: "Cannot block yourself." });
   await prisma.user.update({
     where: { id: userId },
-    data: { blocked: { connect: { id: blockId } } }
+    data: { blockedUsers: { connect: { id: blockId } } }
   });
   res.json({ success: true });
 });
@@ -40,7 +40,7 @@ router.post('/unblock', async (req, res) => {
   const { userId, blockId } = req.body;
   await prisma.user.update({
     where: { id: userId },
-    data: { blocked: { disconnect: { id: blockId } } }
+    data: { blockedUsers: { disconnect: { id: blockId } } }
   });
   res.json({ success: true });
 });
