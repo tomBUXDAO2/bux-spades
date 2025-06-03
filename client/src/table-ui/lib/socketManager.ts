@@ -272,14 +272,15 @@ export async function handleAuthenticatedSession() {
         const sessionWithToken = {
           user: {
             ...session.user,
-            sessionToken: token
+            sessionToken: token // Use the token from localStorage
           }
         };
         
         console.log('Session initialized with token:', {
           userId: sessionWithToken.user.id,
           username: sessionWithToken.user.username,
-          hasToken: !!sessionWithToken.user.sessionToken
+          hasToken: !!sessionWithToken.user.sessionToken,
+          token: sessionWithToken.user.sessionToken // Log the actual token for debugging
         });
         
         socketManager.initialize(sessionWithToken);
