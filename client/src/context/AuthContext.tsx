@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
 // Configure axios defaults
-axios.defaults.baseURL = import.meta.env.PROD ? import.meta.env.VITE_PROD_API_URL : import.meta.env.VITE_API_URL;
+axios.defaults.baseURL = import.meta.env.PROD
+  ? import.meta.env.VITE_PROD_API_URL
+  : import.meta.env.VITE_API_URL;
 axios.defaults.withCredentials = true;
 
 // Add request/response interceptors for debugging

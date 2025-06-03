@@ -11,7 +11,10 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const fetchUserProfile = async (token: string) => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/auth/profile`, {
+        const apiUrl = import.meta.env.PROD
+          ? import.meta.env.VITE_PROD_API_URL
+          : import.meta.env.VITE_API_URL;
+        const response = await axios.get(`${apiUrl}/api/auth/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(response.data.user);
