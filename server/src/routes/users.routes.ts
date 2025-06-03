@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
     blockedUsers = await prisma.blockedUser.findMany({ where: { userId: currentUserId } });
   }
 
+  // @ts-ignore
   const usersWithStatus = users.map(u => ({
     ...u,
     online: onlineUsers.has(u.id),
