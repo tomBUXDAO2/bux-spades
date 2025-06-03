@@ -373,4 +373,16 @@ const PORT = Number(process.env.PORT) || 3000;
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log('Server configuration:', {
+    port: PORT,
+    env: process.env.NODE_ENV,
+    cors: {
+      allowedOrigins,
+      credentials: true
+    },
+    socket: {
+      path: '/socket.io',
+      transports: ['polling', 'websocket']
+    }
+  });
 }); 
