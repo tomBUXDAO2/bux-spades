@@ -66,7 +66,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // @ts-expect-error
+    // @ts-ignore
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || '', {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     } as any);
