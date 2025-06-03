@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   const currentUserId = req.user?.id || req.headers['x-user-id']; // fallback for dev
   const users = await prisma.user.findMany({
     select: { id: true, username: true, avatar: true, coins: true }
-  }) as Array<{ id: string; username: string; avatar: string | null; coins: number }>;
+  }) as any[];
 
   let friends: { friendId: string }[] = [], blockedUsers: { blockedId: string }[] = [];
   if (currentUserId) {

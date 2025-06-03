@@ -67,9 +67,9 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // @ts-ignore
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || '', {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET as any, {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    } as any);
+    });
 
     res.status(201).json({
       token,
