@@ -23,7 +23,7 @@ router.post('/', (req, res) => {
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints,
       buyIn: settings.buyIn,
-      forcedBid: settings.specialRules?.screamer ? 'SUICIDE' : 'NONE',
+      forcedBid: (settings.specialRules?.screamer ? 'SUICIDE' : 'NONE') as 'SUICIDE' | 'NONE',
       specialRules: settings.specialRules || {},
       players: [creatorPlayer, null, null, null],
       status: 'WAITING',
