@@ -39,6 +39,23 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400
+}));
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // Socket.IO setup
 const io = new Server(httpServer, {
   cors: {
