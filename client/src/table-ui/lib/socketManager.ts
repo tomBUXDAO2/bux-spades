@@ -9,7 +9,7 @@ class SocketManager {
   private connectionTimeout: NodeJS.Timeout | null = null;
   private storedToken: string | null = null;
 
-  initialize(session: any): Socket {
+  initialize(session: any): Socket | null {
     console.log('Initializing socket with session:', {
       userId: session.user.id,
       username: session.user.username,
@@ -78,13 +78,12 @@ class SocketManager {
 
     // Set a connection timeout
     this.connectionTimeout = setTimeout(() => {
-      const socket = this.socket;
-      if (socket && !socket.connected) {
+      if (this.socket && !this.socket.connected) {
         console.log('Connection timeout, retrying with polling only');
-        const opts = socket.io.opts;
+        const opts = this.socket.io.opts;
         if (opts && Array.isArray(opts.transports)) {
           opts.transports = ['polling'];
-          socket.connect();
+          this.socket.connect();
         }
       }
     }, 5000);
@@ -98,10 +97,9 @@ class SocketManager {
       this.reconnectAttempts = 0;
       
       // Emit authenticate event immediately after connection
-      const socket = this.socket;
-      if (socket && session.user.sessionToken) {
+      if (this.socket && session.user.sessionToken) {
         console.log('Emitting authenticate event with token:', session.user.sessionToken);
-        socket.emit('authenticate', {
+        this.socket.emit('authenticate', {
           userId: session.user.id,
           token: session.user.sessionToken
         });
@@ -110,11 +108,11 @@ class SocketManager {
 
     this.socket.on('authenticated', (data) => {
       console.log('Socket authenticated:', data);
-      if (data.success && data.userId === session.user.id) {
-        if (data.games && this.socket) {
+      if (data.success && data.userId === session.user.id && this.socket) {
+        if (data.games) {
           data.games.forEach((gameId: string) => {
             console.log('Joining existing game:', gameId);
-            this.socket.emit('join_game', { gameId });
+            this.socket?.emit('join_game', { gameId });
           });
         }
       } else {
@@ -135,43 +133,41 @@ class SocketManager {
 
     this.socket.on('error', (error: { message: string }) => {
       console.error('Socket error:', error.message);
-      const socket = this.socket;
-      if (error.message === 'Not authenticated' && !this.reconnectAttempts >= this.maxReconnectAttempts) {
+      if (error.message === 'Not authenticated' && this.reconnectAttempts < this.maxReconnectAttempts && this.socket) {
         this.reconnectAttempts++;
         console.log('Re-authenticating...');
         if (session.user.sessionToken) {
-          socket.emit('authenticate', {
+          this.socket.emit('authenticate', {
             userId: session.user.id,
             token: session.user.sessionToken
           });
         } else {
           console.error('No session token available for re-authentication');
           localStorage.removeItem('token');
-          socket.disconnect();
+          this.socket.disconnect();
         }
       }
     });
 
     this.socket.on('connect_error', (error: Error) => {
       console.error('Socket connection error:', error);
-      const socket = this.socket;
       console.log('Current socket state:', {
-        connected: socket?.connected,
-        id: socket?.id,
-        auth: socket?.auth
+        connected: this.socket?.connected,
+        id: this.socket?.id,
+        auth: this.socket?.auth
       });
       this.reconnectAttempts++;
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
-        socket?.disconnect();
+        this.socket?.disconnect();
         this.socket = null;
-      } else if (socket) {
+      } else if (this.socket) {
         // Try polling if websocket fails
-        const opts = socket.io.opts;
+        const opts = this.socket.io.opts;
         if (opts && Array.isArray(opts.transports) && opts.transports.includes('websocket' as any)) {
           console.log('Switching to polling transport');
           opts.transports = ['polling'];
-          socket.connect();
+          this.socket.connect();
         }
       }
     });
@@ -192,15 +188,15 @@ class SocketManager {
     return this.socket;
   }
 
-  getSocket() {
+  getSocket(): Socket | null {
     return this.socket;
   }
 
-  isInitialized() {
+  isInitialized(): boolean {
     return !!this.socket?.connected;
   }
 
-  disconnect() {
+  disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
