@@ -70,8 +70,8 @@ const io = new Server(httpServer, {
     name: 'io',
     path: '/',
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
+    sameSite: 'none',
+    secure: true
   },
   upgradeTimeout: 30000,
   maxHttpBufferSize: 1e8,
@@ -131,20 +131,30 @@ app.use('/api/social', socialRoutes);
 // Socket.IO connection handling
 io.use((socket: AuthenticatedSocket, next) => {
   const auth = socket.handshake.auth;
+  console.log('Socket auth attempt:', {
+    hasUserId: !!auth?.userId,
+    hasToken: !!auth?.token,
+    socketId: socket.id
+  });
+
   if (!auth?.userId || !auth?.token) {
+    console.log('Authentication failed: Missing userId or token');
     return next(new Error('Authentication required'));
   }
 
   try {
-    const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!);
-    if (typeof decoded === 'object' && decoded.userId === auth.userId) {
+    const decoded = jwt.verify(auth.token, process.env.JWT_SECRET!) as { userId: string };
+    if (decoded.userId === auth.userId) {
       socket.userId = auth.userId;
       socket.auth = auth;
       socket.isAuthenticated = true;
+      console.log('Socket authenticated successfully:', socket.userId);
       return next();
     }
+    console.log('Authentication failed: Token userId mismatch');
     return next(new Error('Invalid token'));
   } catch (err) {
+    console.error('Token verification error:', err);
     return next(new Error('Invalid token'));
   }
 });
