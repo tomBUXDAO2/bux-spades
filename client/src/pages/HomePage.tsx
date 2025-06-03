@@ -8,7 +8,7 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data/sets/15/native.json';
 import type { GameState } from '../types/game';
 import { useNavigate } from 'react-router-dom';
-import { io as socketIOClient } from 'socket.io-client';
+import { getSocketManager } from '../table-ui/lib/socketManager';
 
 interface ChatMessage {
   id: string;
@@ -61,6 +61,7 @@ const HomePage: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const navigate = useNavigate();
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
+  const socketManager = useRef(getSocketManager());
   const socket = useRef<any>(null);
 
   // Check if user is new (has 5M coins and 0 games played)
@@ -77,54 +78,52 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    socket.current = socketIOClient(
-      import.meta.env.PROD
-        ? import.meta.env.VITE_PROD_API_URL
-        : import.meta.env.VITE_API_URL,
-      {
-        withCredentials: true,
-        transports: ['websocket'],
-        auth: {
-          userId: user?.id,
-          username: user?.username,
-          token: token // pass the JWT token here
-        }
-      }
-    );
-    // Authenticate after connecting
-    socket.current.on('connect', () => {
-      if (user?.id && token) {
-        socket.current.emit('authenticate', { userId: user.id, token });
-      }
-    });
-    socket.current.on('games_updated', (updatedGames: GameState[]) => {
-      setGames(updatedGames);
-      setIsLoading(false);
-    });
-    socket.current.on('lobby_chat_message', (msg: ChatMessage) => {
-      setChatMessages(prev => [...prev, msg]);
-    });
-    socket.current.on('online_users', (onlineUserIds: string[]) => {
-      setOnlinePlayers(prev => prev.map(player => ({
-        ...player,
-        online: onlineUserIds.includes(player.id)
-      })));
-    });
+    if (!token) {
+      console.error('No token found in localStorage');
+      return;
+    }
 
-    // Listen for the custom online_users_updated event
-    const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
-      setOnlinePlayers(prev => prev.map(player => ({
-        ...player,
-        online: event.detail.includes(player.id)
-      })));
+    const session = {
+      user: {
+        ...user,
+        sessionToken: token
+      }
     };
-    window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
 
-    return () => {
-      socket.current.disconnect();
-      window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
-    };
-  }, [user?.id]);
+    socket.current = socketManager.current.initialize(session);
+
+    if (socket.current) {
+      socket.current.on('games_updated', (updatedGames: GameState[]) => {
+        setGames(updatedGames);
+        setIsLoading(false);
+      });
+
+      socket.current.on('lobby_chat_message', (msg: ChatMessage) => {
+        setChatMessages(prev => [...prev, msg]);
+      });
+
+      socket.current.on('online_users', (onlineUserIds: string[]) => {
+        setOnlinePlayers(prev => prev.map(player => ({
+          ...player,
+          online: onlineUserIds.includes(player.id)
+        })));
+      });
+
+      // Listen for the custom online_users_updated event
+      const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+        setOnlinePlayers(prev => prev.map(player => ({
+          ...player,
+          online: event.detail.includes(player.id)
+        })));
+      };
+      window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+
+      return () => {
+        socket.current?.disconnect();
+        window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+      };
+    }
+  }, [user]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
