@@ -218,20 +218,13 @@ export const getSocketManager = () => {
 };
 
 export const getSocket = (): Socket | null => {
-  return socketInstance;
+  const manager = getSocketManager();
+  return manager.getSocket();
 };
 
 export const disconnectSocket = () => {
-  if (socketInstance) {
-    socketInstance.disconnect();
-    socketInstance = null;
-    pendingAuth = false;
-    reconnectAttempts = 0;
-    if (connectionTimeout) {
-      clearTimeout(connectionTimeout);
-      connectionTimeout = null;
-    }
-  }
+  const manager = getSocketManager();
+  manager.disconnect();
 };
 
 export async function handleAuthenticatedSession() {
