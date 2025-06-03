@@ -10,35 +10,40 @@ export const games: Game[] = [];
 
 // Create a new game
 router.post('/', (req, res) => {
-  const settings = req.body;
-  const creatorPlayer = {
-    id: settings.creatorId,
-    username: settings.creatorName,
-    avatar: settings.creatorImage || null
-  };
-  const newGame: Game = {
-    id: uuidv4(),
-    gameMode: settings.gameMode,
-    maxPoints: settings.maxPoints,
-    minPoints: settings.minPoints,
-    buyIn: settings.buyIn,
-    forcedBid: settings.specialRules?.screamer ? 'SUICIDE' : 'NONE',
-    specialRules: settings.specialRules || {},
-    players: [creatorPlayer, null, null, null],
-    status: 'WAITING',
-    completedTricks: [],
-    rules: {
-      gameType: settings.gameMode,
-      allowNil: true,
-      allowBlindNil: false,
-      coinAmount: settings.buyIn,
+  try {
+    const settings = req.body;
+    const creatorPlayer = {
+      id: settings.creatorId,
+      username: settings.creatorName,
+      avatar: settings.creatorImage || null
+    };
+    const newGame = {
+      id: uuidv4(),
+      gameMode: settings.gameMode,
       maxPoints: settings.maxPoints,
-      minPoints: settings.minPoints
-    }
-  };
-  games.push(newGame);
-  io.emit('games_updated', games);
-  res.status(201).json(newGame);
+      minPoints: settings.minPoints,
+      buyIn: settings.buyIn,
+      forcedBid: settings.specialRules?.screamer ? 'SUICIDE' : 'NONE',
+      specialRules: settings.specialRules || {},
+      players: [creatorPlayer, null, null, null],
+      status: 'WAITING',
+      completedTricks: [],
+      rules: {
+        gameType: settings.gameMode,
+        allowNil: true,
+        allowBlindNil: false,
+        coinAmount: settings.buyIn,
+        maxPoints: settings.maxPoints,
+        minPoints: settings.minPoints
+      }
+    };
+    games.push(newGame);
+    io.emit('games_updated', games);
+    res.status(201).json(newGame);
+  } catch (err) {
+    console.error('Error creating game:', err);
+    res.status(500).json({ error: 'Failed to create game' });
+  }
 });
 
 // List all games
