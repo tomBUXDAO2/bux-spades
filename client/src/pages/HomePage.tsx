@@ -76,19 +76,25 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     socket.current = socketIOClient(
       import.meta.env.PROD
         ? import.meta.env.VITE_PROD_API_URL
         : import.meta.env.VITE_API_URL,
       {
         withCredentials: true,
-        transports: ['websocket']
+        transports: ['websocket'],
+        auth: {
+          userId: user?.id,
+          username: user?.username,
+          token: token // pass the JWT token here
+        }
       }
     );
     // Authenticate after connecting
     socket.current.on('connect', () => {
-      if (user?.id) {
-        socket.current.emit('authenticate', { userId: user.id });
+      if (user?.id && token) {
+        socket.current.emit('authenticate', { userId: user.id, token });
       }
     });
     socket.current.on('games_updated', (updatedGames: GameState[]) => {
