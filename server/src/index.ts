@@ -36,12 +36,22 @@ app.use((req, res, next) => {
   next();
 });
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://bux-spades.pro',
+  'https://bux-spades.vercel.app'
+];
+
 // Socket.IO setup
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? process.env.PROD_CLIENT_URL 
-      : process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
