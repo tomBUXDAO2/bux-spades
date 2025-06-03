@@ -54,6 +54,8 @@ class SocketManager {
 
     this.socket = io(SOCKET_URL, {
       auth: {
+        userId: session.user.id,
+        username: session.user.username,
         token: session.user.sessionToken
       },
       transports: ['websocket'],
@@ -67,7 +69,6 @@ class SocketManager {
       forceNew: true,
       autoConnect: true,
       extraHeaders: {
-        'X-Requested-With': 'XMLHttpRequest',
         'Authorization': `Bearer ${session.user.sessionToken}`
       }
     });
@@ -97,6 +98,7 @@ class SocketManager {
         console.log('Emitting authenticate event with token:', session.user.sessionToken);
         this.socket.emit('authenticate', {
           userId: session.user.id,
+          username: session.user.username,
           token: session.user.sessionToken
         });
       }
