@@ -15,9 +15,9 @@ router.get(
   passport.authenticate('discord', { failureRedirect: '/login' }),
   (req, res) => {
     const user = (req as any).user;
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || '', {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    });
+    } as any);
 
     // Redirect to frontend with token
     res.redirect(
