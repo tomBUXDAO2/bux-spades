@@ -92,7 +92,7 @@ export function getSocketManager() {
         
         // Emit authenticate event immediately after connection
         if (session.user.sessionToken) {
-          console.log('Emitting authenticate event');
+          console.log('Emitting authenticate event with token:', session.user.sessionToken);
           socketInstance.emit('authenticate', {
             userId: session.user.id,
             token: session.user.sessionToken
