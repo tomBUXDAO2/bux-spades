@@ -29,7 +29,7 @@ interface ChatMessage {
 
 // Fallback avatars 
 const GUEST_AVATAR = "/guest-avatar.png";
-const BOT_AVATAR = "/guest-avatar.png";
+const BOT_AVATAR = "/bot-avatar.jpg";
 
 export default function Chat({ socket, gameId, userId, userName, players }: ChatProps) {
   const [inputValue, setInputValue] = useState('');

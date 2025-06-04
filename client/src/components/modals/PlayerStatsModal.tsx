@@ -81,7 +81,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         <div className="flex flex-row items-center justify-center mb-6 gap-6 border border-slate-600 rounded-lg p-4 bg-slate-900">
           {/* Left column: avatar, username, buttons */}
           <div className="flex flex-col items-center min-w-[120px]">
-            <img src={player.avatar} alt={player.username} className="w-20 h-20 rounded-full border-4 border-indigo-600 mb-1" />
+            <img src={player.avatar || '/bot-avatar.jpg'} alt={player.username} className="w-20 h-20 rounded-full border-4 border-indigo-600 mb-1" />
             <h2 className="text-2xl font-bold text-slate-200 mb-2">{player.username}</h2>
             {/* Friend/Block buttons below avatar and username */}
             <div className="flex flex-row gap-3 mb-2">

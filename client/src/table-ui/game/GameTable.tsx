@@ -12,6 +12,8 @@ import { calculateHandScore } from '../../lib/scoring';
 import LandscapePrompt from '../../LandscapePrompt';
 import { IoExitOutline, IoInformationCircleOutline } from "react-icons/io5";
 import { useWindowSize } from '../../hooks/useWindowSize';
+import { FaRobot } from 'react-icons/fa';
+import { FaMinus } from 'react-icons/fa';
 
 interface GameTableProps {
   game: GameState;
@@ -111,6 +113,32 @@ declare global {
 const countSpades = (hand: Card[]): number => {
   return hand.filter(card => card.suit === '♠').length;
 };
+
+// Helper function to determine if the current user can invite a bot for a seat
+function canInviteBot({
+  gameState,
+  currentPlayerId,
+  seatIndex,
+  isPreGame,
+  sanitizedPlayers,
+}: {
+  gameState: GameState;
+  currentPlayerId: string;
+  seatIndex: number;
+  isPreGame: boolean;
+  sanitizedPlayers: (Player | null)[];
+}) {
+  if (!currentPlayerId) return false;
+  if (isPreGame) {
+    // Only host (seat 0) can invite bots pre-game
+    return sanitizedPlayers[0]?.id === currentPlayerId && gameState.status === 'WAITING';
+  } else {
+    // Mid-game: only the partner of the empty seat can invite a bot
+    // Partner is seat (seatIndex + 2) % 4
+    const partnerIndex = (seatIndex + 2) % 4;
+    return sanitizedPlayers[partnerIndex]?.id === currentPlayerId && gameState.status === 'PLAYING';
+  }
+}
 
 export default function GameTable({ 
   game, 
@@ -243,6 +271,53 @@ export default function GameTable({
     console.log('Socket connected:', socket?.connected);
   };
 
+  // Add at the top of the GameTable component, after useState declarations
+  const [invitingBotSeat, setInvitingBotSeat] = useState<number | null>(null);
+
+  const handleInviteBot = async (seatIndex: number) => {
+    setInvitingBotSeat(seatIndex);
+    try {
+      const endpoint = gameState.status === 'WAITING'
+        ? `/api/games/${gameState.id}/invite-bot`
+        : `/api/games/${gameState.id}/invite-bot-midgame`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seatIndex, requesterId: currentPlayerId }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert('Failed to invite bot: ' + (error.error || 'Unknown error'));
+      } else {
+        // Optionally, refresh game state or rely on socket update
+      }
+    } catch (err) {
+      alert('Failed to invite bot');
+    } finally {
+      setInvitingBotSeat(null);
+    }
+  };
+
+  // Add remove bot handler
+  const handleRemoveBot = async (seatIndex: number) => {
+    try {
+      const endpoint = gameState.status === 'WAITING'
+        ? `/api/games/${gameState.id}/remove-bot`
+        : `/api/games/${gameState.id}/remove-bot-midgame`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seatIndex, requesterId: currentPlayerId }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert('Failed to remove bot: ' + (error.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Failed to remove bot');
+    }
+  };
+
   // Update the player tricks display
   const renderPlayerPosition = (position: number) => {
     // Define getPositionClasses FIRST
@@ -281,6 +356,115 @@ export default function GameTable({
           >
             JOIN
           </button>
+        </div>
+      );
+    }
+    // If seat is empty and user can invite a bot, show Invite Bot button
+    if (!player && currentPlayerId && canInviteBot({
+      gameState,
+      currentPlayerId,
+      seatIndex: position,
+      isPreGame: gameState.status === 'WAITING',
+      sanitizedPlayers,
+    })) {
+      return (
+        <div className={`absolute ${getPositionClasses(position)} z-10`}>
+          <button
+            className="w-16 h-16 rounded-full bg-gray-600 border border-slate-300 text-white flex flex-col items-center justify-center hover:bg-gray-500 transition disabled:opacity-50 p-0 py-1"
+            onClick={() => handleInviteBot(position)}
+            disabled={invitingBotSeat === position}
+            style={{ fontSize: '10px', lineHeight: 1.1 }}
+          >
+            <span className="text-[10px] leading-tight mb-0">Invite</span>
+            <span className="flex items-center justify-center my-0">
+              <span className="text-lg font-bold mr-0.5">+</span>
+              <FaRobot className="w-4 h-4" />
+            </span>
+            <span className="text-[10px] leading-tight mt-0">{invitingBotSeat === position ? '...' : 'Bot'}</span>
+          </button>
+        </div>
+      );
+    }
+    // If seat is empty and user cannot invite a bot, show nothing
+    if (!player) return null;
+
+    // If player is a bot, show bot avatar and label
+    if (player.type === 'bot') {
+      const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
+      const isSideSeat = position === 1 || position === 3;
+      const avatarWidth = isMobile ? 32 : 40;
+      const avatarHeight = isMobile ? 32 : 40;
+      // Team color: seats 0 and 2 are blue, 1 and 3 are red
+      const teamGradient = (position === 0 || position === 2)
+        ? "bg-gradient-to-r from-blue-700 to-blue-500"
+        : "bg-gradient-to-r from-red-700 to-red-500";
+      const madeCount = player.tricks || 0;
+      const bidCount = player.bid !== undefined ? player.bid : 0;
+      const madeStatus = madeCount >= bidCount 
+        ? "✅"
+        : "❌";
+      // Permission to remove bot: host (pre-game) or partner (mid-game)
+      const canRemoveBot = canInviteBot({
+        gameState,
+        currentPlayerId,
+        seatIndex: position,
+        isPreGame: gameState.status === 'WAITING',
+        sanitizedPlayers,
+      });
+      return (
+        <div className={`absolute ${getPositionClasses(position)} z-30`}>
+          <div className={`
+            backdrop-blur-sm bg-white/10 rounded-xl overflow-hidden
+            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
+            transition-all duration-200
+          `}>
+            <div className={isSideSeat ? "flex flex-col items-center p-1.5 gap-1.5" : "flex items-center p-1.5 gap-1.5"}>
+              <div className="relative">
+                <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                  <div className="bg-gray-900 rounded-full p-0.5">
+                    <img
+                      src={player.avatar || '/bot-avatar.jpg'}
+                      alt="Bot"
+                      width={avatarWidth}
+                      height={avatarHeight}
+                      className="rounded-full object-cover"
+                    />
+                    {canRemoveBot && (
+                      <button
+                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                        title="Remove Bot"
+                        onClick={() => handleRemoveBot(position)}
+                        style={{ zIndex: 50 }}
+                      >
+                        <FaMinus className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
+                  <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+                    Bot
+                  </div>
+                </div>
+                {/* Bid/Trick counter for bots, same as humans */}
+                <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
+                     style={{ width: isMobile ? '50px' : '70px' }}>
+                  <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
+                    {gameState.status === "WAITING" ? "0" : madeCount}
+                  </span>
+                  <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
+                  <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+                    {gameState.status === "WAITING" ? "0" : bidCount}
+                  </span>
+                  <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
+                    {gameState.status === "WAITING" ? "" : madeStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
@@ -942,29 +1126,29 @@ export default function GameTable({
               {renderTrickCards()}
 
               {/* Overlay the game status buttons/messages on top of the play area */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 {gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all"
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto"
                     style={{ fontSize: `${Math.floor(16 * scaleFactor)}px` }}
                   >
                     Start Game
                   </button>
                 ) : gameState.status === "WAITING" && sanitizedPlayers.length < 4 ? (
-                  <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center"
+                  <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Players</div>
                     <div className="text-sm mt-1">{sanitizedPlayers.length}/4 joined</div>
                   </div>
                 ) : gameState.status === "WAITING" && sanitizedPlayers[0]?.id !== currentPlayerId ? (
-                  <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center"
+                  <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Host</div>
                     <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.name} can start</div>
                   </div>
                 ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId ? (
-                  <div className="flex items-center justify-center w-full h-full">
+                  <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     <BiddingInterface
                       onBid={handleBid}
                       currentBid={orderedPlayers[0]?.bid}
@@ -976,7 +1160,7 @@ export default function GameTable({
                     />
                   </div>
                 ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId ? (
-                  <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse"
+                  <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
                       const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);
@@ -986,7 +1170,7 @@ export default function GameTable({
                     })()}
                   </div>
                 ) : gameState.status === "PLAYING" && currentTrick?.length === 0 ? (
-                  <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center"
+                  <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
                       const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);

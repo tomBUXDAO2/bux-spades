@@ -275,7 +275,7 @@ const HomePage: React.FC = () => {
                   {player ? (
                     <div className="text-center flex flex-col items-center">
                       <img
-                        src={player.avatar || player.image || '/default-pfp.jpg'}
+                        src={player.avatar || player.image || '/bot-avatar.jpg'}
                         alt=""
                         className="w-16 h-16 rounded-full border-2 border-slate-600"
                       />
@@ -687,7 +687,7 @@ const HomePage: React.FC = () => {
                     })
                     .map(player => (
                       <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
-                        <img src={player.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+                        <img src={player.avatar || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
                         <span
                           className={`text-sm font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                           onClick={() => handleOpenPlayerStats(player)}
