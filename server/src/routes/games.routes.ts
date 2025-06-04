@@ -18,7 +18,7 @@ router.post('/', (req, res) => {
       id: settings.creatorId,
       username: settings.creatorName,
       avatar: settings.creatorImage || null,
-      type: 'human',
+      type: 'human' as const,
     };
     const newGame = {
       id: uuidv4(),
@@ -74,7 +74,7 @@ router.post('/:id/join', async (req, res) => {
     id: playerId,
     username: req.body.username || 'Unknown',
     avatar: req.body.avatar || '/default-pfp.jpg',
-    type: 'human',
+    type: 'human' as const,
     position: requestedSeat
   };
 
@@ -131,7 +131,7 @@ router.post('/:id/invite-bot', (req, res) => {
     id: `bot-${uuidv4()}`,
     username: `Bot ${seatIndex + 1}`,
     avatar: '/bot-avatar.jpg',
-    type: 'bot',
+    type: 'bot' as const,
     position: seatIndex
   };
   game.players[seatIndex] = botPlayer;
@@ -161,7 +161,7 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
     id: `bot-${uuidv4()}`,
     username: `Bot ${seatIndex + 1}`,
     avatar: '/bot-avatar.jpg',
-    type: 'bot',
+    type: 'bot' as const,
     position: seatIndex
   };
   game.players[seatIndex] = botPlayer;
@@ -232,7 +232,7 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 });
 
 // --- Basic Bot Engine ---
-function botMakeMove(game, seatIndex) {
+function botMakeMove(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
   if (!bot || bot.type !== 'bot') return;
   // Example: log bot action (replace with real logic)
@@ -246,7 +246,7 @@ function botMakeMove(game, seatIndex) {
  * Call this after every player move (bid, play card, etc.)
  * It will check if the next player is a bot and, if so, trigger their move.
  */
-function advanceTurnOrBotMove(game, nextSeatIndex) {
+function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
   const nextPlayer = game.players[nextSeatIndex];
   if (nextPlayer && nextPlayer.type === 'bot') {
     botMakeMove(game, nextSeatIndex);
