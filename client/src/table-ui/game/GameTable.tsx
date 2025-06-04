@@ -165,6 +165,14 @@ function isBot(p: Player | Bot | null): p is Bot {
   return !!p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 }
 
+// Add this utility function at the top (after imports)
+const formatCoins = (value: number) => {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  return `${value / 1000}k`;
+};
+
 export default function GameTable({ 
   game, 
   joinGame, 
@@ -1181,11 +1189,21 @@ export default function GameTable({
                         <div className="mt-2 pt-2 border-t border-gray-700">
                           <div className="text-sm">
                             <span className="text-gray-400">Buy-in:</span>
-                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? `${(gameState.rules.coinAmount / 1000)}k` : '100k'}</span>
+                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? formatCoins(gameState.rules.coinAmount) : '100k'}</span>
                           </div>
                           <div className="text-sm">
-                            <span className="text-gray-400">Prize Pool:</span>
-                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? `${((gameState.rules.coinAmount * 4 * 0.9) / 1000)}k` : '360k'}</span>
+                            <span className="text-gray-400">Prize:</span>
+                            <span className="font-bold text-yellow-400 ml-2">
+                              {(() => {
+                                const buyIn = gameState.rules?.coinAmount || 100000;
+                                const prizePot = buyIn * 4 * 0.9;
+                                if ((gameState.rules?.gameType || '').toUpperCase() === 'PARTNERS') {
+                                  return `${formatCoins(prizePot / 2)} each`;
+                                } else {
+                                  return `1st: ${formatCoins(prizePot * 0.7)}, 2nd: ${formatCoins(prizePot * 0.3)}`;
+                                }
+                              })()}
+                            </span>
                           </div>
                         </div>
                       </div>
