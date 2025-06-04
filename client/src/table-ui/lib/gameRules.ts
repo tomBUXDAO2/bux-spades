@@ -163,12 +163,4 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   if (team1Score <= -250) return 'team2';
   if (team2Score <= -250) return 'team1';
   return team1Score > team2Score ? 'team1' : 'team2';
-}
-
-// Add type guards if not present
-function isPlayer(p: any): p is Player {
-  return p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
-}
-function isBot(p: any): p is Bot {
-  return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 } 
