@@ -1,4 +1,4 @@
-import type { GameState, Player, Bot } from '../../types/game';
+import type { GameState } from '../../types/game';
 
 interface GameCardProps {
   game: GameState;
@@ -29,7 +29,7 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
           {game.players.map((player, idx) => {
             if (!player) return null;
             const isBot = 'type' in player && player.type === 'bot';
-            const displayName = isBot ? player.username : (player.username || player.name);
+            const displayName = isBot ? player.username : ('name' in player ? player.name : player.username);
             return (
               <span key={idx} className="text-sm text-gray-400">
                 {displayName}
