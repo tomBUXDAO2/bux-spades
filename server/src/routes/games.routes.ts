@@ -196,6 +196,9 @@ function shuffle(deck: Card[]): Card[] {
 
 export function assignDealer(players: (GamePlayer | null)[]): number {
   const playerIndexes = players.map((p, i) => p ? i : null).filter((i): i is number => i !== null);
+  if (playerIndexes.length === 0) {
+    throw new Error('No valid players to assign dealer');
+  }
   const dealerIndex = playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
   return dealerIndex;
 }
@@ -381,7 +384,10 @@ if (ioInstance) {
     // --- Play phase: play_card event ---
     socket.on('play_card', ({ gameId, userId, card }) => {
       const game = games.find(g => g.id === gameId);
-      if (!game || !game.play || !game.hands) return;
+      if (!game || !game.play || !game.hands || !game.bidding) {
+        socket.emit('error', { message: 'Invalid game state' });
+        return;
+      }
       
       const playerIndex = game.players.findIndex(p => p && p.id === userId);
       if (playerIndex === -1) return;
@@ -501,6 +507,9 @@ function getCardValue(rank: Rank): number {
 
 // --- Scoring helper ---
 function calculatePartnersHandScore(game: Game) {
+  if (!game.bidding || !game.play) {
+    throw new Error('Invalid game state for scoring');
+  }
   const team1 = [0, 2];
   const team2 = [1, 3];
   let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
