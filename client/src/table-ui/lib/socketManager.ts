@@ -69,7 +69,7 @@ class SocketManager {
         username: session.user.username,
         token: token
       },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
@@ -87,11 +87,14 @@ class SocketManager {
     // Set a connection timeout
     this.connectionTimeout = setTimeout(() => {
       if (this.socket && !this.socket.connected) {
-        console.log('Connection timeout, retrying with polling only');
-        const opts = this.socket.io.opts;
-        if (opts && Array.isArray(opts.transports)) {
-          opts.transports = ['polling'];
-          this.socket.connect();
+        console.log('Connection timeout, attempting to reconnect...');
+        if (this.socket) {
+          this.socket.disconnect();
+          setTimeout(() => {
+            if (!this.socket) {
+              this.initialize(session);
+            }
+          }, 1000);
         }
       }
     }, 5000);
@@ -165,6 +168,7 @@ class SocketManager {
         id: this.socket?.id,
         auth: this.socket?.auth
       });
+      
       this.reconnectAttempts++;
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
@@ -184,13 +188,18 @@ class SocketManager {
     this.socket.on('disconnect', (reason: string) => {
       console.log('Socket disconnected:', reason);
       if (reason === 'io server disconnect' || reason === 'transport close') {
-        this.socket = null;
-        setTimeout(() => {
-          if (!this.socket) {
-            console.log('Attempting to reconnect...');
-            this.initialize(session);
-          }
-        }, 1000);
+        // Only attempt reconnection if we have a valid session
+        if (session.user.sessionToken) {
+          this.socket = null;
+          setTimeout(() => {
+            if (!this.socket) {
+              console.log('Attempting to reconnect...');
+              this.initialize(session);
+            }
+          }, 1000);
+        } else {
+          console.error('No session token available for reconnection');
+        }
       }
     });
 

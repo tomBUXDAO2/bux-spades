@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, CompletedTrick, Bot } from '../../types/game';
-import { Socket } from "socket.io-client";
-import Chat from './Chat';
+import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import WinnerModal from './WinnerModal';
 import LoserModal from './LoserModal';
@@ -14,10 +13,10 @@ import { IoExitOutline, IoInformationCircleOutline } from "react-icons/io5";
 import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
+import { useSocket } from '../../context/SocketContext';
 
 interface GameTableProps {
   game: GameState;
-  socket: Socket | null;
   joinGame: (gameId: string, userId: string, options?: any) => void;
   onLeaveTable: () => void;
   startGame: (gameId: string, userId?: string) => Promise<void>;
@@ -168,12 +167,12 @@ function isBot(p: Player | Bot | null): p is Bot {
 
 export default function GameTable({ 
   game, 
-  socket, 
   joinGame, 
   onLeaveTable,
   startGame,
   user: propUser
 }: GameTableProps) {
+  const socket = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -306,18 +305,25 @@ export default function GameTable({
       const endpoint = gameState.status === 'WAITING'
         ? `/api/games/${gameState.id}/invite-bot`
         : `/api/games/${gameState.id}/invite-bot-midgame`;
+      
+      console.log('Inviting bot to seat:', seatIndex);
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seatIndex, requesterId: currentPlayerId }),
       });
+      
       if (!res.ok) {
         const error = await res.json();
+        console.error('Failed to invite bot:', error);
         alert('Failed to invite bot: ' + (error.error || 'Unknown error'));
       } else {
-        // Optionally, refresh game state or rely on socket update
+        const updatedGame = await res.json();
+        console.log('Bot invited successfully:', updatedGame);
+        setGameState(updatedGame);
       }
     } catch (err) {
+      console.error('Error inviting bot:', err);
       alert('Failed to invite bot');
     } finally {
       setInvitingBotSeat(null);
@@ -1022,15 +1028,31 @@ export default function GameTable({
 
   // Listen for game_update and update the UI
   useEffect(() => {
-    if (!socket) return;
-    const handleGameUpdate = (updatedGame: any) => {
-      setGameState(updatedGame);
+    if (!socket || !gameState?.id) return;
+
+    const handleGameUpdate = (updatedGame: GameState) => {
+      if (updatedGame.id === gameState.id) {
+        console.log('Game state updated:', updatedGame);
+        setGameState(updatedGame);
+      }
     };
+
+    const handleGamesUpdate = (updatedGames: GameState[]) => {
+      const updatedGame = updatedGames.find(g => g.id === gameState.id);
+      if (updatedGame) {
+        console.log('Games list updated, updating game state:', updatedGame);
+        setGameState(updatedGame);
+      }
+    };
+
     socket.on('game_update', handleGameUpdate);
+    socket.on('games_updated', handleGamesUpdate);
+
     return () => {
       socket.off('game_update', handleGameUpdate);
+      socket.off('games_updated', handleGamesUpdate);
     };
-  }, [socket]);
+  }, [socket, gameState?.id]);
 
   // Add a useEffect to log the socket connection status when the component mounts
   useEffect(() => {
@@ -1090,6 +1112,21 @@ export default function GameTable({
     socket.on('game_started', handleGameStarted);
     return () => {
       socket.off('game_started', handleGameStarted);
+    };
+  }, [socket]);
+
+  // --- Lobby chat toggle state ---
+  const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
+  const [lobbyMessages, setLobbyMessages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleLobbyMsg = (msg: any) => {
+      setLobbyMessages(prev => [...prev, msg]);
+    };
+    socket.on('lobby_chat_message', handleLobbyMsg);
+    return () => {
+      socket.off('lobby_chat_message', handleLobbyMsg);
     };
   }, [socket]);
 
@@ -1264,11 +1301,13 @@ export default function GameTable({
           {/* Chat area - 30%, full height */}
           <div className="w-[30%] h-full overflow-hidden">
             <Chat 
-              socket={socket}
               gameId={gameState.id}
               userId={currentPlayerId || ''}
               userName={isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
-              players={sanitizedPlayers.filter(isPlayer)}
+              players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
+              chatType={chatType}
+              onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
+              lobbyMessages={lobbyMessages}
             />
           </div>
         </div>
