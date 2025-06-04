@@ -408,9 +408,11 @@ if (ioInstance) {
       }
       
       const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
-      if (cardIndex === -1) return; // Card not in hand
+      if (cardIndex === -1) {
+        socket.emit('error', { message: 'Card not in hand' });
+        return;
+      }
       
-      // TODO: Validate play legality (follow suit, etc.)
       // Remove card from hand and add to current trick
       hand.splice(cardIndex, 1);
       game.play.currentTrick.push({ ...card, playerIndex });
