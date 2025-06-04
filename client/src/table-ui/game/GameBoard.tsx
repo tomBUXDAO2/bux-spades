@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { GameState } from "../../types/game";
+import type { GameState, Player, Bot } from "../../types/game";
 import { useSocket } from "../../lib/socket";
 
 interface GameBoardProps {

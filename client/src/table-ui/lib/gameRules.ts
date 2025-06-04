@@ -1,4 +1,4 @@
-import type { GameType, Card, Suit, GameState } from '../../types/game';
+import type { GameType, Card, Suit, GameState, Player, Bot } from '../../types/game';
 // import { Player } from '../../types/game';
 
 /**

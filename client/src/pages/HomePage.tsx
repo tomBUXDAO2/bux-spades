@@ -6,7 +6,7 @@ import Header from '@/components/common/Header';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data/sets/15/native.json';
-import type { GameState } from '../types/game';
+import type { GameState, Player, Bot } from '../types/game';
 import { useNavigate } from 'react-router-dom';
 import { getSocketManager } from '../table-ui/lib/socketManager';
 
