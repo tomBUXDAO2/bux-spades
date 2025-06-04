@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import type { Socket } from 'socket.io-client';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
@@ -33,6 +32,11 @@ interface ChatMessage {
 // Fallback avatars 
 const GUEST_AVATAR = "/guest-avatar.png";
 const BOT_AVATAR = "/bot-avatar.jpg";
+
+// Add proper type for emoji parameter
+interface EmojiData {
+  native: string;
+}
 
 export default function Chat({ gameId, userId, userName, players, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
   const socket = useSocket();
@@ -76,12 +80,10 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
   
   // Font sizes based on scale
   const fontSize = Math.max(12, Math.floor(14 * scaleFactor));
-  const headerFontSize = Math.max(14, Math.floor(18 * scaleFactor));
   
-  // Mobile-specific font sizes (smaller than regular sizes)
+  // Mobile detection
   const isMobile = screenSize.width < 640;
   const mobileFontSize = isMobile ? 11 : fontSize;
-  const mobileHeaderFontSize = isMobile ? 13 : headerFontSize;
 
   const activeSocket = socket;
   
@@ -272,10 +274,6 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
     }
   };
 
-  const onEmojiSelect = (emoji: any) => {
-    setInputValue(prev => prev + emoji.native);
-  };
-
   const formatTime = (timestamp: number): string => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -432,12 +430,14 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
                 </button>
                 {showLobbyEmojiPicker && (
                   <div className="absolute bottom-full right-0 mb-2 z-10">
-                    <Picker 
-                      data={data} 
-                      onEmojiSelect={emoji => setLobbyInputValue(prev => prev + emoji.native)}
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(emoji: EmojiData) => setLobbyInputValue(prev => prev + emoji.native)}
                       theme="dark"
+                      set="twitter"
                       previewPosition="none"
                       skinTonePosition="none"
+                      autoFocus
                     />
                   </div>
                 )}
@@ -471,12 +471,14 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
                 </button>
                 {showEmojiPicker && (
                   <div className="absolute bottom-full right-0 mb-2 z-10">
-                    <Picker 
-                      data={data} 
-                      onEmojiSelect={onEmojiSelect}
+                    <Picker
+                      data={data}
+                      onEmojiSelect={(emoji: EmojiData) => setInputValue(prev => prev + emoji.native)}
                       theme="dark"
+                      set="twitter"
                       previewPosition="none"
                       skinTonePosition="none"
+                      autoFocus
                     />
                   </div>
                 )}

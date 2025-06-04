@@ -113,7 +113,6 @@ export default function TablePage() {
     <div className="table-page">
       <GameTable
         game={game}
-        socket={socket}
         joinGame={handleJoinGame}
         onLeaveTable={handleLeaveTable}
         startGame={handleStartGame}
