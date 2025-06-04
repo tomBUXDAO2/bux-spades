@@ -421,6 +421,10 @@ if (ioInstance) {
       if (game.play.currentTrick.length === 4) {
         // Determine winner of the trick
         const winnerIndex = determineTrickWinner(game.play.currentTrick);
+        if (winnerIndex === undefined) {
+          socket.emit('error', { message: 'Invalid trick state' });
+          return;
+        }
         game.play.tricks.push({
           cards: game.play.currentTrick,
           winnerIndex,
