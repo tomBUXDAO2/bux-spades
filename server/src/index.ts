@@ -234,7 +234,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         game.players[emptySeatIndex] = {
           id: socket.userId,
           username: socket.auth?.username || 'Unknown',
-          avatar: socket.auth?.avatar || '/default-avatar.png'
+          avatar: socket.auth?.avatar || '/default-avatar.png',
+          type: 'human',
         };
       }
 
