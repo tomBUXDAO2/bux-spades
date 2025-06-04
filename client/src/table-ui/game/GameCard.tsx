@@ -26,10 +26,12 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
       <div className="mb-4">
         <p className="text-gray-300 text-sm">Players: {game.players.length}/4</p>
         <div className="flex flex-wrap gap-2 mt-1">
-          {game.players.map(player => (
-            <span key={player.id} className="text-sm text-gray-400">
-              {player && (('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name))}
-            </span>
+          {game.players.map((player: any) => (
+            player ? (
+              <span key={player.id} className="text-sm text-gray-400">
+                {('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name)}
+              </span>
+            ) : null
           ))}
         </div>
       </div>
