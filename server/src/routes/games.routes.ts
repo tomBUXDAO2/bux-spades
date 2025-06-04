@@ -329,24 +329,32 @@ if (ioInstance) {
   ioInstance.on('connection', (socket) => {
     socket.on('make_bid', ({ gameId, userId, bid }) => {
       const game = games.find(g => g.id === gameId);
-      if (!game) return;
+      if (!game || !game.bidding) return;
+      
       const playerIndex = game.players.findIndex(p => p && p.id === userId);
       if (playerIndex === -1) return;
+      
       if (playerIndex !== game.bidding.currentBidderIndex) return; // Not their turn
       if (game.bidding.bids[playerIndex] !== null) return; // Already bid
+      
       // Store the bid
       game.bidding.bids[playerIndex] = bid;
+      
       // Find next player who hasn't bid
       let next = (playerIndex + 1) % 4;
       while (game.bidding.bids[next] !== null && next !== playerIndex) {
         next = (next + 1) % 4;
       }
+      
       if (game.bidding.bids.every(b => b !== null)) {
         // All bids in, move to play phase
-        // --- Play phase state ---
         const firstPlayer = game.players[(game.dealerIndex! + 1) % 4];
-        if (!firstPlayer) return res.status(500).json({ error: 'Invalid game state' });
+        if (!firstPlayer) {
+          socket.emit('error', { message: 'Invalid game state' });
+          return;
+        }
         
+        // --- Play phase state ---
         game.play = {
           currentPlayer: firstPlayer.id,
           currentPlayerIndex: (game.dealerIndex! + 1) % 4,
@@ -373,18 +381,23 @@ if (ioInstance) {
     // --- Play phase: play_card event ---
     socket.on('play_card', ({ gameId, userId, card }) => {
       const game = games.find(g => g.id === gameId);
-      if (!game || !game.play) return;
+      if (!game || !game.play || !game.hands) return;
+      
       const playerIndex = game.players.findIndex(p => p && p.id === userId);
       if (playerIndex === -1) return;
+      
       if (playerIndex !== game.play.currentPlayerIndex) return; // Not their turn
+      
       // Validate card is in player's hand
       const hand = game.hands[playerIndex];
       const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
       if (cardIndex === -1) return; // Card not in hand
+      
       // TODO: Validate play legality (follow suit, etc.)
       // Remove card from hand and add to current trick
       hand.splice(cardIndex, 1);
       game.play.currentTrick.push({ ...card, playerIndex });
+      
       // If trick is complete (4 cards)
       if (game.play.currentTrick.length === 4) {
         // Determine winner of the trick
@@ -396,12 +409,14 @@ if (ioInstance) {
         game.play.currentTrick = [];
         game.play.trickNumber += 1;
         game.play.currentPlayerIndex = winnerIndex;
+        
         // Emit trick complete
         ioInstance.to(game.id).emit('trick_complete', {
           trick: game.play.tricks[game.play.tricks.length - 1],
           trickNumber: game.play.trickNumber,
         });
-        // If all tricks played, move to hand summary/scoring (to be implemented next)
+        
+        // If all tricks played, move to hand summary/scoring
         if (game.play.trickNumber === 13) {
           // --- Hand summary and scoring ---
           const handSummary = calculatePartnersHandScore(game);
@@ -410,6 +425,7 @@ if (ioInstance) {
           game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
           game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
           game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+          
           ioInstance.to(game.id).emit('hand_completed', {
             ...handSummary,
             team1TotalScore: game.team1TotalScore,
@@ -417,6 +433,7 @@ if (ioInstance) {
             team1Bags: game.team1Bags,
             team2Bags: game.team2Bags,
           });
+          
           // --- Game over check ---
           const winThreshold = 500, lossThreshold = -150;
           if (
@@ -444,6 +461,7 @@ if (ioInstance) {
         // Advance to next player
         game.play.currentPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
       }
+      
       // Emit play update
       ioInstance.to(game.id).emit('play_update', {
         currentPlayerIndex: game.play.currentPlayerIndex,

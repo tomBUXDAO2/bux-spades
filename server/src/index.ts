@@ -334,9 +334,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       const hands = dealCards(game.players, dealerIndex);
       game.hands = hands;
       // Bidding phase state
+      const firstBidder = game.players[(dealerIndex + 1) % 4];
+      if (!firstBidder) {
+        throw new Error('Invalid game state: no first bidder found');
+      }
       game.bidding = {
+        currentPlayer: firstBidder.id,
         currentBidderIndex: (dealerIndex + 1) % 4,
         bids: [null, null, null, null],
+        nilBids: {}
       };
       // Emit to all players
       io.emit('games_updated', games);
