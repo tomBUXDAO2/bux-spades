@@ -499,6 +499,50 @@ if (ioInstance) {
         })),
       });
     });
+
+    socket.on('leave_game', ({ gameId, userId }) => {
+      if (!socket.isAuthenticated || !socket.userId || socket.userId !== userId) {
+        console.log('Unauthorized leave_game attempt');
+        socket.emit('error', { message: 'Not authorized' });
+        return;
+      }
+
+      try {
+        const game = games.find((g: Game) => g.id === gameId);
+        if (!game) {
+          console.log(`Game ${gameId} not found`);
+          socket.emit('error', { message: 'Game not found' });
+          return;
+        }
+
+        // Remove the player from the game
+        const playerIdx = game.players.findIndex((p: GamePlayer | null) => p && p.id === userId);
+        if (playerIdx !== -1) {
+          game.players[playerIdx] = null;
+          socket.leave(gameId);
+          // Emit game_update to the game room for real-time sync
+          io.to(gameId).emit('game_update', game);
+          io.emit('games_updated', games);
+          console.log(`User ${userId} left game ${gameId}`);
+        }
+
+        // Check if there are any human players left
+        const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
+        
+        // If no human players remain, remove the game
+        if (!hasHumanPlayers) {
+          const gameIdx = games.findIndex((g: Game) => g.id === gameId);
+          if (gameIdx !== -1) {
+            games.splice(gameIdx, 1);
+            io.emit('games_updated', games);
+            console.log(`Game ${gameId} removed (no human players left)`);
+          }
+        }
+      } catch (error) {
+        console.error('Error in leave_game:', error);
+        socket.emit('error', { message: 'Internal server error' });
+      }
+    });
   });
 }
 

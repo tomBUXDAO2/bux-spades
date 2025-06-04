@@ -382,21 +382,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               io.to(game.id).emit('game_update', game);
               io.emit('games_updated', games);
               console.log(`User ${socket.userId} removed from game ${game.id} due to disconnect`);
+
+              // Check if there are any human players left
+              const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
+              
+              // If no human players remain, remove the game
+              if (!hasHumanPlayers) {
+                const gameIdx = games.findIndex((g: Game) => g.id === game.id);
+                if (gameIdx !== -1) {
+                  games.splice(gameIdx, 1);
+                  io.emit('games_updated', games);
+                  console.log(`Game ${game.id} removed (no human players left after disconnect)`);
+                }
+              }
             }
           }, 30000); // 30 second grace period
         }
       });
-
-      // Remove any games that are now empty after the grace period
-      setTimeout(() => {
-        for (let i = games.length - 1; i >= 0; i--) {
-          if (games[i].players.every((p: GamePlayer | null) => p === null)) {
-            console.log(`Game ${games[i].id} removed (no players left after disconnect)`);
-            games.splice(i, 1);
-            io.emit('games_updated', games);
-          }
-        }
-      }, 30000);
     }
   });
 
