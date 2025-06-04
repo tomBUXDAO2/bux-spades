@@ -504,8 +504,9 @@ if (ioInstance) {
 
 // --- Helper: Determine Trick Winner ---
 function determineTrickWinner(trick: Card[]): number {
-  // trick: array of 4 { suit, rank, playerIndex }
-  const leadSuit = trick[0].suit;
+  if (!trick.length) {
+    throw new Error('Cannot determine winner of empty trick');
+  }
   let winningCard = trick[0];
   for (const card of trick) {
     if (
@@ -515,7 +516,7 @@ function determineTrickWinner(trick: Card[]): number {
       winningCard = card;
     }
   }
-  return winningCard.playerIndex;
+  return winningCard.playerIndex ?? 0; // Provide default value if undefined
 }
 
 function getCardValue(rank: Rank): number {
@@ -620,6 +621,7 @@ async function updateStatsAndCoins(game: Game, winningTeam: number) {
     const player = game.players[i];
     if (!player || player.type !== 'human') continue;
     const userId = player.id;
+    if (!userId) continue; // Skip if no user ID
     const isWinner = (winningTeam === 1 && (i === 0 || i === 2)) || (winningTeam === 2 && (i === 1 || i === 3));
     try {
       // Update overall stats
@@ -630,9 +632,6 @@ async function updateStatsAndCoins(game: Game, winningTeam: number) {
           gamesWon: { increment: isWinner ? 1 : 0 }
         }
       });
-      // Update mode/bid/gimmick stats
-      // Remove the userGameStats upsert since it doesn't exist in the schema
-      // await prisma.userGameStats.upsert({ ... });
     } catch (err) {
       console.error('Failed to update stats/coins for user', userId, err);
     }
