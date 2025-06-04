@@ -8,10 +8,11 @@ import { Server, Socket } from 'socket.io';
 import passport from 'passport';
 import session from 'express-session';
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { games } from './routes/games.routes';
+import gamesRoutes, { games, assignDealer, dealCards } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
@@ -19,6 +20,7 @@ import type { Game, GamePlayer } from './types/game';
 
 const app = express();
 const httpServer = createServer(app);
+const prisma = new PrismaClient();
 
 // Body parsing middleware MUST come first
 app.use(express.json());
@@ -292,6 +294,63 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     } catch (error) {
       console.error('Error in leave_game:', error);
       socket.emit('error', { message: 'Internal server error' });
+    }
+  });
+
+  // Start game event
+  socket.on('start_game', async ({ gameId }) => {
+    try {
+      const game = games.find(g => g.id === gameId);
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+      if (game.status !== 'WAITING') {
+        socket.emit('error', { message: 'Game already started' });
+        return;
+      }
+      // Only deduct coins if all 4 players are human
+      const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
+      if (allHuman) {
+        try {
+          for (const player of game.players) {
+            if (player && player.type === 'human') {
+              await prisma.user.update({
+                where: { id: player.id },
+                data: { coins: { decrement: game.buyIn } }
+              });
+            }
+          }
+        } catch (err) {
+          socket.emit('error', { message: 'Failed to debit coins from players' });
+          return;
+        }
+      }
+      game.isBotGame = !allHuman;
+      game.status = 'BIDDING';
+      // Dealer assignment and card dealing
+      const dealerIndex = assignDealer(game.players);
+      game.dealerIndex = dealerIndex;
+      const hands = dealCards(game.players, dealerIndex);
+      game.hands = hands;
+      // Bidding phase state
+      game.bidding = {
+        currentBidderIndex: (dealerIndex + 1) % 4,
+        bids: [null, null, null, null],
+      };
+      // Emit to all players
+      io.emit('games_updated', games);
+      io.to(game.id).emit('game_started', {
+        dealerIndex,
+        hands: hands.map((hand, i) => ({
+          playerId: game.players[i]?.id,
+          hand
+        })),
+        bidding: game.bidding,
+      });
+    } catch (err) {
+      console.error('Error in start_game handler:', err);
+      socket.emit('error', { message: 'Failed to start game' });
     }
   });
 

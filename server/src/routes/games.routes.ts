@@ -170,6 +170,42 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
   res.json(game);
 });
 
+// --- Gameplay Helpers ---
+const SUITS = ['S', 'H', 'D', 'C'];
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+function createDeck() {
+  const deck = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({ suit, rank });
+    }
+  }
+  return deck;
+}
+function shuffle(deck) {
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+export function assignDealer(players) {
+  const playerIndexes = players.map((p, i) => p ? i : null).filter(i => i !== null);
+  const dealerIndex = playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
+  return dealerIndex;
+}
+
+export function dealCards(players, dealerIndex) {
+  const deck = shuffle(createDeck());
+  const hands = [[], [], [], []];
+  let current = (dealerIndex + 1) % 4;
+  for (const card of deck) {
+    hands[current].push(card);
+    current = (current + 1) % 4;
+  }
+  return hands;
+}
+
 // Start the game
 router.post('/:id/start', async (req, res) => {
   const game = games.find(g => g.id === req.params.id);
@@ -193,8 +229,26 @@ router.post('/:id/start', async (req, res) => {
     }
   }
   game.status = 'BIDDING'; // or whatever the next phase is
+  // --- Dealer assignment and card dealing ---
+  const dealerIndex = assignDealer(game.players);
+  game.dealerIndex = dealerIndex;
+  const hands = dealCards(game.players, dealerIndex);
+  game.hands = hands;
+  // --- Bidding phase state ---
+  game.bidding = {
+    currentBidderIndex: (dealerIndex + 1) % 4,
+    bids: [null, null, null, null],
+  };
+  // Emit to all players
   io.emit('games_updated', games);
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_started', {
+    dealerIndex,
+    hands: hands.map((hand, i) => ({
+      playerId: game.players[i]?.id,
+      hand
+    })),
+    bidding: game.bidding,
+  });
   res.json(game);
 });
 
@@ -250,6 +304,293 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
   const nextPlayer = game.players[nextSeatIndex];
   if (nextPlayer && nextPlayer.type === 'bot') {
     botMakeMove(game, nextSeatIndex);
+  }
+}
+
+// --- Bidding socket event ---
+import { io as ioInstance } from '../index';
+if (ioInstance) {
+  ioInstance.on('connection', (socket) => {
+    socket.on('make_bid', ({ gameId, userId, bid }) => {
+      const game = games.find(g => g.id === gameId);
+      if (!game) return;
+      const playerIndex = game.players.findIndex(p => p && p.id === userId);
+      if (playerIndex === -1) return;
+      if (playerIndex !== game.bidding.currentBidderIndex) return; // Not their turn
+      if (game.bidding.bids[playerIndex] !== null) return; // Already bid
+      // Store the bid
+      game.bidding.bids[playerIndex] = bid;
+      // Find next player who hasn't bid
+      let next = (playerIndex + 1) % 4;
+      while (game.bidding.bids[next] !== null && next !== playerIndex) {
+        next = (next + 1) % 4;
+      }
+      if (game.bidding.bids.every(b => b !== null)) {
+        // All bids in, move to play phase
+        // --- Play phase state ---
+        game.play = {
+          currentPlayerIndex: (game.dealerIndex + 1) % 4,
+          currentTrick: [],
+          tricks: [],
+          trickNumber: 0,
+        };
+        ioInstance.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
+        ioInstance.to(game.id).emit('play_start', {
+          currentPlayerIndex: game.play.currentPlayerIndex,
+          currentTrick: game.play.currentTrick,
+          trickNumber: game.play.trickNumber,
+        });
+      } else {
+        game.bidding.currentBidderIndex = next;
+        ioInstance.to(game.id).emit('bidding_update', {
+          currentBidderIndex: next,
+          bids: game.bidding.bids,
+        });
+      }
+    });
+
+    // --- Play phase: play_card event ---
+    socket.on('play_card', ({ gameId, userId, card }) => {
+      const game = games.find(g => g.id === gameId);
+      if (!game || !game.play) return;
+      const playerIndex = game.players.findIndex(p => p && p.id === userId);
+      if (playerIndex === -1) return;
+      if (playerIndex !== game.play.currentPlayerIndex) return; // Not their turn
+      // Validate card is in player's hand
+      const hand = game.hands[playerIndex];
+      const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
+      if (cardIndex === -1) return; // Card not in hand
+      // TODO: Validate play legality (follow suit, etc.)
+      // Remove card from hand and add to current trick
+      hand.splice(cardIndex, 1);
+      game.play.currentTrick.push({ ...card, playerIndex });
+      // If trick is complete (4 cards)
+      if (game.play.currentTrick.length === 4) {
+        // Determine winner of the trick
+        const winnerIndex = determineTrickWinner(game.play.currentTrick);
+        game.play.tricks.push({
+          cards: game.play.currentTrick,
+          winnerIndex,
+        });
+        game.play.currentTrick = [];
+        game.play.trickNumber += 1;
+        game.play.currentPlayerIndex = winnerIndex;
+        // Emit trick complete
+        ioInstance.to(game.id).emit('trick_complete', {
+          trick: game.play.tricks[game.play.tricks.length - 1],
+          trickNumber: game.play.trickNumber,
+        });
+        // If all tricks played, move to hand summary/scoring (to be implemented next)
+        if (game.play.trickNumber === 13) {
+          // --- Hand summary and scoring ---
+          const handSummary = calculatePartnersHandScore(game);
+          // Update running totals
+          game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
+          game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+          game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
+          game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+          ioInstance.to(game.id).emit('hand_completed', {
+            ...handSummary,
+            team1TotalScore: game.team1TotalScore,
+            team2TotalScore: game.team2TotalScore,
+            team1Bags: game.team1Bags,
+            team2Bags: game.team2Bags,
+          });
+          // --- Game over check ---
+          const winThreshold = 500, lossThreshold = -150;
+          if (
+            game.team1TotalScore >= winThreshold || game.team2TotalScore >= winThreshold ||
+            game.team1TotalScore <= lossThreshold || game.team2TotalScore <= lossThreshold
+          ) {
+            game.status = 'COMPLETED';
+            const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
+            ioInstance.to(game.id).emit('game_over', {
+              team1Score: game.team1TotalScore,
+              team2Score: game.team2TotalScore,
+              winningTeam,
+            });
+            // Update stats and coins in DB
+            updateStatsAndCoins(game, winningTeam).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+          }
+          return;
+        } else {
+          // Advance to next player
+          game.play.currentPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
+        }
+      } else {
+        // Advance to next player
+        game.play.currentPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
+      }
+      // Emit play update
+      ioInstance.to(game.id).emit('play_update', {
+        currentPlayerIndex: game.play.currentPlayerIndex,
+        currentTrick: game.play.currentTrick,
+        hands: game.hands.map((h, i) => ({
+          playerId: game.players[i]?.id,
+          handCount: h.length,
+        })),
+      });
+    });
+  });
+}
+
+// --- Helper: Determine Trick Winner ---
+function determineTrickWinner(trick) {
+  // trick: array of 4 { suit, rank, playerIndex }
+  const leadSuit = trick[0].suit;
+  let winningCard = trick[0];
+  for (const card of trick) {
+    if (
+      (card.suit === 'S' && winningCard.suit !== 'S') ||
+      (card.suit === winningCard.suit && getCardValue(card.rank) > getCardValue(winningCard.rank))
+    ) {
+      winningCard = card;
+    }
+  }
+  return winningCard.playerIndex;
+}
+function getCardValue(rank) {
+  if (typeof rank === 'number') return rank;
+  const rankMap = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+  return rankMap[rank];
+}
+
+// --- Scoring helper ---
+function calculatePartnersHandScore(game) {
+  const team1 = [0, 2];
+  const team2 = [1, 3];
+  let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
+  let team1Bags = 0, team2Bags = 0;
+  let team1Score = 0, team2Score = 0;
+  // Count tricks per player
+  const tricksPerPlayer = [0, 0, 0, 0];
+  for (const trick of game.play.tricks) {
+    tricksPerPlayer[trick.winnerIndex]++;
+  }
+  // Calculate team bids and tricks
+  for (const i of team1) {
+    team1Bid += game.bidding.bids[i];
+    team1Tricks += tricksPerPlayer[i];
+  }
+  for (const i of team2) {
+    team2Bid += game.bidding.bids[i];
+    team2Tricks += tricksPerPlayer[i];
+  }
+  // Team 1 scoring
+  if (team1Tricks >= team1Bid) {
+    team1Score += team1Bid * 10;
+    team1Bags = team1Tricks - team1Bid;
+    team1Score += team1Bags;
+  } else {
+    team1Score -= team1Bid * 10;
+    team1Bags = 0;
+  }
+  // Team 2 scoring
+  if (team2Tricks >= team2Bid) {
+    team2Score += team2Bid * 10;
+    team2Bags = team2Tricks - team2Bid;
+    team2Score += team2Bags;
+  } else {
+    team2Score -= team2Bid * 10;
+    team2Bags = 0;
+  }
+  // Nil and Blind Nil
+  for (const i of [...team1, ...team2]) {
+    const bid = game.bidding.bids[i];
+    const tricks = tricksPerPlayer[i];
+    if (bid === 0) { // Nil
+      if (tricks === 0) {
+        if (team1.includes(i)) team1Score += 100;
+        else team2Score += 100;
+      } else {
+        if (team1.includes(i)) team1Score -= 100;
+        else team2Score -= 100;
+        // Bags for failed nil go to team
+        if (team1.includes(i)) team1Bags += tricks;
+        else team2Bags += tricks;
+      }
+    } else if (bid === -1) { // Blind Nil (use -1 for blind nil)
+      if (tricks === 0) {
+        if (team1.includes(i)) team1Score += 200;
+        else team2Score += 200;
+      } else {
+        if (team1.includes(i)) team1Score -= 200;
+        else team2Score -= 200;
+        // Bags for failed blind nil go to team
+        if (team1.includes(i)) team1Bags += tricks;
+        else team2Bags += tricks;
+      }
+    }
+  }
+  // Bag penalty
+  if (team1Bags >= 10) {
+    team1Score -= 100;
+    team1Bags -= 10;
+  }
+  if (team2Bags >= 10) {
+    team2Score -= 100;
+    team2Bags -= 10;
+  }
+  return {
+    team1Score,
+    team2Score,
+    team1Bags,
+    team2Bags,
+    tricksPerPlayer,
+  };
+}
+
+// --- Stats and coins update helper ---
+async function updateStatsAndCoins(game, winningTeam) {
+  for (let i = 0; i < 4; i++) {
+    const player = game.players[i];
+    if (!player || player.type !== 'human') continue;
+    const userId = player.id;
+    const isWinner = (winningTeam === 1 && (i === 0 || i === 2)) || (winningTeam === 2 && (i === 1 || i === 3));
+    try {
+      // Update overall stats
+      await prisma.userStats.update({
+        where: { userId },
+        data: {
+          gamesPlayed: { increment: 1 },
+          gamesWon: { increment: isWinner ? 1 : 0 },
+          // Add more stat updates as needed
+        }
+      });
+      // Update mode/bid/gimmick stats
+      await prisma.userGameStats.upsert({
+        where: {
+          userId_gameMode_bidType_gimmickType_screamer_assassin: {
+            userId,
+            gameMode: game.gameMode,
+            bidType: game.rules.bidType,
+            gimmickType: game.rules.gimmickType,
+            screamer: !!game.specialRules.screamer,
+            assassin: !!game.specialRules.assassin,
+          }
+        },
+        update: {
+          gamesPlayed: { increment: 1 },
+          gamesWon: { increment: isWinner ? 1 : 0 },
+        },
+        create: {
+          userId,
+          gameMode: game.gameMode,
+          bidType: game.rules.bidType,
+          gimmickType: game.rules.gimmickType,
+          screamer: !!game.specialRules.screamer,
+          assassin: !!game.specialRules.assassin,
+          gamesPlayed: 1,
+          gamesWon: isWinner ? 1 : 0,
+        }
+      });
+      // Award coins if needed (e.g., winners get prize pool)
+      // await prisma.user.update({ ... });
+    } catch (err) {
+      console.error('Failed to update stats/coins for user', userId, err);
+    }
   }
 }
 

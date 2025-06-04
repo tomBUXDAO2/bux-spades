@@ -5,6 +5,7 @@ import { getSocketManager } from '../table-ui/lib/socketManager';
 import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
 import type { Socket } from 'socket.io-client';
+import { socketApi } from '../table-ui/lib/socketApi';
 
 export default function TablePage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -87,8 +88,13 @@ export default function TablePage() {
   };
 
   const handleStartGame = async () => {
-    // TODO: Implement start game logic
-    console.log('Start game clicked');
+    if (!socket || !gameId || !user) return;
+    try {
+      console.log('Starting game:', gameId);
+      await socketApi.startGame(socket, gameId);
+    } catch (error) {
+      console.error('Error starting game:', error);
+    }
   };
 
   if (isLoading) {

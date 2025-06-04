@@ -53,7 +53,7 @@ class SocketManager {
     // Use proxy by setting URL to root
     const SOCKET_URL = import.meta.env.PROD 
       ? import.meta.env.VITE_PROD_API_URL 
-      : '/';
+      : import.meta.env.VITE_API_URL || 'http://localhost:3001';
     console.log('Connecting to socket server:', SOCKET_URL);
 
     // Clear any existing connection timeout

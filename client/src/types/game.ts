@@ -26,10 +26,23 @@ export interface Player {
   username?: string;
 }
 
+export interface Bot {
+  id: string;
+  username: string;
+  avatar: string;
+  type: 'bot';
+  position: number;
+  hand: Card[];
+  bid?: number;
+  tricks?: number;
+  isDealer?: boolean;
+  team?: number;
+}
+
 export interface GameState {
   id: string;
   status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'COMPLETED';
-  players: Player[];
+  players: (Player | Bot | null)[];
   currentPlayer: string;
   currentTrick: Card[];
   completedTricks: Card[][];

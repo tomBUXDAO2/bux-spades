@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { GameState, Card, Suit, Player, CompletedTrick } from '../../types/game';
+import type { GameState, Card, Suit, Player, CompletedTrick, Bot } from '../../types/game';
 import { Socket } from "socket.io-client";
 import Chat from './Chat';
 import HandSummaryModal from './HandSummaryModal';
@@ -27,8 +27,15 @@ interface GameTableProps {
 // Helper function to get card image filename
 function getCardImage(card: Card): string {
   if (!card) return 'back.png';
-  const suitMap: Record<Suit, string> = { '♠': 'S', '♥': 'H', '♦': 'D', '♣': 'C' };
-  return `${card.rank}${suitMap[card.suit]}.png`;
+  // Accepts suit as symbol, letter, or word
+  const suitMap: Record<string, string> = {
+    '♠': 'S', 'Spades': 'S', 'S': 'S',
+    '♥': 'H', 'Hearts': 'H', 'H': 'H',
+    '♦': 'D', 'Diamonds': 'D', 'D': 'D',
+    '♣': 'C', 'Clubs': 'C', 'C': 'C',
+  };
+  const suitLetter = suitMap[card.suit] || card.suit || 'X';
+  return `${card.rank}${suitLetter}.png`;
 }
 
 // Helper function to get card rank value
@@ -48,10 +55,21 @@ function getCardValue(rank: string | number): number {
 
 // Helper function to sort cards
 function sortCards(cards: Card[]): Card[] {
+  // Suit order: Diamonds, Clubs, Hearts, Spades
+  const suitOrder: Record<string, number> = { '♦': 0, 'C': 1, '♣': 1, '♥': 2, 'H': 2, '♠': 3, 'S': 3 };
   return [...cards].sort((a, b) => {
-    const suitOrder: Record<Suit, number> = { '♣': 0, '♥': 1, '♦': 2, '♠': 3 };
-    if (a.suit !== b.suit) {
-      return suitOrder[a.suit] - suitOrder[b.suit];
+    // Normalize suit to single letter for sorting
+    const getSuitKey = (suit: string) => {
+      if (suit === '♦' || suit === 'Diamonds' || suit === 'D') return '♦';
+      if (suit === '♣' || suit === 'Clubs' || suit === 'C') return '♣';
+      if (suit === '♥' || suit === 'Hearts' || suit === 'H') return '♥';
+      if (suit === '♠' || suit === 'Spades' || suit === 'S') return '♠';
+      return suit;
+    };
+    const suitA = getSuitKey(a.suit);
+    const suitB = getSuitKey(b.suit);
+    if (suitOrder[suitA] !== suitOrder[suitB]) {
+      return suitOrder[suitA] - suitOrder[suitB];
     }
     return getCardValue(a.rank) - getCardValue(b.rank);
   });
@@ -140,6 +158,14 @@ function canInviteBot({
   }
 }
 
+// Type guards for Player and Bot
+function isPlayer(p: Player | Bot | null): p is Player {
+  return !!p && (p as Player).name !== undefined && (!('type' in p) || p.type !== 'bot');
+}
+function isBot(p: Player | Bot | null): p is Bot {
+  return !!p && 'type' in p && p.type === 'bot';
+}
+
 export default function GameTable({ 
   game, 
   socket, 
@@ -172,11 +198,11 @@ export default function GameTable({
   
   // After getting the players array:
   const sanitizedPlayers = (gameState.players || []);
-  const isObserver = !sanitizedPlayers.some((p: Player | null) => p && p.id === currentPlayerId);
+  const isObserver = !sanitizedPlayers.some((p): p is Player | Bot => !!p && p.id === currentPlayerId);
   console.log('game.players:', gameState.players); // Debug log to catch nulls
 
   // Find the current player's position and team
-  const currentPlayer = sanitizedPlayers.find((p: Player | null) => p && p.id === currentPlayerId) || null;
+  const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === currentPlayerId) || null;
   
   // Add state to force component updates when the current player changes
   const [lastCurrentPlayer, setLastCurrentPlayer] = useState<string>(gameState.currentPlayer);
@@ -204,17 +230,17 @@ export default function GameTable({
     const currentPlayerPosition = currentPlayer?.position ?? 0;
     
     // Create a rotated array where current player is at position 0 (South)
-    const rotatedPlayers = sanitizedPlayers.map((player: Player | null) => {
+    const rotatedPlayers = sanitizedPlayers.map((player) => {
       if (!player) return null;
       // Calculate new position: (4 + originalPos - currentPlayerPosition) % 4
       // This ensures current player is at 0, and others are rotated accordingly
       const newPosition = (4 + (player.position ?? 0) - currentPlayerPosition) % 4;
-      return { ...player, displayPosition: newPosition } as Player & { displayPosition: number };
+      return { ...player, displayPosition: newPosition } as (Player | Bot) & { displayPosition: number };
     });
     
     // Create final array with players in their display positions
     const positions = Array(4).fill(null);
-    rotatedPlayers.forEach((player: (Player & { displayPosition: number }) | null) => {
+    rotatedPlayers.forEach((player) => {
       if (player && player.displayPosition !== undefined) {
         positions[player.displayPosition] = player;
       }
@@ -365,7 +391,7 @@ export default function GameTable({
       currentPlayerId,
       seatIndex: position,
       isPreGame: gameState.status === 'WAITING',
-      sanitizedPlayers,
+      sanitizedPlayers: sanitizedPlayers.filter((p): p is Player | null => isPlayer(p) || p === null),
     })) {
       return (
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
@@ -389,7 +415,7 @@ export default function GameTable({
     if (!player) return null;
 
     // If player is a bot, show bot avatar and label
-    if (player.type === 'bot') {
+    if (isBot(player)) {
       const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
       const isSideSeat = position === 1 || position === 3;
       const avatarWidth = isMobile ? 32 : 40;
@@ -409,7 +435,7 @@ export default function GameTable({
         currentPlayerId,
         seatIndex: position,
         isPreGame: gameState.status === 'WAITING',
-        sanitizedPlayers,
+        sanitizedPlayers: sanitizedPlayers.filter((p): p is Player | null => isPlayer(p) || p === null),
       });
       return (
         <div className={`absolute ${getPositionClasses(position)} z-30`}>
@@ -519,7 +545,7 @@ export default function GameTable({
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={getPlayerAvatar(player)}
-                      alt={player.username || "Player"}
+                      alt={isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
                       width={avatarWidth}
                       height={avatarHeight}
                       className="rounded-full object-cover"
@@ -544,7 +570,7 @@ export default function GameTable({
                 <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                   <div className="text-white font-medium truncate text-center"
                        style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {player.username}
+                    {isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
                   </div>
                 </div>
                 
@@ -577,7 +603,7 @@ export default function GameTable({
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={getPlayerAvatar(player)}
-                      alt={player.username || "Player"}
+                      alt={isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
                       width={avatarWidth}
                       height={avatarHeight}
                       className="rounded-full object-cover"
@@ -602,7 +628,7 @@ export default function GameTable({
                 <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                   <div className="text-white font-medium truncate text-center"
                        style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {player.username}
+                    {isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
                   </div>
                 </div>
                 
@@ -631,55 +657,62 @@ export default function GameTable({
   const renderPlayerHand = () => {
     if (!currentPlayer) return null;
     const sortedHand = currentPlayer.hand ? sortCards(currentPlayer.hand) : [];
-    
     // Determine playable cards
     const isLeadingTrick = currentTrick.length === 0;
     const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
-    
-    // Calculate card width based on screen size
-    const cardUIWidth = Math.floor(isMobile ? 70 : 84 * scaleFactor);
-    const cardUIHeight = Math.floor(isMobile ? 100 : 120 * scaleFactor);
-    const overlapOffset = Math.floor(isMobile ? -40 : -32 * scaleFactor); // How much cards overlap
+    // Make cards bigger
+    const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
+    const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
+    const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
 
     return (
-      <div className="absolute inset-x-0 bottom-0 flex justify-center">
+      <div
+        className="absolute inset-x-0 flex justify-center"
+        style={{
+          bottom: '-40px', // less off-screen
+          pointerEvents: 'none',
+        }}
+      >
         <div className="flex">
-        {sortedHand.map((card: Card, index: number) => {
-          const isPlayable = gameState.status === "PLAYING" && 
-            gameState.currentPlayer === currentPlayerId &&
-            playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
+          {sortedHand.map((card: Card, index: number) => {
+            console.log('Card in hand:', card); // Debug log
+            const isPlayable = gameState.status === "PLAYING" &&
+              gameState.currentPlayer === currentPlayerId &&
+              playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
 
-          return (
-            <div
-              key={`${card.suit}${card.rank}`}
+            return (
+              <div
+                key={`${card.suit}${card.rank}`}
                 className={`relative transition-transform hover:-translate-y-4 hover:z-10 ${
-                isPlayable ? 'cursor-pointer' : 'cursor-not-allowed'
-              }`}
-              style={{ 
-                width: `${cardUIWidth}px`, 
-                height: `${cardUIHeight}px`,
+                  isPlayable ? 'cursor-pointer' : 'cursor-not-allowed'
+                }`}
+                style={{
+                  width: `${cardUIWidth}px`,
+                  height: `${cardUIHeight}px`,
                   marginLeft: index > 0 ? `${overlapOffset}px` : '0',
-                  zIndex: index
-              }}
-              onClick={() => isPlayable && handlePlayCard(card)}
-            >
-              <div className="relative">
-                <img
-                  src={`/cards/${getCardImage(card)}`}
-                  alt={`${card.rank}${card.suit}`}
-                  width={cardUIWidth}
-                  height={cardUIHeight}
-                  className={`rounded-lg shadow-md ${
-                    isPlayable ? 'hover:shadow-lg' : ''
-                  }`}
-                />
-                {!isPlayable && (
-                  <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
-                )}
+                  zIndex: index,
+                  pointerEvents: 'auto', // Make visible part clickable
+                }}
+                onClick={() => isPlayable && handlePlayCard(card)}
+              >
+                <div className="relative">
+                  <img
+                    src={`/cards/${getCardImage(card)}`}
+                    alt={`${card.rank}${card.suit}`}
+                    width={cardUIWidth}
+                    height={cardUIHeight}
+                    className={`rounded-lg shadow-md ${
+                      isPlayable ? 'hover:shadow-lg' : ''
+                    }`}
+                    style={{ objectFit: 'cover' }}
+                  />
+                  {!isPlayable && (
+                    <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       </div>
     );
@@ -694,7 +727,8 @@ export default function GameTable({
       console.log('Hand completed - calculating scores for display');
       
       // Calculate scores using the scoring algorithm
-      const calculatedScores = calculateHandScore(sanitizedPlayers);
+      const onlyPlayers = sanitizedPlayers.filter(isPlayer);
+      const calculatedScores = calculateHandScore(onlyPlayers);
       
       console.log('Hand scores calculated:', calculatedScores);
       
@@ -706,7 +740,7 @@ export default function GameTable({
     socket.on('hand_completed', handleHandCompleted);
     
     // Handle scoring state change directly in case the server doesn't emit the event
-    if (gameState.status === "PLAYING" && sanitizedPlayers.every((p: Player) => p.hand.length === 0) && !showHandSummary) {
+    if (gameState.status === "PLAYING" && (sanitizedPlayers.filter(isPlayer) as Player[]).every((p) => p.hand.length === 0) && !showHandSummary) {
       handleHandCompleted();
     }
     
@@ -930,7 +964,7 @@ export default function GameTable({
       return;
     }
 
-    console.log(`Playing card: ${card.rank}${card.suit} as player ${currentPlayer?.name ?? 'Unknown'}`);
+    console.log(`Playing card: ${card.rank}${card.suit} as player ${isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}`);
     
     // Update our local tracking immediately to know that current player played this card
     // This helps prevent the "Unknown" player issue when we play our own card
@@ -1025,6 +1059,39 @@ export default function GameTable({
       socket.off('authenticated', handleAuthenticated);
     };
   }, [socket, gameState?.id, propUser?.id]);
+
+  // Listen for game_started and update the UI
+  useEffect(() => {
+    if (!socket) return;
+    const handleGameStarted = (data: any) => {
+      setGameState(prev => {
+        // Map hands and bids to players, preserving nulls for empty seats
+        const updatedPlayers = (prev.players || []).map((player, i) => {
+          if (!player) return null;
+          // Find the hand for this player
+          const handObj = data.hands?.find((h: any) => h.playerId === player.id);
+          return {
+            ...player,
+            hand: handObj ? handObj.hand : [],
+            isDealer: i === data.dealerIndex,
+            bid: data.bidding?.bids ? data.bidding.bids[i] : null,
+          };
+        });
+        return {
+          ...prev,
+          status: 'BIDDING',
+          dealerIndex: data.dealerIndex,
+          players: updatedPlayers,
+          bidding: data.bidding,
+          // Optionally update other fields as needed
+        };
+      });
+    };
+    socket.on('game_started', handleGameStarted);
+    return () => {
+      socket.off('game_started', handleGameStarted);
+    };
+  }, [socket]);
 
   // Return the JSX for the component
   return (
@@ -1145,7 +1212,7 @@ export default function GameTable({
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Host</div>
-                    <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.name} can start</div>
+                    <div className="text-sm mt-1">Only {isPlayer(sanitizedPlayers[0]) ? sanitizedPlayers[0].name : isBot(sanitizedPlayers[0]) ? sanitizedPlayers[0].username : 'Unknown'} can start</div>
                   </div>
                 ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
@@ -1163,9 +1230,10 @@ export default function GameTable({
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
-                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);
+                      const waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
+                      const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
                       return (
-                        <div className="font-bold">Waiting for {waitingPlayer ? waitingPlayer.name : "Unknown"} to bid</div>
+                        <div className="font-bold">Waiting for {waitingName}</div>
                       );
                     })()}
                   </div>
@@ -1173,9 +1241,10 @@ export default function GameTable({
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {(() => {
-                      const waitingPlayer = sanitizedPlayers.find((p: Player) => p.id === gameState.currentPlayer);
+                      const waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
+                      const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
                       return (
-                        <div className="text-sm">Waiting for {waitingPlayer ? waitingPlayer.name : "Unknown"} to play</div>
+                        <div className="text-sm">Waiting for {waitingName} to play</div>
                       );
                     })()}
                   </div>
@@ -1198,8 +1267,8 @@ export default function GameTable({
               socket={socket}
               gameId={gameState.id}
               userId={currentPlayerId || ''}
-              userName={currentPlayer?.name || 'Unknown'}
-              players={sanitizedPlayers}
+              userName={isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
+              players={sanitizedPlayers.filter(isPlayer)}
             />
           </div>
         </div>
