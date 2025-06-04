@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
 import { PrismaClient } from '@prisma/client';
+import type { AuthenticatedSocket } from '../index';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -329,7 +330,7 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
 // --- Bidding socket event ---
 import { io as ioInstance } from '../index';
 if (ioInstance) {
-  ioInstance.on('connection', (socket) => {
+  ioInstance.on('connection', (socket: AuthenticatedSocket) => {
     socket.on('make_bid', ({ gameId, userId, bid }) => {
       const game = games.find(g => g.id === gameId);
       if (!game || !game.bidding) return;

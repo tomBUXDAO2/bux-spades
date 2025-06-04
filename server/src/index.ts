@@ -83,7 +83,7 @@ const io = new Server(httpServer, {
 });
 
 // Extend Socket type to allow userId property
-interface AuthenticatedSocket extends Socket {
+export interface AuthenticatedSocket extends Socket {
   userId?: string;
   isAuthenticated?: boolean;
   auth?: {
