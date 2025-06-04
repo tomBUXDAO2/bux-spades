@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { Game, GamePlayer } from '../types/game';
+import type { Game, GamePlayer, Card, Suit, Rank } from '../types/game';
 import { io } from '../index';
 import { PrismaClient } from '@prisma/client';
 
@@ -171,10 +171,10 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
 });
 
 // --- Gameplay Helpers ---
-const SUITS = ['S', 'H', 'D', 'C'];
-const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-function createDeck() {
-  const deck = [];
+const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
+const RANKS: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+function createDeck(): Card[] {
+  const deck: Card[] = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
       deck.push({ suit, rank });
@@ -182,22 +182,22 @@ function createDeck() {
   }
   return deck;
 }
-function shuffle(deck) {
+function shuffle(deck: Card[]): Card[] {
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;
 }
-export function assignDealer(players) {
-  const playerIndexes = players.map((p, i) => p ? i : null).filter(i => i !== null);
+export function assignDealer(players: (GamePlayer | null)[]): number {
+  const playerIndexes = players.map((p, i) => p ? i : null).filter((i): i is number => i !== null);
   const dealerIndex = playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
   return dealerIndex;
 }
 
-export function dealCards(players, dealerIndex) {
+export function dealCards(players: (GamePlayer | null)[], dealerIndex: number): Card[][] {
   const deck = shuffle(createDeck());
-  const hands = [[], [], [], []];
+  const hands: Card[][] = [[], [], [], []];
   let current = (dealerIndex + 1) % 4;
   for (const card of deck) {
     hands[current].push(card);
@@ -437,7 +437,7 @@ if (ioInstance) {
 }
 
 // --- Helper: Determine Trick Winner ---
-function determineTrickWinner(trick) {
+function determineTrickWinner(trick: Card[]): number {
   // trick: array of 4 { suit, rank, playerIndex }
   const leadSuit = trick[0].suit;
   let winningCard = trick[0];
@@ -451,14 +451,14 @@ function determineTrickWinner(trick) {
   }
   return winningCard.playerIndex;
 }
-function getCardValue(rank) {
+function getCardValue(rank: string | number): number {
   if (typeof rank === 'number') return rank;
   const rankMap = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
   return rankMap[rank];
 }
 
 // --- Scoring helper ---
-function calculatePartnersHandScore(game) {
+function calculatePartnersHandScore(game: Game) {
   const team1 = [0, 2];
   const team2 = [1, 3];
   let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
@@ -543,7 +543,7 @@ function calculatePartnersHandScore(game) {
 }
 
 // --- Stats and coins update helper ---
-async function updateStatsAndCoins(game, winningTeam) {
+async function updateStatsAndCoins(game: Game, winningTeam: number) {
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];
     if (!player || player.type !== 'human') continue;
@@ -551,7 +551,7 @@ async function updateStatsAndCoins(game, winningTeam) {
     const isWinner = (winningTeam === 1 && (i === 0 || i === 2)) || (winningTeam === 2 && (i === 1 || i === 3));
     try {
       // Update overall stats
-      await prisma.userStats.update({
+      const stats = await prisma.userStats.update({
         where: { userId },
         data: {
           gamesPlayed: { increment: 1 },

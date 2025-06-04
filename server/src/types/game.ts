@@ -1,12 +1,26 @@
 export type GameMode = 'PARTNERS' | 'SOLO';
 export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
 export type GamePlayOption = 'REG' | 'WHIZ' | 'MIRROR';
+export type Suit = 'S' | 'H' | 'D' | 'C';
+export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
+
+export interface Card {
+  suit: Suit;
+  rank: Rank;
+  playedBy?: string;
+}
 
 export interface GamePlayer {
   id: string;
   username: string;
   avatar: string | null;
   type: 'human' | 'bot';
+  position?: number;
+  hand?: Card[];
+  bid?: number;
+  tricks?: number;
+  team?: number;
+  isDealer?: boolean;
 }
 
 export interface Game {
@@ -22,7 +36,7 @@ export interface Game {
   };
   players: (GamePlayer | null)[];
   status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'COMPLETED';
-  completedTricks: any[];
+  completedTricks: Card[][];
   rules: {
     gameType: GameMode;
     allowNil: boolean;
@@ -32,4 +46,21 @@ export interface Game {
     minPoints: number;
   };
   isBotGame: boolean;
+  dealerIndex?: number;
+  hands?: Card[][];
+  bidding?: {
+    currentPlayer: string;
+    bids: Record<string, number>;
+    nilBids: Record<string, boolean>;
+  };
+  play?: {
+    currentPlayer: string;
+    currentTrick: Card[];
+    leadSuit?: Suit;
+  };
+  team1TotalScore?: number;
+  team2TotalScore?: number;
+  team1Bags?: number;
+  team2Bags?: number;
+  winningTeam?: 'team1' | 'team2';
 } 
