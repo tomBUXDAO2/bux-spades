@@ -7,14 +7,6 @@ interface GameCardProps {
   currentUserId: string;
 }
 
-function isPlayer(p: any): p is Player {
-  return p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
-}
-
-function isBot(p: any): p is Bot {
-  return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
-}
-
 export default function GameCard({ game, onJoin, onSelect, currentUserId }: GameCardProps) {
   const isPlayerInGame = game.players.some(player => player.id === currentUserId);
   const isGameFull = game.players.length >= 4;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSocket } from "../../lib/socket";
+import type { GameState } from '../../types/game';
 
 interface GameBoardProps {
   gameId: string;
@@ -32,7 +33,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
   }, [gameId, socket]);
 
   const currentPlayer = game?.players.find(
-    (p) => p.id === "TODO"
+    (p: Player | Bot | null) => p?.id === "TODO"
   );
 
   const handlePlayCard = () => {
@@ -83,7 +84,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium mb-2">Current Trick</h3>
           <div className="flex gap-4">
-            {game.currentTrick.map((card, index) => (
+            {game.currentTrick.map((card: Card, index: number) => (
               <div
                 key={index}
                 className="p-2 bg-white rounded border text-center min-w-[60px]"
@@ -100,7 +101,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium mb-2">Make Your Bid</h3>
           <div className="flex gap-2">
-            {Array.from({ length: 13 }, (_, i) => i).map((bid) => (
+            {Array.from({ length: 13 }, (_, i) => i).map((bid: number) => (
               <button
                 key={bid}
                 onClick={() => handleMakeBid()}
@@ -118,7 +119,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium mb-2">Your Hand</h3>
           <div className="flex flex-wrap gap-2">
-            {currentPlayer.hand.map((card, index) => (
+            {currentPlayer.hand.map((card: Card, index: number) => (
               <button
                 key={index}
                 onClick={() => handlePlayCard()}
@@ -138,11 +139,11 @@ export default function GameBoard({ gameId }: GameBoardProps) {
 
       {/* Player information */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {game.players.map((player) => (
+        {game.players.map((player: Player | Bot | null) => (
           <div
-            key={player.id}
+            key={player?.id}
             className={`p-4 rounded-lg ${
-              game.currentPlayer === player.id
+              game.currentPlayer === player?.id
                 ? "bg-blue-50 border-2 border-blue-200"
                 : "bg-gray-50"
             }`}
