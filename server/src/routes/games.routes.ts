@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { Game, GamePlayer, Card, Suit, Rank } from '../types/game';
+import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
 import { PrismaClient } from '@prisma/client';
 
@@ -20,7 +20,7 @@ router.post('/', (req, res) => {
       avatar: settings.creatorImage || null,
       type: 'human' as const,
     };
-    const newGame = {
+    const newGame: Game = {
       id: uuidv4(),
       gameMode: settings.gameMode,
       maxPoints: settings.maxPoints,
@@ -37,7 +37,9 @@ router.post('/', (req, res) => {
         allowBlindNil: false,
         coinAmount: settings.buyIn,
         maxPoints: settings.maxPoints,
-        minPoints: settings.minPoints
+        minPoints: settings.minPoints,
+        bidType: 'REG' as BiddingOption,
+        gimmickType: 'REG' as GamePlayOption
       },
       isBotGame: false,
     };
@@ -214,8 +216,10 @@ router.post('/:id/start', async (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status !== 'WAITING') return res.status(400).json({ error: 'Game already started' });
+  
   // If any seat is a bot, set isBotGame true
   game.isBotGame = game.players.some(p => p && p.type === 'bot');
+  
   if (!game.isBotGame) {
     // Debit buy-in from each human player's coin balance
     try {
@@ -231,17 +235,26 @@ router.post('/:id/start', async (req, res) => {
       return res.status(500).json({ error: 'Failed to debit coins from players' });
     }
   }
-  game.status = 'BIDDING'; // or whatever the next phase is
+  
+  game.status = 'BIDDING';
+  
   // --- Dealer assignment and card dealing ---
   const dealerIndex = assignDealer(game.players);
   game.dealerIndex = dealerIndex;
   const hands = dealCards(game.players, dealerIndex);
   game.hands = hands;
+  
   // --- Bidding phase state ---
+  const firstBidder = game.players[(dealerIndex + 1) % 4];
+  if (!firstBidder) return res.status(500).json({ error: 'Invalid game state' });
+  
   game.bidding = {
+    currentPlayer: firstBidder.id,
     currentBidderIndex: (dealerIndex + 1) % 4,
     bids: [null, null, null, null],
+    nilBids: {}
   };
+  
   // Emit to all players
   io.emit('games_updated', games);
   io.to(game.id).emit('game_started', {
@@ -331,12 +344,17 @@ if (ioInstance) {
       if (game.bidding.bids.every(b => b !== null)) {
         // All bids in, move to play phase
         // --- Play phase state ---
+        const firstPlayer = game.players[(game.dealerIndex! + 1) % 4];
+        if (!firstPlayer) return res.status(500).json({ error: 'Invalid game state' });
+        
         game.play = {
-          currentPlayerIndex: (game.dealerIndex + 1) % 4,
+          currentPlayer: firstPlayer.id,
+          currentPlayerIndex: (game.dealerIndex! + 1) % 4,
           currentTrick: [],
           tricks: [],
-          trickNumber: 0,
+          trickNumber: 0
         };
+        
         ioInstance.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
         ioInstance.to(game.id).emit('play_start', {
           currentPlayerIndex: game.play.currentPlayerIndex,
@@ -454,9 +472,12 @@ function determineTrickWinner(trick: Card[]): number {
   }
   return winningCard.playerIndex;
 }
-function getCardValue(rank: string | number): number {
-  if (typeof rank === 'number') return rank;
-  const rankMap = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+
+function getCardValue(rank: Rank): number {
+  const rankMap: Record<Rank, number> = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+    'J': 11, 'Q': 12, 'K': 13, 'A': 14
+  };
   return rankMap[rank];
 }
 
