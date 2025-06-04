@@ -39,6 +39,14 @@ const ConfirmActionModal = ({ open, player, action, onConfirm, onCancel }: any) 
   );
 };
 
+// Add type guards if not present
+function isPlayer(p) {
+  return p && typeof p === 'object' && (('username' in p && p.type !== 'bot') || ('name' in p && (!('type' in p) || p.type !== 'bot')));
+}
+function isBot(p) {
+  return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
+}
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   if (!user) return null;
@@ -275,12 +283,12 @@ const HomePage: React.FC = () => {
                   {player ? (
                     <div className="text-center flex flex-col items-center">
                       <img
-                        src={player.avatar || player.image || '/bot-avatar.jpg'}
+                        src={isPlayer(player) ? player.avatar : isBot(player) ? player.avatar : '/bot-avatar.jpg'}
                         alt=""
                         className="w-16 h-16 rounded-full border-2 border-slate-600"
                       />
                       <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                        {player.username || player.name || 'Player'}
+                        {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Player'}
                       </span>
                     </div>
                   ) : (
@@ -687,12 +695,12 @@ const HomePage: React.FC = () => {
                     })
                     .map(player => (
                       <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
-                        <img src={player.avatar || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+                        <img src={isPlayer(player) ? player.avatar : isBot(player) ? player.avatar : '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
                         <span
                           className={`text-sm font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                           onClick={() => handleOpenPlayerStats(player)}
                         >
-                          {player.username}
+                          {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Player'}
                           {player.online && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
                           {player.status === 'friend' && (
                             <img src="/friend.svg" alt="Friend" className="ml-2 w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />

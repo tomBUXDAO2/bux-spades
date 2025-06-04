@@ -160,10 +160,10 @@ function canInviteBot({
 
 // Type guards for Player and Bot
 function isPlayer(p: Player | Bot | null): p is Player {
-  return !!p && (p as Player).name !== undefined && (!('type' in p) || p.type !== 'bot');
+  return !!p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
 }
 function isBot(p: Player | Bot | null): p is Bot {
-  return !!p && 'type' in p && p.type === 'bot';
+  return !!p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 }
 
 export default function GameTable({ 
@@ -545,7 +545,7 @@ export default function GameTable({
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={getPlayerAvatar(player)}
-                      alt={isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
+                      alt={isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
                       width={avatarWidth}
                       height={avatarHeight}
                       className="rounded-full object-cover"
@@ -570,7 +570,7 @@ export default function GameTable({
                 <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                   <div className="text-white font-medium truncate text-center"
                        style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
+                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
                   </div>
                 </div>
                 
@@ -603,7 +603,7 @@ export default function GameTable({
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={getPlayerAvatar(player)}
-                      alt={isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
+                      alt={isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
                       width={avatarWidth}
                       height={avatarHeight}
                       className="rounded-full object-cover"
@@ -628,7 +628,7 @@ export default function GameTable({
                 <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                   <div className="text-white font-medium truncate text-center"
                        style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {isPlayer(player) ? player.name : isBot(player) ? player.username : 'Unknown'}
+                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
                   </div>
                 </div>
                 
