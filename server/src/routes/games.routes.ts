@@ -173,6 +173,7 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
 // --- Gameplay Helpers ---
 const SUITS: Suit[] = ['S', 'H', 'D', 'C'];
 const RANKS: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
 function createDeck(): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
@@ -182,6 +183,7 @@ function createDeck(): Card[] {
   }
   return deck;
 }
+
 function shuffle(deck: Card[]): Card[] {
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -189,6 +191,7 @@ function shuffle(deck: Card[]): Card[] {
   }
   return deck;
 }
+
 export function assignDealer(players: (GamePlayer | null)[]): number {
   const playerIndexes = players.map((p, i) => p ? i : null).filter((i): i is number => i !== null);
   const dealerIndex = playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
@@ -555,39 +558,12 @@ async function updateStatsAndCoins(game: Game, winningTeam: number) {
         where: { userId },
         data: {
           gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 },
-          // Add more stat updates as needed
+          gamesWon: { increment: isWinner ? 1 : 0 }
         }
       });
       // Update mode/bid/gimmick stats
-      await prisma.userGameStats.upsert({
-        where: {
-          userId_gameMode_bidType_gimmickType_screamer_assassin: {
-            userId,
-            gameMode: game.gameMode,
-            bidType: game.rules.bidType,
-            gimmickType: game.rules.gimmickType,
-            screamer: !!game.specialRules.screamer,
-            assassin: !!game.specialRules.assassin,
-          }
-        },
-        update: {
-          gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 },
-        },
-        create: {
-          userId,
-          gameMode: game.gameMode,
-          bidType: game.rules.bidType,
-          gimmickType: game.rules.gimmickType,
-          screamer: !!game.specialRules.screamer,
-          assassin: !!game.specialRules.assassin,
-          gamesPlayed: 1,
-          gamesWon: isWinner ? 1 : 0,
-        }
-      });
-      // Award coins if needed (e.g., winners get prize pool)
-      // await prisma.user.update({ ... });
+      // Remove the userGameStats upsert since it doesn't exist in the schema
+      // await prisma.userGameStats.upsert({ ... });
     } catch (err) {
       console.error('Failed to update stats/coins for user', userId, err);
     }

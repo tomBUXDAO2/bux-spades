@@ -8,6 +8,7 @@ export interface Card {
   suit: Suit;
   rank: Rank;
   playedBy?: string;
+  playerIndex?: number;
 }
 
 export interface GamePlayer {
@@ -44,19 +45,28 @@ export interface Game {
     coinAmount: number;
     maxPoints: number;
     minPoints: number;
+    bidType: BiddingOption;
+    gimmickType: GamePlayOption;
   };
   isBotGame: boolean;
   dealerIndex?: number;
   hands?: Card[][];
   bidding?: {
     currentPlayer: string;
-    bids: Record<string, number>;
+    currentBidderIndex: number;
+    bids: (number | null)[];
     nilBids: Record<string, boolean>;
   };
   play?: {
     currentPlayer: string;
+    currentPlayerIndex: number;
     currentTrick: Card[];
     leadSuit?: Suit;
+    tricks: {
+      cards: Card[];
+      winnerIndex: number;
+    }[];
+    trickNumber: number;
   };
   team1TotalScore?: number;
   team2TotalScore?: number;
