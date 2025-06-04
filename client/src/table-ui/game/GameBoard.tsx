@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSocket } from "../../lib/socket";
-import type { GameState } from '../../types/game';
+import type { GameState, Player, Bot, Card } from '../../types/game';
 
 interface GameBoardProps {
   gameId: string;
