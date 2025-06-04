@@ -40,10 +40,10 @@ const ConfirmActionModal = ({ open, player, action, onConfirm, onCancel }: any) 
 };
 
 // Add type guards if not present
-function isPlayer(p) {
-  return p && typeof p === 'object' && (('username' in p && p.type !== 'bot') || ('name' in p && (!('type' in p) || p.type !== 'bot')));
+function isPlayer(p: any): p is Player {
+  return p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
 }
-function isBot(p) {
+function isBot(p: any): p is Bot {
   return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 }
 

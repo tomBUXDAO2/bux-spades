@@ -57,10 +57,10 @@ export default function GameBoard({ gameId }: GameBoardProps) {
   const team2Bags = Math.floor((team2Score % 100) / 10);
 
   // Add type guards if not present
-  function isPlayer(p) {
-    return p && typeof p === 'object' && 'name' in p && (!('type' in p) || p.type !== 'bot');
+  function isPlayer(p: any): p is Player {
+    return p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
   }
-  function isBot(p) {
+  function isBot(p: any): p is Bot {
     return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
   }
 
@@ -156,14 +156,14 @@ export default function GameBoard({ gameId }: GameBoardProps) {
                 : "bg-gray-50"
             }`}
           >
-            <div className="font-medium">{isPlayer(player) ? player.name : isBot(player) ? player.username : ''}</div>
+            <div className="font-medium">{player && (isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : '')}</div>
             {game.status !== "WAITING" && (
               <>
                 <div className="text-sm text-gray-600">
-                  Bid: {player.bid ?? "?"}
+                  Bid: {player && player.bid ?? "?"}
                 </div>
                 <div className="text-sm text-gray-600">
-                  Tricks: {player.tricks}
+                  Tricks: {player && player.tricks}
                 </div>
               </>
             )}

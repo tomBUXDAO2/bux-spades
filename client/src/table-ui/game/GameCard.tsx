@@ -7,11 +7,11 @@ interface GameCardProps {
   currentUserId: string;
 }
 
-function isPlayer(p) {
-  return p && typeof p === 'object' && 'name' in p && (!('type' in p) || p.type !== 'bot');
+function isPlayer(p: any): p is Player {
+  return p && typeof p === 'object' && ((('type' in p) && p.type !== 'bot') || !('type' in p));
 }
 
-function isBot(p) {
+function isBot(p: any): p is Bot {
   return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 }
 
@@ -36,7 +36,7 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
         <div className="flex flex-wrap gap-2 mt-1">
           {game.players.map(player => (
             <span key={player.id} className="text-sm text-gray-400">
-              {isPlayer(player) ? player.name : isBot(player) ? player.username : ''}
+              {player && (isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : '')}
             </span>
           ))}
         </div>
