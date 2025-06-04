@@ -6,6 +6,7 @@ export interface GamePlayer {
   id: string;
   username: string;
   avatar: string | null;
+  type: 'human' | 'bot';
 }
 
 export interface Game {
@@ -30,4 +31,5 @@ export interface Game {
     maxPoints: number;
     minPoints: number;
   };
+  isBotGame: boolean;
 } 
