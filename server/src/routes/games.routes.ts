@@ -544,11 +544,13 @@ function calculatePartnersHandScore(game: Game) {
   }
   // Calculate team bids and tricks
   for (const i of team1) {
-    team1Bid += game.bidding.bids[i];
+    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
+    team1Bid += bid;
     team1Tricks += tricksPerPlayer[i];
   }
   for (const i of team2) {
-    team2Bid += game.bidding.bids[i];
+    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
+    team2Bid += bid;
     team2Tricks += tricksPerPlayer[i];
   }
   // Team 1 scoring
