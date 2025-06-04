@@ -351,7 +351,11 @@ if (ioInstance) {
       
       if (game.bidding.bids.every(b => b !== null)) {
         // All bids in, move to play phase
-        const firstPlayer = game.players[(game.dealerIndex! + 1) % 4];
+        if (!game.dealerIndex) {
+          socket.emit('error', { message: 'Invalid game state: no dealer assigned' });
+          return;
+        }
+        const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
         if (!firstPlayer) {
           socket.emit('error', { message: 'Invalid game state' });
           return;
@@ -360,7 +364,7 @@ if (ioInstance) {
         // --- Play phase state ---
         game.play = {
           currentPlayer: firstPlayer.id,
-          currentPlayerIndex: (game.dealerIndex! + 1) % 4,
+          currentPlayerIndex: (game.dealerIndex + 1) % 4,
           currentTrick: [],
           tricks: [],
           trickNumber: 0
