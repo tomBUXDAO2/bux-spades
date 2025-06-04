@@ -282,13 +282,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         console.log(`User ${userId} left game ${gameId}`);
       }
 
-      // If all players are null, remove the game
-      if (game.players.every((p: GamePlayer | null) => p === null)) {
+      // Remove the game if there are no human players left
+      const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
+      if (!hasHumanPlayers) {
         const gameIdx = games.findIndex((g: Game) => g.id === gameId);
         if (gameIdx !== -1) {
           games.splice(gameIdx, 1);
           io.emit('games_updated', games);
-          console.log(`Game ${gameId} removed (no players left)`);
+          console.log(`Game ${gameId} removed (no human players left)`);
         }
       }
     } catch (error) {
