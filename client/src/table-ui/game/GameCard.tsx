@@ -28,7 +28,7 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
         <div className="flex flex-wrap gap-2 mt-1">
           {game.players.map((player: any, idx: number) =>
             player
-              ? <span key={player.id} className="text-sm text-gray-400">
+              ? <span key={idx} className="text-sm text-gray-400">
                   {('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name)}
                 </span>
               : null
