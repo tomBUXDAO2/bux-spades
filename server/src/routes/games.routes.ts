@@ -390,12 +390,23 @@ if (ioInstance) {
       }
       
       const playerIndex = game.players.findIndex(p => p && p.id === userId);
-      if (playerIndex === -1) return;
+      if (playerIndex === -1) {
+        socket.emit('error', { message: 'Player not found in game' });
+        return;
+      }
       
-      if (playerIndex !== game.play.currentPlayerIndex) return; // Not their turn
+      if (playerIndex !== game.play.currentPlayerIndex) {
+        socket.emit('error', { message: 'Not your turn' });
+        return;
+      }
       
       // Validate card is in player's hand
       const hand = game.hands[playerIndex];
+      if (!hand) {
+        socket.emit('error', { message: 'Invalid hand state' });
+        return;
+      }
+      
       const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
       if (cardIndex === -1) return; // Card not in hand
       
