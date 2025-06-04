@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useSocket } from '../lib/socket';
+import { useSocket } from '../context/SocketContext';
 import type { Socket } from 'socket.io-client';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
@@ -9,11 +9,14 @@ import { Player } from '../types/game';
 import { socketApi } from '../lib/socketApi';
 
 interface ChatProps {
-  socket: Socket | null;
   gameId: string;
   userId: string;
   userName: string;
   players: Player[];
+  showPlayerListTab?: boolean;
+  chatType?: 'game' | 'lobby';
+  onToggleChatType?: () => void;
+  lobbyMessages?: ChatMessage[];
 }
 
 interface ChatMessage {
@@ -31,7 +34,8 @@ interface ChatMessage {
 const GUEST_AVATAR = "/guest-avatar.png";
 const BOT_AVATAR = "/bot-avatar.jpg";
 
-export default function Chat({ socket, gameId, userId, userName, players }: ChatProps) {
+export default function Chat({ gameId, userId, userName, players, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
+  const socket = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -79,11 +83,7 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
   const mobileFontSize = isMobile ? 11 : fontSize;
   const mobileHeaderFontSize = isMobile ? 13 : headerFontSize;
 
-  // Only use regular socket if not in test mode
-  const { socket: regularSocket } = !socket ? useSocket() : { socket: null };
-
-  // Get the actual socket to use
-  const activeSocket = socket || regularSocket;
+  const activeSocket = socket;
   
   // Track connection status
   useEffect(() => {
@@ -97,7 +97,6 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
         activeSocket.emit('join_game', {
           gameId,
           userId,
-          // We're just joining to listen, not as a player
           watchOnly: true
         });
       }
@@ -286,103 +285,230 @@ export default function Chat({ socket, gameId, userId, userName, players }: Chat
     playerColors[player.id] = player.team === 1 ? 'text-red-400' : 'text-blue-400';
   });
 
+  // Add tab state
+  const [activeTab, setActiveTab] = useState<'chat' | 'players'>('chat');
+
+  // Add state for lobby chat if needed
+  const [lobbyInputValue, setLobbyInputValue] = useState('');
+  const [showLobbyEmojiPicker, setShowLobbyEmojiPicker] = useState(false);
+  const lobbyMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Use correct socket/messages depending on chatType
+  const isLobby = chatType === 'lobby';
+  const activeMessages = isLobby && lobbyMessages ? lobbyMessages : messages;
+
+  // Scroll to bottom for lobby chat
+  useEffect(() => {
+    if (isLobby && lobbyMessagesEndRef.current) {
+      lobbyMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isLobby, lobbyMessages]);
+
+  // Handle lobby chat send
+  const handleLobbySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lobbyInputValue.trim()) return;
+    try {
+      const messageId = `${Date.now()}-${userId}-${Math.random().toString(36).substr(2, 9)}`;
+      const chatMessage = {
+        id: messageId,
+        userName: userName,
+        userId: userId,
+        message: lobbyInputValue.trim(),
+        timestamp: Date.now()
+      };
+      // Optimistic UI: parent should update lobbyMessages
+      socket.emit('lobby_chat_message', chatMessage);
+      setLobbyInputValue('');
+      setShowLobbyEmojiPicker(false);
+    } catch (err) {
+      console.error('Failed to send lobby chat message:', err);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-800 overflow-hidden border-l border-gray-600">
-      {/* Chat header */}
-      <div className="bg-gray-900 p-2 border-b border-gray-600">
-        <h3 className="text-white font-bold" style={{ fontSize: `${mobileHeaderFontSize}px` }}>Game Chat</h3>
-      </div>
-      
-      {/* Messages container - flex-grow to fill available space */}
-      <div className="flex-grow overflow-y-auto p-2 bg-gray-850" style={{ backgroundColor: '#1a202c' }}>
-        {messages.length === 0 ? (
-          <div className="text-gray-400 text-center my-4" style={{ fontSize: `${mobileFontSize}px` }}>
-            No messages yet. Start the conversation!
-          </div>
-        ) : (
-          messages.map((msg, index) => (
-            <div
-              key={msg.id || index}
-              className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''}`}
-            >
-              {msg.userId !== userId && (
-                <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
-                  <img 
-                    src={getPlayerAvatar(msg.userId)} 
-                    alt={msg.userName || msg.user || ''} 
-                    width={isMobile ? 24 : 32} 
-                    height={isMobile ? 24 : 32}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              
-              <div className={`max-w-[80%] ${msg.userId === userId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}>
-                <div className="flex justify-between items-center mb-1">
-                  {msg.userId !== userId && (
-                    <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
-                  )}
-                  <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>
-                </div>
-                <p style={{ fontSize: `${mobileFontSize}px` }}>{msg.message || msg.text}</p>
-              </div>
-              
-              {msg.userId === userId && (
-                <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} ml-2 rounded-full overflow-hidden flex-shrink-0`}>
-                  <img 
-                    src={getPlayerAvatar(msg.userId)} 
-                    alt={msg.userName || msg.user || ''} 
-                    width={isMobile ? 24 : 32} 
-                    height={isMobile ? 24 : 32}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Message input */}
-      <form onSubmit={handleSubmit} className="p-2 bg-gray-900 flex border-t border-gray-600">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
-            className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
-            style={{ fontSize: `${fontSize}px` }}
-          />
+      {/* Chat/Players Header */}
+      <div className="flex items-center justify-between bg-gray-900 p-2 border-b border-gray-600">
+        <div className="flex items-center gap-2">
           <button
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xl text-yellow-300 hover:text-yellow-200"
+            className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            onClick={() => setActiveTab('chat')}
+            aria-label="Chat"
           >
-            😊
+            <img src="/chat.svg" alt="Chat" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
           </button>
-          {showEmojiPicker && (
-            <div className="absolute bottom-full right-0 mb-2 z-10">
-              <Picker 
-                data={data} 
-                onEmojiSelect={onEmojiSelect}
-                theme="dark"
-                previewPosition="none"
-                skinTonePosition="none"
-              />
-            </div>
+          {showPlayerListTab && (
+            <button
+              className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+              onClick={() => setActiveTab('players')}
+              aria-label="Players"
+            >
+              <img src="/players.svg" alt="Players" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            </button>
           )}
         </div>
-        <button
-          type="submit"
-          className="bg-blue-600 text-white rounded-r hover:bg-blue-700 flex items-center justify-center w-10"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-            <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-          </svg>
-        </button>
-      </form>
+        {/* Toggle switch for chat type */}
+        {onToggleChatType && (
+          <div className="flex items-center gap-2 pr-4">
+            <span className="text-xs font-semibold text-indigo-400">{isLobby ? 'Lobby' : 'Game'}</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={isLobby} onChange={onToggleChatType} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-all"></div>
+              <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isLobby ? 'translate-x-5' : ''}`}></div>
+            </label>
+          </div>
+        )}
+      </div>
+      {/* Tab Content */}
+      {activeTab === 'chat' ? (
+        <>
+          {/* Messages container - flex-grow to fill available space */}
+          <div className="flex-grow overflow-y-auto p-2 bg-gray-850" style={{ backgroundColor: '#1a202c' }}>
+            {activeMessages.length === 0 ? (
+              <div className="text-gray-400 text-center my-4" style={{ fontSize: `${mobileFontSize}px` }}>
+                No messages yet. Start the conversation!
+              </div>
+            ) : (
+              activeMessages.map((msg, index) => (
+                <div
+                  key={msg.id || index}
+                  className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''}`}
+                >
+                  {msg.userId !== userId && (
+                    <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
+                      <img 
+                        src={getPlayerAvatar(msg.userId)} 
+                        alt={msg.userName || msg.user || ''} 
+                        width={isMobile ? 24 : 32} 
+                        height={isMobile ? 24 : 32}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className={`max-w-[80%] ${msg.userId === userId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}>                <div className="flex justify-between items-center mb-1">
+                      {msg.userId !== userId && (
+                        <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
+                      )}
+                      <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>
+                    </div>
+                    <p style={{ fontSize: `${mobileFontSize}px` }}>{msg.message || msg.text}</p>
+                  </div>
+                  {msg.userId === userId && (
+                    <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} ml-2 rounded-full overflow-hidden flex-shrink-0`}>
+                      <img 
+                        src={getPlayerAvatar(msg.userId)} 
+                        alt={msg.userName || msg.user || ''} 
+                        width={isMobile ? 24 : 32} 
+                        height={isMobile ? 24 : 32}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            {isLobby && <div ref={lobbyMessagesEndRef} />}
+            {!isLobby && <div ref={messagesEndRef} />}
+          </div>
+          {/* Message input */}
+          {isLobby ? (
+            <form onSubmit={handleLobbySubmit} className="p-2 bg-gray-900 flex border-t border-gray-600">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={lobbyInputValue}
+                  onChange={(e) => setLobbyInputValue(e.target.value)}
+                  placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
+                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
+                  style={{ fontSize: `${fontSize}px` }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLobbyEmojiPicker(!showLobbyEmojiPicker)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xl text-yellow-300 hover:text-yellow-200"
+                >
+                  😊
+                </button>
+                {showLobbyEmojiPicker && (
+                  <div className="absolute bottom-full right-0 mb-2 z-10">
+                    <Picker 
+                      data={data} 
+                      onEmojiSelect={emoji => setLobbyInputValue(prev => prev + emoji.native)}
+                      theme="dark"
+                      previewPosition="none"
+                      skinTonePosition="none"
+                    />
+                  </div>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white rounded-r hover:bg-blue-700 flex items-center justify-center w-10"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                </svg>
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="p-2 bg-gray-900 flex border-t border-gray-600">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
+                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
+                  style={{ fontSize: `${fontSize}px` }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xl text-yellow-300 hover:text-yellow-200"
+                >
+                  😊
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full right-0 mb-2 z-10">
+                    <Picker 
+                      data={data} 
+                      onEmojiSelect={onEmojiSelect}
+                      theme="dark"
+                      previewPosition="none"
+                      skinTonePosition="none"
+                    />
+                  </div>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white rounded-r hover:bg-blue-700 flex items-center justify-center w-10"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                </svg>
+              </button>
+            </form>
+          )}
+        </>
+      ) : (
+        // Player List Tab
+        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-850" style={{ backgroundColor: '#1a202c' }}>
+          {players.length === 0 && (
+            <div className="text-center text-gray-400 py-4">No players found.</div>
+          )}
+          {players.map(player => (
+            <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
+              <img src={player.avatar || player.image || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+              <span className="text-sm font-medium text-slate-200 flex items-center">
+                {player.username || player.name}
+              </span>
+              {/* No online/friend/block status for now */}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 } 

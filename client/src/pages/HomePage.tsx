@@ -8,7 +8,7 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data/sets/15/native.json';
 import type { GameState, Player, Bot } from '../types/game';
 import { useNavigate } from 'react-router-dom';
-import { getSocketManager } from '../table-ui/lib/socketManager';
+import { useSocket } from '../context/SocketContext';
 
 interface ChatMessage {
   id: string;
@@ -49,6 +49,7 @@ function isBot(p: any): p is Bot {
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
+  const socket = useSocket();
   if (!user) return null;
   const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -69,8 +70,6 @@ const HomePage: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const navigate = useNavigate();
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
-  const socketManager = useRef(getSocketManager());
-  const socket = useRef<any>(null);
 
   // Check if user is new (has 5M coins and 0 games played)
   useEffect(() => {
@@ -85,64 +84,45 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.error('No token found in localStorage');
-      return;
-    }
-
-    const session = {
-      user: {
-        ...user,
-        sessionToken: token
-      }
+    if (!socket) return;
+    socket.on('games_updated', (updatedGames: GameState[]) => {
+      setGames(updatedGames);
+      setIsLoading(false);
+    });
+    socket.on('lobby_chat_message', (msg: ChatMessage) => {
+      setChatMessages(prev => [...prev, msg]);
+    });
+    socket.on('online_users', (onlineUserIds: string[]) => {
+      setOnlinePlayers(prev => prev.map(player => ({
+        ...player,
+        online: onlineUserIds.includes(player.id)
+      })));
+    });
+    // Listen for the custom online_users_updated event
+    const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+      setOnlinePlayers(prev => prev.map(player => ({
+        ...player,
+        online: event.detail.includes(player.id)
+      })));
     };
-
-    socket.current = socketManager.current.initialize(session);
-
-    if (socket.current) {
-      socket.current.on('games_updated', (updatedGames: GameState[]) => {
-        setGames(updatedGames);
-        setIsLoading(false);
-      });
-
-      socket.current.on('lobby_chat_message', (msg: ChatMessage) => {
-        setChatMessages(prev => [...prev, msg]);
-      });
-
-      socket.current.on('online_users', (onlineUserIds: string[]) => {
-        setOnlinePlayers(prev => prev.map(player => ({
-          ...player,
-          online: onlineUserIds.includes(player.id)
-        })));
-      });
-
-      // Listen for the custom online_users_updated event
-      const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
-        setOnlinePlayers(prev => prev.map(player => ({
-          ...player,
-          online: event.detail.includes(player.id)
-        })));
-      };
-      window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
-
-      // Listen for friendAdded event and refresh player list
-      const handleFriendAdded = () => {
-        fetch('/api/users', {
-          headers: { 'x-user-id': user.id }
-        })
-          .then(res => res.json())
-          .then(setOnlinePlayers);
-      };
-      socket.current.on('friendAdded', handleFriendAdded);
-
-      return () => {
-        socket.current?.disconnect();
-        window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
-        socket.current?.off('friendAdded', handleFriendAdded);
-      };
-    }
-  }, [user]);
+    window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+    // Listen for friendAdded event and refresh player list
+    const handleFriendAdded = () => {
+      fetch('/api/users', {
+        headers: { 'x-user-id': user.id }
+      })
+        .then(res => res.json())
+        .then(setOnlinePlayers);
+    };
+    socket.on('friendAdded', handleFriendAdded);
+    return () => {
+      socket.off('games_updated');
+      socket.off('lobby_chat_message');
+      socket.off('online_users');
+      socket.off('friendAdded');
+      window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+    };
+  }, [user, socket]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -153,18 +133,16 @@ const HomePage: React.FC = () => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
-
     const message: ChatMessage = {
       id: Date.now().toString(),
       username: user?.username || 'Anonymous',
       message: newMessage.trim(),
       timestamp: new Date(),
     };
-
     setChatMessages([...chatMessages, message]);
     setNewMessage('');
-    if (socket.current) {
-      socket.current.emit('lobby_chat_message', message);
+    if (socket) {
+      socket.emit('lobby_chat_message', message);
     }
   };
 

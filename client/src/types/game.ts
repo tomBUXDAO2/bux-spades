@@ -115,5 +115,7 @@ export interface GameSettings {
   specialRules: {
     screamer: boolean;
     assassin: boolean;
+    allowNil: boolean;
+    allowBlindNil: boolean;
   };
 } 

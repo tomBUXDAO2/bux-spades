@@ -10,6 +10,7 @@ import Register from '@/components/auth/Register';
 import AuthCallback from '@/components/auth/AuthCallback';
 import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
+import { SocketProvider } from './context/SocketContext';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;
@@ -82,10 +83,19 @@ const router = createBrowserRouter(
   ]
 );
 
+const AppWithSocket: React.FC = () => {
+  const { user } = useAuth();
+  return (
+    <SocketProvider user={user}>
+      <RouterProvider router={router} />
+    </SocketProvider>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <RouterProvider router={router} />
+      <AppWithSocket />
     </AuthProvider>
   );
 };
