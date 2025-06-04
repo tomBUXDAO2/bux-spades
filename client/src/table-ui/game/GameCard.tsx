@@ -1,4 +1,4 @@
-import type { GameState } from '../../types/game';
+import type { GameState, Player, Bot } from '../../types/game';
 
 interface GameCardProps {
   game: GameState;
@@ -8,7 +8,7 @@ interface GameCardProps {
 }
 
 export default function GameCard({ game, onJoin, onSelect, currentUserId }: GameCardProps) {
-  const isPlayerInGame = game.players.some(player => player.id === currentUserId);
+  const isPlayerInGame = game.players.some(player => player?.id === currentUserId);
   const isGameFull = game.players.length >= 4;
   const isGameStarted = game.status === 'PLAYING';
 
@@ -26,13 +26,16 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
       <div className="mb-4">
         <p className="text-gray-300 text-sm">Players: {game.players.length}/4</p>
         <div className="flex flex-wrap gap-2 mt-1">
-          {game.players.map((player: any, idx: number) =>
-            player
-              ? <span key={idx} className="text-sm text-gray-400">
-                  {('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name)}
-                </span>
-              : null
-          )}
+          {game.players.map((player, idx) => {
+            if (!player) return null;
+            const isBot = 'type' in player && player.type === 'bot';
+            const displayName = isBot ? player.username : (player.username || player.name);
+            return (
+              <span key={idx} className="text-sm text-gray-400">
+                {displayName}
+              </span>
+            );
+          })}
         </div>
       </div>
 
