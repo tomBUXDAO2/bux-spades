@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { GameState, Player, Bot } from "../../types/game";
 import { useSocket } from "../../lib/socket";
 
 interface GameBoardProps {
@@ -148,7 +147,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
                 : "bg-gray-50"
             }`}
           >
-            <div className="font-medium">{player && (player.type !== 'bot' ? (player.username || player.name) : player.username)}</div>
+            <div className="font-medium">{player && (('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name))}</div>
             {game.status !== "WAITING" && (
               <>
                 <div className="text-sm text-gray-600">

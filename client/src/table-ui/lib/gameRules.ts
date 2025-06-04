@@ -1,4 +1,4 @@
-import type { GameType, Card, Suit, GameState, Player, Bot } from '../../types/game';
+import type { GameType, Card, Suit, GameState } from '../../types/game';
 // import { Player } from '../../types/game';
 
 /**
@@ -129,7 +129,7 @@ export function isPlayableCard(
  */
 export function isHandComplete(game: GameState): boolean {
   // A hand is complete when all players have played all their cards
-  return game.players.every(player => player.hand.length === 0);
+  return game.players.every(player => player && player.hand.length === 0);
 }
 
 /**
