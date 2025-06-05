@@ -114,7 +114,7 @@ router.post('/:id/join', async (req, res) => {
   res.json(game);
   io.emit('games_updated', games);
   // Emit game_update to the game room for real-time sync
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
 });
 
 // Invite a bot to an empty seat (host only, pre-game)
@@ -143,7 +143,7 @@ router.post('/:id/invite-bot', (req, res) => {
   // If any seat is a bot, set isBotGame true
   game.isBotGame = game.players.some(p => p && p.type === 'bot');
   io.emit('games_updated', games);
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
   res.json(game);
 });
 
@@ -169,7 +169,7 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
   };
   game.players[seatIndex] = botPlayer;
   io.emit('games_updated', games);
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
   res.json(game);
 });
 
@@ -283,7 +283,7 @@ router.post('/:id/remove-bot', (req, res) => {
   if (seatIndex < 0 || seatIndex > 3 || !game.players[seatIndex] || game.players[seatIndex].type !== 'bot') return res.status(400).json({ error: 'Invalid seat or not a bot' });
   game.players[seatIndex] = null;
   io.emit('games_updated', games);
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
   res.json(game);
 });
 
@@ -301,7 +301,7 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
   }
   game.players[seatIndex] = null;
   io.emit('games_updated', games);
-  io.to(game.id).emit('game_update', game);
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
   res.json(game);
 });
 
@@ -522,7 +522,7 @@ if (ioInstance) {
           game.players[playerIdx] = null;
           socket.leave(gameId);
           // Emit game_update to the game room for real-time sync
-          io.to(gameId).emit('game_update', game);
+          io.to(gameId).emit('game_update', enrichGameForClient(game));
           io.emit('games_updated', games);
           console.log(`User ${userId} left game ${gameId}`);
         }
@@ -683,6 +683,24 @@ async function updateStatsAndCoins(game: Game, winningTeam: number) {
       console.error('Failed to update stats/coins for user', userId, err);
     }
   }
+}
+
+// Helper to enrich game object for client
+function enrichGameForClient(game: Game): Game {
+  if (!game) return game;
+  const hands = game.hands || [];
+  const dealerIndex = game.dealerIndex;
+  return {
+    ...game,
+    players: (game.players || []).map((p: GamePlayer | null, i: number) => {
+      if (!p) return null;
+      return {
+        ...p,
+        hand: hands[i] || [],
+        isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
+      };
+    })
+  };
 }
 
 export default router; 

@@ -244,9 +244,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Join the game room
       socket.join(gameId);
       console.log(`User ${socket.userId} joined game ${gameId}`);
-      
+      // Emit confirmation to the client
+      socket.emit('joined_game_room', { gameId });
       // Broadcast game update to all players in the room
-      io.to(gameId).emit('game_update', game);
+      io.to(gameId).emit('game_update', enrichGameForClient(game));
       // Notify all clients about games update
       io.emit('games_updated', games);
     } catch (error) {
@@ -277,7 +278,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         game.players[playerIdx] = null;
         socket.leave(gameId);
         // Emit game_update to the game room for real-time sync
-        io.to(gameId).emit('game_update', game);
+        io.to(gameId).emit('game_update', enrichGameForClient(game));
         io.emit('games_updated', games);
         console.log(`User ${userId} left game ${gameId}`);
       }
@@ -332,6 +333,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Dealer assignment and card dealing
       const dealerIndex = assignDealer(game.players);
       game.dealerIndex = dealerIndex;
+      // Assign dealer chip/flag for UI
+      game.players.forEach((p, i) => {
+        if (p) p.isDealer = (i === dealerIndex);
+      });
       const hands = dealCards(game.players, dealerIndex);
       game.hands = hands;
       // Bidding phase state
@@ -355,10 +360,20 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         })),
         bidding: game.bidding,
       });
+      // Emit game_update for client sync
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      io.to(socket.id).emit('game_update', enrichGameForClient(game));
     } catch (err) {
       console.error('Error in start_game handler:', err);
       socket.emit('error', { message: 'Failed to start game' });
     }
+  });
+
+  // Broadcast chat messages to all clients in the game room
+  socket.on('chat_message', ({ gameId, message }) => {
+    console.log('[SERVER] chat_message received:', JSON.stringify({ gameId, message }));
+    console.log('[SERVER] Broadcasting chat_message to room:', gameId, 'Message:', message);
+    io.to(gameId).emit('chat_message', { gameId, message });
   });
 
   socket.on('disconnect', (reason) => {
@@ -380,7 +395,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             // Check if the user has reconnected
             if (!authenticatedSockets.has(socket.userId!)) {
               game.players[playerIdx] = null;
-              io.to(game.id).emit('game_update', game);
+              io.to(game.id).emit('game_update', enrichGameForClient(game));
               io.emit('games_updated', games);
               console.log(`User ${socket.userId} removed from game ${game.id} due to disconnect`);
 
@@ -440,6 +455,24 @@ io.engine.on('upgrade', (transport) => {
 io.engine.on('upgradeError', (err) => {
   console.error('Upgrade error:', err);
 });
+
+// Helper to enrich game object for client
+function enrichGameForClient(game: Game): Game {
+  if (!game) return game;
+  const hands = game.hands || [];
+  const dealerIndex = game.dealerIndex;
+  return {
+    ...game,
+    players: (game.players || []).map((p: GamePlayer | null, i: number) => {
+      if (!p) return null;
+      return {
+        ...p,
+        hand: hands[i] || [],
+        isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
+      };
+    })
+  };
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 

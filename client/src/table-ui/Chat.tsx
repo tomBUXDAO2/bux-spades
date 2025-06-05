@@ -5,7 +5,7 @@ import { useSocket } from '../context/SocketContext';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
-import { socketApi } from '../lib/socketApi';
+import { socketApi } from './lib/socketApi';
 
 interface ChatProps {
   gameId: string;
@@ -89,6 +89,88 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
   
   // Track connection status
   useEffect(() => {
+    if (!activeSocket) {
+      console.log('No active socket available for chat');
+      return;
+    }
+    
+    console.log('Setting up chat message listeners for game:', gameId);
+    
+    const handleMessage = (data: any) => {
+      console.log('SOCKET MESSAGE RECEIVED:', JSON.stringify(data));
+      // Handle different message formats
+      let chatMessage: ChatMessage;
+      if (data.message && typeof data.message === 'object') {
+        chatMessage = data.message;
+        console.log('Extracted message from wrapper:', chatMessage);
+      } else if (data.userId || data.user) {
+        chatMessage = data;
+        console.log('Using direct message object:', chatMessage);
+      } else {
+        console.error('Unrecognized chat message format:', data);
+        return;
+      }
+      // Force system message fields
+      if (chatMessage.userId === 'system' || chatMessage.isGameMessage) {
+        chatMessage.userId = 'system';
+        chatMessage.userName = 'System';
+        chatMessage.isGameMessage = true;
+      }
+      // Ensure message has an ID and timestamp
+      if (!chatMessage.id) {
+        chatMessage.id = `${Date.now()}-${chatMessage.userId || 'server'}-${Math.random().toString(36).substr(2, 9)}`;
+      }
+      if (!chatMessage.timestamp) {
+        chatMessage.timestamp = Date.now();
+      }
+      // Remove filtering that blocks system messages
+      // Add to state and log
+      setMessages(prev => {
+        if (chatMessage.id && prev.some(m => m.id === chatMessage.id)) {
+          console.log('Duplicate message detected, skipping:', chatMessage.id);
+          return prev;
+        }
+        const newMessages = [...prev, chatMessage];
+        if (newMessages.length > 100) {
+          console.log('ADDING TO CHAT STATE (truncated):', chatMessage);
+          return newMessages.slice(-100);
+        }
+        console.log('ADDING TO CHAT STATE:', chatMessage);
+        return newMessages;
+      });
+    };
+
+    // Listen for direct chat messages
+    activeSocket.on('chat_message', handleMessage);
+    console.log('Registered chat_message listener');
+    
+    // Some servers might use this event name instead
+    activeSocket.on('chat', handleMessage);
+    console.log('Registered chat listener');
+
+    // Handle socket reconnection
+    activeSocket.on('connect', () => {
+      console.log('Chat socket reconnected, joining game room:', gameId);
+      if (activeSocket && typeof activeSocket === 'object') {
+        activeSocket.emit('join_game', {
+          gameId,
+          userId,
+          watchOnly: true
+        });
+        console.log('Emitted join_game event after reconnection');
+      }
+    });
+
+    return () => {
+      console.log('Cleaning up chat message listeners');
+      activeSocket.off('chat_message', handleMessage);
+      activeSocket.off('chat', handleMessage);
+      activeSocket.off('connect');
+    };
+  }, [activeSocket, gameId, userId]);
+
+  // Track connection status
+  useEffect(() => {
     if (!activeSocket) return;
     
     const onConnect = () => {
@@ -96,6 +178,7 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
       
       // Explicitly join the game room when connected
       if (activeSocket && typeof activeSocket === 'object') {
+        console.log('Joining game room:', gameId);
         activeSocket.emit('join_game', {
           gameId,
           userId,
@@ -119,6 +202,7 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
     
     // Set initial connection state
     if (activeSocket.connected) {
+      console.log('Socket already connected, joining game room:', gameId);
       // Explicitly join the game room if already connected
       if (activeSocket && typeof activeSocket === 'object') {
         activeSocket.emit('join_game', {
@@ -134,101 +218,6 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
       activeSocket.off('disconnect', onDisconnect);
       activeSocket.off('connect_error', onError);
       activeSocket.off('error', onError);
-    };
-  }, [activeSocket, gameId, userId]);
-
-  // Get a player's avatar - updated to match GameTable.tsx logic
-  const getPlayerAvatar = (playerId: string): string => {
-    // Find the player in the players array
-    const player = players.find(p => p.id === playerId);
-    
-    // Type guard for image property
-    if (player && 'image' in player && player.image) {
-      return player.image as string;
-    }
-    
-    // Discord user ID (numeric string)
-    if (playerId && /^\d+$/.test(playerId)) {
-      // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
-      return `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
-    }
-    
-    // Guest user, use default avatar
-    if (playerId && playerId.startsWith('guest_')) {
-      return GUEST_AVATAR;
-    }
-    
-    // Fallback to bot avatar
-    return BOT_AVATAR;
-  };
-
-  useEffect(() => {
-    if (!activeSocket) return;
-    
-    const handleMessage = (data: any) => {
-      console.log('Received raw chat message data:', data);
-      
-      // Handle different message formats
-      let chatMessage: ChatMessage;
-      
-      if (data.message && typeof data.message === 'object') {
-        // Case where the server wraps the message object
-        chatMessage = data.message;
-      } else if (data.userId || data.user) {
-        // Direct message object
-        chatMessage = data;
-      } else {
-        console.error('Unrecognized chat message format:', data);
-        return;
-      }
-      
-      // Ensure message has an ID and timestamp
-      if (!chatMessage.id) {
-        chatMessage.id = `${Date.now()}-${chatMessage.userId || 'server'}-${Math.random().toString(36).substr(2, 9)}`;
-      }
-      
-      if (!chatMessage.timestamp) {
-        chatMessage.timestamp = Date.now();
-      }
-      
-      console.log('Processed chat message:', chatMessage);
-      
-      setMessages(prev => {
-        // Deduplicate messages by id if id exists
-        if (chatMessage.id && prev.some(m => m.id === chatMessage.id)) {
-          return prev;
-        }
-        // Keep only the last 100 messages
-        const newMessages = [...prev, chatMessage];
-        if (newMessages.length > 100) {
-          return newMessages.slice(-100);
-        }
-        return newMessages;
-      });
-    };
-
-    // Listen for direct chat messages
-    activeSocket.on('chat_message', handleMessage);
-    
-    // Some servers might use this event name instead
-    activeSocket.on('chat', handleMessage);
-
-    // Handle socket reconnection
-    activeSocket.on('connect', () => {
-      console.log('Chat socket reconnected, joining game room:', gameId);
-      if (activeSocket && typeof activeSocket === 'object') {
-        activeSocket.emit('join_game', {
-          gameId,
-          userId,
-          watchOnly: true
-        });
-      }
-    });
-
-    return () => {
-      activeSocket.off('chat_message', handleMessage);
-      activeSocket.off('chat', handleMessage);
-      activeSocket.off('connect');
     };
   }, [activeSocket, gameId, userId]);
 
@@ -324,6 +313,42 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
     }
   };
 
+  // Get a player's avatar - updated to match GameTable.tsx logic
+  const getPlayerAvatar = (playerId: string): string => {
+    // Find the player in the players array
+    const player = players.find(p => p.id === playerId);
+    
+    // Type guard for image property
+    if (player && 'image' in player && player.image) {
+      return player.image as string;
+    }
+    
+    // Discord user ID (numeric string)
+    if (playerId && /^\d+$/.test(playerId)) {
+      // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
+      return `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
+    }
+    
+    // Guest user, use default avatar
+    if (playerId && playerId.startsWith('guest_')) {
+      return GUEST_AVATAR;
+    }
+    
+    // Fallback to bot avatar
+    return BOT_AVATAR;
+  };
+
+  useEffect(() => {
+    if (!activeSocket) return;
+    const logAll = (event: string, ...args: unknown[]) => {
+      console.log('SOCKET EVENT:', event, ...args);
+    };
+    activeSocket.onAny(logAll);
+    return () => {
+      activeSocket.offAny(logAll);
+    };
+  }, [activeSocket]);
+
   return (
     <div className="flex flex-col h-full bg-gray-800 overflow-hidden border-l border-gray-600">
       {/* Chat/Players Header */}
@@ -371,9 +396,9 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
               activeMessages.map((msg, index) => (
                 <div
                   key={msg.id || index}
-                  className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''}`}
+                  className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''} ${msg.userId === 'system' ? 'justify-center' : ''}`}
                 >
-                  {msg.userId !== userId && (
+                  {msg.userId !== userId && msg.userId !== 'system' && (
                     <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
                       <img 
                         src={getPlayerAvatar(msg.userId)} 
@@ -384,8 +409,15 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
                       />
                     </div>
                   )}
-                  <div className={`max-w-[80%] ${msg.userId === userId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}>                <div className="flex justify-between items-center mb-1">
-                      {msg.userId !== userId && (
+                  <div className={`max-w-[80%] ${
+                    msg.userId === 'system' 
+                      ? 'bg-gray-600 text-gray-200 italic' 
+                      : msg.userId === userId 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-700 text-white'
+                  } rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}>
+                    <div className="flex justify-between items-center mb-1">
+                      {msg.userId !== userId && msg.userId !== 'system' && (
                         <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
                       )}
                       <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>

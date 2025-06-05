@@ -329,6 +329,7 @@ export default function GameTable({
         const updatedGame = await res.json();
         console.log('Bot invited successfully:', updatedGame);
         setGameState(updatedGame);
+        sendSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
       }
     } catch (err) {
       console.error('Error inviting bot:', err);
@@ -352,6 +353,8 @@ export default function GameTable({
       if (!res.ok) {
         const error = await res.json();
         alert('Failed to remove bot: ' + (error.error || 'Unknown error'));
+      } else {
+        sendSystemMessage(`A bot was removed from seat ${seatIndex + 1}.`);
       }
     } catch (err) {
       alert('Failed to remove bot');
@@ -360,6 +363,7 @@ export default function GameTable({
 
   // Update the player tricks display
   const renderPlayerPosition = (position: number) => {
+    const player = orderedPlayers[position];
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning
@@ -385,7 +389,7 @@ export default function GameTable({
       return basePositions[pos];
     };
 
-    const player = orderedPlayers[position];
+    console.log('Rendering player position', position, player);
     // If observer and seat is empty, show join button
     if (isObserver && !player) {
       return (
@@ -669,8 +673,9 @@ export default function GameTable({
   };
 
   const renderPlayerHand = () => {
-    if (!currentPlayer) return null;
-    const sortedHand = currentPlayer.hand ? sortCards(currentPlayer.hand) : [];
+    if (!currentPlayer || !currentPlayer.hand || gameState.status !== "PLAYING") return null;
+    console.log('Rendering hand for:', currentPlayer);
+    const sortedHand = sortCards(currentPlayer.hand);
     // Determine playable cards
     const isLeadingTrick = currentTrick.length === 0;
     const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
@@ -1029,99 +1034,31 @@ export default function GameTable({
     try {
       console.log(`Starting game ${gameState.id} as user ${currentPlayerId}, creator: ${sanitizedPlayers[0]?.id}`);
       await startGame(gameState.id, currentPlayerId);
+      sendSystemMessage('Game started! GOOD LUCK!');
     } catch (error) {
       console.error("Failed to start game:", error);
     }
   };
 
-  // Listen for game_update and update the UI
-  useEffect(() => {
-    if (!socket || !gameState?.id) return;
-
-    const handleGameUpdate = (updatedGame: GameState) => {
-      if (updatedGame.id === gameState.id) {
-        console.log('Game state updated:', updatedGame);
-        setGameState(updatedGame);
-      }
-    };
-
-    const handleGamesUpdate = (updatedGames: GameState[]) => {
-      const updatedGame = updatedGames.find(g => g.id === gameState.id);
-      if (updatedGame) {
-        console.log('Games list updated, updating game state:', updatedGame);
-        setGameState(updatedGame);
-      }
-    };
-
-    socket.on('game_update', handleGameUpdate);
-    socket.on('games_updated', handleGamesUpdate);
-
-    return () => {
-      socket.off('game_update', handleGameUpdate);
-      socket.off('games_updated', handleGamesUpdate);
-    };
-  }, [socket, gameState?.id]);
-
-  // Add a useEffect to log the socket connection status when the component mounts
-  useEffect(() => {
-    console.log("Socket connection status on mount:", socket?.connected);
-  }, [socket]);
-
-  // Add a useEffect to log the socket connection status whenever the socket prop changes
-  useEffect(() => {
-    console.log("Socket connection status changed:", socket?.connected);
-  }, [socket]);
-
-  // Add this effect:
+  // Only send system message after joined_game_room event
   useEffect(() => {
     if (!socket || !gameState?.id || !propUser?.id) return;
 
-    const handleAuthenticated = (data: any) => {
-      if (data.success && data.userId === propUser.id) {
-        console.log('Authenticated, now joining game:', gameState.id);
-        socket.emit('join_game', { gameId: gameState.id, userId: propUser.id });
+    const handleJoinedRoom = (data: { gameId: string }) => {
+      if (data.gameId === gameState.id && socket.connected) {
+        sendSystemMessage(`${propUser.username} joined the game chat.`);
+        socket.off('joined_game_room', handleJoinedRoom);
+      } else if (!socket.connected) {
+        console.log('handleJoinedRoom: Socket not connected, not sending system message');
       }
     };
 
-    socket.on('authenticated', handleAuthenticated);
+    socket.on('joined_game_room', handleJoinedRoom);
 
     return () => {
-      socket.off('authenticated', handleAuthenticated);
+      socket.off('joined_game_room', handleJoinedRoom);
     };
   }, [socket, gameState?.id, propUser?.id]);
-
-  // Listen for game_started and update the UI
-  useEffect(() => {
-    if (!socket) return;
-    const handleGameStarted = (data: any) => {
-      setGameState(prev => {
-        // Map hands and bids to players, preserving nulls for empty seats
-        const updatedPlayers = (prev.players || []).map((player, i) => {
-          if (!player) return null;
-          // Find the hand for this player
-          const handObj = data.hands?.find((h: any) => h.playerId === player.id);
-          return {
-            ...player,
-            hand: handObj ? handObj.hand : [],
-            isDealer: i === data.dealerIndex,
-            bid: data.bidding?.bids ? data.bidding.bids[i] : null,
-          };
-        });
-        return {
-          ...prev,
-          status: 'BIDDING',
-          dealerIndex: data.dealerIndex,
-          players: updatedPlayers,
-          bidding: data.bidding,
-          // Optionally update other fields as needed
-        };
-      });
-    };
-    socket.on('game_started', handleGameStarted);
-    return () => {
-      socket.off('game_started', handleGameStarted);
-    };
-  }, [socket]);
 
   // --- Lobby chat toggle state ---
   const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
@@ -1137,6 +1074,55 @@ export default function GameTable({
       socket.off('lobby_chat_message', handleLobbyMsg);
     };
   }, [socket]);
+
+  // At the top of your GameTable.tsx (after imports, before component)
+  const unsentSystemMessages: any[] = [];
+
+  // Helper to send a system message to the game chat
+  const sendSystemMessage = (msg: string) => {
+    if (!socket || !gameState?.id) {
+      console.log('sendSystemMessage: No socket or gameState');
+      return;
+    }
+    const chatMessage = {
+      id: `${Date.now()}-system-${Math.random().toString(36).substr(2, 9)}`,
+      userId: 'system',
+      userName: 'System',
+      message: msg,
+      timestamp: Date.now(),
+      isGameMessage: true,
+    };
+    // Wait for socket to be connected before sending
+    if (!socket.connected) {
+      console.log('sendSystemMessage: Socket not connected, waiting...');
+      socket.once('connect', () => {
+        console.log('sendSystemMessage: Socket connected, sending queued system message');
+        socket.emit('chat_message', { gameId: gameState.id, message: chatMessage });
+      });
+      return;
+    }
+    console.log('Sending system message:', chatMessage);
+    socket.emit('chat_message', { gameId: gameState.id, message: chatMessage });
+  };
+
+  // Listen for socket connect and flush unsent messages
+  useEffect(() => {
+    if (!socket) return;
+    const flushMessages = () => {
+      while (unsentSystemMessages.length > 0) {
+        const msg = unsentSystemMessages.shift();
+        console.log('Flushing queued system message:', msg);
+        socket.emit('chat_message', { gameId: gameState.id, message: msg });
+      }
+    };
+    socket.on('connect', flushMessages);
+    return () => {
+      socket.off('connect', flushMessages);
+    };
+  }, [socket, gameState?.id]);
+
+  // Loosen the chatReady guard so Chat UI renders as soon as gameState.id and currentPlayerId are available
+  const chatReady = gameState?.id && currentPlayerId;
 
   // Return the JSX for the component
   return (
@@ -1318,15 +1304,19 @@ export default function GameTable({
 
           {/* Chat area - 30%, full height */}
           <div className="w-[30%] h-full overflow-hidden">
-            <Chat 
-              gameId={gameState.id}
-              userId={currentPlayerId || ''}
-              userName={isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
-              players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-              chatType={chatType}
-              onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
-              lobbyMessages={lobbyMessages}
-            />
+            {chatReady ? (
+              <Chat 
+                gameId={gameState.id}
+                userId={currentPlayerId || ''}
+                userName={isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
+                players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
+                chatType={chatType}
+                onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
+                lobbyMessages={lobbyMessages}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400 text-lg">Connecting chat...</div>
+            )}
           </div>
         </div>
 

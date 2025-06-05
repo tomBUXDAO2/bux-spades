@@ -29,14 +29,32 @@ export const socketApi = {
   },
   
   startGame: (socketOverride: Socket | null, gameId: string): Promise<void> => {
+    const socket = socketOverride || getSocket();
+    if (!socket?.connected) {
+      return Promise.reject(new Error('Socket not connected'));
+    }
     return new Promise<void>((resolve, reject) => {
-      const socket = socketOverride || getSocket();
-      if (!socket?.connected) {
-        reject(new Error('Socket not connected'));
-        return;
-      }
+      const handleUpdate = (updatedGame: any) => {
+        console.log('Received game_update in startGame:', updatedGame);
+        if (updatedGame.id === gameId && updatedGame.status === 'BIDDING') {
+          socket.off('game_update', handleUpdate);
+          resolve();
+        }
+      };
+      const handleError = (error: any) => {
+        console.error('Start game error:', error);
+        socket.off('error', handleError);
+        socket.off('game_update', handleUpdate);
+        reject(error);
+      };
+      socket.on('game_update', handleUpdate);
+      socket.on('error', handleError);
       socket.emit('start_game', { gameId });
-      resolve();
+      setTimeout(() => {
+        socket.off('game_update', handleUpdate);
+        socket.off('error', handleError);
+        reject('Timeout waiting for game to start');
+      }, 5000);
     });
   },
   
@@ -45,7 +63,13 @@ export const socketApi = {
     if (!socket?.connected) {
       throw new Error('Socket not connected');
     }
-    socket.emit('chat_message', { gameId, message });
+    socket.emit('chat_message', { 
+      gameId, 
+      message: {
+        ...message,
+        gameId // Include gameId in the message object for consistency
+      }
+    });
   },
   
   setupTrickCompletionDelay: (socketOverride: Socket | null, gameId: string) => {
