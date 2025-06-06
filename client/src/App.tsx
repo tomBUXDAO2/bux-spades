@@ -4,7 +4,7 @@ import {
   createBrowserRouter,
   Navigate,
 } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AuthProvider as AuthContextProvider, useAuth } from '@/context/AuthContext';
 import Login from '@/components/auth/Login';
 import Register from '@/components/auth/Register';
 import AuthCallback from '@/components/auth/AuthCallback';
@@ -86,7 +86,7 @@ const router = createBrowserRouter(
 const AppWithSocket: React.FC = () => {
   const { user } = useAuth();
   return (
-    <SocketProvider user={user}>
+    <SocketProvider>
       <RouterProvider router={router} />
     </SocketProvider>
   );
@@ -94,9 +94,9 @@ const AppWithSocket: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
+    <AuthContextProvider>
       <AppWithSocket />
-    </AuthProvider>
+    </AuthContextProvider>
   );
 };
 

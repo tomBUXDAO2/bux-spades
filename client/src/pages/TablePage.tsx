@@ -23,7 +23,8 @@ export default function TablePage() {
       return;
     }
 
-    const newSocket = socketManager.initialize({ user });
+    socketManager.initialize(user.id, user.username);
+    const newSocket = socketManager.getSocket();
     if (newSocket) {
       setSocket(newSocket);
     }

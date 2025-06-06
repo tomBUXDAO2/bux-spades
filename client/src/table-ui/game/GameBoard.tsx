@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSocket } from "../../lib/socket";
+import { getSocket } from '../../lib/socket';
 import type { GameState, Player, Bot, Card } from '../../types/game';
 
 interface GameBoardProps {
@@ -10,7 +10,7 @@ interface GameBoardProps {
 
 export default function GameBoard({ gameId }: GameBoardProps) {
   const [game, setGame] = useState<GameState | null>(null);
-  const { socket } = useSocket();
+  const { socket } = getSocket();
 
   useEffect(() => {
     if (!socket) return;

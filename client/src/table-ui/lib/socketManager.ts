@@ -3,18 +3,30 @@ import { io, Socket } from 'socket.io-client';
 // Get the socket URL from environment variables or use default
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
+// Add SocketState interface
+interface SocketState {
+  isConnected: boolean;
+  isAuthenticated: boolean;
+  isReady: boolean;
+  error: string | null;
+}
+
 export class SocketManager {
   private static instance: SocketManager;
   private socket: Socket | null = null;
-  private isAuthenticated = false;
-  private isConnected = false;
-  private isReady = false;
+  private state: SocketState = {
+    isConnected: false,
+    isAuthenticated: false,
+    isReady: false,
+    error: null
+  };
   private session: { token: string; userId: string; username: string } | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private stateChangeCallbacks: ((state: SocketState) => void)[] = [];
+  private initialized = false;
 
   private constructor() {
     // Private constructor to enforce singleton
@@ -40,10 +52,10 @@ export class SocketManager {
 
   public getState(): SocketState {
     return {
-      hasSocket: !!this.socket,
-      isConnected: this.isConnected,
-      isAuthenticated: this.isAuthenticated,
-      isReady: this.isReady
+      isConnected: this.state.isConnected,
+      isAuthenticated: this.state.isAuthenticated,
+      isReady: this.state.isReady,
+      error: this.state.error
     };
   }
 
@@ -59,7 +71,7 @@ export class SocketManager {
     const token = localStorage.getItem('sessionToken') || localStorage.getItem('token');
     if (!token) {
       console.error('SocketManager: No session token found');
-      this.isReady = false;
+      this.state.isReady = false;
       this.notifyStateChange();
       return;
     }
@@ -91,6 +103,7 @@ export class SocketManager {
 
     this.setupSocketListeners();
     this.notifyStateChange();
+    this.initialized = true;
   }
 
   private setupSocketListeners(): void {
@@ -98,7 +111,7 @@ export class SocketManager {
 
     this.socket.on('connect', () => {
       console.log('Socket connected successfully');
-      this.isConnected = true;
+      this.state.isConnected = true;
       this.reconnectAttempts = 0;
       
       // If we have a session, authenticate immediately
@@ -116,9 +129,9 @@ export class SocketManager {
 
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
-      this.isConnected = false;
-      this.isAuthenticated = false;
-      this.isReady = false;
+      this.state.isConnected = false;
+      this.state.isAuthenticated = false;
+      this.state.isReady = false;
       
       // Clear any existing reconnect timer
       if (this.reconnectTimer) {
@@ -140,14 +153,15 @@ export class SocketManager {
 
     this.socket.on('authenticated', (data: { success: boolean; userId: string; games: any[] }) => {
       console.log('Socket authenticated:', data);
-      this.isAuthenticated = data.success;
-      this.isReady = this.isConnected && this.isAuthenticated;
+      this.state.isAuthenticated = data.success;
+      this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
       this.notifyStateChange();
     });
 
     this.socket.on('error', (error) => {
       console.error('Socket error:', error);
-      this.isReady = false;
+      this.state.isReady = false;
+      this.state.error = error.message;
       this.notifyStateChange();
     });
   }
@@ -161,11 +175,15 @@ export class SocketManager {
       this.socket.disconnect();
       this.socket = null;
     }
-    this.isConnected = false;
-    this.isAuthenticated = false;
-    this.isReady = false;
+    this.state.isConnected = false;
+    this.state.isAuthenticated = false;
+    this.state.isReady = false;
     this.session = null;
     this.notifyStateChange();
+  }
+
+  public isInitialized(): boolean {
+    return this.initialized;
   }
 }
 
