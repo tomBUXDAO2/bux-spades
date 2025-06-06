@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getSocketManager } from '../table-ui/lib/socketManager';
 import GameTable from '../table-ui/game/GameTable';
@@ -11,11 +11,15 @@ export default function TablePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
   const socketManager = getSocketManager();
+
+  // Detect spectate intent
+  const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
 
   useEffect(() => {
     if (!user) {
@@ -31,6 +35,18 @@ export default function TablePage() {
 
     const fetchGame = async () => {
       try {
+        // If spectating, call spectate endpoint
+        if (isSpectator) {
+          await fetch(`/api/games/${gameId}/spectate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: user.id,
+              username: user.username,
+              avatar: user.avatar
+            })
+          });
+        }
         const response = await fetch(`/api/games/${gameId}`);
         if (response.status === 404) {
           navigate('/'); // Redirect to lobby if not found
@@ -54,10 +70,11 @@ export default function TablePage() {
       socketManager.disconnect();
       setSocket(null);
     };
-  }, [gameId, user, navigate]);
+  }, [gameId, user, navigate, isSpectator]);
 
+  // Only join as a player if not spectating
   const handleJoinGame = async () => {
-    if (!user || !gameId) return;
+    if (!user || !gameId || isSpectator) return;
     try {
       const response = await fetch(`/api/games/${gameId}/join`, {
         method: 'POST',
@@ -79,9 +96,13 @@ export default function TablePage() {
   };
 
   const handleLeaveTable = async () => {
-    if (!socket || !gameId || !user) return;
+    if (!gameId || !user) return;
     try {
-      socket.emit('leave_game', { gameId, userId: user.id });
+      await fetch(`/api/games/${gameId}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.id })
+      });
       window.location.href = '/';
     } catch (error) {
       console.error('Error leaving game:', error);

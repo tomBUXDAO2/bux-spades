@@ -36,6 +36,7 @@ export interface Game {
     assassin?: boolean;
   };
   players: (GamePlayer | null)[];
+  spectators: GamePlayer[];
   status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'COMPLETED';
   completedTricks: Card[][];
   rules: {

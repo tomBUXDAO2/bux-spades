@@ -30,6 +30,7 @@ router.post('/', (req, res) => {
       forcedBid: (settings.specialRules?.screamer ? 'SUICIDE' : 'NONE') as 'SUICIDE' | 'NONE',
       specialRules: settings.specialRules || {},
       players: [creatorPlayer, null, null, null],
+      spectators: [],
       status: 'WAITING' as Game['status'],
       completedTricks: [],
       rules: {
@@ -170,6 +171,52 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
   game.players[seatIndex] = botPlayer;
   io.emit('games_updated', games);
   io.to(game.id).emit('game_update', enrichGameForClient(game));
+  res.json(game);
+});
+
+// Add a spectator to a game
+router.post('/:id/spectate', async (req, res) => {
+  const game = games.find(g => g.id === req.params.id);
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const userId = req.body.id;
+  if (!userId) return res.status(400).json({ error: 'Missing user id' });
+  // Prevent duplicate spectate
+  if (game.spectators.some(s => s.id === userId)) {
+    return res.status(400).json({ error: 'Already spectating' });
+  }
+  // Prevent joining as both player and spectator
+  if (game.players.some(p => p && p.id === userId)) {
+    return res.status(400).json({ error: 'Already joined as player' });
+  }
+  // Add to spectators
+  game.spectators.push({
+    id: userId,
+    username: req.body.username || 'Unknown',
+    avatar: req.body.avatar || '/default-pfp.jpg',
+    type: 'human',
+  });
+  io.to(game.id).emit('game_update', game);
+  io.emit('games_updated', games);
+  res.json(game);
+});
+
+// Remove a player or spectator from a game
+router.post('/:id/leave', (req, res) => {
+  const game = games.find(g => g.id === req.params.id);
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const userId = req.body.id;
+  // Remove from players
+  const playerIdx = game.players.findIndex(p => p && p.id === userId);
+  if (playerIdx !== -1) {
+    game.players[playerIdx] = null;
+  }
+  // Remove from spectators
+  const specIdx = game.spectators.findIndex(s => s.id === userId);
+  if (specIdx !== -1) {
+    game.spectators.splice(specIdx, 1);
+  }
+  io.to(game.id).emit('game_update', game);
+  io.emit('games_updated', games);
   res.json(game);
 });
 

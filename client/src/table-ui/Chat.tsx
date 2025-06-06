@@ -11,6 +11,7 @@ interface ChatProps {
   userId: string;
   userName: string;
   players: Player[];
+  spectators?: Player[];
   userAvatar?: string;
   showPlayerListTab?: boolean;
   chatType?: 'game' | 'lobby';
@@ -39,7 +40,12 @@ interface EmojiData {
   native: string;
 }
 
-export default function Chat({ gameId, userId, userName, players, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
+// Add EyeIcon SVG component
+const EyeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block w-5 h-5 ml-1 align-middle"><path d="M12 5C5.63636 5 2 12 2 12C2 12 5.63636 19 12 19C18.3636 19 22 12 22 12C22 12 18.3636 5 12 5Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path></svg>
+);
+
+export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
   const { socket, isAuthenticated, isConnected, isReady } = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -508,16 +514,26 @@ export default function Chat({ gameId, userId, userName, players, userAvatar, sh
       ) : (
         // Player List Tab
         <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-850" style={{ backgroundColor: '#1a202c' }}>
-          {players.length === 0 && (
+          {players.length === 0 && (!spectators || spectators.length === 0) && (
             <div className="text-center text-gray-400 py-4">No players found.</div>
           )}
+          {/* Seated players */}
           {players.map(player => (
             <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
               <img src={player.avatar || player.image || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
               <span className="text-sm font-medium text-slate-200 flex items-center">
                 {player.username || player.name}
               </span>
-              {/* No online/friend/block status for now */}
+            </div>
+          ))}
+          {/* Spectators */}
+          {spectators && spectators.map(spectator => (
+            <div key={spectator.id} className="flex items-center gap-3 p-2 rounded bg-slate-700 opacity-80">
+              <img src={spectator.avatar || spectator.image || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+              <span className="text-sm font-medium text-slate-200 flex items-center">
+                {spectator.username || spectator.name}
+                <EyeIcon />
+              </span>
             </div>
           ))}
         </div>

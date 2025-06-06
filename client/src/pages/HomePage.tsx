@@ -222,7 +222,7 @@ const HomePage: React.FC = () => {
 
   // Handler to watch a game as an observer
   const handleWatchGame = (gameId: string) => {
-    navigate(`/table/${gameId}`);
+    navigate(`/table/${gameId}?spectate=1`);
   };
 
   const getGameTypeBrick = (game: GameState) => {
