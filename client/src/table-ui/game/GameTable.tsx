@@ -1297,6 +1297,7 @@ export default function GameTable({
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
+                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : undefined}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}

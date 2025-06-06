@@ -11,6 +11,7 @@ interface ChatProps {
   userId: string;
   userName: string;
   players: Player[];
+  userAvatar?: string;
   showPlayerListTab?: boolean;
   chatType?: 'game' | 'lobby';
   onToggleChatType?: () => void;
@@ -38,7 +39,7 @@ interface EmojiData {
   native: string;
 }
 
-export default function Chat({ gameId, userId, userName, players, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
+export default function Chat({ gameId, userId, userName, players, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
   const { socket, isAuthenticated, isConnected, isReady } = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -369,48 +370,51 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
               </div>
             ) : (
               activeMessages.map((msg, index) => (
-                <div
-                  key={msg.id || index}
-                  className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''} ${msg.userId === 'system' ? 'justify-center' : ''}`}
-                >
-                  {msg.userId !== userId && msg.userId !== 'system' && (
-                    <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
-                      <img 
-                        src={getPlayerAvatar(msg.userId)} 
-                        alt={msg.userName || msg.user || ''} 
-                        width={isMobile ? 24 : 32} 
-                        height={isMobile ? 24 : 32}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className={`max-w-[80%] ${
-                    msg.userId === 'system' 
-                      ? 'bg-gray-600 text-gray-200 italic' 
-                      : msg.userId === userId 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-700 text-white'
-                  } rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}>
-                    <div className="flex justify-between items-center mb-1">
-                      {msg.userId !== userId && msg.userId !== 'system' && (
-                        <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
-                      )}
-                      <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>
-                    </div>
-                    <p style={{ fontSize: `${mobileFontSize}px` }}>{msg.message || msg.text}</p>
+                msg.userId === 'system' ? (
+                  <div
+                    key={msg.id || index}
+                    className="w-full text-center my-2"
+                  >
+                    <span className="text-orange-400 italic" style={{ fontSize: `${mobileFontSize + 2}px` }}>{msg.message || msg.text}</span>
                   </div>
-                  {msg.userId === userId && (
-                    <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} ml-2 rounded-full overflow-hidden flex-shrink-0`}>
-                      <img 
-                        src={getPlayerAvatar(msg.userId)} 
-                        alt={msg.userName || msg.user || ''} 
-                        width={isMobile ? 24 : 32} 
-                        height={isMobile ? 24 : 32}
-                        className="w-full h-full object-cover"
-                      />
+                ) : (
+                  <div
+                    key={msg.id || index}
+                    className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''}`}
+                  >
+                    {msg.userId !== userId && (
+                      <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
+                        <img 
+                          src={getPlayerAvatar(msg.userId)} 
+                          alt={msg.userName || msg.user || ''} 
+                          width={isMobile ? 24 : 32} 
+                          height={isMobile ? 24 : 32}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className={`max-w-[80%] ${msg.userId === userId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}> 
+                      <div className="flex justify-between items-center mb-1">
+                        {msg.userId !== userId && (
+                          <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
+                        )}
+                        <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>
+                      </div>
+                      <p style={{ fontSize: `${mobileFontSize}px` }}>{msg.message || msg.text}</p>
                     </div>
-                  )}
-                </div>
+                    {msg.userId === userId && (
+                      <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} ml-2 rounded-full overflow-hidden flex-shrink-0`}>
+                        <img 
+                          src={userAvatar || getPlayerAvatar(msg.userId)} 
+                          alt={msg.userName || msg.user || ''} 
+                          width={isMobile ? 24 : 32} 
+                          height={isMobile ? 24 : 32}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
               ))
             )}
             {isLobby && <div ref={lobbyMessagesEndRef} />}
