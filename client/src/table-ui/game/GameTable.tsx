@@ -1145,39 +1145,71 @@ export default function GameTable({
                     <IoInformationCircleOutline className="h-5 w-5" />
                   </button>
                   {showGameInfo && (
-                    <div className="absolute left-0 mt-2 w-56 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-50 text-sm text-white">
+                    <div className="absolute left-0 mt-2 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-50 text-sm text-white">
                       <div className="font-bold mb-2 flex items-center gap-2">
                         <IoInformationCircleOutline className="inline-block h-4 w-4 text-blue-400" />
                         Table Details
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <div><span className="text-gray-400">Type:</span> {gameState.rules?.gameType || 'REGULAR'}</div>
-                        <div><span className="text-gray-400">Points:</span> {gameState.maxPoints ?? 500}/{gameState.minPoints ?? -150}</div>
-                        {(gameState.rules?.gameType === 'REGULAR' || gameState.rules?.gameType === 'SOLO') && (
-                          <>
-                            <div><span className="text-gray-400">Nil:</span> {gameState.rules?.allowNil ? '✅ Allowed' : '❌ Not allowed'}</div>
-                            <div><span className="text-gray-400">Blind Nil:</span> {gameState.rules?.allowBlindNil ? '✅ Allowed' : '❌ Not allowed'}</div>
-                          </>
+                      {/* GameTile-style info header */}
+                      <div className="flex items-center gap-2 text-sm mb-2">
+                        {/* Game type brick */}
+                        {(() => {
+                          const type = gameState.rules?.gameType || 'REGULAR';
+                          let color = 'bg-green-600';
+                          let label = 'REGULAR';
+                          if (type === 'WHIZ') {
+                            color = 'bg-blue-600';
+                            label = 'WHIZ';
+                          } else if (type === 'MIRROR') {
+                            color = 'bg-red-600';
+                            label = 'MIRRORS';
+                          } else if (gameState.forcedBid && type === 'REGULAR') {
+                            color = 'bg-orange-500';
+                            if (gameState.forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
+                            else if (gameState.forcedBid === 'BID3') label = 'BID 3';
+                            else if (gameState.forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
+                            else if (gameState.forcedBid === 'SUICIDE') label = 'SUICIDE';
+                            else label = 'GIMMICK';
+                          }
+                          return <span className={`inline-block ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
+                        })()}
+                        {/* Points */}
+                        <span className="text-slate-300 font-medium">{gameState.minPoints}/{gameState.maxPoints}</span>
+                        {/* Nil and bn (blind nil) with inline check/cross */}
+                        {gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
+                        {!gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
+                        <span className="text-slate-300 ml-2">bn <span className="align-middle">{gameState.rules?.allowBlindNil ? '☑️' : '❌'}</span></span>
+                      </div>
+                      {/* Line 2: Buy-in, game mode, and special bricks */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? gameState.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
+                        <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{gameState.gameMode || (gameState.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+                        {/* Special bricks for assassin/screamer */}
+                        {gameState.specialRules?.assassin && (
+                          <span className="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
                         )}
-                        <div className="mt-2 pt-2 border-t border-gray-700">
-                          <div className="text-sm">
-                            <span className="text-gray-400">Buy-in:</span>
-                            <span className="font-bold text-yellow-400 ml-2">{gameState.rules?.coinAmount ? formatCoins(gameState.rules.coinAmount) : '100k'}</span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-gray-400">Prize:</span>
-                            <span className="font-bold text-yellow-400 ml-2">
-                              {(() => {
-                                const buyIn = gameState.rules?.coinAmount || 100000;
-                                const prizePot = buyIn * 4 * 0.9;
-                                if ((gameState.rules?.gameType || '').toUpperCase() === 'PARTNERS') {
-                                  return `${formatCoins(prizePot / 2)} each`;
-                                } else {
-                                  return `1st: ${formatCoins(prizePot * 0.7)}, 2nd: ${formatCoins(prizePot * 0.3)}`;
-                                }
-                              })()}
-                            </span>
-                          </div>
+                        {gameState.specialRules?.screamer && (
+                          <span className="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
+                        )}
+                      </div>
+                      {/* Prize info (unchanged) */}
+                      <div className="mt-2 pt-2 border-t border-gray-700">
+                        <div className="text-sm">
+                          <span className="text-gray-400">Prize:</span>
+                          <span className="font-bold text-yellow-400 ml-2">
+                            {(() => {
+                              const buyIn = gameState.rules?.coinAmount || 100000;
+                              const prizePot = buyIn * 4 * 0.9;
+                              if ((gameState.rules?.gameType || '').toUpperCase() === 'PARTNERS') {
+                                return `${formatCoins(prizePot / 2)} each`;
+                              } else {
+                                return `1st: ${formatCoins(prizePot * 0.7)}, 2nd: ${formatCoins(prizePot * 0.3)}`;
+                              }
+                            })()}
+                          </span>
                         </div>
                       </div>
                     </div>

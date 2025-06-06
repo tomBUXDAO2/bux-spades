@@ -225,48 +225,64 @@ const HomePage: React.FC = () => {
     navigate(`/table/${gameId}`);
   };
 
+  const getGameTypeBrick = (game: GameState) => {
+    const type = game.rules?.gameType || 'REGULAR';
+    let color = 'bg-green-600';
+    let label = 'REGULAR';
+    if (type === 'WHIZ') {
+      color = 'bg-blue-600';
+      label = 'WHIZ';
+    } else if (type === 'MIRROR') {
+      color = 'bg-red-600';
+      label = 'MIRRORS';
+    } else if (game.forcedBid && type === 'REGULAR') {
+      color = 'bg-orange-500';
+      if (game.forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
+      else if (game.forcedBid === 'BID3') label = 'BID 3';
+      else if (game.forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
+      else if (game.forcedBid === 'SUICIDE') label = 'SUICIDE';
+      else label = 'GIMMICK';
+    }
+    return <span className={`inline-block ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
+  };
+
+  const getSpecialBricks = (game: GameState) => {
+    const bricks = [];
+    if (game.specialRules?.assassin) {
+      bricks.push(<span key="assassin" className="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+    }
+    if (game.specialRules?.screamer) {
+      bricks.push(<span key="screamer" className="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+    }
+    return bricks;
+  };
+
   const GameTile: React.FC<{ game: GameState }> = ({ game }) => {
     const seatMap = [
-      { className: "absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 0 }, // South (creator)
-      { className: "absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 1 },    // West
-      { className: "absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 2 },    // North
-      { className: "absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 3 },   // East
+      { className: "absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 0 },
+      { className: "absolute left-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 1 },
+      { className: "absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center", seat: 2 },
+      { className: "absolute right-8 top-1/2 -translate-y-1/2 flex flex-col items-center", seat: 3 },
     ];
     return (
       <div className="bg-slate-800 rounded-lg p-4 hover:bg-slate-750 transition relative overflow-visible">
-        {/* Game settings header */}
-        <div className="flex items-center gap-2 text-sm mb-4">
-          <span className="text-slate-200 font-medium">{game.gameMode}</span>
-          <span className="text-slate-300">{game.minPoints}/{game.maxPoints}</span>
-          <span className="text-slate-300">nil ☑️</span>
-          <span className="text-slate-300">bn ❌</span>
+        {/* Game settings header - new layout */}
+        <div className="flex items-center gap-2 text-sm mb-1">
+          {getGameTypeBrick(game)}
+          <span className="text-slate-300 font-medium">{game.minPoints}/{game.maxPoints}</span>
+          {game.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
+          {!game.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
+          <span className="text-slate-300 ml-2">bn <span className="align-middle">{game.rules?.allowBlindNil ? '☑️' : '❌'}</span></span>
         </div>
-        {/* Absolutely positioned rule labels */}
-        <div className="absolute top-4 right-4 flex flex-col items-end space-y-1 z-20">
-          {game.forcedBid === 'SUICIDE' && (
-            <div className="inline-block bg-pink-600 text-white text-xs px-2 py-0.5 rounded font-semibold shadow">
-              SUICIDE
-            </div>
-          )}
-          {game.specialRules?.screamer && (
-            <div className="inline-block bg-indigo-600 text-white text-xs px-2 py-0.5 rounded font-semibold shadow">
-              SCREAMER
-            </div>
-          )}
-          {game.specialRules?.assassin && (
-            <div className="inline-block bg-green-600 text-white text-xs px-2 py-0.5 rounded font-semibold shadow">
-              ASSASSIN
-            </div>
-          )}
-        </div>
-        {/* Coin value, no extra margin or z-index */}
-        <div className="flex items-center gap-1 mb-4">
-          <span className="text-yellow-500 text-lg font-bold">
-            {((game.buyIn ?? 100000) / 1000).toFixed(0)}k
-          </span>
+        {/* Line 2: Buy-in, game mode, and special bricks */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-yellow-500 text-lg font-bold">{((game.buyIn ?? game.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
           <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
           </svg>
+          <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (game.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+          {/* Special bricks moved here */}
+          {getSpecialBricks(game)}
         </div>
         {/* Table visualization, no negative margin */}
         <div className="relative h-44 mb-2">
@@ -275,11 +291,7 @@ const HomePage: React.FC = () => {
           {/* Seats */}
           <div className="absolute inset-0">
             {seatMap.map(({ className, seat }) => {
-              // Always use the player at this seat
               const player = game.players[seat];
-              if (player) {
-                console.log('GameTile player:', player);
-              }
               return (
                 <div className={className} key={seat}>
                   {player ? (
