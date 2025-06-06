@@ -49,7 +49,7 @@ function isBot(p: any): p is Bot {
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
-  const socket = useSocket();
+  const { socket, isAuthenticated } = useSocket();
   if (!user) return null;
   const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -83,46 +83,70 @@ const HomePage: React.FC = () => {
     }
   }, [user]);
 
+  // Socket event handlers
   useEffect(() => {
-    if (!socket) return;
-    socket.on('games_updated', (updatedGames: GameState[]) => {
+    if (!socket || !isAuthenticated) {
+      console.log('Socket not ready or not authenticated');
+      return;
+    }
+
+    console.log('Setting up socket event handlers');
+
+    const handleGamesUpdated = (updatedGames: GameState[]) => {
+      console.log('Games updated:', updatedGames);
       setGames(updatedGames);
       setIsLoading(false);
-    });
-    socket.on('lobby_chat_message', (msg: ChatMessage) => {
+    };
+
+    const handleLobbyChatMessage = (msg: ChatMessage) => {
+      console.log('Lobby chat message received:', msg);
       setChatMessages(prev => [...prev, msg]);
-    });
-    socket.on('online_users', (onlineUserIds: string[]) => {
+    };
+
+    const handleOnlineUsers = (onlineUserIds: string[]) => {
+      console.log('Online users updated:', onlineUserIds);
       setOnlinePlayers(prev => prev.map(player => ({
         ...player,
         online: onlineUserIds.includes(player.id)
       })));
-    });
+    };
+
+    const handleFriendAdded = () => {
+      console.log('Friend added, refreshing player list');
+      fetch('/api/users', {
+        headers: { 'x-user-id': user.id }
+      })
+        .then(res => res.json())
+        .then(setOnlinePlayers)
+        .catch(err => console.error('Failed to refresh player list:', err));
+    };
+
+    // Add event listeners
+    socket.on('games_updated', handleGamesUpdated);
+    socket.on('lobby_chat_message', handleLobbyChatMessage);
+    socket.on('online_users', handleOnlineUsers);
+    socket.on('friendAdded', handleFriendAdded);
+
     // Listen for the custom online_users_updated event
     const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+      console.log('Online users custom event:', event.detail);
       setOnlinePlayers(prev => prev.map(player => ({
         ...player,
         online: event.detail.includes(player.id)
       })));
     };
     window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
-    // Listen for friendAdded event and refresh player list
-    const handleFriendAdded = () => {
-      fetch('/api/users', {
-        headers: { 'x-user-id': user.id }
-      })
-        .then(res => res.json())
-        .then(setOnlinePlayers);
-    };
-    socket.on('friendAdded', handleFriendAdded);
+
+    // Cleanup
     return () => {
-      socket.off('games_updated');
-      socket.off('lobby_chat_message');
-      socket.off('online_users');
-      socket.off('friendAdded');
+      console.log('Cleaning up socket event handlers');
+      socket.off('games_updated', handleGamesUpdated);
+      socket.off('lobby_chat_message', handleLobbyChatMessage);
+      socket.off('online_users', handleOnlineUsers);
+      socket.off('friendAdded', handleFriendAdded);
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
     };
-  }, [user, socket]);
+  }, [socket, isAuthenticated, user.id]);
 
   useEffect(() => {
     if (chatContainerRef.current) {

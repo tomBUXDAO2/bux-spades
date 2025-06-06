@@ -1,28 +1,70 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Socket } from 'socket.io-client';
 import { getSocketManager } from '../table-ui/lib/socketManager';
 
-const SocketContext = createContext<any>(null);
+interface SocketContextType {
+  socket: Socket | null;
+  isConnected: boolean;
+  isAuthenticated: boolean;
+  isReady: boolean;
+}
 
-export const SocketProvider = ({ user, children }: { user: any, children: React.ReactNode }) => {
-  const [socket, setSocket] = useState<any>(null);
+const SocketContext = createContext<SocketContextType>({
+  socket: null,
+  isConnected: false,
+  isAuthenticated: false,
+  isReady: false
+});
+
+export const useSocket = () => useContext(SocketContext);
+
+export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const session = { user: { ...user, sessionToken: token } };
-    const newSocket = getSocketManager().initialize(session);
-    setSocket(newSocket);
+    const socketManager = getSocketManager();
+
+    // Subscribe to socket state changes
+    socketManager.onStateChange((state) => {
+      console.log('Socket state changed:', state);
+      setSocket(state.hasSocket ? socketManager.getSocket() : null);
+      setIsConnected(state.isConnected);
+      setIsAuthenticated(state.isAuthenticated);
+      setIsReady(state.isReady);
+    });
+
+    // Initialize socket if we have a user
+    const token = localStorage.getItem('sessionToken');
+    const userData = localStorage.getItem('userData');
+    
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user.id && user.username) {
+          console.log('Initializing socket with user:', { id: user.id, username: user.username });
+          socketManager.initialize(user.id, user.username);
+        } else {
+          console.error('Invalid user data format:', user);
+        }
+      } catch (error) {
+        console.error('Failed to parse user data:', error);
+      }
+    } else {
+      console.log('No token or user data available for socket initialization');
+    }
+
     return () => {
-      newSocket?.disconnect();
+      console.log('Cleaning up socket connection');
+      socketManager.disconnect();
     };
-  }, [user]);
+  }, []);
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket, isConnected, isAuthenticated, isReady }}>
       {children}
     </SocketContext.Provider>
   );
-};
-
-export const useSocket = () => useContext(SocketContext); 
+}; 

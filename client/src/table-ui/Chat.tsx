@@ -5,7 +5,6 @@ import { useSocket } from '../context/SocketContext';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
-import { socketApi } from './lib/socketApi';
 
 interface ChatProps {
   gameId: string;
@@ -18,7 +17,8 @@ interface ChatProps {
   lobbyMessages?: ChatMessage[];
 }
 
-interface ChatMessage {
+// Export the ChatMessage interface
+export interface ChatMessage {
   id?: string;
   userId: string;
   userName: string;
@@ -39,227 +39,202 @@ interface EmojiData {
 }
 
 export default function Chat({ gameId, userId, userName, players, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
-  const socket = useSocket();
+  const { socket, isAuthenticated, isConnected, isReady } = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'players'>('chat');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
+
   // Add responsive sizing state
   const [screenSize, setScreenSize] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
-    height: typeof window !== 'undefined' ? window.innerHeight : 800
+    width: window.innerWidth,
+    height: window.innerHeight
   });
 
-  // Listen for screen size changes
+  // Add responsive sizing effect
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
     const handleResize = () => {
       setScreenSize({
         width: window.innerWidth,
         height: window.innerHeight
       });
     };
-    
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
-  // Calculate scale factor for responsive sizing
+
+  // Calculate scale factor based on screen size
   const getScaleFactor = () => {
-    // Base scale on the screen width compared to a reference size
-    const referenceWidth = 1200; // Reference width for desktop
-    let scale = Math.min(1, screenSize.width / referenceWidth);
-    
-    // Minimum scale to ensure things aren't too small
-    return Math.max(0.65, scale);
+    if (screenSize.width < 640) {
+      return 0.8;
+    } else if (screenSize.width < 768) {
+      return 0.9;
+    }
+    return 1;
   };
-  
-  const scaleFactor = getScaleFactor();
-  
-  // Font sizes based on scale
-  const fontSize = Math.max(12, Math.floor(14 * scaleFactor));
-  
-  // Mobile detection
-  const isMobile = screenSize.width < 640;
+
+  // Update scale factor when screen size changes
+  useEffect(() => {
+    setScaleFactor(getScaleFactor());
+    setIsMobile(screenSize.width < 640);
+  }, [screenSize]);
+
+  // Calculate font sizes based on scale factor
+  const fontSize = 14 * scaleFactor;
   const mobileFontSize = isMobile ? 11 : fontSize;
 
-  const activeSocket = socket;
-  
-  // Track connection status
   useEffect(() => {
-    if (!activeSocket) {
-      console.log('No active socket available for chat');
-      return;
-    }
-    
-    console.log('Setting up chat message listeners for game:', gameId);
-    
-    const handleMessage = (data: any) => {
-      console.log('SOCKET MESSAGE RECEIVED:', JSON.stringify(data));
-      // Handle different message formats
-      let chatMessage: ChatMessage;
-      if (data.message && typeof data.message === 'object') {
-        chatMessage = data.message;
-        console.log('Extracted message from wrapper:', chatMessage);
-      } else if (data.userId || data.user) {
-        chatMessage = data;
-        console.log('Using direct message object:', chatMessage);
-      } else {
-        console.error('Unrecognized chat message format:', data);
-        return;
-      }
-      // Force system message fields
-      if (chatMessage.userId === 'system' || chatMessage.isGameMessage) {
-        chatMessage.userId = 'system';
-        chatMessage.userName = 'System';
-        chatMessage.isGameMessage = true;
-      }
-      // Ensure message has an ID and timestamp
-      if (!chatMessage.id) {
-        chatMessage.id = `${Date.now()}-${chatMessage.userId || 'server'}-${Math.random().toString(36).substr(2, 9)}`;
-      }
-      if (!chatMessage.timestamp) {
-        chatMessage.timestamp = Date.now();
-      }
-      // Remove filtering that blocks system messages
-      // Add to state and log
-      setMessages(prev => {
-        if (chatMessage.id && prev.some(m => m.id === chatMessage.id)) {
-          console.log('Duplicate message detected, skipping:', chatMessage.id);
-          return prev;
-        }
-        const newMessages = [...prev, chatMessage];
-        if (newMessages.length > 100) {
-          console.log('ADDING TO CHAT STATE (truncated):', chatMessage);
-          return newMessages.slice(-100);
-        }
-        console.log('ADDING TO CHAT STATE:', chatMessage);
-        return newMessages;
-      });
-    };
-
-    // Listen for direct chat messages
-    activeSocket.on('chat_message', handleMessage);
-    console.log('Registered chat_message listener');
-    
-    // Some servers might use this event name instead
-    activeSocket.on('chat', handleMessage);
-    console.log('Registered chat listener');
-
-    // Handle socket reconnection
-    activeSocket.on('connect', () => {
-      console.log('Chat socket reconnected, joining game room:', gameId);
-      if (activeSocket && typeof activeSocket === 'object') {
-        activeSocket.emit('join_game', {
-          gameId,
-          userId,
-          watchOnly: true
-        });
-        console.log('Emitted join_game event after reconnection');
-      }
+    console.log('Chat useEffect: socket state:', { 
+      hasSocket: !!socket, 
+      isConnected, 
+      isAuthenticated,
+      isReady,
+      chatType
     });
 
-    return () => {
-      console.log('Cleaning up chat message listeners');
-      activeSocket.off('chat_message', handleMessage);
-      activeSocket.off('chat', handleMessage);
-      activeSocket.off('connect');
-    };
-  }, [activeSocket, gameId, userId]);
+    if (!socket || !isReady) {
+      console.log('No active socket available for chat or not authenticated');
+      return;
+    }
 
-  // Track connection status
-  useEffect(() => {
-    if (!activeSocket) return;
-    
-    const onConnect = () => {
-      console.log('Chat socket connected to game:', gameId);
+    // Set up message handler
+    const handleMessage = (data: ChatMessage | { gameId: string; message: ChatMessage }) => {
+      console.log('Chat: Received message:', data);
       
-      // Explicitly join the game room when connected
-      if (activeSocket && typeof activeSocket === 'object') {
-        console.log('Joining game room:', gameId);
-        activeSocket.emit('join_game', {
-          gameId,
-          userId,
-          watchOnly: true
-        });
+      // Handle game chat messages
+      if (chatType === 'game') {
+        if (!('gameId' in data)) {
+          console.error('Invalid game chat message format:', data);
+          return;
+        }
+        const message = data.message;
+        
+        // Handle system messages
+        if (message.userId === 'system') {
+          console.log('Chat: Received system message:', message);
+          setMessages(prev => [...prev, {
+            ...message,
+            id: message.id || `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: message.timestamp || Date.now(),
+            userName: 'System'
+          }]);
+          return;
+        }
+
+        // Handle player messages
+        setMessages(prev => [...prev, {
+          ...message,
+          id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: message.timestamp || Date.now()
+        }]);
+      } 
+      // Handle lobby chat messages
+      else {
+        if ('gameId' in data) {
+          console.error('Invalid lobby chat message format:', data);
+          return;
+        }
+        const message = data as ChatMessage;
+        setMessages(prev => [...prev, {
+          ...message,
+          id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: message.timestamp || Date.now()
+        }]);
       }
     };
-    
+
+    // Set up reconnection handler
+    const handleReconnect = () => {
+      console.log('Chat: Socket reconnected');
+      if (socket && isAuthenticated) {
+        if (chatType === 'game') {
+          socket.emit('join_game', { gameId });
+        }
+      }
+    };
+
+    // Set up connection handlers
+    const onConnect = () => {
+      console.log('Chat: Socket connected');
+      if (socket && isAuthenticated) {
+        if (chatType === 'game') {
+          socket.emit('join_game', { gameId });
+        }
+      }
+    };
+
     const onDisconnect = () => {
-      console.log('Chat socket disconnected from game:', gameId);
+      console.log('Chat: Socket disconnected');
     };
-    
-    const onError = (err: any) => {
-      console.error('Chat socket error:', err);
+
+    const onError = (err: Error) => {
+      console.error('Chat: Socket error:', err);
     };
-    
-    activeSocket.on('connect', onConnect);
-    activeSocket.on('disconnect', onDisconnect);
-    activeSocket.on('connect_error', onError);
-    activeSocket.on('error', onError);
-    
-    // Set initial connection state
-    if (activeSocket.connected) {
-      console.log('Socket already connected, joining game room:', gameId);
-      // Explicitly join the game room if already connected
-      if (activeSocket && typeof activeSocket === 'object') {
-        activeSocket.emit('join_game', {
-          gameId,
-          userId,
-          watchOnly: true
-        });
+
+    // Set up event listeners based on chat type
+    if (socket) {
+      if (chatType === 'game') {
+        socket.on('chat_message', handleMessage);
+      } else {
+        socket.on('lobby_chat_message', handleMessage);
+      }
+      
+      socket.on('reconnect', handleReconnect);
+      socket.on('connect', onConnect);
+      socket.on('disconnect', onDisconnect);
+      socket.on('error', onError);
+
+      // Join the game room if needed
+      if (isAuthenticated && chatType === 'game') {
+        console.log('Chat: Joining game:', gameId);
+        socket.emit('join_game', { gameId });
       }
     }
 
     return () => {
-      activeSocket.off('connect', onConnect);
-      activeSocket.off('disconnect', onDisconnect);
-      activeSocket.off('connect_error', onError);
-      activeSocket.off('error', onError);
-    };
-  }, [activeSocket, gameId, userId]);
-
-  useEffect(() => {
-    // Scroll to bottom whenever messages change
-    if (messagesEndRef.current) {
-      const shouldAutoScroll = messagesEndRef.current.scrollHeight - messagesEndRef.current.scrollTop <= messagesEndRef.current.clientHeight + 100;
-      if (shouldAutoScroll) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      if (socket) {
+        if (chatType === 'game') {
+          socket.off('chat_message', handleMessage);
+        } else {
+          socket.off('lobby_chat_message', handleMessage);
+        }
+        socket.off('reconnect', handleReconnect);
+        socket.off('connect', onConnect);
+        socket.off('disconnect', onDisconnect);
+        socket.off('error', onError);
       }
-    }
-  }, [messages]);
+    };
+  }, [socket, isAuthenticated, isConnected, isReady, gameId, chatType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !activeSocket) return;
+    if (!newMessage.trim() || !socket || !isReady) {
+      console.log('Cannot send message - socket not ready:', { isConnected, isAuthenticated, isReady });
+      return;
+    }
+
+    const message: ChatMessage = {
+      id: `${userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      userName,
+      message: newMessage.trim(),
+      timestamp: Date.now(),
+      isGameMessage: chatType === 'game'
+    };
 
     try {
-      // Generate a unique ID for this message
-      const messageId = `${Date.now()}-${userId}-${Math.random().toString(36).substr(2, 9)}`;
-
-      const chatMessage = {
-        id: messageId,
-        userName: userName,
-        userId: userId,
-        message: inputValue.trim(),
-        timestamp: Date.now()
-      };
-
-      console.log('Sending chat message:', chatMessage, 'to game:', gameId);
-      
-      // Add the message to our local state immediately (optimistic UI)
-      setMessages(prev => [...prev, chatMessage as ChatMessage]);
-
-      // Send the message using the helper function
-      socketApi.sendChatMessage(activeSocket, gameId, chatMessage);
-
-      // Clear the input field
-      setInputValue('');
-      setShowEmojiPicker(false);
-    } catch (err) {
-      console.error('Failed to send chat message:', err);
+      if (chatType === 'game') {
+        socket.emit('chat_message', { gameId, message });
+      } else {
+        socket.emit('lobby_chat_message', message);
+      }
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send chat message:', error);
     }
   };
 
@@ -271,9 +246,6 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
   players.forEach(player => {
     playerColors[player.id] = player.team === 1 ? 'text-red-400' : 'text-blue-400';
   });
-
-  // Add tab state
-  const [activeTab, setActiveTab] = useState<'chat' | 'players'>('chat');
 
   // Add state for lobby chat if needed
   const [lobbyInputValue, setLobbyInputValue] = useState('');
@@ -294,10 +266,13 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
   // Handle lobby chat send
   const handleLobbySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lobbyInputValue.trim()) return;
+    if (!lobbyInputValue.trim() || !socket || !isAuthenticated) {
+      console.log('Cannot send lobby message - socket not ready:', { connected: socket?.connected, authenticated: isAuthenticated });
+      return;
+    }
     try {
       const messageId = `${Date.now()}-${userId}-${Math.random().toString(36).substr(2, 9)}`;
-      const chatMessage = {
+      const chatMessage: ChatMessage = {
         id: messageId,
         userName: userName,
         userId: userId,
@@ -339,15 +314,15 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
   };
 
   useEffect(() => {
-    if (!activeSocket) return;
+    if (!socket || !isAuthenticated) return;
     const logAll = (event: string, ...args: unknown[]) => {
       console.log('SOCKET EVENT:', event, ...args);
     };
-    activeSocket.onAny(logAll);
+    socket.onAny(logAll);
     return () => {
-      activeSocket.offAny(logAll);
+      socket.offAny(logAll);
     };
-  }, [activeSocket]);
+  }, [socket, isAuthenticated]);
 
   return (
     <div className="flex flex-col h-full bg-gray-800 overflow-hidden border-l border-gray-600">
@@ -488,24 +463,24 @@ export default function Chat({ gameId, userId, userName, players, showPlayerList
               <div className="relative flex-1">
                 <input
                   type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
                   placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
                   className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
                   style={{ fontSize: `${fontSize}px` }}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-xl text-yellow-300 hover:text-yellow-200"
                 >
                   😊
                 </button>
-                {showEmojiPicker && (
+                {isEmojiPickerOpen && (
                   <div className="absolute bottom-full right-0 mb-2 z-10">
                     <Picker
                       data={data}
-                      onEmojiSelect={(emoji: EmojiData) => setInputValue(prev => prev + emoji.native)}
+                      onEmojiSelect={(emoji: EmojiData) => setNewMessage(prev => prev + emoji.native)}
                       theme="dark"
                       set="twitter"
                       previewPosition="none"

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, CompletedTrick, Bot } from '../../types/game';
+import type { ChatMessage } from '../Chat';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import WinnerModal from './WinnerModal';
@@ -123,6 +124,7 @@ declare global {
       winnerIndex: number;
       timeout: any;
     } | null;
+    __sentJoinSystemMessage: string | null;
   }
 }
 
@@ -180,7 +182,7 @@ export default function GameTable({
   startGame,
   user: propUser
 }: GameTableProps) {
-  const socket = useSocket();
+  const { socket, isAuthenticated } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -329,7 +331,7 @@ export default function GameTable({
         const updatedGame = await res.json();
         console.log('Bot invited successfully:', updatedGame);
         setGameState(updatedGame);
-        sendSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
+        setPendingSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
       }
     } catch (err) {
       console.error('Error inviting bot:', err);
@@ -354,7 +356,10 @@ export default function GameTable({
         const error = await res.json();
         alert('Failed to remove bot: ' + (error.error || 'Unknown error'));
       } else {
-        sendSystemMessage(`A bot was removed from seat ${seatIndex + 1}.`);
+        // Update the local game state with the new data from the server
+        const updatedGame = await res.json();
+        setGameState(updatedGame);
+        setPendingSystemMessage(`A bot was removed from seat ${seatIndex + 1}.`);
       }
     } catch (err) {
       alert('Failed to remove bot');
@@ -1034,39 +1039,30 @@ export default function GameTable({
     try {
       console.log(`Starting game ${gameState.id} as user ${currentPlayerId}, creator: ${sanitizedPlayers[0]?.id}`);
       await startGame(gameState.id, currentPlayerId);
-      sendSystemMessage('Game started! GOOD LUCK!');
+      setPendingSystemMessage('Game started! GOOD LUCK!');
     } catch (error) {
       console.error("Failed to start game:", error);
     }
   };
 
-  // Only send system message after joined_game_room event
+  // At the top of the component:
+  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
+
+  // Add this useEffect:
   useEffect(() => {
-    if (!socket || !gameState?.id || !propUser?.id) return;
-
-    const handleJoinedRoom = (data: { gameId: string }) => {
-      if (data.gameId === gameState.id && socket.connected) {
-        sendSystemMessage(`${propUser.username} joined the game chat.`);
-        socket.off('joined_game_room', handleJoinedRoom);
-      } else if (!socket.connected) {
-        console.log('handleJoinedRoom: Socket not connected, not sending system message');
-      }
-    };
-
-    socket.on('joined_game_room', handleJoinedRoom);
-
-    return () => {
-      socket.off('joined_game_room', handleJoinedRoom);
-    };
-  }, [socket, gameState?.id, propUser?.id]);
+    if (pendingSystemMessage && socket && isAuthenticated) {
+      sendSystemMessage(pendingSystemMessage);
+      setPendingSystemMessage(null);
+    }
+  }, [pendingSystemMessage, socket, isAuthenticated]);
 
   // --- Lobby chat toggle state ---
   const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
-  const [lobbyMessages, setLobbyMessages] = useState<any[]>([]);
+  const [lobbyMessages, setLobbyMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
     if (!socket) return;
-    const handleLobbyMsg = (msg: any) => {
+    const handleLobbyMsg = (msg: ChatMessage) => {
       setLobbyMessages(prev => [...prev, msg]);
     };
     socket.on('lobby_chat_message', handleLobbyMsg);
@@ -1075,54 +1071,45 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // At the top of your GameTable.tsx (after imports, before component)
-  const unsentSystemMessages: any[] = [];
-
-  // Helper to send a system message to the game chat
-  const sendSystemMessage = (msg: string) => {
-    if (!socket || !gameState?.id) {
-      console.log('sendSystemMessage: No socket or gameState');
-      return;
-    }
-    const chatMessage = {
-      id: `${Date.now()}-system-${Math.random().toString(36).substr(2, 9)}`,
-      userId: 'system',
-      userName: 'System',
-      message: msg,
-      timestamp: Date.now(),
-      isGameMessage: true,
-    };
-    // Wait for socket to be connected before sending
-    if (!socket.connected) {
-      console.log('sendSystemMessage: Socket not connected, waiting...');
-      socket.once('connect', () => {
-        console.log('sendSystemMessage: Socket connected, sending queued system message');
-        socket.emit('chat_message', { gameId: gameState.id, message: chatMessage });
-      });
-      return;
-    }
-    console.log('Sending system message:', chatMessage);
-    socket.emit('chat_message', { gameId: gameState.id, message: chatMessage });
-  };
-
-  // Listen for socket connect and flush unsent messages
-  useEffect(() => {
-    if (!socket) return;
-    const flushMessages = () => {
-      while (unsentSystemMessages.length > 0) {
-        const msg = unsentSystemMessages.shift();
-        console.log('Flushing queued system message:', msg);
-        socket.emit('chat_message', { gameId: gameState.id, message: msg });
-      }
-    };
-    socket.on('connect', flushMessages);
-    return () => {
-      socket.off('connect', flushMessages);
-    };
-  }, [socket, gameState?.id]);
-
   // Loosen the chatReady guard so Chat UI renders as soon as gameState.id and currentPlayerId are available
   const chatReady = gameState?.id && currentPlayerId;
+
+  // Add a new effect to handle socket reconnection and message sending
+  useEffect(() => {
+    if (!socket || !isAuthenticated || !gameState?.id || !user?.username) return;
+
+    // Only send the join system message once per session
+    if (window.__sentJoinSystemMessage !== gameState.id) {
+      const systemMessage = {
+        id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: 'system',
+        userName: 'System',
+        message: `${user.username} joined the game.`,
+        timestamp: Date.now(),
+        isGameMessage: true
+      };
+      socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
+      window.__sentJoinSystemMessage = gameState.id;
+    }
+  }, [socket, isAuthenticated, gameState?.id, user?.username]);
+
+  // Move sendSystemMessage definition inside GameTable, after useSocket and gameState
+  const sendSystemMessage = (message: string) => {
+    if (!socket || !isAuthenticated) {
+      console.log('Socket not ready for system message:', { connected: socket?.connected, authenticated: isAuthenticated });
+      return;
+    }
+    const systemMessage: ChatMessage = {
+      id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId: 'system',
+      userName: 'System',
+      message,
+      timestamp: Date.now(),
+      isGameMessage: true
+    };
+    console.log('Sending system message:', systemMessage);
+    socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
+  };
 
   // Return the JSX for the component
   return (

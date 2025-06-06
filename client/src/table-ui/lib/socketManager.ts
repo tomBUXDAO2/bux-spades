@@ -1,229 +1,171 @@
 import { io, Socket } from 'socket.io-client';
 
-class SocketManager {
-  private static instance: SocketManager | null = null;
+// Get the socket URL from environment variables or use default
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
+export class SocketManager {
+  private static instance: SocketManager;
   private socket: Socket | null = null;
+  private isAuthenticated = false;
+  private isConnected = false;
+  private isReady = false;
+  private session: { token: string; userId: string; username: string } | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private connectionTimeout: NodeJS.Timeout | null = null;
-  private storedToken: string | null = null;
+  private reconnectDelay = 1000;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private stateChangeCallbacks: ((state: SocketState) => void)[] = [];
 
-  private constructor() {}
+  private constructor() {
+    // Private constructor to enforce singleton
+  }
 
-  static getInstance(): SocketManager {
+  public static getInstance(): SocketManager {
     if (!SocketManager.instance) {
       SocketManager.instance = new SocketManager();
     }
     return SocketManager.instance;
   }
 
-  initialize(session: any): Socket | null {
-    console.log('Initializing socket with session:', {
-      userId: session.user.id,
-      username: session.user.username,
-      hasSessionToken: !!session.user.sessionToken,
-      token: session.user.sessionToken
+  public onStateChange(callback: (state: SocketState) => void) {
+    this.stateChangeCallbacks.push(callback);
+    // Immediately notify of current state
+    callback(this.getState());
+  }
+
+  private notifyStateChange() {
+    const state = this.getState();
+    this.stateChangeCallbacks.forEach(callback => callback(state));
+  }
+
+  public getState(): SocketState {
+    return {
+      hasSocket: !!this.socket,
+      isConnected: this.isConnected,
+      isAuthenticated: this.isAuthenticated,
+      isReady: this.isReady
+    };
+  }
+
+  public initialize(userId: string, username: string): void {
+    console.log('SocketManager: Initializing with user:', { userId, username });
+    console.log('SocketManager: localStorage contents:', {
+      sessionToken: localStorage.getItem('sessionToken'),
+      userData: localStorage.getItem('userData'),
+      token: localStorage.getItem('token')
     });
-
-    // Store the token for reconnection attempts
-    if (session.user.sessionToken) {
-      this.storedToken = session.user.sessionToken;
+    
+    // Get token from localStorage
+    const token = localStorage.getItem('sessionToken') || localStorage.getItem('token');
+    if (!token) {
+      console.error('SocketManager: No session token found');
+      this.isReady = false;
+      this.notifyStateChange();
+      return;
     }
 
-    // If we have a stored token but no session token, use the stored token
-    if (!session.user.sessionToken && this.storedToken) {
-      session.user.sessionToken = this.storedToken;
-    }
-
-    if (!session.user.sessionToken) {
-      console.error('No session token available for socket connection');
-      return null;
-    }
-
-    if (this.socket?.connected) {
-      console.log('Socket exists and is connected, reusing...');
-      return this.socket;
-    }
-
+    this.session = { token, userId, username };
+    
+    // If we already have a socket, disconnect it
     if (this.socket) {
-      console.log('Socket exists but not connected, disconnecting...');
+      console.log('SocketManager: Disconnecting existing socket');
       this.socket.disconnect();
+      this.socket = null;
     }
 
-    // Use proxy by setting URL to root
-    const SOCKET_URL = import.meta.env.PROD 
-      ? import.meta.env.VITE_PROD_API_URL 
-      : import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    console.log('Connecting to socket server:', SOCKET_URL);
-
-    // Clear any existing connection timeout
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
-
-    const token = session.user.sessionToken;
+    // Initialize new socket connection
+    console.log('SocketManager: Connecting to', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
-      auth: {
-        userId: session.user.id,
-        username: session.user.username,
-        token: token
-      },
       transports: ['websocket', 'polling'],
+      auth: {
+        token,
+        userId,
+        username
+      },
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      path: '/socket.io',
-      withCredentials: true,
-      forceNew: true,
-      autoConnect: true,
-      extraHeaders: {
-        'Authorization': `Bearer ${token}`
-      }
+      reconnectionDelay: this.reconnectDelay,
+      timeout: 10000,
+      autoConnect: true
     });
 
-    // Set a connection timeout
-    this.connectionTimeout = setTimeout(() => {
-      if (this.socket && !this.socket.connected) {
-        console.log('Connection timeout, attempting to reconnect...');
-        if (this.socket) {
-          this.socket.disconnect();
-          setTimeout(() => {
-            if (!this.socket) {
-              this.initialize(session);
-            }
-          }, 1000);
-        }
-      }
-    }, 5000);
+    this.setupSocketListeners();
+    this.notifyStateChange();
+  }
+
+  private setupSocketListeners(): void {
+    if (!this.socket) return;
 
     this.socket.on('connect', () => {
       console.log('Socket connected successfully');
-      if (this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-        this.connectionTimeout = null;
-      }
+      this.isConnected = true;
       this.reconnectAttempts = 0;
       
-      // Emit authenticate event immediately after connection
-      if (this.socket && token) {
-        console.log('Emitting authenticate event with token:', token);
-        this.socket.emit('authenticate', {
-          userId: session.user.id,
-          username: session.user.username,
-          token: token
+      // If we have a session, authenticate immediately
+      if (this.session) {
+        console.log('SocketManager: Authenticating with session');
+        this.socket?.emit('authenticate', {
+          token: this.session.token,
+          userId: this.session.userId,
+          username: this.session.username
         });
       }
-    });
-
-    this.socket.on('authenticated', (data) => {
-      console.log('Socket authenticated:', data);
-      if (data.success && data.userId === session.user.id && this.socket) {
-        if (data.games) {
-          data.games.forEach((gameId: string) => {
-            console.log('Joining existing game:', gameId);
-            this.socket?.emit('join_game', { gameId });
-          });
-        }
-      } else {
-        console.error('Authentication failed:', data);
-        // Clear invalid token
-        localStorage.removeItem('token');
-        this.socket?.disconnect();
-      }
-    });
-
-    this.socket.on('online_users', (onlineUserIds: string[]) => {
-      console.log('Online users updated:', onlineUserIds);
-      // Dispatch a custom event that components can listen to
-      window.dispatchEvent(new CustomEvent('online_users_updated', { 
-        detail: onlineUserIds 
-      }));
-    });
-
-    this.socket.on('error', (error: { message: string }) => {
-      console.error('Socket error:', error.message);
-      if (error.message === 'Not authenticated' && this.reconnectAttempts < this.maxReconnectAttempts && this.socket) {
-        this.reconnectAttempts++;
-        console.log('Re-authenticating...');
-        if (session.user.sessionToken) {
-          this.socket.emit('authenticate', {
-            userId: session.user.id,
-            token: session.user.sessionToken
-          });
-        } else {
-          console.error('No session token available for re-authentication');
-          localStorage.removeItem('token');
-          this.socket.disconnect();
-        }
-      }
-    });
-
-    this.socket.on('connect_error', (error: Error) => {
-      console.error('Socket connection error:', error);
-      console.log('Current socket state:', {
-        connected: this.socket?.connected,
-        id: this.socket?.id,
-        auth: this.socket?.auth
-      });
       
-      this.reconnectAttempts++;
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Max reconnection attempts reached');
-        this.socket?.disconnect();
-        this.socket = null;
-      } else if (this.socket) {
-        // Try polling if websocket fails
-        const opts = this.socket.io.opts;
-        if (opts && Array.isArray(opts.transports) && opts.transports.includes('websocket' as any)) {
-          console.log('Switching to polling transport');
-          opts.transports = ['polling'];
-          this.socket.connect();
-        }
-      }
+      this.notifyStateChange();
     });
 
-    this.socket.on('disconnect', (reason: string) => {
+    this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
-      if (reason === 'io server disconnect' || reason === 'transport close') {
-        // Only attempt reconnection if we have a valid session
-        if (session.user.sessionToken) {
-          this.socket = null;
-          setTimeout(() => {
-            if (!this.socket) {
-              console.log('Attempting to reconnect...');
-              this.initialize(session);
-            }
-          }, 1000);
-        } else {
-          console.error('No session token available for reconnection');
-        }
+      this.isConnected = false;
+      this.isAuthenticated = false;
+      this.isReady = false;
+      
+      // Clear any existing reconnect timer
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
       }
+
+      // Attempt to reconnect if we have a session
+      if (this.session && this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectAttempts++;
+          console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+          this.socket?.connect();
+        }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts));
+      }
+      
+      this.notifyStateChange();
     });
 
+    this.socket.on('authenticated', (data: { success: boolean; userId: string; games: any[] }) => {
+      console.log('Socket authenticated:', data);
+      this.isAuthenticated = data.success;
+      this.isReady = this.isConnected && this.isAuthenticated;
+      this.notifyStateChange();
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('Socket error:', error);
+      this.isReady = false;
+      this.notifyStateChange();
+    });
+  }
+
+  public getSocket(): Socket | null {
     return this.socket;
   }
 
-  getSocket(): Socket | null {
-    return this.socket;
-  }
-
-  isInitialized(): boolean {
-    return !!this.socket?.connected;
-  }
-
-  disconnect(): void {
+  public disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.reconnectAttempts = 0;
-      if (this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-        this.connectionTimeout = null;
-      }
     }
+    this.isConnected = false;
+    this.isAuthenticated = false;
+    this.isReady = false;
+    this.session = null;
+    this.notifyStateChange();
   }
 }
 
@@ -281,7 +223,7 @@ export async function handleAuthenticatedSession() {
           token: sessionWithToken.user.sessionToken // Log the actual token for debugging
         });
         
-        socketManager.initialize(sessionWithToken);
+        socketManager.initialize(sessionWithToken.user.id, sessionWithToken.user.username);
       } else {
         console.error('Invalid session response:', session);
         // Clear invalid token

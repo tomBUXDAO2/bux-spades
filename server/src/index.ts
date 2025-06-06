@@ -68,13 +68,13 @@ const io = new Server(httpServer, {
   pingInterval: 25000,
   connectTimeout: 45000,
   allowUpgrades: true,
-  cookie: {
+  cookie: process.env.NODE_ENV === 'production' ? {
     name: 'io',
     path: '/',
     httpOnly: true,
     sameSite: 'none',
     secure: true
-  },
+  } : false,
   upgradeTimeout: 30000,
   maxHttpBufferSize: 1e8,
   perMessageDeflate: {
@@ -157,9 +157,18 @@ io.use((socket: AuthenticatedSocket, next) => {
       match: decoded.userId === auth.userId
     });
 
-    if (decoded.userId === auth.userId) {
-      socket.userId = auth.userId;
-      socket.auth = { ...auth, token };
+    // Extract the actual user ID from the auth object
+    const authUserId = typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.id : auth.userId;
+
+    if (decoded.userId === authUserId) {
+      socket.userId = authUserId;
+      socket.auth = { 
+        ...auth, 
+        token,
+        userId: authUserId,
+        username: typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined,
+        avatar: typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined
+      };
       socket.isAuthenticated = true;
       console.log('Socket authenticated successfully:', {
         userId: socket.userId,
@@ -197,6 +206,102 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       games: Array.from(socket.rooms).filter(room => room !== socket.id)
     });
   }
+
+  // Handle chat messages
+  socket.on('chat_message', ({ gameId, message }) => {
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized chat message attempt:', { 
+        socketId: socket.id, 
+        isAuthenticated: socket.isAuthenticated,
+        userId: socket.userId 
+      });
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    if (!gameId || !message) {
+      console.log('Invalid chat message format:', { gameId, message });
+      return;
+    }
+
+    // Validate message format
+    if (!message.userId || !message.message) {
+      console.log('Invalid message format:', message);
+      return;
+    }
+
+    // Add timestamp and ID if not present
+    const enrichedMessage = {
+      ...message,
+      id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: message.timestamp || Date.now(),
+      userName: message.userName || (message.userId === 'system' ? 'System' : socket.auth?.username || 'Unknown')
+    };
+
+    console.log('Broadcasting chat message:', {
+      gameId,
+      message: enrichedMessage,
+      room: socket.rooms.has(gameId)
+    });
+
+    // Broadcast to game room
+    io.to(gameId).emit('chat_message', { gameId, message: enrichedMessage });
+  });
+
+  // Handle lobby chat messages
+  socket.on('lobby_chat_message', (message) => {
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized lobby chat message attempt:', { 
+        socketId: socket.id, 
+        isAuthenticated: socket.isAuthenticated,
+        userId: socket.userId 
+      });
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    if (!message || !message.message) {
+      console.log('Invalid lobby message format:', message);
+      return;
+    }
+
+    // Validate message format
+    if (!message.userId) {
+      console.log('Invalid lobby message format:', message);
+      return;
+    }
+
+    // Add timestamp and ID if not present
+    const enrichedMessage = {
+      ...message,
+      id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: message.timestamp || Date.now(),
+      userName: message.userName || socket.auth?.username || 'Unknown'
+    };
+
+    console.log('Broadcasting lobby message:', enrichedMessage);
+
+    // Broadcast to all connected clients
+    io.emit('lobby_chat_message', enrichedMessage);
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', {
+      socketId: socket.id,
+      userId: socket.userId
+    });
+
+    if (socket.userId) {
+      authenticatedSockets.delete(socket.userId);
+      onlineUsers.delete(socket.userId);
+      io.emit('online_users', Array.from(onlineUsers));
+      console.log('User disconnected:', {
+        userId: socket.userId,
+        onlineUsers: Array.from(onlineUsers)
+      });
+    }
+  });
 
   // Join game room for real-time updates
   socket.on('join_game', ({ gameId }) => {
@@ -367,65 +472,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.error('Error in start_game handler:', err);
       socket.emit('error', { message: 'Failed to start game' });
     }
-  });
-
-  // Broadcast chat messages to all clients in the game room
-  socket.on('chat_message', ({ gameId, message }) => {
-    console.log('[SERVER] chat_message received:', JSON.stringify({ gameId, message }));
-    console.log('[SERVER] Broadcasting chat_message to room:', gameId, 'Message:', message);
-    io.to(gameId).emit('chat_message', { gameId, message });
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log('Client disconnected:', socket.id, 'Reason:', reason);
-    
-    if (socket.userId) {
-      // Clean up user data
-      authenticatedSockets.delete(socket.userId);
-      onlineUsers.delete(socket.userId);
-      io.emit('online_users', Array.from(onlineUsers));
-      console.log('User disconnected:', socket.userId);
-
-      // Handle game cleanup for disconnected user
-      games.forEach((game: Game) => {
-        const playerIdx = game.players.findIndex((p: GamePlayer | null) => p && p.id === socket.userId);
-        if (playerIdx !== -1) {
-          // Don't immediately remove the player, wait for a grace period
-          setTimeout(() => {
-            // Check if the user has reconnected
-            if (!authenticatedSockets.has(socket.userId!)) {
-              game.players[playerIdx] = null;
-              io.to(game.id).emit('game_update', enrichGameForClient(game));
-              io.emit('games_updated', games);
-              console.log(`User ${socket.userId} removed from game ${game.id} due to disconnect`);
-
-              // Check if there are any human players left
-              const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
-              
-              // If no human players remain, remove the game
-              if (!hasHumanPlayers) {
-                const gameIdx = games.findIndex((g: Game) => g.id === game.id);
-                if (gameIdx !== -1) {
-                  games.splice(gameIdx, 1);
-                  io.emit('games_updated', games);
-                  console.log(`Game ${game.id} removed (no human players left after disconnect)`);
-                }
-              }
-            }
-          }, 30000); // 30 second grace period
-        }
-      });
-    }
-  });
-
-  // Real-time lobby chat: broadcast messages to all clients except sender
-  socket.on('lobby_chat_message', (msg) => {
-    if (!socket.isAuthenticated || !socket.userId) {
-      console.log('Unauthorized chat message attempt');
-      socket.emit('error', { message: 'Not authenticated' });
-      return;
-    }
-    socket.broadcast.emit('lobby_chat_message', msg);
   });
 });
 

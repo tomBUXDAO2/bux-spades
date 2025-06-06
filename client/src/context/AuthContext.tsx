@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('sessionToken');
     if (token) {
       fetchProfile();
     } else {
@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('sessionToken');
       if (!token) {
         setLoading(false);
         return;
@@ -104,14 +104,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (response.data?.user) {
-        setUser(response.data.user);
+        const userData = {
+          ...response.data.user,
+          sessionToken: token
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
       } else {
         console.error('Invalid profile response:', response.data);
-        localStorage.removeItem('token');
+        localStorage.removeItem('sessionToken');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      localStorage.removeItem('token');
+      localStorage.removeItem('sessionToken');
     } finally {
       setLoading(false);
     }
@@ -133,8 +138,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.data?.token && response.data?.user) {
         console.log('Login successful:', response.data);
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
+        localStorage.setItem('sessionToken', response.data.token);
+        const userData = {
+          ...response.data.user,
+          sessionToken: response.data.token
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
       } else {
         console.error('Invalid login response:', response.data);
         throw new Error('Invalid response from server');
@@ -163,8 +173,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.data?.token && response.data?.user) {
         console.log('Registration successful:', response.data);
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
+        localStorage.setItem('sessionToken', response.data.token);
+        const userData = {
+          ...response.data.user,
+          sessionToken: response.data.token
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
       } else {
         console.error('Invalid registration response:', response.data);
         throw new Error('Invalid response from server');
@@ -178,14 +193,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('sessionToken');
+    localStorage.removeItem('userData');
     setUser(null);
   };
 
   const updateProfile = async (username: string, avatar: string) => {
     try {
       setError(null);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('sessionToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -204,7 +220,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.data?.user) {
         console.log('Profile update successful:', response.data);
-        setUser(response.data.user);
+        const userData = {
+          ...response.data.user,
+          sessionToken: token
+        };
+        setUser(userData);
+        localStorage.setItem('userData', JSON.stringify(userData));
       } else {
         console.error('Invalid profile update response:', response.data);
         throw new Error('Invalid response from server');
