@@ -84,7 +84,6 @@ const router = createBrowserRouter(
 );
 
 const AppWithSocket: React.FC = () => {
-  const { user } = useAuth();
   return (
     <SocketProvider>
       <RouterProvider router={router} />

@@ -1,4 +1,4 @@
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { SocketManager } from './socketManager';
 
 export const socketManager = SocketManager.getInstance();
@@ -7,8 +7,8 @@ export const getSocket = (): Socket | null => {
   return socketManager.getSocket();
 };
 
-export const initializeSocket = (userId: string, token: string, username: string): void => {
-  socketManager.initialize(userId, token, username);
+export const initializeSocket = (userId: string, username: string): void => {
+  socketManager.initialize(userId, username);
 };
 
 export const disconnectSocket = (): void => {
