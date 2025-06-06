@@ -10,7 +10,7 @@ interface GameBoardProps {
 
 export default function GameBoard({ gameId }: GameBoardProps) {
   const [game, setGame] = useState<GameState | null>(null);
-  const { socket } = getSocket();
+  const socket = getSocket();
 
   useEffect(() => {
     if (!socket) return;
