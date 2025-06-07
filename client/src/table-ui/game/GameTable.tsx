@@ -437,254 +437,212 @@ export default function GameTable({
     // If seat is empty and user cannot invite a bot, show nothing
     if (!player) return null;
 
-    // If player is a bot, show bot avatar and label
-    if (isBot(player)) {
-      const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
-      const isSideSeat = position === 1 || position === 3;
-      const avatarWidth = isMobile ? 32 : 40;
-      const avatarHeight = isMobile ? 32 : 40;
-      // Team color: seats 0 and 2 are blue, 1 and 3 are red
-      const teamGradient = (position === 0 || position === 2)
-        ? "bg-gradient-to-r from-blue-700 to-blue-500"
-        : "bg-gradient-to-r from-red-700 to-red-500";
-      const madeCount = player.tricks || 0;
-      const bidCount = player.bid !== undefined ? player.bid : 0;
-      const madeStatus = madeCount >= bidCount 
-        ? "✅"
-        : "❌";
-      // Permission to remove bot: host (pre-game) or partner (mid-game)
-      const canRemoveBot = canInviteBot({
-        gameState,
-        currentPlayerId,
-        seatIndex: position,
-        isPreGame: gameState.status === 'WAITING',
-        sanitizedPlayers: sanitizedPlayers.filter((p): p is Player | null => isPlayer(p) || p === null),
-      });
-      return (
-        <div className={`absolute ${getPositionClasses(position)} z-30`}>
-          <div className={`
-            backdrop-blur-sm bg-white/10 rounded-xl overflow-hidden
-            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
-            transition-all duration-200
-          `}>
-            <div className={isSideSeat ? "flex flex-col items-center p-1.5 gap-1.5" : "flex items-center p-1.5 gap-1.5"}>
-              <div className="relative">
-                <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
-                  <div className="bg-gray-900 rounded-full p-0.5">
-                    <img
-                      src={player.avatar || '/bot-avatar.jpg'}
-                      alt="Bot"
-                      width={avatarWidth}
-                      height={avatarHeight}
-                      className="rounded-full object-cover"
-                    />
-                    {canRemoveBot && (
-                      <button
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                        title="Remove Bot"
-                        onClick={() => handleRemoveBot(position)}
-                        style={{ zIndex: 50 }}
-                      >
-                        <FaMinus className="w-2.5 h-2.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
-                  <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    Bot
-                  </div>
-                </div>
-                {/* Bid/Trick counter for bots, same as humans */}
-                <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
-                     style={{ width: isMobile ? '50px' : '70px' }}>
-                  <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
-                    {gameState.status === "WAITING" ? "0" : madeCount}
-                  </span>
-                  <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
-                  <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {gameState.status === "WAITING" ? "0" : bidCount}
-                  </span>
-                  <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
-                    {gameState.status === "WAITING" ? "" : madeStatus}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    if (!player) return null;
-
+    // Shared variables for both bots and humans
     const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
-    
-    // Get player avatar
-    const getPlayerAvatar = (player: Player | null) => {
-      if (!player) return '/guest-avatar.png';
-      return player.avatar ?? '/guest-avatar.png';
-    };
-
-    // Determine if this is a left/right seat (position 1 or 3)
     const isSideSeat = position === 1 || position === 3;
-    
-    // Calculate sizes based on device
     const avatarWidth = isMobile ? 32 : 40;
     const avatarHeight = isMobile ? 32 : 40;
-    
-    // Determine made/bid status color
-    const madeCount = player.tricks || 0;
-    const bidCount = player.bid !== undefined ? player.bid : 0;
-    // Replace color-based status with emoji indicators
-    const madeStatus = madeCount >= bidCount 
-      ? "✅" // Checkmark for met or exceeded bid
-      : "❌"; // X for not met bid
-    
-    // Custom team colors
     const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
     const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
-    const teamGradient = player.team === 1 ? redTeamGradient : blueTeamGradient;
-    const teamAccentColor = player.team === 1 ? 'from-red-400' : 'from-blue-400';
+    const teamGradient = (position === 0 || position === 2)
+      ? blueTeamGradient
+      : redTeamGradient;
+    // Calculate bid/made/tick/cross logic for both bots and humans
+    const madeCount = player.tricks || 0;
+    const bidCount = player.bid !== undefined ? player.bid : 0;
+    let madeStatus = null;
+    const tricksLeft = 13 - (gameState.completedTricks?.length || 0);
+    const isPartnerGame = (gameState.gameMode || gameState.rules?.gameType) === 'PARTNERS';
+    const isSoloGame = (gameState.gameMode || gameState.rules?.gameType) === 'SOLO';
+    // Find partner (for 4p, partner is (position+2)%4)
+    let teamBid = bidCount;
+    let teamMade = madeCount;
+    if (isPartnerGame) {
+      const partnerIndex = (position + 2) % 4;
+      const partner = orderedPlayers[partnerIndex];
+      const partnerBid = partner && partner.bid !== undefined ? partner.bid : 0;
+      const partnerMade = partner && partner.tricks ? partner.tricks : 0;
+      teamBid += partnerBid;
+      teamMade += partnerMade;
+      // Nil logic: if player bid 0 (nil) and made > 0, show cross for that player only
+      if (bidCount === 0 && madeCount > 0) {
+        madeStatus = '❌';
+      } else if (teamMade >= teamBid && teamBid > 0) {
+        madeStatus = '✅';
+      } else if (teamMade + tricksLeft < teamBid && teamBid > 0) {
+        madeStatus = '❌';
+      } else {
+        madeStatus = null;
+      }
+    } else if (isSoloGame) {
+      // Solo: tick/cross only for self
+      if (bidCount === 0 && madeCount > 0) {
+        madeStatus = '❌';
+      } else if (madeCount >= bidCount && bidCount > 0) {
+        madeStatus = '✅';
+      } else if (madeCount + tricksLeft < bidCount && bidCount > 0) {
+        madeStatus = '❌';
+      } else {
+        madeStatus = null;
+      }
+    } else {
+      // Fallback: hide
+      madeStatus = null;
+    }
+    // --- END NEW LOGIC ---
 
+    // Permission to remove bot: host (pre-game) or partner (mid-game)
+    const canRemoveBot = (() => {
+      if (!currentPlayerId) return false;
+      if (gameState.status === 'WAITING') {
+        // Host (seat 0) can always remove bots pre-game
+        return sanitizedPlayers[0]?.id === currentPlayerId;
+      } else {
+        // Mid-game: partner (seat (position+2)%4) can remove bots
+        const partnerIndex = (position + 2) % 4;
+        return sanitizedPlayers[partnerIndex]?.id === currentPlayerId;
+      }
+    })();
     return (
-      <div className={`absolute ${getPositionClasses(position)} ${isActive ? 'z-10' : 'z-0'}`}>
+      <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
           backdrop-blur-sm bg-white/10 rounded-xl overflow-hidden
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
           transition-all duration-200
         `}>
-          {isSideSeat ? (
-            // Left/right seats - vertical layout
-            <div className="flex flex-col items-center p-1.5 gap-1.5">
-              {/* Avatar with glowing active border */}
-              <div className={`relative`}>
-                <div className={`
-                  rounded-full overflow-hidden p-0.5
-                  ${isActive ? 'bg-gradient-to-r from-yellow-300 to-yellow-500 animate-pulse' : 
-                    `bg-gradient-to-r ${teamAccentColor} to-white/80`}
-                `}>
-                  <div className="bg-gray-900 rounded-full p-0.5">
-                    <img
-                      src={getPlayerAvatar(player)}
-                      alt={isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
-                      width={avatarWidth}
-                      height={avatarHeight}
-                      className="rounded-full object-cover"
-                    />
-                  </div>
-                  
-                  {/* Dealer chip with premium styling */}
+          <div className={isSideSeat ? "flex flex-col items-center p-1.5 gap-1.5" : "flex items-center p-1.5 gap-1.5"}>
+            <div className="relative">
+              <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                <div className="bg-gray-900 rounded-full p-0.5">
+                  <img
+                    src={player.avatar || '/bot-avatar.jpg'}
+                    alt="Bot"
+                    width={avatarWidth}
+                    height={avatarHeight}
+                    className="rounded-full object-cover"
+                  />
+                  {canRemoveBot && (
+                    <button
+                      className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                      title="Remove Bot"
+                      onClick={() => handleRemoveBot(position)}
+                      style={{ zIndex: 50 }}
+                    >
+                      <FaMinus className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                  {/* Dealer chip for bots */}
                   {player.isDealer && (
-                    <div className="absolute -bottom-1 -right-1">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                        <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                          <span className="text-[8px] font-bold text-yellow-200">D</span>
+                    <>
+                      {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
+                      <div className="absolute -bottom-1 -right-1">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
+                          <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
+                            <span className="text-[8px] font-bold text-yellow-200">D</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
-              
-              <div className="flex flex-col items-center gap-1">
-                {/* Player name with team color gradient background */}
-                <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
-                  <div className="text-white font-medium truncate text-center"
-                       style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
-                  </div>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
+                <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+                  Bot
                 </div>
-                
-                {/* Bid/Trick counter with glass morphism effect */}
-                <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
-                     style={{ width: isMobile ? '50px' : '70px' }}>
-                  <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
-                    {gameState.status === "WAITING" ? "0" : madeCount}
-                  </span>
-                  <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
-                  <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {gameState.status === "WAITING" ? "0" : bidCount}
-                  </span>
-                  <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
-                    {gameState.status === "WAITING" ? "" : madeStatus}
-                  </span>
-                </div>
+              </div>
+              {/* Bid/Trick counter for bots, same as humans */}
+              <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
+                   style={{ width: isMobile ? '50px' : '70px' }}>
+                <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
+                  {gameState.status === "WAITING" ? "0" : madeCount}
+                </span>
+                <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
+                <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+                  {gameState.status === "WAITING" ? "0" : bidCount}
+                </span>
+                <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
+                  {madeStatus}
+                </span>
               </div>
             </div>
-          ) : (
-            // Top/bottom seats - horizontal layout
-            <div className="flex items-center p-1.5 gap-1.5">
-              {/* Avatar with glowing active border */}
-              <div className={`relative`}>
-                <div className={`
-                  rounded-full overflow-hidden p-0.5
-                  ${isActive ? 'bg-gradient-to-r from-yellow-300 to-yellow-500 animate-pulse' : 
-                    `bg-gradient-to-r ${teamAccentColor} to-white/80`}
-                `}>
-                  <div className="bg-gray-900 rounded-full p-0.5">
-                    <img
-                      src={getPlayerAvatar(player)}
-                      alt={isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
-                      width={avatarWidth}
-                      height={avatarHeight}
-                      className="rounded-full object-cover"
-                    />
-                  </div>
-                  
-                  {/* Dealer chip with premium styling */}
-                  {player.isDealer && (
-                    <div className="absolute -bottom-1 -right-1">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                        <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                          <span className="text-[8px] font-bold text-yellow-200">D</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex flex-col gap-1 items-center">
-                {/* Player name with team color gradient background */}
-                <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
-                  <div className="text-white font-medium truncate text-center"
-                       style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Unknown'}
-                  </div>
-                </div>
-                
-                {/* Bid/Trick counter with glass morphism effect */}
-                <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
-                     style={{ width: isMobile ? '50px' : '70px' }}>
-                  <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
-                    {gameState.status === "WAITING" ? "0" : madeCount}
-                  </span>
-                  <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
-                  <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                    {gameState.status === "WAITING" ? "0" : bidCount}
-                  </span>
-                  <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
-                    {gameState.status === "WAITING" ? "" : madeStatus}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     );
   };
 
-  const renderPlayerHand = () => {
-    if (!currentPlayer || !currentPlayer.hand || gameState.status !== "PLAYING") return null;
-    console.log('Rendering hand for:', currentPlayer);
+  // --- Card dealing animation state ---
+  const [handImagesLoaded, setHandImagesLoaded] = useState(false);
+  const [dealtCardCount, setDealtCardCount] = useState(0);
+  const handImageRefs = useRef<{ [key: string]: boolean }>({});
+  const dealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Preload card images when hand changes
+  useEffect(() => {
+    if (!currentPlayer || !currentPlayer.hand) {
+      setHandImagesLoaded(false);
+      setDealtCardCount(0);
+      handImageRefs.current = {};
+      return;
+    }
     const sortedHand = sortCards(currentPlayer.hand);
-    // Determine playable cards
+    let loadedCount = 0;
+    handImageRefs.current = {};
+    setHandImagesLoaded(false);
+    setDealtCardCount(0);
+    sortedHand.forEach((card) => {
+      const img = new window.Image();
+      img.src = `/cards/${getCardImage(card)}`;
+      img.onload = () => {
+        handImageRefs.current[`${card.suit}${card.rank}`] = true;
+        loadedCount++;
+        if (loadedCount === sortedHand.length) {
+          setHandImagesLoaded(true);
+        }
+      };
+      img.onerror = () => {
+        handImageRefs.current[`${card.suit}${card.rank}`] = false;
+        loadedCount++;
+        if (loadedCount === sortedHand.length) {
+          setHandImagesLoaded(true);
+        }
+      };
+    });
+    // Cleanup on hand change
+    return () => {
+      if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
+    };
+  }, [currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
+
+  // Animate dealing cards after images are loaded
+  useEffect(() => {
+    if (!handImagesLoaded || !currentPlayer || !currentPlayer.hand) return;
+    setDealtCardCount(0);
+    const sortedHand = sortCards(currentPlayer.hand);
+    function dealNext(idx: number) {
+      setDealtCardCount(idx + 1);
+      if (idx + 1 < sortedHand.length) {
+        dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 100);
+      }
+    }
+    dealTimeoutRef.current = setTimeout(() => dealNext(0), 100);
+    return () => {
+      if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
+    };
+  }, [handImagesLoaded, currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
+
+  const renderPlayerHand = () => {
+    if (!currentPlayer || !currentPlayer.hand) return null;
+    const sortedHand = sortCards(currentPlayer.hand);
+    if (!handImagesLoaded) {
+      return null;
+    }
+    // All cards are in their final positions, but only the first dealtCardCount are visible
     const isLeadingTrick = currentTrick.length === 0;
     const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
-    // Make cards bigger
     const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
     const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
     const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
@@ -693,29 +651,27 @@ export default function GameTable({
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: '-40px', // less off-screen
+          bottom: '-40px',
           pointerEvents: 'none',
         }}
       >
         <div className="flex">
           {sortedHand.map((card: Card, index: number) => {
-            console.log('Card in hand:', card); // Debug log
             const isPlayable = gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
               playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
-
+            const isVisible = index < dealtCardCount;
             return (
               <div
                 key={`${card.suit}${card.rank}`}
-                className={`relative transition-transform hover:-translate-y-4 hover:z-10 ${
-                  isPlayable ? 'cursor-pointer' : 'cursor-not-allowed'
-                }`}
+                className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                 style={{
                   width: `${cardUIWidth}px`,
                   height: `${cardUIHeight}px`,
                   marginLeft: index > 0 ? `${overlapOffset}px` : '0',
                   zIndex: index,
-                  pointerEvents: 'auto', // Make visible part clickable
+                  pointerEvents: 'auto',
+                  opacity: isVisible ? 1 : 0,
                 }}
                 onClick={() => isPlayable && handlePlayCard(card)}
               >
@@ -725,9 +681,7 @@ export default function GameTable({
                     alt={`${card.rank}${card.suit}`}
                     width={cardUIWidth}
                     height={cardUIHeight}
-                    className={`rounded-lg shadow-md ${
-                      isPlayable ? 'hover:shadow-lg' : ''
-                    }`}
+                    className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     style={{ objectFit: 'cover' }}
                   />
                   {!isPlayable && (
@@ -1110,6 +1064,12 @@ export default function GameTable({
     console.log('Sending system message:', systemMessage);
     socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
   };
+
+  // After: const [gameState, setGameState] = useState(game);
+  useEffect(() => {
+    console.log('[DEBUG] GameTable received new game prop:', game);
+    setGameState(game);
+  }, [game]);
 
   // Return the JSX for the component
   return (

@@ -351,9 +351,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.log(`User ${socket.userId} joined game ${gameId}`);
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
-      // Broadcast game update to all players in the room
-      io.to(gameId).emit('game_update', enrichGameForClient(game));
+      // Send game update ONLY to this socket, with hand
+      socket.emit('game_update', enrichGameForClient(game, socket.userId));
       // Notify all clients about games update
+      emitGameUpdateToPlayers(game);
       io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game:', error);
@@ -383,7 +384,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         game.players[playerIdx] = null;
         socket.leave(gameId);
         // Emit game_update to the game room for real-time sync
-        io.to(gameId).emit('game_update', enrichGameForClient(game));
+        emitGameUpdateToPlayers(game);
         io.emit('games_updated', games);
         console.log(`User ${userId} left game ${gameId}`);
       }
@@ -436,7 +437,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       game.isBotGame = !allHuman;
       game.status = 'BIDDING';
       // Dealer assignment and card dealing
-      const dealerIndex = assignDealer(game.players);
+      const dealerIndex = assignDealer(game.players, game.dealerIndex);
       game.dealerIndex = dealerIndex;
       // Assign dealer chip/flag for UI
       game.players.forEach((p, i) => {
@@ -466,8 +467,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         bidding: game.bidding,
       });
       // Emit game_update for client sync
-      io.to(game.id).emit('game_update', enrichGameForClient(game));
-      io.to(socket.id).emit('game_update', enrichGameForClient(game));
+      console.log('[DEBUG] Emitting game_update:', JSON.stringify(game, null, 2));
+      emitGameUpdateToPlayers(game);
     } catch (err) {
       console.error('Error in start_game handler:', err);
       socket.emit('error', { message: 'Failed to start game' });
@@ -503,21 +504,35 @@ io.engine.on('upgradeError', (err) => {
 });
 
 // Helper to enrich game object for client
-function enrichGameForClient(game: Game): Game {
+function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
   const hands = game.hands || [];
   const dealerIndex = game.dealerIndex;
+  // Find the index of the player with userId
+  const handIndex = userId ? (game.players || []).findIndex(p => p && p.id === userId) : -1;
   return {
     ...game,
     players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {
         ...p,
-        hand: hands[i] || [],
+        hand: userId && p.id === userId && handIndex !== -1 ? hands[handIndex] || [] : undefined,
         isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
       };
     })
   };
+}
+
+// Helper to emit game update to all players with their own hands
+function emitGameUpdateToPlayers(game: Game) {
+  game.players.forEach((player) => {
+    if (player && player.id) {
+      const playerSocket = authenticatedSockets.get(player.id);
+      if (playerSocket) {
+        playerSocket.emit('game_update', enrichGameForClient(game, player.id));
+      }
+    }
+  });
 }
 
 const PORT = Number(process.env.PORT) || 3000;

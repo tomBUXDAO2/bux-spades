@@ -72,6 +72,25 @@ export default function TablePage() {
     };
   }, [gameId, user, navigate, isSpectator]);
 
+  // Listen for game_update events and update local game state
+  useEffect(() => {
+    if (!socket) return;
+    const handleGameUpdate = (updatedGame: any) => {
+      setGame(updatedGame);
+    };
+    socket.on('game_update', handleGameUpdate);
+    return () => {
+      socket.off('game_update', handleGameUpdate);
+    };
+  }, [socket]);
+
+  // Ensure player always (re)joins the game room on socket connect or refresh
+  useEffect(() => {
+    if (socket && socket.connected && user && gameId) {
+      socket.emit('join_game', { gameId, userId: user.id });
+    }
+  }, [socket, user, gameId]);
+
   // Only join as a player if not spectating
   const handleJoinGame = async () => {
     if (!user || !gameId || isSpectator) return;

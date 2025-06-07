@@ -242,13 +242,16 @@ function shuffle(deck: Card[]): Card[] {
   return deck;
 }
 
-export function assignDealer(players: (GamePlayer | null)[]): number {
+export function assignDealer(players: (GamePlayer | null)[], previousDealerIndex?: number): number {
   const playerIndexes = players.map((p, i) => p ? i : null).filter((i): i is number => i !== null);
   if (playerIndexes.length === 0) {
     throw new Error('No valid players to assign dealer');
   }
-  const dealerIndex = playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
-  return dealerIndex;
+  if (previousDealerIndex !== undefined) {
+    const nextDealerIndex = (previousDealerIndex + 1) % 4;
+    return playerIndexes.includes(nextDealerIndex) ? nextDealerIndex : playerIndexes[0];
+  }
+  return playerIndexes[Math.floor(Math.random() * playerIndexes.length)];
 }
 
 export function dealCards(players: (GamePlayer | null)[], dealerIndex: number): Card[][] {
@@ -290,7 +293,7 @@ router.post('/:id/start', async (req, res) => {
   game.status = 'BIDDING';
   
   // --- Dealer assignment and card dealing ---
-  const dealerIndex = assignDealer(game.players);
+  const dealerIndex = assignDealer(game.players, game.dealerIndex);
   game.dealerIndex = dealerIndex;
   const hands = dealCards(game.players, dealerIndex);
   game.hands = hands;
