@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
@@ -131,9 +131,12 @@ app.use('/api/users', usersRoutes);
 app.use('/api/social', socialRoutes);
 
 // Add this at the end, after all routes
-app.use((err, req, res, next) => {
-  console.error('UNCAUGHT ERROR:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+// Error handling middleware
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    message: err.message || 'Something went wrong!',
+  });
 });
 
 // Socket.IO connection handling
@@ -479,14 +482,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.error('Error in start_game handler:', err);
       socket.emit('error', { message: 'Failed to start game' });
     }
-  });
-});
-
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    message: err.message || 'Something went wrong!',
   });
 });
 
