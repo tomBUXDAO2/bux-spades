@@ -26,6 +26,7 @@ const generateToken = (userId: string): string => {
 };
 
 export const register = async (req: Request, res: Response) => {
+  console.log('Register endpoint hit', req.body); // Log when register is hit
   try {
     const { username, email, password } = registerSchema.parse(req.body);
 
@@ -89,8 +90,7 @@ export const register = async (req: Request, res: Response) => {
         errors: error.errors,
       });
     }
-
-    console.error('Registration error:', error);
+    console.error('Registration error:', error); // Log all errors
     res.status(500).json({
       message: 'Internal server error',
     });
@@ -98,6 +98,7 @@ export const register = async (req: Request, res: Response) => {
 };
 
 export const login = async (req: Request, res: Response) => {
+  console.log('Login endpoint hit', req.body); // Log when login is hit
   try {
     const { email, password } = loginSchema.parse(req.body);
 
@@ -147,8 +148,7 @@ export const login = async (req: Request, res: Response) => {
         errors: error.errors,
       });
     }
-
-    console.error('Login error:', error);
+    console.error('Login error:', error); // Log all errors
     res.status(500).json({
       message: 'Internal server error',
     });

@@ -130,6 +130,12 @@ app.use('/api/games', gamesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/social', socialRoutes);
 
+// Add this at the end, after all routes
+app.use((err, req, res, next) => {
+  console.error('UNCAUGHT ERROR:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
 // Socket.IO connection handling
 io.use((socket: AuthenticatedSocket, next) => {
   const auth = socket.handshake.auth;
