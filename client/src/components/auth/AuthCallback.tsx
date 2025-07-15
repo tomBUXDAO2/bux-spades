@@ -28,7 +28,7 @@ const AuthCallback: React.FC = () => {
 
     const token = searchParams.get('token');
     if (token) {
-      localStorage.setItem('token', token);
+      localStorage.setItem('sessionToken', token);
       fetchUserProfile(token);
     } else {
       navigate('/login', { replace: true });

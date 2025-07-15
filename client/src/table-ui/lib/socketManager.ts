@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
 // Get the socket URL from environment variables or use default
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
 // Add SocketState interface
 interface SocketState {
