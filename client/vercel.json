@@ -7,10 +7,13 @@
     {
       "source": "/ws/:path*",
       "destination": "https://bux-spades-server.fly.dev/ws/:path*"
-    },
+    }
+  ],
+  "redirects": [
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/((?!api|ws|_next|static|favicon.ico).*)",
+      "destination": "/",
+      "permanent": false
     }
   ],
   "headers": [
