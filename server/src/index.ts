@@ -12,7 +12,7 @@ import { PrismaClient } from '@prisma/client';
 
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { games, assignDealer, dealCards } from './routes/games.routes';
+import gamesRoutes, { games, assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
@@ -478,10 +478,172 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit game_update for client sync
       console.log('[DEBUG] Emitting game_update:', JSON.stringify(game, null, 2));
       emitGameUpdateToPlayers(game);
+      // --- FIX: If first bidder is a bot, trigger bot bidding immediately ---
+      if (firstBidder.type === 'bot') {
+        console.log('[DEBUG] (SOCKET) About to call botMakeMove for seat', (dealerIndex + 1) % 4, 'bot:', firstBidder.username);
+        botMakeMove(game, (dealerIndex + 1) % 4);
+      }
     } catch (err) {
       console.error('Error in start_game handler:', err);
       socket.emit('error', { message: 'Failed to start game' });
     }
+  });
+
+  socket.on('make_bid', ({ gameId, userId, bid }) => {
+    const game = games.find(g => g.id === gameId);
+    if (!game || !game.bidding) return;
+    const playerIndex = game.players.findIndex(p => p && p.id === userId);
+    console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, playerIndex, currentBidderIndex: game.bidding.currentBidderIndex, bids: game.bidding.bids });
+    if (playerIndex === -1) {
+      console.log('[BID DEBUG] Bid rejected: player not found');
+      return;
+    }
+    if (playerIndex !== game.bidding.currentBidderIndex) {
+      console.log('[BID DEBUG] Bid rejected: not player turn', { playerIndex, currentBidderIndex: game.bidding.currentBidderIndex });
+      return; // Not their turn
+    }
+    if (game.bidding.bids[playerIndex] !== null) {
+      console.log('[BID DEBUG] Bid rejected: already bid', { playerIndex });
+      return; // Already bid
+    }
+    // Store the bid
+    game.bidding.bids[playerIndex] = bid;
+    // Find next player who hasn't bid
+    let next = (playerIndex + 1) % 4;
+    while (game.bidding.bids[next] !== null && next !== playerIndex) {
+      next = (next + 1) % 4;
+    }
+    if (game.bidding.bids.every(b => b !== null)) {
+      // All bids in, move to play phase
+      if (typeof game.dealerIndex !== 'number') {
+        socket.emit('error', { message: 'Invalid game state: no dealer assigned' });
+        return;
+      }
+      const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
+      if (!firstPlayer) {
+        socket.emit('error', { message: 'Invalid game state' });
+        return;
+      } else {
+        // --- Play phase state ---
+        game.status = 'PLAYING';
+        game.play = {
+          currentPlayer: firstPlayer?.id || '',
+          currentPlayerIndex: (game.dealerIndex + 1) % 4,
+          currentTrick: [],
+          tricks: [],
+          trickNumber: 0
+        };
+        // Emit game_update for client sync
+        emitGameUpdateToPlayers(game);
+      }
+      io.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
+      io.to(game.id).emit('play_start', {
+        currentPlayerIndex: game.play.currentPlayerIndex,
+        currentTrick: game.play.currentTrick,
+        trickNumber: game.play.trickNumber,
+      });
+      // If first player is a bot, trigger bot card play
+      if (firstPlayer.type === 'bot') {
+        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
+        botPlayCard(game, (game.dealerIndex + 1) % 4);
+      }
+    } else {
+      game.bidding.currentBidderIndex = next;
+      game.bidding.currentPlayer = game.players[next]?.id ?? '';
+      io.to(game.id).emit('bidding_update', {
+        currentBidderIndex: next,
+        bids: game.bidding.bids,
+      });
+      // If next is a bot, trigger their move
+      if (game.players[next] && game.players[next].type === 'bot') {
+        botMakeMove(game, next);
+      }
+    }
+  });
+
+  socket.on('play_card', ({ gameId, userId, card }) => {
+    const game = games.find(g => g.id === gameId);
+    if (!game || !game.play || !game.hands || !game.bidding) {
+      socket.emit('error', { message: 'Invalid game state' });
+      return;
+    }
+    const playerIndex = game.players.findIndex(p => p && p.id === userId);
+    if (playerIndex === -1) {
+      socket.emit('error', { message: 'Player not found in game' });
+      return;
+    }
+    if (playerIndex !== game.play.currentPlayerIndex) {
+      socket.emit('error', { message: 'Not your turn' });
+      return;
+    }
+    // Validate card is in player's hand
+    const hand = game.hands[playerIndex];
+    if (!hand) {
+      socket.emit('error', { message: 'Invalid hand state' });
+      return;
+    }
+    const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
+    if (cardIndex === -1) {
+      socket.emit('error', { message: 'Card not in hand' });
+      return;
+    }
+    // Remove card from hand and add to current trick
+    hand.splice(cardIndex, 1);
+    game.play.currentTrick.push({ ...card, playerIndex });
+    // If trick is complete (4 cards)
+    if (game.play.currentTrick.length === 4) {
+      // Determine winner of the trick
+      const winnerIndex = determineTrickWinner(game.play.currentTrick);
+      if (winnerIndex === undefined) {
+        socket.emit('error', { message: 'Invalid trick state' });
+        return;
+      }
+      game.play.tricks.push({
+        cards: game.play.currentTrick,
+        winnerIndex,
+      });
+      game.play.currentTrick = [];
+      game.play.trickNumber += 1;
+      game.play.currentPlayerIndex = winnerIndex;
+      game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
+      // Emit trick complete
+      io.to(game.id).emit('trick_complete', {
+        trick: game.play.tricks[game.play.tricks.length - 1],
+        trickNumber: game.play.trickNumber,
+      });
+      emitGameUpdateToPlayers(game);
+      // If all tricks played, move to hand summary/scoring
+      if (game.play.trickNumber === 13) {
+        // ... existing code ...
+      } else {
+        // If next player is a bot, trigger their move
+        const nextPlayer = game.players[winnerIndex];
+        if (nextPlayer && nextPlayer.type === 'bot') {
+          console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', winnerIndex, 'bot:', nextPlayer.username);
+          botPlayCard(game, winnerIndex);
+        }
+      }
+      return;
+    } else {
+      // Advance to next player
+      game.play.currentPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
+      game.play.currentPlayer = game.players[game.play.currentPlayerIndex]?.id ?? '';
+      // If next player is a bot, trigger their move
+      const nextPlayer = game.players[game.play.currentPlayerIndex];
+      if (nextPlayer) {
+        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', game.play.currentPlayerIndex, 'bot:', nextPlayer.username);
+        botPlayCard(game, game.play.currentPlayerIndex);
+      }
+    }
+    io.to(game.id).emit('play_update', {
+      currentPlayerIndex: game.play.currentPlayerIndex,
+      currentTrick: game.play.currentTrick,
+      hands: game.hands.map((h, i) => ({
+        playerId: game.players[i]?.id,
+        handCount: h.length,
+      })),
+    });
+    emitGameUpdateToPlayers(game);
   });
 });
 
@@ -509,15 +671,23 @@ function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
   const hands = game.hands || [];
   const dealerIndex = game.dealerIndex;
-  // Find the index of the player with userId
-  const handIndex = userId ? (game.players || []).findIndex(p => p && p.id === userId) : -1;
+
+  // Patch: Always set top-level currentPlayer for frontend
+  let currentPlayer: string | undefined = undefined;
+  if (game.status === 'BIDDING' && game.bidding) {
+    currentPlayer = game.bidding.currentPlayer ?? '';
+  } else if (game.status === 'PLAYING' && game.play) {
+    currentPlayer = game.play.currentPlayer ?? '';
+  }
+
   return {
     ...game,
+    currentPlayer, // Always present for frontend
     players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {
         ...p,
-        hand: userId && p.id === userId && handIndex !== -1 ? hands[handIndex] || [] : undefined,
+        hand: userId && p.id === userId ? hands[i] || [] : undefined,
         isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
       };
     })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getSocketManager } from '../table-ui/lib/socketManager';
@@ -81,6 +81,70 @@ export default function TablePage() {
     socket.on('game_update', handleGameUpdate);
     return () => {
       socket.off('game_update', handleGameUpdate);
+    };
+  }, [socket]);
+
+  // Listen for bidding_update events and update only the bidding part of the game state
+  useEffect(() => {
+    if (!socket) return;
+    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
+      setGame(prev => prev ? ({
+        ...prev,
+        bidding: {
+          ...prev.bidding,
+          currentBidderIndex: bidding.currentBidderIndex,
+          currentPlayer: prev.players[bidding.currentBidderIndex]?.id ?? '',
+          bids: bidding.bids,
+        },
+        // --- FIX: Also update root-level currentPlayer! ---
+        currentPlayer: prev.players[bidding.currentBidderIndex]?.id ?? '',
+      }) : prev);
+    };
+    socket.on('bidding_update', handleBiddingUpdate);
+    return () => {
+      socket.off('bidding_update', handleBiddingUpdate);
+    };
+  }, [socket]);
+
+  const playCardSound = () => {
+    try {
+      const audio = new Audio('/sounds/card.wav');
+      audio.volume = 0.3;
+      audio.play().catch(err => console.log('Audio play failed:', err));
+    } catch (error) {
+      console.log('Audio not supported or failed to load:', error);
+    }
+  };
+
+  const lastTrickLengthRef = useRef(0);
+
+  // Listen for play_update events and update play state
+  useEffect(() => {
+    if (!socket) return;
+    const handlePlayUpdate = (data: { currentPlayerIndex: number, currentTrick: any[], hands: any[] }) => {
+      // Play card sound if a new card is played
+      if (Array.isArray(data.currentTrick)) {
+        if (data.currentTrick.length > lastTrickLengthRef.current) {
+          playCardSound();
+        }
+        lastTrickLengthRef.current = data.currentTrick.length;
+      }
+      setGame(prev => prev ? ({
+        ...prev,
+        play: {
+          ...prev.play,
+          currentTrick: data.currentTrick,
+        },
+        hands: prev.hands?.map((h, i) => {
+          // Optionally update hand counts if needed
+          return h;
+        }) ?? prev.hands,
+        // Don't update currentPlayer from play_update - let game_update handle that
+      }) : prev);
+    };
+    socket.on('play_update', handlePlayUpdate);
+    return () => {
+      socket.off('play_update', handlePlayUpdate);
     };
   }, [socket]);
 

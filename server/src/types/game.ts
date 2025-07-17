@@ -74,4 +74,5 @@ export interface Game {
   team1Bags?: number;
   team2Bags?: number;
   winningTeam?: 'team1' | 'team2';
+  currentPlayer?: string;
 } 

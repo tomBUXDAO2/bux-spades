@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { GameState, Card, Suit, Player, CompletedTrick, Bot } from '../../types/game';
+import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
@@ -15,6 +15,40 @@ import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
+import StartGameWarningModal from '../modals/StartGameWarningModal';
+
+// Sound utility for dealing cards
+const playCardSound = () => {
+  try {
+    const audio = new Audio('/sounds/card.wav'); // Use public/sounds/card.wav
+    audio.volume = 0.3;
+    audio.play().catch(err => console.log('Audio play failed:', err));
+  } catch (error) {
+    console.log('Audio not supported or failed to load:', error);
+  }
+};
+
+// Sound utility for bid
+const playBidSound = () => {
+  try {
+    const audio = new Audio('/sounds/bid.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(err => console.log('Audio play failed:', err));
+  } catch (error) {
+    console.log('Audio not supported or failed to load:', error);
+  }
+};
+
+// Sound utility for win
+const playWinSound = () => {
+  try {
+    const audio = new Audio('/sounds/win.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(err => console.log('Audio play failed:', err));
+  } catch (error) {
+    console.log('Audio not supported or failed to load:', error);
+  }
+};
 
 interface GameTableProps {
   game: GameState;
@@ -76,8 +110,9 @@ function sortCards(cards: Card[]): Card[] {
 }
 
 // Add new helper functions after the existing ones
-function getLeadSuit(trick: Card[]): Suit | null {
-  return trick[0]?.suit || null;
+function getLeadSuit(trick: Card[] | undefined): Suit | null {
+  if (!Array.isArray(trick) || trick.length === 0) return null;
+  return trick[0].suit;
 }
 
 function hasSpadeBeenPlayed(game: GameState): boolean {
@@ -94,8 +129,8 @@ function canLeadSpades(game: GameState, hand: Card[]): boolean {
   return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === '♠');
 }
 
-function getPlayableCards(game: GameState, hand: Card[], isLeadingTrick: boolean): Card[] {
-  if (!hand.length) return [];
+function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean): Card[] {
+  if (!Array.isArray(hand) || !hand.length) return [];
 
   // If leading the trick
   if (isLeadingTrick) {
@@ -182,25 +217,32 @@ export default function GameTable({
   startGame,
   user: propUser
 }: GameTableProps) {
+  // Add dummy handlePlayAgain to fix missing reference error
+  const handlePlayAgain = () => window.location.reload();
+  // Restore user assignment
+  const user = propUser;
   const { socket, isAuthenticated } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
+  const [showStartWarning, setShowStartWarning] = useState(false);
+  const [pendingStartWithBots, setPendingStartWithBots] = useState(false);
+  const [dealingComplete, setDealingComplete] = useState(false);
+  const [biddingReady, setBiddingReady] = useState(false);
   
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
-  // Add state to directly track which player played which card
-  const [cardPlayers, setCardPlayers] = useState<{[key: string]: string}>({});
-  
-  const user = propUser;
-  
   // Use gameState for all game data
   const [gameState, setGameState] = useState(game);
   
-  // Use gameState instead of game
-  const currentTrick = gameState.currentTrick || [];
+  // Add debug logs for hand mapping
+  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+  const myHand = Array.isArray((gameState as any).hands) && myPlayerIndex >= 0 ? (gameState as any).hands[myPlayerIndex] : [];
+  console.log('myPlayerIndex:', myPlayerIndex);
+  console.log('gameState.hands:', (gameState as any).hands);
+  console.log('myHand:', myHand);
   
   // Find the current player's ID
   const currentPlayerId = user?.id;
@@ -282,6 +324,7 @@ export default function GameTable({
     setIsMobile(windowSize.isMobile);
   }, [windowSize.isMobile]);
 
+  // Modified handleBid to play sound
   const handleBid = (bid: number) => {
     if (!currentPlayerId || !currentPlayer) {
       console.error('Cannot bid: No current player or player ID');
@@ -300,14 +343,21 @@ export default function GameTable({
       return;
     }
     
-    console.log(`Submitting bid: ${bid} for player ${currentPlayerId} in game ${gameState.id}`);
-    socket?.emit("make_bid", { gameId: gameState.id, userId: currentPlayerId, bid });
+    playBidSound();
+    const payload = { gameId: gameState.id, userId: currentPlayerId, bid };
+    console.log('[BID DEBUG] About to emit make_bid:', payload, 'Socket connected:', socket?.connected);
+    socket?.emit("make_bid", payload);
+    console.log('[BID DEBUG] make_bid emitted:', payload);
     console.log('Game status:', gameState.status, 'Current player:', gameState.currentPlayer);
     console.log('Socket connected:', socket?.connected);
   };
 
   // Add at the top of the GameTable component, after useState declarations
   const [invitingBotSeat, setInvitingBotSeat] = useState<number | null>(null);
+  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
+  const prevBidsRef = useRef<(number|null)[] | null>(null);
+  const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
+  const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
 
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
@@ -331,7 +381,9 @@ export default function GameTable({
         const updatedGame = await res.json();
         console.log('Bot invited successfully:', updatedGame);
         setGameState(updatedGame);
-        setPendingSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
+        if (typeof setPendingSystemMessage === 'function') {
+          setPendingSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
+        }
       }
     } catch (err) {
       console.error('Error inviting bot:', err);
@@ -449,11 +501,11 @@ export default function GameTable({
       : redTeamGradient;
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
-    const bidCount = player.bid !== undefined ? player.bid : 0;
+    const bidCount = (gameState as any).bidding?.bids?.[position] ?? 0;
     let madeStatus = null;
-    const tricksLeft = 13 - (gameState.completedTricks?.length || 0);
-    const isPartnerGame = (gameState.gameMode || gameState.rules?.gameType) === 'PARTNERS';
-    const isSoloGame = (gameState.gameMode || gameState.rules?.gameType) === 'SOLO';
+    const tricksLeft = 13 - ((gameState as any).completedTricks?.length || 0);
+    const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
+    const isSoloGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'SOLO';
     // Find partner (for 4p, partner is (position+2)%4)
     let teamBid = bidCount;
     let teamMade = madeCount;
@@ -503,6 +555,11 @@ export default function GameTable({
         return sanitizedPlayers[partnerIndex]?.id === currentPlayerId;
       }
     })();
+    // After rendering the player avatar/info, render the played card if any
+    // const playedCard = player ? getPlayedCardForPlayer(player.id) : null;
+    const isHuman = player?.type === 'human';
+    const displayName = isHuman ? player.username : 'Bot';
+    const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
@@ -515,8 +572,8 @@ export default function GameTable({
               <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
                 <div className="bg-gray-900 rounded-full p-0.5">
                   <img
-                    src={player.avatar || '/bot-avatar.jpg'}
-                    alt="Bot"
+                    src={displayAvatar}
+                    alt={displayName}
                     width={avatarWidth}
                     height={avatarHeight}
                     className="rounded-full object-cover"
@@ -550,7 +607,7 @@ export default function GameTable({
             <div className="flex flex-col items-center gap-1">
               <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                 <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
-                  Bot
+                  {displayName}
                 </div>
               </div>
               {/* Bid/Trick counter for bots, same as humans */}
@@ -568,6 +625,15 @@ export default function GameTable({
                 </span>
               </div>
             </div>
+            {/* playedCard && (
+              <div className="flex justify-center mt-2">
+                <img
+                  src={`/cards/${getCardImage(playedCard)}`}
+                  alt={`${playedCard.rank} of ${playedCard.suit}`}
+                  style={{ width: 60, height: 90, objectFit: 'contain', borderRadius: 8, boxShadow: '0 2px 8px #0004' }}
+                />
+              </div>
+            ) */}
           </div>
         </div>
       </div>
@@ -619,33 +685,138 @@ export default function GameTable({
 
   // Animate dealing cards after images are loaded
   useEffect(() => {
-    if (!handImagesLoaded || !currentPlayer || !currentPlayer.hand) return;
+    if (!handImagesLoaded || !currentPlayer || !currentPlayer.hand || gameState.status !== 'BIDDING') return;
     setDealtCardCount(0);
+    setDealingComplete(false);
     const sortedHand = sortCards(currentPlayer.hand);
+    
     function dealNext(idx: number) {
       setDealtCardCount(idx + 1);
+      playCardSound();
+      
       if (idx + 1 < sortedHand.length) {
         dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 100);
+      } else {
+        // Dealing animation complete - wait 1 second before allowing bidding
+        setTimeout(() => setDealingComplete(true), 1000);
       }
     }
-    dealTimeoutRef.current = setTimeout(() => dealNext(0), 100);
+    dealTimeoutRef.current = setTimeout(() => dealNext(0), 10);
     return () => {
       if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
     };
-  }, [handImagesLoaded, currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
+  }, [handImagesLoaded, gameState.status, currentPlayer?.id]);
+
+  // When the game status changes to PLAYING, show all cards immediately
+  useEffect(() => {
+    if (gameState.status === 'PLAYING') {
+      setDealtCardCount(myHand.length);
+      setDealingComplete(true); // Allow immediate play in PLAYING phase
+    }
+  }, [gameState.status, myHand.length]);
+
+  // Reset dealing complete when game status changes to BIDDING
+  useEffect(() => {
+    if (gameState.status === 'BIDDING') {
+      setDealingComplete(false); // Reset for new hand
+    }
+  }, [gameState.status]);
+
+  // After dealing animation completes, add a 2s delay before enabling bidding
+  useEffect(() => {
+    if (dealingComplete && gameState.status === 'BIDDING') {
+      console.log('[DEBUG] Dealing complete. Starting 2s bidding delay...');
+      setBiddingReady(false);
+      const timer = setTimeout(() => {
+        console.log('[DEBUG] Bidding ready set to true after 2s delay.');
+        setBiddingReady(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setBiddingReady(false);
+    }
+  }, [dealingComplete, gameState.status]);
+
+  useEffect(() => {
+    if (
+      gameState.status === 'BIDDING' &&
+      dealingComplete &&
+      biddingReady &&
+      currentPlayer &&
+      isBot(currentPlayer) &&
+      gameState.currentPlayer === currentPlayer.id &&
+      typeof (gameState as any).bidding?.bids?.[currentPlayer.position] === 'undefined'
+    ) {
+      console.log('[DEBUG] Bot bidding triggered:', {
+        dealingComplete,
+        biddingReady,
+        currentPlayer,
+        currentPlayerId: currentPlayer.id,
+        bids: (gameState as any).bidding?.bids
+      });
+      // Add a random delay between 1 and 1.5 seconds
+      const delay = 1000 + Math.random() * 500;
+      const botBidTimeout = setTimeout(() => {
+        console.log('[DEBUG] Bot is making a bid after delay:', { delay, botId: currentPlayer.id });
+        // Choose a simple bot bid (random or always 4 for now)
+        const botBid = 4; // TODO: Replace with smarter logic if needed
+        playBidSound();
+        const payload = { gameId: gameState.id, userId: currentPlayer.id, bid: botBid };
+        socket?.emit("make_bid", payload);
+      }, delay);
+      return () => clearTimeout(botBidTimeout);
+    }
+  }, [gameState.status, dealingComplete, biddingReady, currentPlayer, gameState.currentPlayer, (gameState as any).bidding?.bids, socket]);
+
+  // Play bid sound for any new bid (human or bot)
+  useEffect(() => {
+    const bids = (gameState as any)?.bidding?.bids;
+    if (!Array.isArray(bids)) return;
+    const prevBids = prevBidsRef.current;
+    if (prevBids) {
+      for (let i = 0; i < bids.length; i++) {
+        if (prevBids[i] === null && typeof bids[i] === 'number') {
+          playBidSound();
+          break; // Only play once per update
+        }
+      }
+    }
+    prevBidsRef.current = bids.slice();
+  }, [(gameState as any)?.bidding?.bids]);
 
   const renderPlayerHand = () => {
-    if (!currentPlayer || !currentPlayer.hand) return null;
-    const sortedHand = sortCards(currentPlayer.hand);
-    if (!handImagesLoaded) {
-      return null;
-    }
-    // All cards are in their final positions, but only the first dealtCardCount are visible
+    console.log('[DEBUG] renderPlayerHand called', { myHand, handImagesLoaded, gameStateStatus: gameState.status });
+    if (!myHand || myHand.length === 0) return null;
+    const sortedHand = sortCards(myHand);
     const isLeadingTrick = currentTrick.length === 0;
-    const playableCards = gameState.status === "PLAYING" && currentPlayer ? getPlayableCards(gameState, currentPlayer.hand || [], isLeadingTrick) : [];
+    const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick) : [];
+    // --- FIX: If it's your turn and playableCards is empty, allow all cards ---
+    const isMyTurn = gameState.status === "PLAYING" && gameState.currentPlayer === currentPlayerId;
+    // Only log if these exist
+    if (typeof playableCards !== 'undefined' && typeof myHand !== 'undefined') {
+      console.log('[DEBUG] isMyTurn:', isMyTurn);
+      console.log('[DEBUG] playableCards:', playableCards);
+      console.log('[DEBUG] myHand:', myHand);
+    }
+    // Defensive: only use myHand and playableCards if defined
+    let effectivePlayableCards: typeof myHand = [];
+    if (isMyTurn && Array.isArray(playableCards) && playableCards.length === 0 && Array.isArray(myHand)) {
+      console.warn('[DEBUG] No playable cards detected, allowing all cards for debugging.');
+      effectivePlayableCards = myHand;
+    } else if (Array.isArray(playableCards)) {
+      effectivePlayableCards = playableCards;
+    }
     const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
     const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
     const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
+
+    // --- FIX: Always show all cards in PLAYING phase ---
+    const showAllCards = gameState.status === 'PLAYING';
+    const visibleCount = showAllCards ? sortedHand.length : dealtCardCount;
+
+    console.log('[DEBUG] isMyTurn:', isMyTurn);
+    console.log('[DEBUG] playableCards:', playableCards);
+    console.log('[DEBUG] myHand:', myHand);
 
     return (
       <div
@@ -659,12 +830,12 @@ export default function GameTable({
           {sortedHand.map((card: Card, index: number) => {
             const isPlayable = gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
-              playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
-            const isVisible = index < dealtCardCount;
+              effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
+            const isVisible = index < visibleCount;
             return (
               <div
                 key={`${card.suit}${card.rank}`}
-                className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer hover:z-20 hover:-translate-y-5 hover:shadow-lg' : 'cursor-not-allowed'} ${!isPlayable && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
                 style={{
                   width: `${cardUIWidth}px`,
                   height: `${cardUIHeight}px`,
@@ -684,7 +855,7 @@ export default function GameTable({
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     style={{ objectFit: 'cover' }}
                   />
-                  {!isPlayable && (
+                  {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
                   )}
                 </div>
@@ -718,7 +889,7 @@ export default function GameTable({
     socket.on('hand_completed', handleHandCompleted);
     
     // Handle scoring state change directly in case the server doesn't emit the event
-    if (gameState.status === "PLAYING" && (sanitizedPlayers.filter(isPlayer) as Player[]).every((p) => p.hand.length === 0) && !showHandSummary) {
+    if (gameState.status === "PLAYING" && (sanitizedPlayers.filter(isPlayer) as Player[]).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && !showHandSummary) {
       handleHandCompleted();
     }
     
@@ -743,7 +914,7 @@ export default function GameTable({
   // Update cardPlayers when game state changes
   useEffect(() => {
     if (gameState.cardPlayers) {
-      setCardPlayers(gameState.cardPlayers);
+      // setCardPlayers(gameState.cardPlayers); // This line is removed
     }
   }, [gameState.cardPlayers]);
 
@@ -801,214 +972,65 @@ export default function GameTable({
     };
   }, [showGameInfo]);
 
-  // Modify the renderTrickCards function
+  // --- Trick card rendering on the table, not inside player info ---
   const renderTrickCards = () => {
-    // Use completed trick if available, otherwise use current trick
-    const displayTrick = completedTrick ? completedTrick.cards : currentTrick;
-    if (!displayTrick?.length) return null;
+    // Use animated trick cards during animation, otherwise use current trick
+    let displayTrick = animatingTrick ? animatedTrickCards : ((gameState as any)?.play?.currentTrick || []);
+    if (!displayTrick.length && lastNonEmptyTrick.length) {
+      displayTrick = lastNonEmptyTrick;
+    }
+    if (!displayTrick.length) return null;
 
-    return displayTrick.map((card: Card, index: number) => {
-      if (!card.playedBy) {
-        console.error(`Card ${card.rank}${card.suit} is missing playedBy information`);
-        return null;
-      }
+    // Table positions: 0 = South (you), 1 = West, 2 = North, 3 = East
+    const positions: Record<number, string> = {
+      0: 'absolute bottom-[20%] left-1/2 -translate-x-1/2',  // South
+      1: 'absolute left-[20%] top-1/2 -translate-y-1/2',     // West
+      2: 'absolute top-[20%] left-1/2 -translate-x-1/2',     // North
+      3: 'absolute right-[20%] top-1/2 -translate-y-1/2'     // East
+    };
 
-      const relativePosition = (4 + card.playedBy.position - (currentPlayerPosition ?? 0)) % 4;
+    // Always build seat order by player.position
+    const seatOrderedPlayers = [...gameState.players].sort((a, b) => (a && b ? a.position - b.position : 0));
+    const myPlayerId = user?.id;
+    const mySeatIndex = seatOrderedPlayers.findIndex(p => p && p.id === myPlayerId);
+    const orderedPlayers = [0,1,2,3].map(i => seatOrderedPlayers[(mySeatIndex + i) % 4]);
 
-      const positions: Record<number, string> = windowSize.width < 640 ? {
-        0: 'absolute bottom-16 left-1/2 transform -translate-x-1/2',
-        1: 'absolute left-8 top-1/2 transform -translate-y-1/2',
-        2: 'absolute top-16 left-1/2 transform -translate-x-1/2',
-        3: 'absolute right-8 top-1/2 transform -translate-y-1/2'
-      } : {
-        0: 'absolute bottom-[20%] left-1/2 transform -translate-x-1/2',
-        1: 'absolute left-[20%] top-1/2 transform -translate-y-1/2',
-        2: 'absolute top-[20%] left-1/2 transform -translate-x-1/2',
-        3: 'absolute right-[20%] top-1/2 transform -translate-y-1/2'
-      };
-
-      const isWinningCard = completedTrick && 
-        card.suit === completedTrick.winningCard.suit && 
-        card.rank === completedTrick.winningCard.rank;
-
-      // Calculate card dimensions using the same approach as player's hand
-      const cardUIWidth = windowSize.width < 640 ? 25 : Math.floor(96 * getScaleFactor());
-      const cardUIHeight = windowSize.width < 640 ? 38 : Math.floor(144 * getScaleFactor());
-
+    return displayTrick.map((card: Card, i: number) => {
+      const seatIndex = (card as any).playerIndex;
+      const displayPosition = orderedPlayers.findIndex(p => p && p.position === seatIndex);
+      if (displayPosition === -1 || displayPosition === undefined) return null;
+      
+      // Check if this card is the winning card
+      const isWinningCard = animatingTrick && trickWinner !== null && seatIndex === trickWinner;
+      
       return (
         <div
-          key={`${card.suit}-${card.rank}-${index}`}
-          className={`${positions[relativePosition]} z-10 transition-all duration-500
-            ${isWinningCard ? 'ring-2 ring-yellow-400 scale-110 z-20' : ''}`}
-          style={{
-            width: `${cardUIWidth}px`,
-            height: `${cardUIHeight}px`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 'unset'
-          }}
+          key={`${card.suit}-${card.rank}-${i}`}
+          className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
+          style={{ pointerEvents: 'none' }}
         >
           <img
             src={`/cards/${getCardImage(card)}`}
             alt={`${card.rank} of ${card.suit}`}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain'
+            className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
+            style={{ 
+              width: 70, 
+              height: 100, 
+              objectFit: 'contain', 
+              borderRadius: 8, 
+              boxShadow: isWinningCard ? '0 0 20px 4px gold' : '0 2px 8px #0004',
+              zIndex: isWinningCard ? 30 : 20
             }}
           />
           {isWinningCard && (
-            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 
-              bg-yellow-400 text-black font-bold rounded-full px-3 py-1
-              animate-bounce">
-              +1
+            <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
+              ✓
             </div>
           )}
         </div>
       );
-    }).filter(Boolean);
-  };
-
-  const handlePlayAgain = () => {
-    if (!socket) return;
-    socket.emit('play_again', { gameId: gameState.id });
-  };
-
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('player_wants_to_play_again', (data: { playerId: string }) => {
-      setCardPlayers(prev => ({ ...prev, [data.playerId]: data.playerId }));
-    });
-
-    socket.on('game_restarting', () => {
-      setCardPlayers({});
-      setShowHandSummary(false);
-      setShowWinner(false);
-      setShowLoser(false);
-      if (socket) {
-        socket.emit('leave_game', { gameId: gameState.id, userId: propUser?.id });
-      }
-      onLeaveTable();
-    });
-
-    return () => {
-      socket.off('player_wants_to_play_again');
-      socket.off('game_restarting');
-    };
-  }, [socket, propUser?.id, onLeaveTable]);
-
-  // Add state for trick completion animation
-  const [completedTrick, setCompletedTrick] = useState<CompletedTrick | null>(null);
-
-  // Effect to handle trick completion
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleTrickComplete = (data: CompletedTrick) => {
-      setCompletedTrick(data);
-      
-      // Clear completed trick after delay
-      const timer = setTimeout(() => {
-        setCompletedTrick(null);
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    };
-
-    socket.on('trick_complete', handleTrickComplete);
-
-    return () => {
-      socket.off('trick_complete', handleTrickComplete);
-    };
-  }, [socket]);
-
-  // When playing a card, we now rely solely on server data for tracking
-  const handlePlayCard = (card: Card) => {
-    if (!socket || !currentPlayerId || !currentPlayer) return;
-
-    // Validate if it's player's turn
-    if (gameState.currentPlayer !== currentPlayerId) {
-      console.error(`Cannot play card: Not your turn`);
-      return;
-    }
-
-    // Check if card is playable
-    const isLeadingTrick = currentTrick.length === 0;
-    const playableCards = currentPlayer ? getPlayableCards(gameState, currentPlayer.hand, isLeadingTrick) : [];
-    if (!playableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) {
-      console.error('This card is not playable in the current context');
-      return;
-    }
-
-    console.log(`Playing card: ${card.rank}${card.suit} as player ${isPlayer(currentPlayer) ? currentPlayer.name : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}`);
-    
-    // Update our local tracking immediately to know that current player played this card
-    // This helps prevent the "Unknown" player issue when we play our own card
-    const updatedMapping = { ...cardPlayers };
-    updatedMapping[currentTrick.length.toString()] = currentPlayerId;
-    setCardPlayers(updatedMapping);
-    
-    // Send the play to the server
-    socket.emit("play_card", { 
-      gameId: gameState.id, 
-      userId: currentPlayerId, 
-      card 
     });
   };
-
-  const handleLeaveTable = () => {
-    console.log("Leave Table clicked");
-    console.log("Socket connected:", socket?.connected);
-    if (socket) {
-      socket.emit('leave_game', { gameId: gameState.id, userId: currentPlayerId });
-    } else {
-      console.error("Socket is undefined. Cannot emit leave_game event.");
-    }
-    onLeaveTable();
-  };
-
-  const handleStartGame = async () => {
-    if (!currentPlayerId) return;
-    
-    // Make sure the game is in the WAITING state
-    if (gameState.status !== "WAITING") {
-      console.error(`Cannot start game: game is in ${gameState.status} state, not WAITING`);
-      return;
-    }
-    
-    // Make sure the game has enough players
-    if (sanitizedPlayers.length < 4) {
-      console.error(`Cannot start game: only ${sanitizedPlayers.length}/4 players joined`);
-      return;
-    }
-    
-    // Make sure current user is the creator (first player)
-    if (sanitizedPlayers[0]?.id !== currentPlayerId) {
-      console.error(`Cannot start game: current user ${currentPlayerId} is not the creator ${sanitizedPlayers[0]?.id}`);
-      return;
-    }
-    
-    try {
-      console.log(`Starting game ${gameState.id} as user ${currentPlayerId}, creator: ${sanitizedPlayers[0]?.id}`);
-      await startGame(gameState.id, currentPlayerId);
-      setPendingSystemMessage('Game started! GOOD LUCK!');
-    } catch (error) {
-      console.error("Failed to start game:", error);
-    }
-  };
-
-  // At the top of the component:
-  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
-
-  // Add this useEffect:
-  useEffect(() => {
-    if (pendingSystemMessage && socket && isAuthenticated) {
-      sendSystemMessage(pendingSystemMessage);
-      setPendingSystemMessage(null);
-    }
-  }, [pendingSystemMessage, socket, isAuthenticated]);
 
   // --- Lobby chat toggle state ---
   const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
@@ -1071,7 +1093,141 @@ export default function GameTable({
     setGameState(game);
   }, [game]);
 
+  // --- Always show current user's hand ---
+  // const myUserId = user?.id;
+  // const myHand = Array.isArray(gameState?.hands) && myUserId ? gameState.hands[gameState.players.findIndex(p => p.id === myUserId)] : [];
+  // Use myHand for rendering your cards, both in bidding and play phases.
+
+  // --- Show cards on the table (current trick) with player info ---
+  const currentTrick = (gameState as any)?.play?.currentTrick || [];
+  const trickLeaderIndex = (gameState as any)?.play?.trickLeaderIndex ?? 0; // fallback to 0 if not set
+  const trickPlayers = [];
+  for (let i = 0; i < currentTrick.length; i++) {
+    const playerIndex = (trickLeaderIndex + i) % (gameState?.players?.length || 4);
+    trickPlayers.push(gameState.players[playerIndex]);
+  }
+  // When rendering the trick:
+  // currentTrick.map((card, i) => {
+  //   const player = trickPlayers[i];
+  //   return <div key={i}>{card.rank}{card.suit} played by {player?.username || 'Unknown'}</div>;
+  // })
+
+  // Add this function to handle playing a card
+  const handlePlayCard = (card: Card) => {
+    if (!socket || !gameState?.id || !user?.id) return;
+    playCardSound();
+    setPendingPlayedCard(card); // Optimistically show the card
+    socket.emit('play_card', { gameId: gameState.id, userId: user.id, card });
+  };
+
+  // In useEffect, clear pendingPlayedCard when the backend confirms the card is in the trick
+  useEffect(() => {
+    if (!pendingPlayedCard) return;
+    const currentTrick = (gameState as any)?.play?.currentTrick || [];
+    const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+    if (currentTrick.some((c: Card & { playerIndex: number }) => c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank && c.playerIndex === myPlayerIndex)) {
+      setPendingPlayedCard(null);
+    }
+  }, [gameState, pendingPlayedCard, user]);
+
   // Return the JSX for the component
+  const handleLeaveTable = () => {
+    if (typeof onLeaveTable === 'function') {
+      onLeaveTable();
+    }
+  };
+
+  // Helper to count empty seats
+  const emptySeats = (gameState.players || []).filter(p => !p).length;
+
+  // Modified start game handler
+  const handleStartGame = async () => {
+    if (emptySeats > 0) {
+      setShowStartWarning(true);
+      return;
+    }
+    if (typeof startGame === 'function' && gameState?.id && user?.id) {
+      await startGame(gameState.id, user.id);
+    }
+  };
+
+  // Invite bots to all empty seats, then start game
+  const handlePlayWithBots = async () => {
+    setPendingStartWithBots(true);
+    const emptySeatIndexes = (gameState.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
+    for (const seatIndex of emptySeatIndexes) {
+      await handleInviteBot(seatIndex);
+    }
+    setShowStartWarning(false);
+    setPendingStartWithBots(false);
+    if (typeof startGame === 'function' && gameState?.id && user?.id) {
+      await startGame(gameState.id, user.id);
+    }
+  };
+
+  useEffect(() => {
+    if (pendingSystemMessage && socket && isAuthenticated) {
+      sendSystemMessage(pendingSystemMessage);
+      setPendingSystemMessage(null);
+    }
+  }, [pendingSystemMessage, socket, isAuthenticated]);
+
+  // Add new state for trick animation
+  const trickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [trickWinner, setTrickWinner] = useState<number | null>(null);
+  const [animatingTrick, setAnimatingTrick] = useState(false);
+  const [animatedTrickCards, setAnimatedTrickCards] = useState<Card[]>([]);
+
+  // Listen for trick_complete event and animate trick
+  useEffect(() => {
+    if (socket) {
+      const handleTrickComplete = (data: any) => {
+        console.log('Trick complete event received:', data);
+        if (data.trick && typeof data.trick.winnerIndex === 'number') {
+          // Store the trick cards for animation
+          setAnimatedTrickCards(data.trick.cards || []);
+          setTrickWinner(data.trick.winnerIndex);
+          setAnimatingTrick(true);
+          
+          // Wait 2 seconds before clearing trick animation
+          if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
+          trickTimeoutRef.current = setTimeout(() => {
+            setAnimatingTrick(false);
+            setTrickWinner(null);
+            setAnimatedTrickCards([]);
+          }, 2000);
+        }
+      };
+      socket.on("trick_complete", handleTrickComplete);
+      return () => {
+        socket.off("trick_complete", handleTrickComplete);
+        if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
+      };
+    }
+  }, [socket]);
+
+  // Play win.mp3 when trick winner is announced
+  useEffect(() => {
+    if (animatingTrick && trickWinner !== null) {
+      console.log('[DEBUG] Playing win.mp3 for trick winner:', trickWinner);
+      playWinSound();
+    }
+  }, [animatingTrick, trickWinner]);
+
+  // Play win.mp3 when trick winner is announced
+  // Add CSS for fade-out and highlight-winner (can be in a CSS/SCSS file or styled-components)
+  /*
+  .fade-out {
+    opacity: 0.3;
+    transition: opacity 0.7s;
+  }
+  .highlight-winner {
+    box-shadow: 0 0 16px 4px gold;
+    z-index: 2;
+    transition: box-shadow 0.3s;
+  }
+  */
+
   return (
     <>
       <LandscapePrompt />
@@ -1087,6 +1243,22 @@ export default function GameTable({
               border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
               height: '100%'
             }}>
+              {/* Trick cards overlay - covers the whole table area */}
+              <div className="absolute inset-0 pointer-events-none z-20">
+                {renderTrickCards()}
+              </div>
+              
+              {/* Trick winner announcement */}
+              {animatingTrick && trickWinner !== null && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                  <div className="bg-yellow-400 text-black px-6 py-3 rounded-lg shadow-lg font-bold text-lg animate-pulse">
+                    {(() => {
+                      const winner = gameState.players[trickWinner];
+                      return winner ? `${winner.username} wins the trick!` : 'Trick won!';
+                    })()}
+                  </div>
+                </div>
+              )}
               {/* Leave Table button - inside table in top left corner */}
               <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                 <button
@@ -1114,7 +1286,7 @@ export default function GameTable({
                       <div className="flex items-center gap-2 text-sm mb-2">
                         {/* Game type brick */}
                         {(() => {
-                          const type = gameState.rules?.gameType || 'REGULAR';
+                          const type = (gameState as any).rules?.gameType || 'REGULAR';
                           let color = 'bg-green-600';
                           let label = 'REGULAR';
                           if (type === 'WHIZ') {
@@ -1123,12 +1295,12 @@ export default function GameTable({
                           } else if (type === 'MIRROR') {
                             color = 'bg-red-600';
                             label = 'MIRRORS';
-                          } else if (gameState.forcedBid && type === 'REGULAR') {
+                          } else if ((gameState as any).forcedBid && type === 'REGULAR') {
                             color = 'bg-orange-500';
-                            if (gameState.forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
-                            else if (gameState.forcedBid === 'BID3') label = 'BID 3';
-                            else if (gameState.forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
-                            else if (gameState.forcedBid === 'SUICIDE') label = 'SUICIDE';
+                            if ((gameState as any).forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
+                            else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
+                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
+                            else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
                             else label = 'GIMMICK';
                           }
                           return <span className={`inline-block ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
@@ -1142,7 +1314,7 @@ export default function GameTable({
                       </div>
                       {/* Line 2: Buy-in, game mode, and special bricks */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? gameState.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
+                        <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? (gameState as any).rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
                         <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
                         </svg>
@@ -1161,9 +1333,9 @@ export default function GameTable({
                           <span className="text-gray-400">Prize:</span>
                           <span className="font-bold text-yellow-400 ml-2">
                             {(() => {
-                              const buyIn = gameState.rules?.coinAmount || 100000;
+                              const buyIn = (gameState as any).rules?.coinAmount || 100000;
                               const prizePot = buyIn * 4 * 0.9;
-                              if ((gameState.rules?.gameType || '').toUpperCase() === 'PARTNERS') {
+                              if (((gameState as any).rules?.gameType || '').toUpperCase() === 'PARTNERS') {
                                 return `${formatCoins(prizePot / 2)} each`;
                               } else {
                                 return `1st: ${formatCoins(prizePot * 0.7)}, 2nd: ${formatCoins(prizePot * 0.3)}`;
@@ -1210,8 +1382,6 @@ export default function GameTable({
               ))}
 
               {/* Center content */}
-              {renderTrickCards()}
-
               {/* Overlay the game status buttons/messages on top of the play area */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 {gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
@@ -1234,39 +1404,66 @@ export default function GameTable({
                     <div className="font-bold">Waiting for Host</div>
                     <div className="text-sm mt-1">Only {isPlayer(sanitizedPlayers[0]) ? sanitizedPlayers[0].name : isBot(sanitizedPlayers[0]) ? sanitizedPlayers[0].username : 'Unknown'} can start</div>
                   </div>
-                ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId ? (
+                ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     <BiddingInterface
                       onBid={handleBid}
-                      currentBid={orderedPlayers[0]?.bid}
-                      gameType={gameState.rules.gameType}
+                      currentBid={(gameState as any).bidding?.bids?.[0]}
+                      gameType={(gameState as any).rules.gameType}
                       numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
                       playerId={currentPlayerId}
                       currentPlayerTurn={gameState.currentPlayer}
                       allowNil={gameState.rules.allowNil}
                     />
                   </div>
+                ) : gameState.status === "BIDDING" && !dealingComplete ? (
+                  <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                       style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                    <div className="font-bold">Dealing Cards...</div>
+                    <div className="text-sm mt-1">Please wait while cards are being dealt</div>
+                  </div>
                 ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
-                    {(() => {
-                      const waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
-                      const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
+                    {gameState.currentPlayer
+                      ? (() => {
+                          // Robust debug logging for player ID mapping
+                          console.log('[DEBUG] Waiting for player:', gameState.currentPlayer, 'All player IDs:', sanitizedPlayers.map(p => p && p.id));
+                          // Try to find the player by ID
+                          let waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && String(p.id) === String(gameState.currentPlayer)) || null;
+                          // If not found, try to find by loose equality (in case of type mismatch)
+                          if (!waitingPlayer) {
+                            waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id == gameState.currentPlayer) || null;
+                          }
+                          // If still not found, log a warning
+                          if (!waitingPlayer) {
+                            console.warn('[WARN] Could not resolve waiting player for currentPlayer:', gameState.currentPlayer, 'Players:', sanitizedPlayers);
+                          }
+                          const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : gameState.currentPlayer ? `Player ${gameState.currentPlayer}` : "Unknown";
                       return (
                         <div className="font-bold">Waiting for {waitingName}</div>
                       );
-                    })()}
+                        })()
+                      : (
+                          <div className="font-bold">Waiting for next phase...</div>
+                        )
+                    }
                   </div>
                 ) : gameState.status === "PLAYING" && currentTrick?.length === 0 ? (
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
-                    {(() => {
+                    {gameState.currentPlayer
+                      ? (() => {
                       const waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
                       const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
                       return (
                         <div className="text-sm">Waiting for {waitingName} to play</div>
                       );
-                    })()}
+                        })()
+                      : (
+                          <div className="text-sm">Waiting for next phase...</div>
+                        )
+                    }
                   </div>
                 ) : null}
               </div>
@@ -1341,6 +1538,12 @@ export default function GameTable({
             onPlayAgain={handlePlayAgain}
           />
         )}
+        <StartGameWarningModal
+          isOpen={showStartWarning}
+          onClose={() => setShowStartWarning(false)}
+          onPlayWithBots={handlePlayWithBots}
+          emptySeatsCount={emptySeats}
+        />
       </div>
     </>
   );
