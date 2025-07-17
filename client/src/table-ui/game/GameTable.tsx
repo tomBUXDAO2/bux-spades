@@ -356,7 +356,7 @@ export default function GameTable({
   const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
   const prevBidsRef = useRef<(number|null)[] | null>(null);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
-  const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
+  const [lastNonEmptyTrick] = useState<Card[]>([]);
 
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
