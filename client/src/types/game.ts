@@ -69,6 +69,9 @@ export interface GameState {
   specialRules?: { screamer?: boolean; assassin?: boolean };
   buyIn?: number;
   creatorId: string;
+  bidding?: any;
+  play?: any;
+  hands?: any[];
 }
 
 export interface HandSummary {

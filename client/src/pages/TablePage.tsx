@@ -135,7 +135,7 @@ export default function TablePage() {
           ...prev.play,
           currentTrick: data.currentTrick,
         },
-        hands: prev.hands?.map((h, i) => {
+        hands: prev.hands?.map((h: any, i: number) => {
           // Optionally update hand counts if needed
           return h;
         }) ?? prev.hands,

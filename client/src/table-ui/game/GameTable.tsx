@@ -227,7 +227,6 @@ export default function GameTable({
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
   const [showStartWarning, setShowStartWarning] = useState(false);
-  const [pendingStartWithBots, setPendingStartWithBots] = useState(false);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
   
@@ -1153,13 +1152,11 @@ export default function GameTable({
 
   // Invite bots to all empty seats, then start game
   const handlePlayWithBots = async () => {
-    setPendingStartWithBots(true);
     const emptySeatIndexes = (gameState.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
     for (const seatIndex of emptySeatIndexes) {
       await handleInviteBot(seatIndex);
     }
     setShowStartWarning(false);
-    setPendingStartWithBots(false);
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
