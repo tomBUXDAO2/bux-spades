@@ -800,7 +800,7 @@ if (ioInstance) {
         if (!game.play) return;
         const nextPlayer = game.players[game.play.currentPlayerIndex];
         if (!nextPlayer) return;
-        if (nextPlayer.type === 'bot') {
+        if (nextPlayer!.type === 'bot') {
           botPlayCard(game, game.play.currentPlayerIndex);
         }
       } else {
@@ -809,7 +809,7 @@ if (ioInstance) {
         if (!game.play) return;
         const currentPlayer = game.players[game.play.currentPlayerIndex];
         if (!currentPlayer) return;
-        if (currentPlayer.type === 'bot') {
+        if (currentPlayer!.type === 'bot') {
           botPlayCard(game, game.play.currentPlayerIndex);
         }
       }
