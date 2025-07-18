@@ -702,8 +702,8 @@ if (ioInstance) {
         return;
       }
       const hands = game.hands.filter(isNonNull);
-      const hand = hands[playerIndex];
-      if (!hand) {
+      const hand = hands[playerIndex] || null;
+      if (!hand || hand.length === 0) {
         socket.emit('error', { message: 'Invalid hand state' });
         return;
       }
