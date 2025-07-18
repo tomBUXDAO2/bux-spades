@@ -519,11 +519,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Invalid game state: no dealer assigned' });
         return;
       }
-      const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
-      if (!firstPlayer) return;
-      if (firstPlayer.type === 'bot') {
-        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
-        botPlayCard(game, (game.dealerIndex + 1) % 4);
+      const idx = (game.dealerIndex + 1) % 4;
+      const firstPlayer = game.players[idx];
+      if (firstPlayer && firstPlayer.type === 'bot') {
+        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', idx, 'bot:', firstPlayer.username);
+        botPlayCard(game, idx);
       }
     } else {
       game.bidding.currentBidderIndex = next;

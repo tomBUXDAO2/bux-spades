@@ -797,6 +797,7 @@ if (ioInstance) {
         }
         
         // If next player is a bot, trigger their move
+        if (!game.play) return;
         const nextPlayer = game.players[game.play.currentPlayerIndex];
         if (nextPlayer && nextPlayer.type === 'bot') {
           botPlayCard(game, game.play.currentPlayerIndex);
@@ -804,6 +805,7 @@ if (ioInstance) {
       } else {
         // Don't advance to next player - the current player should continue leading
         // Only trigger next bot move if the current player is a bot
+        if (!game.play) return;
         const currentPlayer = game.players[game.play.currentPlayerIndex];
         if (currentPlayer && currentPlayer.type === 'bot') {
           botPlayCard(game, game.play.currentPlayerIndex);
