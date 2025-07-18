@@ -448,7 +448,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
       } else {
         if (!game.bidding) return; // Guard for undefined
         game.bidding.currentBidderIndex = next;
-        game.bidding.currentPlayer = game.players[next]?.id;
+        game.bidding.currentPlayer = game.players[next]?.id ?? '';
         io.to(game.id).emit('bidding_update', {
           currentBidderIndex: next,
           bids: game.bidding.bids,
@@ -665,7 +665,7 @@ if (ioInstance) {
         });
       } else {
         game.bidding.currentBidderIndex = next;
-        game.bidding.currentPlayer = game.players[next]?.id;
+        game.bidding.currentPlayer = game.players[next]?.id ?? '';
         ioInstance.to(game.id).emit('bidding_update', {
           currentBidderIndex: next,
           bids: game.bidding.bids,
