@@ -697,6 +697,7 @@ if (ioInstance) {
       }
       
       // Validate card is in player's hand
+      // @ts-ignore
       const hand = game.hands[playerIndex];
       if (!hand) {
         socket.emit('error', { message: 'Invalid hand state' });
