@@ -520,29 +520,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         return;
       }
       const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
-      if (!firstPlayer) {
-        socket.emit('error', { message: 'Invalid game state' });
-        return;
-      } else {
-        // --- Play phase state ---
-        game.status = 'PLAYING';
-        game.play = {
-          currentPlayer: firstPlayer?.id || '',
-          currentPlayerIndex: (game.dealerIndex + 1) % 4,
-          currentTrick: [],
-          tricks: [],
-          trickNumber: 0
-        };
-        // Emit game_update for client sync
-        emitGameUpdateToPlayers(game);
-      }
-      io.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
-      io.to(game.id).emit('play_start', {
-        currentPlayerIndex: game.play.currentPlayerIndex,
-        currentTrick: game.play.currentTrick,
-        trickNumber: game.play.trickNumber,
-      });
-      // If first player is a bot, trigger bot card play
+      if (!firstPlayer) return;
       if (firstPlayer.type === 'bot') {
         console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
         botPlayCard(game, (game.dealerIndex + 1) % 4);
