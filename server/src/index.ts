@@ -521,7 +521,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
       const idx = (game.dealerIndex + 1) % 4;
       const firstPlayer = game.players[idx];
-      if (firstPlayer && firstPlayer.type === 'bot') {
+      if (!firstPlayer) return;
+      if (firstPlayer.type === 'bot') {
         console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', idx, 'bot:', firstPlayer.username);
         botPlayCard(game, idx);
       }
