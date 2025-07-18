@@ -27,6 +27,7 @@
     "start": "vite",
     "dev": "vite",
     "build": "tsc && vite build",
+    "postbuild": "cp ../vercel.json dist/vercel.json",
     "serve": "vite preview",
     "test": "vitest",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
