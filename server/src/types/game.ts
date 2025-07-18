@@ -12,7 +12,7 @@ export interface Card {
 }
 
 export interface GamePlayer {
-  id: string;
+  id: string; // Ensure id is always a string and never null
   username: string;
   avatar: string | null;
   type: 'human' | 'bot';
