@@ -674,12 +674,12 @@ function enrichGameForClient(game: Game, userId?: string): Game {
 // Helper to emit game update to all players with their own hands
 function emitGameUpdateToPlayers(game: Game) {
   for (const player of game.players) {
-    if (!player || player.id == null) continue;
+    if (!player) continue;
     // @ts-ignore
-    const playerSocket = authenticatedSockets.get(player.id!);
+    const playerSocket = authenticatedSockets.get(player.id);
     if (playerSocket) {
       // @ts-ignore
-      playerSocket.emit('game_update', enrichGameForClient(game, player.id!));
+      playerSocket.emit('game_update', enrichGameForClient(game, player.id));
     }
   }
 }
