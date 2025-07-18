@@ -480,7 +480,7 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
 export function botPlayCard(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
   if (!bot || bot.type !== 'bot' || !game.hands || !game.play) return;
-  const hand = game.hands[seatIndex]!;
+  const hand = game.hands[seatIndex];
   if (!hand || hand.length === 0) return;
   // Determine lead suit for this trick
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
@@ -697,12 +697,11 @@ if (ioInstance) {
       }
       
       // Validate card is in player's hand
-      // @ts-ignore
-      const hand = game.hands[playerIndex]!;
-      if (!hand) {
+      if (!game.hands || !game.hands[playerIndex]) {
         socket.emit('error', { message: 'Invalid hand state' });
         return;
       }
+      const hand = game.hands[playerIndex];
       
       const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
       if (cardIndex === -1) {
