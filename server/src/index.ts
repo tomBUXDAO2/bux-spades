@@ -673,14 +673,15 @@ function enrichGameForClient(game: Game, userId?: string): Game {
 
 // Helper to emit game update to all players with their own hands
 function emitGameUpdateToPlayers(game: Game) {
-  game.players.forEach((player) => {
-    if (player && player.id) {
-      const playerSocket = authenticatedSockets.get(player.id);
-      if (playerSocket) {
-        playerSocket.emit('game_update', enrichGameForClient(game, player.id));
-      }
+  for (const player of game.players) {
+    if (!player || player.id == null) continue;
+    // @ts-ignore
+    const playerSocket = authenticatedSockets.get(player.id!);
+    if (playerSocket) {
+      // @ts-ignore
+      playerSocket.emit('game_update', enrichGameForClient(game, player.id!));
     }
-  });
+  }
 }
 
 const PORT = Number(process.env.PORT) || 3000;

@@ -480,7 +480,7 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
 export function botPlayCard(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
   if (!bot || bot.type !== 'bot' || !game.hands || !game.play) return;
-  const hand = game.hands[seatIndex];
+  const hand = game.hands[seatIndex]!;
   if (!hand || hand.length === 0) return;
   // Determine lead suit for this trick
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
@@ -522,7 +522,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
       // Update player trick counts
       if (game.players[winnerIndex]) {
-        game.players[winnerIndex].tricks = (game.players[winnerIndex].tricks || 0) + 1;
+        game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
       }
       // Emit trick complete with the current trick before clearing it
       io.to(game.id).emit('trick_complete', {
@@ -539,7 +539,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       // Delay clearing the trick to allow frontend animation
       setTimeout(() => {
         if (!game.play) return; // Guard for undefined
-        game.play.currentTrick = [];
+        game.play!.currentTrick = [];
         // Do NOT emit game_update here
       }, 2000); // 2 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
@@ -753,7 +753,7 @@ if (ioInstance) {
         
         // Delay clearing the trick to allow frontend animation
         setTimeout(() => {
-          game.play.currentTrick = [];
+          game.play!.currentTrick = [];
           // Do NOT emit game_update here
         }, 2000); // 2 second delay to match frontend animation
         
