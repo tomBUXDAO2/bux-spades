@@ -676,10 +676,10 @@ function emitGameUpdateToPlayers(game: Game) {
   for (const player of game.players) {
     if (!player) continue;
     // @ts-ignore
-    const playerSocket = authenticatedSockets.get(player.id);
+    const playerSocket = authenticatedSockets.get(player.id!);
     if (playerSocket) {
       // @ts-ignore
-      playerSocket.emit('game_update', enrichGameForClient(game, player.id));
+      playerSocket.emit('game_update', enrichGameForClient(game, player.id!));
     }
   }
 }
