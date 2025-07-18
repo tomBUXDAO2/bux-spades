@@ -394,8 +394,9 @@ export function botMakeMove(game: Game, seatIndex: number) {
     return;
   }
   // Only act if it's the bot's turn to bid
-  if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids[seatIndex] === null) {
+  if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
     setTimeout(() => {
+      if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
       // Calculate bid for REGULAR games
       let bid = 1;
@@ -424,7 +425,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
         }
         game.status = 'PLAYING';
         game.play = {
-          currentPlayer: firstPlayer.id,
+          currentPlayer: firstPlayer.id ?? '',
           currentPlayerIndex: (game.dealerIndex + 1) % 4,
           currentTrick: [],
           tricks: [],
@@ -445,6 +446,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
         }
         return;
       } else {
+        if (!game.bidding) return; // Guard for undefined
         game.bidding.currentBidderIndex = next;
         game.bidding.currentPlayer = game.players[next]?.id;
         io.to(game.id).emit('bidding_update', {
@@ -459,7 +461,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
       }
     }, 1000);
   } else {
-    console.log('[BOT DEBUG] Conditions not met for bot to bid. Status:', game.status, 'currentBidderIndex:', game.bidding?.currentBidderIndex, 'seatIndex:', seatIndex, 'bid already made:', game.bidding?.bids[seatIndex]);
+    console.log('[BOT DEBUG] Conditions not met for bot to bid. Status:', game.status, 'currentBidderIndex:', game.bidding?.currentBidderIndex, 'seatIndex:', seatIndex, 'bid already made:', game.bidding?.bids ? game.bidding.bids[seatIndex] : undefined);
   }
 }
 
@@ -496,6 +498,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
   const card = playableCards[Math.floor(Math.random() * playableCards.length)];
   if (!card) return;
   setTimeout(() => {
+    if (!game.play) return; // Guard for undefined
     console.log(`[BOT DEBUG] Bot ${bot.username} is playing card:`, card);
     // Simulate play_card event
     // This logic is similar to the play_card socket handler
@@ -517,31 +520,28 @@ export function botPlayCard(game: Game, seatIndex: number) {
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
       console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
-      
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex].tricks = (game.players[winnerIndex].tricks || 0) + 1;
       }
-      
-              // Emit trick complete with the current trick before clearing it
-        io.to(game.id).emit('trick_complete', {
-          trick: {
-            cards: game.play.currentTrick,
-            winnerIndex: winnerIndex,
-          },
-          trickNumber: game.play.trickNumber,
-        });
-        
-        // Emit immediate game update with updated trick counts
-        const enrichedGame = enrichGameForClient(game);
-        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-        io.to(game.id).emit('game_update', enrichedGame);
-        
-        // Delay clearing the trick to allow frontend animation
-        setTimeout(() => {
-          game.play.currentTrick = [];
-          // Do NOT emit game_update here
-        }, 2000); // 2 second delay to match frontend animation
+      // Emit trick complete with the current trick before clearing it
+      io.to(game.id).emit('trick_complete', {
+        trick: {
+          cards: game.play.currentTrick,
+          winnerIndex: winnerIndex,
+        },
+        trickNumber: game.play.trickNumber,
+      });
+      // Emit immediate game update with updated trick counts
+      const enrichedGame = enrichGameForClient(game);
+      console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
+      io.to(game.id).emit('game_update', enrichedGame);
+      // Delay clearing the trick to allow frontend animation
+      setTimeout(() => {
+        if (!game.play) return; // Guard for undefined
+        game.play.currentTrick = [];
+        // Do NOT emit game_update here
+      }, 2000); // 2 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
       if (game.play.trickNumber === 13) {
         // --- Hand summary and scoring ---
@@ -551,7 +551,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
         game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
         game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
         game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
-        
         io.to(game.id).emit('hand_completed', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
@@ -559,7 +558,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
           team1Bags: game.team1Bags,
           team2Bags: game.team2Bags,
         });
-        
         // --- Game over check ---
         const winThreshold = 500, lossThreshold = -150;
         if (
@@ -580,7 +578,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
         }
         return;
       }
-      
       // If the winner is a bot, trigger their move for the next trick
       const winnerPlayer = game.players[winnerIndex];
       if (winnerPlayer && winnerPlayer.type === 'bot') {
@@ -595,25 +592,15 @@ export function botPlayCard(game: Game, seatIndex: number) {
       let nextPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
       game.play.currentPlayerIndex = nextPlayerIndex;
       game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-
       // If the next player is a bot, trigger their move
       const nextPlayer = game.players[nextPlayerIndex];
       if (nextPlayer && nextPlayer.type === 'bot') {
-        botPlayCard(game, nextPlayerIndex);
+        setTimeout(() => {
+          botPlayCard(game, nextPlayerIndex);
+        }, 1000);
       }
     }
-    const playUpdate = {
-      currentPlayerIndex: game.play.currentPlayerIndex,
-      currentTrick: game.play.currentTrick,
-      hands: game.hands.map((h, i) => ({
-        playerId: game.players[i]?.id,
-        handCount: h.length,
-      })),
-    };
-    console.log('[BOT PLAY DEBUG] Emitting play_update with currentPlayerIndex:', playUpdate.currentPlayerIndex);
-    io.to(game.id).emit('play_update', playUpdate);
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-  }, 1000); // 1 second delay for realism
+  }, 1000);
 }
 
 // --- Bidding socket event ---
