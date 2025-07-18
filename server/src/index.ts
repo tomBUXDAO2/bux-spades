@@ -671,15 +671,16 @@ function enrichGameForClient(game: Game, userId?: string): Game {
   };
 }
 
+function isNonNull<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
 // Helper to emit game update to all players with their own hands
 function emitGameUpdateToPlayers(game: Game) {
-  for (const player of game.players) {
-    if (!player) continue;
-    if (!player.id) continue;
-    if (!authenticatedSockets) continue;
-    const playerSocket = authenticatedSockets.get(player.id!);
+  for (const player of game.players.filter(isNonNull)) {
+    const playerSocket = authenticatedSockets.get(player.id);
     if (playerSocket) {
-      playerSocket.emit('game_update', enrichGameForClient(game, player.id!));
+      playerSocket.emit('game_update', enrichGameForClient(game, player.id));
     }
   }
 }

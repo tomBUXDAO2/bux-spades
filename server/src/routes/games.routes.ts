@@ -697,11 +697,16 @@ if (ioInstance) {
       }
       
       // Validate card is in player's hand
-      if (!game.hands || !game.hands[playerIndex]) {
+      if (!game.hands) {
         socket.emit('error', { message: 'Invalid hand state' });
         return;
       }
-      const hand = game.hands[playerIndex]!;
+      const hands = game.hands.filter(isNonNull);
+      const hand = hands[playerIndex];
+      if (!hand) {
+        socket.emit('error', { message: 'Invalid hand state' });
+        return;
+      }
       
       const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
       if (cardIndex === -1) {
