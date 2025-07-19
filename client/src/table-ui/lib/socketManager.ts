@@ -5,7 +5,11 @@ const getWebSocketUrl = () => {
   if (import.meta.env.VITE_SOCKET_URL) {
     return import.meta.env.VITE_SOCKET_URL.replace('https://', 'wss://').replace('http://', 'ws://');
   }
-  if (import.meta.env.PROD) {
+  
+  // Check if we're in production by looking at the current URL
+  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  
+  if (isProduction) {
     return 'wss://bux-spades-server.fly.dev';
   }
   return 'ws://localhost:3000';
@@ -95,7 +99,11 @@ export class SocketManager {
 
     // Initialize new socket connection with more robust settings
     const wsUrl = getWebSocketUrl();
-    console.log('SocketManager: Connecting to', wsUrl);
+    console.log('SocketManager: Environment check:', {
+      hostname: window.location.hostname,
+      isProduction: window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1',
+      wsUrl: wsUrl
+    });
     this.socket = io(wsUrl, {
       transports: ['websocket', 'polling'],
       auth: {
