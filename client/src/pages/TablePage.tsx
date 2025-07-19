@@ -6,6 +6,7 @@ import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
 import type { Socket } from 'socket.io-client';
 import { socketApi } from '../table-ui/lib/socketApi';
+import { api } from '@/lib/api';
 
 export default function TablePage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -37,17 +38,13 @@ export default function TablePage() {
       try {
         // If spectating, call spectate endpoint
         if (isSpectator) {
-          await fetch(`/api/games/${gameId}/spectate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: user.id,
-              username: user.username,
-              avatar: user.avatar
-            })
+          await api.post(`/api/games/${gameId}/spectate`, {
+            id: user.id,
+            username: user.username,
+            avatar: user.avatar
           });
         }
-        const response = await fetch(`/api/games/${gameId}`);
+        const response = await api.get(`/api/games/${gameId}`);
         if (response.status === 404) {
           navigate('/'); // Redirect to lobby if not found
           return;
@@ -159,16 +156,10 @@ export default function TablePage() {
   const handleJoinGame = async () => {
     if (!user || !gameId || isSpectator) return;
     try {
-      const response = await fetch(`/api/games/${gameId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: user.id,
-          username: user.username,
-          avatar: user.avatar
-        }),
+      const response = await api.post(`/api/games/${gameId}/join`, {
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar
       });
       if (!response.ok) throw new Error('Failed to join game');
       const updatedGame = await response.json();
@@ -181,11 +172,7 @@ export default function TablePage() {
   const handleLeaveTable = async () => {
     if (!gameId || !user) return;
     try {
-      await fetch(`/api/games/${gameId}/leave`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id })
-      });
+      await api.post(`/api/games/${gameId}/leave`, { id: user.id });
       window.location.href = '/';
     } catch (error) {
       console.error('Error leaving game:', error);
