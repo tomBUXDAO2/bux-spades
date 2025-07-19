@@ -2,16 +2,27 @@ import { io, Socket } from 'socket.io-client';
 
 // For WebSocket connections in production, we need to use wss:// instead of https://
 const getWebSocketUrl = () => {
+  console.log('getWebSocketUrl called with:', {
+    VITE_SOCKET_URL: import.meta.env.VITE_SOCKET_URL,
+    hostname: window.location.hostname,
+    location: window.location.href
+  });
+  
   if (import.meta.env.VITE_SOCKET_URL) {
-    return import.meta.env.VITE_SOCKET_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+    const url = import.meta.env.VITE_SOCKET_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+    console.log('Using VITE_SOCKET_URL:', url);
+    return url;
   }
   
   // Check if we're in production by looking at the current URL
   const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  console.log('Production check:', { hostname: window.location.hostname, isProduction });
   
   if (isProduction) {
+    console.log('Returning production WebSocket URL: wss://bux-spades-server.fly.dev');
     return 'wss://bux-spades-server.fly.dev';
   }
+  console.log('Returning development WebSocket URL: ws://localhost:3000');
   return 'ws://localhost:3000';
 };
 
