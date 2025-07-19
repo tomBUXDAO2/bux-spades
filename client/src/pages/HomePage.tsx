@@ -9,6 +9,7 @@ import data from '@emoji-mart/data/sets/15/native.json';
 import type { GameState, Player, Bot } from '../types/game';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
+import { api } from '@/lib/api';
 
 interface ChatMessage {
   id: string;
@@ -113,9 +114,7 @@ const HomePage: React.FC = () => {
 
     const handleFriendAdded = () => {
       console.log('Friend added, refreshing player list');
-      fetch('/api/users', {
-        headers: { 'x-user-id': user.id }
-      })
+      api.get('/api/users')
         .then(res => res.json())
         .then(setOnlinePlayers)
         .catch(err => console.error('Failed to refresh player list:', err));
@@ -173,15 +172,11 @@ const HomePage: React.FC = () => {
   const handleCreateGame = async (settings: any) => {
     setIsCreateGameModalOpen(false);
     try {
-      const res = await fetch('/api/games', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...settings,
-          creatorId: user.id,
-          creatorName: user.username,
-          creatorImage: user.avatar // or user.image if that's the field
-        }),
+      const res = await api.post('/api/games', {
+        ...settings,
+        creatorId: user.id,
+        creatorName: user.username,
+        creatorImage: user.avatar // or user.image if that's the field
       });
       if (!res.ok) throw new Error('Failed to create game');
       const game: GameState = await res.json();
@@ -202,15 +197,11 @@ const HomePage: React.FC = () => {
     if (!user) return;
     // Ensure user is not null before accessing properties
     const { id, username, avatar } = user;
-    const res = await fetch(`/api/games/${gameId}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id,
-        username,
-        avatar,
-        seat: seatIndex,
-      }),
+    const res = await api.post(`/api/games/${gameId}/join`, {
+      id,
+      username,
+      avatar,
+      seat: seatIndex,
     });
     if (!res.ok) {
       const error = await res.json();
@@ -382,9 +373,7 @@ const HomePage: React.FC = () => {
 
   // Fetch real users for the lobby
   useEffect(() => {
-    fetch('/api/users', {
-      headers: { 'x-user-id': user.id }
-    })
+    api.get('/api/users')
       .then(res => res.json())
       .then(setOnlinePlayers)
       .catch(() => setOnlinePlayers([]));
@@ -392,7 +381,7 @@ const HomePage: React.FC = () => {
 
   // Fetch games as a fallback for loading spinner
   useEffect(() => {
-    fetch('/api/games')
+    api.get('/api/games')
       .then(res => res.json())
       .then((games) => {
         setGames(games);
@@ -434,9 +423,7 @@ const HomePage: React.FC = () => {
         body: JSON.stringify(body)
       });
       // Refresh player list
-      fetch('/api/users', {
-        headers: { 'x-user-id': user.id }
-      })
+      api.get('/api/users')
         .then(res => res.json())
         .then(setOnlinePlayers);
     }

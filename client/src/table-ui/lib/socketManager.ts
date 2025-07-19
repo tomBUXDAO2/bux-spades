@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { apiFetch } from '@/lib/api';
 
 // For WebSocket connections in production, we need to use wss:// instead of https://
 const getWebSocketUrl = () => {
@@ -281,7 +282,7 @@ export async function handleAuthenticatedSession() {
     
     try {
       console.log('Fetching profile with token:', token);
-      const response = await fetch('/api/auth/profile', {
+      const response = await apiFetch('/api/auth/profile', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
