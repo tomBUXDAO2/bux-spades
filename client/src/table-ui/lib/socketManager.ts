@@ -85,7 +85,7 @@ export class SocketManager {
       this.socket = null;
     }
 
-    // Initialize new socket connection
+    // Initialize new socket connection with more robust settings
     console.log('SocketManager: Connecting to', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
@@ -95,10 +95,14 @@ export class SocketManager {
         username
       },
       reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: this.reconnectDelay,
-      timeout: 10000,
-      autoConnect: true
+      reconnectionAttempts: 10, // Increased from 5
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000, // Increased from 10000
+      autoConnect: true,
+      forceNew: true, // Force new connection
+      upgrade: true, // Allow transport upgrade
+      rememberUpgrade: true
     });
 
     this.setupSocketListeners();
@@ -148,6 +152,42 @@ export class SocketManager {
         }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts));
       }
       
+      this.notifyStateChange();
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      this.state.error = error.message;
+      this.notifyStateChange();
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
+      this.state.isConnected = true;
+      this.reconnectAttempts = 0;
+      
+      // Re-authenticate after reconnection
+      if (this.session) {
+        console.log('SocketManager: Re-authenticating after reconnection');
+        this.socket?.emit('authenticate', {
+          token: this.session.token,
+          userId: this.session.userId,
+          username: this.session.username
+        });
+      }
+      
+      this.notifyStateChange();
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('Socket reconnection error:', error);
+      this.state.error = error.message;
+      this.notifyStateChange();
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('Socket reconnection failed after all attempts');
+      this.state.error = 'Failed to reconnect after all attempts';
       this.notifyStateChange();
     });
 

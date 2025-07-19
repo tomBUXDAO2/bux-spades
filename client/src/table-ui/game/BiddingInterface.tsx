@@ -53,7 +53,7 @@ export default function BiddingInterface({
   if (gameType === "WHIZ") {
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
-        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/10 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
+        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
             <p className="text-sm max-sm:text-xs text-gray-300">You have {numSpades} spades</p>
@@ -88,7 +88,7 @@ export default function BiddingInterface({
   return (
     <>
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
-        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/10 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
+        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
             {currentBid !== undefined && (

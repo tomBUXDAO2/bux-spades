@@ -8,7 +8,7 @@ import HandSummaryModal from './HandSummaryModal';
 import WinnerModal from './WinnerModal';
 import LoserModal from './LoserModal';
 import BiddingInterface from './BiddingInterface';
-import { calculateHandScore } from '../../lib/scoring';
+
 import LandscapePrompt from '../../LandscapePrompt';
 import { IoExitOutline, IoInformationCircleOutline } from "react-icons/io5";
 import { useWindowSize } from '../../hooks/useWindowSize';
@@ -117,9 +117,15 @@ function getLeadSuit(trick: Card[] | undefined): Suit | null {
 
 function hasSpadeBeenPlayed(game: GameState): boolean {
   // Check if any completed trick contained a spade
-  return game.completedTricks?.some((trick: any) =>
+  const completedTricksHaveSpades = game.completedTricks?.some((trick: any) =>
     Array.isArray(trick.cards) && trick.cards.some((card: Card) => card.suit === '♠')
   ) || false;
+  
+  // Also check if current trick has spades
+  const currentTrick = (game as any).play?.currentTrick || [];
+  const currentTrickHasSpades = currentTrick.some((card: Card) => card.suit === '♠');
+  
+  return completedTricksHaveSpades || currentTrickHasSpades;
 }
 
 function canLeadSpades(game: GameState, hand: Card[]): boolean {
@@ -143,7 +149,8 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   }
 
   // If following
-  const leadSuit = getLeadSuit(game.currentTrick);
+  const currentTrick = (game as any).play?.currentTrick || [];
+  const leadSuit = getLeadSuit(currentTrick);
   if (!leadSuit) return [];
 
   // Must follow suit if possible
@@ -219,6 +226,31 @@ export default function GameTable({
 }: GameTableProps) {
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => window.location.reload();
+
+  // Function to start a new hand
+  const handleStartNewHand = () => {
+    console.log('[START NEW HAND] Function called');
+    console.log('Socket connected:', socket?.connected);
+    console.log('Game ID:', gameState.id);
+    
+    setShowHandSummary(false);
+    setHandSummaryData(null);
+    
+    // Reset dealing state for new hand
+    setDealingComplete(false);
+    setBiddingReady(false);
+    setDealtCardCount(0);
+    
+    // Emit start new hand event to server
+    if (socket && gameState.id) {
+      console.log('[START NEW HAND] Emitting start_new_hand event...');
+      socket.emit('start_new_hand', { gameId: gameState.id });
+      console.log('[START NEW HAND] start_new_hand event emitted');
+    } else {
+      console.error('[START NEW HAND] Cannot emit: socket or gameState.id missing', { socket: !!socket, gameId: gameState.id });
+    }
+  };
+
   // Restore user assignment
   const user = propUser;
   const { socket, isAuthenticated } = useSocket();
@@ -226,6 +258,7 @@ export default function GameTable({
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
+  const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [showStartWarning, setShowStartWarning] = useState(false);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
@@ -502,43 +535,95 @@ export default function GameTable({
     const madeCount = player.tricks || 0;
     const bidCount = (gameState as any).bidding?.bids?.[position] ?? 0;
     let madeStatus = null;
-    const tricksLeft = 13 - ((gameState as any).completedTricks?.length || 0);
+    const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
     const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
     const isSoloGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'SOLO';
-    // Find partner (for 4p, partner is (position+2)%4)
-    let teamBid = bidCount;
-    let teamMade = madeCount;
+    
     if (isPartnerGame) {
+      // Partner game logic
       const partnerIndex = (position + 2) % 4;
       const partner = orderedPlayers[partnerIndex];
-      const partnerBid = partner && partner.bid !== undefined ? partner.bid : 0;
+      const partnerBid = (gameState as any).bidding?.bids?.[partnerIndex] ?? 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
-      teamBid += partnerBid;
-      teamMade += partnerMade;
-      // Nil logic: if player bid 0 (nil) and made > 0, show cross for that player only
-      if (bidCount === 0 && madeCount > 0) {
-        madeStatus = '❌';
-      } else if (teamMade >= teamBid && teamBid > 0) {
-        madeStatus = '✅';
-      } else if (teamMade + tricksLeft < teamBid && teamBid > 0) {
-        madeStatus = '❌';
+      
+      // Calculate team totals
+      const teamBid = bidCount + partnerBid;
+      const teamMade = madeCount + partnerMade;
+      
+      // Handle nil bids first (individual player logic)
+      if (bidCount === 0) {
+        // Nil bid: show cross if they take a trick, tick if they make it through
+        if (madeCount > 0) {
+          madeStatus = '❌'; // Failed nil
+        } else if (tricksLeft === 0) {
+          madeStatus = '✅'; // Successful nil (hand complete)
+        } else {
+          madeStatus = null; // Still in progress
+        }
+      } else if (partnerBid === 0) {
+        // Partner has nil bid: show cross if partner takes a trick, tick if partner makes it through
+        if (partnerMade > 0) {
+          madeStatus = '❌'; // Partner failed nil
+        } else if (tricksLeft === 0) {
+          madeStatus = '✅'; // Partner successful nil (hand complete)
+        } else {
+          madeStatus = null; // Still in progress
+        }
       } else {
-        madeStatus = null;
+        // Regular team bid logic (no nils)
+        if (teamBid > 0) {
+          if (teamMade >= teamBid) {
+            madeStatus = '✅'; // Team made their bid
+          } else if (teamMade + tricksLeft < teamBid) {
+            madeStatus = '❌'; // Team cannot make their bid
+          } else {
+            madeStatus = null; // Still possible to make bid
+          }
+        } else {
+          madeStatus = null; // No bid
+        }
       }
     } else if (isSoloGame) {
-      // Solo: tick/cross only for self
-      if (bidCount === 0 && madeCount > 0) {
-        madeStatus = '❌';
-      } else if (madeCount >= bidCount && bidCount > 0) {
-        madeStatus = '✅';
-      } else if (madeCount + tricksLeft < bidCount && bidCount > 0) {
-        madeStatus = '❌';
+      // Solo game logic (individual player)
+      if (bidCount === 0) {
+        // Nil bid
+        if (madeCount > 0) {
+          madeStatus = '❌'; // Failed nil
+        } else if (tricksLeft === 0) {
+          madeStatus = '✅'; // Successful nil
+        } else {
+          madeStatus = null; // Still in progress
+        }
+      } else if (bidCount > 0) {
+        // Regular bid
+        if (madeCount >= bidCount) {
+          madeStatus = '✅'; // Made bid
+        } else if (madeCount + tricksLeft < bidCount) {
+          madeStatus = '❌'; // Cannot make bid
+        } else {
+          madeStatus = null; // Still possible
+        }
       } else {
-        madeStatus = null;
+        madeStatus = null; // No bid
       }
     } else {
       // Fallback: hide
       madeStatus = null;
+    }
+    
+    // Debug logging for tick/cross logic
+    if (gameState.status === 'PLAYING' && (bidCount > 0 || madeCount > 0)) {
+      if (isPartnerGame) {
+        const partnerIndex = (position + 2) % 4;
+        const partner = orderedPlayers[partnerIndex];
+        const partnerBid = (gameState as any).bidding?.bids?.[partnerIndex] ?? 0;
+        const partnerMade = partner && partner.tricks ? partner.tricks : 0;
+        const teamBid = bidCount + partnerBid;
+        const teamMade = madeCount + partnerMade;
+        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, partnerBid=${partnerBid}, partnerMade=${partnerMade}, teamBid=${teamBid}, teamMade=${teamMade}, tricksLeft=${tricksLeft}, status=${madeStatus}, canMakeBid=${teamMade + tricksLeft >= teamBid}`);
+      } else {
+        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, tricksLeft=${tricksLeft}, status=${madeStatus}, isPartnerGame=${isPartnerGame}`);
+      }
     }
     // --- END NEW LOGIC ---
 
@@ -696,8 +781,8 @@ export default function GameTable({
       if (idx + 1 < sortedHand.length) {
         dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 100);
       } else {
-        // Dealing animation complete - wait 1 second before allowing bidding
-        setTimeout(() => setDealingComplete(true), 1000);
+        // Dealing animation complete - allow bidding immediately
+        setDealingComplete(true);
       }
     }
     dealTimeoutRef.current = setTimeout(() => dealNext(0), 10);
@@ -721,16 +806,11 @@ export default function GameTable({
     }
   }, [gameState.status]);
 
-  // After dealing animation completes, add a 2s delay before enabling bidding
+  // After dealing animation completes, enable bidding immediately
   useEffect(() => {
     if (dealingComplete && gameState.status === 'BIDDING') {
-      console.log('[DEBUG] Dealing complete. Starting 2s bidding delay...');
-      setBiddingReady(false);
-      const timer = setTimeout(() => {
-        console.log('[DEBUG] Bidding ready set to true after 2s delay.');
-        setBiddingReady(true);
-      }, 2000);
-      return () => clearTimeout(timer);
+      console.log('[DEBUG] Dealing complete. Enabling bidding immediately.');
+      setBiddingReady(true);
     } else {
       setBiddingReady(false);
     }
@@ -827,9 +907,10 @@ export default function GameTable({
       >
         <div className="flex">
           {sortedHand.map((card: Card, index: number) => {
-            const isPlayable = gameState.status === "PLAYING" &&
+            const isPlayable = (gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
-              effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank);
+              effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
+              (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
             const isVisible = index < visibleCount;
             return (
               <div
@@ -843,7 +924,7 @@ export default function GameTable({
                   pointerEvents: 'auto',
                   opacity: isVisible ? 1 : 0,
                 }}
-                onClick={() => isPlayable && handlePlayCard(card)}
+                onClick={() => isPlayable && gameState.status === "PLAYING" && handlePlayCard(card)}
               >
                 <div className="relative">
                   <img
@@ -871,31 +952,151 @@ export default function GameTable({
     if (!socket) return;
 
     // Listen for hand completion event
-    const handleHandCompleted = () => {
-      console.log('Hand completed - calculating scores for display');
+    const handleHandCompleted = (data?: any) => {
+      console.log('[HAND COMPLETED] Client received hand completion event:', data);
+      console.log('Hand summary data received:', JSON.stringify(data, null, 2));
       
-      // Calculate scores using the scoring algorithm
-      const onlyPlayers = sanitizedPlayers.filter(isPlayer);
-      const calculatedScores = calculateHandScore(onlyPlayers);
+      // Store the hand summary data from server
+      if (data) {
+        setHandSummaryData(data);
+        console.log('Hand summary data stored in state');
+      } else {
+        console.log('No hand summary data received');
+      }
       
-      console.log('Hand scores calculated:', calculatedScores);
-      
-      // Set the hand scores and show the modal
-      setShowHandSummary(true);
+      // Add delay to allow trick completion animation to finish before showing hand summary
+      setTimeout(() => {
+        setShowHandSummary(true);
+      }, 3000); // 3 second delay to allow trick animation to complete
     };
     
     // Register event listener for hand completion
-    socket.on('hand_completed', handleHandCompleted);
+    if (socket && socket.connected) {
+      console.log('[SOCKET] Registering hand_completed event listener (socket connected)');
+      socket.on('hand_completed', (data) => {
+        console.log('[CLIENT] hand_completed event received:', data);
+        handleHandCompleted(data);
+      });
+    } else {
+      console.log('[SOCKET] Cannot register hand_completed listener - socket not ready:', { socket: !!socket, connected: socket?.connected });
+    }
     
-    // Handle scoring state change directly in case the server doesn't emit the event
-    if (gameState.status === "PLAYING" && (sanitizedPlayers.filter(isPlayer) as Player[]).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && !showHandSummary) {
-      handleHandCompleted();
+    // Fallback: Check if hand is complete but no event was received
+    if (gameState.status === "PLAYING" && 
+        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && 
+        !showHandSummary && 
+        !handSummaryData &&
+        gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
+      console.log('[FALLBACK] Detected hand completion without event, calculating scores manually');
+      
+      // Calculate scores manually from game state
+      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
+      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
+      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
+      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+      
+      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
+      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
+      
+      const fallbackData = {
+        team1Score,
+        team2Score,
+        team1Bags: Math.max(0, team1Tricks - team1Bid),
+        team2Bags: Math.max(0, team2Tricks - team2Bid),
+        team1TotalScore: team1Score,
+        team2TotalScore: team2Score,
+        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
+      };
+      
+      console.log('[FALLBACK] Calculated fallback data:', fallbackData);
+      handleHandCompleted(fallbackData);
     }
     
     return () => {
-      socket.off('hand_completed', handleHandCompleted);
+      if (socket) {
+        socket.off('hand_completed', handleHandCompleted);
+      }
     };
   }, [socket, gameState.id, gameState.status, sanitizedPlayers, showHandSummary]);
+
+  // Fallback: Check if hand is complete but no event was received
+  useEffect(() => {
+    if (gameState.status === "PLAYING" && 
+        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && 
+        !showHandSummary && 
+        !handSummaryData &&
+        gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
+      console.log('[FALLBACK] Detected hand completion without event, calculating scores manually');
+      
+      // Calculate scores manually from game state
+      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
+      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
+      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
+      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+      
+      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
+      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
+      
+      const fallbackData = {
+        team1Score,
+        team2Score,
+        team1Bags: Math.max(0, team1Tricks - team1Bid),
+        team2Bags: Math.max(0, team2Tricks - team2Bid),
+        team1TotalScore: team1Score,
+        team2TotalScore: team2Score,
+        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
+      };
+      
+      console.log('[FALLBACK] Calculated fallback data:', fallbackData);
+      
+      // Store the hand summary data
+      setHandSummaryData(fallbackData);
+      
+      // Add delay to allow trick completion animation to finish before showing hand summary
+      setTimeout(() => {
+        setShowHandSummary(true);
+      }, 3000);
+    }
+  }, [gameState.status, sanitizedPlayers, showHandSummary, handSummaryData, gameState.players, gameState.bidding]);
+
+  // Effect to handle new hand started
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewHandStarted = (data: any) => {
+      console.log('[NEW HAND] New hand started event received:', data);
+      console.log('New dealer index:', data.dealerIndex);
+      console.log('New hands:', data.hands);
+      console.log('New current bidder index:', data.currentBidderIndex);
+      
+      // Reset dealing state for new hand
+      setDealingComplete(false);
+      setBiddingReady(false);
+      setDealtCardCount(0);
+      
+      // The game state will be updated by the game_update event
+    };
+
+    socket.on('new_hand_started', handleNewHandStarted);
+
+    return () => {
+      socket.off('new_hand_started', handleNewHandStarted);
+    };
+  }, [socket]);
+
+  // Fallback: If hand summary was shown but no new hand started after 15 seconds, force start
+  useEffect(() => {
+    if (!showHandSummary && handSummaryData && gameState.status === "PLAYING" && 
+        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0)) {
+      
+      const timeout = setTimeout(() => {
+        console.log('[FALLBACK] Hand summary closed but no new hand started after 15s, forcing start');
+        handleStartNewHand();
+      }, 15000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [showHandSummary, handSummaryData, gameState.status, sanitizedPlayers]);
 
   // Initialize the global variable
   useEffect(() => {
@@ -904,11 +1105,11 @@ export default function GameTable({
     }
   }, []);
 
-  // Calculate scores
-  const team1Score = gameState?.scores?.['team1'] ?? 0;
-  const team2Score = gameState?.scores?.['team2'] ?? 0;
-  const team1Bags = gameState?.team1Bags ?? 0;
-  const team2Bags = gameState?.team2Bags ?? 0;
+  // Calculate scores - use hand summary data if available, otherwise use game state
+  const team1Score = handSummaryData?.team1TotalScore ?? gameState?.scores?.['team1'] ?? 0;
+  const team2Score = handSummaryData?.team2TotalScore ?? gameState?.scores?.['team2'] ?? 0;
+  const team1Bags = handSummaryData?.team1Bags ?? gameState?.team1Bags ?? 0;
+  const team2Bags = handSummaryData?.team2Bags ?? gameState?.team2Bags ?? 0;
 
   // Update cardPlayers when game state changes
   useEffect(() => {
@@ -1446,7 +1647,7 @@ export default function GameTable({
                         )
                     }
                   </div>
-                ) : gameState.status === "PLAYING" && currentTrick?.length === 0 ? (
+                ) : gameState.status === "PLAYING" && currentTrick?.length === 0 && gameState.currentPlayer !== currentPlayerId ? (
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {gameState.currentPlayer
@@ -1501,12 +1702,11 @@ export default function GameTable({
             isOpen={showHandSummary}
             onClose={() => setShowHandSummary(false)}
             gameState={gameState}
-            onNextHand={() => {
-              setShowHandSummary(false);
-              // Add any next hand logic here
-            }}
+            handSummaryData={handSummaryData}
+            onNextHand={handleStartNewHand}
             onNewGame={() => {
               setShowHandSummary(false);
+              setHandSummaryData(null);
               // Add any new game logic here
             }}
           />

@@ -414,6 +414,22 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
   });
 
+  // Handle play_start event to trigger bot playing
+  socket.on('play_start', ({ gameId }) => {
+    const game = games.find(g => g.id === gameId);
+    if (!game || !game.play) return;
+    
+    const currentPlayer = game.players[game.play.currentPlayerIndex];
+    if (currentPlayer && currentPlayer.type === 'bot') {
+      console.log('[BOT DEBUG] play_start triggered bot playing for:', currentPlayer.username);
+      setTimeout(() => {
+        botPlayCard(game, game.play.currentPlayerIndex);
+      }, 1000);
+    }
+  });
+
+
+
   // Start game event
   socket.on('start_game', async ({ gameId }) => {
     try {
@@ -519,10 +535,37 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Invalid game state: no dealer assigned' });
         return;
       }
-      const idx = (game.dealerIndex + 1) % 4;
-      if (game.players[idx] && game.players[idx]!.type === 'bot') {
-        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', idx, 'bot:', game.players[idx]!.username);
-        botPlayCard(game, idx);
+      const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
+      if (!firstPlayer) {
+        socket.emit('error', { message: 'Invalid game state' });
+        return;
+      }
+      
+      // --- Play phase state ---
+      game.status = 'PLAYING';
+      game.play = {
+        currentPlayer: firstPlayer.id,
+        currentPlayerIndex: (game.dealerIndex + 1) % 4,
+        currentTrick: [],
+        tricks: [],
+        trickNumber: 0
+      };
+      
+      io.to(game.id).emit('bidding_complete', { currentBidderIndex: null, bids: game.bidding.bids });
+      io.to(game.id).emit('play_start', {
+        gameId: game.id,
+        currentPlayerIndex: game.play.currentPlayerIndex,
+        currentTrick: game.play.currentTrick,
+        trickNumber: game.play.trickNumber,
+      });
+      emitGameUpdateToPlayers(game);
+      
+      // If first player is a bot, trigger bot card play
+      if (firstPlayer.type === 'bot') {
+        console.log('[BOT DEBUG] (SOCKET) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
+        setTimeout(() => {
+          botPlayCard(game, (game.dealerIndex + 1) % 4);
+        }, 500);
       }
     } else {
       game.bidding.currentBidderIndex = next;

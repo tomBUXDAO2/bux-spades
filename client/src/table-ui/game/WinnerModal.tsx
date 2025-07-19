@@ -27,7 +27,7 @@ export default function WinnerModal({ isOpen, onClose, team1Score, team2Score, w
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900/75 rounded-lg p-3 max-w-xs w-full shadow-xl border border-gray-700">
+      <div className="bg-gray-900/75 rounded-lg p-3 max-w-xs w-full shadow-xl border border-white/20">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
           <h2 className="text-lg font-bold text-white text-center">Team {winningTeam} Wins!</h2>

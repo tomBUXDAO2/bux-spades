@@ -17,28 +17,26 @@ const StartGameWarningModal: React.FC<StartGameWarningModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-        <div className="text-center">
-          {/* Warning Icon */}
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
-            <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+        <div>
+          {/* Header with inline icon and title */}
+          <div className="flex items-center justify-center mb-4">
+            <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            <h3 className="text-2xl font-bold text-white">
+              Empty Seats Detected
+            </h3>
           </div>
-
-          {/* Title */}
-          <h3 className="text-lg font-medium text-white mb-2">
-            Empty Seats Detected
-          </h3>
-
-          {/* Message */}
-          <p className="text-gray-300 mb-2">
-            Coin games require 4 human players. You have {emptySeatsCount} empty seat{emptySeatsCount !== 1 ? 's' : ''}.
-          </p>
-          <p className="text-gray-300 mb-6">
-            If you continue, the game will start with bot players in all empty seats and the game will not be rated.
-          </p>
-
+          {/* Message - center aligned */}
+          <div className="text-center mb-6">
+            <p className="text-lg text-gray-200 mb-2 font-semibold">
+              Coin games require 4 human players.<br />You have {emptySeatsCount} empty seat{emptySeatsCount !== 1 ? 's' : ''}.
+            </p>
+            <p className="text-gray-300">
+              If you continue, the game will start with bot players in all empty seats and the game will not be rated.
+            </p>
+          </div>
           {/* Buttons */}
           <div className="flex gap-3 justify-center">
             <button

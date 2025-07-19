@@ -8,6 +8,11 @@ import type { AuthenticatedSocket } from '../index';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper function to filter out null values
+function isNonNull<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
 // In-memory games store
 export const games: Game[] = [];
 
@@ -435,15 +440,18 @@ export function botMakeMove(game: Game, seatIndex: number) {
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         io.to(game.id).emit('bidding_complete', { currentBidderIndex: null, bids: game.bidding.bids });
         io.to(game.id).emit('play_start', {
+          gameId: game.id,
           currentPlayerIndex: game.play.currentPlayerIndex,
           currentTrick: game.play.currentTrick,
           trickNumber: game.play.trickNumber,
         });
-        // If first player is a bot, trigger bot card play
-        if (firstPlayer.type === 'bot') {
-          console.log('[BOT DEBUG] (ROUTES) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
+              // If first player is a bot, trigger bot card play
+      if (firstPlayer.type === 'bot') {
+        console.log('[BOT DEBUG] (ROUTES) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
+        setTimeout(() => {
           botPlayCard(game, (game.dealerIndex + 1) % 4);
-        }
+        }, 500);
+      }
         return;
       } else {
         if (!game.bidding) return; // Guard for undefined
@@ -506,6 +514,17 @@ export function botPlayCard(game: Game, seatIndex: number) {
     if (cardIndex === -1) return;
     hand.splice(cardIndex, 1);
     game.play.currentTrick.push({ ...card, playerIndex: seatIndex });
+    
+    // Emit play_update to notify frontend about the card being played
+    io.to(game.id).emit('play_update', {
+      currentPlayerIndex: game.play.currentPlayerIndex,
+      currentTrick: game.play.currentTrick,
+      hands: game.hands.map((h, i) => ({
+        playerId: game.players[i]?.id,
+        handCount: h.length,
+      })),
+    });
+    
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
       console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
@@ -524,25 +543,27 @@ export function botPlayCard(game: Game, seatIndex: number) {
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
       }
-      // Emit trick complete with the current trick before clearing it
-      io.to(game.id).emit('trick_complete', {
-        trick: {
-          cards: game.play.currentTrick,
-          winnerIndex: winnerIndex,
-        },
-        trickNumber: game.play.trickNumber,
-      });
-      // Emit immediate game update with updated trick counts
-      const enrichedGame = enrichGameForClient(game);
-      console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-      io.to(game.id).emit('game_update', enrichedGame);
-      // Delay clearing the trick to allow frontend animation
-      setTimeout(() => {
-        if (!game.play) return; // Guard for undefined
-        game.play!.currentTrick = [];
-        // Do NOT emit game_update here
-      }, 2000); // 2 second delay to match frontend animation
+              // Emit trick complete with the current trick before clearing it
+        ioInstance.to(game.id).emit('trick_complete', {
+          trick: {
+            cards: game.play.currentTrick,
+            winnerIndex: winnerIndex,
+          },
+          trickNumber: game.play.trickNumber,
+        });
+        // Emit immediate game update with updated trick counts
+        const enrichedGame = enrichGameForClient(game);
+        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
+        ioInstance.to(game.id).emit('game_update', enrichedGame);
+        // Delay clearing the trick to allow frontend animation
+        setTimeout(() => {
+          if (!game.play) return; // Guard for undefined
+          game.play!.currentTrick = [];
+          // Emit game update to clear the trick from the table
+          ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+        }, 1000); // 1 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
+      console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       if (game.play.trickNumber === 13) {
         // --- Hand summary and scoring ---
         const handSummary = calculatePartnersHandScore(game);
@@ -551,7 +572,14 @@ export function botPlayCard(game: Game, seatIndex: number) {
         game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
         game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
         game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
-        io.to(game.id).emit('hand_completed', {
+        console.log('[HAND COMPLETED] Emitting hand_completed event with data:', {
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
+        ioInstance.to(game.id).emit('hand_completed', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
           team2TotalScore: game.team2TotalScore,
@@ -566,7 +594,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         ) {
           game.status = 'COMPLETED';
           const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
-          io.to(game.id).emit('game_over', {
+          ioInstance.to(game.id).emit('game_over', {
             team1Score: game.team1TotalScore,
             team2Score: game.team2TotalScore,
             winningTeam,
@@ -584,23 +612,35 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Add a small delay to allow the trick completion animation
         setTimeout(() => {
           botPlayCard(game, winnerIndex);
-        }, 2500); // 2.5 second delay to allow trick completion animation
+        }, 1200); // 1.2 second delay to allow trick completion animation
       }
       return;
     } else {
-      // Advance to the next player
-      let nextPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
-      game.play.currentPlayerIndex = nextPlayerIndex;
-      game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-      // If the next player is a bot, trigger their move
-      const nextPlayer = game.players[nextPlayerIndex];
-      if (nextPlayer && nextPlayer.type === 'bot') {
-        setTimeout(() => {
-          botPlayCard(game, nextPlayerIndex);
-        }, 1000);
-      }
+      // Emit game update to ensure frontend has latest state
+      ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+      
+      // Add delay before advancing to next player to allow card rendering
+      setTimeout(() => {
+        if (!game.play) return; // Guard for undefined
+        
+        // Advance to the next player
+        let nextPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
+        game.play.currentPlayerIndex = nextPlayerIndex;
+        game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
+        
+        // Emit final game update with new current player
+        ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+        
+        // If the next player is a bot, trigger their move
+        const nextPlayer = game.players[nextPlayerIndex];
+        if (nextPlayer && nextPlayer.type === 'bot') {
+          setTimeout(() => {
+            botPlayCard(game, nextPlayerIndex);
+          }, 500);
+        }
+      }, 800); // 0.8 second delay to allow card rendering
     }
-  }, 1000);
+  }, 300);
 }
 
 // --- Bidding socket event ---
@@ -659,6 +699,7 @@ if (ioInstance) {
         
         ioInstance.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
         ioInstance.to(game.id).emit('play_start', {
+          gameId: game.id,
           currentPlayerIndex: game.play.currentPlayerIndex,
           currentTrick: game.play.currentTrick,
           trickNumber: game.play.trickNumber,
@@ -701,7 +742,7 @@ if (ioInstance) {
         socket.emit('error', { message: 'Invalid hand state' });
         return;
       }
-      const hands = game.hands.filter(isNonNull);
+      const hands = game.hands.filter((h): h is Card[] => h !== null && h !== undefined);
       const hand = hands[playerIndex]!;
       if (!hand || hand.length === 0) {
         socket.emit('error', { message: 'Invalid hand state' });
@@ -825,6 +866,70 @@ if (ioInstance) {
       console.log('[PLAY DEBUG] Emitting play_update with currentPlayerIndex:', playUpdate.currentPlayerIndex);
       ioInstance.to(game.id).emit('play_update', playUpdate);
       ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+    });
+
+    socket.on('start_new_hand', ({ gameId }) => {
+      if (!socket.isAuthenticated || !socket.userId) {
+        console.log('Unauthorized start_new_hand attempt');
+        socket.emit('error', { message: 'Not authorized' });
+        return;
+      }
+
+      try {
+        const game = games.find((g: Game) => g.id === gameId);
+        if (!game) {
+          console.log(`Game ${gameId} not found`);
+          socket.emit('error', { message: 'Game not found' });
+          return;
+        }
+
+        console.log('[START NEW HAND] Starting new hand for game:', gameId);
+
+        // Move dealer to the left (next position)
+        const newDealerIndex = (game.dealerIndex + 1) % 4;
+        game.dealerIndex = newDealerIndex;
+
+        // Reset game state for new hand
+        game.status = 'BIDDING';
+        game.hands = dealCards(game.players, newDealerIndex);
+        game.bidding = {
+          currentBidderIndex: (newDealerIndex + 1) % 4,
+          currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
+          bids: [null, null, null, null],
+          nilBids: {}
+        };
+        game.play = undefined;
+
+        // Reset player trick counts for new hand
+        game.players.forEach(player => {
+          if (player) {
+            player.tricks = 0;
+          }
+        });
+
+        // Emit new hand started event
+        console.log('[START NEW HAND] Emitting new_hand_started event');
+        ioInstance.to(game.id).emit('new_hand_started', {
+          dealerIndex: newDealerIndex,
+          hands: game.hands,
+          currentBidderIndex: game.bidding.currentBidderIndex
+        });
+
+        // Emit game update
+        ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+
+        // If first bidder is a bot, trigger their bid
+        const firstBidder = game.players[game.bidding.currentBidderIndex];
+        if (firstBidder && firstBidder.type === 'bot') {
+          setTimeout(() => {
+            botMakeMove(game, game.bidding.currentBidderIndex);
+          }, 500);
+        }
+
+      } catch (error) {
+        console.error('Error in start_new_hand:', error);
+        socket.emit('error', { message: 'Internal server error' });
+      }
     });
 
     socket.on('leave_game', ({ gameId, userId }) => {

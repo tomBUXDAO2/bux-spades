@@ -1,22 +1,3 @@
-// Remove Next.js-specific imports
-// import Image from 'next/image';
-
-// Remove unused imports
-// import { calculateHandScore, isGameOver } from '../../lib/scoring';
-// import { Player, HandSummary, TeamScore } from '../types/game';
-
-// Remove unused variables
-// const team1HandScore = handScores?.team1Score?.score || 0;
-// const team2HandScore = handScores?.team2Score?.score || 0;
-// const team1Bid = handScores?.team1Score?.bid || 0;
-// const team2Bid = handScores?.team2Score?.bid || 0;
-// const team1Tricks = handScores?.team1Score?.tricks || 0;
-// const team2Tricks = handScores?.team2Score?.tricks || 0;
-// const team1NilBids = handScores?.team1Score?.nilBids || 0;
-// const team2NilBids = handScores?.team2Score?.nilBids || 0;
-// const team1MadeNils = handScores?.team1Score?.madeNils || 0;
-// const team2MadeNils = handScores?.team2Score?.madeNils || 0;
-
 import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -32,6 +13,15 @@ interface HandSummaryModalProps {
   gameState: GameState;
   onNextHand: () => void;
   onNewGame: () => void;
+  handSummaryData?: {
+    team1Score: number;
+    team2Score: number;
+    team1Bags: number;
+    team2Bags: number;
+    team1TotalScore: number;
+    team2TotalScore: number;
+    tricksPerPlayer: number[];
+  };
 }
 
 export default function HandSummaryModal({
@@ -39,18 +29,62 @@ export default function HandSummaryModal({
   onClose,
   gameState,
   onNextHand,
-  onNewGame
+  onNewGame,
+  handSummaryData
 }: HandSummaryModalProps) {
+  console.log('HandSummaryModal rendered with data:', {
+    isOpen,
+    handSummaryData,
+    gameState: {
+      scores: gameState?.scores,
+      team1Bags: gameState?.team1Bags,
+      team2Bags: gameState?.team2Bags,
+      bidding: gameState?.bidding?.bids,
+      players: gameState?.players?.map(p => ({ tricks: p?.tricks, bid: p?.bid }))
+    }
+  });
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showLoserModal, setShowLoserModal] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(12);
   
   // Use total scores for game over check
-  const team1Score = gameState?.scores?.team1 || 0;
-  const team2Score = gameState?.scores?.team2 || 0;
+  const team1TotalScore = handSummaryData?.team1TotalScore || gameState?.scores?.team1 || 0;
+  const team2TotalScore = handSummaryData?.team2TotalScore || gameState?.scores?.team2 || 0;
 
   // Check if game is over using the GameState
   const gameIsOver = isGameOver(gameState);
-  // Determine winner using getWinningTeam if needed
+
+  // Timer effect for auto-advancing to next hand
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    console.log('HandSummaryModal timer started, timeRemaining:', timeRemaining);
+    
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        console.log('Timer tick, prev:', prev);
+        if (prev <= 1) {
+          // Auto-advance to next hand
+          console.log('[TIMER] Timer reached 0, calling onNextHand()');
+          onNextHand();
+          return 12;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      console.log('Clearing timer');
+      clearInterval(timer);
+    };
+  }, [isOpen, onNextHand]);
+
+  // Reset timer when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeRemaining(12);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (gameIsOver) {
@@ -59,6 +93,70 @@ export default function HandSummaryModal({
       // You may want to use getWinningTeam(gameState) here
     }
   }, [gameIsOver, onNextHand]);
+
+  // Calculate team bids and tricks
+  const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
+  const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+  const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
+  const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
+
+  // Calculate trick scores
+  const team1TrickScore = team1Tricks >= team1Bid ? team1Bid * 10 : -team1Bid * 10;
+  const team2TrickScore = team2Tricks >= team2Bid ? team2Bid * 10 : -team2Bid * 10;
+
+  // Calculate bag scores (excess tricks beyond bid)
+  const team1BagScore = Math.max(0, team1Tricks - team1Bid);
+  const team2BagScore = Math.max(0, team2Tricks - team2Bid);
+
+  // Calculate bag penalties
+  const team1BagPenalty = team1BagScore >= 10 ? -100 : 0;
+  const team2BagPenalty = team2BagScore >= 10 ? -100 : 0;
+
+  // Calculate nil bonuses
+  const calculateNilBonus = (team: number[]) => {
+    let bonus = 0;
+    for (const playerIndex of team) {
+      const bid = gameState.bidding?.bids?.[playerIndex] || 0;
+      const tricks = gameState.players?.[playerIndex]?.tricks || 0;
+      
+      if (bid === 0) { // Nil bid
+        if (tricks === 0) {
+          bonus += 100; // Successful nil
+        } else {
+          bonus -= 100; // Failed nil
+        }
+      } else if (bid === -1) { // Blind nil
+        if (tricks === 0) {
+          bonus += 200; // Successful blind nil
+        } else {
+          bonus -= 200; // Failed blind nil
+        }
+      }
+    }
+    return bonus;
+  };
+
+  const team1NilBonus = calculateNilBonus([0, 2]);
+  const team2NilBonus = calculateNilBonus([1, 3]);
+
+  // Calculate total hand scores
+  const team1HandTotal = team1TrickScore + team1BagScore + team1BagPenalty + team1NilBonus;
+  const team2HandTotal = team2TrickScore + team2BagScore + team2BagPenalty + team2NilBonus;
+
+  // Get player names
+  const getPlayerName = (index: number) => {
+    const player = gameState.players?.[index];
+    if (!player) return `Player ${index + 1}`;
+    return player.username || `Player ${index + 1}`;
+  };
+
+  const getPlayerBid = (index: number) => {
+    return gameState.bidding?.bids?.[index] || 0;
+  };
+
+  const getPlayerTricks = (index: number) => {
+    return gameState.players?.[index]?.tricks || 0;
+  };
 
     return (
       <>
@@ -87,36 +185,169 @@ export default function HandSummaryModal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all border border-white/20">
                   <Dialog.Title
                     as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900"
+                    className="text-2xl font-bold leading-6 text-white text-center mb-6"
                   >
                     Hand Summary
                   </Dialog.Title>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      Team 1 Score: {team1Score}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Team 2 Score: {team2Score}
-                    </p>
+                  
+                  <div className="grid grid-cols-2 gap-8">
+                    {/* Team 1 */}
+                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
+                      <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Team 1</h4>
+                      
+                      {/* Player Details */}
+                      <div className="space-y-3 mb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">{getPlayerName(0)}</span>
+                          <span className="text-white">{getPlayerTricks(0)} / {getPlayerBid(0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">{getPlayerName(2)}</span>
+                          <span className="text-white">{getPlayerTricks(2)} / {getPlayerBid(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Team Totals */}
+                      <div className="border-t border-gray-600 pt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Team Bid:</span>
+                          <span className="text-white">{team1Bid}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Team Tricks:</span>
+                          <span className="text-white">{team1Tricks}</span>
+                        </div>
+                      </div>
+
+                      {/* Scoring Breakdown */}
+                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Trick Score:</span>
+                          <span className={`font-semibold ${team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team1TrickScore >= 0 ? '+' : ''}{team1TrickScore}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Bag Score:</span>
+                          <span className={`font-semibold ${team1BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team1BagScore >= 0 ? '+' : ''}{team1BagScore}
+                          </span>
+                        </div>
+                        {team1BagPenalty !== 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Bag Penalty:</span>
+                            <span className="text-red-400 font-semibold">{team1BagPenalty}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Nil Bonus:</span>
+                          <span className={`font-semibold ${team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team1NilBonus >= 0 ? '+' : ''}{team1NilBonus}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
+                          <span className="text-white">Round:</span>
+                          <span className={`${team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team1HandTotal >= 0 ? '+' : ''}{team1HandTotal}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Running Total */}
+                      <div className="border-t border-gray-600 pt-3 mt-4">
+                        <div className="flex justify-between text-xl font-bold">
+                          <span className="text-blue-300">Score:</span>
+                          <span className={`${team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team1TotalScore >= 0 ? '+' : ''}{team1TotalScore}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Team 2 */}
+                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
+                      <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Team 2</h4>
+                      
+                      {/* Player Details */}
+                      <div className="space-y-3 mb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">{getPlayerName(1)}</span>
+                          <span className="text-white">{getPlayerTricks(1)} / {getPlayerBid(1)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">{getPlayerName(3)}</span>
+                          <span className="text-white">{getPlayerTricks(3)} / {getPlayerBid(3)}</span>
+                        </div>
+                      </div>
+
+                      {/* Team Totals */}
+                      <div className="border-t border-gray-600 pt-3 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Team Bid:</span>
+                          <span className="text-white">{team2Bid}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Team Tricks:</span>
+                          <span className="text-white">{team2Tricks}</span>
+                        </div>
+                      </div>
+
+                      {/* Scoring Breakdown */}
+                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Trick Score:</span>
+                          <span className={`font-semibold ${team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team2TrickScore >= 0 ? '+' : ''}{team2TrickScore}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Bag Score:</span>
+                          <span className={`font-semibold ${team2BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team2BagScore >= 0 ? '+' : ''}{team2BagScore}
+                          </span>
+                        </div>
+                        {team2BagPenalty !== 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Bag Penalty:</span>
+                            <span className="text-red-400 font-semibold">{team2BagPenalty}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-300">Nil Bonus:</span>
+                          <span className={`font-semibold ${team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team2NilBonus >= 0 ? '+' : ''}{team2NilBonus}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
+                          <span className="text-white">Round:</span>
+                          <span className={`${team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team2HandTotal >= 0 ? '+' : ''}{team2HandTotal}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Running Total */}
+                      <div className="border-t border-gray-600 pt-3 mt-4">
+                        <div className="flex justify-between text-xl font-bold">
+                          <span className="text-red-300">Score:</span>
+                          <span className={`${team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {team2TotalScore >= 0 ? '+' : ''}{team2TotalScore}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-6 flex justify-center">
                     <button
                       type="button"
-                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
                       onClick={onNextHand}
                     >
-                      Next Hand
-                    </button>
-                    <button
-                      type="button"
-                      className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-red-100 px-4 py-2 text-sm font-medium text-red-900 hover:bg-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                      onClick={onNewGame}
-                    >
-                      New Game
+                      Next Hand ({timeRemaining}s)
                     </button>
                   </div>
                 </Dialog.Panel>
@@ -129,16 +360,16 @@ export default function HandSummaryModal({
           <WinnerModal 
             isOpen={showWinnerModal} 
         onClose={() => setShowWinnerModal(false)}
-            team1Score={team1Score} 
-            team2Score={team2Score} 
+        team1Score={team1TotalScore} 
+        team2Score={team2TotalScore} 
             winningTeam={1} 
         onPlayAgain={onNewGame}
           />
           <LoserModal 
             isOpen={showLoserModal} 
         onClose={() => setShowLoserModal(false)}
-            team1Score={team1Score} 
-            team2Score={team2Score} 
+        team1Score={team1TotalScore} 
+        team2Score={team2TotalScore} 
             winningTeam={2} 
         onPlayAgain={onNewGame}
       />
