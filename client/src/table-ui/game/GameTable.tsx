@@ -16,6 +16,7 @@ import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
 import StartGameWarningModal from '../modals/StartGameWarningModal';
+import { api } from '@/lib/api';
 
 // Sound utility for dealing cards
 const playCardSound = () => {
@@ -399,11 +400,7 @@ export default function GameTable({
         : `/api/games/${gameState.id}/invite-bot-midgame`;
       
       console.log('Inviting bot to seat:', seatIndex);
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seatIndex, requesterId: currentPlayerId }),
-      });
+      const res = await api.post(endpoint, { seatIndex, requesterId: currentPlayerId });
       
       if (!res.ok) {
         const error = await res.json();
@@ -431,11 +428,7 @@ export default function GameTable({
       const endpoint = gameState.status === 'WAITING'
         ? `/api/games/${gameState.id}/remove-bot`
         : `/api/games/${gameState.id}/remove-bot-midgame`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seatIndex, requesterId: currentPlayerId }),
-      });
+      const res = await api.post(endpoint, { seatIndex, requesterId: currentPlayerId });
       if (!res.ok) {
         const error = await res.json();
         alert('Failed to remove bot: ' + (error.error || 'Unknown error'));
