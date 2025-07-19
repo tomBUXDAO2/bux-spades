@@ -40,7 +40,7 @@ const Login: React.FC = () => {
 
   const handleDiscordLogin = () => {
     const apiUrl = import.meta.env.PROD
-      ? import.meta.env.VITE_PROD_API_URL
+      ? "https://bux-spades-server.fly.dev"
       : "http://localhost:3000"; // Always use backend port in dev
     window.location.href = `${apiUrl}/api/auth/discord`;
   };

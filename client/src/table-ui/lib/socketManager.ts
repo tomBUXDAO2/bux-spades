@@ -1,7 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 
-// Get the socket URL from environment variables or use default
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+// For WebSocket connections in production, we need to use wss:// instead of https://
+const getWebSocketUrl = () => {
+  if (import.meta.env.VITE_SOCKET_URL) {
+    return import.meta.env.VITE_SOCKET_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+  }
+  if (import.meta.env.PROD) {
+    return 'wss://bux-spades-server.fly.dev';
+  }
+  return 'ws://localhost:3000';
+};
 
 // Add SocketState interface
 interface SocketState {
@@ -86,8 +94,9 @@ export class SocketManager {
     }
 
     // Initialize new socket connection with more robust settings
-    console.log('SocketManager: Connecting to', SOCKET_URL);
-    this.socket = io(SOCKET_URL, {
+    const wsUrl = getWebSocketUrl();
+    console.log('SocketManager: Connecting to', wsUrl);
+    this.socket = io(wsUrl, {
       transports: ['websocket', 'polling'],
       auth: {
         token,
