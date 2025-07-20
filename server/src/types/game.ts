@@ -68,6 +68,7 @@ export interface Game {
       winnerIndex: number;
     }[];
     trickNumber: number;
+    spadesBroken?: boolean;
   };
   team1TotalScore?: number;
   team2TotalScore?: number;

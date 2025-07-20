@@ -434,7 +434,8 @@ export function botMakeMove(game: Game, seatIndex: number) {
           currentPlayerIndex: (game.dealerIndex + 1) % 4,
           currentTrick: [],
           tricks: [],
-          trickNumber: 0
+          trickNumber: 0,
+          spadesBroken: false
         };
         // Emit game_update for client sync
         io.to(game.id).emit('game_update', enrichGameForClient(game));
@@ -500,7 +501,16 @@ export function botPlayCard(game: Game, seatIndex: number) {
       playableCards = hand; // No cards of lead suit, can play anything
     }
   } else {
-    playableCards = hand; // Bot is leading, can play anything
+    // Bot is leading
+    if (game.play.spadesBroken || hand.every(c => c.suit === 'S')) {
+      playableCards = hand; // Can lead any card
+    } else {
+      // Cannot lead spades unless only spades left
+      playableCards = hand.filter(c => c.suit !== 'S');
+      if (playableCards.length === 0) {
+        playableCards = hand; // Only spades left, must lead spades
+      }
+    }
   }
   // Simple bot: pick a random playable card
   const card = playableCards[Math.floor(Math.random() * playableCards.length)];
@@ -514,7 +524,10 @@ export function botPlayCard(game: Game, seatIndex: number) {
     if (cardIndex === -1) return;
     hand.splice(cardIndex, 1);
     game.play.currentTrick.push({ ...card, playerIndex: seatIndex });
-    
+    // Set spadesBroken if a spade is played
+    if (card.suit === 'S') {
+      game.play.spadesBroken = true;
+    }
     // Emit play_update to notify frontend about the card being played
     io.to(game.id).emit('play_update', {
       currentPlayerIndex: game.play.currentPlayerIndex,
@@ -755,10 +768,22 @@ if (ioInstance) {
         return;
       }
       
+      // --- ENFORCE SPADES BROKEN RULE ---
+      if (game.play.currentTrick.length === 0 && card.suit === 'S' && !game.play.spadesBroken) {
+        // If player has any non-spades, cannot lead spades
+        if (hand.some(c => c.suit !== 'S')) {
+          socket.emit('error', { message: 'You cannot lead spades until they are broken, unless you only have spades left.' });
+          return;
+        }
+      }
       // Remove card from hand and add to current trick
       hand.splice(cardIndex, 1);
       game.play.currentTrick.push({ ...card, playerIndex });
-      
+      // Set spadesBroken if a spade is played
+      if (card.suit === 'S') {
+        game.play.spadesBroken = true;
+      }
+
       // If trick is complete (4 cards)
       if (game.play.currentTrick.length === 4) {
         // Determine winner of the trick
@@ -1013,10 +1038,19 @@ function calculatePartnersHandScore(game: Game) {
   let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
   let team1Bags = 0, team2Bags = 0;
   let team1Score = 0, team2Score = 0;
+  // Use completedTricks if it has 13 tricks, otherwise fallback to play.tricks
+  const tricksArray = Array.isArray(game.completedTricks) && game.completedTricks.length === 13
+    ? game.completedTricks
+    : (Array.isArray(game.play.tricks) ? game.play.tricks : []);
   // Count tricks per player
   const tricksPerPlayer = [0, 0, 0, 0];
-  for (const trick of game.play.tricks) {
-    tricksPerPlayer[trick.winnerIndex]++;
+  for (const trick of tricksArray) {
+    if (Array.isArray(trick)) {
+      // This is a Card[] (legacy or fallback), skip
+      continue;
+    } else if (trick && typeof trick === 'object' && 'winnerIndex' in trick && typeof trick.winnerIndex === 'number') {
+      tricksPerPlayer[trick.winnerIndex]++;
+    }
   }
   // Calculate team bids and tricks
   for (const i of team1) {
@@ -1083,6 +1117,22 @@ function calculatePartnersHandScore(game: Game) {
   if (team2Bags >= 10) {
     team2Score -= 100;
     team2Bags -= 10;
+  }
+  // Ensure tricksPerPlayer always sums to 13
+  const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
+  if (totalTricks !== 13) {
+    // If not, try to fix by distributing missing tricks to players with the highest bid
+    let missing = 13 - totalTricks;
+    while (missing > 0) {
+      const maxBid = Math.max(...game.bidding.bids.map(b => b ?? 0));
+      const idx = game.bidding.bids.findIndex(b => b === maxBid);
+      if (idx >= 0) {
+        tricksPerPlayer[idx]++;
+        missing--;
+      } else {
+        break;
+      }
+    }
   }
   return {
     team1Score,

@@ -1061,12 +1061,11 @@ export default function GameTable({
       console.log('New dealer index:', data.dealerIndex);
       console.log('New hands:', data.hands);
       console.log('New current bidder index:', data.currentBidderIndex);
-      
       // Reset dealing state for new hand
       setDealingComplete(false);
       setBiddingReady(false);
       setDealtCardCount(0);
-      
+      setShowHandSummary(false); // Close hand summary modal
       // The game state will be updated by the game_update event
     };
 
@@ -1418,6 +1417,13 @@ export default function GameTable({
     transition: box-shadow 0.3s;
   }
   */
+
+  // Add effect to close hand summary modal when gameState.status transitions to BIDDING
+  useEffect(() => {
+    if (gameState.status === 'BIDDING') {
+      setShowHandSummary(false);
+    }
+  }, [gameState.status]);
 
   return (
     <>
