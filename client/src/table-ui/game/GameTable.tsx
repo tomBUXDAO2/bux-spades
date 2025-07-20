@@ -543,9 +543,8 @@ export default function GameTable({
       const teamBid = bidCount + partnerBid;
       const teamMade = madeCount + partnerMade;
       
-      // Handle nil bids first (individual player logic)
+      // Nil bid: show cross if they take a trick, tick if they make it through
       if (bidCount === 0) {
-        // Nil bid: show cross if they take a trick, tick if they make it through
         if (madeCount > 0) {
           madeStatus = '❌'; // Failed nil
         } else if (tricksLeft === 0) {
@@ -553,17 +552,8 @@ export default function GameTable({
         } else {
           madeStatus = null; // Still in progress
         }
-      } else if (partnerBid === 0) {
-        // Partner has nil bid: show cross if partner takes a trick, tick if partner makes it through
-        if (partnerMade > 0) {
-          madeStatus = '❌'; // Partner failed nil
-        } else if (tricksLeft === 0) {
-          madeStatus = '✅'; // Partner successful nil (hand complete)
-        } else {
-          madeStatus = null; // Still in progress
-        }
       } else {
-        // Regular team bid logic (no nils)
+        // Non-nil: tick if teamMade >= teamBid, cross if teamMade < teamBid
         if (teamBid > 0) {
           if (teamMade >= teamBid) {
             madeStatus = '✅'; // Team made their bid
