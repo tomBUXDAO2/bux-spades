@@ -862,9 +862,17 @@ export default function GameTable({
     }
     // Defensive: only use myHand and playableCards if defined
     let effectivePlayableCards: typeof myHand = [];
-    if (isMyTurn && Array.isArray(playableCards) && playableCards.length === 0 && Array.isArray(myHand)) {
-      console.warn('[DEBUG] No playable cards detected, allowing all cards for debugging.');
-      effectivePlayableCards = myHand;
+    if (isMyTurn && Array.isArray(myHand)) {
+      const isLeading = currentTrick.length === 0;
+      const spadesBroken = (gameState as any).play?.spadesBroken;
+      if (isLeading && !spadesBroken && myHand.some(c => c.suit !== 'S')) {
+        effectivePlayableCards = myHand.filter(c => c.suit !== 'S');
+        if (effectivePlayableCards.length === 0) {
+          effectivePlayableCards = myHand; // Only spades left
+        }
+      } else {
+        effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading);
+      }
     } else if (Array.isArray(playableCards)) {
       effectivePlayableCards = playableCards;
     }
@@ -1414,6 +1422,20 @@ export default function GameTable({
       setShowHandSummary(false);
     }
   }, [gameState.status]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleSocketError = (error: { message: string }) => {
+      if (typeof error?.message === 'string' && error.message.includes('spades')) {
+        setPendingPlayedCard(null);
+        alert(error.message);
+      }
+    };
+    socket.on('error', handleSocketError);
+    return () => {
+      socket.off('error', handleSocketError);
+    };
+  }, [socket]);
 
   return (
     <>
