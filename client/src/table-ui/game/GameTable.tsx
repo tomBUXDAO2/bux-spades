@@ -1088,10 +1088,10 @@ export default function GameTable({
   }, []);
 
   // Calculate scores - use hand summary data if available, otherwise use game state
-  const team1Score = handSummaryData?.team1TotalScore ?? gameState?.scores?.['team1'] ?? 0;
-  const team2Score = handSummaryData?.team2TotalScore ?? gameState?.scores?.['team2'] ?? 0;
-  const team1Bags = handSummaryData?.team1Bags ?? gameState?.team1Bags ?? 0;
-  const team2Bags = handSummaryData?.team2Bags ?? gameState?.team2Bags ?? 0;
+  const team1Score = gameState.team1TotalScore ?? 0;
+  const team2Score = gameState.team2TotalScore ?? 0;
+  const team1Bags = gameState.team1Bags ?? 0;
+  const team2Bags = gameState.team2Bags ?? 0;
 
   // Update cardPlayers when game state changes
   useEffect(() => {

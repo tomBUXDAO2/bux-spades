@@ -50,6 +50,8 @@ export interface GameState {
     team1: number;
     team2: number;
   };
+  team1TotalScore?: number;
+  team2TotalScore?: number;
   rules: {
     gameType: GameType;
     allowNil: boolean;
