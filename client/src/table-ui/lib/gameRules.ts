@@ -137,8 +137,8 @@ export function isHandComplete(game: GameState): boolean {
  */
 export function isGameOver(game: GameState): boolean {
   // Use total scores for game over check
-  const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
-  const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
+  const team1Score = game.team1TotalScore || 0;
+  const team2Score = game.team2TotalScore || 0;
   
   // Use the actual game settings - these should always be set when game is created
   const maxPoints = game.maxPoints;
@@ -173,8 +173,8 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
     return null;
   }
   // Use total scores for winning team determination
-  const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
-  const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
+  const team1Score = game.team1TotalScore || 0;
+  const team2Score = game.team2TotalScore || 0;
   
   // Use the actual game settings - these should always be set when game is created
   const maxPoints = game.maxPoints;

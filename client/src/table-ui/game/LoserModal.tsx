@@ -30,15 +30,15 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
       <div className="bg-gray-900/75 rounded-lg p-3 max-w-xs w-full shadow-xl border border-white/20">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-gray-400" />
-          <h2 className="text-lg font-bold text-white text-center">Team {winningTeam} Wins!</h2>
+          <h2 className="text-lg font-bold text-white text-center">{winningTeam === 1 ? 'Blue Team' : 'Red Team'} Wins!</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           {/* Team 1 (Red) */}
           <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
             <div className="flex items-center mb-1">
-              <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-              <h3 className="text-base font-semibold text-white">Team 1</h3>
+              <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+              <h3 className="text-base font-semibold text-white">Blue Team</h3>
             </div>
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
@@ -51,8 +51,8 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
           {/* Team 2 (Blue) */}
           <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
             <div className="flex items-center mb-1">
-              <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-              <h3 className="text-base font-semibold text-white">Team 2</h3>
+              <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+              <h3 className="text-base font-semibold text-white">Red Team</h3>
             </div>
             <div className="space-y-1">
               <div className="flex justify-between text-xs">

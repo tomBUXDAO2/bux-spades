@@ -987,6 +987,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         return;
       }
 
+      // Check if game is already completed - don't allow new hands
+      if (game.status === 'COMPLETED') {
+        console.log('[START NEW HAND] Game is already completed, cannot start new hand');
+        socket.emit('error', { message: 'Game is already completed' });
+        return;
+      }
+
       console.log('[START NEW HAND] Starting new hand for game:', gameId);
 
       // Move dealer to the left (next position)

@@ -48,15 +48,20 @@ export default function HandSummaryModal({
   const [timeRemaining, setTimeRemaining] = useState(12);
   
   // Use total scores for game over check
-  const team1TotalScore = handSummaryData?.team1TotalScore || gameState?.scores?.team1 || 0;
-  const team2TotalScore = handSummaryData?.team2TotalScore || gameState?.scores?.team2 || 0;
+  const team1TotalScore = handSummaryData?.team1TotalScore || gameState?.team1TotalScore || 0;
+  const team2TotalScore = handSummaryData?.team2TotalScore || gameState?.team2TotalScore || 0;
 
   // Check if game is over using the GameState
   const gameIsOver = isGameOver(gameState);
+  if (gameIsOver) return null;
 
   // Timer effect for auto-advancing to next hand
   useEffect(() => {
-    if (!isOpen || gameIsOver) return; // Don't run timer if game is over
+    if (!isOpen || gameIsOver) {
+      // Clear timer if game is over
+      setTimeRemaining(0);
+      return;
+    }
     
     console.log('HandSummaryModal timer started, timeRemaining:', timeRemaining);
     
@@ -80,38 +85,41 @@ export default function HandSummaryModal({
 
   // Effect to handle timer completion
   useEffect(() => {
-    if (timeRemaining === 0 && !gameIsOver) {
+    if (timeRemaining === 0 && !gameIsOver && isOpen) {
       console.log('[TIMER] Timer completed, calling onNextHand() and onClose()');
       console.log('[TIMER] onNextHand function:', onNextHand);
       console.log('[TIMER] onClose function:', onClose);
       onNextHand();
       onClose();
     }
-  }, [timeRemaining, onNextHand, onClose, gameIsOver]);
+  }, [timeRemaining, onNextHand, onClose, gameIsOver, isOpen]);
 
   // Reset timer when modal opens
   useEffect(() => {
     if (isOpen && !gameIsOver) {
       setTimeRemaining(12);
+    } else if (isOpen && gameIsOver) {
+      setTimeRemaining(0);
     }
   }, [isOpen, gameIsOver]);
 
-  useEffect(() => {
-    if (gameIsOver) {
-      console.log('[HAND SUMMARY] Game is over, determining winner');
-      const winningTeam = getWinningTeam(gameState);
-      console.log('[HAND SUMMARY] Winning team:', winningTeam);
-      
-      if (winningTeam === 'team1') {
-        setShowWinnerModal(true);
-      } else if (winningTeam === 'team2') {
-        setShowLoserModal(true);
-      }
-      
-      // Don't auto-advance to next hand when game is over
-      return;
-    }
-  }, [gameIsOver, gameState]);
+  // Don't show winner/loser modals in HandSummaryModal - GameTable will handle that
+  // useEffect(() => {
+  //   if (gameIsOver) {
+  //     console.log('[HAND SUMMARY] Game is over, determining winner');
+  //     const winningTeam = getWinningTeam(gameState);
+  //     console.log('[HAND SUMMARY] Winning team:', winningTeam);
+  //     
+  //     if (winningTeam === 'team1') {
+  //       setShowWinnerModal(true);
+  //     } else if (winningTeam === 'team2') {
+  //       setShowLoserModal(true);
+  //     }
+  //     
+  //     // Don't auto-advance to next hand when game is over
+  //     return;
+  //   }
+  // }, [gameIsOver, gameState]);
 
   // Calculate team bids and tricks
   const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
@@ -247,9 +255,9 @@ export default function HandSummaryModal({
                   </Dialog.Title>
                   
                   <div className="grid grid-cols-2 gap-8">
-                    {/* Team 1 */}
+                    {/* Blue Team */}
                     <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                      <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Team 1</h4>
+                      <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Blue Team</h4>
                       
                       {/* Player Details */}
                       <div className="space-y-3 mb-4">
@@ -320,9 +328,9 @@ export default function HandSummaryModal({
                       </div>
                     </div>
 
-                    {/* Team 2 */}
+                    {/* Red Team */}
                     <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                      <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Team 2</h4>
+                      <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Red Team</h4>
                       
                       {/* Player Details */}
                       <div className="space-y-3 mb-4">
@@ -395,13 +403,20 @@ export default function HandSummaryModal({
                   </div>
 
                   <div className="mt-6 flex justify-center">
-                    <button
-                      type="button"
-                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
-                      onClick={onNextHand}
-                    >
-                      Next Hand ({timeRemaining}s)
-                    </button>
+                    {!gameIsOver ? (
+                      <button
+                        type="button"
+                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
+                        onClick={onNextHand}
+                      >
+                        Next Hand ({timeRemaining}s)
+                      </button>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-yellow-400 font-semibold mb-2">Game Over!</p>
+                        <p className="text-gray-300 text-sm">The game has ended. Check the winner/loser modal.</p>
+                      </div>
+                    )}
                   </div>
                 </Dialog.Panel>
               </Transition.Child>
@@ -410,22 +425,7 @@ export default function HandSummaryModal({
         </Dialog>
       </Transition>
 
-          <WinnerModal 
-            isOpen={showWinnerModal} 
-        onClose={() => setShowWinnerModal(false)}
-        team1Score={team1TotalScore} 
-        team2Score={team2TotalScore} 
-            winningTeam={1} 
-        onPlayAgain={onNewGame}
-          />
-          <LoserModal 
-            isOpen={showLoserModal} 
-        onClose={() => setShowLoserModal(false)}
-        team1Score={team1TotalScore} 
-        team2Score={team2TotalScore} 
-            winningTeam={2} 
-        onPlayAgain={onNewGame}
-      />
+          {/* Winner/Loser modals are handled by GameTable component */}
     </>
   );
 } 

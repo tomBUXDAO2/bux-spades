@@ -17,6 +17,7 @@ import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
 import StartGameWarningModal from '../modals/StartGameWarningModal';
 import { api } from '@/lib/api';
+import { isGameOver } from '../lib/gameRules';
 
 // Sound utility for dealing cards
 const playCardSound = () => {
@@ -1144,6 +1145,7 @@ export default function GameTable({
     const handleGameOver = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
       console.log('Game over event received:', data);
       setShowHandSummary(false);
+      setHandSummaryData(null);
       if (data.winningTeam === 1) {
         setShowWinner(true);
       } else {
@@ -1163,6 +1165,7 @@ export default function GameTable({
     if (gameState.status === "COMPLETED") {
       const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
       setShowHandSummary(false);
+      setHandSummaryData(null);
       if (winningTeam === 1) {
         setShowWinner(true);
       } else {
@@ -1653,23 +1656,23 @@ export default function GameTable({
               
               {/* Scoreboard in top right corner - inside the table */}
               <div className="absolute top-4 right-4 z-10 flex flex-col items-center gap-2 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
-                {/* Team 1 (Red) Score and Bags */}
+                {/* Blue Team Score and Bags */}
                 <div className="flex items-center">
-                  <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+                  <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
                   <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
-                  {/* Team 1 Bags */}
-                  <div className="flex items-center text-yellow-300 ml-2" title={`Team 1 Bags: ${team1Bags}`}> 
+                  {/* Blue Team Bags */}
+                  <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team1Bags}`}> 
                     <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
                     <span className="text-xs font-bold">{team1Bags}</span>
                   </div>
                 </div>
 
-                {/* Team 2 (Blue) Score and Bags */}
+                {/* Red Team Score and Bags */}
                 <div className="flex items-center">
-                  <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+                  <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
                   <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
-                  {/* Team 2 Bags */}
-                  <div className="flex items-center text-yellow-300 ml-2" title={`Team 2 Bags: ${team2Bags}`}> 
+                  {/* Red Team Bags */}
+                  <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team2Bags}`}> 
                     <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
                     <span className="text-xs font-bold">{team2Bags}</span>
                   </div>
@@ -1801,7 +1804,7 @@ export default function GameTable({
         </div>
 
         {/* Hand Summary Modal - Pass currentHandSummary */}
-        {showHandSummary && (
+        {showHandSummary && !isGameOver(gameState) && (
           <HandSummaryModal
             isOpen={showHandSummary}
             onClose={() => setShowHandSummary(false)}
@@ -1821,8 +1824,8 @@ export default function GameTable({
           <WinnerModal
             isOpen={true}
             onClose={handleLeaveTable}
-            team1Score={gameState.scores.team1}
-            team2Score={gameState.scores.team2}
+            team1Score={gameState.team1TotalScore || 0}
+            team2Score={gameState.team2TotalScore || 0}
             winningTeam={1}
             onPlayAgain={handlePlayAgain}
           />
@@ -1833,8 +1836,8 @@ export default function GameTable({
           <LoserModal
             isOpen={true}
             onClose={handleLeaveTable}
-            team1Score={gameState.scores.team1}
-            team2Score={gameState.scores.team2}
+            team1Score={gameState.team1TotalScore || 0}
+            team2Score={gameState.team2TotalScore || 0}
             winningTeam={2}
             onPlayAgain={handlePlayAgain}
           />

@@ -46,10 +46,6 @@ export interface GameState {
   currentPlayer: string;
   currentTrick: Card[];
   completedTricks: Card[][];
-  scores: {
-    team1: number;
-    team2: number;
-  };
   team1TotalScore?: number;
   team2TotalScore?: number;
   rules: {
