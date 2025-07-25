@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { isGameOver } from '../lib/gameRules';
+import { isGameOver, getWinningTeam } from '../lib/gameRules';
 import type { GameState } from '../../types/game';
 import WinnerModal from './WinnerModal';
 import LoserModal from './LoserModal';
@@ -56,7 +56,7 @@ export default function HandSummaryModal({
 
   // Timer effect for auto-advancing to next hand
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || gameIsOver) return; // Don't run timer if game is over
     
     console.log('HandSummaryModal timer started, timeRemaining:', timeRemaining);
     
@@ -76,33 +76,42 @@ export default function HandSummaryModal({
       console.log('Clearing timer');
       clearInterval(timer);
     };
-  }, [isOpen]);
+  }, [isOpen, gameIsOver]);
 
   // Effect to handle timer completion
   useEffect(() => {
-    if (timeRemaining === 0) {
+    if (timeRemaining === 0 && !gameIsOver) {
       console.log('[TIMER] Timer completed, calling onNextHand() and onClose()');
       console.log('[TIMER] onNextHand function:', onNextHand);
       console.log('[TIMER] onClose function:', onClose);
       onNextHand();
       onClose();
     }
-  }, [timeRemaining, onNextHand, onClose]);
+  }, [timeRemaining, onNextHand, onClose, gameIsOver]);
 
   // Reset timer when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !gameIsOver) {
       setTimeRemaining(12);
     }
-  }, [isOpen]);
+  }, [isOpen, gameIsOver]);
 
   useEffect(() => {
     if (gameIsOver) {
-      onNextHand();
-      // Show appropriate modal based on winner
-      // You may want to use getWinningTeam(gameState) here
+      console.log('[HAND SUMMARY] Game is over, determining winner');
+      const winningTeam = getWinningTeam(gameState);
+      console.log('[HAND SUMMARY] Winning team:', winningTeam);
+      
+      if (winningTeam === 'team1') {
+        setShowWinnerModal(true);
+      } else if (winningTeam === 'team2') {
+        setShowLoserModal(true);
+      }
+      
+      // Don't auto-advance to next hand when game is over
+      return;
     }
-  }, [gameIsOver, onNextHand]);
+  }, [gameIsOver, gameState]);
 
   // Calculate team bids and tricks
   const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);

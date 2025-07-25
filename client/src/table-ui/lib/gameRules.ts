@@ -136,16 +136,22 @@ export function isHandComplete(game: GameState): boolean {
  * Determines if the game is over based on game type and scores
  */
 export function isGameOver(game: GameState): boolean {
-  const team1Score = game.scores?.team1 || 0;
-  const team2Score = game.scores?.team2 || 0;
+  // Use total scores for game over check
+  const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
+  const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
+  const maxPoints = game.maxPoints || 500;
+  const minPoints = game.minPoints || -250;
+  
+  console.log('[GAME OVER CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
+  
   switch (game.rules.gameType) {
     case 'REGULAR':
     case 'SOLO':
-      return team1Score >= 500 || team2Score >= 500 || team1Score <= -250 || team2Score <= -250;
+      return team1Score >= maxPoints || team2Score >= maxPoints || team1Score <= minPoints || team2Score <= minPoints;
     case 'WHIZ':
     case 'MIRROR':
       return (game.round || 0) >= (game.rules.numHands || 4) || 
-             team1Score >= 500 || team2Score >= 500;
+             team1Score >= maxPoints || team2Score >= maxPoints;
     default:
       return false;
   }
@@ -158,9 +164,22 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   if (!isGameOver(game)) {
     return null;
   }
-  const team1Score = game.scores?.team1 || 0;
-  const team2Score = game.scores?.team2 || 0;
-  if (team1Score <= -250) return 'team2';
-  if (team2Score <= -250) return 'team1';
+  // Use total scores for winning team determination
+  const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
+  const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
+  const maxPoints = game.maxPoints || 500;
+  const minPoints = game.minPoints || -250;
+  
+  console.log('[WINNING TEAM CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
+  
+  // If either team is below minPoints, the other team wins
+  if (team1Score <= minPoints) return 'team2';
+  if (team2Score <= minPoints) return 'team1';
+  
+  // If either team is above maxPoints, they win
+  if (team1Score >= maxPoints) return 'team1';
+  if (team2Score >= maxPoints) return 'team2';
+  
+  // Otherwise, highest score wins
   return team1Score > team2Score ? 'team1' : 'team2';
 } 
