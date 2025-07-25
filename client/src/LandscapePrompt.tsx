@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const LandscapePrompt: React.FC = () => {
   const [isPortrait, setIsPortrait] = useState(false);
+  const location = useLocation();
+
+  // Only show landscape prompt on game table pages
+  const isGameTablePage = location.pathname.includes('/table/');
 
   useEffect(() => {
     const checkOrientation = () => {
@@ -22,7 +27,8 @@ const LandscapePrompt: React.FC = () => {
     };
   }, []);
 
-  if (!isPortrait) {
+  // Only show if we're on a game table page AND in portrait mode
+  if (!isGameTablePage || !isPortrait) {
     return null;
   }
 
@@ -46,7 +52,7 @@ const LandscapePrompt: React.FC = () => {
         </div>
         <h2 className="text-2xl font-bold mb-4">Please Rotate Your Device</h2>
         <p className="text-lg mb-6">
-          BUX Spades is designed for landscape mode. Please rotate your device to continue playing.
+          The game table is designed for landscape mode. Please rotate your device to continue playing.
         </p>
         <div className="text-sm text-gray-400">
           <p>• Turn your device sideways</p>

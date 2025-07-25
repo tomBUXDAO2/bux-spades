@@ -29,7 +29,7 @@ export default function TablePage() {
            window.innerWidth <= 1024;
   };
 
-  // Request full-screen mode
+  // Request full-screen mode (only for game table)
   const requestFullScreen = async () => {
     if (isMobileOrTablet()) {
       try {
