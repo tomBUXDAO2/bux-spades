@@ -424,10 +424,21 @@ export function botMakeMove(game: Game, seatIndex: number) {
     setTimeout(() => {
       if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
-      // Calculate bid for REGULAR games
+      // Calculate bid based on game type
       let bid = 1;
-      if (game.rules && game.rules.bidType === 'REG' && game.hands && game.hands[seatIndex]) {
-        bid = calculateBotBid(game.hands[seatIndex]);
+      if (game.rules && game.hands && game.hands[seatIndex]) {
+        if (game.rules.bidType === 'MIRROR') {
+          // Mirror games: bid the number of spades in hand
+          const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
+          bid = spades.length;
+          console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
+        } else if (game.rules.bidType === 'REG') {
+          // Regular games: use complex bidding logic
+          bid = calculateBotBid(game.hands[seatIndex]);
+        } else {
+          // Default fallback
+          bid = calculateBotBid(game.hands[seatIndex]);
+        }
       }
       // Simulate bot making a bid
       game.bidding.bids[seatIndex] = bid;
