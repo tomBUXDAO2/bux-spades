@@ -135,9 +135,26 @@ export default function HandSummaryModal({
   const team1BagScore = Math.max(0, team1Tricks - team1Bid);
   const team2BagScore = Math.max(0, team2Tricks - team2Bid);
 
-  // Calculate bag penalties
-  const team1BagPenalty = team1BagScore >= 10 ? -100 : 0;
-  const team2BagPenalty = team2BagScore >= 10 ? -100 : 0;
+  // Get running total bags from game state
+  const team1RunningBags = gameState.team1Bags || 0;
+  const team2RunningBags = gameState.team2Bags || 0;
+
+  // Calculate bag penalties based on running total bags
+  // Bag penalty applies when running total reaches 10 or more
+  const team1BagPenalty = (team1RunningBags + team1BagScore) >= 10 ? -100 : 0;
+  const team2BagPenalty = (team2RunningBags + team2BagScore) >= 10 ? -100 : 0;
+
+  // Debug logging for bag penalty calculation
+  console.log('[HAND SUMMARY] Bag penalty calculation:', {
+    team1RunningBags,
+    team1BagScore,
+    team1TotalBags: team1RunningBags + team1BagScore,
+    team1BagPenalty,
+    team2RunningBags,
+    team2BagScore,
+    team2TotalBags: team2RunningBags + team2BagScore,
+    team2BagPenalty
+  });
 
   // Calculate nil bonuses
   const calculateNilBonus = (team: number[]) => {
