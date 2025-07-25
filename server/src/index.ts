@@ -769,11 +769,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         
         // --- Game over check ---
-        const winThreshold = 500, lossThreshold = -150;
+        // Use the actual game settings - these should always be set when game is created
+        const maxPoints = game.maxPoints;
+        const minPoints = game.minPoints;
+        
+        // Validate that we have the required game settings
+        if (maxPoints === undefined || minPoints === undefined) {
+          console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
+          return;
+        }
+        
+        console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
+        
         if (
-          game.team1TotalScore >= winThreshold || game.team2TotalScore >= winThreshold ||
-          game.team1TotalScore <= lossThreshold || game.team2TotalScore <= lossThreshold
+          game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
+          game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
         ) {
+          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
           game.status = 'COMPLETED';
           const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
           io.to(game.id).emit('game_over', {
@@ -835,11 +847,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         
         // --- Game over check ---
-        const winThreshold = 500, lossThreshold = -150;
+        // Use the actual game settings - these should always be set when game is created
+        const maxPoints = game.maxPoints;
+        const minPoints = game.minPoints;
+        
+        // Validate that we have the required game settings
+        if (maxPoints === undefined || minPoints === undefined) {
+          console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
+          return;
+        }
+        
+        console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
+        
         if (
-          game.team1TotalScore >= winThreshold || game.team2TotalScore >= winThreshold ||
-          game.team1TotalScore <= lossThreshold || game.team2TotalScore <= lossThreshold
+          game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
+          game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
         ) {
+          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
           game.status = 'COMPLETED';
           const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
           io.to(game.id).emit('game_over', {

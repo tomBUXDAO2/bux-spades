@@ -139,8 +139,16 @@ export function isGameOver(game: GameState): boolean {
   // Use total scores for game over check
   const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
   const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
-  const maxPoints = game.maxPoints || 500;
-  const minPoints = game.minPoints || -250;
+  
+  // Use the actual game settings - these should always be set when game is created
+  const maxPoints = game.maxPoints;
+  const minPoints = game.minPoints;
+  
+  // Validate that we have the required game settings
+  if (maxPoints === undefined || minPoints === undefined) {
+    console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
+    return false;
+  }
   
   console.log('[GAME OVER CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
   
@@ -167,8 +175,16 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   // Use total scores for winning team determination
   const team1Score = game.team1TotalScore || game.scores?.team1 || 0;
   const team2Score = game.team2TotalScore || game.scores?.team2 || 0;
-  const maxPoints = game.maxPoints || 500;
-  const minPoints = game.minPoints || -250;
+  
+  // Use the actual game settings - these should always be set when game is created
+  const maxPoints = game.maxPoints;
+  const minPoints = game.minPoints;
+  
+  // Validate that we have the required game settings
+  if (maxPoints === undefined || minPoints === undefined) {
+    console.error('[WINNING TEAM CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
+    return null;
+  }
   
   console.log('[WINNING TEAM CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
   
