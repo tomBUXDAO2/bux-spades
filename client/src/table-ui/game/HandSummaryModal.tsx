@@ -66,8 +66,7 @@ export default function HandSummaryModal({
         if (prev <= 1) {
           // Auto-advance to next hand
           console.log('[TIMER] Timer reached 0, calling onNextHand()');
-          onNextHand();
-          return 12;
+          return 0; // Set to 0 to trigger the effect below
         }
         return prev - 1;
       });
@@ -77,7 +76,18 @@ export default function HandSummaryModal({
       console.log('Clearing timer');
       clearInterval(timer);
     };
-  }, [isOpen, onNextHand]);
+  }, [isOpen]);
+
+  // Effect to handle timer completion
+  useEffect(() => {
+    if (timeRemaining === 0) {
+      console.log('[TIMER] Timer completed, calling onNextHand() and onClose()');
+      console.log('[TIMER] onNextHand function:', onNextHand);
+      console.log('[TIMER] onClose function:', onClose);
+      onNextHand();
+      onClose();
+    }
+  }, [timeRemaining, onNextHand, onClose]);
 
   // Reset timer when modal opens
   useEffect(() => {
@@ -97,8 +107,25 @@ export default function HandSummaryModal({
   // Calculate team bids and tricks
   const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
   const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-  const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
-  const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
+  
+  // Use server-calculated trick counts from handSummaryData if available, otherwise fallback to gameState
+  const tricksPerPlayer = handSummaryData?.tricksPerPlayer || [
+    gameState.players?.[0]?.tricks || 0,
+    gameState.players?.[1]?.tricks || 0,
+    gameState.players?.[2]?.tricks || 0,
+    gameState.players?.[3]?.tricks || 0
+  ];
+  
+  console.log('[HAND SUMMARY DEBUG] handSummaryData.tricksPerPlayer:', handSummaryData?.tricksPerPlayer);
+  console.log('[HAND SUMMARY DEBUG] gameState.players tricks:', gameState.players?.map(p => p?.tricks || 0));
+  console.log('[HAND SUMMARY DEBUG] Final tricksPerPlayer:', tricksPerPlayer);
+  console.log('[HAND SUMMARY DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
+  
+  const team1Tricks = tricksPerPlayer[0] + tricksPerPlayer[2];
+  const team2Tricks = tricksPerPlayer[1] + tricksPerPlayer[3];
+  
+  console.log('[HAND SUMMARY DEBUG] Team 1 tricks:', team1Tricks, '(', tricksPerPlayer[0], '+', tricksPerPlayer[2], ')');
+  console.log('[HAND SUMMARY DEBUG] Team 2 tricks:', team2Tricks, '(', tricksPerPlayer[1], '+', tricksPerPlayer[3], ')');
 
   // Calculate trick scores
   const team1TrickScore = team1Tricks >= team1Bid ? team1Bid * 10 : -team1Bid * 10;

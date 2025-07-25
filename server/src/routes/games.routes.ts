@@ -489,6 +489,12 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
 export function botPlayCard(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
   if (!bot || bot.type !== 'bot' || !game.hands || !game.play) return;
+  
+  // Guard: Make sure it's actually this bot's turn
+  if (game.play.currentPlayerIndex !== seatIndex) {
+    console.log('[BOT GUARD] Bot', bot.username, 'at seat', seatIndex, 'tried to play but current player is', game.play.currentPlayerIndex);
+    return;
+  }
   const hand = game.hands[seatIndex]!;
   if (!hand || hand.length === 0) return;
   // Determine lead suit for this trick
@@ -528,15 +534,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
     if (card.suit === 'S') {
       game.play.spadesBroken = true;
     }
-    // Emit play_update to notify frontend about the card being played
-    io.to(game.id).emit('play_update', {
-      currentPlayerIndex: game.play.currentPlayerIndex,
-      currentTrick: game.play.currentTrick,
-      hands: game.hands.map((h, i) => ({
-        playerId: game.players[i]?.id,
-        handCount: h.length,
-      })),
-    });
     
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
@@ -549,42 +546,80 @@ export function botPlayCard(game: Game, seatIndex: number) {
         winnerIndex,
       });
       game.play.trickNumber += 1;
+      console.log('[TRICK DEBUG] Trick completed, new trickNumber:', game.play.trickNumber);
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
       console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
+        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
+        console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
       }
-              // Emit trick complete with the current trick before clearing it
-        ioInstance.to(game.id).emit('trick_complete', {
+        // Store the completed trick for animation before clearing
+        const completedTrick = [...game.play.currentTrick];
+        
+        // Clear the trick immediately for proper game state
+        game.play!.currentTrick = [];
+        
+        // Emit immediate game update with cleared trick and updated trick counts
+        const enrichedGame = enrichGameForClient(game);
+        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
+        io.to(game.id).emit('game_update', enrichedGame);
+        
+        // Emit trick complete with the stored trick data for animation
+        io.to(game.id).emit('trick_complete', {
           trick: {
-            cards: game.play.currentTrick,
+            cards: completedTrick,
             winnerIndex: winnerIndex,
           },
           trickNumber: game.play.trickNumber,
         });
-        // Emit immediate game update with updated trick counts
-        const enrichedGame = enrichGameForClient(game);
-        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-        ioInstance.to(game.id).emit('game_update', enrichedGame);
-        // Delay clearing the trick to allow frontend animation
+        
+        // Emit clear trick event after animation delay
         setTimeout(() => {
-          if (!game.play) return; // Guard for undefined
-          game.play!.currentTrick = [];
-          // Emit game update to clear the trick from the table
-          ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
-        }, 1000); // 1 second delay to match frontend animation
+          io.to(game.id).emit('clear_trick');
+        }, 2000); // 2 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
+      console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
       if (game.play.trickNumber === 13) {
         // --- Hand summary and scoring ---
         const handSummary = calculatePartnersHandScore(game);
+        
+        // Validate that we have exactly 13 tricks before proceeding
+        const totalTricks = handSummary.tricksPerPlayer.reduce((a, b) => a + b, 0);
+        if (totalTricks !== 13) {
+          console.error(`[HAND COMPLETION ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total. Cannot complete hand.`);
+          console.error('[HAND COMPLETION ERROR] Tricks per player:', handSummary.tricksPerPlayer);
+          console.error('[HAND COMPLETION ERROR] Game play tricks:', game.play.tricks);
+          
+          // Force a game update to show current state but don't complete the hand
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
+          return;
+        }
+        
         // Update running totals
         game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
         game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+        
+        // Add new bags to running total
         game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
         game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+        
+        // Apply bag penalty to running total if needed
+        if (game.team1Bags >= 10) {
+          game.team1TotalScore -= 100;
+          game.team1Bags -= 10;
+        }
+        if (game.team2Bags >= 10) {
+          game.team2TotalScore -= 100;
+          game.team2Bags -= 10;
+        }
+        
+        // Set game status to indicate hand is completed
+        game.status = 'HAND_COMPLETED';
+        
         console.log('[HAND COMPLETED] Emitting hand_completed event with data:', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
@@ -592,13 +627,17 @@ export function botPlayCard(game: Game, seatIndex: number) {
           team1Bags: game.team1Bags,
           team2Bags: game.team2Bags,
         });
-        ioInstance.to(game.id).emit('hand_completed', {
+        io.to(game.id).emit('hand_completed', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
           team2TotalScore: game.team2TotalScore,
           team1Bags: game.team1Bags,
           team2Bags: game.team2Bags,
         });
+        
+        // Emit game update with new status
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
+        
         // --- Game over check ---
         const winThreshold = 500, lossThreshold = -150;
         if (
@@ -607,7 +646,73 @@ export function botPlayCard(game: Game, seatIndex: number) {
         ) {
           game.status = 'COMPLETED';
           const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
-          ioInstance.to(game.id).emit('game_over', {
+          io.to(game.id).emit('game_over', {
+            team1Score: game.team1TotalScore,
+            team2Score: game.team2TotalScore,
+            winningTeam,
+          });
+          // Update stats and coins in DB
+          updateStatsAndCoins(game, winningTeam).catch(err => {
+            console.error('Failed to update stats/coins:', err);
+          });
+        }
+        return;
+      }
+      
+              // Additional check: If all hands are empty and we have 13 tricks total, force hand completion
+      const totalTricksPlayed = game.players.reduce((sum, p) => sum + (p?.tricks || 0), 0);
+      if (totalTricksPlayed === 13 && game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0)) {
+        console.log('[FORCE HAND COMPLETION] All hands empty and 13 tricks played, forcing hand completion');
+        const handSummary = calculatePartnersHandScore(game);
+        
+        // Update running totals
+        game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
+        game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+        
+        // Add new bags to running total
+        game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
+        game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+        
+        // Apply bag penalty to running total if needed
+        if (game.team1Bags >= 10) {
+          game.team1TotalScore -= 100;
+          game.team1Bags -= 10;
+        }
+        if (game.team2Bags >= 10) {
+          game.team2TotalScore -= 100;
+          game.team2Bags -= 10;
+        }
+        
+        // Set game status to indicate hand is completed
+        game.status = 'HAND_COMPLETED';
+        
+        console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
+        io.to(game.id).emit('hand_completed', {
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
+        
+        // Emit game update with new status
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
+        
+        // --- Game over check ---
+        const winThreshold = 500, lossThreshold = -150;
+        if (
+          game.team1TotalScore >= winThreshold || game.team2TotalScore >= winThreshold ||
+          game.team1TotalScore <= lossThreshold || game.team2TotalScore <= lossThreshold
+        ) {
+          game.status = 'COMPLETED';
+          const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
+          io.to(game.id).emit('game_over', {
             team1Score: game.team1TotalScore,
             team2Score: game.team2TotalScore,
             winningTeam,
@@ -622,386 +727,85 @@ export function botPlayCard(game: Game, seatIndex: number) {
       // If the winner is a bot, trigger their move for the next trick
       const winnerPlayer = game.players[winnerIndex];
       if (winnerPlayer && winnerPlayer.type === 'bot') {
+        console.log('[BOT TURN] Winner is bot, triggering next turn for:', winnerPlayer.username, 'at index:', winnerIndex);
         // Add a small delay to allow the trick completion animation
         setTimeout(() => {
-          botPlayCard(game, winnerIndex);
+          // Double-check that it's still this bot's turn before playing
+          if (game.play && game.play.currentPlayerIndex === winnerIndex && 
+              game.players[winnerIndex] && game.players[winnerIndex]!.type === 'bot') {
+            botPlayCard(game, winnerIndex);
+          }
         }, 1200); // 1.2 second delay to allow trick completion animation
       }
+      
+      // Failsafe: If all hands are empty but we haven't reached 13 tricks, force completion
+      if (game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0) && game.play.trickNumber < 13) {
+        console.log('[FAILSAFE] All hands empty but only', game.play.trickNumber, 'tricks completed. Forcing hand completion.');
+        
+        // If current trick is complete, score it first
+        if (game.play.currentTrick.length === 4) {
+          const finalWinnerIndex = determineTrickWinner(game.play.currentTrick);
+          game.play.tricks.push({
+            cards: game.play.currentTrick,
+            winnerIndex: finalWinnerIndex,
+          });
+          game.play.trickNumber += 1;
+          if (game.players[finalWinnerIndex]) {
+            game.players[finalWinnerIndex]!.tricks = (game.players[finalWinnerIndex]!.tricks || 0) + 1;
+          }
+          console.log('[FAILSAFE] Final trick completed, new trickNumber:', game.play.trickNumber);
+        }
+        
+        // Force hand completion regardless of trick number
+        console.log('[FAILSAFE] Forcing hand completion due to empty hands');
+        game.status = 'HAND_COMPLETED';
+        
+        // Calculate final scores
+        const finalScores = calculatePartnersHandScore(game);
+        console.log('[FAILSAFE] Final scores calculated:', finalScores);
+        
+        // Emit hand completed event
+        io.to(game.id).emit('hand_completed', finalScores);
+        console.log('[FAILSAFE] Hand completed event emitted');
+        
+        return; // Exit early to prevent further processing
+      }
+      
       return;
     } else {
-      // Emit game update to ensure frontend has latest state
-      ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
+      // Trick is not complete, advance to next player
+      let nextPlayerIndex = (seatIndex + 1) % 4;
+      game.play.currentPlayerIndex = nextPlayerIndex;
+      game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
       
-      // Add delay before advancing to next player to allow card rendering
-      setTimeout(() => {
-        if (!game.play) return; // Guard for undefined
-        
-        // Advance to the next player
-        let nextPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
-        game.play.currentPlayerIndex = nextPlayerIndex;
-        game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-        
-        // Emit final game update with new current player
-        ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
-        
-        // If the next player is a bot, trigger their move
-        const nextPlayer = game.players[nextPlayerIndex];
-        if (nextPlayer && nextPlayer.type === 'bot') {
-          setTimeout(() => {
-            botPlayCard(game, nextPlayerIndex);
-          }, 500);
-        }
-      }, 800); // 0.8 second delay to allow card rendering
-    }
-  }, 300);
-}
-
-// --- Bidding socket event ---
-import { io as ioInstance } from '../index';
-if (ioInstance) {
-  ioInstance.on('connection', (socket: AuthenticatedSocket) => {
-    socket.on('make_bid', ({ gameId, userId, bid }) => {
-      const game = games.find(g => g.id === gameId);
-      if (!game || !game.bidding) return;
-      
-      const playerIndex = game.players.findIndex(p => p && p.id === userId);
-      console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, playerIndex, currentBidderIndex: game.bidding.currentBidderIndex, bids: game.bidding.bids });
-      if (playerIndex === -1) {
-        console.log('[BID DEBUG] Bid rejected: player not found');
-        return;
-      }
-      
-      if (playerIndex !== game.bidding.currentBidderIndex) {
-        console.log('[BID DEBUG] Bid rejected: not player turn', { playerIndex, currentBidderIndex: game.bidding.currentBidderIndex });
-        return; // Not their turn
-      }
-      if (game.bidding.bids[playerIndex] !== null) {
-        console.log('[BID DEBUG] Bid rejected: already bid', { playerIndex });
-        return; // Already bid
-      }
-      
-      // Store the bid
-      game.bidding.bids[playerIndex] = bid;
-      
-      // Find next player who hasn't bid
-      let next = (playerIndex + 1) % 4;
-      while (game.bidding.bids[next] !== null && next !== playerIndex) {
-        next = (next + 1) % 4;
-      }
-      
-      if (game.bidding.bids.every(b => b !== null)) {
-        // All bids in, move to play phase
-        if (!game.dealerIndex) {
-          socket.emit('error', { message: 'Invalid game state: no dealer assigned' });
-          return;
-        }
-        const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
-        if (!firstPlayer) {
-          socket.emit('error', { message: 'Invalid game state' });
-          return;
-        }
-        
-        // --- Play phase state ---
-        game.play = {
-          currentPlayer: firstPlayer.id,
-          currentPlayerIndex: (game.dealerIndex + 1) % 4,
-          currentTrick: [],
-          tricks: [],
-          trickNumber: 0
-        };
-        
-        ioInstance.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
-        ioInstance.to(game.id).emit('play_start', {
-          gameId: game.id,
-          currentPlayerIndex: game.play.currentPlayerIndex,
-          currentTrick: game.play.currentTrick,
-          trickNumber: game.play.trickNumber,
-        });
-      } else {
-        game.bidding.currentBidderIndex = next;
-        game.bidding.currentPlayer = game.players[next]?.id ?? '';
-        ioInstance.to(game.id).emit('bidding_update', {
-          currentBidderIndex: next,
-          bids: game.bidding.bids,
-        });
-        // If next is a bot, trigger their move
-        if (game.players[next] && game.players[next].type === 'bot') {
-          botMakeMove(game, next);
-        }
-      }
-    });
-
-    // --- Play phase: play_card event ---
-    socket.on('play_card', ({ gameId, userId, card }) => {
-      const game = games.find(g => g.id === gameId);
-      if (!game || !game.play || !game.hands || !game.bidding) {
-        socket.emit('error', { message: 'Invalid game state' });
-        return;
-      }
-      
-      const playerIndex = game.players.findIndex(p => p && p.id === userId);
-      if (playerIndex === -1) {
-        socket.emit('error', { message: 'Player not found in game' });
-        return;
-      }
-      
-      if (playerIndex !== game.play.currentPlayerIndex) {
-        socket.emit('error', { message: 'Not your turn' });
-        return;
-      }
-      
-      // Validate card is in player's hand
-      if (!game.hands) {
-        socket.emit('error', { message: 'Invalid hand state' });
-        return;
-      }
-      const hands = game.hands.filter((h): h is Card[] => h !== null && h !== undefined);
-      const hand = hands[playerIndex]!;
-      if (!hand || hand.length === 0) {
-        socket.emit('error', { message: 'Invalid hand state' });
-        return;
-      }
-      
-      const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
-      if (cardIndex === -1) {
-        socket.emit('error', { message: 'Card not in hand' });
-        return;
-      }
-      
-      // --- ENFORCE SPADES BROKEN RULE ---
-      if (game.play.currentTrick.length === 0 && card.suit === 'S' && !game.play.spadesBroken) {
-        // If player has any non-spades, cannot lead spades
-        if (hand.some(c => c.suit !== 'S')) {
-          socket.emit('error', { message: 'You cannot lead spades until they are broken, unless you only have spades left.' });
-          return;
-        }
-      }
-      // Remove card from hand and add to current trick
-      hand.splice(cardIndex, 1);
-      game.play.currentTrick.push({ ...card, playerIndex });
-      // Set spadesBroken if a spade is played
-      if (card.suit === 'S') {
-        game.play.spadesBroken = true;
-      }
-
-      // If trick is complete (4 cards)
-      if (game.play.currentTrick.length === 4) {
-        // Determine winner of the trick
-        console.log('[TRICK DEBUG] Determining winner for trick:', game.play.currentTrick);
-        const winnerIndex = determineTrickWinner(game.play.currentTrick);
-        console.log('[TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
-        if (winnerIndex === undefined) {
-          socket.emit('error', { message: 'Invalid trick state' });
-          return;
-        }
-        game.play.tricks.push({
-          cards: game.play.currentTrick,
-          winnerIndex,
-        });
-        game.play.trickNumber += 1;
-        game.play.currentPlayerIndex = winnerIndex;
-        game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
-        console.log('[TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
-        
-        // Update player trick counts
-        if (game.players[winnerIndex]) {
-          game.players[winnerIndex].tricks = (game.players[winnerIndex].tricks || 0) + 1;
-        }
-        
-        // Emit trick complete with the current trick before clearing it
-        ioInstance.to(game.id).emit('trick_complete', {
-          trick: {
-            cards: game.play.currentTrick,
-            winnerIndex: winnerIndex,
-          },
-          trickNumber: game.play.trickNumber,
-        });
-        
-        // Emit immediate game update with updated trick counts
-        const enrichedGame = enrichGameForClient(game);
-        console.log('[TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-        ioInstance.to(game.id).emit('game_update', enrichedGame);
-        
-        // Delay clearing the trick to allow frontend animation
-        setTimeout(() => {
-          game.play!.currentTrick = [];
-          // Do NOT emit game_update here
-        }, 2000); // 2 second delay to match frontend animation
-        
-        // If all tricks played, move to hand summary/scoring
-        if (game.play.trickNumber === 13) {
-          // --- Hand summary and scoring ---
-          const handSummary = calculatePartnersHandScore(game);
-          // Update running totals
-          game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
-          game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
-          game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
-          game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
-          
-          ioInstance.to(game.id).emit('hand_completed', {
-            ...handSummary,
-            team1TotalScore: game.team1TotalScore,
-            team2TotalScore: game.team2TotalScore,
-            team1Bags: game.team1Bags,
-            team2Bags: game.team2Bags,
-          });
-          
-          // --- Game over check ---
-          const winThreshold = 500, lossThreshold = -150;
-          if (
-            game.team1TotalScore >= winThreshold || game.team2TotalScore >= winThreshold ||
-            game.team1TotalScore <= lossThreshold || game.team2TotalScore <= lossThreshold
-          ) {
-            game.status = 'COMPLETED';
-            const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
-            ioInstance.to(game.id).emit('game_over', {
-              team1Score: game.team1TotalScore,
-              team2Score: game.team2TotalScore,
-              winningTeam,
-            });
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningTeam).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-          }
-          return;
-        }
-        
-        // If next player is a bot, trigger their move
-        if (game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-          botPlayCard(game, game.play.currentPlayerIndex);
-        }
-      } else {
-        // Don't advance to next player - the current player should continue leading
-        // Only trigger next bot move if the current player is a bot
-        if (game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-          botPlayCard(game, game.play.currentPlayerIndex);
-        }
-      }
-      
-      // Emit play update
-      const playUpdate = {
-        currentPlayerIndex: game.play.currentPlayerIndex,
+      // Emit play_update to notify frontend about the card being played
+      io.to(game.id).emit('play_update', {
+        currentPlayerIndex: nextPlayerIndex,
         currentTrick: game.play.currentTrick,
         hands: game.hands.map((h, i) => ({
           playerId: game.players[i]?.id,
           handCount: h.length,
         })),
-      };
-      console.log('[PLAY DEBUG] Emitting play_update with currentPlayerIndex:', playUpdate.currentPlayerIndex);
-      ioInstance.to(game.id).emit('play_update', playUpdate);
-      ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
-    });
-
-    socket.on('start_new_hand', ({ gameId }) => {
-      if (!socket.isAuthenticated || !socket.userId) {
-        console.log('Unauthorized start_new_hand attempt');
-        socket.emit('error', { message: 'Not authorized' });
-        return;
+      });
+      
+      // Emit game update to ensure frontend has latest state
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      
+      // If the next player is a bot, trigger their move with a delay
+      const nextPlayer = game.players[nextPlayerIndex];
+      if (nextPlayer && nextPlayer.type === 'bot') {
+        console.log('[BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
+        setTimeout(() => {
+          botPlayCard(game, nextPlayerIndex);
+        }, 1500); // 1.5 second delay
+      } else {
+        console.log('[BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', nextPlayerIndex, '- waiting for human input');
       }
-
-      try {
-        const game = games.find((g: Game) => g.id === gameId);
-        if (!game) {
-          console.log(`Game ${gameId} not found`);
-          socket.emit('error', { message: 'Game not found' });
-          return;
-        }
-
-        console.log('[START NEW HAND] Starting new hand for game:', gameId);
-
-        // Move dealer to the left (next position)
-        const newDealerIndex = (game.dealerIndex + 1) % 4;
-        game.dealerIndex = newDealerIndex;
-
-        // Reset game state for new hand
-        game.status = 'BIDDING';
-        game.hands = dealCards(game.players, newDealerIndex);
-        game.bidding = {
-          currentBidderIndex: (newDealerIndex + 1) % 4,
-          currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
-          bids: [null, null, null, null],
-          nilBids: {}
-        };
-        game.play = undefined;
-
-        // Reset player trick counts for new hand
-        game.players.forEach(player => {
-          if (player) {
-            player.tricks = 0;
-          }
-        });
-
-        // Emit new hand started event
-        console.log('[START NEW HAND] Emitting new_hand_started event');
-        ioInstance.to(game.id).emit('new_hand_started', {
-          dealerIndex: newDealerIndex,
-          hands: game.hands,
-          currentBidderIndex: game.bidding.currentBidderIndex
-        });
-
-        // Emit game update
-        ioInstance.to(game.id).emit('game_update', enrichGameForClient(game));
-
-        // If first bidder is a bot, trigger their bid
-        const firstBidder = game.players[game.bidding.currentBidderIndex];
-        if (firstBidder && firstBidder.type === 'bot') {
-          setTimeout(() => {
-            botMakeMove(game, game.bidding.currentBidderIndex);
-          }, 500);
-        }
-
-      } catch (error) {
-        console.error('Error in start_new_hand:', error);
-        socket.emit('error', { message: 'Internal server error' });
-      }
-    });
-
-    socket.on('leave_game', ({ gameId, userId }) => {
-      if (!socket.isAuthenticated || !socket.userId || socket.userId !== userId) {
-        console.log('Unauthorized leave_game attempt');
-        socket.emit('error', { message: 'Not authorized' });
-        return;
-      }
-
-      try {
-        const game = games.find((g: Game) => g.id === gameId);
-        if (!game) {
-          console.log(`Game ${gameId} not found`);
-          socket.emit('error', { message: 'Game not found' });
-          return;
-        }
-
-        // Remove the player from the game
-        const playerIdx = game.players.findIndex((p: GamePlayer | null) => p && p.id === userId);
-        if (playerIdx !== -1) {
-          game.players[playerIdx] = null;
-          socket.leave(gameId);
-          // Emit game_update to the game room for real-time sync
-          io.to(gameId).emit('game_update', enrichGameForClient(game));
-          io.emit('games_updated', games);
-          console.log(`User ${userId} left game ${gameId}`);
-        }
-
-        // Check if there are any human players left
-        const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
-        
-        // If no human players remain, remove the game
-        if (!hasHumanPlayers) {
-          const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-          if (gameIdx !== -1) {
-            games.splice(gameIdx, 1);
-            io.emit('games_updated', games);
-            console.log(`Game ${gameId} removed (no human players left)`);
-          }
-        }
-      } catch (error) {
-        console.error('Error in leave_game:', error);
-        socket.emit('error', { message: 'Internal server error' });
-      }
-    });
-  });
+    }
+  }, 300);
 }
+
+// Socket handlers are now properly registered in index.ts to ensure consistent trick counting
 
 // --- Helper: Determine Trick Winner ---
 export function determineTrickWinner(trick: Card[]): number {
@@ -1038,20 +842,13 @@ function calculatePartnersHandScore(game: Game) {
   let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
   let team1Bags = 0, team2Bags = 0;
   let team1Score = 0, team2Score = 0;
-  // Use completedTricks if it has 13 tricks, otherwise fallback to play.tricks
-  const tricksArray = Array.isArray(game.completedTricks) && game.completedTricks.length === 13
-    ? game.completedTricks
-    : (Array.isArray(game.play.tricks) ? game.play.tricks : []);
-  // Count tricks per player
-  const tricksPerPlayer = [0, 0, 0, 0];
-  for (const trick of tricksArray) {
-    if (Array.isArray(trick)) {
-      // This is a Card[] (legacy or fallback), skip
-      continue;
-    } else if (trick && typeof trick === 'object' && 'winnerIndex' in trick && typeof trick.winnerIndex === 'number') {
-      tricksPerPlayer[trick.winnerIndex]++;
-    }
-  }
+  
+  // Use the already updated player trick counts instead of recalculating
+  const tricksPerPlayer = game.players.map(p => p?.tricks || 0);
+  
+  console.log('[SCORING DEBUG] Tricks per player:', tricksPerPlayer);
+  console.log('[SCORING DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
+  
   // Calculate team bids and tricks
   for (const i of team1) {
     const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
@@ -1063,6 +860,10 @@ function calculatePartnersHandScore(game: Game) {
     team2Bid += bid;
     team2Tricks += tricksPerPlayer[i];
   }
+  
+  console.log('[SCORING DEBUG] Team 1 bid:', team1Bid, 'tricks:', team1Tricks);
+  console.log('[SCORING DEBUG] Team 2 bid:', team2Bid, 'tricks:', team2Tricks);
+  
   // Team 1 scoring
   if (team1Tricks >= team1Bid) {
     team1Score += team1Bid * 10;
@@ -1081,6 +882,7 @@ function calculatePartnersHandScore(game: Game) {
     team2Score -= team2Bid * 10;
     team2Bags = 0;
   }
+  
   // Nil and Blind Nil
   for (const i of [...team1, ...team2]) {
     const bid = game.bidding.bids[i];
@@ -1109,6 +911,7 @@ function calculatePartnersHandScore(game: Game) {
       }
     }
   }
+  
   // Bag penalty
   if (team1Bags >= 10) {
     team1Score -= 100;
@@ -1118,22 +921,17 @@ function calculatePartnersHandScore(game: Game) {
     team2Score -= 100;
     team2Bags -= 10;
   }
-  // Ensure tricksPerPlayer always sums to 13
+  
+  // Validate total tricks equals 13
   const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
   if (totalTricks !== 13) {
-    // If not, try to fix by distributing missing tricks to players with the highest bid
-    let missing = 13 - totalTricks;
-    while (missing > 0) {
-      const maxBid = Math.max(...game.bidding.bids.map(b => b ?? 0));
-      const idx = game.bidding.bids.findIndex(b => b === maxBid);
-      if (idx >= 0) {
-        tricksPerPlayer[idx]++;
-        missing--;
-      } else {
-        break;
-      }
-    }
+    console.error(`[SCORING ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total.`);
+    console.error('[SCORING ERROR] Tricks per player:', tricksPerPlayer);
+    console.error('[SCORING ERROR] Game play tricks:', game.play.tricks);
   }
+  
+  console.log('[SCORING DEBUG] Final scores - Team 1:', team1Score, 'Team 2:', team2Score);
+  
   return {
     team1Score,
     team2Score,
@@ -1180,16 +978,6 @@ function enrichGameForClient(game: Game, userId?: string): Game {
     currentPlayer = game.play.currentPlayer ?? '';
   }
 
-  // --- Patch: Recalculate tricks per player from play.tricks ---
-  let tricksPerPlayer: number[] = [0, 0, 0, 0];
-  if (game.play && Array.isArray(game.play.tricks)) {
-    for (const trick of game.play.tricks) {
-      if (typeof trick.winnerIndex === 'number' && trick.winnerIndex >= 0 && trick.winnerIndex < 4) {
-        tricksPerPlayer[trick.winnerIndex]++;
-      }
-    }
-  }
-
   return {
     ...game,
     currentPlayer, // Always present for frontend
@@ -1200,7 +988,7 @@ function enrichGameForClient(game: Game, userId?: string): Game {
         position: i, // <--- Always include position for seat order
         hand: userId && p.id === userId ? hands[i] || [] : undefined,
         isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
-        tricks: tricksPerPlayer[i], // <--- Always recalculate tricks!
+        tricks: p.tricks || 0, // <--- Use the already calculated trick count!
       };
     })
   };

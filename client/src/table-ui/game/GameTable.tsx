@@ -136,7 +136,7 @@ function canLeadSpades(game: GameState, hand: Card[]): boolean {
   return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === '♠');
 }
 
-function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean): Card[] {
+function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean, trickCompleted: boolean = false): Card[] {
   if (!Array.isArray(hand) || !hand.length) return [];
 
   // If leading the trick
@@ -151,6 +151,12 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
 
   // If following
   const currentTrick = (game as any).play?.currentTrick || [];
+  
+  // If trick is completed but still animating, treat it as a new trick (leading)
+  if (trickCompleted && currentTrick.length === 4) {
+    return hand; // Allow any card since we're starting a new trick
+  }
+  
   const leadSuit = getLeadSuit(currentTrick);
   if (!leadSuit) return [];
 
@@ -172,7 +178,8 @@ declare global {
 }
 
 // Helper function to count spades in a hand
-const countSpades = (hand: Card[]): number => {
+const countSpades = (hand: Card[] | undefined): number => {
+  if (!hand || !Array.isArray(hand)) return 0;
   return hand.filter(card => card.suit === '♠').length;
 };
 
@@ -233,6 +240,8 @@ export default function GameTable({
     console.log('[START NEW HAND] Function called');
     console.log('Socket connected:', socket?.connected);
     console.log('Game ID:', gameState.id);
+    console.log('Socket ID:', socket?.id);
+    console.log('Socket object:', socket);
     
     setShowHandSummary(false);
     setHandSummaryData(null);
@@ -245,8 +254,26 @@ export default function GameTable({
     // Emit start new hand event to server
     if (socket && gameState.id) {
       console.log('[START NEW HAND] Emitting start_new_hand event...');
-      socket.emit('start_new_hand', { gameId: gameState.id });
-      console.log('[START NEW HAND] start_new_hand event emitted');
+      console.log('[START NEW HAND] Socket ready state:', { connected: socket.connected, id: socket.id });
+      
+      if (socket.connected) {
+        socket.emit('start_new_hand', { gameId: gameState.id }, (response: any) => {
+          console.log('[START NEW HAND] Server response:', response);
+        });
+        console.log('[START NEW HAND] start_new_hand event emitted');
+      } else {
+        console.error('[START NEW HAND] Socket not connected, cannot emit event');
+        // Try to reconnect and emit
+        socket.connect();
+        setTimeout(() => {
+          if (socket.connected) {
+            console.log('[START NEW HAND] Retrying emit after reconnect...');
+            socket.emit('start_new_hand', { gameId: gameState.id }, (response: any) => {
+              console.log('[START NEW HAND] Server response (retry):', response);
+            });
+          }
+        }, 1000);
+      }
     } else {
       console.error('[START NEW HAND] Cannot emit: socket or gameState.id missing', { socket: !!socket, gameId: gameState.id });
     }
@@ -390,7 +417,7 @@ export default function GameTable({
   const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
   const prevBidsRef = useRef<(number|null)[] | null>(null);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
-  const [lastNonEmptyTrick] = useState<Card[]>([]);
+  const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
 
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
@@ -782,6 +809,19 @@ export default function GameTable({
     }
   }, [gameState.status, myHand.length]);
 
+  // Fallback: If we're in BIDDING and have cards but dealing is not complete after 3 seconds, force completion
+  useEffect(() => {
+    if (gameState.status === 'BIDDING' && myHand && myHand.length > 0 && !dealingComplete) {
+      const timeout = setTimeout(() => {
+        console.log('[FALLBACK] Forcing dealing completion after timeout');
+        setDealtCardCount(myHand.length);
+        setDealingComplete(true);
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [gameState.status, myHand, dealingComplete]);
+
   // Reset dealing complete when game status changes to BIDDING
   useEffect(() => {
     if (gameState.status === 'BIDDING') {
@@ -851,7 +891,7 @@ export default function GameTable({
     if (!myHand || myHand.length === 0) return null;
     const sortedHand = sortCards(myHand);
     const isLeadingTrick = currentTrick.length === 0;
-    const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick) : [];
+    const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted) : [];
     // --- FIX: If it's your turn and playableCards is empty, allow all cards ---
     const isMyTurn = gameState.status === "PLAYING" && gameState.currentPlayer === currentPlayerId;
     // Only log if these exist
@@ -863,7 +903,7 @@ export default function GameTable({
     // Defensive: only use myHand and playableCards if defined
     let effectivePlayableCards: typeof myHand = [];
     if (isMyTurn && Array.isArray(myHand)) {
-      const isLeading = currentTrick.length === 0;
+      const isLeading = currentTrick.length === 0 || (trickCompleted && currentTrick.length === 4);
       const spadesBroken = (gameState as any).play?.spadesBroken;
       if (isLeading && !spadesBroken && myHand.some(c => c.suit !== 'S')) {
         effectivePlayableCards = myHand.filter(c => c.suit !== 'S');
@@ -871,7 +911,7 @@ export default function GameTable({
           effectivePlayableCards = myHand; // Only spades left
         }
       } else {
-        effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading);
+        effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted);
       }
     } else if (Array.isArray(playableCards)) {
       effectivePlayableCards = playableCards;
@@ -880,8 +920,8 @@ export default function GameTable({
     const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
     const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
 
-    // --- FIX: Always show all cards in PLAYING phase ---
-    const showAllCards = gameState.status === 'PLAYING';
+    // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
+    const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
     const visibleCount = showAllCards ? sortedHand.length : dealtCardCount;
 
     console.log('[DEBUG] isMyTurn:', isMyTurn);
@@ -903,6 +943,22 @@ export default function GameTable({
               effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
               (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
             const isVisible = index < visibleCount;
+            
+            // Debug card playability
+            if (index === 0) {
+              console.log('[CARD DEBUG] Card playability check:', {
+                card: `${card.rank}${card.suit}`,
+                gameStateStatus: gameState.status,
+                currentPlayer: gameState.currentPlayer,
+                currentPlayerId,
+                isMyTurn: gameState.currentPlayer === currentPlayerId,
+                effectivePlayableCards: effectivePlayableCards.map((c: Card) => `${c.rank}${c.suit}`),
+                isPlayable,
+                isLeading: currentTrick.length === 0,
+                trickCompleted,
+                currentTrickLength: currentTrick.length
+              });
+            }
             return (
               <div
                 key={`${card.suit}${card.rank}`}
@@ -972,47 +1028,17 @@ export default function GameTable({
       console.log('[SOCKET] Cannot register hand_completed listener - socket not ready:', { socket: !!socket, connected: socket?.connected });
     }
     
-    // Fallback: Check if hand is complete but no event was received
-    if (gameState.status === "PLAYING" && 
-        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && 
-        !showHandSummary && 
-        !handSummaryData &&
-        gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
-      console.log('[FALLBACK] Detected hand completion without event, calculating scores manually');
-      
-      // Calculate scores manually from game state
-      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
-      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
-      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
-      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-      
-      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
-      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
-      
-      const fallbackData = {
-        team1Score,
-        team2Score,
-        team1Bags: Math.max(0, team1Tricks - team1Bid),
-        team2Bags: Math.max(0, team2Tricks - team2Bid),
-        team1TotalScore: team1Score,
-        team2TotalScore: team2Score,
-        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
-      };
-      
-      console.log('[FALLBACK] Calculated fallback data:', fallbackData);
-      handleHandCompleted(fallbackData);
-    }
-    
     return () => {
       if (socket) {
         socket.off('hand_completed', handleHandCompleted);
       }
     };
-  }, [socket, gameState.id, gameState.status, sanitizedPlayers, showHandSummary]);
+  }, [socket, gameState.id]);
 
   // Fallback: Check if hand is complete but no event was received
   useEffect(() => {
-    if (gameState.status === "PLAYING" && 
+    // Only run fallback if we haven't already shown hand summary and no hand summary data exists
+    if ((gameState.status === "PLAYING" || gameState.status === "HAND_COMPLETED") && 
         sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && 
         !showHandSummary && 
         !handSummaryData &&
@@ -1033,8 +1059,8 @@ export default function GameTable({
         team2Score,
         team1Bags: Math.max(0, team1Tricks - team1Bid),
         team2Bags: Math.max(0, team2Tricks - team2Bid),
-        team1TotalScore: team1Score,
-        team2TotalScore: team2Score,
+        team1TotalScore: gameState.team1TotalScore || team1Score,
+        team2TotalScore: gameState.team2TotalScore || team2Score,
         tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
       };
       
@@ -1056,15 +1082,29 @@ export default function GameTable({
 
     const handleNewHandStarted = (data: any) => {
       console.log('[NEW HAND] New hand started event received:', data);
-      console.log('New dealer index:', data.dealerIndex);
-      console.log('New hands:', data.hands);
-      console.log('New current bidder index:', data.currentBidderIndex);
-      // Reset dealing state for new hand
       setDealingComplete(false);
       setBiddingReady(false);
       setDealtCardCount(0);
       setShowHandSummary(false); // Close hand summary modal
-      // The game state will be updated by the game_update event
+      setHandSummaryData(null); // Clear hand summary data
+
+      // Directly update the game state with the new hand data
+      setGameState(prev => ({
+        ...prev,
+        hands: data.hands,
+        dealerIndex: data.dealerIndex,
+        bidding: {
+          ...prev.bidding,
+          currentBidderIndex: data.currentBidderIndex,
+          bids: [null, null, null, null],
+          nilBids: {},
+          currentPlayer: data.hands && data.hands.length > 0 && prev.players && Array.isArray(prev.players) && prev.players[(data.dealerIndex + 1) % 4]
+            ? prev.players[(data.dealerIndex + 1) % 4]!.id
+            : prev.bidding?.currentPlayer
+        },
+        status: 'BIDDING',
+        play: undefined, // Clear play state for new hand
+      }));
     };
 
     socket.on('new_hand_started', handleNewHandStarted);
@@ -1074,19 +1114,7 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // Fallback: If hand summary was shown but no new hand started after 15 seconds, force start
-  useEffect(() => {
-    if (!showHandSummary && handSummaryData && gameState.status === "PLAYING" && 
-        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0)) {
-      
-      const timeout = setTimeout(() => {
-        console.log('[FALLBACK] Hand summary closed but no new hand started after 15s, forcing start');
-        handleStartNewHand();
-      }, 15000);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [showHandSummary, handSummaryData, gameState.status, sanitizedPlayers]);
+
 
   // Initialize the global variable
   useEffect(() => {
@@ -1098,8 +1126,9 @@ export default function GameTable({
   // Calculate scores - use hand summary data if available, otherwise use game state
   const team1Score = gameState.team1TotalScore ?? 0;
   const team2Score = gameState.team2TotalScore ?? 0;
-  const team1Bags = gameState.team1Bags ?? 0;
-  const team2Bags = gameState.team2Bags ?? 0;
+  // Bag counter should show only the last digit (modulo 10)
+  const team1Bags = (gameState.team1Bags ?? 0) % 10;
+  const team2Bags = (gameState.team2Bags ?? 0) % 10;
 
   // Update cardPlayers when game state changes
   useEffect(() => {
@@ -1305,9 +1334,13 @@ export default function GameTable({
   // Add this function to handle playing a card
   const handlePlayCard = (card: Card) => {
     if (!socket || !gameState?.id || !user?.id) return;
+    console.log('[CLIENT] handlePlayCard called:', { card, gameId: gameState.id, userId: user.id, socketConnected: socket.connected });
+    console.log('[CLIENT] Current game state:', { status: gameState.status, currentPlayer: gameState.currentPlayer, myTurn: gameState.currentPlayer === user.id });
+    console.log('[CLIENT] Card being played:', `${card.rank}${card.suit}`);
     playCardSound();
     setPendingPlayedCard(card); // Optimistically show the card
     socket.emit('play_card', { gameId: gameState.id, userId: user.id, card });
+    console.log('[CLIENT] play_card event emitted');
   };
 
   // In useEffect, clear pendingPlayedCard when the backend confirms the card is in the trick
@@ -1365,6 +1398,7 @@ export default function GameTable({
   const [trickWinner, setTrickWinner] = useState<number | null>(null);
   const [animatingTrick, setAnimatingTrick] = useState(false);
   const [animatedTrickCards, setAnimatedTrickCards] = useState<Card[]>([]);
+  const [trickCompleted, setTrickCompleted] = useState(false);
 
   // Listen for trick_complete event and animate trick
   useEffect(() => {
@@ -1376,6 +1410,10 @@ export default function GameTable({
           setAnimatedTrickCards(data.trick.cards || []);
           setTrickWinner(data.trick.winnerIndex);
           setAnimatingTrick(true);
+          setTrickCompleted(true); // Mark that trick is completed
+          
+          // Store the completed trick for fallback display
+          setLastNonEmptyTrick(data.trick.cards || []);
           
           // Wait 2 seconds before clearing trick animation
           if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
@@ -1383,12 +1421,29 @@ export default function GameTable({
             setAnimatingTrick(false);
             setTrickWinner(null);
             setAnimatedTrickCards([]);
+            setTrickCompleted(false); // Reset trick completed state
           }, 2000);
         }
       };
       socket.on("trick_complete", handleTrickComplete);
+      
+      // Listen for clear_trick event to immediately clear table cards
+      const handleClearTrick = () => {
+        console.log('[DEBUG] Received clear_trick event, clearing table cards immediately');
+        setAnimatedTrickCards([]);
+        setTrickWinner(null);
+        setAnimatingTrick(false);
+        setTrickCompleted(false); // Reset trick completed state
+        setLastNonEmptyTrick([]); // Clear the last non-empty trick as well
+        
+        // Don't clear currentTrick here - let the server handle it after animation
+        // This allows the animation to complete while keeping cards visible
+      };
+      socket.on("clear_trick", handleClearTrick);
+      
       return () => {
         socket.off("trick_complete", handleTrickComplete);
+        socket.off("clear_trick", handleClearTrick);
         if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
       };
     }
@@ -1420,8 +1475,45 @@ export default function GameTable({
   useEffect(() => {
     if (gameState.status === 'BIDDING') {
       setShowHandSummary(false);
+      setHandSummaryData(null);
     }
   }, [gameState.status]);
+
+  // Fallback: Show hand summary when game status is HAND_COMPLETED but no hand summary is shown
+  useEffect(() => {
+    if (gameState.status === 'HAND_COMPLETED' && !showHandSummary && !handSummaryData) {
+      console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
+      
+      // Calculate scores manually from game state
+      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
+      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
+      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
+      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+      
+      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
+      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
+      
+      const fallbackData = {
+        team1Score,
+        team2Score,
+        team1Bags: Math.max(0, team1Tricks - team1Bid),
+        team2Bags: Math.max(0, team2Tricks - team2Bid),
+        team1TotalScore: gameState.team1TotalScore || team1Score,
+        team2TotalScore: gameState.team2TotalScore || team2Score,
+        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
+      };
+      
+      console.log('[FALLBACK] Calculated fallback data for HAND_COMPLETED:', fallbackData);
+      
+      // Store the hand summary data
+      setHandSummaryData(fallbackData);
+      
+      // Show hand summary immediately
+      setShowHandSummary(true);
+    }
+  }, [gameState.status, showHandSummary, handSummaryData, gameState.players, gameState.bidding, gameState.team1TotalScore, gameState.team2TotalScore]);
+
+
 
   useEffect(() => {
     if (!socket) return;
@@ -1485,6 +1577,7 @@ export default function GameTable({
                   >
                     <IoInformationCircleOutline className="h-5 w-5" />
                   </button>
+
                   {showGameInfo && (
                     <div className="absolute left-0 mt-2 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-50 text-sm text-white">
                       <div className="font-bold mb-2 flex items-center gap-2">
