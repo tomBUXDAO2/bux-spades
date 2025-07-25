@@ -22,6 +22,45 @@
     @apply bg-slate-900 text-slate-200;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Mobile/Tablet specific styles */
+  @media (max-width: 1024px) {
+    body {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #root {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .table-page {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+  }
+
+  /* Full-screen styles */
+  :fullscreen {
+    background-color: #1f2937;
+  }
+  
+  :-webkit-full-screen {
+    background-color: #1f2937;
+  }
+  
+  :-moz-full-screen {
+    background-color: #1f2937;
+  }
+  
+  :-ms-fullscreen {
+    background-color: #1f2937;
+  }
 }
 
 @layer components {

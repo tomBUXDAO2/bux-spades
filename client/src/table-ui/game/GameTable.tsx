@@ -566,11 +566,11 @@ export default function GameTable({
       playerGradient = soloColors[position];
     } else {
       // Partners mode: 2 team colors
-      const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
-      const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
+    const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
+    const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
       playerGradient = (position === 0 || position === 2)
-        ? blueTeamGradient
-        : redTeamGradient;
+      ? blueTeamGradient
+      : redTeamGradient;
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
@@ -1703,26 +1703,26 @@ export default function GameTable({
                   // Partners mode - 2 teams
                   <>
                     {/* Blue Team Score and Bags */}
-                    <div className="flex items-center">
+                <div className="flex items-center">
                       <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-                      <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
+                  <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
                       {/* Blue Team Bags */}
                       <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team1Bags}`}> 
-                        <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
-                        <span className="text-xs font-bold">{team1Bags}</span>
-                      </div>
-                    </div>
+                    <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
+                    <span className="text-xs font-bold">{team1Bags}</span>
+                  </div>
+                </div>
 
                     {/* Red Team Score and Bags */}
-                    <div className="flex items-center">
+                <div className="flex items-center">
                       <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-                      <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
+                  <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
                       {/* Red Team Bags */}
                       <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team2Bags}`}> 
-                        <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
-                        <span className="text-xs font-bold">{team2Bags}</span>
-                      </div>
-                    </div>
+                    <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
+                    <span className="text-xs font-bold">{team2Bags}</span>
+                  </div>
+                </div>
                   </>
                 )}
               </div>
@@ -1856,12 +1856,12 @@ export default function GameTable({
           const shouldShow = showHandSummary && !isGameOver(gameState);
           console.log('[MODAL DEBUG] showHandSummary:', showHandSummary, 'isGameOver:', isGameOver(gameState), 'shouldShow:', shouldShow);
           return shouldShow ? (
-            <HandSummaryModal
-              isOpen={showHandSummary}
-              onClose={() => setShowHandSummary(false)}
-              gameState={gameState}
-              handSummaryData={handSummaryData}
-              onNextHand={handleStartNewHand}
+          <HandSummaryModal
+            isOpen={showHandSummary}
+            onClose={() => setShowHandSummary(false)}
+            gameState={gameState}
+            handSummaryData={handSummaryData}
+            onNextHand={handleStartNewHand}
             />
           ) : null;
         })()}
@@ -1882,7 +1882,7 @@ export default function GameTable({
                 winningPlayer={winningPlayer}
                 onPlayAgain={handlePlayAgain}
                 userPlayerIndex={myPlayerIndex}
-              />
+          />
             );
           } else {
             // Partners mode - use existing Winner/Loser modals
@@ -1891,27 +1891,27 @@ export default function GameTable({
             
             if (showWinner) {
               return (
-                <WinnerModal
-                  isOpen={true}
-                  onClose={handleLeaveTable}
+          <WinnerModal
+            isOpen={true}
+            onClose={handleLeaveTable}
                   team1Score={gameState.team1TotalScore || 0}
                   team2Score={gameState.team2TotalScore || 0}
-                  winningTeam={1}
-                  onPlayAgain={handlePlayAgain}
+            winningTeam={1}
+            onPlayAgain={handlePlayAgain}
                   userTeam={userTeam}
-                />
+          />
               );
             } else if (showLoser) {
               return (
-                <LoserModal
-                  isOpen={true}
-                  onClose={handleLeaveTable}
+          <LoserModal
+            isOpen={true}
+            onClose={handleLeaveTable}
                   team1Score={gameState.team1TotalScore || 0}
                   team2Score={gameState.team2TotalScore || 0}
-                  winningTeam={2}
-                  onPlayAgain={handlePlayAgain}
+            winningTeam={2}
+            onPlayAgain={handlePlayAgain}
                   userTeam={userTeam}
-                />
+          />
               );
             }
           }

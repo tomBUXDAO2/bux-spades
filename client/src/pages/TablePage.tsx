@@ -17,10 +17,68 @@ export default function TablePage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const socketManager = getSocketManager();
 
   // Detect spectate intent
   const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
+
+  // Check if device is mobile or tablet
+  const isMobileOrTablet = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           window.innerWidth <= 1024;
+  };
+
+  // Request full-screen mode
+  const requestFullScreen = async () => {
+    if (isMobileOrTablet()) {
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        } else if ((document.documentElement as any).webkitRequestFullscreen) {
+          await (document.documentElement as any).webkitRequestFullscreen();
+        } else if ((document.documentElement as any).msRequestFullscreen) {
+          await (document.documentElement as any).msRequestFullscreen();
+        }
+        setIsFullScreen(true);
+      } catch (error) {
+        console.log('Full-screen request failed:', error);
+      }
+    }
+  };
+
+  // Exit full-screen mode
+  const exitFullScreen = async () => {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen();
+      }
+      setIsFullScreen(false);
+    } catch (error) {
+      console.log('Exit full-screen failed:', error);
+    }
+  };
+
+  // Listen for full-screen changes
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullScreenChange);
+    document.addEventListener('msfullscreenchange', handleFullScreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullScreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullScreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullScreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -54,6 +112,13 @@ export default function TablePage() {
         }
         const data = await response.json();
         setGame(data);
+        
+        // Request full-screen on mobile/tablet after game loads
+        if (isMobileOrTablet()) {
+          setTimeout(() => {
+            requestFullScreen();
+          }, 1000); // Small delay to ensure game is loaded
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load game');
       } finally {
@@ -66,6 +131,10 @@ export default function TablePage() {
     return () => {
       socketManager.disconnect();
       setSocket(null);
+      // Exit full-screen when leaving the page
+      if (isFullScreen) {
+        exitFullScreen();
+      }
     };
   }, [gameId, user, navigate, isSpectator]);
 
@@ -202,7 +271,26 @@ export default function TablePage() {
   }
 
   return (
-    <div className="table-page">
+    <div className="table-page relative">
+      {/* Full-screen toggle button for mobile/tablet */}
+      {isMobileOrTablet() && (
+        <button
+          onClick={isFullScreen ? exitFullScreen : requestFullScreen}
+          className="fixed top-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg shadow-lg transition-colors"
+          title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}
+        >
+          {isFullScreen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          )}
+        </button>
+      )}
+      
       <GameTable
         game={game}
         joinGame={handleJoinGame}

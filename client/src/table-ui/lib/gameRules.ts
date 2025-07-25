@@ -145,12 +145,12 @@ export function isGameOver(game: GameState): boolean {
     console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
     return false;
   }
-
+  
   // Check if it's Solo mode
   if (game.rules.gameType === 'SOLO') {
     const playerScores = game.playerScores || [];
     console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
-    
+  
     // Check if any player has reached max points or gone below min points
     const isOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
     console.log('[GAME OVER CHECK] Solo mode game over result:', isOver);

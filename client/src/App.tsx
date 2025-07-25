@@ -11,6 +11,7 @@ import AuthCallback from '@/components/auth/AuthCallback';
 import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
 import { SocketProvider } from './context/SocketContext';
+import LandscapePrompt from './LandscapePrompt';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;
@@ -91,6 +92,7 @@ const router = createBrowserRouter(
 const AppWithSocket: React.FC = () => {
   return (
     <SocketProvider>
+      <LandscapePrompt />
       <RouterProvider router={router} />
     </SocketProvider>
   );
