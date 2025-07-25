@@ -1658,7 +1658,9 @@ export default function GameTable({
                             {(() => {
                               const buyIn = (gameState as any).rules?.coinAmount || 100000;
                               const prizePot = buyIn * 4 * 0.9;
-                              if (((gameState as any).rules?.gameType || '').toUpperCase() === 'PARTNERS') {
+                              // Check gameMode for Partners vs Solo, not gameType
+                              const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
+                              if (isPartnersMode) {
                                 return `${formatCoins(prizePot / 2)} each`;
                               } else {
                                 // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
