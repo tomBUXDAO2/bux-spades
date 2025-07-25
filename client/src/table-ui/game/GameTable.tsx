@@ -1761,15 +1761,27 @@ export default function GameTable({
                   </div>
                 ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
-                    <BiddingInterface
-                      onBid={handleBid}
-                      currentBid={(gameState as any).bidding?.bids?.[0]}
-                      gameType={(gameState as any).rules.gameType}
-                      numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
-                      playerId={currentPlayerId}
-                      currentPlayerTurn={gameState.currentPlayer}
-                      allowNil={gameState.rules.allowNil}
-                    />
+                    {(() => {
+                      const gameType = (gameState as any).rules.gameType;
+                      console.log('[GAMETABLE DEBUG] BiddingInterface props:', {
+                        gameType,
+                        gameStateRules: (gameState as any).rules,
+                        currentPlayerId,
+                        gameStateCurrentPlayer: gameState.currentPlayer,
+                        numSpades: currentPlayer ? countSpades(currentPlayer.hand) : 0
+                      });
+                      return (
+                        <BiddingInterface
+                          onBid={handleBid}
+                          currentBid={(gameState as any).bidding?.bids?.[0]}
+                          gameType={gameType}
+                          numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
+                          playerId={currentPlayerId}
+                          currentPlayerTurn={gameState.currentPlayer}
+                          allowNil={gameState.rules.allowNil}
+                        />
+                      );
+                    })()}
                   </div>
                 ) : gameState.status === "BIDDING" && !dealingComplete ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
