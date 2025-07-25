@@ -744,6 +744,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (game.play.trickNumber === 13) {
         console.log('[HAND COMPLETION DEBUG] Hand completion triggered! Emitting hand_completed event');
         console.log('[HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
+        console.log('[HAND COMPLETION DEBUG] Full game object keys:', Object.keys(game));
+        console.log('[HAND COMPLETION DEBUG] Game rules:', game.rules);
         // --- Hand summary and scoring ---
         
         if (game.gameMode === 'SOLO') {
@@ -886,6 +888,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (totalTricksPlayed === 13 && game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0)) {
         console.log('[FORCE HAND COMPLETION] All hands empty and 13 tricks played, forcing hand completion');
         console.log('[FORCE HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
+        console.log('[FORCE HAND COMPLETION DEBUG] Full game object keys:', Object.keys(game));
+        console.log('[FORCE HAND COMPLETION DEBUG] Game rules:', game.rules);
         
         if (game.gameMode === 'SOLO') {
           // Solo mode scoring
