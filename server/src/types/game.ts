@@ -74,6 +74,10 @@ export interface Game {
   team2TotalScore?: number;
   team1Bags?: number;
   team2Bags?: number;
+  // Solo mode properties
+  playerScores?: number[];
+  playerBags?: number[];
+  winningPlayer?: number;
   winningTeam?: 'team1' | 'team2';
   currentPlayer?: string;
 } 
