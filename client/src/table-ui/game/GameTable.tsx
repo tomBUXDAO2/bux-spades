@@ -548,18 +548,35 @@ export default function GameTable({
     const isSideSeat = position === 1 || position === 3;
     const avatarWidth = isMobile ? 32 : 40;
     const avatarHeight = isMobile ? 32 : 40;
-    const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
-    const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
-    const teamGradient = (position === 0 || position === 2)
-      ? blueTeamGradient
-      : redTeamGradient;
+    
+    // Determine game mode early for color selection
+    const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
+    const isSoloGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'SOLO';
+    
+    // Determine player color based on game mode
+    let playerGradient;
+    if (isSoloGame) {
+      // Solo mode: 4 individual colors
+      const soloColors = [
+        "bg-gradient-to-r from-red-700 to-red-500",    // Position 0: Red
+        "bg-gradient-to-r from-blue-700 to-blue-500",  // Position 1: Blue
+        "bg-gradient-to-r from-orange-600 to-orange-400", // Position 2: Orange
+        "bg-gradient-to-r from-purple-700 to-purple-500"  // Position 3: Purple
+      ];
+      playerGradient = soloColors[position];
+    } else {
+      // Partners mode: 2 team colors
+      const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
+      const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
+      playerGradient = (position === 0 || position === 2)
+        ? blueTeamGradient
+        : redTeamGradient;
+    }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
     const bidCount = (gameState as any).bidding?.bids?.[position] ?? 0;
     let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
-    const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
-    const isSoloGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'SOLO';
     
     if (isPartnerGame) {
       // Partner game logic
@@ -701,7 +718,7 @@ export default function GameTable({
               </div>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${teamGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
+              <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${playerGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
                 <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
                   {displayName}
                 </div>
@@ -1633,7 +1650,7 @@ export default function GameTable({
                           <span className="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
                         )}
                       </div>
-                      {/* Prize info (unchanged) */}
+                      {/* Prize info */}
                       <div className="mt-2 pt-2 border-t border-gray-700">
                         <div className="text-sm">
                           <span className="text-gray-400">Prize:</span>
@@ -1644,7 +1661,10 @@ export default function GameTable({
                               if (((gameState as any).rules?.gameType || '').toUpperCase() === 'PARTNERS') {
                                 return `${formatCoins(prizePot / 2)} each`;
                               } else {
-                                return `1st: ${formatCoins(prizePot * 0.7)}, 2nd: ${formatCoins(prizePot * 0.3)}`;
+                                // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
+                                const secondPlacePrize = buyIn; // Exactly their stake back
+                                const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
+                                return `1st: ${formatCoins(firstPlacePrize)}, 2nd: ${formatCoins(secondPlacePrize)}`;
                               }
                             })()}
                           </span>
