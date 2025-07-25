@@ -39,13 +39,13 @@ router.post('/', (req, res) => {
       status: 'WAITING' as Game['status'],
       completedTricks: [],
       rules: {
-        gameType: settings.gameMode,
-        allowNil: true,
-        allowBlindNil: false,
+        gameType: settings.biddingOption || 'REG', // Use biddingOption to set gameType
+        allowNil: settings.specialRules?.allowNil ?? true,
+        allowBlindNil: settings.specialRules?.allowBlindNil ?? false,
         coinAmount: settings.buyIn,
         maxPoints: settings.maxPoints,
         minPoints: settings.minPoints,
-        bidType: 'REG' as BiddingOption,
+        bidType: settings.biddingOption || 'REG' as BiddingOption,
         gimmickType: 'REG' as GamePlayOption
       },
       isBotGame: false,

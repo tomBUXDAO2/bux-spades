@@ -33,6 +33,17 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   const [allowNil, setAllowNil] = useState(true);
   const [allowBlindNil, setAllowBlindNil] = useState(false);
 
+  // Handle bidding option changes for Mirror game type
+  const handleBiddingOptionChange = (option: BiddingOption) => {
+    setBiddingOption(option);
+    
+    // Mirror game type logic: nil always allowed, blind nil never allowed
+    if (option === 'MIRROR') {
+      setAllowNil(true); // Nil is always allowed in Mirror
+      setAllowBlindNil(false); // Blind nil is never allowed in Mirror
+    }
+  };
+
   if (!isOpen) return null;
 
   const handlePointsChange = (field: 'min' | 'max', delta: number) => {
@@ -175,7 +186,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     name="biddingOption"
                     value={opt}
                     checked={biddingOption === opt as BiddingOption}
-                    onChange={() => setBiddingOption(opt as BiddingOption)}
+                    onChange={() => handleBiddingOptionChange(opt as BiddingOption)}
                   />
                   <span className="text-slate-200">{opt}</span>
                 </label>
@@ -183,21 +194,23 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
             {/* Nil and Blind Nil checkboxes */}
             <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                 <input
                   type="checkbox"
                   checked={allowNil}
                   onChange={() => setAllowNil((v) => !v)}
+                  disabled={biddingOption === 'MIRROR'}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded w-6 h-6"
                   style={{ minWidth: '1.5rem', minHeight: '1.5rem' }}
                 />
                 <span className="text-slate-200">Nil</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className={`flex items-center gap-2 ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                 <input
                   type="checkbox"
                   checked={allowBlindNil}
                   onChange={() => setAllowBlindNil((v) => !v)}
+                  disabled={biddingOption === 'MIRROR'}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded w-6 h-6"
                   style={{ minWidth: '1.5rem', minHeight: '1.5rem' }}
                 />

@@ -35,7 +35,9 @@ export default function BiddingInterface({
     if (gameType === "MIRROR" && isMyTurn) {
       console.log('Auto-bidding in MIRROR game:', numSpades);
       setIsSubmitting(true);
-      onBid(numSpades);
+      // In Mirror games: bid the number of spades in hand, or nil (0) if no spades
+      const mirrorBid = numSpades > 0 ? numSpades : 0;
+      onBid(mirrorBid);
     }
   }, [gameType, isMyTurn, numSpades, onBid]);
 
