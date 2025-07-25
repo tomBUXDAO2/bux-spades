@@ -1819,28 +1819,40 @@ export default function GameTable({
         })()}
 
         {/* Winner Modal */}
-        {showWinner && (
-          <WinnerModal
-            isOpen={true}
-            onClose={handleLeaveTable}
-            team1Score={gameState.team1TotalScore || 0}
-            team2Score={gameState.team2TotalScore || 0}
-            winningTeam={1}
-            onPlayAgain={handlePlayAgain}
-          />
-        )}
+        {showWinner && (() => {
+          // Determine user's team based on their position
+          const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+          const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
+          return (
+            <WinnerModal
+              isOpen={true}
+              onClose={handleLeaveTable}
+              team1Score={gameState.team1TotalScore || 0}
+              team2Score={gameState.team2TotalScore || 0}
+              winningTeam={1}
+              onPlayAgain={handlePlayAgain}
+              userTeam={userTeam}
+            />
+          );
+        })()}
 
         {/* Loser Modal */}
-        {showLoser && (
-          <LoserModal
-            isOpen={true}
-            onClose={handleLeaveTable}
-            team1Score={gameState.team1TotalScore || 0}
-            team2Score={gameState.team2TotalScore || 0}
-            winningTeam={2}
-            onPlayAgain={handlePlayAgain}
-          />
-        )}
+        {showLoser && (() => {
+          // Determine user's team based on their position
+          const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+          const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
+          return (
+            <LoserModal
+              isOpen={true}
+              onClose={handleLeaveTable}
+              team1Score={gameState.team1TotalScore || 0}
+              team2Score={gameState.team2TotalScore || 0}
+              winningTeam={2}
+              onPlayAgain={handlePlayAgain}
+              userTeam={userTeam}
+            />
+          );
+        })()}
         <StartGameWarningModal
           isOpen={showStartWarning}
           onClose={() => setShowStartWarning(false)}

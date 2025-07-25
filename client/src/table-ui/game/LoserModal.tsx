@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaTrophy } from 'react-icons/fa';
 
 interface LoserModalProps {
@@ -8,10 +8,12 @@ interface LoserModalProps {
   team2Score: number;
   winningTeam: number;
   onPlayAgain?: () => void;
+  userTeam?: number; // 1 for Blue Team, 2 for Red Team
 }
 
-export default function LoserModal({ isOpen, onClose, team1Score, team2Score, winningTeam, onPlayAgain }: LoserModalProps) {
+export default function LoserModal({ isOpen, onClose, team1Score, team2Score, winningTeam, onPlayAgain, userTeam }: LoserModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(30);
 
   const handlePlayAgain = () => {
     setShowPlayAgainPrompt(true);
@@ -23,6 +25,30 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
     onClose();
   };
 
+  // Timer effect for auto-leaving after 30 seconds
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeRemaining(30);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          console.log('[LOSER MODAL] Timer expired, auto-leaving');
+          onClose();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isOpen, onClose]);
+
+  // Determine if user won
+  const userWon = userTeam === winningTeam;
+
   if (!isOpen) return null;
 
   return (
@@ -30,7 +56,7 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
       <div className="bg-gray-900/75 rounded-lg p-3 max-w-xs w-full shadow-xl border border-white/20">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-gray-400" />
-          <h2 className="text-lg font-bold text-white text-center">{winningTeam === 1 ? 'Blue Team' : 'Red Team'} Wins!</h2>
+          <h2 className="text-lg font-bold text-white text-center">{userWon ? 'YOU WIN!' : 'YOU LOSE!'}</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -69,7 +95,7 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
               onClick={handlePlayAgain}
               className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
             >
-              Play Again
+              Play Again ({timeRemaining}s)
             </button>
             <button
               onClick={handleLeave}
