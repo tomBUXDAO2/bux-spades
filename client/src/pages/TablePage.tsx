@@ -7,6 +7,7 @@ import type { GameState } from '../types/game';
 import type { Socket } from 'socket.io-client';
 import { socketApi } from '../table-ui/lib/socketApi';
 import { api } from '@/lib/api';
+import LandscapePrompt from '../LandscapePrompt';
 
 export default function TablePage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -272,6 +273,7 @@ export default function TablePage() {
 
   return (
     <div className="table-page relative">
+      <LandscapePrompt />
       {/* Full-screen toggle button for mobile/tablet */}
       {isMobileOrTablet() && (
         <button
