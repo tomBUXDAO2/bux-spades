@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { isGameOver, getWinningTeam } from '../lib/gameRules';
+import { isGameOver } from '../lib/gameRules';
 import type { GameState } from '../../types/game';
-import WinnerModal from './WinnerModal';
-import LoserModal from './LoserModal';
 import { useEffect } from 'react';
 
 interface HandSummaryModalProps {
@@ -12,7 +10,6 @@ interface HandSummaryModalProps {
   onClose: () => void;
   gameState: GameState;
   onNextHand: () => void;
-  onNewGame: () => void;
   handSummaryData?: {
     team1Score: number;
     team2Score: number;
@@ -29,22 +26,20 @@ export default function HandSummaryModal({
   onClose,
   gameState,
   onNextHand,
-  onNewGame,
   handSummaryData
 }: HandSummaryModalProps) {
   console.log('HandSummaryModal rendered with data:', {
     isOpen,
     handSummaryData,
     gameState: {
-      scores: gameState?.scores,
+      team1TotalScore: gameState?.team1TotalScore,
+      team2TotalScore: gameState?.team2TotalScore,
       team1Bags: gameState?.team1Bags,
       team2Bags: gameState?.team2Bags,
       bidding: gameState?.bidding?.bids,
       players: gameState?.players?.map(p => ({ tricks: p?.tricks, bid: p?.bid }))
     }
   });
-  const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [showLoserModal, setShowLoserModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(12);
   
   // Use total scores for game over check
