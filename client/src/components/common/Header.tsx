@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg py-1 border border-slate-700">
+                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg py-1 border border-slate-700 z-50">
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);

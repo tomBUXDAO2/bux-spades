@@ -60,7 +60,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg w-full max-w-[95vw] mx-1 p-1 sm:p-8 sm:max-w-md sm:mx-4 animate-fade-in relative">
+      <div className="bg-slate-800 rounded-lg w-full max-w-[95vw] mx-1 p-1 sm:p-8 sm:max-w-md sm:mx-4 animate-fade-in relative border border-white/20">
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl">&times;</button>
         {/* Radio buttons */}
         <div className="flex justify-center gap-6 mb-4">

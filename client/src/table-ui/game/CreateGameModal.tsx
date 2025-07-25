@@ -55,7 +55,7 @@ export default function CreateGameModal({ isOpen, onClose, onCreateGame }: Creat
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all border border-white/20">
                 <Dialog.Title
                   as="h3"
                   className="text-2xl font-bold leading-6 text-white text-center mb-4"

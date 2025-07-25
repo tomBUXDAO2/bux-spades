@@ -10,7 +10,7 @@ const NewUserWelcomeModal: React.FC<NewUserWelcomeModalProps> = ({ isOpen, onClo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 animate-fade-in">
+      <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 animate-fade-in border border-white/20">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-200 mb-4">Welcome to BUX Spades! 🎉</h2>
           

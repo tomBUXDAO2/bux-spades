@@ -78,7 +78,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center">
+      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20">
         <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center">Create Game</h2>
         <div className="space-y-3 w-full flex flex-col items-center justify-center">
           {/* Partners/Solo Toggle with text outside */}
