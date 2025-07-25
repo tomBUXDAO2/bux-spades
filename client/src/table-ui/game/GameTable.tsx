@@ -1804,15 +1804,19 @@ export default function GameTable({
         </div>
 
         {/* Hand Summary Modal - Pass currentHandSummary */}
-        {showHandSummary && !isGameOver(gameState) && (
-          <HandSummaryModal
-            isOpen={showHandSummary}
-            onClose={() => setShowHandSummary(false)}
-            gameState={gameState}
-            handSummaryData={handSummaryData}
-            onNextHand={handleStartNewHand}
-          />
-        )}
+        {(() => {
+          const shouldShow = showHandSummary && !isGameOver(gameState);
+          console.log('[MODAL DEBUG] showHandSummary:', showHandSummary, 'isGameOver:', isGameOver(gameState), 'shouldShow:', shouldShow);
+          return shouldShow ? (
+            <HandSummaryModal
+              isOpen={showHandSummary}
+              onClose={() => setShowHandSummary(false)}
+              gameState={gameState}
+              handSummaryData={handSummaryData}
+              onNextHand={handleStartNewHand}
+            />
+          ) : null;
+        })()}
 
         {/* Winner Modal */}
         {showWinner && (

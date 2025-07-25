@@ -48,7 +48,11 @@ export default function HandSummaryModal({
 
   // Check if game is over using the GameState
   const gameIsOver = isGameOver(gameState);
-  if (gameIsOver) return null;
+  console.log('[HAND SUMMARY] gameIsOver check:', gameIsOver, 'gameState.team1TotalScore:', gameState.team1TotalScore, 'gameState.team2TotalScore:', gameState.team2TotalScore);
+  if (gameIsOver) {
+    console.log('[HAND SUMMARY] Game is over, returning null');
+    return null;
+  }
 
   // Timer effect for auto-advancing to next hand
   useEffect(() => {

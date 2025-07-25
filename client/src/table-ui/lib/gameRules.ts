@@ -152,17 +152,15 @@ export function isGameOver(game: GameState): boolean {
   
   console.log('[GAME OVER CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
   
-  switch (game.rules.gameType) {
-    case 'REGULAR':
-    case 'SOLO':
-      return team1Score >= maxPoints || team2Score >= maxPoints || team1Score <= minPoints || team2Score <= minPoints;
-    case 'WHIZ':
-    case 'MIRROR':
-      return (game.round || 0) >= (game.rules.numHands || 4) || 
-             team1Score >= maxPoints || team2Score >= maxPoints;
-    default:
-      return false;
-  }
+  const isOver = team1Score >= maxPoints || team2Score >= maxPoints || team1Score <= minPoints || team2Score <= minPoints;
+  console.log('[GAME OVER CHECK] Game over result:', isOver, 'Reason:', {
+    team1AboveMax: team1Score >= maxPoints,
+    team2AboveMax: team2Score >= maxPoints,
+    team1BelowMin: team1Score <= minPoints,
+    team2BelowMin: team2Score <= minPoints
+  });
+  
+  return isOver;
 }
 
 /**
