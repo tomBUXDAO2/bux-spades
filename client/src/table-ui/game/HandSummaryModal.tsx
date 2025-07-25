@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { isGameOver } from '../lib/gameRules';
+import { isGameOver, getPlayerColor } from '../lib/gameRules';
 import type { GameState } from '../../types/game';
 import { useEffect } from 'react';
 
@@ -18,6 +18,9 @@ interface HandSummaryModalProps {
     team1TotalScore: number;
     team2TotalScore: number;
     tricksPerPlayer: number[];
+    // Solo mode data
+    playerScores?: number[];
+    playerBags?: number[];
   };
 }
 
@@ -245,7 +248,7 @@ export default function HandSummaryModal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all border border-white/20">
+                <Dialog.Panel className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-gray-800 p-6 text-left align-middle shadow-xl transition-all border border-white/20">
                   <Dialog.Title
                     as="h3"
                     className="text-2xl font-bold leading-6 text-white text-center mb-6"
@@ -253,153 +256,241 @@ export default function HandSummaryModal({
                     Hand Summary
                   </Dialog.Title>
                   
-                  <div className="grid grid-cols-2 gap-8">
-                    {/* Blue Team */}
-                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                      <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Blue Team</h4>
-                      
-                      {/* Player Details */}
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(0)}</span>
-                          <span className="text-white">{getPlayerTricks(0)} / {getPlayerBid(0)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(2)}</span>
-                          <span className="text-white">{getPlayerTricks(2)} / {getPlayerBid(2)}</span>
-                        </div>
-                      </div>
+                  {gameState.rules.gameType === 'SOLO' ? (
+                    // Solo mode - 4 individual players
+                    <div className="grid grid-cols-2 gap-4">
+                      {[0, 1, 2, 3].map((playerIndex) => {
+                        const playerColor = getPlayerColor(playerIndex);
+                        const playerName = getPlayerName(playerIndex);
+                        const playerBid = getPlayerBid(playerIndex);
+                        const playerTricks = getPlayerTricks(playerIndex);
+                        const playerScore = handSummaryData?.playerScores?.[playerIndex] || gameState.playerScores?.[playerIndex] || 0;
+                        const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
+                        
+                        // Calculate individual player scoring
+                        const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
+                        const bagScore = Math.max(0, playerTricks - playerBid);
+                        const bagPenalty = playerBags >= 10 ? -100 : 0;
+                        const nilBonus = 0; // Solo mode doesn't have nil bids
+                        const handTotal = trickScore + bagScore + bagPenalty + nilBonus;
+                        
+                        return (
+                          <div key={playerIndex} className="bg-gray-700 rounded-lg p-4 border border-white/20">
+                            <h4 className={`text-xl font-semibold ${playerColor.text} mb-4 text-center`}>
+                              {playerColor.name} Player
+                            </h4>
+                            
+                            {/* Player Details */}
+                            <div className="space-y-3 mb-4">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-300">{playerName}</span>
+                                <span className="text-white">{playerTricks} / {playerBid}</span>
+                              </div>
+                            </div>
 
-                      {/* Team Totals */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Bid:</span>
-                          <span className="text-white">{team1Bid}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Tricks:</span>
-                          <span className="text-white">{team1Tricks}</span>
-                        </div>
-                      </div>
+                            {/* Player Totals */}
+                            <div className="border-t border-gray-600 pt-3 space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-300">Bid:</span>
+                                <span className="text-white">{playerBid}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-300">Tricks:</span>
+                                <span className="text-white">{playerTricks}</span>
+                              </div>
+                            </div>
 
-                      {/* Scoring Breakdown */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Trick Score:</span>
-                          <span className={`font-semibold ${team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1TrickScore >= 0 ? '+' : ''}{team1TrickScore}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Bag Score:</span>
-                          <span className={`font-semibold ${team1BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1BagScore >= 0 ? '+' : ''}{team1BagScore}
-                          </span>
-                        </div>
-                        {team1BagPenalty !== 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">Bag Penalty:</span>
-                            <span className="text-red-400 font-semibold">{team1BagPenalty}</span>
+                            {/* Scoring Breakdown */}
+                            <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-300">Trick Score:</span>
+                                <span className={`font-semibold ${trickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {trickScore >= 0 ? '+' : ''}{trickScore}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-300">Bag Score:</span>
+                                <span className={`font-semibold ${bagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {bagScore >= 0 ? '+' : ''}{bagScore}
+                                </span>
+                              </div>
+                              {bagPenalty !== 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-300">Bag Penalty:</span>
+                                  <span className="text-red-400 font-semibold">{bagPenalty}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
+                                <span className="text-white">Round:</span>
+                                <span className={`${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {handTotal >= 0 ? '+' : ''}{handTotal}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Running Total */}
+                            <div className="border-t border-gray-600 pt-3 mt-4">
+                              <div className="flex justify-between text-xl font-bold">
+                                <span className={`${playerColor.text}`}>Score:</span>
+                                <span className={`${playerScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {playerScore >= 0 ? '+' : ''}{playerScore}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Nil Bonus:</span>
-                          <span className={`font-semibold ${team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1NilBonus >= 0 ? '+' : ''}{team1NilBonus}
-                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    // Partners mode - 2 teams (existing logic)
+                    <div className="grid grid-cols-2 gap-8">
+                      {/* Blue Team */}
+                      <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
+                        <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Blue Team</h4>
+                        
+                        {/* Player Details */}
+                        <div className="space-y-3 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">{getPlayerName(0)}</span>
+                            <span className="text-white">{getPlayerTricks(0)} / {getPlayerBid(0)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">{getPlayerName(2)}</span>
+                            <span className="text-white">{getPlayerTricks(2)} / {getPlayerBid(2)}</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
-                          <span className="text-white">Round:</span>
-                          <span className={`${team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1HandTotal >= 0 ? '+' : ''}{team1HandTotal}
-                          </span>
+
+                        {/* Team Totals */}
+                        <div className="border-t border-gray-600 pt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Team Bid:</span>
+                            <span className="text-white">{team1Bid}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Team Tricks:</span>
+                            <span className="text-white">{team1Tricks}</span>
+                          </div>
+                        </div>
+
+                        {/* Scoring Breakdown */}
+                        <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Trick Score:</span>
+                            <span className={`font-semibold ${team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team1TrickScore >= 0 ? '+' : ''}{team1TrickScore}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Bag Score:</span>
+                            <span className={`font-semibold ${team1BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team1BagScore >= 0 ? '+' : ''}{team1BagScore}
+                            </span>
+                          </div>
+                          {team1BagPenalty !== 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-300">Bag Penalty:</span>
+                              <span className="text-red-400 font-semibold">{team1BagPenalty}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Nil Bonus:</span>
+                            <span className={`font-semibold ${team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team1NilBonus >= 0 ? '+' : ''}{team1NilBonus}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
+                            <span className="text-white">Round:</span>
+                            <span className={`${team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team1HandTotal >= 0 ? '+' : ''}{team1HandTotal}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Running Total */}
+                        <div className="border-t border-gray-600 pt-3 mt-4">
+                          <div className="flex justify-between text-xl font-bold">
+                            <span className="text-blue-300">Score:</span>
+                            <span className={`${team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team1TotalScore >= 0 ? '+' : ''}{team1TotalScore}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Running Total */}
-                      <div className="border-t border-gray-600 pt-3 mt-4">
-                        <div className="flex justify-between text-xl font-bold">
-                          <span className="text-blue-300">Score:</span>
-                          <span className={`${team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1TotalScore >= 0 ? '+' : ''}{team1TotalScore}
-                          </span>
+                      {/* Red Team */}
+                      <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
+                        <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Red Team</h4>
+                        
+                        {/* Player Details */}
+                        <div className="space-y-3 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">{getPlayerName(1)}</span>
+                            <span className="text-white">{getPlayerTricks(1)} / {getPlayerBid(1)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">{getPlayerName(3)}</span>
+                            <span className="text-white">{getPlayerTricks(3)} / {getPlayerBid(3)}</span>
+                          </div>
+                        </div>
+
+                        {/* Team Totals */}
+                        <div className="border-t border-gray-600 pt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Team Bid:</span>
+                            <span className="text-white">{team2Bid}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Team Tricks:</span>
+                            <span className="text-white">{team2Tricks}</span>
+                          </div>
+                        </div>
+
+                        {/* Scoring Breakdown */}
+                        <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Trick Score:</span>
+                            <span className={`font-semibold ${team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team2TrickScore >= 0 ? '+' : ''}{team2TrickScore}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Bag Score:</span>
+                            <span className={`font-semibold ${team2BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team2BagScore >= 0 ? '+' : ''}{team2BagScore}
+                            </span>
+                          </div>
+                          {team2BagPenalty !== 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-300">Bag Penalty:</span>
+                              <span className="text-red-400 font-semibold">{team2BagPenalty}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-300">Nil Bonus:</span>
+                            <span className={`font-semibold ${team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team2NilBonus >= 0 ? '+' : ''}{team2NilBonus}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
+                            <span className="text-white">Round:</span>
+                            <span className={`${team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team2HandTotal >= 0 ? '+' : ''}{team2HandTotal}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Running Total */}
+                        <div className="border-t border-gray-600 pt-3 mt-4">
+                          <div className="flex justify-between text-xl font-bold">
+                            <span className="text-red-300">Score:</span>
+                            <span className={`${team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {team2TotalScore >= 0 ? '+' : ''}{team2TotalScore}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Red Team */}
-                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                      <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Red Team</h4>
-                      
-                      {/* Player Details */}
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(1)}</span>
-                          <span className="text-white">{getPlayerTricks(1)} / {getPlayerBid(1)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(3)}</span>
-                          <span className="text-white">{getPlayerTricks(3)} / {getPlayerBid(3)}</span>
-                        </div>
-                      </div>
-
-                      {/* Team Totals */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Bid:</span>
-                          <span className="text-white">{team2Bid}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Tricks:</span>
-                          <span className="text-white">{team2Tricks}</span>
-                        </div>
-                      </div>
-
-                      {/* Scoring Breakdown */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Trick Score:</span>
-                          <span className={`font-semibold ${team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2TrickScore >= 0 ? '+' : ''}{team2TrickScore}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Bag Score:</span>
-                          <span className={`font-semibold ${team2BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2BagScore >= 0 ? '+' : ''}{team2BagScore}
-                          </span>
-                        </div>
-                        {team2BagPenalty !== 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">Bag Penalty:</span>
-                            <span className="text-red-400 font-semibold">{team2BagPenalty}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Nil Bonus:</span>
-                          <span className={`font-semibold ${team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2NilBonus >= 0 ? '+' : ''}{team2NilBonus}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
-                          <span className="text-white">Round:</span>
-                          <span className={`${team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2HandTotal >= 0 ? '+' : ''}{team2HandTotal}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Running Total */}
-                      <div className="border-t border-gray-600 pt-3 mt-4">
-                        <div className="flex justify-between text-xl font-bold">
-                          <span className="text-red-300">Score:</span>
-                          <span className={`${team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2TotalScore >= 0 ? '+' : ''}{team2TotalScore}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   <div className="mt-6 flex justify-center">
                     {!gameIsOver ? (

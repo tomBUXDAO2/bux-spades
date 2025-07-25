@@ -136,10 +136,6 @@ export function isHandComplete(game: GameState): boolean {
  * Determines if the game is over based on game type and scores
  */
 export function isGameOver(game: GameState): boolean {
-  // Use total scores for game over check
-  const team1Score = game.team1TotalScore || 0;
-  const team2Score = game.team2TotalScore || 0;
-  
   // Use the actual game settings - these should always be set when game is created
   const maxPoints = game.maxPoints;
   const minPoints = game.minPoints;
@@ -149,11 +145,26 @@ export function isGameOver(game: GameState): boolean {
     console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
     return false;
   }
+
+  // Check if it's Solo mode
+  if (game.rules.gameType === 'SOLO') {
+    const playerScores = game.playerScores || [];
+    console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
+    
+    // Check if any player has reached max points or gone below min points
+    const isOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+    console.log('[GAME OVER CHECK] Solo mode game over result:', isOver);
+    return isOver;
+  }
+
+  // Partners mode (existing logic)
+  const team1Score = game.team1TotalScore || 0;
+  const team2Score = game.team2TotalScore || 0;
   
-  console.log('[GAME OVER CHECK] Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
+  console.log('[GAME OVER CHECK] Partners mode - Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
   
   const isOver = team1Score >= maxPoints || team2Score >= maxPoints || team1Score <= minPoints || team2Score <= minPoints;
-  console.log('[GAME OVER CHECK] Game over result:', isOver, 'Reason:', {
+  console.log('[GAME OVER CHECK] Partners mode game over result:', isOver, 'Reason:', {
     team1AboveMax: team1Score >= maxPoints,
     team2AboveMax: team2Score >= maxPoints,
     team1BelowMin: team1Score <= minPoints,
@@ -196,4 +207,49 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   
   // Otherwise, highest score wins
   return team1Score > team2Score ? 'team1' : 'team2';
+}
+
+/**
+ * Gets the winning player for Solo mode if the game is over
+ */
+export function getWinningPlayer(game: GameState): number | null {
+  if (!isGameOver(game)) {
+    return null;
+  }
+  
+  const playerScores = game.playerScores || [];
+  const maxPoints = game.maxPoints;
+  const minPoints = game.minPoints;
+  
+  if (maxPoints === undefined || minPoints === undefined) {
+    console.error('[WINNING PLAYER CHECK] Missing game settings');
+    return null;
+  }
+  
+  // Find the highest scoring player
+  let winningPlayer = 0;
+  let highestScore = playerScores[0] || 0;
+  
+  for (let i = 1; i < playerScores.length; i++) {
+    if ((playerScores[i] || 0) > highestScore) {
+      highestScore = playerScores[i] || 0;
+      winningPlayer = i;
+    }
+  }
+  
+  return winningPlayer;
+}
+
+/**
+ * Gets the player color for Solo mode
+ */
+export function getPlayerColor(playerIndex: number): { bg: string; text: string; name: string } {
+  const colors = [
+    { bg: 'bg-red-500', text: 'text-red-500', name: 'Red' },
+    { bg: 'bg-blue-500', text: 'text-blue-500', name: 'Blue' },
+    { bg: 'bg-orange-500', text: 'text-orange-500', name: 'Orange' },
+    { bg: 'bg-purple-500', text: 'text-purple-500', name: 'Purple' }
+  ];
+  
+  return colors[playerIndex] || colors[0];
 } 

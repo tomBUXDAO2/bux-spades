@@ -48,6 +48,9 @@ export interface GameState {
   completedTricks: Card[][];
   team1TotalScore?: number;
   team2TotalScore?: number;
+  // Individual player scores for Solo mode
+  playerScores?: number[];
+  playerBags?: number[];
   rules: {
     gameType: GameType;
     allowNil: boolean;
@@ -59,6 +62,7 @@ export interface GameState {
   maxPoints: number;
   minPoints: number;
   winningTeam?: 'team1' | 'team2';
+  winningPlayer?: number; // For Solo mode
   cardPlayers?: Record<string, string>;
   team1Bags?: number;
   team2Bags?: number;

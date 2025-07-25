@@ -7,6 +7,7 @@ import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import WinnerModal from './WinnerModal';
 import LoserModal from './LoserModal';
+import SoloWinnerModal from './SoloWinnerModal';
 import BiddingInterface from './BiddingInterface';
 
 import LandscapePrompt from '../../LandscapePrompt';
@@ -17,7 +18,7 @@ import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
 import StartGameWarningModal from '../modals/StartGameWarningModal';
 import { api } from '@/lib/api';
-import { isGameOver } from '../lib/gameRules';
+import { isGameOver, getPlayerColor } from '../lib/gameRules';
 
 // Sound utility for dealing cards
 const playCardSound = () => {
@@ -1656,27 +1657,54 @@ export default function GameTable({
               
               {/* Scoreboard in top right corner - inside the table */}
               <div className="absolute top-4 right-4 z-10 flex flex-col items-center gap-2 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
-                {/* Blue Team Score and Bags */}
-                <div className="flex items-center">
-                  <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-                  <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
-                  {/* Blue Team Bags */}
-                  <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team1Bags}`}> 
-                    <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
-                    <span className="text-xs font-bold">{team1Bags}</span>
-                  </div>
-                </div>
+                {gameState.rules.gameType === 'SOLO' ? (
+                  // Solo mode - 4 individual players
+                  <>
+                    {[0, 1, 2, 3].map((playerIndex) => {
+                      const playerScore = gameState.playerScores?.[playerIndex] || 0;
+                      const playerBags = gameState.playerBags?.[playerIndex] || 0;
+                      const playerColor = getPlayerColor(playerIndex);
+                      const playerName = gameState.players[playerIndex]?.username || `Player ${playerIndex + 1}`;
+                      
+                      return (
+                        <div key={playerIndex} className="flex items-center">
+                          <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-1`}></div>
+                          <span className="text-white font-bold mr-1 text-sm">{playerScore}</span>
+                          {/* Player Bags */}
+                          <div className="flex items-center text-yellow-300 ml-2" title={`${playerName} Bags: ${playerBags}`}> 
+                            <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
+                            <span className="text-xs font-bold">{playerBags}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                ) : (
+                  // Partners mode - 2 teams
+                  <>
+                    {/* Blue Team Score and Bags */}
+                    <div className="flex items-center">
+                      <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+                      <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
+                      {/* Blue Team Bags */}
+                      <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team1Bags}`}> 
+                        <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
+                        <span className="text-xs font-bold">{team1Bags}</span>
+                      </div>
+                    </div>
 
-                {/* Red Team Score and Bags */}
-                <div className="flex items-center">
-                  <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-                  <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
-                  {/* Red Team Bags */}
-                  <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team2Bags}`}> 
-                    <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
-                    <span className="text-xs font-bold">{team2Bags}</span>
-                  </div>
-                </div>
+                    {/* Red Team Score and Bags */}
+                    <div className="flex items-center">
+                      <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+                      <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
+                      {/* Red Team Bags */}
+                      <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team2Bags}`}> 
+                        <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
+                        <span className="text-xs font-bold">{team2Bags}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
         
               {/* Players around the table */}
@@ -1818,40 +1846,55 @@ export default function GameTable({
           ) : null;
         })()}
 
-        {/* Winner Modal */}
-        {showWinner && (() => {
-          // Determine user's team based on their position
-          const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-          const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
-          return (
-            <WinnerModal
-              isOpen={true}
-              onClose={handleLeaveTable}
-              team1Score={gameState.team1TotalScore || 0}
-              team2Score={gameState.team2TotalScore || 0}
-              winningTeam={1}
-              onPlayAgain={handlePlayAgain}
-              userTeam={userTeam}
-            />
-          );
-        })()}
-
-        {/* Loser Modal */}
-        {showLoser && (() => {
-          // Determine user's team based on their position
-          const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-          const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
-          return (
-            <LoserModal
-              isOpen={true}
-              onClose={handleLeaveTable}
-              team1Score={gameState.team1TotalScore || 0}
-              team2Score={gameState.team2TotalScore || 0}
-              winningTeam={2}
-              onPlayAgain={handlePlayAgain}
-              userTeam={userTeam}
-            />
-          );
+        {/* Winner/Loser Modals */}
+        {(showWinner || showLoser) && (() => {
+          if (gameState.rules.gameType === 'SOLO') {
+            // Solo mode - use SoloWinnerModal for both winner and loser
+            const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+            const winningPlayer = gameState.winningPlayer || 0;
+            const playerScores = gameState.playerScores || [0, 0, 0, 0];
+            
+            return (
+              <SoloWinnerModal
+                isOpen={true}
+                onClose={handleLeaveTable}
+                playerScores={playerScores}
+                winningPlayer={winningPlayer}
+                onPlayAgain={handlePlayAgain}
+                userPlayerIndex={myPlayerIndex}
+              />
+            );
+          } else {
+            // Partners mode - use existing Winner/Loser modals
+            const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+            const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
+            
+            if (showWinner) {
+              return (
+                <WinnerModal
+                  isOpen={true}
+                  onClose={handleLeaveTable}
+                  team1Score={gameState.team1TotalScore || 0}
+                  team2Score={gameState.team2TotalScore || 0}
+                  winningTeam={1}
+                  onPlayAgain={handlePlayAgain}
+                  userTeam={userTeam}
+                />
+              );
+            } else if (showLoser) {
+              return (
+                <LoserModal
+                  isOpen={true}
+                  onClose={handleLeaveTable}
+                  team1Score={gameState.team1TotalScore || 0}
+                  team2Score={gameState.team2TotalScore || 0}
+                  winningTeam={2}
+                  onPlayAgain={handlePlayAgain}
+                  userTeam={userTeam}
+                />
+              );
+            }
+          }
         })()}
         <StartGameWarningModal
           isOpen={showStartWarning}
