@@ -1759,7 +1759,19 @@ export default function GameTable({
                     <div className="font-bold">Waiting for Host</div>
                     <div className="text-sm mt-1">Only {isPlayer(sanitizedPlayers[0]) ? sanitizedPlayers[0].name : isBot(sanitizedPlayers[0]) ? sanitizedPlayers[0].username : 'Unknown'} can start</div>
                   </div>
-                ) : gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
+                ) : (() => {
+                  console.log('[BIDDING DEBUG] Checking bidding conditions:', {
+                    gameStateStatus: gameState.status,
+                    currentPlayerId,
+                    gameStateCurrentPlayer: gameState.currentPlayer,
+                    dealingComplete,
+                    biddingReady,
+                    isBiddingPhase: gameState.status === "BIDDING",
+                    isMyTurn: gameState.currentPlayer === currentPlayerId,
+                    shouldShowBiddingInterface: gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady
+                  });
+                  return null;
+                })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       const gameType = (gameState as any).rules.gameType;
@@ -1768,7 +1780,10 @@ export default function GameTable({
                         gameStateRules: (gameState as any).rules,
                         currentPlayerId,
                         gameStateCurrentPlayer: gameState.currentPlayer,
-                        numSpades: currentPlayer ? countSpades(currentPlayer.hand) : 0
+                        numSpades: currentPlayer ? countSpades(currentPlayer.hand) : 0,
+                        gameStateStatus: gameState.status,
+                        dealingComplete,
+                        biddingReady
                       });
                       return (
                         <BiddingInterface
