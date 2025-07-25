@@ -124,7 +124,10 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 if (mode === 'PARTNERS') {
                   return ` (Prize = ${formatCoins(prizePot / 2)} each)`;
                 } else {
-                  return ` (1st = ${formatCoins(prizePot * 0.7)}, 2nd = ${formatCoins(prizePot * 0.3)})`;
+                  // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
+                  const secondPlacePrize = buyIn; // Exactly their stake back
+                  const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
+                  return ` (1st = ${formatCoins(firstPlacePrize)}, 2nd = ${formatCoins(secondPlacePrize)})`;
                 }
               })()}
             </div>
