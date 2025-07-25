@@ -1811,11 +1811,6 @@ export default function GameTable({
             gameState={gameState}
             handSummaryData={handSummaryData}
             onNextHand={handleStartNewHand}
-            onNewGame={() => {
-              setShowHandSummary(false);
-              setHandSummaryData(null);
-              // Add any new game logic here
-            }}
           />
         )}
 
