@@ -1549,16 +1549,9 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // Add image preloading state and logic
-  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
-  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
-
   // Preload all card images on component mount
   useEffect(() => {
     const preloadCardImages = async () => {
-      const cardImages = new Set<string>();
-      const errorImages = new Set<string>();
-      
       // Define all possible card images
       const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
       const suits = ['S', 'H', 'D', 'C'];
@@ -1571,23 +1564,14 @@ export default function GameTable({
       const preloadPromises = cardFiles.map(filename => {
         return new Promise<void>((resolve) => {
           const img = new Image();
-          img.onload = () => {
-            cardImages.add(filename);
-            resolve();
-          };
-          img.onerror = () => {
-            errorImages.add(filename);
-            resolve();
-          };
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
           img.src = `/cards/${filename}`;
         });
       });
       
       await Promise.all(preloadPromises);
-      setPreloadedImages(cardImages);
-      setImageLoadErrors(errorImages);
-      
-      console.log(`[IMAGE PRELOAD] Loaded ${cardImages.size} images, ${errorImages.size} errors`);
+      console.log(`[IMAGE PRELOAD] Preloaded ${cardFiles.length} card images`);
     };
     
     preloadCardImages();
