@@ -1801,6 +1801,13 @@ export default function GameTable({
                       // Calculate if player has Ace of Spades for Whiz games
                       const hasAceSpades = currentPlayerHand?.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') || false;
                       
+                      // Get partner bid for Suicide games
+                      let partnerBid: number | undefined;
+                      if ((gameState as any).forcedBid === 'SUICIDE' && (gameState as any).bidding && (gameState as any).bidding.bids) {
+                        const partnerIndex = (currentPlayerIndex + 2) % 4;
+                        partnerBid = (gameState as any).bidding.bids[partnerIndex];
+                      }
+                      
                       return (
                         <BiddingInterface
                           onBid={handleBid}
@@ -1811,6 +1818,8 @@ export default function GameTable({
                           currentPlayerTurn={gameState.currentPlayer}
                           allowNil={gameState.rules.allowNil}
                           hasAceSpades={hasAceSpades}
+                          forcedBid={(gameState as any).forcedBid}
+                          partnerBid={partnerBid}
                         />
                       );
                     })()}

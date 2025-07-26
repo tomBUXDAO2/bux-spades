@@ -391,8 +391,43 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 });
 
 // --- Bot Bidding Logic ---
-function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number): number {
+function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, forcedBid?: string): number {
   if (!hand) return 1;
+  
+  // For SUICIDE games, implement suicide bidding logic
+  if (forcedBid === 'SUICIDE') {
+    const spades = hand.filter(c => c.suit === 'S');
+    const hasAceSpades = spades.some(c => c.rank === 'A');
+    
+    // If partner hasn't bid yet (first partner)
+    if (partnerBid === undefined) {
+      // 50% chance to nil, 50% chance to bid normally
+      if (Math.random() < 0.5) {
+        return 0; // Bid nil
+      } else {
+        // Bid normally (spades count or calculated bid)
+        if (hasAceSpades) {
+          return spades.length; // Must bid spades count if has Ace
+        } else {
+          return Math.max(1, spades.length); // Bid spades count or at least 1
+        }
+      }
+    }
+    
+    // If partner already bid (second partner)
+    if (partnerBid === 0) {
+      // Partner bid nil, so we can bid normally
+      if (hasAceSpades) {
+        return spades.length; // Must bid spades count if has Ace
+      } else {
+        // 70% chance to nil, 30% chance to bid spades count
+        return Math.random() < 0.7 ? 0 : spades.length;
+      }
+    } else {
+      // Partner bid something, so we must bid nil
+      return 0;
+    }
+  }
   
   // For WHIZ games, use simplified bidding logic
   if (gameType === 'WHIZ') {
@@ -460,32 +495,36 @@ export function botMakeMove(game: Game, seatIndex: number) {
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
       // Calculate bid based on game type
       let bid = 1;
-      if (game.rules && game.hands && game.hands[seatIndex]) {
-        // Get partner bid for smart bidding logic
-        let partnerBid: number | undefined;
-        if (game.rules.bidType === 'WHIZ' && game.bidding && game.bidding.bids) {
-          // In partners mode, partner is at seatIndex + 2 (opposite side)
-          const partnerIndex = (seatIndex + 2) % 4;
-          partnerBid = game.bidding.bids[partnerIndex];
+              if (game.rules && game.hands && game.hands[seatIndex]) {
+          // Get partner bid for smart bidding logic
+          let partnerBid: number | undefined;
+          if ((game.rules.bidType === 'WHIZ' || game.forcedBid === 'SUICIDE') && game.bidding && game.bidding.bids) {
+            // In partners mode, partner is at seatIndex + 2 (opposite side)
+            const partnerIndex = (seatIndex + 2) % 4;
+            partnerBid = game.bidding.bids[partnerIndex];
+          }
+          
+          if (game.rules.bidType === 'MIRROR') {
+            // Mirror games: bid the number of spades in hand
+            const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
+            bid = spades.length;
+            console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
+          } else if (game.rules.bidType === 'WHIZ') {
+            // Whiz games: use simplified bidding logic
+            bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid);
+            console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
+          } else if (game.forcedBid === 'SUICIDE') {
+            // Suicide games: implement suicide bidding logic
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'SUICIDE');
+            console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
+          } else if (game.rules.bidType === 'REG') {
+            // Regular games: use complex bidding logic
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
+          } else {
+            // Default fallback
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
+          }
         }
-        
-        if (game.rules.bidType === 'MIRROR') {
-          // Mirror games: bid the number of spades in hand
-          const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
-          bid = spades.length;
-          console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
-        } else if (game.rules.bidType === 'WHIZ') {
-          // Whiz games: use simplified bidding logic
-          bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid);
-          console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
-        } else if (game.rules.bidType === 'REG') {
-          // Regular games: use complex bidding logic
-          bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
-        } else {
-          // Default fallback
-          bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
-        }
-      }
       // Simulate bot making a bid
       game.bidding.bids[seatIndex] = bid;
       console.log('[BOT DEBUG] Bot', bot.username, 'bid', bid);
