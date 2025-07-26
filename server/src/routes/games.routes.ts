@@ -414,7 +414,7 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 });
 
 // --- Bot Bidding Logic ---
-function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, forcedBid?: string): number {
+function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, forcedBid?: string, allowNil?: boolean, allowBlindNil?: boolean): number {
   if (!hand) return 1;
   
   // For SUICIDE games, implement smart suicide bidding logic
@@ -510,9 +510,9 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
     const spades = hand.filter(c => c.suit === 'S');
     const hasAceSpades = spades.some(c => c.rank === 'A');
     
-    // If no spades, must bid nil
+    // If no spades, must bid nil (unless nil is disabled)
     if (spades.length === 0) {
-      return 0;
+      return allowNil ? 0 : 1; // If nil disabled, bid 1 instead
     }
     
     // If has Ace of Spades, cannot bid nil
@@ -564,8 +564,8 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
     if (suitCards.some(c => c.rank === 'Q') && suitCards.length >= 3) bid += 1;
   }
   
-  // Smart nil consideration for regular games
-  if (partnerBid !== undefined) {
+  // Smart nil consideration for regular games (only if nil is allowed)
+  if (allowNil && partnerBid !== undefined) {
     // If partner already bid nil, consider nil if we have a weak hand
     if (partnerBid === 0) {
       if (bid <= 2 && !hasAceSpades && !hasLoneAce) {
@@ -613,30 +613,30 @@ export function botMakeMove(game: Game, seatIndex: number) {
             console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
           } else if (game.rules.bidType === 'WHIZ') {
             // Whiz games: use simplified bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid);
+            bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
           } else if (game.forcedBid === 'SUICIDE') {
             // Suicide games: implement suicide bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'SUICIDE');
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'SUICIDE', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
           } else if (game.forcedBid === 'BID4NIL') {
             // 4 OR NIL games: bot must bid 4 or nil
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID4NIL');
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID4NIL', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] 4 OR NIL game - Bot', bot.username, 'bidding', bid);
           } else if (game.forcedBid === 'BID3') {
             // BID 3 games: bot must bid exactly 3
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID3');
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID3', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] BID 3 game - Bot', bot.username, 'bidding', bid);
           } else if (game.forcedBid === 'BIDHEARTS') {
             // BID HEARTS games: bot must bid number of hearts
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BIDHEARTS');
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
           } else if (game.rules.bidType === 'REG') {
             // Regular games: use complex bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
           } else {
             // Default fallback
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
           }
         }
       // Simulate bot making a bid

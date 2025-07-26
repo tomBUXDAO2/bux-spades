@@ -1147,9 +1147,9 @@ export default function GameTable({
 
     const handleNewHandStarted = (data: any) => {
       console.log('[NEW HAND] New hand started event received:', data);
-      setDealingComplete(false);
-      setBiddingReady(false);
-      setDealtCardCount(0);
+      setDealingComplete(true); // Cards are dealt immediately
+      setBiddingReady(false); // Bidding not ready yet
+      setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
       setHandSummaryData(null); // Clear hand summary data
 
@@ -1172,10 +1172,25 @@ export default function GameTable({
       }));
     };
 
+    const handleBiddingReady = (data: any) => {
+      console.log('[BIDDING READY] Bidding phase ready:', data);
+      setBiddingReady(true);
+      setGameState(prev => ({
+        ...prev,
+        bidding: {
+          ...prev.bidding,
+          currentBidderIndex: data.currentBidderIndex,
+          currentPlayer: data.currentPlayer || ''
+        }
+      }));
+    };
+
     socket.on('new_hand_started', handleNewHandStarted);
+    socket.on('bidding_ready', handleBiddingReady);
 
     return () => {
       socket.off('new_hand_started', handleNewHandStarted);
+      socket.off('bidding_ready', handleBiddingReady);
     };
   }, [socket]);
 

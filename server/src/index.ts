@@ -1152,7 +1152,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
       });
 
-      // Emit new hand started event
+      // Emit new hand started event with dealing phase
       console.log('[START NEW HAND] Emitting new_hand_started event');
       io.to(game.id).emit('new_hand_started', {
         dealerIndex: newDealerIndex,
@@ -1163,13 +1163,24 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit game update
       io.to(game.id).emit('game_update', enrichGameForClient(game));
 
-      // If first bidder is a bot, trigger their bid
-      const firstBidder = game.players[game.bidding.currentBidderIndex];
-      if (firstBidder && firstBidder.type === 'bot') {
-        setTimeout(() => {
-          botMakeMove(game, game.bidding.currentBidderIndex);
-        }, 500);
-      }
+      // Add delay before starting bidding phase
+      setTimeout(() => {
+        console.log('[START NEW HAND] Starting bidding phase after delay');
+        
+        // Emit bidding ready event
+        io.to(game.id).emit('bidding_ready', {
+          currentBidderIndex: game.bidding.currentBidderIndex,
+          currentPlayer: game.bidding.currentPlayer
+        });
+
+        // If first bidder is a bot, trigger their bid
+        const firstBidder = game.players[game.bidding.currentBidderIndex];
+        if (firstBidder && firstBidder.type === 'bot') {
+          setTimeout(() => {
+            botMakeMove(game, game.bidding.currentBidderIndex);
+          }, 1000); // Additional delay for bot bidding
+        }
+      }, 2000); // 2 second delay after dealing
 
     } catch (error) {
       console.error('Error in start_new_hand:', error);
