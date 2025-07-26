@@ -1577,59 +1577,27 @@ export default function GameTable({
     preloadCardImages();
   }, []);
 
-  // Optimized card image component with loading state - moved outside to prevent recreation
-  const CardImage = React.memo(({ card, width, height, className, alt }: {
+  // Simple stateless card image component to prevent flickering
+  const CardImage = ({ card, width, height, className, alt }: {
     card: Card;
     width: number;
     height: number;
     className?: string;
     alt?: string;
   }) => {
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [hasError, setHasError] = useState(false);
-    const imageSrc = useMemo(() => `/cards/${getCardImage(card)}`, [card]);
-    
-    // Reset loading state when card changes
-    useEffect(() => {
-      setIsLoaded(false);
-      setHasError(false);
-    }, [card]);
-    
+    const imageSrc = `/cards/${getCardImage(card)}`;
     return (
-      <div className="relative" style={{ width, height }}>
-        {/* Loading placeholder */}
-        {!isLoaded && !hasError && (
-          <div 
-            className={`${className} bg-gray-700 animate-pulse rounded-lg`}
-            style={{ width, height }}
-          />
-        )}
-        
-        {/* Error fallback */}
-        {hasError && (
-          <div 
-            className={`${className} bg-gray-600 rounded-lg flex items-center justify-center text-white text-xs`}
-            style={{ width, height }}
-          >
-            {card.rank}{card.suit}
-          </div>
-        )}
-        
-        {/* Actual image */}
-        <img
-          src={imageSrc}
-          alt={alt || `${card.rank}${card.suit}`}
-          width={width}
-          height={height}
-          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
-          style={{ objectFit: 'cover' }}
-          onLoad={() => setIsLoaded(true)}
-          onError={() => setHasError(true)}
-          loading="eager" // Force eager loading for game cards
-        />
-      </div>
+      <img
+        src={imageSrc}
+        alt={alt || `${card.rank}${card.suit}`}
+        width={width}
+        height={height}
+        className={className}
+        style={{ objectFit: 'cover' }}
+        loading="eager"
+      />
     );
-  });
+  };
 
   return (
     <>
