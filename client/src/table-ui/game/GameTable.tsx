@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
 import Chat from '../Chat';
