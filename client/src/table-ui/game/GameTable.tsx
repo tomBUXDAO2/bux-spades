@@ -340,15 +340,16 @@ export default function GameTable({
         (gameState as any)?.rules?.allowBlindNil &&
         !showBlindNilModal &&
         !isBlindNil &&
-        !blindNilDismissed) {
-      // Add a delay to show blind nil modal after dealing
+        !blindNilDismissed &&
+        !cardsRevealed) {
+      // Show blind nil modal BEFORE revealing cards
       const timer = setTimeout(() => {
         setShowBlindNilModal(true);
-      }, 2000); // 2 second delay after dealing
+      }, 1000); // 1 second delay after dealing
       
       return () => clearTimeout(timer);
     }
-  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
@@ -454,9 +455,7 @@ export default function GameTable({
     setIsBlindNil(true);
     setShowBlindNilModal(false);
     setBlindNilDismissed(true);
-    // Reveal cards after blind nil choice
-    setCardsRevealed(true);
-    // Blind nil is always bid 0
+    // Blind nil is always bid 0 - no need to reveal cards or show bidding interface
     handleBid(0);
   };
 
@@ -1053,7 +1052,7 @@ export default function GameTable({
                     height={cardUIHeight}
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     alt={`${card.rank}${card.suit}`}
-                    faceDown={!cardsRevealed && gameState.status === "BIDDING" && !(biddingReady && gameState.currentPlayer === currentPlayerId)}
+                    faceDown={!cardsRevealed && gameState.status === "BIDDING"}
                   />
                   {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
@@ -1160,6 +1159,12 @@ export default function GameTable({
       setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
       setHandSummaryData(null); // Clear hand summary data
+      
+      // Reset blind nil state for new hand
+      setCardsRevealed(false);
+      setBlindNilDismissed(false);
+      setIsBlindNil(false);
+      setShowBlindNilModal(false);
 
       // Directly update the game state with the new hand data
       setGameState(prev => ({
@@ -1964,7 +1969,7 @@ export default function GameTable({
                             />
                             
                             {/* Bidding Interface */}
-                            {!showBlindNilModal && (
+                            {!showBlindNilModal && cardsRevealed && (
                               <BiddingInterface
                                 onBid={handleBid}
                                 currentBid={(gameState as any).bidding?.bids?.[0]}
