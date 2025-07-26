@@ -258,7 +258,7 @@ export default function HandSummaryModal({
                   
                   {gameState.gameMode === 'SOLO' ? (
                     // Solo mode - 4 individual players
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       {[0, 1, 2, 3].map((playerIndex) => {
                         const playerColor = getPlayerColor(playerIndex);
                         const playerName = getPlayerName(playerIndex);
