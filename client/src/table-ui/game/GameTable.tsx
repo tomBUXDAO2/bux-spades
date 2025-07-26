@@ -1774,11 +1774,18 @@ export default function GameTable({
                 })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
-                      // Determine game type, including Suicide games
-  let gameType = (gameState as any).rules.gameType;
-  if ((gameState as any).forcedBid === 'SUICIDE') {
-    gameType = 'SUICIDE';
-  }
+                      // Determine game type, including all gimmick games
+                      let gameType = (gameState as any).rules.gameType;
+                      const forcedBid = (gameState as any).forcedBid;
+                      if (forcedBid === 'SUICIDE') {
+                        gameType = 'SUICIDE';
+                      } else if (forcedBid === 'BID4NIL') {
+                        gameType = '4 OR NIL';
+                      } else if (forcedBid === 'BID3') {
+                        gameType = 'BID 3';
+                      } else if (forcedBid === 'BIDHEARTS') {
+                        gameType = 'BID HEARTS';
+                      }
   
   console.log('[GAMETABLE DEBUG] Game state analysis:', {
     gameMode: gameState.gameMode,

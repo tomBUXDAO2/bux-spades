@@ -43,7 +43,8 @@ router.post('/', (req, res) => {
       gameMode: settings.gameMode,
       biddingOption: settings.biddingOption,
       specialRules: settings.specialRules,
-      forcedBid
+      forcedBid,
+      finalGameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS') ? 'REG' : (settings.biddingOption || 'REG')
     });
     
     const newGame: Game = {
@@ -59,7 +60,9 @@ router.post('/', (req, res) => {
       status: 'WAITING' as Game['status'],
       completedTricks: [],
       rules: {
-        gameType: settings.biddingOption || 'REG', // Use biddingOption to set gameType
+        // For gimmick games (SUICIDE, 4 OR NIL, BID 3, BID HEARTS), set gameType to 'REG'
+        // and use forcedBid to distinguish between them
+        gameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS') ? 'REG' : (settings.biddingOption || 'REG'),
         allowNil: settings.specialRules?.allowNil ?? true,
         allowBlindNil: settings.specialRules?.allowBlindNil ?? false,
         coinAmount: settings.buyIn,
