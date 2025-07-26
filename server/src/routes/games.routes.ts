@@ -537,22 +537,48 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
     return spades.length;
   }
   
-  // For regular games, use complex bidding logic
+  // For regular games, use smart bidding logic with nil consideration
   let bid = 0;
   let spades = hand.filter(c => c.suit === 'S');
   let nonSpades = hand.filter(c => c.suit !== 'S');
+  const hasAceSpades = spades.some(c => c.rank === 'A');
+  const hasQueenKingSpades = spades.some(c => c.rank === 'Q') && spades.some(c => c.rank === 'K');
+  
+  // Check for lone aces in other suits
+  const hasLoneAce = ['H', 'D', 'C'].some(suit => {
+    const suitCards = hand.filter(c => c.suit === suit);
+    return suitCards.length === 1 && suitCards[0].rank === 'A';
+  });
+  
   // Spades logic
-  if (spades.some(c => c.rank === 'A')) bid += 1;
-  if (spades.some(c => c.rank === 'K') && spades.length >= 2) bid += 1;
-  if (spades.some(c => c.rank === 'Q') && spades.length >= 3) bid += 1;
-  if (spades.some(c => c.rank === 'J') && spades.length >= 4) bid += 1;
-  // +1 for every spade more than 4
-  if (spades.length > 4) bid += spades.length - 4;
+  if (hasAceSpades) bid += 1;
+  if (hasQueenKingSpades) bid += 1;
+  if (spades.length >= 3) bid += 1;
+  if (spades.length >= 5) bid += 1;
+  
   // Non-spades logic
   for (const suit of ['H', 'D', 'C']) {
-    if (nonSpades.some(c => c.suit === suit && c.rank === 'A')) bid += 1;
-    if (nonSpades.some(c => c.suit === suit && c.rank === 'K')) bid += 1;
+    const suitCards = hand.filter(c => c.suit === suit);
+    if (suitCards.some(c => c.rank === 'A')) bid += 1;
+    if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
+    if (suitCards.some(c => c.rank === 'Q') && suitCards.length >= 3) bid += 1;
   }
+  
+  // Smart nil consideration for regular games
+  if (partnerBid !== undefined) {
+    // If partner already bid nil, consider nil if we have a weak hand
+    if (partnerBid === 0) {
+      if (bid <= 2 && !hasAceSpades && !hasLoneAce) {
+        // Weak hand, consider nil
+        return Math.random() < 0.6 ? 0 : Math.max(1, bid);
+      }
+    }
+    // If partner bid something, consider nil if we have a very weak hand
+    else if (partnerBid > 0 && bid <= 1 && !hasAceSpades && !hasLoneAce) {
+      return Math.random() < 0.7 ? 0 : Math.max(1, bid);
+    }
+  }
+  
   return Math.max(1, bid); // Always bid at least 1
 }
 
@@ -825,7 +851,7 @@ function selectCardToWin(playableCards: Card[], currentTrick: Card[], hand: Card
   if (cardsOfLeadSuit.length > 0) {
     // Can beat the highest on table
     const winningCards = cardsOfLeadSuit.filter(c => 
-      getCardValue(card.rank) > getCardValue(highestOnTable.rank)
+      getCardValue(c.rank) > getCardValue(highestOnTable.rank)
     );
     
     if (winningCards.length > 0) {
@@ -891,13 +917,13 @@ export function botPlayCard(game: Game, seatIndex: number) {
   // Smart bot card selection based on game type and bidding
   let card: Card;
   
+  // Get bot's bid and partner's bid to determine strategy
+  const botBid = game.bidding?.bids[seatIndex];
+  const partnerIndex = (seatIndex + 2) % 4; // Partner is 2 seats away
+  const partnerBid = game.bidding?.bids[partnerIndex];
+  
   // Check if this is a Suicide game
   if (game.forcedBid === 'SUICIDE') {
-    // Get bot's bid to determine strategy
-    const botBid = game.bidding?.bids[seatIndex];
-    const partnerIndex = (seatIndex + 2) % 4; // Partner is 2 seats away
-    const partnerBid = game.bidding?.bids[partnerIndex];
-    
     if (botBid === 0) {
       // Bot is nil - try to avoid winning tricks
       card = selectCardForNil(playableCards, game.play.currentTrick, hand);
@@ -909,8 +935,17 @@ export function botPlayCard(game: Game, seatIndex: number) {
       card = selectCardToWin(playableCards, game.play.currentTrick, hand);
     }
   } else {
-    // Non-Suicide game - use simple random selection
-    card = playableCards[Math.floor(Math.random() * playableCards.length)];
+    // All other game types - check for nil players
+    if (botBid === 0) {
+      // Bot is nil - try to avoid winning tricks
+      card = selectCardForNil(playableCards, game.play.currentTrick, hand);
+    } else if (partnerBid === 0) {
+      // Partner is nil - try to cover partner
+      card = selectCardToCoverPartner(playableCards, game.play.currentTrick, hand, game.hands[partnerIndex] || []);
+    } else {
+      // Normal bidding - play to win
+      card = selectCardToWin(playableCards, game.play.currentTrick, hand);
+    }
   }
   if (!card) return;
   setTimeout(() => {
