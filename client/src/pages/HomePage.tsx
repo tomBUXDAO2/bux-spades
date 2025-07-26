@@ -399,33 +399,34 @@ const HomePage: React.FC = () => {
   const handleConfirmAction = async () => {
     if (!confirmModal.player) return;
     const player = confirmModal.player;
-    let url = '';
+    let endpoint = '';
     let body: any = { userId: user.id };
 
     if (confirmModal.action === 'add-friend') {
-      url = '/api/social/friends/add';
+      endpoint = '/api/social/friends/add';
       body.friendId = player.id;
     } else if (confirmModal.action === 'remove-friend') {
-      url = '/api/social/friends/remove';
+      endpoint = '/api/social/friends/remove';
       body.friendId = player.id;
     } else if (confirmModal.action === 'block') {
-      url = '/api/social/block';
+      endpoint = '/api/social/block';
       body.blockId = player.id;
     } else if (confirmModal.action === 'unblock') {
-      url = '/api/social/unblock';
+      endpoint = '/api/social/unblock';
       body.blockId = player.id;
     }
 
-    if (url) {
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      // Refresh player list
-      api.get('/api/users')
-        .then(res => res.json())
-        .then(setOnlinePlayers);
+    if (endpoint) {
+      try {
+        await api.post(endpoint, body);
+        // Refresh player list
+        const response = await api.get('/api/users');
+        const players = await response.json();
+        setOnlinePlayers(players);
+      } catch (error) {
+        console.error('Error performing social action:', error);
+        alert('Failed to perform action. Please try again.');
+      }
     }
     setConfirmModal({ open: false, player: null, action: '' });
   };
