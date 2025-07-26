@@ -44,31 +44,62 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
     console.log('[AVATAR DEBUG] Starting upload process');
     setIsUploading(true);
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64String = event.target?.result as string;
-        console.log('[AVATAR DEBUG] File converted to base64, length:', base64String.length);
-        
-        // Update profile with new avatar
-        console.log('[AVATAR DEBUG] Calling updateProfile with username:', user?.username);
-        await updateProfile(user?.username || '', base64String);
-        console.log('[AVATAR DEBUG] Profile update completed');
-        
-        // Close dropdown
-        setIsDropdownOpen(false);
-      };
-      reader.onerror = (error) => {
-        console.error('[AVATAR DEBUG] FileReader error:', error);
-        alert('Failed to read file. Please try again.');
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      // Compress and resize the image before converting to base64
+      const compressedImage = await compressImage(file);
+      console.log('[AVATAR DEBUG] Image compressed, new size:', compressedImage.length);
+      
+      // Update profile with new avatar
+      console.log('[AVATAR DEBUG] Calling updateProfile with username:', user?.username);
+      await updateProfile(user?.username || '', compressedImage);
+      console.log('[AVATAR DEBUG] Profile update completed');
+      
+      // Close dropdown
+      setIsDropdownOpen(false);
     } catch (error) {
       console.error('[AVATAR DEBUG] Error uploading avatar:', error);
       alert('Failed to upload avatar. Please try again.');
       setIsUploading(false);
     }
+  };
+
+  // Function to compress and resize image
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Set canvas size (max 200x200 for avatars)
+        const maxSize = 200;
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression (0.7 quality)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressedBase64);
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
   };
 
   return (
