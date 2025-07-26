@@ -450,6 +450,8 @@ export default function GameTable({
     console.log('[BLIND NIL] User chose blind nil');
     setIsBlindNil(true);
     setShowBlindNilModal(false);
+    // Reveal cards after blind nil choice
+    setCardsRevealed(true);
     // Blind nil is always bid 0
     handleBid(0);
   };
@@ -1045,7 +1047,7 @@ export default function GameTable({
                     height={cardUIHeight}
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     alt={`${card.rank}${card.suit}`}
-                    faceDown={!cardsRevealed && (gameState.status === "BIDDING" || isBlindNil)}
+                    faceDown={!cardsRevealed && gameState.status === "BIDDING"}
                   />
                   {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
