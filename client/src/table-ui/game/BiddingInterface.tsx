@@ -82,7 +82,7 @@ export default function BiddingInterface({
       return null;
     }
     
-    // If first partner or partner bid nil, show regular bidding modal
+    // If first partner or partner bid nil, show Suicide-specific bidding modal
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
@@ -90,21 +90,93 @@ export default function BiddingInterface({
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
             {isFirstPartner ? (
               <p className="text-sm max-sm:text-xs text-gray-300">
-                Suicide: One partner must nil. You have {numSpades} spades
+                Suicide: One partner must nil. Choose your bid.
               </p>
             ) : (
               <p className="text-sm max-sm:text-xs text-gray-300">
-                Partner bid nil. You have {numSpades} spades
+                Partner bid nil. Choose your bid.
               </p>
             )}
           </div>
           <div className="flex flex-col gap-3">
-            {/* Normal bid options */}
+            {/* Regular bidding options */}
             <button
-              onClick={() => setSelectedBid(numSpades)}
-              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === numSpades ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+              onClick={() => setSelectedBid(1)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
             >
-              Bid {numSpades}
+              Bid 1
+            </button>
+            <button
+              onClick={() => setSelectedBid(2)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 2 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 2
+            </button>
+            <button
+              onClick={() => setSelectedBid(3)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 3 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 3
+            </button>
+            <button
+              onClick={() => setSelectedBid(4)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 4 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 4
+            </button>
+            <button
+              onClick={() => setSelectedBid(5)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 5 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 5
+            </button>
+            <button
+              onClick={() => setSelectedBid(6)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 6 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 6
+            </button>
+            <button
+              onClick={() => setSelectedBid(7)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 7 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 7
+            </button>
+            <button
+              onClick={() => setSelectedBid(8)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 8 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 8
+            </button>
+            <button
+              onClick={() => setSelectedBid(9)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 9 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 9
+            </button>
+            <button
+              onClick={() => setSelectedBid(10)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 10 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 10
+            </button>
+            <button
+              onClick={() => setSelectedBid(11)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 11 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 11
+            </button>
+            <button
+              onClick={() => setSelectedBid(12)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 12 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 12
+            </button>
+            <button
+              onClick={() => setSelectedBid(13)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 13 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 13
             </button>
             
             {/* Nil option - always available in Suicide */}
