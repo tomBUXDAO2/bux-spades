@@ -258,6 +258,7 @@ export default function GameTable({
     setShowBlindNilModal(false);
     setIsBlindNil(false);
     setCardsRevealed(false);
+    setBlindNilDismissed(false);
     
     // Emit start new hand event to server
     if (socket && gameState.id) {
@@ -301,6 +302,7 @@ export default function GameTable({
   const [showBlindNilModal, setShowBlindNilModal] = useState(false);
   const [isBlindNil, setIsBlindNil] = useState(false);
   const [cardsRevealed, setCardsRevealed] = useState(false);
+  const [blindNilDismissed, setBlindNilDismissed] = useState(false);
   
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
@@ -337,7 +339,8 @@ export default function GameTable({
         biddingReady &&
         (gameState as any)?.rules?.allowBlindNil &&
         !showBlindNilModal &&
-        !isBlindNil) {
+        !isBlindNil &&
+        !blindNilDismissed) {
       // Add a delay to show blind nil modal after dealing
       const timer = setTimeout(() => {
         setShowBlindNilModal(true);
@@ -345,7 +348,7 @@ export default function GameTable({
       
       return () => clearTimeout(timer);
     }
-  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, showBlindNilModal, isBlindNil, gameState.rules?.allowBlindNil]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
@@ -450,6 +453,7 @@ export default function GameTable({
     console.log('[BLIND NIL] User chose blind nil');
     setIsBlindNil(true);
     setShowBlindNilModal(false);
+    setBlindNilDismissed(true);
     // Reveal cards after blind nil choice
     setCardsRevealed(true);
     // Blind nil is always bid 0
@@ -459,6 +463,7 @@ export default function GameTable({
   const handleRegularBid = () => {
     console.log('[BLIND NIL] User chose regular bid');
     setShowBlindNilModal(false);
+    setBlindNilDismissed(true);
     setCardsRevealed(true);
   };
 
