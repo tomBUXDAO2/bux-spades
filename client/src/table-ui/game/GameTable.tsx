@@ -182,7 +182,7 @@ declare global {
 // Helper function to count spades in a hand
 const countSpades = (hand: Card[] | undefined): number => {
   if (!hand || !Array.isArray(hand)) return 0;
-  return hand.filter(card => card.suit === '♠').length;
+  return hand.filter(card => card.suit === '♠' || (card as any).suit === 'S').length;
 };
 
 // Helper function to determine if the current user can invite a bot for a seat
@@ -1789,8 +1789,17 @@ export default function GameTable({
                       const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
                       const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
                       
+                      // Debug logging to see what's in the hand
+                      console.log('[WHIZ DEBUG] Hand data:', {
+                        currentPlayerIndex,
+                        currentPlayerHand,
+                        handLength: currentPlayerHand?.length,
+                        spadesInHand: currentPlayerHand?.filter((card: any) => card.suit === '♠'),
+                        allCards: currentPlayerHand?.map((card: any) => `${card.suit}${card.rank}`)
+                      });
+                      
                       // Calculate if player has Ace of Spades for Whiz games
-                      const hasAceSpades = currentPlayerHand?.some((card: any) => card.suit === '♠' && card.rank === 'A') || false;
+                      const hasAceSpades = currentPlayerHand?.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') || false;
                       
                       return (
                         <BiddingInterface
