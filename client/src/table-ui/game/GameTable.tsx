@@ -1620,7 +1620,7 @@ export default function GameTable({
                             label = 'MIRRORS';
                           } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
                             color = 'bg-orange-500';
-                            if ((gameState as any).forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
+                                                          if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
                             else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
                             else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
                             else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';

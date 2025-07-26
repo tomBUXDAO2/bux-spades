@@ -228,7 +228,7 @@ const HomePage: React.FC = () => {
       label = 'MIRRORS';
     } else if (game.forcedBid && type === 'REGULAR') {
       color = 'bg-orange-500';
-      if (game.forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
+              if (game.forcedBid === 'BID4NIL') label = '4 OR NIL';
       else if (game.forcedBid === 'BID3') label = 'BID 3';
       else if (game.forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
       else if (game.forcedBid === 'SUICIDE') label = 'SUICIDE';
