@@ -333,6 +333,9 @@ export default function GameTable({
   
   // Check if blind nil modal should be shown
   useEffect(() => {
+    // Don't show blind nil modal for spectators
+    if (myPlayerIndex === -1) return;
+    
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
@@ -349,7 +352,7 @@ export default function GameTable({
       
       return () => clearTimeout(timer);
     }
-  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed, myPlayerIndex]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
@@ -1893,10 +1896,11 @@ export default function GameTable({
                     biddingReady,
                     isBiddingPhase: gameState.status === "BIDDING",
                     isMyTurn: gameState.currentPlayer === currentPlayerId,
-                    shouldShowBiddingInterface: gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady
+                    isSpectator: myPlayerIndex === -1,
+                    shouldShowBiddingInterface: gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1
                   });
                   return null;
-                })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
+                })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1 ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       // Determine game type, including all gimmick games
@@ -2041,13 +2045,15 @@ export default function GameTable({
               </div>
             </div>
 
-            {/* Cards area with more space */}
-            <div className="bg-gray-800/50 rounded-lg relative mb-0" 
-                 style={{ 
-                   height: `${Math.floor(110 * scaleFactor)}px`
-                 }}>
-              {renderPlayerHand()}
-            </div>
+            {/* Cards area with more space - only show for actual players, not spectators */}
+            {myPlayerIndex !== -1 && (
+              <div className="bg-gray-800/50 rounded-lg relative mb-0" 
+                   style={{ 
+                     height: `${Math.floor(110 * scaleFactor)}px`
+                   }}>
+                {renderPlayerHand()}
+              </div>
+            )}
           </div>
 
           {/* Chat area - 30%, full height */}
