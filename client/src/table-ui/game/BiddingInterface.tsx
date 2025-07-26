@@ -71,7 +71,6 @@ export default function BiddingInterface({
   // For SUICIDE games, implement suicide bidding logic
   if (forcedBid === "SUICIDE") {
     const isFirstPartner = partnerBid === undefined;
-    const partnerBidNil = partnerBid === 0;
     const partnerBidSomething = partnerBid !== undefined && partnerBid > 0;
     
     // If partner bid something, we must nil (no modal, auto-bid)

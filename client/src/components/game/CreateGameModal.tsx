@@ -7,12 +7,7 @@ interface CreateGameModalProps {
   onCreateGame: (settings: GameSettings) => void;
 }
 
-const GIMMICK_OPTIONS = [
-  { value: 'suicide', label: 'Suicide (1 partner must nil)' },
-  { value: 'bid4orNil', label: 'Bid 4 or Nil' },
-  { value: 'bid3', label: 'Bid 3' },
-  { value: 'bidHearts', label: 'Bid Hearts' },
-];
+
 
 const formatCoins = (value: number) => {
   if (value >= 1000000) {
