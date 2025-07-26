@@ -1785,15 +1785,19 @@ export default function GameTable({
                         dealingComplete,
                         biddingReady
                       });
+                      // Get the current player's hand from gameState.hands array
+                      const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
+                      const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
+                      
                       // Calculate if player has Ace of Spades for Whiz games
-                      const hasAceSpades = currentPlayer?.hand?.some(card => card.suit === '♠' && card.rank === 'A') || false;
+                      const hasAceSpades = currentPlayerHand?.some((card: any) => card.suit === '♠' && card.rank === 'A') || false;
                       
                       return (
                         <BiddingInterface
                           onBid={handleBid}
                           currentBid={(gameState as any).bidding?.bids?.[0]}
                           gameType={gameType}
-                          numSpades={currentPlayer ? countSpades(currentPlayer.hand) : 0}
+                          numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
                           playerId={currentPlayerId}
                           currentPlayerTurn={gameState.currentPlayer}
                           allowNil={gameState.rules.allowNil}
