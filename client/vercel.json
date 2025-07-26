@@ -9,10 +9,6 @@
       "destination": "https://bux-spades-server.fly.dev/ws/$1"
     },
     {
-      "source": "/auth/callback",
-      "destination": "/index.html"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
