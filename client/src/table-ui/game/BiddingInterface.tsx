@@ -8,6 +8,7 @@ interface BiddingProps {
   currentPlayerTurn: string;
   gameType: GameType;
   numSpades: number; // Number of spades in player's hand
+  numHearts?: number; // Number of hearts in player's hand for BID HEARTS games
   allowNil?: boolean; // Add allowNil prop
   hasAceSpades?: boolean; // Add hasAceSpades prop for Whiz games
   forcedBid?: string; // Add forcedBid prop for Suicide games
@@ -27,6 +28,7 @@ export default function BiddingInterface({
   currentPlayerTurn,
   gameType,
   numSpades,
+  numHearts = 0, // Default to 0 for backward compatibility
   allowNil = true, // Default to true for backward compatibility
   hasAceSpades = false, // Default to false for backward compatibility
   forcedBid = 'NONE', // Default to NONE for backward compatibility
@@ -129,6 +131,100 @@ export default function BiddingInterface({
               </>
             )}
             
+            <button
+              onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
+              disabled={selectedBid === null}
+              className={`${bottomButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For 4 OR NIL games, players must bid 4 or nil
+  if (forcedBid === "BID4NIL") {
+    return (
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
+        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
+          <div className="text-center mb-3 max-sm:mb-2">
+            <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
+            <p className="text-sm max-sm:text-xs text-gray-300">4 OR NIL: You must bid 4 or nil</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setSelectedBid(4)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 4 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid 4
+            </button>
+            <button
+              onClick={() => setSelectedBid(0)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Nil
+            </button>
+            <button
+              onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
+              disabled={selectedBid === null}
+              className={`${bottomButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For BID 3 games, players must bid exactly 3
+  if (forcedBid === "BID3") {
+    return (
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
+        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
+          <div className="text-center mb-3 max-sm:mb-2">
+            <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
+            <p className="text-sm max-sm:text-xs text-gray-300">BID 3: You must bid exactly 3</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setSelectedBid(3)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg`}
+            >
+              Bid 3 (Forced)
+            </button>
+            <button
+              onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
+              disabled={selectedBid === null}
+              className={`${bottomButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For BID HEARTS games, players must bid the number of hearts in their hand
+  if (forcedBid === "BIDHEARTS") {
+    
+    return (
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
+        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
+          <div className="text-center mb-3 max-sm:mb-2">
+            <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
+            <p className="text-sm max-sm:text-xs text-gray-300">BID HEARTS: You have {numHearts} hearts</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setSelectedBid(numHearts)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg`}
+            >
+              Bid {numHearts} (Forced)
+            </button>
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
               disabled={selectedBid === null}

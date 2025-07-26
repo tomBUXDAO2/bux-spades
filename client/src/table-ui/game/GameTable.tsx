@@ -1774,7 +1774,19 @@ export default function GameTable({
                 })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
-                      const gameType = (gameState as any).rules.gameType;
+                      // Determine game type, including Suicide games
+  let gameType = (gameState as any).rules.gameType;
+  if ((gameState as any).forcedBid === 'SUICIDE') {
+    gameType = 'SUICIDE';
+  }
+  
+  console.log('[GAMETABLE DEBUG] Game state analysis:', {
+    gameMode: gameState.gameMode,
+    rulesGameType: (gameState as any).rules?.gameType,
+    forcedBid: (gameState as any).forcedBid,
+    specialRules: gameState.specialRules,
+    finalGameType: gameType
+  });
                       console.log('[GAMETABLE DEBUG] BiddingInterface props:', {
                         gameType,
                         gameStateRules: (gameState as any).rules,
@@ -1801,6 +1813,13 @@ export default function GameTable({
                       // Calculate if player has Ace of Spades for Whiz games
                       const hasAceSpades = currentPlayerHand?.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') || false;
                       
+                      // Calculate number of hearts for BID HEARTS games
+                      const countHearts = (hand: Card[] | undefined): number => {
+                        if (!hand || !Array.isArray(hand)) return 0;
+                        return hand.filter(card => card.suit === '♥' || (card as any).suit === 'H').length;
+                      };
+                      const numHearts = currentPlayerHand ? countHearts(currentPlayerHand) : 0;
+                      
                       // Get partner bid for Suicide games
                       let partnerBid: number | undefined;
                       if ((gameState as any).forcedBid === 'SUICIDE' && (gameState as any).bidding && (gameState as any).bidding.bids) {
@@ -1808,20 +1827,21 @@ export default function GameTable({
                         partnerBid = (gameState as any).bidding.bids[partnerIndex];
                       }
                       
-                      return (
-                        <BiddingInterface
-                          onBid={handleBid}
-                          currentBid={(gameState as any).bidding?.bids?.[0]}
-                          gameType={gameType}
-                          numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
-                          playerId={currentPlayerId}
-                          currentPlayerTurn={gameState.currentPlayer}
-                          allowNil={gameState.rules.allowNil}
-                          hasAceSpades={hasAceSpades}
-                          forcedBid={(gameState as any).forcedBid}
-                          partnerBid={partnerBid}
-                        />
-                      );
+                                              return (
+                          <BiddingInterface
+                            onBid={handleBid}
+                            currentBid={(gameState as any).bidding?.bids?.[0]}
+                            gameType={gameType}
+                            numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
+                            numHearts={numHearts}
+                            playerId={currentPlayerId}
+                            currentPlayerTurn={gameState.currentPlayer}
+                            allowNil={gameState.rules.allowNil}
+                            hasAceSpades={hasAceSpades}
+                            forcedBid={(gameState as any).forcedBid}
+                            partnerBid={partnerBid}
+                          />
+                        );
                     })()}
                   </div>
                 ) : gameState.status === "BIDDING" && !dealingComplete ? (

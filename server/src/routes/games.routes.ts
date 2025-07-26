@@ -26,13 +26,33 @@ router.post('/', (req, res) => {
       avatar: settings.creatorImage || null,
       type: 'human' as const,
     };
+    // Determine forcedBid based on bidding option
+    let forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'NONE' = 'NONE';
+    
+    if (settings.biddingOption === 'SUICIDE') {
+      forcedBid = 'SUICIDE';
+    } else if (settings.biddingOption === '4 OR NIL') {
+      forcedBid = 'BID4NIL';
+    } else if (settings.biddingOption === 'BID 3') {
+      forcedBid = 'BID3';
+    } else if (settings.biddingOption === 'BID HEARTS') {
+      forcedBid = 'BIDHEARTS';
+    }
+    
+    console.log('[GAME CREATION DEBUG] Creating game with settings:', {
+      gameMode: settings.gameMode,
+      biddingOption: settings.biddingOption,
+      specialRules: settings.specialRules,
+      forcedBid
+    });
+    
     const newGame: Game = {
       id: uuidv4(),
       gameMode: settings.gameMode,
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints,
       buyIn: settings.buyIn,
-      forcedBid: (settings.specialRules?.screamer ? 'SUICIDE' : 'NONE') as 'SUICIDE' | 'NONE',
+      forcedBid,
       specialRules: settings.specialRules || {},
       players: [creatorPlayer, null, null, null],
       spectators: [],
@@ -429,6 +449,23 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
     }
   }
   
+  // For 4 OR NIL games, players must bid 4 or nil
+  if (forcedBid === 'BID4NIL') {
+    // 50% chance to bid 4, 50% chance to nil
+    return Math.random() < 0.5 ? 4 : 0;
+  }
+  
+  // For BID 3 games, players must bid exactly 3
+  if (forcedBid === 'BID3') {
+    return 3;
+  }
+  
+  // For BID HEARTS games, players must bid the number of hearts in their hand
+  if (forcedBid === 'BIDHEARTS') {
+    const hearts = hand.filter(c => c.suit === 'H');
+    return hearts.length;
+  }
+  
   // For WHIZ games, use simplified bidding logic
   if (gameType === 'WHIZ') {
     const spades = hand.filter(c => c.suit === 'S');
@@ -517,6 +554,18 @@ export function botMakeMove(game: Game, seatIndex: number) {
             // Suicide games: implement suicide bidding logic
             bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'SUICIDE');
             console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
+          } else if (game.forcedBid === 'BID4NIL') {
+            // 4 OR NIL games: bot must bid 4 or nil
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID4NIL');
+            console.log('[BOT DEBUG] 4 OR NIL game - Bot', bot.username, 'bidding', bid);
+          } else if (game.forcedBid === 'BID3') {
+            // BID 3 games: bot must bid exactly 3
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID3');
+            console.log('[BOT DEBUG] BID 3 game - Bot', bot.username, 'bidding', bid);
+          } else if (game.forcedBid === 'BIDHEARTS') {
+            // BID HEARTS games: bot must bid number of hearts
+            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BIDHEARTS');
+            console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
           } else if (game.rules.bidType === 'REG') {
             // Regular games: use complex bidding logic
             bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
@@ -1303,6 +1352,7 @@ function enrichGameForClient(game: Game, userId?: string): Game {
     playerScores: game.playerScores, // Added for Solo mode
     playerBags: game.playerBags,     // Added for Solo mode
     winningPlayer: game.winningPlayer, // Added for Solo mode
+    forcedBid: game.forcedBid, // Added for Suicide games
     players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {

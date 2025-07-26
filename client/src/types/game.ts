@@ -1,6 +1,6 @@
 export type GameType = 'REGULAR' | 'SOLO' | 'WHIZ' | 'MIRROR';
 export type GameMode = 'PARTNERS' | 'SOLO';
-export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS';
 export type GamePlayOption = 'REG' | 'WHIZ' | 'MIRROR';
 
 export type Suit = '♠' | '♥' | '♦' | '♣';

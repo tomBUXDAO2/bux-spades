@@ -1,5 +1,5 @@
 export type GameMode = 'PARTNERS' | 'SOLO';
-export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS';
 export type GamePlayOption = 'REG' | 'WHIZ' | 'MIRROR';
 export type Suit = 'S' | 'H' | 'D' | 'C';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -30,7 +30,7 @@ export interface Game {
   maxPoints: number;
   minPoints: number;
   buyIn: number;
-  forcedBid: 'SUICIDE' | 'NONE';
+  forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'NONE';
   specialRules: {
     screamer?: boolean;
     assassin?: boolean;

@@ -25,7 +25,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [biddingOption, setBiddingOption] = useState<BiddingOption>('REG');
-  const [gimmickOption, setGimmickOption] = useState('');
+
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
   const [buyIn, setBuyIn] = useState(100000);
@@ -179,7 +179,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           {/* Bidding Options Radio Buttons - label removed */}
           <div className="w-full flex flex-col items-center my-2">
             <div className="flex flex-wrap gap-4 justify-center mb-2">
-              {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
+              {['REG', 'WHIZ', 'MIRROR', 'SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS'].map((opt) => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -219,21 +219,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
           </div>
 
-          {/* Gimmick Dropdown - always visible, disabled unless GIMMICK is selected */}
-          <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-slate-300 mb-2 text-center">Gimmick Option</label>
-            <select
-              value={gimmickOption}
-              onChange={e => setGimmickOption(e.target.value)}
-              className="w-full bg-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={biddingOption !== 'GIMMICK'}
-            >
-              <option value="">Select a Gimmick</option>
-              {(mode === 'PARTNERS' ? GIMMICK_OPTIONS : GIMMICK_OPTIONS.filter(opt => opt.value !== 'suicide')).map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
+
 
           {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
