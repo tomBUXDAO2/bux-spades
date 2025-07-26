@@ -420,7 +420,6 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
   // For SUICIDE games, implement suicide bidding logic
   if (forcedBid === 'SUICIDE') {
     const spades = hand.filter(c => c.suit === 'S');
-    const hasAceSpades = spades.some(c => c.rank === 'A');
     
     // If partner hasn't bid yet (first partner)
     if (partnerBid === undefined) {
@@ -429,23 +428,15 @@ function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, f
         return 0; // Bid nil
       } else {
         // Bid normally (spades count or calculated bid)
-        if (hasAceSpades) {
-          return spades.length; // Must bid spades count if has Ace
-        } else {
-          return Math.max(1, spades.length); // Bid spades count or at least 1
-        }
+        return Math.max(1, spades.length); // Bid spades count or at least 1
       }
     }
     
     // If partner already bid (second partner)
     if (partnerBid === 0) {
       // Partner bid nil, so we can bid normally
-      if (hasAceSpades) {
-        return spades.length; // Must bid spades count if has Ace
-      } else {
-        // 70% chance to nil, 30% chance to bid spades count
-        return Math.random() < 0.7 ? 0 : spades.length;
-      }
+      // 70% chance to nil, 30% chance to bid spades count
+      return Math.random() < 0.7 ? 0 : spades.length;
     } else {
       // Partner bid something, so we must bid nil
       return 0;

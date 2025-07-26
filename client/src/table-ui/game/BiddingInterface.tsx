@@ -73,9 +73,16 @@ export default function BiddingInterface({
     const isFirstPartner = partnerBid === undefined;
     const partnerBidNil = partnerBid === 0;
     const partnerBidSomething = partnerBid !== undefined && partnerBid > 0;
-    const mustBidNil = partnerBidSomething; // If partner bid something, we must nil
-    const canBidNil = !hasAceSpades; // Can only nil if no Ace of Spades
     
+    // If partner bid something, we must nil (no modal, auto-bid)
+    if (!isFirstPartner && partnerBidSomething) {
+      console.log('[SUICIDE DEBUG] Partner bid something, auto-bidding nil');
+      setIsSubmitting(true);
+      onBid(0); // Force nil
+      return null;
+    }
+    
+    // If first partner or partner bid nil, show regular bidding modal
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
@@ -84,52 +91,29 @@ export default function BiddingInterface({
             {isFirstPartner ? (
               <p className="text-sm max-sm:text-xs text-gray-300">
                 Suicide: One partner must nil. You have {numSpades} spades
-                {hasAceSpades && " (Ace of Spades - cannot nil)"}
-              </p>
-            ) : partnerBidNil ? (
-              <p className="text-sm max-sm:text-xs text-gray-300">
-                Partner bid nil. You have {numSpades} spades
-                {hasAceSpades && " (Ace of Spades - cannot nil)"}
               </p>
             ) : (
               <p className="text-sm max-sm:text-xs text-gray-300">
-                Partner bid {partnerBid}. You must bid nil!
-                {hasAceSpades && " (But you have Ace of Spades - bid 1)"}
+                Partner bid nil. You have {numSpades} spades
               </p>
             )}
           </div>
           <div className="flex flex-col gap-3">
-            {/* Show normal bid options if first partner or if partner bid nil */}
-            {(!isFirstPartner && !partnerBidNil) ? (
-              // Partner bid something, we must nil (or bid 1 if Ace of Spades)
-              <button
-                onClick={() => setSelectedBid(hasAceSpades ? 1 : 0)}
-                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === (hasAceSpades ? 1 : 0) ? 'bg-gradient-to-br from-red-500 to-red-700 text-white ring-2 ring-red-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-              >
-                {hasAceSpades ? 'Bid 1 (Forced)' : 'Bid Nil (Forced)'}
-              </button>
-            ) : (
-              // First partner or partner bid nil - can choose
-              <>
-                {/* Normal bid options */}
-                <button
-                  onClick={() => setSelectedBid(numSpades)}
-                  className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === numSpades ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                >
-                  Bid {numSpades}
-                </button>
-                
-                {/* Nil option if allowed */}
-                {canBidNil && (
-                  <button
-                    onClick={() => setSelectedBid(0)}
-                    className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                  >
-                    Nil
-                  </button>
-                )}
-              </>
-            )}
+            {/* Normal bid options */}
+            <button
+              onClick={() => setSelectedBid(numSpades)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === numSpades ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Bid {numSpades}
+            </button>
+            
+            {/* Nil option - always available in Suicide */}
+            <button
+              onClick={() => setSelectedBid(0)}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+            >
+              Nil
+            </button>
             
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}

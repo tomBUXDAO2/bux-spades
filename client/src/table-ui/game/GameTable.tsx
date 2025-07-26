@@ -1618,7 +1618,7 @@ export default function GameTable({
                           } else if (type === 'MIRROR') {
                             color = 'bg-red-600';
                             label = 'MIRRORS';
-                          } else if ((gameState as any).forcedBid && type === 'REGULAR') {
+                          } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
                             color = 'bg-orange-500';
                             if ((gameState as any).forcedBid === 'BID4NIL') label = 'BID 4 OR NIL';
                             else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
