@@ -417,26 +417,71 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, forcedBid?: string): number {
   if (!hand) return 1;
   
-  // For SUICIDE games, implement suicide bidding logic
+  // For SUICIDE games, implement smart suicide bidding logic
   if (forcedBid === 'SUICIDE') {
     const spades = hand.filter(c => c.suit === 'S');
+    const hasAceSpades = spades.some(c => c.rank === 'A');
+    const hasQueenKingSpades = spades.some(c => c.rank === 'Q') && spades.some(c => c.rank === 'K');
+    
+    // Check for lone aces in other suits
+    const hasLoneAce = ['H', 'D', 'C'].some(suit => {
+      const suitCards = hand.filter(c => c.suit === suit);
+      return suitCards.length === 1 && suitCards[0].rank === 'A';
+    });
     
     // If partner hasn't bid yet (first partner)
     if (partnerBid === undefined) {
-      // 50% chance to nil, 50% chance to bid normally
-      if (Math.random() < 0.5) {
-        return 0; // Bid nil
+      // Don't nil if we have strong spades or lone aces
+      if (hasAceSpades || hasQueenKingSpades || spades.length > 3 || hasLoneAce) {
+        // Calculate a smart bid based on hand strength
+        let bid = 0;
+        
+        // Spades logic
+        if (hasAceSpades) bid += 1;
+        if (hasQueenKingSpades) bid += 1;
+        if (spades.length >= 3) bid += 1;
+        if (spades.length >= 5) bid += 1;
+        
+        // Non-spades logic
+        for (const suit of ['H', 'D', 'C']) {
+          const suitCards = hand.filter(c => c.suit === suit);
+          if (suitCards.some(c => c.rank === 'A')) bid += 1;
+          if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
+          if (suitCards.some(c => c.rank === 'Q') && suitCards.length >= 3) bid += 1;
+        }
+        
+        // Adjust bid based on hand strength
+        if (bid >= 6) return Math.min(bid, 8); // Strong hand: 6-8
+        if (bid >= 4) return Math.min(bid, 5); // Good hand: 4-5
+        return Math.max(2, bid); // Weak hand: 2-3
       } else {
-        // Bid normally (spades count or calculated bid)
-        return Math.max(1, spades.length); // Bid spades count or at least 1
+        // Weak hand, consider nil
+        return Math.random() < 0.6 ? 0 : Math.max(2, spades.length);
       }
     }
     
     // If partner already bid (second partner)
     if (partnerBid === 0) {
       // Partner bid nil, so we can bid normally
-      // 70% chance to nil, 30% chance to bid spades count
-      return Math.random() < 0.7 ? 0 : spades.length;
+      // Don't nil if we have strong spades
+      if (hasAceSpades || hasQueenKingSpades || spades.length > 3) {
+        let bid = 0;
+        if (hasAceSpades) bid += 1;
+        if (hasQueenKingSpades) bid += 1;
+        if (spades.length >= 3) bid += 1;
+        if (spades.length >= 5) bid += 1;
+        
+        for (const suit of ['H', 'D', 'C']) {
+          const suitCards = hand.filter(c => c.suit === suit);
+          if (suitCards.some(c => c.rank === 'A')) bid += 1;
+          if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
+        }
+        
+        return Math.max(2, Math.min(bid, 6));
+      } else {
+        // Weak hand, likely nil
+        return Math.random() < 0.7 ? 0 : Math.max(2, spades.length);
+      }
     } else {
       // Partner bid something, so we must bid nil
       return 0;
@@ -645,6 +690,171 @@ function advanceTurnOrBotMove(game: Game, nextSeatIndex: number) {
   }
 }
 
+// --- Smart Card Selection Functions for Suicide Games ---
+function selectCardForNil(playableCards: Card[], currentTrick: Card[], hand: Card[]): Card {
+  // Nil player should try to avoid winning tricks
+  if (currentTrick.length === 0) {
+    // Leading - play lowest card possible
+    return playableCards.reduce((lowest, card) => {
+      return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+    });
+  }
+  
+  // Following - try to play highest card under the current highest
+  const leadSuit = currentTrick[0].suit;
+  const highestOnTable = currentTrick.reduce((highest, card) => {
+    return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+  });
+  
+  const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
+  if (cardsOfLeadSuit.length > 0) {
+    // Must follow suit - play highest card under the highest on table
+    const cardsUnderHighest = cardsOfLeadSuit.filter(c => 
+      getCardValue(c.rank) < getCardValue(highestOnTable.rank)
+    );
+    
+    if (cardsUnderHighest.length > 0) {
+      // Play highest card under the highest on table
+      return cardsUnderHighest.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    } else {
+      // All cards are higher - play the lowest
+      return cardsOfLeadSuit.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    }
+  } else {
+    // Void in lead suit - discard highest cards in other suits (not spades)
+    const nonSpades = playableCards.filter(c => c.suit !== 'S');
+    if (nonSpades.length > 0) {
+      // Discard highest non-spade
+      return nonSpades.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    } else {
+      // Only spades left - play lowest spade
+      return playableCards.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    }
+  }
+}
+
+function selectCardToCoverPartner(playableCards: Card[], currentTrick: Card[], hand: Card[], partnerHand: Card[]): Card {
+  // Partner is nil - try to cover by leading high cards and suits partner is void in
+  if (currentTrick.length === 0) {
+    // Leading - lead highest cards first, especially in suits partner is void
+    const partnerVoidSuits = ['H', 'D', 'C', 'S'].filter(suit => 
+      !partnerHand.some(c => c.suit === suit)
+    );
+    
+    // Prioritize leading in suits partner is void
+    for (const suit of partnerVoidSuits) {
+      const suitCards = playableCards.filter(c => c.suit === suit);
+      if (suitCards.length > 0) {
+        // Lead highest card in this suit
+        return suitCards.reduce((highest, card) => {
+          return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+        });
+      }
+    }
+    
+    // If no void suits available, lead highest card
+    return playableCards.reduce((highest, card) => {
+      return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+    });
+  }
+  
+  // Following - play to win if possible, otherwise play high
+  const leadSuit = currentTrick[0].suit;
+  const highestOnTable = currentTrick.reduce((highest, card) => {
+    return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+  });
+  
+  const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
+  if (cardsOfLeadSuit.length > 0) {
+    // Can beat the highest on table
+    const winningCards = cardsOfLeadSuit.filter(c => 
+      getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+    );
+    
+    if (winningCards.length > 0) {
+      // Play lowest winning card
+      return winningCards.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    } else {
+      // Can't win - play highest card
+      return cardsOfLeadSuit.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    }
+  } else {
+    // Void in lead suit - play highest spade if possible
+    const spades = playableCards.filter(c => c.suit === 'S');
+    if (spades.length > 0) {
+      return spades.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    } else {
+      // No spades - play highest card
+      return playableCards.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    }
+  }
+}
+
+function selectCardToWin(playableCards: Card[], currentTrick: Card[], hand: Card[]): Card {
+  // Normal bidding - try to win the trick
+  if (currentTrick.length === 0) {
+    // Leading - lead highest card
+    return playableCards.reduce((highest, card) => {
+      return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+    });
+  }
+  
+  // Following - try to win if possible
+  const leadSuit = currentTrick[0].suit;
+  const highestOnTable = currentTrick.reduce((highest, card) => {
+    return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+  });
+  
+  const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
+  if (cardsOfLeadSuit.length > 0) {
+    // Can beat the highest on table
+    const winningCards = cardsOfLeadSuit.filter(c => 
+      getCardValue(card.rank) > getCardValue(highestOnTable.rank)
+    );
+    
+    if (winningCards.length > 0) {
+      // Play lowest winning card
+      return winningCards.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    } else {
+      // Can't win - play lowest card
+      return cardsOfLeadSuit.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    }
+  } else {
+    // Void in lead suit - play highest spade if possible
+    const spades = playableCards.filter(c => c.suit === 'S');
+    if (spades.length > 0) {
+      return spades.reduce((highest, card) => {
+        return getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest;
+      });
+    } else {
+      // No spades - play lowest card
+      return playableCards.reduce((lowest, card) => {
+        return getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest;
+      });
+    }
+  }
+}
+
 // --- Bot Card Play Logic ---
 export function botPlayCard(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
@@ -678,8 +888,30 @@ export function botPlayCard(game: Game, seatIndex: number) {
       }
     }
   }
-  // Simple bot: pick a random playable card
-  const card = playableCards[Math.floor(Math.random() * playableCards.length)];
+  // Smart bot card selection based on game type and bidding
+  let card: Card;
+  
+  // Check if this is a Suicide game
+  if (game.forcedBid === 'SUICIDE') {
+    // Get bot's bid to determine strategy
+    const botBid = game.bidding?.bids[seatIndex];
+    const partnerIndex = (seatIndex + 2) % 4; // Partner is 2 seats away
+    const partnerBid = game.bidding?.bids[partnerIndex];
+    
+    if (botBid === 0) {
+      // Bot is nil - try to avoid winning tricks
+      card = selectCardForNil(playableCards, game.play.currentTrick, hand);
+    } else if (partnerBid === 0) {
+      // Partner is nil - try to cover partner
+      card = selectCardToCoverPartner(playableCards, game.play.currentTrick, hand, game.hands[partnerIndex] || []);
+    } else {
+      // Normal bidding - play to win
+      card = selectCardToWin(playableCards, game.play.currentTrick, hand);
+    }
+  } else {
+    // Non-Suicide game - use simple random selection
+    card = playableCards[Math.floor(Math.random() * playableCards.length)];
+  }
   if (!card) return;
   setTimeout(() => {
     if (!game.play) return; // Guard for undefined
