@@ -13,19 +13,32 @@ const getApiUrl = () => {
   return 'http://localhost:3000';
 };
 
+// Get authentication token from localStorage
+const getAuthToken = () => {
+  return localStorage.getItem('sessionToken');
+};
+
 // Create a fetch wrapper that uses the correct API URL
 export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const baseUrl = getApiUrl();
   const url = `${baseUrl}${endpoint}`;
+  const token = getAuthToken();
   
   console.log('API call:', { endpoint, fullUrl: url, isProduction: window.location.hostname !== 'localhost' });
   
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers as Record<string, string>,
+  };
+  
+  // Add authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
   return fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 };
 

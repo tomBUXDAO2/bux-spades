@@ -2,13 +2,13 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { onlineUsers } from '../index';
+import { authenticateToken } from '../middleware/auth.middleware';
 const router = Router();
 const prisma = new PrismaClient();
 
 // GET /api/users - return all users with online status and friend/block status
-router.get('/', async (req, res) => {
-  // TODO: Replace with real auth user ID
-  const currentUserId = req.user?.id || req.headers['x-user-id']; // fallback for dev
+router.get('/', authenticateToken, async (req, res) => {
+  const currentUserId = (req as any).user.userId;
   const users = await prisma.user.findMany({
     select: { id: true, username: true, avatar: true, coins: true }
   }) as any[];

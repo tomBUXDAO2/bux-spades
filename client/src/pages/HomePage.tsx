@@ -400,7 +400,7 @@ const HomePage: React.FC = () => {
     if (!confirmModal.player) return;
     const player = confirmModal.player;
     let endpoint = '';
-    let body: any = { userId: user.id };
+    let body: any = {};
 
     if (confirmModal.action === 'add-friend') {
       endpoint = '/api/social/friends/add';
