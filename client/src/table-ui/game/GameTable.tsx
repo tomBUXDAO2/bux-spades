@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
 import Chat from '../Chat';
@@ -1577,8 +1577,8 @@ export default function GameTable({
     preloadCardImages();
   }, []);
 
-  // Optimized card image component with loading state
-  const CardImage = ({ card, width, height, className, alt }: {
+  // Optimized card image component with loading state - moved outside to prevent recreation
+  const CardImage = React.memo(({ card, width, height, className, alt }: {
     card: Card;
     width: number;
     height: number;
@@ -1587,7 +1587,13 @@ export default function GameTable({
   }) => {
     const [isLoaded, setIsLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
-    const imageSrc = `/cards/${getCardImage(card)}`;
+    const imageSrc = useMemo(() => `/cards/${getCardImage(card)}`, [card]);
+    
+    // Reset loading state when card changes
+    useEffect(() => {
+      setIsLoaded(false);
+      setHasError(false);
+    }, [card]);
     
     return (
       <div className="relative" style={{ width, height }}>
@@ -1615,7 +1621,7 @@ export default function GameTable({
           alt={alt || `${card.rank}${card.suit}`}
           width={width}
           height={height}
-          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
+          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
           style={{ objectFit: 'cover' }}
           onLoad={() => setIsLoaded(true)}
           onError={() => setHasError(true)}
@@ -1623,7 +1629,7 @@ export default function GameTable({
         />
       </div>
     );
-  };
+  });
 
   return (
     <>
