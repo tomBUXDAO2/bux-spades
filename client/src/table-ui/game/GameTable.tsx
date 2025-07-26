@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
+import BlindNilModal from './BlindNilModal';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import WinnerModal from './WinnerModal';
@@ -253,6 +254,11 @@ export default function GameTable({
     setBiddingReady(false);
     setDealtCardCount(0);
     
+    // Reset blind nil state for new hand
+    setShowBlindNilModal(false);
+    setIsBlindNil(false);
+    setCardsRevealed(false);
+    
     // Emit start new hand event to server
     if (socket && gameState.id) {
       console.log('[START NEW HAND] Emitting start_new_hand event...');
@@ -292,6 +298,9 @@ export default function GameTable({
   const [showStartWarning, setShowStartWarning] = useState(false);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
+  const [showBlindNilModal, setShowBlindNilModal] = useState(false);
+  const [isBlindNil, setIsBlindNil] = useState(false);
+  const [cardsRevealed, setCardsRevealed] = useState(false);
   
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
@@ -319,6 +328,24 @@ export default function GameTable({
   
   // Add state to force component updates when the current player changes
   const [lastCurrentPlayer, setLastCurrentPlayer] = useState<string>(gameState.currentPlayer);
+  
+  // Check if blind nil modal should be shown
+  useEffect(() => {
+    if (gameState.status === "BIDDING" && 
+        gameState.currentPlayer === currentPlayerId && 
+        dealingComplete && 
+        biddingReady &&
+        (gameState as any)?.rules?.allowBlindNil &&
+        !showBlindNilModal &&
+        !isBlindNil) {
+      // Add a delay to show blind nil modal after dealing
+      const timer = setTimeout(() => {
+        setShowBlindNilModal(true);
+      }, 2000); // 2 second delay after dealing
+      
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, showBlindNilModal, isBlindNil, gameState.rules?.allowBlindNil]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
@@ -412,6 +439,25 @@ export default function GameTable({
     console.log('[BID DEBUG] make_bid emitted:', payload);
     console.log('Game status:', gameState.status, 'Current player:', gameState.currentPlayer);
     console.log('Socket connected:', socket?.connected);
+    
+    // Reveal cards after bidding if not blind nil
+    if (!isBlindNil) {
+      setCardsRevealed(true);
+    }
+  };
+
+  const handleBlindNil = () => {
+    console.log('[BLIND NIL] User chose blind nil');
+    setIsBlindNil(true);
+    setShowBlindNilModal(false);
+    // Blind nil is always bid 0
+    handleBid(0);
+  };
+
+  const handleRegularBid = () => {
+    console.log('[BLIND NIL] User chose regular bid');
+    setShowBlindNilModal(false);
+    setCardsRevealed(true);
   };
 
   // Add at the top of the GameTable component, after useState declarations
@@ -999,6 +1045,7 @@ export default function GameTable({
                     height={cardUIHeight}
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     alt={`${card.rank}${card.suit}`}
+                    faceDown={!cardsRevealed && (gameState.status === "BIDDING" || isBlindNil)}
                   />
                   {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
@@ -1578,18 +1625,19 @@ export default function GameTable({
   }, []);
 
   // Simple stateless card image component to prevent flickering
-  const CardImage = ({ card, width, height, className, alt }: {
+  const CardImage = ({ card, width, height, className, alt, faceDown = false }: {
     card: Card;
     width: number;
     height: number;
     className?: string;
     alt?: string;
+    faceDown?: boolean;
   }) => {
-    const imageSrc = `/cards/${getCardImage(card)}`;
+    const imageSrc = faceDown ? '/cards/blue_back.png' : `/cards/${getCardImage(card)}`;
     return (
       <img
         src={imageSrc}
-        alt={alt || `${card.rank}${card.suit}`}
+        alt={alt || (faceDown ? 'Card Back' : `${card.rank}${card.suit}`)}
         width={width}
         height={height}
         className={className}
@@ -1884,19 +1932,31 @@ export default function GameTable({
                       }
                       
                                               return (
-                          <BiddingInterface
-                            onBid={handleBid}
-                            currentBid={(gameState as any).bidding?.bids?.[0]}
-                            gameType={gameType}
-                            numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
-                            numHearts={numHearts}
-                            playerId={currentPlayerId}
-                            currentPlayerTurn={gameState.currentPlayer}
-                            allowNil={gameState.rules.allowNil}
-                            hasAceSpades={hasAceSpades}
-                            forcedBid={(gameState as any).forcedBid}
-                            partnerBid={partnerBid}
-                          />
+                          <>
+                            {/* Blind Nil Modal */}
+                            <BlindNilModal
+                              isOpen={showBlindNilModal}
+                              onBlindNil={handleBlindNil}
+                              onRegularBid={handleRegularBid}
+                            />
+                            
+                            {/* Bidding Interface */}
+                            {!showBlindNilModal && (
+                              <BiddingInterface
+                                onBid={handleBid}
+                                currentBid={(gameState as any).bidding?.bids?.[0]}
+                                gameType={gameType}
+                                numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
+                                numHearts={numHearts}
+                                playerId={currentPlayerId}
+                                currentPlayerTurn={gameState.currentPlayer}
+                                allowNil={gameState.rules.allowNil}
+                                hasAceSpades={hasAceSpades}
+                                forcedBid={(gameState as any).forcedBid}
+                                partnerBid={partnerBid}
+                              />
+                            )}
+                          </>
                         );
                     })()}
                   </div>

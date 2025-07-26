@@ -39,6 +39,24 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     }
   };
 
+  // Handle nil toggle changes
+  const handleNilToggle = (enabled: boolean) => {
+    setAllowNil(enabled);
+    // If nil is disabled, blind nil should also be disabled
+    if (!enabled) {
+      setAllowBlindNil(false);
+    }
+  };
+
+  // Handle blind nil toggle changes
+  const handleBlindNilToggle = (enabled: boolean) => {
+    setAllowBlindNil(enabled);
+    // If blind nil is enabled, nil should also be enabled
+    if (enabled) {
+      setAllowNil(true);
+    }
+  };
+
   if (!isOpen) return null;
 
   const handlePointsChange = (field: 'min' | 'max', delta: number) => {
@@ -187,30 +205,42 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 </label>
               ))}
             </div>
-            {/* Nil and Blind Nil checkboxes */}
+            {/* Nil and Blind Nil toggles */}
             <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
-              <label className={`flex items-center gap-2 ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                <input
-                  type="checkbox"
-                  checked={allowNil}
-                  onChange={() => setAllowNil((v) => !v)}
-                  disabled={biddingOption === 'MIRROR'}
-                  className="form-checkbox bg-slate-700 text-indigo-600 rounded w-6 h-6"
-                  style={{ minWidth: '1.5rem', minHeight: '1.5rem' }}
-                />
-                <span className="text-slate-200">Nil</span>
-              </label>
-              <label className={`flex items-center gap-2 ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                <input
-                  type="checkbox"
-                  checked={allowBlindNil}
-                  onChange={() => setAllowBlindNil((v) => !v)}
-                  disabled={biddingOption === 'MIRROR'}
-                  className="form-checkbox bg-slate-700 text-indigo-600 rounded w-6 h-6"
-                  style={{ minWidth: '1.5rem', minHeight: '1.5rem' }}
-                />
-                <span className="text-slate-200">Blind Nil</span>
-              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 text-sm">Nil:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
+                  <div
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(biddingOption === 'MIRROR') && handleNilToggle(!allowNil)}
+                    style={{ userSelect: 'none' }}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-6' : ''}`}
+                      style={{ transform: allowNil ? 'translateX(24px)' : 'translateX(0)' }}
+                    ></div>
+                  </div>
+                  <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 text-sm">Blind Nil:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
+                  <div
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${biddingOption === 'MIRROR' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(biddingOption === 'MIRROR' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
+                    style={{ userSelect: 'none' }}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-6' : ''}`}
+                      style={{ transform: allowBlindNil ? 'translateX(24px)' : 'translateX(0)' }}
+                    ></div>
+                  </div>
+                  <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                </div>
+              </div>
             </div>
           </div>
 
