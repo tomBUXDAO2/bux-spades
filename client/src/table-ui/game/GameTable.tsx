@@ -1785,6 +1785,9 @@ export default function GameTable({
                         dealingComplete,
                         biddingReady
                       });
+                      // Calculate if player has Ace of Spades for Whiz games
+                      const hasAceSpades = currentPlayer?.hand?.some(card => card.suit === 'S' && card.rank === 'A') || false;
+                      
                       return (
                         <BiddingInterface
                           onBid={handleBid}
@@ -1794,6 +1797,7 @@ export default function GameTable({
                           playerId={currentPlayerId}
                           currentPlayerTurn={gameState.currentPlayer}
                           allowNil={gameState.rules.allowNil}
+                          hasAceSpades={hasAceSpades}
                         />
                       );
                     })()}

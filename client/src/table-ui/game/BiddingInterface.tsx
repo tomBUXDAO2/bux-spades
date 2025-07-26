@@ -9,6 +9,7 @@ interface BiddingProps {
   gameType: GameType;
   numSpades: number; // Number of spades in player's hand
   allowNil?: boolean; // Add allowNil prop
+  hasAceSpades?: boolean; // Add hasAceSpades prop for Whiz games
 }
 
 // Assign a unique class name for direct targeting
@@ -24,7 +25,8 @@ export default function BiddingInterface({
   currentPlayerTurn,
   gameType,
   numSpades,
-  allowNil = true // Default to true for backward compatibility
+  allowNil = true, // Default to true for backward compatibility
+  hasAceSpades = false // Default to false for backward compatibility
 }: BiddingProps) {
   const [selectedBid, setSelectedBid] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,26 +64,47 @@ export default function BiddingInterface({
 
   // For WHIZ games, show spades count and nil options
   if (gameType === "WHIZ") {
+    const isForcedNil = numSpades === 0;
+    const canBidNil = numSpades > 0 && !hasAceSpades;
+    
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
-            <p className="text-sm max-sm:text-xs text-gray-300">You have {numSpades} spades</p>
+            {isForcedNil ? (
+              <p className="text-sm max-sm:text-xs text-gray-300">You have no spades - you must bid nil</p>
+            ) : hasAceSpades ? (
+              <p className="text-sm max-sm:text-xs text-gray-300">You have {numSpades} spades (Ace of Spades - cannot bid nil)</p>
+            ) : (
+              <p className="text-sm max-sm:text-xs text-gray-300">You have {numSpades} spades</p>
+            )}
           </div>
           <div className="flex flex-col gap-3">
-            <button
-              onClick={() => setSelectedBid(numSpades)}
-              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === numSpades ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-            >
-              Bid {numSpades}
-            </button>
-            <button
-              onClick={() => setSelectedBid(0)}
-              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-            >
-              Nil
-            </button>
+            {!isForcedNil && (
+              <button
+                onClick={() => setSelectedBid(numSpades)}
+                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === numSpades ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+              >
+                Bid {numSpades}
+              </button>
+            )}
+            {canBidNil && (
+              <button
+                onClick={() => setSelectedBid(0)}
+                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+              >
+                Nil
+              </button>
+            )}
+            {isForcedNil && (
+              <button
+                onClick={() => setSelectedBid(0)}
+                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+              >
+                Bid Nil (Forced)
+              </button>
+            )}
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
               disabled={selectedBid === null}

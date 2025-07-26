@@ -391,8 +391,42 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 });
 
 // --- Bot Bidding Logic ---
-function calculateBotBid(hand: Card[]): number {
+function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number): number {
   if (!hand) return 1;
+  
+  // For WHIZ games, use simplified bidding logic
+  if (gameType === 'WHIZ') {
+    const spades = hand.filter(c => c.suit === 'S');
+    const hasAceSpades = spades.some(c => c.rank === 'A');
+    
+    // If no spades, must bid nil
+    if (spades.length === 0) {
+      return 0;
+    }
+    
+    // If has Ace of Spades, cannot bid nil
+    if (hasAceSpades) {
+      return spades.length;
+    }
+    
+    // Smart partner bidding logic
+    if (partnerBid !== undefined) {
+      // If partner already bid nil, try to bid spades count
+      if (partnerBid === 0) {
+        return spades.length;
+      }
+      // If partner bid spades count, consider nil if no ace spades
+      if (partnerBid > 0 && !hasAceSpades) {
+        // 70% chance to bid nil, 30% chance to bid spades count
+        return Math.random() < 0.7 ? 0 : spades.length;
+      }
+    }
+    
+    // Default: bid spades count
+    return spades.length;
+  }
+  
+  // For regular games, use complex bidding logic
   let bid = 0;
   let spades = hand.filter(c => c.suit === 'S');
   let nonSpades = hand.filter(c => c.suit !== 'S');
@@ -427,17 +461,29 @@ export function botMakeMove(game: Game, seatIndex: number) {
       // Calculate bid based on game type
       let bid = 1;
       if (game.rules && game.hands && game.hands[seatIndex]) {
+        // Get partner bid for smart bidding logic
+        let partnerBid: number | undefined;
+        if (game.rules.bidType === 'WHIZ' && game.bidding && game.bidding.bids) {
+          // In partners mode, partner is at seatIndex + 2 (opposite side)
+          const partnerIndex = (seatIndex + 2) % 4;
+          partnerBid = game.bidding.bids[partnerIndex];
+        }
+        
         if (game.rules.bidType === 'MIRROR') {
           // Mirror games: bid the number of spades in hand
           const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
           bid = spades.length;
           console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
+        } else if (game.rules.bidType === 'WHIZ') {
+          // Whiz games: use simplified bidding logic
+          bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid);
+          console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
         } else if (game.rules.bidType === 'REG') {
           // Regular games: use complex bidding logic
-          bid = calculateBotBid(game.hands[seatIndex]);
+          bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
         } else {
           // Default fallback
-          bid = calculateBotBid(game.hands[seatIndex]);
+          bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid);
         }
       }
       // Simulate bot making a bid
