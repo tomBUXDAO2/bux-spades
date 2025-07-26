@@ -353,6 +353,23 @@ export default function GameTable({
       return () => clearTimeout(timer);
     }
   }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed, myPlayerIndex]);
+
+  // Reveal cards for regular bidding (non-blind nil games)
+  useEffect(() => {
+    // Don't reveal cards for spectators
+    if (myPlayerIndex === -1) return;
+    
+    if (gameState.status === "BIDDING" && 
+        gameState.currentPlayer === currentPlayerId && 
+        dealingComplete && 
+        biddingReady &&
+        !cardsRevealed &&
+        !showBlindNilModal &&
+        !isBlindNil) {
+      // For regular games, reveal cards immediately when it's your turn
+      setCardsRevealed(true);
+    }
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, cardsRevealed, showBlindNilModal, isBlindNil, myPlayerIndex]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
