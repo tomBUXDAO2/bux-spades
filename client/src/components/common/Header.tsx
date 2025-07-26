@@ -6,8 +6,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChangeAvatarClick = () => {
@@ -17,12 +18,41 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
     }
   };
 
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Mock upload: in real app, upload to server and update user.avatar
-      alert('Avatar changed! (mock)');
-      // TODO: Implement real upload and update logic
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64String = event.target?.result as string;
+        
+        // Update profile with new avatar
+        await updateProfile(user?.username || '', base64String);
+        
+        // Close dropdown
+        setIsDropdownOpen(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Failed to upload avatar. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -80,9 +110,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                       setIsDropdownOpen(false);
                       handleChangeAvatarClick();
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    disabled={isUploading}
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Change Avatar
+                    {isUploading ? 'Uploading...' : 'Change Avatar'}
                   </button>
                   <button
                     onClick={() => {
