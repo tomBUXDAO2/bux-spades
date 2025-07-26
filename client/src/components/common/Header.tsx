@@ -20,38 +20,53 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
 
   const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    console.log('[AVATAR DEBUG] File selected:', file);
+    
+    if (!file) {
+      console.log('[AVATAR DEBUG] No file selected');
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
+      console.log('[AVATAR DEBUG] Invalid file type:', file.type);
       alert('Please select an image file');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
+      console.log('[AVATAR DEBUG] File too large:', file.size);
       alert('File size must be less than 5MB');
       return;
     }
 
+    console.log('[AVATAR DEBUG] Starting upload process');
     setIsUploading(true);
     try {
       // Convert file to base64
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64String = event.target?.result as string;
+        console.log('[AVATAR DEBUG] File converted to base64, length:', base64String.length);
         
         // Update profile with new avatar
+        console.log('[AVATAR DEBUG] Calling updateProfile with username:', user?.username);
         await updateProfile(user?.username || '', base64String);
+        console.log('[AVATAR DEBUG] Profile update completed');
         
         // Close dropdown
         setIsDropdownOpen(false);
       };
+      reader.onerror = (error) => {
+        console.error('[AVATAR DEBUG] FileReader error:', error);
+        alert('Failed to read file. Please try again.');
+        setIsUploading(false);
+      };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.error('[AVATAR DEBUG] Error uploading avatar:', error);
       alert('Failed to upload avatar. Please try again.');
-    } finally {
       setIsUploading(false);
     }
   };

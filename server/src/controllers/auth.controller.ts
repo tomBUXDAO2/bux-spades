@@ -194,6 +194,13 @@ export const updateProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.userId;
     const { username, avatar } = req.body;
+    
+    console.log('[SERVER DEBUG] Profile update request:', { 
+      userId, 
+      username, 
+      avatarLength: avatar ? avatar.length : 0,
+      hasAvatar: !!avatar 
+    });
 
     const user = await prisma.user.update({
       where: { id: userId },
@@ -201,6 +208,12 @@ export const updateProfile = async (req: Request, res: Response) => {
         username,
         avatar,
       },
+    });
+
+    console.log('[SERVER DEBUG] Profile update successful:', { 
+      userId: user.id, 
+      username: user.username, 
+      avatar: user.avatar 
     });
 
     res.json({
@@ -213,7 +226,7 @@ export const updateProfile = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Update profile error:', error);
+    console.error('[SERVER DEBUG] Update profile error:', error);
     res.status(500).json({
       message: 'Internal server error',
     });
