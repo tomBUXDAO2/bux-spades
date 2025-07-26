@@ -1799,7 +1799,7 @@ export default function GameTable({
               
               {/* Scoreboard in top right corner - inside the table */}
               <div className="absolute top-4 right-4 z-10 flex flex-col items-center gap-2 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
-                {gameState.rules.gameType === 'SOLO' ? (
+                {gameState.gameMode === 'SOLO' ? (
                   // Solo mode - 4 individual players
                   <>
                     {[0, 1, 2, 3].map((playerIndex) => {
@@ -2082,7 +2082,7 @@ export default function GameTable({
 
         {/* Winner/Loser Modals */}
         {(showWinner || showLoser) && (() => {
-          if (gameState.rules.gameType === 'SOLO') {
+          if (gameState.gameMode === 'SOLO') {
             // Solo mode - use SoloWinnerModal for both winner and loser
             const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
             const winningPlayer = gameState.winningPlayer || 0;
