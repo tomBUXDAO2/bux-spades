@@ -993,13 +993,12 @@ export default function GameTable({
                 onClick={() => isPlayable && gameState.status === "PLAYING" && handlePlayCard(card)}
               >
                 <div className="relative">
-                  <img
-                    src={`/cards/${getCardImage(card)}`}
-                    alt={`${card.rank}${card.suit}`}
+                  <CardImage
+                    card={card}
                     width={cardUIWidth}
                     height={cardUIHeight}
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
-                    style={{ objectFit: 'cover' }}
+                    alt={`${card.rank}${card.suit}`}
                   />
                   {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
@@ -1549,6 +1548,98 @@ export default function GameTable({
       socket.off('error', handleSocketError);
     };
   }, [socket]);
+
+  // Add image preloading state and logic
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
+  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
+
+  // Preload all card images on component mount
+  useEffect(() => {
+    const preloadCardImages = async () => {
+      const cardImages = new Set<string>();
+      const errorImages = new Set<string>();
+      
+      // Define all possible card images
+      const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const suits = ['S', 'H', 'D', 'C'];
+      const cardFiles = [
+        'blue_back.png',
+        ...ranks.map(rank => suits.map(suit => `${rank}${suit}.png`)).flat()
+      ];
+      
+      // Preload each image
+      const preloadPromises = cardFiles.map(filename => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            cardImages.add(filename);
+            resolve();
+          };
+          img.onerror = () => {
+            errorImages.add(filename);
+            resolve();
+          };
+          img.src = `/cards/${filename}`;
+        });
+      });
+      
+      await Promise.all(preloadPromises);
+      setPreloadedImages(cardImages);
+      setImageLoadErrors(errorImages);
+      
+      console.log(`[IMAGE PRELOAD] Loaded ${cardImages.size} images, ${errorImages.size} errors`);
+    };
+    
+    preloadCardImages();
+  }, []);
+
+  // Optimized card image component with loading state
+  const CardImage = ({ card, width, height, className, alt }: {
+    card: Card;
+    width: number;
+    height: number;
+    className?: string;
+    alt?: string;
+  }) => {
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [hasError, setHasError] = useState(false);
+    const imageSrc = `/cards/${getCardImage(card)}`;
+    
+    return (
+      <div className="relative" style={{ width, height }}>
+        {/* Loading placeholder */}
+        {!isLoaded && !hasError && (
+          <div 
+            className={`${className} bg-gray-700 animate-pulse rounded-lg`}
+            style={{ width, height }}
+          />
+        )}
+        
+        {/* Error fallback */}
+        {hasError && (
+          <div 
+            className={`${className} bg-gray-600 rounded-lg flex items-center justify-center text-white text-xs`}
+            style={{ width, height }}
+          >
+            {card.rank}{card.suit}
+          </div>
+        )}
+        
+        {/* Actual image */}
+        <img
+          src={imageSrc}
+          alt={alt || `${card.rank}${card.suit}`}
+          width={width}
+          height={height}
+          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
+          style={{ objectFit: 'cover' }}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setHasError(true)}
+          loading="eager" // Force eager loading for game cards
+        />
+      </div>
+    );
+  };
 
   return (
     <>
