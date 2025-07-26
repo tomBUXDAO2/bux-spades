@@ -465,6 +465,7 @@ export default function GameTable({
     setShowBlindNilModal(false);
     setBlindNilDismissed(true);
     setCardsRevealed(true);
+    // Cards are now revealed and regular bidding interface will show
   };
 
   // Add at the top of the GameTable component, after useState declarations
@@ -1052,7 +1053,7 @@ export default function GameTable({
                     height={cardUIHeight}
                     className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     alt={`${card.rank}${card.suit}`}
-                    faceDown={!cardsRevealed && gameState.status === "BIDDING"}
+                    faceDown={!cardsRevealed && gameState.status === "BIDDING" && !(biddingReady && gameState.currentPlayer === currentPlayerId)}
                   />
                   {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                     <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />

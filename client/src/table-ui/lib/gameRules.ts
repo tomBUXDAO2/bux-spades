@@ -147,7 +147,7 @@ export function isGameOver(game: GameState): boolean {
   }
   
   // Check if it's Solo mode
-  if (game.rules.gameType === 'SOLO') {
+  if (game.gameMode === 'SOLO') {
     const playerScores = game.playerScores || [];
     console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
   
