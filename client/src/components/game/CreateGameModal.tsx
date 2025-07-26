@@ -7,8 +7,6 @@ interface CreateGameModalProps {
   onCreateGame: (settings: GameSettings) => void;
 }
 
-
-
 const formatCoins = (value: number) => {
   if (value >= 1000000) {
     return `${(value / 1000000).toFixed(1)}mil`;
@@ -19,7 +17,8 @@ const formatCoins = (value: number) => {
 const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCreateGame }) => {
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
-  const [biddingOption, setBiddingOption] = useState<BiddingOption>('REG');
+  const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
+  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS'>('SUICIDE');
 
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
@@ -28,12 +27,20 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   const [allowNil, setAllowNil] = useState(true);
   const [allowBlindNil, setAllowBlindNil] = useState(false);
 
-  // Handle bidding option changes for Mirror game type
-  const handleBiddingOptionChange = (option: BiddingOption) => {
-    setBiddingOption(option);
+  // Get the actual bidding option based on game type and gimmick selection
+  const getBiddingOption = (): BiddingOption => {
+    if (gameType === 'GIMMICK') {
+      return gimmickType as BiddingOption;
+    }
+    return gameType as BiddingOption;
+  };
+
+  // Handle game type changes
+  const handleGameTypeChange = (type: 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK') => {
+    setGameType(type);
     
     // Mirror game type logic: nil always allowed, blind nil never allowed
-    if (option === 'MIRROR') {
+    if (type === 'MIRROR') {
       setAllowNil(true); // Nil is always allowed in Mirror
       setAllowBlindNil(false); // Blind nil is never allowed in Mirror
     }
@@ -85,7 +92,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     // Pass all necessary settings to onCreateGame
     onCreateGame({
       gameMode: mode,
-      biddingOption,
+      biddingOption: getBiddingOption(),
       gamePlayOption: 'REG',
       minPoints,
       maxPoints,
@@ -98,6 +105,15 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
       }
     });
     onClose();
+  };
+
+  // Get available gimmick options based on game mode
+  const getGimmickOptions = () => {
+    const options = ['4 OR NIL', 'BID 3', 'BID HEARTS'];
+    if (mode === 'PARTNERS') {
+      options.unshift('SUICIDE'); // Add SUICIDE at the beginning for partners mode
+    }
+    return options;
   };
 
   return (
@@ -189,22 +205,43 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
           </div>
 
-          {/* Bidding Options Radio Buttons - label removed */}
+          {/* Game Type Radio Buttons */}
           <div className="w-full flex flex-col items-center my-2">
             <div className="flex flex-wrap gap-4 justify-center mb-2">
-              {['REG', 'WHIZ', 'MIRROR', 'SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS'].map((opt) => (
+              {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="biddingOption"
+                    name="gameType"
                     value={opt}
-                    checked={biddingOption === opt as BiddingOption}
-                    onChange={() => handleBiddingOptionChange(opt as BiddingOption)}
+                    checked={gameType === opt}
+                    onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
                   />
                   <span className="text-slate-200">{opt}</span>
                 </label>
               ))}
             </div>
+
+            {/* Gimmick Dropdown */}
+            <div className="w-full flex justify-center mb-2">
+              <select
+                value={gimmickType}
+                onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS')}
+                disabled={gameType !== 'GIMMICK'}
+                className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
+                  gameType === 'GIMMICK' 
+                    ? 'bg-slate-100 cursor-pointer' 
+                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {getGimmickOptions().map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Nil and Blind Nil toggles */}
             <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
               <div className="flex items-center gap-2">
@@ -212,8 +249,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 <div className="flex items-center gap-2">
                   <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                   <div
-                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${biddingOption === 'MIRROR' ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={() => !(biddingOption === 'MIRROR') && handleNilToggle(!allowNil)}
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType === 'MIRROR' ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(gameType === 'MIRROR') && handleNilToggle(!allowNil)}
                     style={{ userSelect: 'none' }}
                   >
                     <div
@@ -229,8 +266,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 <div className="flex items-center gap-2">
                   <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                   <div
-                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${biddingOption === 'MIRROR' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={() => !(biddingOption === 'MIRROR' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType === 'MIRROR' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(gameType === 'MIRROR' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
                     style={{ userSelect: 'none' }}
                   >
                     <div
@@ -243,8 +280,6 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </div>
             </div>
           </div>
-
-
 
           {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
