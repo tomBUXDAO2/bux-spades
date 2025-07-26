@@ -550,8 +550,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return; // Already bid
     }
     
+    // For MIRROR games, automatically calculate the correct bid for human players
+    let finalBid = bid;
+    if (game.rules?.bidType === 'MIRROR' && game.players[playerIndex]?.type === 'human' && game.hands && game.hands[playerIndex]) {
+      const spades = game.hands[playerIndex].filter(c => c.suit === 'S');
+      finalBid = spades.length;
+      console.log('[MIRROR BID] Human player in Mirror game - calculated bid:', finalBid, 'spades:', spades.length, 'hand:', game.hands[playerIndex].map(c => c.suit + c.rank));
+    }
+    
     // Store the bid
-    game.bidding.bids[playerIndex] = bid;
+    game.bidding.bids[playerIndex] = finalBid;
     
     // Find next player who hasn't bid
     let next = (playerIndex + 1) % 4;
