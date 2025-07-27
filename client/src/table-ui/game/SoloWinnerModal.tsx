@@ -75,8 +75,8 @@ export default function SoloWinnerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900/75 rounded-lg p-3 max-w-md w-full shadow-xl border border-white/20">
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+      <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
           <h2 className="text-lg font-bold text-white text-center">{getPlacementText(userPlacement)}</h2>
