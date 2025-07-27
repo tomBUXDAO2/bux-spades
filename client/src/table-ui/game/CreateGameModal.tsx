@@ -158,6 +158,56 @@ export default function CreateGameModal({ isOpen, onClose, onCreateGame }: Creat
                       onChange={(e) => setRules({ ...rules, coinAmount: parseInt(e.target.value) })}
                     />
                   </div>
+
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-300">
+                      Screamer
+                    </label>
+                    <button
+                      type="button"
+                      className={`${
+                        rules.specialRules?.screamer ? 'bg-red-600' : 'bg-gray-600'
+                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2`}
+                      onClick={() => setRules({ 
+                        ...rules, 
+                        specialRules: { 
+                          screamer: !rules.specialRules?.screamer,
+                          assassin: false // Disable assassin when screamer is enabled
+                        } 
+                      })}
+                    >
+                      <span
+                        className={`${
+                          rules.specialRules?.screamer ? 'translate-x-5' : 'translate-x-0'
+                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                      />
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-300">
+                      Assassin
+                    </label>
+                    <button
+                      type="button"
+                      className={`${
+                        rules.specialRules?.assassin ? 'bg-purple-600' : 'bg-gray-600'
+                      } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2`}
+                      onClick={() => setRules({ 
+                        ...rules, 
+                        specialRules: { 
+                          assassin: !rules.specialRules?.assassin,
+                          screamer: false // Disable screamer when assassin is enabled
+                        } 
+                      })}
+                    >
+                      <span
+                        className={`${
+                          rules.specialRules?.assassin ? 'translate-x-5' : 'translate-x-0'
+                        } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-6 flex justify-end space-x-3">
@@ -167,6 +217,28 @@ export default function CreateGameModal({ isOpen, onClose, onCreateGame }: Creat
                     onClick={onClose}
                   >
                     Cancel
+                  }
+                  
+                  {(rules.specialRules?.screamer || rules.specialRules?.assassin) && (
+                    <div className="mt-3 p-3 bg-gray-700 rounded-lg">
+                      <p className="text-xs text-gray-300">
+                        {rules.specialRules?.screamer && (
+                          <span className="block mb-1">
+                            <strong>Screamer:</strong> Players cannot play spades unless they have no other cards.
+                          </span>
+                        )}
+                        {rules.specialRules?.assassin && (
+                          <span className="block">
+                            <strong>Assassin:</strong> Players must play spades whenever possible.
+                          </span>
+                        )}
+                        <span className="block mt-2 text-yellow-400 text-xs">
+                          <strong>Note:</strong> Screamer and Assassin rules are mutually exclusive.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
                   </button>
                   <button
                     type="button"
