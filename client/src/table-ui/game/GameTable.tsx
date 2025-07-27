@@ -17,7 +17,7 @@ import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
-import StartGameWarningModal from '../modals/StartGameWarningModal';
+
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
 
@@ -2133,12 +2133,47 @@ export default function GameTable({
             )}
 
             {/* Start Game Warning Modal - positioned inside game table container */}
-            <StartGameWarningModal
-              isOpen={showStartWarning}
-              onClose={() => setShowStartWarning(false)}
-              onPlayWithBots={handlePlayWithBots}
-              emptySeatsCount={emptySeats}
-            />
+            {showStartWarning && (
+              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+                  <div>
+                    {/* Header with inline icon and title */}
+                    <div className="flex items-center justify-center mb-4">
+                      <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <h3 className="text-2xl font-bold text-white">
+                        Empty Seats Detected
+                      </h3>
+                    </div>
+                    {/* Message - center aligned */}
+                    <div className="text-center mb-6">
+                      <p className="text-lg text-gray-200 mb-2 font-semibold">
+                        Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
+                      </p>
+                      <p className="text-gray-300">
+                        If you continue, the game will start with bot players in all empty seats and the game will not be rated.
+                      </p>
+                    </div>
+                    {/* Buttons */}
+                    <div className="flex gap-3 justify-center">
+                      <button
+                        onClick={() => setShowStartWarning(false)}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handlePlayWithBots}
+                        className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                      >
+                        Play with Bots
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Chat area - 30%, full height */}
