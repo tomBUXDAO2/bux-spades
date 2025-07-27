@@ -336,21 +336,36 @@ export default function GameTable({
     // Don't show blind nil modal for spectators
     if (myPlayerIndex === -1) return;
     
+    console.log('[BLIND NIL DEBUG] Checking blind nil modal conditions:');
+    console.log('[BLIND NIL DEBUG] gameState.status:', gameState.status);
+    console.log('[BLIND NIL DEBUG] gameState.currentPlayer:', gameState.currentPlayer);
+    console.log('[BLIND NIL DEBUG] currentPlayerId:', currentPlayerId);
+    console.log('[BLIND NIL DEBUG] dealingComplete:', dealingComplete);
+    console.log('[BLIND NIL DEBUG] biddingReady:', biddingReady);
+    console.log('[BLIND NIL DEBUG] gameState.rules?.allowBlindNil:', gameState.rules?.allowBlindNil);
+    console.log('[BLIND NIL DEBUG] showBlindNilModal:', showBlindNilModal);
+    console.log('[BLIND NIL DEBUG] isBlindNil:', isBlindNil);
+    console.log('[BLIND NIL DEBUG] blindNilDismissed:', blindNilDismissed);
+    console.log('[BLIND NIL DEBUG] cardsRevealed:', cardsRevealed);
+    
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
         biddingReady &&
-        (gameState as any)?.rules?.allowBlindNil &&
+        gameState.rules?.allowBlindNil &&
         !showBlindNilModal &&
         !isBlindNil &&
         !blindNilDismissed &&
         !cardsRevealed) {
+      console.log('[BLIND NIL DEBUG] All conditions met, showing blind nil modal');
       // Show blind nil modal BEFORE revealing cards
       const timer = setTimeout(() => {
         setShowBlindNilModal(true);
       }, 1000); // 1 second delay after dealing
       
       return () => clearTimeout(timer);
+    } else {
+      console.log('[BLIND NIL DEBUG] Conditions not met for blind nil modal');
     }
   }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed, myPlayerIndex]);
 
