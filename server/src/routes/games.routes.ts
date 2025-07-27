@@ -433,25 +433,27 @@ function countHighCards(hand: Card[]): number {
 
 // Helper function to calculate expected tricks based on hand strength
 function calculateExpectedTricks(hand: Card[]): number {
-  let expectedTricks = 3.25; // Base expectation: 1 trick per 4 cards (13 cards = ~3.25 tricks)
+  // Start with a more conservative base expectation
+  let expectedTricks = 2.5; // Base expectation: ~2.5 tricks per player (10 total, leaving room for variance)
   
-  // Add value for high cards
-  for (const card of hand) {
-    if (card.rank === 'A') expectedTricks += 0.5;
-    else if (card.rank === 'K') expectedTricks += 0.3;
-    else if (card.rank === 'Q') expectedTricks += 0.2;
-    else if (card.rank === 'J') expectedTricks += 0.1;
-  }
+  // Count high cards (Aces, Kings, Queens)
+  const highCards = hand.filter(c => ['A', 'K', 'Q'].includes(c.rank)).length;
+  expectedTricks += highCards * 0.3; // Each high card adds ~0.3 tricks
+  
+  // Count spades (trump suit)
+  const spadesCount = hand.filter(c => c.suit === 'S').length;
+  expectedTricks += spadesCount * 0.2; // Each spade adds ~0.2 tricks
   
   // Adjust for suit distribution
   const suits = ['S', 'H', 'D', 'C'];
   for (const suit of suits) {
     const suitCards = hand.filter(c => c.suit === suit);
-    if (suitCards.length <= 1) expectedTricks -= 0.5; // Short suits reduce options
-    else if (suitCards.length >= 5) expectedTricks += 0.5; // Long suits give control
+    if (suitCards.length === 0) expectedTricks -= 0.3; // Void suits reduce options
+    else if (suitCards.length >= 4) expectedTricks += 0.2; // Long suits give control
   }
   
-  return Math.max(0, expectedTricks);
+  // Cap at reasonable maximum (no player should expect more than 6-7 tricks)
+  return Math.max(0, Math.min(6, expectedTricks));
 }
 
 // Helper function to analyze score position
@@ -685,7 +687,7 @@ function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allo
   if (strategy === 'CONSERVATIVE') {
     baseBid = Math.max(0, baseBid - 1);
   } else if (strategy === 'AGGRESSIVE') {
-    baseBid = Math.min(13, baseBid + 1);
+    baseBid = Math.min(5, baseBid + 1); // Cap aggressive bids at 5
   }
   
   // 6. Nil consideration
@@ -693,7 +695,8 @@ function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allo
     return 0; // Nil
   }
   
-  return Math.max(0, Math.min(13, baseBid));
+  // 7. Ensure reasonable bid range (0-5 for most hands)
+  return Math.max(0, Math.min(5, baseBid));
 }
 
 // --- Basic Bot Engine ---

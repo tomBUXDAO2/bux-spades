@@ -53,8 +53,24 @@ export default function SoloWinnerModal({
     return () => clearInterval(timer);
   }, [isOpen, onClose]);
 
-  // Determine if user won
-  const userWon = userPlayerIndex === winningPlayer;
+  // Sort players by score in descending order
+  const sortedPlayers = playerScores
+    .map((score, index) => ({ score, index }))
+    .sort((a, b) => b.score - a.score);
+
+  // Find user's placement
+  const userPlacement = sortedPlayers.findIndex(player => player.index === userPlayerIndex) + 1;
+  
+  // Get placement text
+  const getPlacementText = (placement: number) => {
+    switch (placement) {
+      case 1: return '1st PLACE';
+      case 2: return '2nd PLACE';
+      case 3: return '3rd PLACE';
+      case 4: return '4th PLACE';
+      default: return `${placement}th PLACE`;
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -63,14 +79,16 @@ export default function SoloWinnerModal({
       <div className="bg-gray-900/75 rounded-lg p-3 max-w-md w-full shadow-xl border border-white/20">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
-          <h2 className="text-lg font-bold text-white text-center">{userWon ? 'YOU WIN!' : 'YOU LOSE!'}</h2>
+          <h2 className="text-lg font-bold text-white text-center">{getPlacementText(userPlacement)}</h2>
         </div>
 
         <div className="space-y-3 mb-4">
-          {playerScores.map((score, index) => {
+          {sortedPlayers.map((player, sortedIndex) => {
+            const { score, index } = player;
             const playerColor = getPlayerColor(index);
             const isWinner = index === winningPlayer;
             const isUser = index === userPlayerIndex;
+            const placement = sortedIndex + 1;
             
             return (
               <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
@@ -78,7 +96,7 @@ export default function SoloWinnerModal({
                   <div className="flex items-center">
                     <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2`}></div>
                     <span className={`text-sm font-medium ${isUser ? 'text-white' : 'text-gray-300'}`}>
-                      {playerColor.name} Player {isUser ? '(You)' : ''}
+                      {getPlacementText(placement)} - {playerColor.name} Player {isUser ? '(You)' : ''}
                     </span>
                     {isWinner && <FaTrophy className="h-4 w-4 text-yellow-500 ml-2" />}
                   </div>
