@@ -638,7 +638,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
             // Default fallback
             bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
           }
-        }
+      }
       // Simulate bot making a bid
       game.bidding.bids[seatIndex] = bid;
       console.log('[BOT DEBUG] Bot', bot.username, 'bid', bid);
@@ -1076,55 +1076,55 @@ export function botPlayCard(game: Game, seatIndex: number) {
           });
         } else {
           // Partners mode scoring
-          const handSummary = calculatePartnersHandScore(game);
+        const handSummary = calculatePartnersHandScore(game);
+        
+        // Validate that we have exactly 13 tricks before proceeding
+        const totalTricks = handSummary.tricksPerPlayer.reduce((a, b) => a + b, 0);
+        if (totalTricks !== 13) {
+          console.error(`[HAND COMPLETION ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total. Cannot complete hand.`);
+          console.error('[HAND COMPLETION ERROR] Tricks per player:', handSummary.tricksPerPlayer);
+          console.error('[HAND COMPLETION ERROR] Game play tricks:', game.play.tricks);
           
-          // Validate that we have exactly 13 tricks before proceeding
-          const totalTricks = handSummary.tricksPerPlayer.reduce((a, b) => a + b, 0);
-          if (totalTricks !== 13) {
-            console.error(`[HAND COMPLETION ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total. Cannot complete hand.`);
-            console.error('[HAND COMPLETION ERROR] Tricks per player:', handSummary.tricksPerPlayer);
-            console.error('[HAND COMPLETION ERROR] Game play tricks:', game.play.tricks);
-            
-            // Force a game update to show current state but don't complete the hand
-            io.to(game.id).emit('game_update', enrichGameForClient(game));
-            return;
-          }
-          
-          // Update running totals
-          game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
-          game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
-          
-          // Add new bags to running total
-          game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
-          game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
-          
-          // Apply bag penalty to running total if needed
-          if (game.team1Bags >= 10) {
-            game.team1TotalScore -= 100;
-            game.team1Bags -= 10;
-          }
-          if (game.team2Bags >= 10) {
-            game.team2TotalScore -= 100;
-            game.team2Bags -= 10;
-          }
-          
-          // Set game status to indicate hand is completed
-          game.status = 'HAND_COMPLETED';
-          
+          // Force a game update to show current state but don't complete the hand
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
+          return;
+        }
+        
+        // Update running totals
+        game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
+        game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+        
+        // Add new bags to running total
+        game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
+        game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+        
+        // Apply bag penalty to running total if needed
+        if (game.team1Bags >= 10) {
+          game.team1TotalScore -= 100;
+          game.team1Bags -= 10;
+        }
+        if (game.team2Bags >= 10) {
+          game.team2TotalScore -= 100;
+          game.team2Bags -= 10;
+        }
+        
+        // Set game status to indicate hand is completed
+        game.status = 'HAND_COMPLETED';
+        
           console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with data:', {
-            ...handSummary,
-            team1TotalScore: game.team1TotalScore,
-            team2TotalScore: game.team2TotalScore,
-            team1Bags: game.team1Bags,
-            team2Bags: game.team2Bags,
-          });
-          io.to(game.id).emit('hand_completed', {
-            ...handSummary,
-            team1TotalScore: game.team1TotalScore,
-            team2TotalScore: game.team2TotalScore,
-            team1Bags: game.team1Bags,
-            team2Bags: game.team2Bags,
-          });
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
+        io.to(game.id).emit('hand_completed', {
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
         }
         
         // Emit game update with new status
@@ -1174,24 +1174,24 @@ export function botPlayCard(game: Game, seatIndex: number) {
           }
         } else {
           // Partners mode game over check
-          console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
-          
-          if (
-            game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
-            game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
-          ) {
-            console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
-            game.status = 'COMPLETED';
-            const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
-            io.to(game.id).emit('game_over', {
-              team1Score: game.team1TotalScore,
-              team2Score: game.team2TotalScore,
-              winningTeam,
-            });
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningTeam).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
+        console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
+        
+        if (
+          game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
+          game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
+        ) {
+          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
+          game.status = 'COMPLETED';
+          const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
+          io.to(game.id).emit('game_over', {
+            team1Score: game.team1TotalScore,
+            team2Score: game.team2TotalScore,
+            winningTeam,
+          });
+          // Update stats and coins in DB
+          updateStatsAndCoins(game, winningTeam).catch(err => {
+            console.error('Failed to update stats/coins:', err);
+          });
           }
         }
         return;

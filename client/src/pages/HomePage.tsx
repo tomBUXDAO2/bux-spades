@@ -419,7 +419,7 @@ const HomePage: React.FC = () => {
     if (endpoint) {
       try {
         await api.post(endpoint, body);
-        // Refresh player list
+      // Refresh player list
         const response = await api.get('/api/users');
         const players = await response.json();
         setOnlinePlayers(players);

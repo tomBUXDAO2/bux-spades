@@ -194,7 +194,7 @@ export const updateProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.userId;
     const { username, avatar } = req.body;
-    
+
     console.log('[SERVER DEBUG] Profile update request:', { 
       userId, 
       username, 

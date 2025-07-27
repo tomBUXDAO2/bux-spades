@@ -1173,13 +1173,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           currentPlayer: game.bidding.currentPlayer
         });
 
-        // If first bidder is a bot, trigger their bid
-        const firstBidder = game.players[game.bidding.currentBidderIndex];
-        if (firstBidder && firstBidder.type === 'bot') {
-          setTimeout(() => {
-            botMakeMove(game, game.bidding.currentBidderIndex);
+      // If first bidder is a bot, trigger their bid
+      const firstBidder = game.players[game.bidding.currentBidderIndex];
+      if (firstBidder && firstBidder.type === 'bot') {
+        setTimeout(() => {
+          botMakeMove(game, game.bidding.currentBidderIndex);
           }, 1000); // Additional delay for bot bidding
-        }
+      }
       }, 2000); // 2 second delay after dealing
 
     } catch (error) {
