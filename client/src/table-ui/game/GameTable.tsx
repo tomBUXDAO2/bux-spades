@@ -374,6 +374,22 @@ export default function GameTable({
     // Don't reveal cards for spectators
     if (myPlayerIndex === -1) return;
     
+    // Don't reveal cards if blind nil is enabled and should be shown first
+    const shouldShowBlindNilFirst = gameState.status === "BIDDING" && 
+        gameState.currentPlayer === currentPlayerId && 
+        dealingComplete && 
+        biddingReady &&
+        gameState.rules?.allowBlindNil &&
+        !showBlindNilModal &&
+        !isBlindNil &&
+        !blindNilDismissed &&
+        !cardsRevealed;
+    
+    if (shouldShowBlindNilFirst) {
+      console.log('[BLIND NIL DEBUG] Blind nil should be shown first, not revealing cards yet');
+      return;
+    }
+    
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
@@ -381,10 +397,11 @@ export default function GameTable({
         !cardsRevealed &&
         !showBlindNilModal &&
         !isBlindNil) {
+      console.log('[BLIND NIL DEBUG] Revealing cards for regular bidding');
       // For regular games, reveal cards immediately when it's your turn
       setCardsRevealed(true);
     }
-  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, cardsRevealed, showBlindNilModal, isBlindNil, myPlayerIndex]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, cardsRevealed, showBlindNilModal, isBlindNil, blindNilDismissed, gameState.rules?.allowBlindNil, myPlayerIndex]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
