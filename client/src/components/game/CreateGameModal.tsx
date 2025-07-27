@@ -122,7 +122,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     if (!availableOptions.includes(gimmickType)) {
       setGimmickType(availableOptions[0] as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS');
     }
-  }, [mode, gimmickType]);
+  }, [mode]); // Remove gimmickType from dependencies to prevent infinite loop
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
