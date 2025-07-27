@@ -1131,11 +1131,10 @@ export default function GameTable({
   useEffect(() => {
     // Only run fallback if we haven't already shown hand summary and no hand summary data exists
     if ((gameState.status === "PLAYING" || gameState.status === "HAND_COMPLETED") && 
-        sanitizedPlayers.filter(isPlayer).every((p) => Array.isArray(p.hand) && p.hand.length === 0) && 
         !showHandSummary && 
         !handSummaryData &&
         gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
-      console.log('[FALLBACK] Detected hand completion without event, calculating scores manually');
+      console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
       
       // Calculate scores manually from game state
       const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
