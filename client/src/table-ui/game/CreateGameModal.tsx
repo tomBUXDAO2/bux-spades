@@ -217,28 +217,6 @@ export default function CreateGameModal({ isOpen, onClose, onCreateGame }: Creat
                     onClick={onClose}
                   >
                     Cancel
-                  }
-                  
-                  {(rules.specialRules?.screamer || rules.specialRules?.assassin) && (
-                    <div className="mt-3 p-3 bg-gray-700 rounded-lg">
-                      <p className="text-xs text-gray-300">
-                        {rules.specialRules?.screamer && (
-                          <span className="block mb-1">
-                            <strong>Screamer:</strong> Players cannot play spades unless they have no other cards.
-                          </span>
-                        )}
-                        {rules.specialRules?.assassin && (
-                          <span className="block">
-                            <strong>Assassin:</strong> Players must play spades whenever possible.
-                          </span>
-                        )}
-                        <span className="block mt-2 text-yellow-400 text-xs">
-                          <strong>Note:</strong> Screamer and Assassin rules are mutually exclusive.
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                </div>
                   </button>
                   <button
                     type="button"
