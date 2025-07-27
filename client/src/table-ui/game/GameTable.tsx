@@ -1130,10 +1130,13 @@ export default function GameTable({
   // Fallback: Check if hand is complete but no event was received
   useEffect(() => {
     // Only run fallback if we haven't already shown hand summary and no hand summary data exists
+    // AND all 13 tricks have been played (hand is actually complete)
+    const totalTricksPlayed = gameState.players?.reduce((total, p) => total + (p?.tricks || 0), 0) || 0;
+    
     if ((gameState.status === "PLAYING" || gameState.status === "HAND_COMPLETED") && 
         !showHandSummary && 
         !handSummaryData &&
-        gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
+        totalTricksPlayed === 13) {
       console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
       
       // Add a flag to prevent multiple fallback triggers
