@@ -230,7 +230,7 @@ const HomePage: React.FC = () => {
       color = 'bg-orange-500';
               if (game.forcedBid === 'BID4NIL') label = '4 OR NIL';
       else if (game.forcedBid === 'BID3') label = 'BID 3';
-      else if (game.forcedBid === 'BIDHEARTS') label = '♥️';
+      else if (game.forcedBid === 'BIDHEARTS') label = 'BID ♥s';
       else if (game.forcedBid === 'SUICIDE') label = 'SUICIDE';
       else label = 'GIMMICK';
     }

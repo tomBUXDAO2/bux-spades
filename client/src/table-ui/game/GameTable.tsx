@@ -1811,7 +1811,7 @@ export default function GameTable({
                             color = 'bg-orange-500';
                                                           if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
                             else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
-                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = '♥️';
+                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
                             else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
                             else label = 'GIMMICK';
                           }
