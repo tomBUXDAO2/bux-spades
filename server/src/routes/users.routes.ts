@@ -33,13 +33,23 @@ router.get('/', authenticateToken, async (req, res) => {
   res.json(usersWithStatus);
 });
 
-// GET /api/users/:id/stats - return all UserStats for a user
-router.get('/:id/stats', async (req, res) => {
-  const userId = req.params.id;
-  const stats = await prisma.userStats.findMany({
-    where: { userId }
-  });
-  res.json(stats);
+// GET /api/users/:id/stats - return UserStats for a user
+router.get('/:id/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const stats = await prisma.userStats.findUnique({
+      where: { userId }
+    });
+    
+    if (!stats) {
+      return res.status(404).json({ message: 'Stats not found' });
+    }
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 export default router; 

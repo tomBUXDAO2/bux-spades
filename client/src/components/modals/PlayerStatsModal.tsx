@@ -39,7 +39,14 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   if (!isOpen || !player) return null;
 
-  const stats = player.stats;
+  const stats = player.stats || {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    nilsBid: 0,
+    nilsMade: 0,
+    blindNilsBid: 0,
+    blindNilsMade: 0,
+  };
   const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
   const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
   const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;

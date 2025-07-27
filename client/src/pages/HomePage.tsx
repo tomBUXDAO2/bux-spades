@@ -343,13 +343,45 @@ const HomePage: React.FC = () => {
 
   // Handler to open stats for another player
   const handleOpenPlayerStats = async (player: any) => {
-    setSelectedPlayer({
-      username: player.username,
-      avatar: player.avatar,
-      status: player.status,
-      coins: player.coins,
-    });
-    setIsPlayerStatsOpen(true);
+    try {
+      // Fetch player stats from the server
+      const response = await api.get(`/api/users/${player.id}/stats`);
+      const stats = await response.json();
+      
+      setSelectedPlayer({
+        username: player.username,
+        avatar: player.avatar,
+        status: player.status,
+        coins: player.coins,
+        stats: stats || {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          nilsBid: 0,
+          nilsMade: 0,
+          blindNilsBid: 0,
+          blindNilsMade: 0,
+        },
+      });
+      setIsPlayerStatsOpen(true);
+    } catch (error) {
+      console.error('Error fetching player stats:', error);
+      // Fallback with default stats if fetch fails
+      setSelectedPlayer({
+        username: player.username,
+        avatar: player.avatar,
+        status: player.status,
+        coins: player.coins,
+        stats: {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          nilsBid: 0,
+          nilsMade: 0,
+          blindNilsBid: 0,
+          blindNilsMade: 0,
+        },
+      });
+      setIsPlayerStatsOpen(true);
+    }
   };
 
   // Insert emoji at cursor position
