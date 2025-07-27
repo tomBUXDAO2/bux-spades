@@ -376,7 +376,6 @@ export default function HandSummaryModal({
                           const playerAvatar = getPlayerAvatar(playerIndex);
                           const playerBid = getPlayerBid(playerIndex);
                           const playerTricks = getPlayerTricks(playerIndex);
-                          const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
                           
                           // Team borders - Blue team (players 0,2) get blue border, Red team (players 1,3) get red border
                           const isBlueTeam = playerIndex === 0 || playerIndex === 2;
