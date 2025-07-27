@@ -107,18 +107,12 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onClose();
   };
 
-  // Get available gimmick options based on game mode
-  const getGimmickOptions = () => {
-    const options = ['4 OR NIL', 'BID 3', 'BID HEARTS'];
-    if (mode === 'PARTNERS') {
-      options.unshift('SUICIDE'); // Add SUICIDE at the beginning for partners mode
-    }
-    return options;
-  };
-
   // Reset gimmickType when options change to prevent index-based selection issues
   useEffect(() => {
-    const availableOptions = getGimmickOptions();
+    const availableOptions = mode === 'PARTNERS' 
+      ? ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS']
+      : ['4 OR NIL', 'BID 3', 'BID HEARTS'];
+    
     if (!availableOptions.includes(gimmickType)) {
       setGimmickType(availableOptions[0] as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS');
     }
@@ -243,7 +237,10 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 }`}
               >
                 <option value="NO GIMMICK" disabled>NO GIMMICK</option>
-                {gameType === 'GIMMICK' && getGimmickOptions().map((option) => (
+                {gameType === 'GIMMICK' && (mode === 'PARTNERS' 
+                  ? ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS']
+                  : ['4 OR NIL', 'BID 3', 'BID HEARTS']
+                ).map((option: string) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
