@@ -1136,6 +1136,13 @@ export default function GameTable({
         gameState.players?.some(p => p?.tricks && p.tricks > 0)) {
       console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
       
+      // Add a flag to prevent multiple fallback triggers
+      if ((window as any).__fallbackTriggered) {
+        console.log('[FALLBACK] Fallback already triggered, skipping');
+        return;
+      }
+      (window as any).__fallbackTriggered = true;
+      
       // Calculate scores manually from game state
       const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
       const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
@@ -1178,6 +1185,9 @@ export default function GameTable({
       setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
       setHandSummaryData(null); // Clear hand summary data
+      
+      // Clear the fallback flag when a new hand starts
+      (window as any).__fallbackTriggered = false;
       
       // Reset blind nil state for new hand
       setCardsRevealed(false);
