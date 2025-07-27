@@ -220,7 +220,14 @@ export default function HandSummaryModal({
   const getPlayerName = (index: number) => {
     const player = gameState.players?.[index];
     if (!player) return `Player ${index + 1}`;
-    return player.username || `Player ${index + 1}`;
+    return player.username || (player as any).name || `Player ${index + 1}`;
+  };
+
+  // Get player avatar
+  const getPlayerAvatar = (index: number) => {
+    const player = gameState.players?.[index];
+    if (!player) return '/default-pfp.jpg';
+    return player.avatar || (player as any).image || '/default-pfp.jpg';
   };
 
   const getPlayerBid = (index: number) => {
@@ -267,239 +274,199 @@ export default function HandSummaryModal({
                   </Dialog.Title>
                   
                   {gameState.gameMode === 'SOLO' ? (
-                    // Solo mode - 4 individual players
-                    <div className="grid grid-cols-4 gap-4">
-                      {[0, 1, 2, 3].map((playerIndex) => {
-                        const playerColor = getPlayerColor(playerIndex);
-                        const playerName = getPlayerName(playerIndex);
-                        const playerBid = getPlayerBid(playerIndex);
-                        const playerTricks = getPlayerTricks(playerIndex);
-                        const playerScore = handSummaryData?.playerScores?.[playerIndex] || gameState.playerScores?.[playerIndex] || 0;
-                        const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
-                        
-                        // Calculate individual player scoring
-                        const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
-                        const bagScore = Math.max(0, playerTricks - playerBid);
-                        const bagPenalty = playerBags >= 10 ? -100 : 0;
-                        const nilBonus = 0; // Solo mode doesn't have nil bids
-                        const handTotal = trickScore + bagScore + bagPenalty + nilBonus;
-                        
-                        return (
-                          <div key={playerIndex} className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                            <h4 className={`text-xl font-semibold ${playerColor.text} mb-4 text-center`}>
-                              {playerColor.name} Player
-                            </h4>
-                            
-                            {/* Player Details */}
-                            <div className="space-y-3 mb-4">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-300">{playerName}</span>
-                                <span className="text-white">{playerTricks} / {playerBid}</span>
-                              </div>
-                            </div>
+                    // Solo mode - Column-based layout with colored borders
+                    <div className="bg-gray-700 rounded-lg p-6 border-4 border-gray-600">
+                      {/* Column-based layout */}
+                      <div className="grid grid-cols-5 gap-4">
+                        {/* Row Headers Column */}
+                        <div className="space-y-3">
+                          <div className="text-gray-400 font-semibold text-sm h-16 flex items-center">Player</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bid</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Tricks</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Trick Score</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bag Score</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bag Penalty</div>
+                          <div className="text-white text-sm font-bold h-12 flex items-center border-t border-gray-600 pt-3">Round Total</div>
+                          <div className="text-white text-lg font-bold h-12 flex items-center border-t border-gray-600 pt-3">Final Score</div>
+                        </div>
 
-                            {/* Player Totals */}
-                            <div className="border-t border-gray-600 pt-3 space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-300">Bid:</span>
-                                <span className="text-white">{playerBid}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-300">Tricks:</span>
-                                <span className="text-white">{playerTricks}</span>
-                              </div>
-                            </div>
-
-                            {/* Scoring Breakdown */}
-                            <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-300">Trick Score:</span>
-                                <span className={`font-semibold ${trickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {trickScore >= 0 ? '+' : ''}{trickScore}
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-300">Bag Score:</span>
-                                <span className={`font-semibold ${bagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {bagScore >= 0 ? '+' : ''}{bagScore}
-                                </span>
-                              </div>
-                              {bagPenalty !== 0 && (
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-gray-300">Bag Penalty:</span>
-                                  <span className="text-red-400 font-semibold">{bagPenalty}</span>
+                        {/* Player Columns */}
+                        {[0, 1, 2, 3].map((playerIndex) => {
+                          const playerColor = getPlayerColor(playerIndex);
+                          const playerName = getPlayerName(playerIndex);
+                          const playerAvatar = getPlayerAvatar(playerIndex);
+                          const playerBid = getPlayerBid(playerIndex);
+                          const playerTricks = getPlayerTricks(playerIndex);
+                          const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
+                          const playerScore = handSummaryData?.playerScores?.[playerIndex] || gameState.playerScores?.[playerIndex] || 0;
+                          
+                          // Calculate scores
+                          const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
+                          const bagScore = Math.max(0, playerTricks - playerBid);
+                          const bagPenalty = playerBags >= 10 ? -100 : 0;
+                          const handTotal = trickScore + bagScore + bagPenalty;
+                          
+                          // Border colors for each player
+                          const borderColors = [
+                            'border-red-500',    // Player 0: Red
+                            'border-blue-500',   // Player 1: Blue
+                            'border-orange-500', // Player 2: Orange
+                            'border-purple-500'  // Player 3: Purple
+                          ];
+                          const playerBorderColor = borderColors[playerIndex];
+                          
+                          return (
+                            <div key={playerIndex} className={`space-y-3 border-4 ${playerBorderColor} rounded-lg p-3`}>
+                              {/* Player Header */}
+                              <div className="flex flex-col items-center h-16 justify-center">
+                                <img 
+                                  src={playerAvatar} 
+                                  alt={playerName} 
+                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                                />
+                                <div className="flex items-center gap-1">
+                                  <div className={`${playerColor.bg} rounded-full w-2 h-2`}></div>
+                                  <span className="text-white font-semibold text-xs">{playerName}</span>
                                 </div>
-                              )}
-                              <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
-                                <span className="text-white">Round:</span>
-                                <span className={`${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {handTotal >= 0 ? '+' : ''}{handTotal}
-                                </span>
                               </div>
-                            </div>
 
-                            {/* Running Total */}
-                            <div className="border-t border-gray-600 pt-3 mt-4">
-                              <div className="flex justify-between text-xl font-bold">
-                                <span className={`${playerColor.text}`}>Score:</span>
-                                <span className={`${playerScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {playerScore >= 0 ? '+' : ''}{playerScore}
-                                </span>
+                              {/* Bid */}
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                                {playerBid}
+                              </div>
+
+                              {/* Tricks */}
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                                {playerTricks}
+                              </div>
+
+                              {/* Trick Score */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${trickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {trickScore}
+                              </div>
+
+                              {/* Bag Score */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${bagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {bagScore}
+                              </div>
+
+                              {/* Bag Penalty */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${bagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                                {bagPenalty}
+                              </div>
+
+                              {/* Round Total */}
+                              <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {handTotal}
+                              </div>
+
+                              {/* Final Score */}
+                              <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${playerScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {playerScore}
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : (
-                    // Partners mode - 2 teams (existing logic)
-                  <div className="grid grid-cols-2 gap-8">
-                      {/* Blue Team */}
-                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                        <h4 className="text-xl font-semibold text-blue-400 mb-4 text-center">Blue Team</h4>
-                      
-                      {/* Player Details */}
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(0)}</span>
-                          <span className="text-white">{getPlayerTricks(0)} / {getPlayerBid(0)}</span>
+                    // Partners mode - Same layout as solo with 4 player columns and team borders
+                    <div className="bg-gray-700 rounded-lg p-6 border-4 border-gray-600">
+                      {/* Column-based layout */}
+                      <div className="grid grid-cols-5 gap-4">
+                        {/* Row Headers Column */}
+                        <div className="space-y-3">
+                          <div className="text-gray-400 font-semibold text-sm h-16 flex items-center">Player</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bid</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Tricks</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Trick Score</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bag Score</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Bag Penalty</div>
+                          <div className="text-gray-300 text-sm font-medium h-12 flex items-center">Nil Bonus</div>
+                          <div className="text-white text-sm font-bold h-12 flex items-center border-t border-gray-600 pt-3">Round Total</div>
+                          <div className="text-white text-lg font-bold h-12 flex items-center border-t border-gray-600 pt-3">Final Score</div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(2)}</span>
-                          <span className="text-white">{getPlayerTricks(2)} / {getPlayerBid(2)}</span>
-                        </div>
-                      </div>
 
-                      {/* Team Totals */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Bid:</span>
-                          <span className="text-white">{team1Bid}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Tricks:</span>
-                          <span className="text-white">{team1Tricks}</span>
-                        </div>
-                      </div>
+                        {/* Player Columns - Blue Team first (0,2), then Red Team (1,3) */}
+                        {[0, 2, 1, 3].map((playerIndex) => {
+                          const playerColor = getPlayerColor(playerIndex);
+                          const playerName = getPlayerName(playerIndex);
+                          const playerAvatar = getPlayerAvatar(playerIndex);
+                          const playerBid = getPlayerBid(playerIndex);
+                          const playerTricks = getPlayerTricks(playerIndex);
+                          const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
+                          const playerScore = handSummaryData?.playerScores?.[playerIndex] || gameState.playerScores?.[playerIndex] || 0;
+                          
+                          // Calculate individual player scoring
+                          const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
+                          const bagScore = Math.max(0, playerTricks - playerBid);
+                          const bagPenalty = playerBags >= 10 ? -100 : 0;
+                          const nilBonus = 0; // Individual nil bonuses would be calculated differently
+                          const handTotal = trickScore + bagScore + bagPenalty + nilBonus;
+                          
+                          // Team borders - Blue team (players 0,2) get blue border, Red team (players 1,3) get red border
+                          const isBlueTeam = playerIndex === 0 || playerIndex === 2;
+                          const teamBorderColor = isBlueTeam ? 'border-blue-500' : 'border-red-500';
+                          
+                          return (
+                            <div key={playerIndex} className={`space-y-3 border-4 ${teamBorderColor} rounded-lg p-3`}>
+                              {/* Player Header */}
+                              <div className="flex flex-col items-center h-16 justify-center">
+                                <img 
+                                  src={playerAvatar} 
+                                  alt={playerName} 
+                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                                />
+                                <div className="flex items-center gap-1">
+                                  <div className={`${playerColor.bg} rounded-full w-2 h-2`}></div>
+                                  <span className="text-white font-semibold text-xs">{playerName}</span>
+                                </div>
+                              </div>
 
-                      {/* Scoring Breakdown */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Trick Score:</span>
-                          <span className={`font-semibold ${team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1TrickScore >= 0 ? '+' : ''}{team1TrickScore}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Bag Score:</span>
-                          <span className={`font-semibold ${team1BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1BagScore >= 0 ? '+' : ''}{team1BagScore}
-                          </span>
-                        </div>
-                        {team1BagPenalty !== 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">Bag Penalty:</span>
-                            <span className="text-red-400 font-semibold">{team1BagPenalty}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Nil Bonus:</span>
-                          <span className={`font-semibold ${team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1NilBonus >= 0 ? '+' : ''}{team1NilBonus}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
-                          <span className="text-white">Round:</span>
-                          <span className={`${team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1HandTotal >= 0 ? '+' : ''}{team1HandTotal}
-                          </span>
-                        </div>
-                      </div>
+                              {/* Bid - Individual */}
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                                {playerBid}
+                              </div>
 
-                      {/* Running Total */}
-                      <div className="border-t border-gray-600 pt-3 mt-4">
-                        <div className="flex justify-between text-xl font-bold">
-                          <span className="text-blue-300">Score:</span>
-                          <span className={`${team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team1TotalScore >= 0 ? '+' : ''}{team1TotalScore}
-                          </span>
-                        </div>
+                              {/* Tricks - Individual */}
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                                {playerTricks}
+                              </div>
+
+                              {/* Trick Score - Team combined */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${isBlueTeam ? (team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400') : (team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1TrickScore : team2TrickScore}
+                              </div>
+
+                              {/* Bag Score - Team combined */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${isBlueTeam ? (team1BagScore >= 0 ? 'text-green-400' : 'text-red-400') : (team2BagScore >= 0 ? 'text-green-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1BagScore : team2BagScore}
+                              </div>
+
+                              {/* Bag Penalty - Team combined */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${isBlueTeam ? (team1BagPenalty === 0 ? 'text-gray-400' : 'text-red-400') : (team2BagPenalty === 0 ? 'text-gray-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1BagPenalty : team2BagPenalty}
+                              </div>
+
+                              {/* Nil Bonus - Team combined */}
+                              <div className={`text-center font-semibold h-12 flex items-center justify-center ${isBlueTeam ? (team1NilBonus === 0 ? 'text-gray-400' : team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400') : (team2NilBonus === 0 ? 'text-gray-400' : team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1NilBonus : team2NilBonus}
+                              </div>
+
+                              {/* Round Total - Team combined */}
+                              <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${isBlueTeam ? (team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400') : (team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1HandTotal : team2HandTotal}
+                              </div>
+
+                              {/* Final Score - Team combined */}
+                              <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${isBlueTeam ? (team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400') : (team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400')}`}>
+                                {isBlueTeam ? team1TotalScore : team2TotalScore}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-
-                      {/* Red Team */}
-                    <div className="bg-gray-700 rounded-lg p-4 border border-white/20">
-                        <h4 className="text-xl font-semibold text-red-400 mb-4 text-center">Red Team</h4>
-                      
-                      {/* Player Details */}
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(1)}</span>
-                          <span className="text-white">{getPlayerTricks(1)} / {getPlayerBid(1)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">{getPlayerName(3)}</span>
-                          <span className="text-white">{getPlayerTricks(3)} / {getPlayerBid(3)}</span>
-                        </div>
-                      </div>
-
-                      {/* Team Totals */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Bid:</span>
-                          <span className="text-white">{team2Bid}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Team Tricks:</span>
-                          <span className="text-white">{team2Tricks}</span>
-                        </div>
-                      </div>
-
-                      {/* Scoring Breakdown */}
-                      <div className="border-t border-gray-600 pt-3 space-y-2 mt-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Trick Score:</span>
-                          <span className={`font-semibold ${team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2TrickScore >= 0 ? '+' : ''}{team2TrickScore}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Bag Score:</span>
-                          <span className={`font-semibold ${team2BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2BagScore >= 0 ? '+' : ''}{team2BagScore}
-                          </span>
-                        </div>
-                        {team2BagPenalty !== 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-300">Bag Penalty:</span>
-                            <span className="text-red-400 font-semibold">{team2BagPenalty}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-300">Nil Bonus:</span>
-                          <span className={`font-semibold ${team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2NilBonus >= 0 ? '+' : ''}{team2NilBonus}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-lg font-bold border-t border-gray-600 pt-2">
-                          <span className="text-white">Round:</span>
-                          <span className={`${team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2HandTotal >= 0 ? '+' : ''}{team2HandTotal}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Running Total */}
-                      <div className="border-t border-gray-600 pt-3 mt-4">
-                        <div className="flex justify-between text-xl font-bold">
-                          <span className="text-red-300">Score:</span>
-                          <span className={`${team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {team2TotalScore >= 0 ? '+' : ''}{team2TotalScore}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                   )}
 
                   <div className="mt-6 flex justify-center">

@@ -226,6 +226,19 @@ const formatCoins = (value: number) => {
   return `${value / 1000}k`;
 };
 
+// Helper functions for player info
+const getPlayerName = (index: number, gameState: any) => {
+  const player = gameState.players?.[index];
+  if (!player) return `Player ${index + 1}`;
+  return player.username || (player as any).name || `Player ${index + 1}`;
+};
+
+const getPlayerAvatar = (index: number, gameState: any) => {
+  const player = gameState.players?.[index];
+  if (!player) return '/default-pfp.jpg';
+  return player.avatar || (player as any).image || '/default-pfp.jpg';
+};
+
 export default function GameTable({ 
   game, 
   joinGame, 
@@ -1875,6 +1888,11 @@ export default function GameTable({
                                 <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center">
+                                      <img 
+                                        src={getPlayerAvatar(index, gameState)} 
+                                        alt={getPlayerName(index, gameState)} 
+                                        className="w-5 h-5 rounded-full border border-white/20 mr-2"
+                                      />
                                       <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2`}></div>
                                       <span className={`text-sm font-medium ${isUser ? 'text-white' : 'text-gray-300'}`}>
                                         {(() => {
@@ -1885,7 +1903,7 @@ export default function GameTable({
                                             case 4: return '4th PLACE';
                                             default: return `${placement}th PLACE`;
                                           }
-                                        })()} - {playerColor.name} Player {isUser ? '(You)' : ''}
+                                        })()} - {getPlayerName(index, gameState)} {isUser ? '(You)' : ''}
                                       </span>
                                       {isWinner && <svg className="h-4 w-4 text-yellow-500 ml-2" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -1925,7 +1943,7 @@ export default function GameTable({
                   if (showWinner) {
                     return (
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-                        <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+                        <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
                           <div className="flex items-center justify-center gap-2 mb-3">
                             <svg className="h-6 w-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -1933,11 +1951,30 @@ export default function GameTable({
                             <h2 className="text-lg font-bold text-white text-center">YOU WIN!</h2>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
-                            {/* Team 1 (Red) */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
-                              <div className="flex items-center mb-1">
+                            {/* Blue Team */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-blue-500">
+                              <div className="flex items-center mb-2">
                                 <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
                                 <h3 className="text-base font-semibold text-white">Blue Team</h3>
+                              </div>
+                              {/* Player Details */}
+                              <div className="space-y-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(0, gameState)} 
+                                    alt={getPlayerName(0, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(0, gameState)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(2, gameState)} 
+                                    alt={getPlayerName(2, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(2, gameState)}</span>
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -1946,11 +1983,30 @@ export default function GameTable({
                                 </div>
                               </div>
                             </div>
-                            {/* Team 2 (Blue) */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
-                              <div className="flex items-center mb-1">
+                            {/* Red Team */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-red-500">
+                              <div className="flex items-center mb-2">
                                 <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
                                 <h3 className="text-base font-semibold text-white">Red Team</h3>
+                              </div>
+                              {/* Player Details */}
+                              <div className="space-y-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(1, gameState)} 
+                                    alt={getPlayerName(1, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(1, gameState)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(3, gameState)} 
+                                    alt={getPlayerName(3, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(3, gameState)}</span>
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -1980,7 +2036,7 @@ export default function GameTable({
                   } else if (showLoser) {
                     return (
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-                        <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+                        <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
                           <div className="flex items-center justify-center gap-2 mb-3">
                             <svg className="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -1988,11 +2044,30 @@ export default function GameTable({
                             <h2 className="text-lg font-bold text-white text-center">YOU LOSE!</h2>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
-                            {/* Team 1 (Red) */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
-                              <div className="flex items-center mb-1">
+                            {/* Blue Team */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-blue-500">
+                              <div className="flex items-center mb-2">
                                 <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
                                 <h3 className="text-base font-semibold text-white">Blue Team</h3>
+                              </div>
+                              {/* Player Details */}
+                              <div className="space-y-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(0, gameState)} 
+                                    alt={getPlayerName(0, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(0, gameState)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(2, gameState)} 
+                                    alt={getPlayerName(2, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(2, gameState)}</span>
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -2001,11 +2076,30 @@ export default function GameTable({
                                 </div>
                               </div>
                             </div>
-                            {/* Team 2 (Blue) */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
-                              <div className="flex items-center mb-1">
+                            {/* Red Team */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-red-500">
+                              <div className="flex items-center mb-2">
                                 <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
                                 <h3 className="text-base font-semibold text-white">Red Team</h3>
+                              </div>
+                              {/* Player Details */}
+                              <div className="space-y-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(1, gameState)} 
+                                    alt={getPlayerName(1, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(1, gameState)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={getPlayerAvatar(3, gameState)} 
+                                    alt={getPlayerName(3, gameState)} 
+                                    className="w-5 h-5 rounded-full border border-white/20"
+                                  />
+                                  <span className="text-xs text-gray-300">{getPlayerName(3, gameState)}</span>
+                                </div>
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
@@ -2351,6 +2445,39 @@ export default function GameTable({
                         )
                     }
                   </div>
+                ) : gameState.status === "BIDDING" && !animatingTrick ? (
+                  // Show forced bid messages on table during bidding
+                  (() => {
+                    const forcedBid = (gameState as any).forcedBid;
+                    const gameType = (gameState as any).gameType;
+                    
+                    if (forcedBid === "BIDHEARTS") {
+                      return (
+                        <div className="px-4 py-2 bg-orange-600/80 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                             style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                          <div className="font-bold">BIDDING HEARTS</div>
+                          <div className="text-sm mt-1">All players must bid their number of hearts</div>
+                        </div>
+                      );
+                    } else if (forcedBid === "BID3") {
+                      return (
+                        <div className="px-4 py-2 bg-yellow-600/80 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                             style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                          <div className="font-bold">BIDDING 3</div>
+                          <div className="text-sm mt-1">All players must bid exactly 3</div>
+                        </div>
+                      );
+                    } else if (gameType === "MIRROR") {
+                      return (
+                        <div className="px-4 py-2 bg-purple-600/80 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                             style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                          <div className="font-bold">BIDDING SPADES</div>
+                          <div className="text-sm mt-1">All players must bid their number of spades</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()
                 ) : gameState.status === "PLAYING" && currentTrick?.length === 0 && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
