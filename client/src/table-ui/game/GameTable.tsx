@@ -1937,7 +1937,6 @@ export default function GameTable({
                   );
                 } else {
                   // Partners mode - use existing Winner/Loser modals
-                  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
                   
                   if (showWinner) {
                     return (
