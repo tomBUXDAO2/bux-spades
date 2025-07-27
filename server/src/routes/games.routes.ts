@@ -414,172 +414,286 @@ router.post('/:id/remove-bot-midgame', (req, res) => {
 });
 
 // --- Bot Bidding Logic ---
-function calculateBotBid(hand: Card[], gameType?: string, partnerBid?: number, forcedBid?: string, allowNil?: boolean, allowBlindNil?: boolean): number {
-  if (!hand) return 1;
+// ===== GENERIC BOT BIDDING LOGIC =====
+
+// Helper function to count spades in hand
+function countSpades(hand: Card[]): number {
+  return hand.filter(c => c.suit === 'S').length;
+}
+
+// Helper function to check if hand has Ace of Spades
+function hasAceOfSpades(hand: Card[]): boolean {
+  return hand.some(c => c.suit === 'S' && c.rank === 'A');
+}
+
+// Helper function to count high cards (A, K, Q, J)
+function countHighCards(hand: Card[]): number {
+  return hand.filter(c => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
+}
+
+// Helper function to calculate expected tricks based on hand strength
+function calculateExpectedTricks(hand: Card[]): number {
+  let expectedTricks = 3.25; // Base expectation: 1 trick per 4 cards (13 cards = ~3.25 tricks)
   
-  // For SUICIDE games, implement smart suicide bidding logic
-  if (forcedBid === 'SUICIDE') {
-    const spades = hand.filter(c => c.suit === 'S');
-    const hasAceSpades = spades.some(c => c.rank === 'A');
-    const hasQueenKingSpades = spades.some(c => c.rank === 'Q') && spades.some(c => c.rank === 'K');
-    
-    // Check for lone aces in other suits
-    const hasLoneAce = ['H', 'D', 'C'].some(suit => {
-      const suitCards = hand.filter(c => c.suit === suit);
-      return suitCards.length === 1 && suitCards[0].rank === 'A';
-    });
-    
-    // If partner hasn't bid yet (first partner)
-    if (partnerBid === undefined) {
-      // Don't nil if we have strong spades or lone aces
-      if (hasAceSpades || hasQueenKingSpades || spades.length > 3 || hasLoneAce) {
-        // Calculate a smart bid based on hand strength
-        let bid = 0;
-        
-        // Spades logic
-        if (hasAceSpades) bid += 1;
-        if (hasQueenKingSpades) bid += 1;
-        if (spades.length >= 3) bid += 1;
-        if (spades.length >= 5) bid += 1;
-        
-        // Non-spades logic
-        for (const suit of ['H', 'D', 'C']) {
-          const suitCards = hand.filter(c => c.suit === suit);
-          if (suitCards.some(c => c.rank === 'A')) bid += 1;
-          if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
-          if (suitCards.some(c => c.rank === 'Q') && suitCards.length >= 3) bid += 1;
-        }
-        
-        // Adjust bid based on hand strength
-        if (bid >= 6) return Math.min(bid, 8); // Strong hand: 6-8
-        if (bid >= 4) return Math.min(bid, 5); // Good hand: 4-5
-        return Math.max(2, bid); // Weak hand: 2-3
-      } else {
-        // Weak hand, consider nil
-        return Math.random() < 0.6 ? 0 : Math.max(2, spades.length);
-      }
-    }
-    
-    // If partner already bid (second partner)
-    if (partnerBid === 0) {
-      // Partner bid nil, so we can bid normally
-      // Don't nil if we have strong spades
-      if (hasAceSpades || hasQueenKingSpades || spades.length > 3) {
-        let bid = 0;
-        if (hasAceSpades) bid += 1;
-        if (hasQueenKingSpades) bid += 1;
-        if (spades.length >= 3) bid += 1;
-        if (spades.length >= 5) bid += 1;
-        
-        for (const suit of ['H', 'D', 'C']) {
-          const suitCards = hand.filter(c => c.suit === suit);
-          if (suitCards.some(c => c.rank === 'A')) bid += 1;
-          if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
-        }
-        
-        return Math.max(2, Math.min(bid, 6));
-      } else {
-        // Weak hand, likely nil
-        return Math.random() < 0.7 ? 0 : Math.max(2, spades.length);
-      }
-    } else {
-      // Partner bid something, so we must bid nil
-      return 0;
-    }
+  // Add value for high cards
+  for (const card of hand) {
+    if (card.rank === 'A') expectedTricks += 0.5;
+    else if (card.rank === 'K') expectedTricks += 0.3;
+    else if (card.rank === 'Q') expectedTricks += 0.2;
+    else if (card.rank === 'J') expectedTricks += 0.1;
   }
   
-  // For 4 OR NIL games, players must bid 4 or nil
+  // Adjust for suit distribution
+  const suits = ['S', 'H', 'D', 'C'];
+  for (const suit of suits) {
+    const suitCards = hand.filter(c => c.suit === suit);
+    if (suitCards.length <= 1) expectedTricks -= 0.5; // Short suits reduce options
+    else if (suitCards.length >= 5) expectedTricks += 0.5; // Long suits give control
+  }
+  
+  return Math.max(0, expectedTricks);
+}
+
+// Helper function to analyze score position
+function analyzeScorePosition(game: Game, playerIndex: number): 'WINNING' | 'LOSING' | 'CLOSE' {
+  const teamIndex = playerIndex % 2; // 0,1 = team 1, 2,3 = team 2
+  const team1Score = game.team1TotalScore || 0;
+  const team2Score = game.team2TotalScore || 0;
+  
+  if (teamIndex === 0) { // Team 1
+    if (team1Score - team2Score > 50) return 'WINNING';
+    if (team2Score - team1Score > 50) return 'LOSING';
+  } else { // Team 2
+    if (team2Score - team1Score > 50) return 'WINNING';
+    if (team1Score - team2Score > 50) return 'LOSING';
+  }
+  
+  return 'CLOSE';
+}
+
+// Helper function to analyze bag risk
+function analyzeBagRisk(game: Game, playerIndex: number): 'HIGH' | 'MEDIUM' | 'LOW' {
+  const teamIndex = playerIndex % 2;
+  const team1Bags = game.team1Bags || 0;
+  const team2Bags = game.team2Bags || 0;
+  
+  if (teamIndex === 0) { // Team 1
+    if (team1Bags >= 8) return 'HIGH';
+    if (team2Bags >= 8) return 'LOW'; // Opponents have bags, we can be aggressive
+  } else { // Team 2
+    if (team2Bags >= 8) return 'HIGH';
+    if (team1Bags >= 8) return 'LOW'; // Opponents have bags, we can be aggressive
+  }
+  
+  return 'MEDIUM';
+}
+
+// Helper function to get bidding position
+function getBiddingPosition(game: Game, playerIndex: number): 'EARLY' | 'LATE' {
+  // Determine if this player is early (1st/2nd) or late (3rd/4th) in bidding
+  const dealerIndex = game.dealerIndex || 0;
+  const firstBidder = (dealerIndex + 1) % 4;
+  const biddingOrder = [firstBidder, (firstBidder + 1) % 4, (firstBidder + 2) % 4, (firstBidder + 3) % 4];
+  const position = biddingOrder.indexOf(playerIndex);
+  
+  return position < 2 ? 'EARLY' : 'LATE';
+}
+
+// Helper function to get partner's bid
+function getPartnerBid(game: Game, playerIndex: number): number | null {
+  const partnerIndex = playerIndex % 2 === 0 ? playerIndex + 2 : playerIndex - 2;
+  if (partnerIndex < 0 || partnerIndex >= 4) return null;
+  
+  const partner = game.players[partnerIndex];
+  if (!partner) return null;
+  
+  return partner.bid !== undefined ? partner.bid : null;
+}
+
+// Helper function to determine bidding strategy
+function determineBiddingStrategy(
+  scorePosition: 'WINNING' | 'LOSING' | 'CLOSE',
+  bagRisk: 'HIGH' | 'MEDIUM' | 'LOW',
+  biddingPosition: 'EARLY' | 'LATE',
+  partnerBid: number | null
+): 'CONSERVATIVE' | 'AGGRESSIVE' | 'BALANCED' {
+  
+  // Conservative when winning or high bag risk
+  if (scorePosition === 'WINNING' || bagRisk === 'HIGH') {
+    return 'CONSERVATIVE';
+  }
+  
+  // Aggressive when losing or opponents have bags
+  if (scorePosition === 'LOSING' || bagRisk === 'LOW') {
+    return 'AGGRESSIVE';
+  }
+  
+  // Partner considerations
+  if (partnerBid === 0) {
+    return 'CONSERVATIVE'; // Partner bid nil, be conservative
+  }
+  
+  if (partnerBid !== null && partnerBid >= 5) {
+    return 'AGGRESSIVE'; // Partner bid high, can be aggressive
+  }
+  
+  return 'BALANCED';
+}
+
+// Helper function to determine if should consider nil
+function shouldConsiderNil(
+  expectedTricks: number,
+  spadesCount: number,
+  hasAceSpades: boolean,
+  strategy: 'CONSERVATIVE' | 'AGGRESSIVE' | 'BALANCED',
+  partnerBid: number | null,
+  allowNil: boolean
+): boolean {
+  if (!allowNil) return false;
+  
+  // Never nil with Ace of Spades
+  if (hasAceSpades) return false;
+  
+  // Never nil with many spades
+  if (spadesCount > 2) return false;
+  
+  // Consider nil only with weak hands
+  if (expectedTricks > 2) return false;
+  
+  // Conservative strategy favors nil
+  if (strategy === 'CONSERVATIVE' && expectedTricks <= 1.5) {
+    return true;
+  }
+  
+  // Partner considerations
+  if (partnerBid === 0) {
+    // Partner bid nil, consider nil if very weak
+    return expectedTricks <= 1;
+  }
+  
+  if (partnerBid !== null && partnerBid >= 5) {
+    // Partner bid high, consider nil if weak
+    return expectedTricks <= 1.5;
+  }
+  
+  return false;
+}
+
+// Main bot bidding function
+function calculateBotBid(
+  hand: Card[], 
+  game: Game, 
+  playerIndex: number, 
+  gameType?: string, 
+  partnerBid?: number, 
+  forcedBid?: string, 
+  allowNil?: boolean, 
+  allowBlindNil?: boolean
+): number {
+  if (!hand || hand.length === 0) return 1;
+  
+  // Handle forced bid game types first
   if (forcedBid === 'BID4NIL') {
-    // 50% chance to bid 4, 50% chance to nil
+    // 4 OR NIL: 50% chance to bid 4, 50% chance to nil
     return Math.random() < 0.5 ? 4 : 0;
   }
   
-  // For BID 3 games, players must bid exactly 3
   if (forcedBid === 'BID3') {
+    // BID 3: Must bid exactly 3
     return 3;
   }
   
-  // For BID HEARTS games, players must bid the number of hearts in their hand
   if (forcedBid === 'BIDHEARTS') {
-    const hearts = hand.filter(c => c.suit === 'H');
-    return hearts.length;
+    // BID HEARTS: Must bid number of hearts
+    return hand.filter(c => c.suit === 'H').length;
   }
   
-  // For WHIZ games, use simplified bidding logic
+  if (forcedBid === 'SUICIDE') {
+    return calculateSuicideBid(hand, game, playerIndex, partnerBid);
+  }
+  
+  // Handle game-specific logic
   if (gameType === 'WHIZ') {
-    const spades = hand.filter(c => c.suit === 'S');
-    const hasAceSpades = spades.some(c => c.rank === 'A');
-    
-    // If no spades, must bid nil (unless nil is disabled)
-    if (spades.length === 0) {
-      return allowNil ? 0 : 1; // If nil disabled, bid 1 instead
-    }
-    
-    // If has Ace of Spades, cannot bid nil
-    if (hasAceSpades) {
-      return spades.length;
-    }
-    
-    // Smart partner bidding logic
-    if (partnerBid !== undefined) {
-      // If partner already bid nil, try to bid spades count
-      if (partnerBid === 0) {
-        return spades.length;
-      }
-      // If partner bid spades count, consider nil if no ace spades
-      if (partnerBid > 0 && !hasAceSpades) {
-        // 70% chance to bid nil, 30% chance to bid spades count
-        return Math.random() < 0.7 ? 0 : spades.length;
-      }
-    }
-    
-    // Default: bid spades count
-    return spades.length;
+    return calculateWhizBid(hand, allowNil);
   }
   
-  // For regular games, use smart bidding logic with nil consideration
-  let bid = 0;
-  let spades = hand.filter(c => c.suit === 'S');
-  let nonSpades = hand.filter(c => c.suit !== 'S');
-  const hasAceSpades = spades.some(c => c.rank === 'A');
-  const hasQueenKingSpades = spades.some(c => c.rank === 'Q') && spades.some(c => c.rank === 'K');
-  
-  // Check for lone aces in other suits
-  const hasLoneAce = ['H', 'D', 'C'].some(suit => {
-    const suitCards = hand.filter(c => c.suit === suit);
-    return suitCards.length === 1 && suitCards[0].rank === 'A';
-  });
-  
-  // Spades logic
-  if (hasAceSpades) bid += 1;
-  if (hasQueenKingSpades) bid += 1;
-  if (spades.length >= 3) bid += 1;
-  if (spades.length >= 5) bid += 1;
-  
-  // Non-spades logic
-  for (const suit of ['H', 'D', 'C']) {
-    const suitCards = hand.filter(c => c.suit === suit);
-    if (suitCards.some(c => c.rank === 'A')) bid += 1;
-    if (suitCards.some(c => c.rank === 'K') && suitCards.length >= 2) bid += 1;
-    if (suitCards.some(c => c.rank === 'Q') && suitCards.length >= 3) bid += 1;
+  if (gameType === 'MIRROR') {
+    // MIRROR: Must bid spades count
+    return countSpades(hand);
   }
   
-  // Smart nil consideration for regular games (only if nil is allowed)
-  if (allowNil && partnerBid !== undefined) {
-    // If partner already bid nil, consider nil if we have a weak hand
-    if (partnerBid === 0) {
-      if (bid <= 2 && !hasAceSpades && !hasLoneAce) {
-        // Weak hand, consider nil
-        return Math.random() < 0.6 ? 0 : Math.max(1, bid);
-      }
+  // Generic bidding logic for all other game types
+  return calculateGenericBid(hand, game, playerIndex, allowNil);
+}
+
+// Suicide-specific bidding logic
+function calculateSuicideBid(hand: Card[], game: Game, playerIndex: number, partnerBid?: number): number {
+  const spadesCount = countSpades(hand);
+  const hasAceSpades = hasAceOfSpades(hand);
+  const expectedTricks = calculateExpectedTricks(hand);
+  const isFirstPartner = getBiddingPosition(game, playerIndex) === 'EARLY';
+  
+  if (isFirstPartner) {
+    // First partner decides: nil or let partner nil
+    if (expectedTricks <= 1.5 && spadesCount <= 1 && !hasAceSpades) {
+      return 0; // Nil - my hand is weak
     }
-    // If partner bid something, consider nil if we have a very weak hand
-    else if (partnerBid > 0 && bid <= 1 && !hasAceSpades && !hasLoneAce) {
-      return Math.random() < 0.7 ? 0 : Math.max(1, bid);
+    return Math.max(2, Math.round(expectedTricks)); // Let partner nil
+  } else {
+    // Second partner - forced to nil if partner didn't
+    if (partnerBid === null || partnerBid > 0) {
+      return 0; // Forced nil
     }
+    return Math.max(2, Math.round(expectedTricks)); // Normal bid
+  }
+}
+
+// Whiz-specific bidding logic
+function calculateWhizBid(hand: Card[], allowNil?: boolean): number {
+  const spadesCount = countSpades(hand);
+  const hasAceSpades = hasAceOfSpades(hand);
+  
+  // If no spades, must bid nil (unless nil is disabled)
+  if (spadesCount === 0) {
+    return allowNil ? 0 : 1;
   }
   
-  return Math.max(1, bid); // Always bid at least 1
+  // NEVER bid nil with spades in Whiz
+  return spadesCount;
+}
+
+// Generic bidding logic for all other game types
+function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allowNil?: boolean): number {
+  // 1. Analyze hand strength
+  const expectedTricks = calculateExpectedTricks(hand);
+  const spadesCount = countSpades(hand);
+  const hasAceSpades = hasAceOfSpades(hand);
+  
+  // 2. Analyze game state
+  const scorePosition = analyzeScorePosition(game, playerIndex);
+  const bagRisk = analyzeBagRisk(game, playerIndex);
+  const biddingPosition = getBiddingPosition(game, playerIndex);
+  const partnerBid = getPartnerBid(game, playerIndex);
+  
+  // 3. Determine bidding strategy
+  const strategy = determineBiddingStrategy(scorePosition, bagRisk, biddingPosition, partnerBid);
+  
+  // 4. Calculate base bid
+  let baseBid = Math.round(expectedTricks);
+  
+  // 5. Apply strategy adjustments
+  if (strategy === 'CONSERVATIVE') {
+    baseBid = Math.max(0, baseBid - 1);
+  } else if (strategy === 'AGGRESSIVE') {
+    baseBid = Math.min(13, baseBid + 1);
+  }
+  
+  // 6. Nil consideration
+  if (shouldConsiderNil(expectedTricks, spadesCount, hasAceSpades, strategy, partnerBid, allowNil || false)) {
+    return 0; // Nil
+  }
+  
+  return Math.max(0, Math.min(13, baseBid));
 }
 
 // --- Basic Bot Engine ---
@@ -613,30 +727,30 @@ export function botMakeMove(game: Game, seatIndex: number) {
             console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
           } else if (game.rules.bidType === 'WHIZ') {
             // Whiz games: use simplified bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'WHIZ', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'WHIZ', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
           } else if (game.forcedBid === 'SUICIDE') {
             // Suicide games: implement suicide bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'SUICIDE', game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'SUICIDE', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
           } else if (game.forcedBid === 'BID4NIL') {
             // 4 OR NIL games: bot must bid 4 or nil
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID4NIL', game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID4NIL', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] 4 OR NIL game - Bot', bot.username, 'bidding', bid);
           } else if (game.forcedBid === 'BID3') {
             // BID 3 games: bot must bid exactly 3
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BID3', game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID3', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] BID 3 game - Bot', bot.username, 'bidding', bid);
           } else if (game.forcedBid === 'BIDHEARTS') {
             // BID HEARTS games: bot must bid number of hearts
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
           } else if (game.rules.bidType === 'REG') {
             // Regular games: use complex bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
           } else {
             // Default fallback
-            bid = calculateBotBid(game.hands[seatIndex], 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
           }
       }
       // Simulate bot making a bid
