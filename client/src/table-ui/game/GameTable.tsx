@@ -1811,11 +1811,11 @@ export default function GameTable({
                             color = 'bg-orange-500';
                                                           if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
                             else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
-                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
+                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = '♥️';
                             else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
                             else label = 'GIMMICK';
                           }
-                          return <span className={`inline-block ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
+                          return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
                         })()}
                         {/* Points */}
                         <span className="text-slate-300 font-medium">{gameState.minPoints}/{gameState.maxPoints}</span>
