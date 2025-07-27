@@ -395,14 +395,12 @@ export default function HandSummaryModal({
                           const playerBid = getPlayerBid(playerIndex);
                           const playerTricks = getPlayerTricks(playerIndex);
                           const playerBags = handSummaryData?.playerBags?.[playerIndex] || gameState.playerBags?.[playerIndex] || 0;
-                          const playerScore = handSummaryData?.playerScores?.[playerIndex] || gameState.playerScores?.[playerIndex] || 0;
                           
                           // Calculate individual player scoring
                           const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
                           const bagScore = Math.max(0, playerTricks - playerBid);
                           const bagPenalty = playerBags >= 10 ? -100 : 0;
                           const nilBonus = 0; // Individual nil bonuses would be calculated differently
-                          const handTotal = trickScore + bagScore + bagPenalty + nilBonus;
                           
                           // Team borders - Blue team (players 0,2) get blue border, Red team (players 1,3) get red border
                           const isBlueTeam = playerIndex === 0 || playerIndex === 2;
