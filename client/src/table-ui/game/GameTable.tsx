@@ -2131,6 +2131,14 @@ export default function GameTable({
                 {renderPlayerHand()}
               </div>
             )}
+
+            {/* Start Game Warning Modal - positioned inside game table container */}
+            <StartGameWarningModal
+              isOpen={showStartWarning}
+              onClose={() => setShowStartWarning(false)}
+              onPlayWithBots={handlePlayWithBots}
+              emptySeatsCount={emptySeats}
+            />
           </div>
 
           {/* Chat area - 30%, full height */}
@@ -2222,12 +2230,6 @@ export default function GameTable({
             }
           }
         })()}
-        <StartGameWarningModal
-          isOpen={showStartWarning}
-          onClose={() => setShowStartWarning(false)}
-          onPlayWithBots={handlePlayWithBots}
-          emptySeatsCount={emptySeats}
-        />
       </div>
     </>
   );
