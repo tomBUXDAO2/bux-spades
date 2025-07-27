@@ -433,27 +433,81 @@ function countHighCards(hand: Card[]): number {
 
 // Helper function to calculate expected tricks based on hand strength
 function calculateExpectedTricks(hand: Card[]): number {
-  // Start with a more conservative base expectation
-  let expectedTricks = 2.5; // Base expectation: ~2.5 tricks per player (10 total, leaving room for variance)
+  let bid = 0;
   
-  // Count high cards (Aces, Kings, Queens)
-  const highCards = hand.filter(c => ['A', 'K', 'Q'].includes(c.rank)).length;
-  expectedTricks += highCards * 0.3; // Each high card adds ~0.3 tricks
+  // Count spades (trump suit) - most important
+  const spades = hand.filter(c => c.suit === 'S');
+  const spadesCount = spades.length;
   
-  // Count spades (trump suit)
-  const spadesCount = hand.filter(c => c.suit === 'S').length;
-  expectedTricks += spadesCount * 0.2; // Each spade adds ~0.2 tricks
-  
-  // Adjust for suit distribution
-  const suits = ['S', 'H', 'D', 'C'];
-  for (const suit of suits) {
-    const suitCards = hand.filter(c => c.suit === suit);
-    if (suitCards.length === 0) expectedTricks -= 0.3; // Void suits reduce options
-    else if (suitCards.length >= 4) expectedTricks += 0.2; // Long suits give control
+  if (spadesCount > 0) {
+    // Count Ace of Spades
+    if (spades.some(c => c.rank === 'A')) bid += 1;
+    
+    // Count King of Spades (if at least 2 spades)
+    if (spadesCount >= 2 && spades.some(c => c.rank === 'K')) bid += 1;
+    
+    // Count Queen of Spades (if at least 3 spades)
+    if (spadesCount >= 3 && spades.some(c => c.rank === 'Q')) bid += 1;
+    
+    // Count Jack of Spades (if at least 4 spades)
+    if (spadesCount >= 4 && spades.some(c => c.rank === 'J')) bid += 1;
+    
+    // Count 10 of Spades (if at least 5 spades)
+    if (spadesCount >= 5 && spades.some(c => c.rank === '10')) bid += 1;
+    
+    // Count 9 of Spades (if at least 6 spades)
+    if (spadesCount >= 6 && spades.some(c => c.rank === '9')) bid += 1;
+    
+    // Count 8 of Spades (if at least 7 spades)
+    if (spadesCount >= 7 && spades.some(c => c.rank === '8')) bid += 1;
+    
+    // Count 7 of Spades (if at least 8 spades)
+    if (spadesCount >= 8 && spades.some(c => c.rank === '7')) bid += 1;
+    
+    // Count 6 of Spades (if at least 9 spades)
+    if (spadesCount >= 9 && spades.some(c => c.rank === '6')) bid += 1;
+    
+    // Count 5 of Spades (if at least 10 spades)
+    if (spadesCount >= 10 && spades.some(c => c.rank === '5')) bid += 1;
+    
+    // Count 4 of Spades (if at least 11 spades)
+    if (spadesCount >= 11 && spades.some(c => c.rank === '4')) bid += 1;
+    
+    // Count 3 of Spades (if at least 12 spades)
+    if (spadesCount >= 12 && spades.some(c => c.rank === '3')) bid += 1;
+    
+    // Count 2 of Spades (if all 13 spades)
+    if (spadesCount === 13 && spades.some(c => c.rank === '2')) bid += 1;
   }
   
-  // Cap at reasonable maximum (no player should expect more than 6-7 tricks)
-  return Math.max(0, Math.min(6, expectedTricks));
+  // Count other suit Aces (if less than 5 cards in that suit)
+  const suits = ['H', 'D', 'C'];
+  for (const suit of suits) {
+    const suitCards = hand.filter(c => c.suit === suit);
+    if (suitCards.length < 5 && suitCards.some(c => c.rank === 'A')) {
+      bid += 1;
+    }
+  }
+  
+  // Count other suit Kings (if less than 4 cards in that suit)
+  for (const suit of suits) {
+    const suitCards = hand.filter(c => c.suit === suit);
+    if (suitCards.length < 4 && suitCards.some(c => c.rank === 'K')) {
+      bid += 1;
+    }
+  }
+  
+  // Add 1 for each void suit (if more than 1 spade)
+  if (spadesCount > 1) {
+    for (const suit of suits) {
+      const suitCards = hand.filter(c => c.suit === suit);
+      if (suitCards.length === 0) {
+        bid += 1;
+      }
+    }
+  }
+  
+  return Math.max(0, Math.min(13, bid));
 }
 
 // Helper function to analyze score position
@@ -559,11 +613,11 @@ function shouldConsiderNil(
   // Never nil with many spades
   if (spadesCount > 2) return false;
   
-  // Consider nil only with weak hands
-  if (expectedTricks > 2) return false;
+  // Only consider nil if very weak hand (0-1 expected tricks)
+  if (expectedTricks > 1) return false;
   
   // Conservative strategy favors nil
-  if (strategy === 'CONSERVATIVE' && expectedTricks <= 1.5) {
+  if (strategy === 'CONSERVATIVE' && expectedTricks <= 1) {
     return true;
   }
   
@@ -574,8 +628,8 @@ function shouldConsiderNil(
   }
   
   if (partnerBid !== null && partnerBid >= 5) {
-    // Partner bid high, consider nil if weak
-    return expectedTricks <= 1.5;
+    // Partner bid high, consider nil if very weak
+    return expectedTricks <= 1;
   }
   
   return false;
@@ -666,12 +720,12 @@ function calculateWhizBid(hand: Card[], allowNil?: boolean): number {
 
 // Generic bidding logic for all other game types
 function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allowNil?: boolean): number {
-  // 1. Analyze hand strength
-  const expectedTricks = calculateExpectedTricks(hand);
+  // 1. Calculate base bid using the new counting system
+  const baseBid = calculateExpectedTricks(hand);
   const spadesCount = countSpades(hand);
   const hasAceSpades = hasAceOfSpades(hand);
   
-  // 2. Analyze game state
+  // 2. Analyze game state for nil consideration
   const scorePosition = analyzeScorePosition(game, playerIndex);
   const bagRisk = analyzeBagRisk(game, playerIndex);
   const biddingPosition = getBiddingPosition(game, playerIndex);
@@ -680,23 +734,13 @@ function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allo
   // 3. Determine bidding strategy
   const strategy = determineBiddingStrategy(scorePosition, bagRisk, biddingPosition, partnerBid);
   
-  // 4. Calculate base bid
-  let baseBid = Math.round(expectedTricks);
-  
-  // 5. Apply strategy adjustments
-  if (strategy === 'CONSERVATIVE') {
-    baseBid = Math.max(0, baseBid - 1);
-  } else if (strategy === 'AGGRESSIVE') {
-    baseBid = Math.min(5, baseBid + 1); // Cap aggressive bids at 5
-  }
-  
-  // 6. Nil consideration
-  if (shouldConsiderNil(expectedTricks, spadesCount, hasAceSpades, strategy, partnerBid, allowNil || false)) {
+  // 4. Nil consideration - only consider nil if hand is very weak
+  if (shouldConsiderNil(baseBid, spadesCount, hasAceSpades, strategy, partnerBid, allowNil || false)) {
     return 0; // Nil
   }
   
-  // 7. Ensure reasonable bid range (0-5 for most hands)
-  return Math.max(0, Math.min(5, baseBid));
+  // 5. Return the calculated bid (no strategy adjustments to inflate bids)
+  return Math.max(0, Math.min(13, baseBid));
 }
 
 // --- Basic Bot Engine ---
