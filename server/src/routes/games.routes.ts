@@ -964,29 +964,38 @@ function selectCardToWin(playableCards: Card[], currentTrick: Card[], hand: Card
   const totalTableBid = game.bidding?.bids.reduce((sum, bid) => sum + (bid || 0), 0) || 0;
   const isHighBidGame = totalTableBid >= 12 || isMirrorGame;
   
+  // Debug logging for spade counts
+  console.log(`[BOT SPADE DEBUG] Bot at seat ${seatIndex}, Team1 spades: ${team1Spades}, Team2 spades: ${team2Spades}, Our spades: ${ourSpades}, Their spades: ${theirSpades}`);
+  console.log(`[BOT SPADE DEBUG] Is high bid game: ${isHighBidGame}, Total table bid: ${totalTableBid}, Is mirror: ${isMirrorGame}`);
+  
   if (currentTrick.length === 0) {
     // Leading
     if (isHighBidGame) {
       // In high-bid games, be more aggressive about winning tricks
       
-      // 1. Lead partner's void suits if we have spades left
+      // 1. Run spades if we have more than opponents (HIGHEST PRIORITY)
+      if (ourSpades > theirSpades && ourSpades > 0) {
+        const spades = playableCards.filter(c => c.suit === 'S');
+        console.log(`[BOT SPADE DEBUG] Should run spades! Our spades: ${ourSpades}, Their spades: ${theirSpades}, Available spades: ${spades.length}`);
+        if (spades.length > 0) {
+          // Lead highest spade
+          const highestSpade = spades.reduce((highest, card) => 
+            getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+          );
+          console.log(`[BOT SPADE DEBUG] Leading highest spade: ${highestSpade.rank}${highestSpade.suit}`);
+          return highestSpade;
+        }
+      } else {
+        console.log(`[BOT SPADE DEBUG] Not running spades. Our spades: ${ourSpades}, Their spades: ${theirSpades}, Our spades > 0: ${ourSpades > 0}`);
+      }
+      
+      // 2. Lead partner's void suits if we have spades left
       const partnerVoidSuits = getPartnerVoidSuits(partnerHand);
       for (const suit of partnerVoidSuits) {
         const suitCards = playableCards.filter(c => c.suit === suit);
         if (suitCards.length > 0 && ourSpades > theirSpades) {
           // Lead highest card in partner's void suit
           return suitCards.reduce((highest, card) => 
-            getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
-          );
-        }
-      }
-      
-      // 2. Run spades if we have more than opponents
-      if (ourSpades > theirSpades && ourSpades > 0) {
-        const spades = playableCards.filter(c => c.suit === 'S');
-        if (spades.length > 0) {
-          // Lead highest spade
-          return spades.reduce((highest, card) => 
             getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
           );
         }

@@ -1135,10 +1135,8 @@ export default function GameTable({
         console.log('No hand summary data received');
       }
       
-      // Add delay to allow trick completion animation to finish before showing hand summary
-      setTimeout(() => {
-        setShowHandSummary(true);
-      }, 3000); // 3 second delay to allow trick animation to complete
+      // Don't show hand summary immediately - wait for game state update
+      // The game_update event will be emitted after hand_completed with the updated scores
     };
     
     // Register event listener for hand completion
@@ -1158,6 +1156,24 @@ export default function GameTable({
       }
     };
   }, [socket, gameState.id]);
+
+  // Effect to show hand summary when game state is updated with final scores
+  useEffect(() => {
+    // Only show hand summary if we have hand summary data and the game state has been updated
+    if (handSummaryData && gameState.status === 'HAND_COMPLETED' && !showHandSummary) {
+      console.log('[HAND SUMMARY TRIGGER] Game state updated, showing hand summary with final scores:', {
+        team1TotalScore: gameState.team1TotalScore,
+        team2TotalScore: gameState.team2TotalScore,
+        handSummaryDataTeam1: handSummaryData.team1TotalScore,
+        handSummaryDataTeam2: handSummaryData.team2TotalScore
+      });
+      
+      // Add a small delay to ensure all state updates are complete
+      setTimeout(() => {
+        setShowHandSummary(true);
+      }, 500);
+    }
+  }, [gameState.status, gameState.team1TotalScore, gameState.team2TotalScore, handSummaryData, showHandSummary]);
 
   // Fallback: Check if hand is complete but no event was received
   useEffect(() => {
@@ -2141,6 +2157,10 @@ export default function GameTable({
         {(() => {
           const shouldShow = showHandSummary && !isGameOver(gameState);
           console.log('[MODAL DEBUG] showHandSummary:', showHandSummary, 'isGameOver:', isGameOver(gameState), 'shouldShow:', shouldShow);
+          console.log('[MODAL DEBUG] Current gameState scores:', {
+            team1TotalScore: gameState.team1TotalScore,
+            team2TotalScore: gameState.team2TotalScore
+          });
           return shouldShow ? (
           <HandSummaryModal
             isOpen={showHandSummary}

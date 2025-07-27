@@ -45,9 +45,19 @@ export default function HandSummaryModal({
   });
   const [timeRemaining, setTimeRemaining] = useState(12);
   
-  // Use total scores for game over check
-  const team1TotalScore = handSummaryData?.team1TotalScore || gameState?.team1TotalScore || 0;
-  const team2TotalScore = handSummaryData?.team2TotalScore || gameState?.team2TotalScore || 0;
+  // Use total scores for game over check - ALWAYS use gameState as the source of truth
+  const team1TotalScore = gameState?.team1TotalScore || 0;
+  const team2TotalScore = gameState?.team2TotalScore || 0;
+
+  // Debug logging for score consistency
+  console.log('[HAND SUMMARY SCORE DEBUG] Final scores being displayed:', {
+    team1TotalScore,
+    team2TotalScore,
+    handSummaryDataTeam1: handSummaryData?.team1TotalScore,
+    handSummaryDataTeam2: handSummaryData?.team2TotalScore,
+    gameStateTeam1: gameState?.team1TotalScore,
+    gameStateTeam2: gameState?.team2TotalScore
+  });
 
   // Check if game is over using the GameState
   const gameIsOver = isGameOver(gameState);
