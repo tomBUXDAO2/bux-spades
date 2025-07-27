@@ -108,6 +108,10 @@ export interface GameRules {
   maxPoints: number;
   coinAmount: number;
   numHands?: number;
+  specialRules?: {
+    screamer: boolean;
+    assassin: boolean;
+  };
 }
 
 export interface GameSettings {

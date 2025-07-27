@@ -662,6 +662,74 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.emit('error', { message: 'Card not in hand' });
       return;
     }
+    }
+    
+    // --- ENFORCE SPECIAL RULES ---
+    const specialRules = game.rules?.specialRules;
+    if (specialRules) {
+      const isLeading = game.play.currentTrick.length === 0;
+      const leadSuit = isLeading ? null : game.play.currentTrick[0].suit;
+      
+      // Screamer rules: Players cannot play spades unless they have no other cards
+      if (specialRules.screamer) {
+        console.log(`[SPECIAL RULES] Screamer validation for player ${userId}`);
+        
+        if (isLeading) {
+          // When leading, cannot lead spades unless only spades left
+          const nonSpades = hand.filter(c => c.suit !== "S");
+          if (nonSpades.length > 0 && card.suit === "S") {
+            socket.emit("error", { message: "Screamer rule: You cannot lead spades unless you only have spades left." });
+            return;
+          }
+        } else {
+          // Following suit
+          if (leadSuit !== "S") {
+            // Not leading spades - cannot trump with spades unless void in lead suit
+            const cardsOfLeadSuit = hand.filter(c => c.suit === leadSuit);
+            if (cardsOfLeadSuit.length > 0) {
+              // Must follow suit, no spade restriction
+            } else {
+              // Void in lead suit - can only cut if only spades left
+              const nonSpades = hand.filter(c => c.suit !== "S");
+              if (nonSpades.length > 0 && card.suit === "S") {
+                socket.emit("error", { message: "Screamer rule: You cannot cut with spades unless you only have spades left." });
+                return;
+              }
+            }
+          }
+        }
+      }
+      
+      // Assassin rules: Players must play spades whenever possible
+      if (specialRules.assassin) {
+        console.log(`[SPECIAL RULES] Assassin validation for player ${userId}`);
+        
+        if (isLeading) {
+          // When leading, must lead spades if spades are broken and have spades
+          const spades = hand.filter(c => c.suit === "S");
+          if (game.play.spadesBroken && spades.length > 0 && card.suit !== "S") {
+            socket.emit("error", { message: "Assassin rule: You must lead spades when spades are broken and you have spades." });
+            return;
+          }
+        } else {
+          // Following suit
+          if (leadSuit !== "S") {
+            // Not leading spades - must trump if have spades and void in lead suit
+            const cardsOfLeadSuit = hand.filter(c => c.suit === leadSuit);
+            if (cardsOfLeadSuit.length === 0) {
+              // Void in lead suit - must cut if have spades
+              const spades = hand.filter(c => c.suit === "S");
+              if (spades.length > 0 && card.suit !== "S") {
+                socket.emit("error", { message: "Assassin rule: You must cut with spades when void in lead suit and you have spades." });
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Remove card from hand and add to current trick
     
     // --- ENFORCE SPADES BROKEN RULE ---
     if (game.play.currentTrick.length === 0 && card.suit === 'S' && !game.play.spadesBroken) {

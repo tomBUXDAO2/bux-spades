@@ -21,7 +21,11 @@ export default function CreateGameModal({ isOpen, onClose, onCreateGame }: Creat
     allowBlindNil: true,
     minPoints: 500,
     maxPoints: 2500,
-    coinAmount: 100000
+    coinAmount: 100000,
+    specialRules: {
+      screamer: false,
+      assassin: false
+    }
   });
 
   const handleCreateGame = () => {

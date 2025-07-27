@@ -47,6 +47,10 @@ export interface Game {
     maxPoints: number;
     minPoints: number;
     bidType: BiddingOption;
+    specialRules?: {
+      screamer: boolean;
+      assassin: boolean;
+    };
     gimmickType: GamePlayOption;
   };
   isBotGame: boolean;
