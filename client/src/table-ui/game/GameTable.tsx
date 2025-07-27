@@ -2027,7 +2027,7 @@ export default function GameTable({
                     <div className="font-bold">Dealing Cards...</div>
                     <div className="text-sm mt-1">Please wait while cards are being dealt</div>
                   </div>
-                ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId ? (
+                ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {gameState.currentPlayer
@@ -2054,7 +2054,7 @@ export default function GameTable({
                         )
                     }
                   </div>
-                ) : gameState.status === "PLAYING" && currentTrick?.length === 0 && gameState.currentPlayer !== currentPlayerId ? (
+                ) : gameState.status === "PLAYING" && currentTrick?.length === 0 && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
                   <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {gameState.currentPlayer
