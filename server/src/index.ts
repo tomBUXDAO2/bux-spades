@@ -1036,10 +1036,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // If the next player is a human, DO NOT trigger any bot moves - wait for human input
       
       // Failsafe: If all hands are empty but we haven't reached 13 tricks, force completion
-      console.log('[FAILSAFE DEBUG] Checking failsafe - hands:', game.players.map(p => ({ id: p?.id, handLength: p?.hand?.length || 0 })));
-      console.log('[FAILSAFE DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
-      
-      if (game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0) && game.play.trickNumber < 13) {
+      // ONLY check this when a trick is complete (4 cards played)
+      if (game.play.currentTrick.length === 4) {
+        console.log('[FAILSAFE DEBUG] Checking failsafe - hands:', game.players.map(p => ({ id: p?.id, handLength: p?.hand?.length || 0 })));
+        console.log('[FAILSAFE DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
+        
+        if (game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0) && game.play.trickNumber < 13) {
         console.log('[FAILSAFE] All hands empty but only', game.play.trickNumber, 'tricks completed. Forcing hand completion.');
         
         // If there are any cards left in the current trick, score it as the final trick
@@ -1071,6 +1073,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         console.log('[FAILSAFE] Hand completed event emitted');
         
         return; // Exit early to prevent further processing
+        }
       }
     } else {
       // Trick is not complete, advance to next player
