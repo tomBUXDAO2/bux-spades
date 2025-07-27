@@ -230,20 +230,20 @@ const HomePage: React.FC = () => {
       color = 'bg-orange-500';
               if (game.forcedBid === 'BID4NIL') label = '4 OR NIL';
       else if (game.forcedBid === 'BID3') label = 'BID 3';
-      else if (game.forcedBid === 'BIDHEARTS') label = 'BID HEARTS';
+      else if (game.forcedBid === 'BIDHEARTS') label = '♥️';
       else if (game.forcedBid === 'SUICIDE') label = 'SUICIDE';
       else label = 'GIMMICK';
     }
-    return <span className={`inline-block ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
+    return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
   };
 
   const getSpecialBricks = (game: GameState) => {
     const bricks = [];
     if (game.specialRules?.assassin) {
-      bricks.push(<span key="assassin" className="inline-block bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+      bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
     }
     if (game.specialRules?.screamer) {
-      bricks.push(<span key="screamer" className="inline-block bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+      bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
     }
     return bricks;
   };
