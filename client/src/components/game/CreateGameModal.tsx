@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { GameSettings, GameMode, BiddingOption } from '../../types/game';
 
 interface CreateGameModalProps {
@@ -107,16 +107,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onClose();
   };
 
-  // Reset gimmickType when options change to prevent index-based selection issues
-  useEffect(() => {
-    const availableOptions = mode === 'PARTNERS' 
-      ? ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS']
-      : ['4 OR NIL', 'BID 3', 'BID HEARTS'];
-    
-    if (!availableOptions.includes(gimmickType)) {
-      setGimmickType(availableOptions[0] as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS');
-    }
-  }, [mode]); // Remove gimmickType from dependencies to prevent infinite loop
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
