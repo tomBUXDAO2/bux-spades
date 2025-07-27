@@ -6,9 +6,7 @@ import type { ChatMessage } from '../Chat';
 import BlindNilModal from './BlindNilModal';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
-import WinnerModal from './WinnerModal';
-import LoserModal from './LoserModal';
-import SoloWinnerModal from './SoloWinnerModal';
+
 import BiddingInterface from './BiddingInterface';
 
 import LandscapePrompt from '../../LandscapePrompt';
@@ -1786,6 +1784,257 @@ export default function GameTable({
                   </div>
                 </div>
               )}
+
+              {/* Start Game Warning Modal - positioned inside the actual game table (blue oval) */}
+              {showStartWarning && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+                    <div>
+                      {/* Header with inline icon and title */}
+                      <div className="flex items-center justify-center mb-4">
+                        <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="text-2xl font-bold text-white">
+                          Empty Seats Detected
+                        </h3>
+                      </div>
+                      {/* Message - center aligned */}
+                      <div className="text-center mb-6">
+                        <p className="text-lg text-gray-200 mb-2 font-semibold">
+                          Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
+                        </p>
+                        <p className="text-gray-300">
+                          If you continue, the game will start with bot players in all empty seats and the game will not be rated.
+                        </p>
+                      </div>
+                      {/* Buttons */}
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          onClick={() => setShowStartWarning(false)}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handlePlayWithBots}
+                          className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                        >
+                          Play with Bots
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Winner/Loser Modals - positioned inside the actual game table (blue oval) */}
+              {(showWinner || showLoser) && (() => {
+                if (gameState.gameMode === 'SOLO') {
+                  // Solo mode - use SoloWinnerModal for both winner and loser
+                  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+                  const winningPlayer = gameState.winningPlayer || 0;
+                  const playerScores = gameState.playerScores || [0, 0, 0, 0];
+                  
+                  return (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                      <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <svg className="h-6 w-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <h2 className="text-lg font-bold text-white text-center">
+                            {(() => {
+                              const sortedPlayers = playerScores
+                                .map((score, index) => ({ score, index }))
+                                .sort((a, b) => b.score - a.score);
+                              const userPlacement = sortedPlayers.findIndex(player => player.index === myPlayerIndex) + 1;
+                              switch (userPlacement) {
+                                case 1: return '1st PLACE';
+                                case 2: return '2nd PLACE';
+                                case 3: return '3rd PLACE';
+                                case 4: return '4th PLACE';
+                                default: return `${userPlacement}th PLACE`;
+                              }
+                            })()}
+                          </h2>
+                        </div>
+                        <div className="space-y-3 mb-4">
+                          {(() => {
+                            const sortedPlayers = playerScores
+                              .map((score, index) => ({ score, index }))
+                              .sort((a, b) => b.score - a.score);
+                            return sortedPlayers.map((player, sortedIndex) => {
+                              const { score, index } = player;
+                              const playerColor = getPlayerColor(index);
+                              const isWinner = index === winningPlayer;
+                              const isUser = index === myPlayerIndex;
+                              const placement = sortedIndex + 1;
+                              
+                              return (
+                                <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                      <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2`}></div>
+                                      <span className={`text-sm font-medium ${isUser ? 'text-white' : 'text-gray-300'}`}>
+                                        {(() => {
+                                          switch (placement) {
+                                            case 1: return '1st PLACE';
+                                            case 2: return '2nd PLACE';
+                                            case 3: return '3rd PLACE';
+                                            case 4: return '4th PLACE';
+                                            default: return `${placement}th PLACE`;
+                                          }
+                                        })()} - {playerColor.name} Player {isUser ? '(You)' : ''}
+                                      </span>
+                                      {isWinner && <svg className="h-4 w-4 text-yellow-500 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                                      </svg>}
+                                    </div>
+                                    <span className={`font-bold text-sm ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                                      {score}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={handlePlayAgain}
+                            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
+                          >
+                            Play Again
+                          </button>
+                          <button
+                            onClick={handleLeaveTable}
+                            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
+                          >
+                            Leave Table
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // Partners mode - use existing Winner/Loser modals
+                  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+                  const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
+                  
+                  if (showWinner) {
+                    return (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                        <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+                          <div className="flex items-center justify-center gap-2 mb-3">
+                            <svg className="h-6 w-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <h2 className="text-lg font-bold text-white text-center">YOU WIN!</h2>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Team 1 (Red) */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                              <div className="flex items-center mb-1">
+                                <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+                                <h3 className="text-base font-semibold text-white">Blue Team</h3>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-400">Final Score</span>
+                                  <span className="font-medium text-white">{gameState.team1TotalScore || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Team 2 (Blue) */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                              <div className="flex items-center mb-1">
+                                <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+                                <h3 className="text-base font-semibold text-white">Red Team</h3>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-400">Final Score</span>
+                                  <span className="font-medium text-white">{gameState.team2TotalScore || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex flex-col gap-2">
+                            <button
+                              onClick={handlePlayAgain}
+                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
+                            >
+                              Play Again
+                            </button>
+                            <button
+                              onClick={handleLeaveTable}
+                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
+                            >
+                              Leave Table
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  } else if (showLoser) {
+                    return (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                        <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+                          <div className="flex items-center justify-center gap-2 mb-3">
+                            <svg className="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <h2 className="text-lg font-bold text-white text-center">YOU LOSE!</h2>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Team 1 (Red) */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                              <div className="flex items-center mb-1">
+                                <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+                                <h3 className="text-base font-semibold text-white">Blue Team</h3>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-400">Final Score</span>
+                                  <span className="font-medium text-white">{gameState.team1TotalScore || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Team 2 (Blue) */}
+                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                              <div className="flex items-center mb-1">
+                                <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+                                <h3 className="text-base font-semibold text-white">Red Team</h3>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-gray-400">Final Score</span>
+                                  <span className="font-medium text-white">{gameState.team2TotalScore || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex flex-col gap-2">
+                            <button
+                              onClick={handlePlayAgain}
+                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
+                            >
+                              Play Again
+                            </button>
+                            <button
+                              onClick={handleLeaveTable}
+                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
+                            >
+                              Leave Table
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                }
+              })()}
               {/* Leave Table button - inside table in top left corner */}
               <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                 <button
@@ -2132,48 +2381,6 @@ export default function GameTable({
               </div>
             )}
 
-            {/* Start Game Warning Modal - positioned inside game table container */}
-            {showStartWarning && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-                <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
-                  <div>
-                    {/* Header with inline icon and title */}
-                    <div className="flex items-center justify-center mb-4">
-                      <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <h3 className="text-2xl font-bold text-white">
-                        Empty Seats Detected
-                      </h3>
-                    </div>
-                    {/* Message - center aligned */}
-                    <div className="text-center mb-6">
-                      <p className="text-lg text-gray-200 mb-2 font-semibold">
-                        Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
-                      </p>
-                      <p className="text-gray-300">
-                        If you continue, the game will start with bot players in all empty seats and the game will not be rated.
-                      </p>
-                    </div>
-                    {/* Buttons */}
-                    <div className="flex gap-3 justify-center">
-                      <button
-                        onClick={() => setShowStartWarning(false)}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handlePlayWithBots}
-                        className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                      >
-                        Play with Bots
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Chat area - 30%, full height */}
@@ -2215,56 +2422,7 @@ export default function GameTable({
           ) : null;
         })()}
 
-        {/* Winner/Loser Modals */}
-        {(showWinner || showLoser) && (() => {
-          if (gameState.gameMode === 'SOLO') {
-            // Solo mode - use SoloWinnerModal for both winner and loser
-            const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-            const winningPlayer = gameState.winningPlayer || 0;
-            const playerScores = gameState.playerScores || [0, 0, 0, 0];
-            
-            return (
-              <SoloWinnerModal
-                isOpen={true}
-                onClose={handleLeaveTable}
-                playerScores={playerScores}
-                winningPlayer={winningPlayer}
-                onPlayAgain={handlePlayAgain}
-                userPlayerIndex={myPlayerIndex}
-          />
-            );
-          } else {
-            // Partners mode - use existing Winner/Loser modals
-            const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-            const userTeam = myPlayerIndex >= 0 ? (myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2) : 1;
-            
-            if (showWinner) {
-              return (
-          <WinnerModal
-            isOpen={true}
-            onClose={handleLeaveTable}
-                  team1Score={gameState.team1TotalScore || 0}
-                  team2Score={gameState.team2TotalScore || 0}
-            winningTeam={1}
-            onPlayAgain={handlePlayAgain}
-                  userTeam={userTeam}
-          />
-              );
-            } else if (showLoser) {
-              return (
-          <LoserModal
-            isOpen={true}
-            onClose={handleLeaveTable}
-                  team1Score={gameState.team1TotalScore || 0}
-                  team2Score={gameState.team2TotalScore || 0}
-            winningTeam={2}
-            onPlayAgain={handlePlayAgain}
-                  userTeam={userTeam}
-          />
-              );
-            }
-          }
-        })()}
+
       </div>
     </>
   );
