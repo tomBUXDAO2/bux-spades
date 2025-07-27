@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { GameSettings, GameMode, BiddingOption } from '../../types/game';
 
 interface CreateGameModalProps {
@@ -116,6 +116,14 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     return options;
   };
 
+  // Reset gimmickType when options change to prevent index-based selection issues
+  useEffect(() => {
+    const availableOptions = getGimmickOptions();
+    if (!availableOptions.includes(gimmickType)) {
+      setGimmickType(availableOptions[0] as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS');
+    }
+  }, [mode, gimmickType]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20">
@@ -225,7 +233,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             {/* Gimmick Dropdown */}
             <div className="w-full flex justify-center mb-2">
               <select
-                value={gimmickType}
+                value={gameType === 'GIMMICK' ? gimmickType : 'NO GIMMICK'}
                 onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS')}
                 disabled={gameType !== 'GIMMICK'}
                 className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
@@ -234,7 +242,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                {getGimmickOptions().map((option) => (
+                <option value="NO GIMMICK" disabled>NO GIMMICK</option>
+                {gameType === 'GIMMICK' && getGimmickOptions().map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
