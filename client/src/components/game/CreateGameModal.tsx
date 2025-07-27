@@ -119,7 +119,15 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
             <div
               className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
-              onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
+              onClick={() => {
+                const newMode = mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS';
+                setMode(newMode);
+                
+                // Reset gimmickType when switching modes to prevent invalid selections
+                if (newMode === 'SOLO' && gimmickType === 'SUICIDE') {
+                  setGimmickType('4 OR NIL');
+                }
+              }}
               style={{ userSelect: 'none' }}
             >
               <input
