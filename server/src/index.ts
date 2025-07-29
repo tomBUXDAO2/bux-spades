@@ -729,16 +729,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
     
     // Remove card from hand and add to current trick
-    
-    // --- ENFORCE SPADES BROKEN RULE ---
-    if (game.play.currentTrick.length === 0 && card.suit === 'S' && !game.play.spadesBroken) {
-      // If player has any non-spades, cannot lead spades
-      if (hand.some(c => c.suit !== 'S')) {
-        socket.emit('error', { message: 'You cannot lead spades until they are broken, unless you only have spades left.' });
-        return;
-      }
-    }
-    // Remove card from hand and add to current trick
     hand.splice(cardIndex, 1);
     game.play.currentTrick.push({ ...card, playerIndex });
     // Set spadesBroken if a spade is played
