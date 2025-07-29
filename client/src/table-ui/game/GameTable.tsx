@@ -358,6 +358,8 @@ export default function GameTable({
   const [showLoser, setShowLoser] = useState(false);
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [showStartWarning, setShowStartWarning] = useState(false);
+  const [showBotWarning, setShowBotWarning] = useState(false);
+  const [botCount, setBotCount] = useState(0);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
   const [showBlindNilModal, setShowBlindNilModal] = useState(false);
@@ -740,7 +742,8 @@ export default function GameTable({
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
-    const bidCount = (gameState as any).bidding?.bids?.[position] ?? 0;
+    const actualSeatIndex = player.position; // Use actual seat position
+    const bidCount = (gameState as any).bidding?.bids?.[actualSeatIndex] ?? 0;
     let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
     
@@ -748,7 +751,8 @@ export default function GameTable({
       // Partner game logic
       const partnerIndex = (position + 2) % 4;
       const partner = orderedPlayers[partnerIndex];
-      const partnerBid = (gameState as any).bidding?.bids?.[partnerIndex] ?? 0;
+      const partnerActualSeatIndex = partner?.position; // Use actual seat position
+      const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
       
       // Calculate team totals
@@ -811,7 +815,8 @@ export default function GameTable({
       if (isPartnerGame) {
         const partnerIndex = (position + 2) % 4;
         const partner = orderedPlayers[partnerIndex];
-        const partnerBid = (gameState as any).bidding?.bids?.[partnerIndex] ?? 0;
+        const partnerActualSeatIndex = partner?.position; // Use actual seat position
+        const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
         const partnerMade = partner && partner.tricks ? partner.tricks : 0;
         const teamBid = bidCount + partnerBid;
         const teamMade = madeCount + partnerMade;
@@ -1605,6 +1610,23 @@ export default function GameTable({
       setShowStartWarning(true);
       return;
     }
+    
+    // Check for bot players
+    const botPlayers = (gameState.players || []).filter(p => p && isBot(p)).length;
+    if (botPlayers > 0) {
+      setBotCount(botPlayers);
+      setShowBotWarning(true);
+      return;
+    }
+    
+    if (typeof startGame === 'function' && gameState?.id && user?.id) {
+      await startGame(gameState.id, user.id);
+    }
+  };
+
+  // Handle starting game with bots (from bot warning modal)
+  const handleStartWithBots = async () => {
+    setShowBotWarning(false);
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
@@ -1880,10 +1902,53 @@ export default function GameTable({
                           Cancel
                         </button>
                         <button
-                          onClick={handlePlayWithBots}
+                          onClick={handleStartWithBots}
                           className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
                         >
                           Play with Bots
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bot Players Warning Modal */}
+              {showBotWarning && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+                    <div>
+                      {/* Header with inline icon and title */}
+                      <div className="flex items-center justify-center mb-4">
+                        <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="text-2xl font-bold text-white">
+                          Bot Players Detected
+                        </h3>
+                      </div>
+                      {/* Message - center aligned */}
+                      <div className="text-center mb-6">
+                        <p className="text-lg text-gray-200 mb-2 font-semibold">
+                          Coin games require 4 human players.<br />You have {botCount} bot player{botCount !== 1 ? 's' : ''}.
+                        </p>
+                        <p className="text-gray-300">
+                          If you continue, the game will start but will not be rated.
+                        </p>
+                      </div>
+                      {/* Buttons */}
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          onClick={() => setShowBotWarning(false)}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleStartWithBots}
+                          className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                        >
+                          Start Game
                         </button>
                       </div>
                     </div>
