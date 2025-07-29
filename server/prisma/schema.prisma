@@ -105,8 +105,6 @@ model UserStats {
   user          User      @relation(fields: [userId], references: [id])
   gamesPlayed   Int       @default(0)
   gamesWon      Int       @default(0)
-  totalBags     Int       @default(0)
-  bagsPerGame   Float     @default(0)
   nilsBid       Int       @default(0)
   nilsMade      Int       @default(0)
   blindNilsBid  Int       @default(0)

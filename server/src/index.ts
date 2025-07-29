@@ -1625,22 +1625,10 @@ async function updateHandStats(game: Game) {
         }
       }
       
-      // Get current stats to calculate bags per game
-      const currentStats = await prisma.userStats.findUnique({
-        where: { userId }
-      });
-      
-      const currentGamesPlayed = currentStats?.gamesPlayed || 0;
-      const currentTotalBags = currentStats?.totalBags || 0;
-      const newTotalBags = currentTotalBags + bags;
-      const newBagsPerGame = currentGamesPlayed > 0 ? newTotalBags / currentGamesPlayed : bags;
-      
       // Update stats for this hand
       await prisma.userStats.update({
         where: { userId },
         data: {
-          totalBags: newTotalBags,
-          bagsPerGame: newBagsPerGame,
           nilsBid: { increment: nilBidIncrement },
           nilsMade: { increment: nilMadeIncrement },
           blindNilsBid: { increment: blindNilBidIncrement },
