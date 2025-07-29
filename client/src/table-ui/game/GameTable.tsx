@@ -2629,7 +2629,7 @@ export default function GameTable({
               <Chat 
                 gameId={gameState.id}
                 userId={currentPlayerId || ''}
-                userName={isPlayer(currentPlayer) ? currentPlayer.username : isBot(currentPlayer) ? currentPlayer.username : 'Unknown'}
+                userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
                 userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : undefined}
                 chatType={chatType}
