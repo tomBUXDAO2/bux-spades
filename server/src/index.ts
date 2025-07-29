@@ -409,6 +409,56 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
   });
 
+  // Join game as spectator (for chat access)
+  socket.on('join_game_as_spectator', ({ gameId }) => {
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized join_game_as_spectator attempt');
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    try {
+      const game = games.find((g: Game) => g.id === gameId);
+      if (!game) {
+        console.log(`Game ${gameId} not found for spectator join`);
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      // Check if user is already a spectator
+      const isAlreadySpectator = game.spectators.some(
+        (spectator: any) => spectator.id === socket.userId
+      );
+
+      if (!isAlreadySpectator) {
+        // Add user as spectator if not already present
+        game.spectators.push({
+          id: socket.userId,
+          username: socket.auth?.username || 'Unknown',
+          avatar: socket.auth?.avatar || '/default-avatar.png',
+          type: 'human',
+        });
+      }
+
+      // Join the game room for chat
+      socket.join(gameId);
+      console.log(`Spectator ${socket.userId} joined game ${gameId} for chat`);
+      
+      // Emit confirmation to the client
+      socket.emit('joined_game_room', { gameId });
+      
+      // Send game update to this spectator
+      socket.emit('game_update', enrichGameForClient(game, socket.userId));
+      
+      // Notify all clients about games update
+      emitGameUpdateToPlayers(game);
+      io.emit('games_updated', games);
+    } catch (error) {
+      console.error('Error in join_game_as_spectator:', error);
+      socket.emit('error', { message: 'Internal server error' });
+    }
+  });
+
   // Leave game event
   socket.on('leave_game', ({ gameId, userId }) => {
     if (!socket.isAuthenticated || !socket.userId || socket.userId !== userId) {

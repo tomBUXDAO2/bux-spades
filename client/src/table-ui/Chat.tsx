@@ -17,6 +17,7 @@ interface ChatProps {
   chatType?: 'game' | 'lobby';
   onToggleChatType?: () => void;
   lobbyMessages?: ChatMessage[];
+  isSpectator?: boolean;
 }
 
 // Export the ChatMessage interface
@@ -45,7 +46,7 @@ const EyeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block w-5 h-5 ml-1 align-middle"><path d="M12 5C5.63636 5 2 12 2 12C2 12 5.63636 19 12 19C18.3636 19 22 12 22 12C22 12 18.3636 5 12 5Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 );
 
-export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages }: ChatProps) {
+export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages, isSpectator = false }: ChatProps) {
   const { socket, isAuthenticated, isConnected, isReady } = useSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -167,7 +168,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       console.log('Chat: Socket reconnected');
       if (socket && isAuthenticated) {
         if (chatType === 'game') {
-          socket.emit('join_game', { gameId });
+          if (isSpectator) {
+            socket.emit('join_game_as_spectator', { gameId });
+          } else {
+            socket.emit('join_game', { gameId });
+          }
         }
       }
     };
@@ -177,7 +182,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       console.log('Chat: Socket connected');
       if (socket && isAuthenticated) {
         if (chatType === 'game') {
-          socket.emit('join_game', { gameId });
+          if (isSpectator) {
+            socket.emit('join_game_as_spectator', { gameId });
+          } else {
+            socket.emit('join_game', { gameId });
+          }
         }
       }
     };
@@ -205,8 +214,12 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
       // Join the game room if needed
       if (isAuthenticated && chatType === 'game') {
-        console.log('Chat: Joining game:', gameId);
-        socket.emit('join_game', { gameId });
+        console.log('Chat: Joining game:', gameId, 'as', isSpectator ? 'spectator' : 'player');
+        if (isSpectator) {
+          socket.emit('join_game_as_spectator', { gameId });
+        } else {
+          socket.emit('join_game', { gameId });
+        }
       }
     }
 

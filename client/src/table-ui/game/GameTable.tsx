@@ -2687,6 +2687,7 @@ export default function GameTable({
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
                 spectators={(gameState as any).spectators || []}
+                isSpectator={myPlayerIndex === -1}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 text-lg">Connecting chat...</div>
