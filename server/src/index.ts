@@ -298,6 +298,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       room: socket.rooms.has(gameId)
     });
 
+    // Get all sockets in the game room for debugging
+    const roomSockets = await io.in(gameId).fetchSockets();
+    console.log(`Game ${gameId} room has ${roomSockets.length} sockets:`, roomSockets.map(s => ({ id: s.id, userId: (s as any).userId })));
+
     // Broadcast to game room
     io.to(gameId).emit('chat_message', { gameId, message: enrichedMessage });
   });
@@ -453,6 +457,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Join the game room for chat
       socket.join(gameId);
       console.log(`Spectator ${socket.userId} joined game ${gameId} for chat`);
+      console.log(`Spectator ${socket.userId} socket rooms:`, Array.from(socket.rooms));
       
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });

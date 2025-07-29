@@ -201,9 +201,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     // Set up event listeners based on chat type
     if (socket) {
+      console.log('Chat: Setting up event listeners for', chatType, 'chat, isSpectator:', isSpectator);
+      
       if (chatType === 'game') {
+        console.log('Chat: Registering chat_message event listener');
         socket.on('chat_message', handleMessage);
       } else {
+        console.log('Chat: Registering lobby_chat_message event listener');
         socket.on('lobby_chat_message', handleMessage);
       }
       
@@ -225,9 +229,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     return () => {
       if (socket) {
+        console.log('Chat: Cleaning up event listeners for', chatType, 'chat, isSpectator:', isSpectator);
+        
         if (chatType === 'game') {
+          console.log('Chat: Removing chat_message event listener');
           socket.off('chat_message', handleMessage);
         } else {
+          console.log('Chat: Removing lobby_chat_message event listener');
           socket.off('lobby_chat_message', handleMessage);
         }
         socket.off('reconnect', handleReconnect);
