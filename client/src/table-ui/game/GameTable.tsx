@@ -1184,6 +1184,53 @@ export default function GameTable({
     );
   };
 
+  // Render spectator hand (face-down cards for bottom player)
+  const renderSpectatorHand = () => {
+    // Get the bottom player's hand (position 0 in the rotated view)
+    const bottomPlayerIndex = 0;
+    const bottomPlayerHand = (gameState as any)?.hands?.[bottomPlayerIndex] || [];
+    
+    if (!bottomPlayerHand || bottomPlayerHand.length === 0) return null;
+    
+    const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
+    const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
+    const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
+
+    return (
+      <div
+        className="absolute inset-x-0 flex justify-center"
+        style={{
+          bottom: '-40px',
+          pointerEvents: 'none',
+        }}
+      >
+        <div className="flex">
+          {bottomPlayerHand.map((card: Card, index: number) => (
+            <div
+              key={`${card.suit}${card.rank}`}
+              className="relative"
+              style={{
+                width: `${cardUIWidth}px`,
+                height: `${cardUIHeight}px`,
+                marginLeft: index > 0 ? `${overlapOffset}px` : '0',
+                zIndex: index,
+              }}
+            >
+              <CardImage
+                card={card}
+                width={cardUIWidth}
+                height={cardUIHeight}
+                className="rounded-lg shadow-md"
+                alt="Face down card"
+                faceDown={true}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Effect to handle hand completion
   useEffect(() => {
     if (!socket) return;
@@ -1507,8 +1554,8 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // Loosen the chatReady guard so Chat UI renders as soon as gameState.id and currentPlayerId are available
-  const chatReady = gameState?.id && currentPlayerId;
+  // Loosen the chatReady guard so Chat UI renders for both players and spectators
+  const chatReady = gameState?.id && (currentPlayerId || myPlayerIndex === -1);
 
   // Add a new effect to handle socket reconnection and message sending
   useEffect(() => {
@@ -2611,13 +2658,17 @@ export default function GameTable({
               </div>
             </div>
 
-            {/* Cards area with more space - only show for actual players, not spectators */}
-            {myPlayerIndex !== -1 && (
+            {/* Cards area - show for actual players or face-down cards for spectators */}
+            {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
               <div className="bg-gray-800/50 rounded-lg relative mb-0" 
                    style={{ 
                      height: `${Math.floor(110 * scaleFactor)}px`
                    }}>
-                {renderPlayerHand()}
+                {myPlayerIndex !== -1 ? (
+                  renderPlayerHand()
+                ) : (
+                  renderSpectatorHand()
+                )}
               </div>
             )}
 

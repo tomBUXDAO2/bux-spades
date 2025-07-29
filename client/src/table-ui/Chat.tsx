@@ -227,8 +227,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket || !isReady) {
-      console.log('Cannot send message - socket not ready:', { isConnected, isAuthenticated, isReady });
+    if (!newMessage.trim() || !socket || (!isReady && chatType === 'game')) {
+      console.log('Cannot send message - socket not ready:', { isConnected, isAuthenticated, isReady, chatType });
       return;
     }
 
