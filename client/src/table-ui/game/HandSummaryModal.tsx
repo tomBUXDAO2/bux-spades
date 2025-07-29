@@ -116,8 +116,10 @@ export default function HandSummaryModal({
   }, [isOpen, gameIsOver]);
 
   // Calculate team bids and tricks
-  const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
-  const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+  // Red Team: Bot 2 (position 1) and Bot 4 (position 3)
+  // Blue Team: tom_buxdao (position 0) and Bot 3 (position 2)
+  const redTeamBid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
+  const blueTeamBid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
   
   // Use server-calculated trick counts from handSummaryData if available, otherwise fallback to gameState
   const tricksPerPlayer = handSummaryData?.tricksPerPlayer || [
@@ -132,39 +134,41 @@ export default function HandSummaryModal({
   console.log('[HAND SUMMARY DEBUG] Final tricksPerPlayer:', tricksPerPlayer);
   console.log('[HAND SUMMARY DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
   
-  const team1Tricks = tricksPerPlayer[0] + tricksPerPlayer[2];
-  const team2Tricks = tricksPerPlayer[1] + tricksPerPlayer[3];
+  // Red Team: Bot 2 (position 1) and Bot 4 (position 3)
+  // Blue Team: tom_buxdao (position 0) and Bot 3 (position 2)
+  const redTeamTricks = tricksPerPlayer[1] + tricksPerPlayer[3];
+  const blueTeamTricks = tricksPerPlayer[0] + tricksPerPlayer[2];
   
-  console.log('[HAND SUMMARY DEBUG] Team 1 tricks:', team1Tricks, '(', tricksPerPlayer[0], '+', tricksPerPlayer[2], ')');
-  console.log('[HAND SUMMARY DEBUG] Team 2 tricks:', team2Tricks, '(', tricksPerPlayer[1], '+', tricksPerPlayer[3], ')');
+  console.log('[HAND SUMMARY DEBUG] Red Team tricks:', redTeamTricks, '(', tricksPerPlayer[1], '+', tricksPerPlayer[3], ')');
+  console.log('[HAND SUMMARY DEBUG] Blue Team tricks:', blueTeamTricks, '(', tricksPerPlayer[0], '+', tricksPerPlayer[2], ')');
 
   // Calculate trick scores
-  const team1TrickScore = team1Tricks >= team1Bid ? team1Bid * 10 : -team1Bid * 10;
-  const team2TrickScore = team2Tricks >= team2Bid ? team2Bid * 10 : -team2Bid * 10;
+  const redTeamTrickScore = redTeamTricks >= redTeamBid ? redTeamBid * 10 : -redTeamBid * 10;
+  const blueTeamTrickScore = blueTeamTricks >= blueTeamBid ? blueTeamBid * 10 : -blueTeamBid * 10;
 
   // Calculate bag scores (excess tricks beyond bid)
-  const team1BagScore = Math.max(0, team1Tricks - team1Bid);
-  const team2BagScore = Math.max(0, team2Tricks - team2Bid);
+  const redTeamBagScore = Math.max(0, redTeamTricks - redTeamBid);
+  const blueTeamBagScore = Math.max(0, blueTeamTricks - blueTeamBid);
 
   // Get running total bags from game state
-  const team1RunningBags = gameState.team1Bags || 0;
-  const team2RunningBags = gameState.team2Bags || 0;
+  const redTeamRunningBags = gameState.team1Bags || 0;
+  const blueTeamRunningBags = gameState.team2Bags || 0;
 
   // Calculate bag penalties based on running total bags
   // Bag penalty applies when running total reaches 10 or more
-  const team1BagPenalty = (team1RunningBags + team1BagScore) >= 10 ? -100 : 0;
-  const team2BagPenalty = (team2RunningBags + team2BagScore) >= 10 ? -100 : 0;
+  const redTeamBagPenalty = (redTeamRunningBags + redTeamBagScore) >= 10 ? -100 : 0;
+  const blueTeamBagPenalty = (blueTeamRunningBags + blueTeamBagScore) >= 10 ? -100 : 0;
 
   // Debug logging for bag penalty calculation
   console.log('[HAND SUMMARY] Bag penalty calculation:', {
-    team1RunningBags,
-    team1BagScore,
-    team1TotalBags: team1RunningBags + team1BagScore,
-    team1BagPenalty,
-    team2RunningBags,
-    team2BagScore,
-    team2TotalBags: team2RunningBags + team2BagScore,
-    team2BagPenalty
+    redTeamRunningBags,
+    redTeamBagScore,
+    redTeamTotalBags: redTeamRunningBags + redTeamBagScore,
+    redTeamBagPenalty,
+    blueTeamRunningBags,
+    blueTeamBagScore,
+    blueTeamTotalBags: blueTeamRunningBags + blueTeamBagScore,
+    blueTeamBagPenalty
   });
 
   // Calculate nil bonuses
@@ -191,12 +195,14 @@ export default function HandSummaryModal({
     return bonus;
   };
 
-  const team1NilBonus = calculateNilBonus([0, 2]);
-  const team2NilBonus = calculateNilBonus([1, 3]);
+  // Red Team: Bot 2 (position 1) and Bot 4 (position 3)
+  // Blue Team: tom_buxdao (position 0) and Bot 3 (position 2)
+  const redTeamNilBonus = calculateNilBonus([1, 3]);
+  const blueTeamNilBonus = calculateNilBonus([0, 2]);
 
   // Calculate total hand scores
-  const team1HandTotal = team1TrickScore + team1BagScore + team1BagPenalty + team1NilBonus;
-  const team2HandTotal = team2TrickScore + team2BagScore + team2BagPenalty + team2NilBonus;
+  const redTeamHandTotal = redTeamTrickScore + redTeamBagScore + redTeamBagPenalty + redTeamNilBonus;
+  const blueTeamHandTotal = blueTeamTrickScore + blueTeamBagScore + blueTeamBagPenalty + blueTeamNilBonus;
 
   // Get player names
   const getPlayerName = (index: number) => {
@@ -352,9 +358,8 @@ export default function HandSummaryModal({
                       </div>
                     </div>
                   ) : (
-                    // Partners mode - Team-based layout with individual bid/made columns
+                    // Partners mode - Single grid layout with merged team columns
                     <div className="bg-gray-700 rounded-lg p-6 border-4 border-gray-600">
-                      {/* Partners mode layout with merged team columns */}
                       <div className="grid grid-cols-5 gap-4">
                         {/* Row Headers */}
                         <div className="space-y-3">
@@ -369,177 +374,215 @@ export default function HandSummaryModal({
                           <div className="text-white text-lg font-bold h-12 flex items-center border-t border-gray-600 pt-3">Final Score</div>
                         </div>
 
-                        {/* Red Team - Individual Player Columns */}
-                        <div className="border-4 border-red-500 rounded-lg p-3">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                              {/* Team Header */}
-                              <div className="flex flex-col items-center h-16 justify-center">
-                                <img 
-                                  src={getPlayerAvatar(1)} 
-                                  alt={getPlayerName(1)} 
-                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
-                                />
-                                <span className="text-white font-semibold text-xs">{getPlayerName(1)}</span>
-                              </div>
+                        {/* Red Team Column 1 */}
+                        <div className="space-y-3 border-4 border-red-500 rounded-lg p-3">
+                          {/* Team Header */}
+                          <div className="flex flex-col items-center h-16 justify-center">
+                            <img 
+                              src={getPlayerAvatar(1)} 
+                              alt={getPlayerName(1)} 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                            />
+                            <span className="text-white font-semibold text-xs">{getPlayerName(1)}</span>
+                          </div>
 
-                              {/* Individual Bid */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerBid(1)}
-                              </div>
+                          {/* Individual Bid */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerBid(1)}
+                          </div>
 
-                              {/* Individual Made */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerTricks(1)}
-                              </div>
-                            </div>
+                          {/* Individual Made */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerTricks(1)}
+                          </div>
 
-                            <div className="space-y-3">
-                              {/* Team Header */}
-                              <div className="flex flex-col items-center h-16 justify-center">
-                                <img 
-                                  src={getPlayerAvatar(3)} 
-                                  alt={getPlayerName(3)} 
-                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
-                                />
-                                <span className="text-white font-semibold text-xs">{getPlayerName(3)}</span>
-                              </div>
+                          {/* Team Trick Score - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamTrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamTrickScore}
+                          </div>
 
-                              {/* Individual Bid */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerBid(3)}
-                              </div>
+                          {/* Team Bag Score - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamBagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamBagScore}
+                          </div>
 
-                              {/* Individual Made */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerTricks(3)}
-                              </div>
-                            </div>
+                          {/* Team Bag Penalty - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamBagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                            {redTeamBagPenalty}
+                          </div>
+
+                          {/* Team Nil Bonus - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamNilBonus === 0 ? 'text-gray-400' : redTeamNilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamNilBonus}
+                          </div>
+
+                          {/* Team Round Total - spans both red columns */}
+                          <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamHandTotal}
+                          </div>
+
+                          {/* Team Final Score - spans both red columns */}
+                          <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamHandTotal}
                           </div>
                         </div>
 
-                        {/* Blue Team - Individual Player Columns */}
-                        <div className="border-4 border-blue-500 rounded-lg p-3">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                              {/* Team Header */}
-                              <div className="flex flex-col items-center h-16 justify-center">
-                                <img 
-                                  src={getPlayerAvatar(0)} 
-                                  alt={getPlayerName(0)} 
-                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
-                                />
-                                <span className="text-white font-semibold text-xs">{getPlayerName(0)}</span>
-                              </div>
-
-                              {/* Individual Bid */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerBid(0)}
-                              </div>
-
-                              {/* Individual Made */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerTricks(0)}
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              {/* Team Header */}
-                              <div className="flex flex-col items-center h-16 justify-center">
-                                <img 
-                                  src={getPlayerAvatar(2)} 
-                                  alt={getPlayerName(2)} 
-                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
-                                />
-                                <span className="text-white font-semibold text-xs">{getPlayerName(2)}</span>
-                              </div>
-
-                              {/* Individual Bid */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerBid(2)}
-                              </div>
-
-                              {/* Individual Made */}
-                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
-                                {getPlayerTricks(2)}
-                              </div>
-                            </div>
+                        {/* Red Team Column 2 */}
+                        <div className="space-y-3 border-4 border-red-500 rounded-lg p-3">
+                          {/* Team Header */}
+                          <div className="flex flex-col items-center h-16 justify-center">
+                            <img 
+                              src={getPlayerAvatar(3)} 
+                              alt={getPlayerName(3)} 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                            />
+                            <span className="text-white font-semibold text-xs">{getPlayerName(3)}</span>
                           </div>
-                        </div>
-                      </div>
 
-                      {/* Team Data Rows - Merged Columns */}
-                      <div className="grid grid-cols-5 gap-4 mt-4">
-                        {/* Empty space for header column */}
-                        <div></div>
+                          {/* Individual Bid */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerBid(3)}
+                          </div>
 
-                        {/* Red Team Merged Data - spans 2 columns */}
-                        <div className="col-span-2 border-4 border-red-500 rounded-lg p-3">
-                          <div className="space-y-3">
-                            {/* Team Trick Score */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team2TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team2TrickScore}
-                            </div>
+                          {/* Individual Made */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerTricks(3)}
+                          </div>
 
-                            {/* Team Bag Score */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team2BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team2BagScore}
-                            </div>
+                          {/* Team Trick Score - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamTrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamTrickScore}
+                          </div>
 
-                            {/* Team Bag Penalty */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team2BagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
-                              {team2BagPenalty}
-                            </div>
+                          {/* Team Bag Score - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamBagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamBagScore}
+                          </div>
 
-                            {/* Team Nil Bonus */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team2NilBonus === 0 ? 'text-gray-400' : team2NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team2NilBonus}
-                            </div>
+                          {/* Team Bag Penalty - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamBagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                            {redTeamBagPenalty}
+                          </div>
 
-                            {/* Team Round Total */}
-                            <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${team2HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team2HandTotal}
-                            </div>
+                          {/* Team Nil Bonus - spans both red columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${redTeamNilBonus === 0 ? 'text-gray-400' : redTeamNilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamNilBonus}
+                          </div>
 
-                            {/* Team Final Score */}
-                            <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${team2TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team2TotalScore}
-                            </div>
+                          {/* Team Round Total - spans both red columns */}
+                          <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamHandTotal}
+                          </div>
+
+                          {/* Team Final Score - spans both red columns */}
+                          <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamHandTotal}
                           </div>
                         </div>
 
-                        {/* Blue Team Merged Data - spans 2 columns */}
-                        <div className="col-span-2 border-4 border-blue-500 rounded-lg p-3">
-                          <div className="space-y-3">
-                            {/* Team Trick Score */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team1TrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team1TrickScore}
-                            </div>
+                        {/* Blue Team Column 1 */}
+                        <div className="space-y-3 border-4 border-blue-500 rounded-lg p-3">
+                          {/* Team Header */}
+                          <div className="flex flex-col items-center h-16 justify-center">
+                            <img 
+                              src={getPlayerAvatar(0)} 
+                              alt={getPlayerName(0)} 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                            />
+                            <span className="text-white font-semibold text-xs">{getPlayerName(0)}</span>
+                          </div>
 
-                            {/* Team Bag Score */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team1BagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team1BagScore}
-                            </div>
+                          {/* Individual Bid */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerBid(0)}
+                          </div>
 
-                            {/* Team Bag Penalty */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team1BagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
-                              {team1BagPenalty}
-                            </div>
+                          {/* Individual Made */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerTricks(0)}
+                          </div>
 
-                            {/* Team Nil Bonus */}
-                            <div className={`text-center font-semibold h-12 flex items-center justify-center ${team1NilBonus === 0 ? 'text-gray-400' : team1NilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team1NilBonus}
-                            </div>
+                          {/* Team Trick Score - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamTrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamTrickScore}
+                          </div>
 
-                            {/* Team Round Total */}
-                            <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${team1HandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team1HandTotal}
-                            </div>
+                          {/* Team Bag Score - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamBagScore}
+                          </div>
 
-                            {/* Team Final Score */}
-                            <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${team1TotalScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {team1TotalScore}
-                            </div>
+                          {/* Team Bag Penalty - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                            {blueTeamBagPenalty}
+                          </div>
+
+                          {/* Team Nil Bonus - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamNilBonus === 0 ? 'text-gray-400' : blueTeamNilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamNilBonus}
+                          </div>
+
+                          {/* Team Round Total - spans both blue columns */}
+                          <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamHandTotal}
+                          </div>
+
+                          {/* Team Final Score - spans both blue columns */}
+                          <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamHandTotal}
+                          </div>
+                        </div>
+
+                        {/* Blue Team Column 2 */}
+                        <div className="space-y-3 border-4 border-blue-500 rounded-lg p-3">
+                          {/* Team Header */}
+                          <div className="flex flex-col items-center h-16 justify-center">
+                            <img 
+                              src={getPlayerAvatar(2)} 
+                              alt={getPlayerName(2)} 
+                              className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                            />
+                            <span className="text-white font-semibold text-xs">{getPlayerName(2)}</span>
+                          </div>
+
+                          {/* Individual Bid */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerBid(2)}
+                          </div>
+
+                          {/* Individual Made */}
+                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                            {getPlayerTricks(2)}
+                          </div>
+
+                          {/* Team Trick Score - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamTrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamTrickScore}
+                          </div>
+
+                          {/* Team Bag Score - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamBagScore}
+                          </div>
+
+                          {/* Team Bag Penalty - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                            {blueTeamBagPenalty}
+                          </div>
+
+                          {/* Team Nil Bonus - spans both blue columns */}
+                          <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamNilBonus === 0 ? 'text-gray-400' : blueTeamNilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamNilBonus}
+                          </div>
+
+                          {/* Team Round Total - spans both blue columns */}
+                          <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamHandTotal}
+                          </div>
+
+                          {/* Team Final Score - spans both blue columns */}
+                          <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {blueTeamHandTotal}
                           </div>
                         </div>
                       </div>
