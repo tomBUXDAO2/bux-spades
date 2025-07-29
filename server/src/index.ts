@@ -254,17 +254,27 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     if (message.userId === 'system') {
       userName = 'System';
     } else if (game) {
+      // First check if user is a player
       const player = game.players.find((p: GamePlayer | null) => p && p.id === message.userId);
-      console.log('Player lookup debug:', {
+      // Then check if user is a spectator
+      const spectator = game.spectators?.find((s: any) => s && s.id === message.userId);
+      
+      console.log('Player/Spectator lookup debug:', {
         messageUserId: message.userId,
         playerFound: !!player,
-        player: player ? { id: player.id, username: player.username, name: (player as any).name } : null
+        spectatorFound: !!spectator,
+        player: player ? { id: player.id, username: player.username, name: (player as any).name } : null,
+        spectator: spectator ? { id: spectator.id, username: spectator.username, name: (spectator as any).name } : null
       });
+      
       if (player) {
         userName = player.username || (player as any).name || 'Unknown';
-        console.log('Username resolved:', userName);
+        console.log('Username resolved from player:', userName);
+      } else if (spectator) {
+        userName = spectator.username || (spectator as any).name || 'Unknown';
+        console.log('Username resolved from spectator:', userName);
       } else {
-        // Fallback to socket auth if player not found in game
+        // Fallback to socket auth if user not found in game
         userName = socket.auth?.username || 'Unknown';
         console.log('Fallback to socket auth:', userName);
       }

@@ -236,7 +236,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         socket.off('error', onError);
       }
     };
-  }, [socket, isAuthenticated, isConnected, isReady, gameId, chatType]);
+  }, [socket, isAuthenticated, isConnected, isReady, gameId, chatType, isSpectator]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,6 +329,12 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     // Check for image property as fallback
     if (player && 'image' in player && player.image) {
       return player.image as string;
+    }
+    
+    // Check if it's a spectator
+    const spectator = spectators?.find(s => s.id === playerId);
+    if (spectator && spectator.avatar) {
+      return spectator.avatar;
     }
     
     // Discord user ID (numeric string)
