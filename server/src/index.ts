@@ -247,6 +247,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       gameId,
       messageUserId: message.userId,
       gameFound: !!game,
+      allGames: games.map(g => ({ id: g.id, status: g.status })),
       gamePlayers: game?.players?.map(p => p ? { id: p.id, username: p.username, name: (p as any).name } : null)
     });
     
