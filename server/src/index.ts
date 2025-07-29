@@ -217,7 +217,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   }
 
   // Handle chat messages
-  socket.on('chat_message', ({ gameId, message }) => {
+  socket.on('chat_message', async ({ gameId, message }) => {
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized chat message attempt:', { 
         socketId: socket.id, 
@@ -444,6 +444,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         (spectator: any) => spectator.id === socket.userId
       );
 
+      console.log('Spectator join debug:', {
+        userId: socket.userId,
+        username: socket.auth?.username,
+        isAlreadySpectator,
+        currentSpectators: game.spectators.map(s => ({ id: s.id, username: s.username }))
+      });
+
       if (!isAlreadySpectator) {
         // Add user as spectator if not already present
         game.spectators.push({
@@ -452,6 +459,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           avatar: socket.auth?.avatar || '/default-avatar.png',
           type: 'human',
         });
+        console.log('Added new spectator to game.spectators');
+      } else {
+        console.log('Spectator already exists in game.spectators');
       }
 
       // Join the game room for chat

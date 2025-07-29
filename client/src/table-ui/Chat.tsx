@@ -263,6 +263,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     };
 
     try {
+      console.log('Sending chat message:', { chatType, gameId, message, isSpectator });
+      console.log('Current socket state:', { 
+        socketId: socket.id, 
+        isConnected: socket.connected, 
+        rooms: Array.from(socket.rooms || [])
+      });
+      
       if (chatType === 'game') {
         socket.emit('chat_message', { gameId, message });
       } else {
