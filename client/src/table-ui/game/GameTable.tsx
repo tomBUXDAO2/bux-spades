@@ -149,7 +149,16 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
 
   // If leading the trick
   if (isLeadingTrick) {
-    // Check for Screamer rules first
+    // Check for Assassin rules first
+    if (game.specialRules?.assassin) {
+      // Assassin: must lead spades when spades are broken and you have spades
+      const spades = hand.filter(card => card.suit === '♠');
+      if (hasSpadeBeenPlayed(game) && spades.length > 0) {
+        return spades; // Must lead spades if available and spades are broken
+      }
+    }
+    
+    // Check for Screamer rules
     if (game.specialRules?.screamer) {
       // Screamer: cannot lead spades unless only spades left
       const nonSpades = hand.filter(card => card.suit !== '♠');
@@ -186,6 +195,14 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   }
   
   // Void in lead suit - can play any card, but apply special rules
+  if (game.specialRules?.assassin) {
+    // Assassin: must cut with spades when void in lead suit and you have spades
+    const spades = hand.filter(card => card.suit === '♠');
+    if (spades.length > 0) {
+      return spades; // Must cut with spades if available
+    }
+  }
+  
   if (game.specialRules?.screamer) {
     // Screamer: cannot cut with spades unless only spades left
     const nonSpades = hand.filter(card => card.suit !== '♠');
