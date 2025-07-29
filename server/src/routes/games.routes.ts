@@ -1490,6 +1490,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
             team1TotalBags: game.team1Bags,
             team2TotalBags: game.team2Bags,
           });
+          
+          // Update stats for this hand
+          updateHandStats(game).catch(err => {
+            console.error('Failed to update hand stats:', err);
+          });
         } else {
           // Partners mode scoring
         const handSummary = calculatePartnersHandScore(game);
@@ -1540,6 +1545,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
           team2TotalScore: game.team2TotalScore,
           team1Bags: game.team1Bags,
           team2Bags: game.team2Bags,
+        });
+        
+        // Update stats for this hand
+        updateHandStats(game).catch(err => {
+          console.error('Failed to update hand stats:', err);
         });
         }
         
@@ -1979,6 +1989,92 @@ function calculateSoloHandScore(game: Game) {
   };
 }
 
+// --- Stats tracking per hand ---
+async function updateHandStats(game: Game) {
+  // Check if this is an all-human game (no bots)
+  const humanPlayers = game.players.filter(p => p && p.type === 'human');
+  const isAllHumanGame = humanPlayers.length === 4;
+  
+  if (!isAllHumanGame) {
+    console.log('Skipping hand stats update - not an all-human game');
+    return;
+  }
+  
+  console.log('Updating hand stats for all-human game');
+  
+  for (let i = 0; i < 4; i++) {
+    const player = game.players[i];
+    if (!player || player.type !== 'human') continue;
+    const userId = player.id;
+    if (!userId) continue; // Skip if no user ID
+    
+    // Calculate bags for this player for this hand
+    const playerBid = player.bid || 0;
+    const playerTricks = player.tricks || 0;
+    
+    // For nil and blind nil, all tricks count as bags if failed
+    let bags = 0;
+    if (playerBid === 0 || playerBid === -1) {
+      // Nil or blind nil: all tricks count as bags if failed
+      bags = playerTricks;
+    } else {
+      // Regular bid: only excess tricks count as bags
+      bags = Math.max(0, playerTricks - playerBid);
+    }
+    
+    try {
+      // Handle nil tracking for this hand
+      let nilBidIncrement = 0;
+      let nilMadeIncrement = 0;
+      let blindNilBidIncrement = 0;
+      let blindNilMadeIncrement = 0;
+      
+      if (playerBid === 0) {
+        // Regular nil bid
+        nilBidIncrement = 1;
+        if (playerTricks === 0) {
+          // Successfully made nil
+          nilMadeIncrement = 1;
+        }
+      } else if (playerBid === -1) {
+        // Blind nil bid
+        blindNilBidIncrement = 1;
+        if (playerTricks === 0) {
+          // Successfully made blind nil
+          blindNilMadeIncrement = 1;
+        }
+      }
+      
+      // Get current stats to calculate bags per game
+      const currentStats = await prisma.userStats.findUnique({
+        where: { userId }
+      });
+      
+      const currentGamesPlayed = currentStats?.gamesPlayed || 0;
+      const currentTotalBags = currentStats?.totalBags || 0;
+      const newTotalBags = currentTotalBags + bags;
+      const newBagsPerGame = currentGamesPlayed > 0 ? newTotalBags / currentGamesPlayed : bags;
+      
+      // Update stats for this hand
+      await prisma.userStats.update({
+        where: { userId },
+        data: {
+          totalBags: newTotalBags,
+          bagsPerGame: newBagsPerGame,
+          nilsBid: { increment: nilBidIncrement },
+          nilsMade: { increment: nilMadeIncrement },
+          blindNilsBid: { increment: blindNilBidIncrement },
+          blindNilsMade: { increment: blindNilMadeIncrement }
+        }
+      });
+      
+      console.log(`Updated hand stats for user ${userId}: nilsBid+${nilBidIncrement}, nilsMade+${nilMadeIncrement}, blindNilsBid+${blindNilBidIncrement}, blindNilsMade+${blindNilMadeIncrement}, bags+${bags}`);
+    } catch (err: any) {
+      console.error('Failed to update hand stats for user', userId, err);
+    }
+  }
+}
+
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
   // Check if this is an all-human game (no bots)
@@ -2005,33 +2101,21 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
       isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
     }
     
-    // Calculate bags for this player
-    const playerBid = player.bid || 0;
-    const playerTricks = player.tricks || 0;
-    const bags = Math.max(0, playerTricks - playerBid);
+          // Calculate bags for this player
+      const playerBid = player.bid || 0;
+      const playerTricks = player.tricks || 0;
+      
+      // For nil and blind nil, all tricks count as bags if failed
+      let bags = 0;
+      if (playerBid === 0 || playerBid === -1) {
+        // Nil or blind nil: all tricks count as bags if failed
+        bags = playerTricks;
+      } else {
+        // Regular bid: only excess tricks count as bags
+        bags = Math.max(0, playerTricks - playerBid);
+      }
     
     try {
-      // Get current stats to calculate bags per game
-      const currentStats = await prisma.userStats.findUnique({
-        where: { userId }
-      });
-      
-      const currentGamesPlayed = currentStats?.gamesPlayed || 0;
-      const currentTotalBags = currentStats?.totalBags || 0;
-      const newTotalBags = currentTotalBags + bags;
-      const newBagsPerGame = currentGamesPlayed > 0 ? newTotalBags / (currentGamesPlayed + 1) : bags;
-      
-      // Update stats
-      const stats = await prisma.userStats.update({
-        where: { userId },
-        data: {
-          gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 },
-          totalBags: newTotalBags,
-          bagsPerGame: newBagsPerGame
-        }
-      });
-      
       // Handle coin buy-in and prizes
       const buyIn = game.buyIn || 0;
       if (buyIn > 0) {
@@ -2044,12 +2128,17 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
         // Award prizes to winners
         if (isWinner) {
           let prizeAmount = 0;
+          const totalPot = buyIn * 4;
+          const rake = Math.floor(totalPot * 0.1); // 10% rake
+          const prizePool = totalPot - rake;
+          
           if (game.gameMode === 'SOLO') {
-            // Solo mode: winner gets all buy-ins (4 * buyIn)
-            prizeAmount = buyIn * 4;
+            // Solo mode: 2nd place gets buy-in back, 1st place gets remainder
+            const secondPlacePrize = buyIn;
+            prizeAmount = prizePool - secondPlacePrize; // 1st place gets remainder
           } else {
-            // Partners mode: winning team splits all buy-ins (2 * buyIn per winner)
-            prizeAmount = buyIn * 2;
+            // Partners mode: winning team splits 90% of pot (2 winners)
+            prizeAmount = Math.floor(prizePool / 2); // Each winner gets half of 90%
           }
           
           await prisma.user.update({
@@ -2057,9 +2146,18 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
             data: { coins: { increment: prizeAmount } }
           });
           
-          console.log(`Awarded ${prizeAmount} coins to winner ${userId}`);
+          console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool})`);
         }
       }
+      
+      // Update stats (nil tracking is now done per hand)
+      const stats = await prisma.userStats.update({
+        where: { userId },
+        data: {
+          gamesPlayed: { increment: 1 },
+          gamesWon: { increment: isWinner ? 1 : 0 }
+        }
+      });
       
       console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
     } catch (err) {

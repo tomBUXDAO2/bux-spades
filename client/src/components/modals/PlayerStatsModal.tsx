@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 interface PlayerStats {
   gamesPlayed: number;
   gamesWon: number;
+  totalBags?: number;
+  bagsPerGame?: number;
   nilsBid: number;
   nilsMade: number;
   blindNilsBid: number;
@@ -148,6 +150,14 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             <div className="flex items-center text-2xl font-extrabold text-yellow-400">
               <svg className="w-7 h-7 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7zm4.24 11h11.52l1.26-8.18-3.5 3.5-3.52-6.34-3.52 6.34-3.5-3.5L6.24 18z"/></svg>
               {stats.gamesWon} <span className="text-base font-normal text-slate-400 ml-1">Won</span>
+            </div>
+            <div className="flex items-center text-2xl font-extrabold text-orange-400">
+              <svg className="w-7 h-7 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              {stats.totalBags || 0} <span className="text-base font-normal text-slate-400 ml-1">Bags</span>
+            </div>
+            <div className="flex items-center text-2xl font-extrabold text-orange-300">
+              <svg className="w-7 h-7 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              {(stats.bagsPerGame || 0).toFixed(1)} <span className="text-base font-normal text-slate-400 ml-1">Bags/Game</span>
             </div>
           </div>
         </div>
