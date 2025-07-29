@@ -120,6 +120,14 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         }
         const message = data.message;
         
+        // Debug logging for message details
+        console.log('Chat: Message details:', {
+          userId: message.userId,
+          userName: message.userName,
+          message: message.message,
+          timestamp: message.timestamp
+        });
+        
         // Handle system messages
         if (message.userId === 'system') {
           console.log('Chat: Received system message:', message);

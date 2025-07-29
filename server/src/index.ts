@@ -243,19 +243,34 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     const game = games.find((g: Game) => g.id === gameId);
     let userName = 'Unknown';
     
+    console.log('Chat message debug:', {
+      gameId,
+      messageUserId: message.userId,
+      gameFound: !!game,
+      gamePlayers: game?.players?.map(p => p ? { id: p.id, username: p.username, name: (p as any).name } : null)
+    });
+    
     if (message.userId === 'system') {
       userName = 'System';
     } else if (game) {
       const player = game.players.find((p: GamePlayer | null) => p && p.id === message.userId);
+      console.log('Player lookup debug:', {
+        messageUserId: message.userId,
+        playerFound: !!player,
+        player: player ? { id: player.id, username: player.username, name: (player as any).name } : null
+      });
       if (player) {
         userName = player.username || (player as any).name || 'Unknown';
+        console.log('Username resolved:', userName);
       } else {
         // Fallback to socket auth if player not found in game
         userName = socket.auth?.username || 'Unknown';
+        console.log('Fallback to socket auth:', userName);
       }
     } else {
       // Fallback to socket auth if game not found
       userName = socket.auth?.username || 'Unknown';
+      console.log('Game not found, fallback to socket auth:', userName);
     }
 
     // Add timestamp and ID if not present
