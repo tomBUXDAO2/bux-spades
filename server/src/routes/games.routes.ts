@@ -1981,6 +1981,17 @@ function calculateSoloHandScore(game: Game) {
 
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
+  // Check if this is an all-human game (no bots)
+  const humanPlayers = game.players.filter(p => p && p.type === 'human');
+  const isAllHumanGame = humanPlayers.length === 4;
+  
+  if (!isAllHumanGame) {
+    console.log('Skipping stats/coins update - not an all-human game');
+    return;
+  }
+  
+  console.log('Updating stats and coins for all-human game');
+  
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];
     if (!player || player.type !== 'human') continue;
@@ -1994,15 +2005,63 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
       isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
     }
     
+    // Calculate bags for this player
+    const playerBid = player.bid || 0;
+    const playerTricks = player.tricks || 0;
+    const bags = Math.max(0, playerTricks - playerBid);
+    
     try {
-      // Update overall stats
+      // Get current stats to calculate bags per game
+      const currentStats = await prisma.userStats.findUnique({
+        where: { userId }
+      });
+      
+      const currentGamesPlayed = currentStats?.gamesPlayed || 0;
+      const currentTotalBags = currentStats?.totalBags || 0;
+      const newTotalBags = currentTotalBags + bags;
+      const newBagsPerGame = currentGamesPlayed > 0 ? newTotalBags / (currentGamesPlayed + 1) : bags;
+      
+      // Update stats
       const stats = await prisma.userStats.update({
         where: { userId },
         data: {
           gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 }
+          gamesWon: { increment: isWinner ? 1 : 0 },
+          totalBags: newTotalBags,
+          bagsPerGame: newBagsPerGame
         }
       });
+      
+      // Handle coin buy-in and prizes
+      const buyIn = game.buyIn || 0;
+      if (buyIn > 0) {
+        // Deduct buy-in from all players
+        await prisma.user.update({
+          where: { id: userId },
+          data: { coins: { decrement: buyIn } }
+        });
+        
+        // Award prizes to winners
+        if (isWinner) {
+          let prizeAmount = 0;
+          if (game.gameMode === 'SOLO') {
+            // Solo mode: winner gets all buy-ins (4 * buyIn)
+            prizeAmount = buyIn * 4;
+          } else {
+            // Partners mode: winning team splits all buy-ins (2 * buyIn per winner)
+            prizeAmount = buyIn * 2;
+          }
+          
+          await prisma.user.update({
+            where: { id: userId },
+            data: { coins: { increment: prizeAmount } }
+          });
+          
+          console.log(`Awarded ${prizeAmount} coins to winner ${userId}`);
+        }
+      }
+      
+      console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
     } catch (err) {
       console.error('Failed to update stats/coins for user', userId, err);
     }

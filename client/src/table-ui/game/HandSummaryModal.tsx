@@ -483,12 +483,12 @@ export default function HandSummaryModal({
                         {/* Blue Team Column 1 */}
                         <div className="space-y-3 border-4 border-blue-500 rounded-lg p-3">
                           {/* Team Header */}
-                          <div className="flex flex-col items-center h-16 justify-center">
-                            <img 
+                              <div className="flex flex-col items-center h-16 justify-center">
+                                <img 
                               src={getPlayerAvatar(0)} 
                               alt={getPlayerName(0)} 
-                              className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
-                            />
+                                  className="w-8 h-8 rounded-full border-2 border-white/20 mb-1"
+                                />
                             <span className="text-white font-semibold text-xs">{getPlayerName(0)}</span>
                           </div>
 
@@ -530,8 +530,8 @@ export default function HandSummaryModal({
                           {/* Team Final Score - spans both blue columns */}
                           <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamHandTotal}
-                          </div>
-                        </div>
+                                </div>
+                              </div>
 
                         {/* Blue Team Column 2 */}
                         <div className="space-y-3 border-4 border-blue-500 rounded-lg p-3">
@@ -546,45 +546,45 @@ export default function HandSummaryModal({
                           </div>
 
                           {/* Individual Bid */}
-                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
                             {getPlayerBid(2)}
-                          </div>
+                              </div>
 
                           {/* Individual Made */}
-                          <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
+                              <div className="text-white text-center font-semibold h-12 flex items-center justify-center">
                             {getPlayerTricks(2)}
-                          </div>
+                              </div>
 
                           {/* Team Trick Score - spans both blue columns */}
                           <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamTrickScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamTrickScore}
-                          </div>
+                              </div>
 
                           {/* Team Bag Score - spans both blue columns */}
                           <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamBagScore}
-                          </div>
+                              </div>
 
                           {/* Team Bag Penalty - spans both blue columns */}
                           <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamBagPenalty === 0 ? 'text-gray-400' : 'text-red-400'}`}>
                             {blueTeamBagPenalty}
-                          </div>
+                              </div>
 
                           {/* Team Nil Bonus - spans both blue columns */}
                           <div className={`text-center font-semibold h-12 flex items-center justify-center ${blueTeamNilBonus === 0 ? 'text-gray-400' : blueTeamNilBonus >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamNilBonus}
-                          </div>
+                              </div>
 
                           {/* Team Round Total - spans both blue columns */}
                           <div className={`text-center font-bold text-lg h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamHandTotal}
-                          </div>
+                              </div>
 
                           {/* Team Final Score - spans both blue columns */}
                           <div className={`text-center font-bold text-xl h-12 flex items-center justify-center ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamHandTotal}
-                          </div>
-                        </div>
+                              </div>
+                            </div>
                       </div>
                     </div>
                   )}
