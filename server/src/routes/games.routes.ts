@@ -1203,7 +1203,7 @@ function selectCardToCoverPartner(playableCards: Card[], currentTrick: Card[], h
 
 // Special rules filtering function
 function applySpecialRules(playableCards: Card[], hand: Card[], currentTrick: Card[], game: Game, seatIndex: number): Card[] {
-  const specialRules = game.rules?.specialRules;
+  const specialRules = game.specialRules;
   if (!specialRules) return playableCards;
   
   const isLeading = currentTrick.length === 0;
@@ -1266,7 +1266,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
   // Find playable cards with special rules consideration
   let playableCards: Card[] = [];
-  const specialRules = game.rules?.specialRules;
+  const specialRules = game.specialRules;
   
   console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} at seat ${seatIndex} - specialRules:`, specialRules);
   console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} hand:`, hand.map(c => `${c.rank}${c.suit}`));
