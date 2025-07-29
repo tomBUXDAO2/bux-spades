@@ -131,7 +131,14 @@ function hasSpadeBeenPlayed(game: GameState): boolean {
 }
 
 function canLeadSpades(game: GameState, hand: Card[]): boolean {
-  // Can lead spades if:
+  // Check for Screamer rules first
+  if (game.specialRules?.screamer) {
+    // Screamer: cannot lead spades unless only spades left
+    const nonSpades = hand.filter(card => card.suit !== '♠');
+    return nonSpades.length === 0; // Only can lead spades if no other cards
+  }
+  
+  // Normal rules: Can lead spades if:
   // 1. Spades have been broken, or
   // 2. Player only has spades left
   return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === '♠');
@@ -142,7 +149,18 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
 
   // If leading the trick
   if (isLeadingTrick) {
-    // If spades haven't been broken, filter out spades unless only spades remain
+    // Check for Screamer rules first
+    if (game.specialRules?.screamer) {
+      // Screamer: cannot lead spades unless only spades left
+      const nonSpades = hand.filter(card => card.suit !== '♠');
+      if (nonSpades.length > 0) {
+        return nonSpades; // Must lead non-spades if available
+      } else {
+        return hand; // Only spades left, can lead spades
+      }
+    }
+    
+    // Normal rules: If spades haven't been broken, filter out spades unless only spades remain
     if (!canLeadSpades(game, hand)) {
       const nonSpades = hand.filter(card => card.suit !== '♠');
       return nonSpades.length > 0 ? nonSpades : hand;
@@ -163,7 +181,22 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
 
   // Must follow suit if possible
   const suitCards = hand.filter(card => card.suit === leadSuit);
-  return suitCards.length > 0 ? suitCards : hand;
+  if (suitCards.length > 0) {
+    return suitCards; // Must follow suit
+  }
+  
+  // Void in lead suit - can play any card, but apply special rules
+  if (game.specialRules?.screamer) {
+    // Screamer: cannot cut with spades unless only spades left
+    const nonSpades = hand.filter(card => card.suit !== '♠');
+    if (nonSpades.length > 0) {
+      return nonSpades; // Must play non-spades if available
+    } else {
+      return hand; // Only spades left, can play spades
+    }
+  }
+  
+  return hand; // No special rules, can play anything
 }
 
 // Add this near the top of the file, after imports
