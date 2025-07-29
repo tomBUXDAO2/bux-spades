@@ -239,12 +239,31 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
 
+    // Find the game and get the player's username from the game state
+    const game = games.find((g: Game) => g.id === gameId);
+    let userName = 'Unknown';
+    
+    if (message.userId === 'system') {
+      userName = 'System';
+    } else if (game) {
+      const player = game.players.find((p: GamePlayer | null) => p && p.id === message.userId);
+      if (player) {
+        userName = player.username || (player as any).name || 'Unknown';
+      } else {
+        // Fallback to socket auth if player not found in game
+        userName = socket.auth?.username || 'Unknown';
+      }
+    } else {
+      // Fallback to socket auth if game not found
+      userName = socket.auth?.username || 'Unknown';
+    }
+
     // Add timestamp and ID if not present
     const enrichedMessage = {
       ...message,
       id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: message.timestamp || Date.now(),
-      userName: message.userName || (message.userId === 'system' ? 'System' : socket.auth?.username || 'Unknown')
+      userName: message.userName || userName
     };
 
     console.log('Broadcasting chat message:', {
@@ -280,12 +299,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
 
+    // Get username from socket auth (for lobby messages, we use the authenticated user's info)
+    const userName = message.userName || socket.auth?.username || 'Unknown';
+
     // Add timestamp and ID if not present
     const enrichedMessage = {
       ...message,
       id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: message.timestamp || Date.now(),
-      userName: message.userName || socket.auth?.username || 'Unknown'
+      userName: userName
     };
 
     console.log('Broadcasting lobby message:', enrichedMessage);
