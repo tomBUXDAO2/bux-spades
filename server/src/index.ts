@@ -218,6 +218,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   // Handle chat messages
   socket.on('chat_message', async ({ gameId, message }) => {
+    console.log('=== CHAT MESSAGE EVENT RECEIVED ===');
+    console.log('Chat message received:', { gameId, message, socketId: socket.id, userId: socket.userId });
+    
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized chat message attempt:', { 
         socketId: socket.id, 
@@ -425,6 +428,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   // Join game as spectator (for chat access)
   socket.on('join_game_as_spectator', ({ gameId }) => {
+    console.log('=== SPECTATOR JOIN EVENT RECEIVED ===');
+    console.log('Spectator join attempt:', { gameId, socketId: socket.id, userId: socket.userId });
+    
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized join_game_as_spectator attempt');
       socket.emit('error', { message: 'Not authenticated' });
