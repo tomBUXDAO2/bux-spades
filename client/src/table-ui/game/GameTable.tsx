@@ -1902,7 +1902,7 @@ export default function GameTable({
                           Cancel
                         </button>
                         <button
-                          onClick={handleStartWithBots}
+                          onClick={handlePlayWithBots}
                           className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
                         >
                           Play with Bots
