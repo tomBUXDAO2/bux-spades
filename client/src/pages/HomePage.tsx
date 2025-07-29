@@ -720,11 +720,19 @@ const HomePage: React.FC = () => {
                       player.status !== 'blocked'
                     )
                     .sort((a, b) => {
+                      // First priority: friends come first
+                      if (a.status === 'friend' && b.status !== 'friend') return -1;
+                      if (b.status === 'friend' && a.status !== 'friend') return 1;
+                      
+                      // Second priority: online status
                       if (b.online !== a.online) return Number(b.online) - Number(a.online);
+                      
+                      // Third priority: blocked status (when showing all)
                       if (playerFilter === 'all') {
                         if (a.status === 'blocked' && b.status !== 'blocked') return 1;
                         if (b.status === 'blocked' && a.status !== 'blocked') return -1;
                       }
+                      
                       return 0;
                     })
                     .map(player => (
