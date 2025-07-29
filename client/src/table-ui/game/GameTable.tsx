@@ -154,7 +154,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
       // Screamer: cannot lead spades unless only spades left
       const nonSpades = hand.filter(card => card.suit !== '♠');
       if (nonSpades.length > 0) {
-        return nonSpades; // Must lead non-spades if available
+        return nonSpades; // Must play non-spades if available
       } else {
         return hand; // Only spades left, can lead spades
       }
