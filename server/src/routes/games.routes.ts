@@ -1268,6 +1268,10 @@ export function botPlayCard(game: Game, seatIndex: number) {
   let playableCards: Card[] = [];
   const specialRules = game.rules?.specialRules;
   
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} at seat ${seatIndex} - specialRules:`, specialRules);
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} hand:`, hand.map(c => `${c.rank}${c.suit}`));
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} leadSuit:`, leadSuit);
+  
   if (leadSuit) {
     // Following suit - must follow lead suit if possible
     playableCards = hand.filter(c => c.suit === leadSuit);
@@ -1278,11 +1282,14 @@ export function botPlayCard(game: Game, seatIndex: number) {
         const nonSpades = hand.filter(c => c.suit !== 'S');
         if (nonSpades.length > 0) {
           playableCards = nonSpades; // Must play non-spades if available
+          console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Screamer rule applied: cannot cut with spades, using non-spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
         } else {
           playableCards = hand; // Only spades left, can play spades
+          console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Screamer rule applied: only spades left, can play spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
         }
       } else {
         playableCards = hand; // No special rules, can play anything
+        console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - No special rules, can play anything:`, playableCards.map(c => `${c.rank}${c.suit}`));
       }
     }
   } else {
@@ -1292,22 +1299,28 @@ export function botPlayCard(game: Game, seatIndex: number) {
       const nonSpades = hand.filter(c => c.suit !== 'S');
       if (nonSpades.length > 0) {
         playableCards = nonSpades; // Must lead non-spades if available
+        console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Screamer rule applied: cannot lead spades, using non-spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
       } else {
         playableCards = hand; // Only spades left, can lead spades
+        console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Screamer rule applied: only spades left, can lead spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
       }
     } else {
       // Normal rules: cannot lead spades unless spades broken or only spades left
       if (game.play.spadesBroken || hand.every(c => c.suit === 'S')) {
         playableCards = hand; // Can lead any card
+        console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Normal rules: spades broken or only spades, can lead anything:`, playableCards.map(c => `${c.rank}${c.suit}`));
       } else {
         // Cannot lead spades unless only spades left
         playableCards = hand.filter(c => c.suit !== 'S');
         if (playableCards.length === 0) {
           playableCards = hand; // Only spades left, must lead spades
         }
+        console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Normal rules: cannot lead spades, using non-spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
       }
     }
   }
+  
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} final playableCards:`, playableCards.map(c => `${c.rank}${c.suit}`));
   
   // Apply additional special rules filtering (like Assassin)
   playableCards = applySpecialRules(playableCards, hand, game.play.currentTrick, game, seatIndex);
@@ -1346,6 +1359,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
     }
   }
   if (!card) return;
+  
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} selected card:`, `${card.rank}${card.suit}`);
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} selected card is spade:`, card.suit === 'S');
+  console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} has non-spades:`, hand.filter(c => c.suit !== 'S').map(c => `${c.rank}${c.suit}`));
+  
   setTimeout(() => {
     if (!game.play) return; // Guard for undefined
     console.log(`[BOT DEBUG] Bot ${bot.username} is playing card:`, card);
