@@ -427,7 +427,10 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     key={msg.id || index}
                     className="w-full text-center my-2"
                   >
-                    <span className="text-orange-400 italic" style={{ fontSize: `${mobileFontSize + 2}px` }}>{msg.message || msg.text}</span>
+                    <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: `${mobileFontSize + 2}px` }}>
+                      {msg.message || msg.text}
+                      {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes(s.username || s.name)) && <EyeIcon />}
+                    </span>
                   </div>
                 ) : (
                   <div
