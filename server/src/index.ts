@@ -292,7 +292,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       ...message,
       id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: message.timestamp || Date.now(),
-      userName: message.userName || userName
+      userName: userName // Always use the resolved userName, not the client-provided one
     };
 
     console.log('Broadcasting chat message:', {
