@@ -308,7 +308,12 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     // Find the player in the players array
     const player = players.find(p => p.id === playerId);
     
-    // Type guard for image property
+    // Check for avatar property first (most common)
+    if (player && player.avatar) {
+      return player.avatar;
+    }
+    
+    // Check for image property as fallback
     if (player && 'image' in player && player.image) {
       return player.image as string;
     }
@@ -412,7 +417,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                         {msg.userId !== userId && (
                           <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
                         )}
-                        <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}>{formatTime(msg.timestamp)}</span>
+                        <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}> {formatTime(msg.timestamp)}</span>
                       </div>
                       <p style={{ fontSize: `${mobileFontSize}px` }}>{msg.message || msg.text}</p>
                     </div>
