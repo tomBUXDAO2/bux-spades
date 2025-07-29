@@ -662,7 +662,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.emit('error', { message: 'Card not in hand' });
       return;
     }
-    }
     
     // --- ENFORCE SPECIAL RULES ---
     const specialRules = game.rules?.specialRules;

@@ -1292,7 +1292,95 @@ function applySpecialRules(playableCards: Card[], hand: Card[], currentTrick: Ca
 }
 
 
-
+// Special rules filtering function
+function applySpecialRules(playableCards: Card[], hand: Card[], currentTrick: Card[], game: Game, seatIndex: number): Card[] {
+  const specialRules = game.rules?.specialRules;
+  if (!specialRules) return playableCards;
+  
+  const isLeading = currentTrick.length === 0;
+  const leadSuit = isLeading ? null : currentTrick[0].suit;
+  const spadesBroken = game.play?.spadesBroken || false;
+  
+  // Screamer rules: Players cannot play spades unless they have no other cards
+  if (specialRules.screamer) {
+    console.log(`[SPECIAL RULES] Screamer active for bot at seat ${seatIndex}`);
+    
+    if (isLeading) {
+      // When leading, cannot lead spades unless only spades left
+      const nonSpades = hand.filter(c => c.suit !== "S");
+      if (nonSpades.length > 0) {
+        // Have non-spades, cannot lead spades
+        const nonSpadePlayable = playableCards.filter(c => c.suit !== "S");
+        if (nonSpadePlayable.length > 0) {
+          console.log(`[SPECIAL RULES] Screamer: Cannot lead spades, using non-spades:`, nonSpadePlayable);
+          return nonSpadePlayable;
+        }
+      }
+      // Only spades left, can lead spades
+      console.log(`[SPECIAL RULES] Screamer: Only spades left, can lead spades`);
+    } else {
+      // Following suit
+      if (leadSuit !== "S") {
+        // Not leading spades - cannot trump with spades unless void in lead suit
+        const cardsOfLeadSuit = hand.filter(c => c.suit === leadSuit);
+        if (cardsOfLeadSuit.length > 0) {
+          // Must follow suit, no spade restriction
+          return playableCards;
+        } else {
+          // Void in lead suit - can only cut if only spades left
+          const nonSpades = hand.filter(c => c.suit !== "S");
+          if (nonSpades.length > 0) {
+            // Have non-spades, cannot cut with spades
+            const nonSpadePlayable = playableCards.filter(c => c.suit !== "S");
+            if (nonSpadePlayable.length > 0) {
+              console.log(`[SPECIAL RULES] Screamer: Cannot cut with spades, using non-spades:`, nonSpadePlayable);
+              return nonSpadePlayable;
+            }
+          }
+          // Only spades left, can cut with spades
+          console.log(`[SPECIAL RULES] Screamer: Only spades left, can cut with spades`);
+        }
+      }
+    }
+  }
+  
+  // Assassin rules: Players must play spades whenever possible
+  if (specialRules.assassin) {
+    console.log(`[SPECIAL RULES] Assassin active for bot at seat ${seatIndex}`);
+    
+    if (isLeading) {
+      // When leading, must lead spades if spades are broken and have spades
+      const spades = hand.filter(c => c.suit === "S");
+      if (spadesBroken && spades.length > 0) {
+        // Spades broken and have spades - must lead spades
+        const spadePlayable = playableCards.filter(c => c.suit === "S");
+        if (spadePlayable.length > 0) {
+          console.log(`[SPECIAL RULES] Assassin: Must lead spades, using spades:`, spadePlayable);
+          return spadePlayable;
+        }
+      }
+    } else {
+      // Following suit
+      if (leadSuit !== "S") {
+        // Not leading spades - must trump if have spades and void in lead suit
+        const cardsOfLeadSuit = hand.filter(c => c.suit === leadSuit);
+        if (cardsOfLeadSuit.length === 0) {
+          // Void in lead suit - must cut if have spades
+          const spades = hand.filter(c => c.suit === "S");
+          if (spades.length > 0) {
+            const spadePlayable = playableCards.filter(c => c.suit === "S");
+            if (spadePlayable.length > 0) {
+              console.log(`[SPECIAL RULES] Assassin: Must cut with spades:`, spadePlayable);
+              return spadePlayable;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return playableCards;
+}
 // --- Bot Card Play Logic ---
 export function botPlayCard(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
@@ -1323,13 +1411,15 @@ export function botPlayCard(game: Game, seatIndex: number) {
       playableCards = hand.filter(c => c.suit !== 'S');
       if (playableCards.length === 0) {
         playableCards = hand; // Only spades left, must lead spades
-      }
-    }
   }
   
   // Apply special rules filtering to playable cards
   playableCards = applySpecialRules(playableCards, hand, game.play.currentTrick, game, seatIndex);
   
+  // Smart bot card selection based on game type and bidding
+      }
+    }
+  }
   // Smart bot card selection based on game type and bidding
   let card: Card;
   
