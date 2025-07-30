@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import GameRulesModal from '@/components/modals/GameRulesModal';
 
 interface HeaderProps {
   onOpenMyStats?: () => void;
@@ -9,6 +10,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   const { user, logout, updateProfile } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGameRulesOpen, setIsGameRulesOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChangeAvatarClick = () => {
@@ -170,6 +172,15 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                   >
                     My Stats
                   </button>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      setIsGameRulesOpen(true);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  >
+                    Game Rules
+                  </button>
                   <div className="border-t border-slate-700"></div>
                   <button
                     onClick={() => {
@@ -193,6 +204,12 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
         ref={fileInputRef}
         style={{ display: 'none' }}
         onChange={handleAvatarFileChange}
+      />
+      
+      {/* Game Rules Modal */}
+      <GameRulesModal 
+        isOpen={isGameRulesOpen} 
+        onClose={() => setIsGameRulesOpen(false)} 
       />
     </header>
   );
