@@ -2604,7 +2604,7 @@ export default function GameTable({
                           if (!waitingPlayer) {
                             console.warn('[WARN] Could not resolve waiting player for currentPlayer:', gameState.currentPlayer, 'Players:', sanitizedPlayers);
                           }
-                          const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : gameState.currentPlayer ? `Player ${gameState.currentPlayer}` : "Unknown";
+                          const waitingName = isPlayer(waitingPlayer) ? (waitingPlayer.username || waitingPlayer.name) : isBot(waitingPlayer) ? waitingPlayer.username : gameState.currentPlayer ? `Player ${gameState.currentPlayer}` : "Unknown";
                       return (
                         <div className="font-bold">Waiting for {waitingName}</div>
                       );
@@ -2653,7 +2653,7 @@ export default function GameTable({
                     {gameState.currentPlayer
                       ? (() => {
                       const waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
-                      const waitingName = isPlayer(waitingPlayer) ? waitingPlayer.name : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
+                      const waitingName = isPlayer(waitingPlayer) ? (waitingPlayer.username || waitingPlayer.name) : isBot(waitingPlayer) ? waitingPlayer.username : "Unknown";
                       return (
                         <div className="text-sm">Waiting for {waitingName} to play</div>
                       );
