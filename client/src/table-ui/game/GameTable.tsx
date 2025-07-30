@@ -738,8 +738,8 @@ export default function GameTable({
       // Team 2 (positions 1,3) = Blue Team
     const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
     const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
-      const actualSeatPosition = player?.position ?? position;
-      playerGradient = (actualSeatPosition === 0 || actualSeatPosition === 2)
+      // Use display position for team assignment (positions 0,2 = Red, positions 1,3 = Blue)
+      playerGradient = (position === 0 || position === 2)
       ? redTeamGradient
       : blueTeamGradient;
     }
