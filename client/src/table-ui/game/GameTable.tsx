@@ -736,12 +736,15 @@ export default function GameTable({
       // Partners mode: 2 team colors
       // Team 1 (positions 0,2) = Red Team
       // Team 2 (positions 1,3) = Blue Team
-    const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
-    const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
-      // Use display position for team assignment (positions 0,2 = Red, positions 1,3 = Blue)
-      playerGradient = (position === 0 || position === 2)
-      ? redTeamGradient
-      : blueTeamGradient;
+      const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
+      const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
+      
+      // Use ORIGINAL position for team assignment, not display position
+      // Get the original position from the player object
+      const originalPosition = player.position ?? position;
+      playerGradient = (originalPosition === 0 || originalPosition === 2)
+        ? redTeamGradient
+        : blueTeamGradient;
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
@@ -751,9 +754,10 @@ export default function GameTable({
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
     
     if (isPartnerGame) {
-      // Partner game logic
-      const partnerIndex = (position + 2) % 4;
-      const partner = orderedPlayers[partnerIndex];
+      // Partner game logic - use original positions for partner calculation
+      const originalPosition = player.position ?? position;
+      const partnerOriginalPosition = (originalPosition + 2) % 4;
+      const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
       const partnerActualSeatIndex = partner?.position; // Use actual seat position
       const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
@@ -823,7 +827,7 @@ export default function GameTable({
         const partnerMade = gameState.players?.[partnerActualSeatIndex]?.tricks ?? 0;
         const teamBid = bidCount + partnerBid;
         const teamMade = madeCount + partnerMade;
-        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, partnerBid=${partnerBid}, partnerMade=${partnerMade}, teamBid=${teamBid}, teamMade=${teamMade}, tricksLeft=${tricksLeft}, status=${madeStatus}, canMakeBid=${teamMade + tricksLeft >= teamBid}`);
+        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}) at original pos ${actualSeatIndex}: bid=${bidCount}, made=${madeCount}, partnerBid=${partnerBid}, partnerMade=${partnerMade}, teamBid=${teamBid}, teamMade=${teamMade}, tricksLeft=${tricksLeft}, status=${madeStatus}, canMakeBid=${teamMade + tricksLeft >= teamBid}`);
       } else {
         console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, tricksLeft=${tricksLeft}, status=${madeStatus}, isPartnerGame=${isPartnerGame}`);
       }
@@ -837,9 +841,11 @@ export default function GameTable({
         // Host (seat 0) can always remove bots pre-game
         return sanitizedPlayers[0]?.id === currentPlayerId;
       } else {
-        // Mid-game: partner (seat (position+2)%4) can remove bots
-        const partnerIndex = (position + 2) % 4;
-        return sanitizedPlayers[partnerIndex]?.id === currentPlayerId;
+        // Mid-game: partner (original seat (originalPosition+2)%4) can remove bots
+        const originalPosition = player.position ?? position;
+        const partnerOriginalPosition = (originalPosition + 2) % 4;
+        const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+        return partner?.id === currentPlayerId;
       }
     })();
     // After rendering the player avatar/info, render the played card if any

@@ -171,7 +171,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           if (isSpectator) {
             socket.emit('join_game_as_spectator', { gameId });
           } else {
-            socket.emit('join_game', { gameId });
+          socket.emit('join_game', { gameId });
           }
         }
       }
@@ -185,7 +185,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           if (isSpectator) {
             socket.emit('join_game_as_spectator', { gameId });
           } else {
-            socket.emit('join_game', { gameId });
+          socket.emit('join_game', { gameId });
           }
         }
       }
@@ -222,7 +222,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         if (isSpectator) {
           socket.emit('join_game_as_spectator', { gameId });
         } else {
-          socket.emit('join_game', { gameId });
+        socket.emit('join_game', { gameId });
         }
       }
     }

@@ -1306,14 +1306,14 @@ export function botPlayCard(game: Game, seatIndex: number) {
       }
     } else {
       // Normal rules: cannot lead spades unless spades broken or only spades left
-      if (game.play.spadesBroken || hand.every(c => c.suit === 'S')) {
-        playableCards = hand; // Can lead any card
+    if (game.play.spadesBroken || hand.every(c => c.suit === 'S')) {
+      playableCards = hand; // Can lead any card
         console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Normal rules: spades broken or only spades, can lead anything:`, playableCards.map(c => `${c.rank}${c.suit}`));
-      } else {
-        // Cannot lead spades unless only spades left
-        playableCards = hand.filter(c => c.suit !== 'S');
-        if (playableCards.length === 0) {
-          playableCards = hand; // Only spades left, must lead spades
+    } else {
+      // Cannot lead spades unless only spades left
+      playableCards = hand.filter(c => c.suit !== 'S');
+      if (playableCards.length === 0) {
+        playableCards = hand; // Only spades left, must lead spades
         }
         console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} - Normal rules: cannot lead spades, using non-spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
       }
@@ -2113,7 +2113,7 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
       } else {
         // Regular bid: only excess tricks count as bags
         bags = Math.max(0, playerTricks - playerBid);
-      }
+    }
     
     try {
       // Handle coin buy-in and prizes
