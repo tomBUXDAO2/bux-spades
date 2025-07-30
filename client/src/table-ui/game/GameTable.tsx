@@ -2468,7 +2468,7 @@ export default function GameTable({
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Host</div>
-                    <div className="text-sm mt-1">Only {isPlayer(sanitizedPlayers[0]) ? sanitizedPlayers[0].name : isBot(sanitizedPlayers[0]) ? sanitizedPlayers[0].username : 'Unknown'} can start</div>
+                    <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.username || 'Unknown'} can start</div>
                   </div>
                 ) : (() => {
                   console.log('[BIDDING DEBUG] Checking bidding conditions:', {
