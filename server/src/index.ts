@@ -948,21 +948,26 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
           
-          io.to(game.id).emit('hand_completed', {
-            // Current hand scores (for hand summary display)
-            team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
-            team2Score: handSummary.playerScores[1] + handSummary.playerScores[3], // Blue team (positions 1,3)
-            team1Bags: handSummary.playerBags[0] + handSummary.playerBags[2],
-            team2Bags: handSummary.playerBags[1] + handSummary.playerBags[3],
-            tricksPerPlayer: handSummary.tricksPerPlayer,
-            // Running totals (for overall game state)
-            playerScores: game.playerScores,
-            playerBags: game.playerBags,
-            team1TotalScore: game.team1TotalScore,
-            team2TotalScore: game.team2TotalScore,
-            team1TotalBags: game.team1Bags,
-            team2TotalBags: game.team2Bags,
-          });
+                  io.to(game.id).emit('hand_completed', {
+          // Current hand scores (for hand summary display)
+          team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
+          team2Score: handSummary.playerScores[1] + handSummary.playerScores[3], // Blue team (positions 1,3)
+          team1Bags: handSummary.playerBags[0] + handSummary.playerBags[2],
+          team2Bags: handSummary.playerBags[1] + handSummary.playerBags[3],
+          tricksPerPlayer: handSummary.tricksPerPlayer,
+          // Running totals (for overall game state)
+          playerScores: game.playerScores,
+          playerBags: game.playerBags,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1TotalBags: game.team1Bags,
+          team2TotalBags: game.team2Bags,
+        });
+        
+        // Update stats for this hand
+        updateHandStats(game).catch(err => {
+          console.error('Failed to update hand stats:', err);
+        });
         } else {
           // Partners mode scoring
         const handSummary = calculatePartnersHandScore(game);
@@ -994,6 +999,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           team2TotalScore: game.team2TotalScore,
           team1Bags: game.team1Bags,
           team2Bags: game.team2Bags,
+        });
+        
+        // Update stats for this hand
+        updateHandStats(game).catch(err => {
+          console.error('Failed to update hand stats:', err);
         });
         }
         
@@ -1247,6 +1257,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Emit hand completed event
         io.to(game.id).emit('hand_completed', finalScores);
         console.log('[FAILSAFE] Hand completed event emitted');
+        
+        // Update stats for this hand
+        updateHandStats(game).catch(err => {
+          console.error('Failed to update hand stats:', err);
+        });
         
         return; // Exit early to prevent further processing
         }
