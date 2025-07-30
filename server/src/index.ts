@@ -1586,6 +1586,9 @@ function calculatePartnersHandScore(game: Game) {
 
 // --- Stats tracking per hand ---
 async function updateHandStats(game: Game) {
+  console.log('[UPDATE HAND STATS] Function called for game:', game.id);
+  console.log('[UPDATE HAND STATS] Game players:', game.players.map(p => p ? { id: p.id, type: p.type, bid: p.bid, tricks: p.tricks } : null));
+  
   // Check if this is an all-human game (no bots)
   const humanPlayers = game.players.filter(p => p && p.type === 'human');
   const isAllHumanGame = humanPlayers.length === 4;
@@ -1606,6 +1609,8 @@ async function updateHandStats(game: Game) {
     // Calculate bags for this player for this hand
     const playerBid = player.bid;
     const playerTricks = player.tricks || 0;
+    
+    console.log(`[UPDATE HAND STATS] Processing player ${userId}: bid=${playerBid}, tricks=${playerTricks}`);
     
     // Skip if no bid was made (bid is undefined/null)
     if (playerBid === undefined || playerBid === null) {
