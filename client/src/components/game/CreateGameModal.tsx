@@ -111,14 +111,14 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20 max-h-[90vh] overflow-y-auto landscape:max-w-[85vw] landscape:flex-col landscape:gap-2 landscape:p-2">
-        <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center landscape:mb-2 landscape:text-lg">Create Game</h2>
-        <div className="space-y-3 w-full flex flex-col items-center justify-center landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:space-y-0">
+      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20 max-h-[90vh] overflow-y-auto landscape:max-w-[85vw] landscape:flex-col landscape:gap-2 landscape:p-2 sm:p-4 sm:gap-4">
+        <h2 className="text-xl font-bold text-slate-200 mb-4 text-center landscape:mb-2 landscape:text-lg sm:text-2xl">Create Game</h2>
+        <div className="space-y-2 w-full flex flex-col items-center justify-center landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:space-y-0 sm:space-y-3">
           {/* Left Column */}
-          <div className="w-full flex flex-col items-center space-y-3 landscape:space-y-2">
+          <div className="w-full flex flex-col items-center space-y-2 landscape:space-y-2 sm:space-y-3">
             {/* Partners/Solo Toggle with text outside */}
             <div className="flex items-center justify-center w-full gap-2 my-2">
-              <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
+              <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Partners</span>
               <div
                 className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
                 onClick={() => {
@@ -144,12 +144,12 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                   style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
                 ></div>
               </div>
-              <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-base`}>Solo</span>
+              <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Solo</span>
             </div>
 
           {/* Coins with coin icon and prize display - moved above bidding options */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-yellow-500 mb-2 text-center landscape:text-base landscape:mb-1">Coins</label>
+            <label className="block text-lg font-bold text-yellow-500 mb-2 text-center landscape:text-base landscape:mb-1 sm:text-2xl">Coins</label>
             <div className="flex items-center gap-4 justify-center">
               <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">-</button>
               <span className="w-20 text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold">
@@ -161,7 +161,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               <button onClick={() => handleBuyInChange(1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">+</button>
             </div>
             {/* Prize display */}
-            <div className="mt-2 text-sm font-medium text-indigo-300 text-center">
+            <div className="mt-2 text-xs font-medium text-indigo-300 text-center sm:text-sm">
               {(() => {
                 const prizePot = buyIn * 4 * 0.9;
                 if (mode === 'PARTNERS') {
@@ -180,7 +180,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           <div className="w-full flex flex-col items-center my-2">
             <div className="flex gap-8 items-center justify-center w-full">
               <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center">Min Points</label>
+                <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Min Points</label>
                 <div className="flex gap-2 items-center justify-center">
                   <button onClick={() => handlePointsChange('min', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={minPoints <= -250}>-</button>
                   <input
@@ -193,7 +193,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 </div>
               </div>
               <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center">Max Points</label>
+                <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Max Points</label>
                 <div className="flex gap-2 items-center justify-center">
                   <button onClick={() => handlePointsChange('max', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={maxPoints <= 100}>-</button>
                   <input
@@ -210,7 +210,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           </div>
 
           {/* Right Column */}
-          <div className="w-full flex flex-col items-center space-y-3 landscape:space-y-2">
+          <div className="w-full flex flex-col items-center space-y-2 landscape:space-y-2 sm:space-y-3">
 
           {/* Game Type Radio Buttons */}
           <div className="w-full flex flex-col items-center my-2">
@@ -224,7 +224,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     checked={gameType === opt}
                     onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
                   />
-                  <span className="text-slate-200">{opt}</span>
+                  <span className="text-slate-200 text-xs sm:text-sm">{opt}</span>
                 </label>
               ))}
             </div>
@@ -235,7 +235,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 value={gameType === 'GIMMICK' ? gimmickType : 'NO GIMMICK'}
                 onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS')}
                 disabled={gameType !== 'GIMMICK'}
-                className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
+                className={`px-2 py-1 rounded-md text-slate-800 font-semibold text-xs sm:text-sm sm:px-3 ${
                   gameType === 'GIMMICK' 
                     ? 'bg-slate-100 cursor-pointer' 
                     : 'bg-slate-600 text-slate-400 cursor-not-allowed'
@@ -256,7 +256,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             {/* Nil and Blind Nil toggles */}
             <div className="flex flex-row gap-6 justify-center items-center my-2 landscape:gap-3" style={{ minHeight: '2.2rem' }}>
               <div className="flex items-center gap-2">
-                <span className="text-slate-200 text-sm">Nil:</span>
+                                  <span className="text-slate-200 text-xs sm:text-sm">Nil:</span>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                   <div
@@ -273,7 +273,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-200 text-sm">Blind Nil:</span>
+                <span className="text-slate-200 text-xs sm:text-sm">Blind Nil:</span>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                   <div
@@ -294,7 +294,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
           {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-pink-400 mb-2 text-center landscape:text-base landscape:mb-1">Special Rules</label>
+            <label className="block text-lg font-bold text-pink-400 mb-2 text-center landscape:text-base landscape:mb-1 sm:text-2xl">Special Rules</label>
             <div className="flex flex-row gap-6 justify-center landscape:gap-3">
               <label className="flex items-center space-x-2">
                 <input
@@ -303,7 +303,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                   onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded"
                 />
-                <span className="text-slate-300">🎭 Screamer</span>
+                <span className="text-slate-300 text-xs sm:text-sm">🎭 Screamer</span>
               </label>
               <label className="flex items-center space-x-2">
                 <input
@@ -312,7 +312,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                   onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded"
                 />
-                <span className="text-slate-300">⚔️ Assassin</span>
+                <span className="text-slate-300 text-xs sm:text-sm">⚔️ Assassin</span>
               </label>
             </div>
           </div>
@@ -322,13 +322,13 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           <div className="w-full flex justify-center gap-4 mt-4 landscape:col-span-2 landscape:mt-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors"
+              className="px-3 py-1.5 text-slate-300 hover:text-slate-100 transition-colors text-sm sm:text-base sm:px-4 sm:py-2"
             >
               Cancel
             </button>
             <button
               onClick={handleCreate}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md transition-colors text-sm sm:text-base sm:px-4 sm:py-2"
             >
               Create Game
             </button>
