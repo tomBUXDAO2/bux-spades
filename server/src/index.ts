@@ -1662,6 +1662,15 @@ async function updateHandStats(game: Game) {
       const newBagsPerGame = currentGamesPlayed > 0 ? newTotalBags / currentGamesPlayed : bags;
       
       // Update stats for this hand
+      console.log(`[UPDATE HAND STATS] Attempting to update stats for user ${userId} with data:`, {
+        totalBags: newTotalBags,
+        bagsPerGame: newBagsPerGame,
+        nilsBid: { increment: nilBidIncrement },
+        nilsMade: { increment: nilMadeIncrement },
+        blindNilsBid: { increment: blindNilBidIncrement },
+        blindNilsMade: { increment: blindNilMadeIncrement }
+      });
+      
       await prisma.userStats.update({
         where: { userId },
         data: {
