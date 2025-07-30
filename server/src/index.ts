@@ -1607,7 +1607,8 @@ async function updateHandStats(game: Game) {
     if (!userId) continue; // Skip if no user ID
     
     // Calculate bags for this player for this hand
-    const playerBid = player.bid;
+    // Get bid from game.bidding.bids array using player position
+    const playerBid = game.bidding?.bids?.[i];
     const playerTricks = player.tricks || 0;
     
     console.log(`[UPDATE HAND STATS] Processing player ${userId}: bid=${playerBid}, tricks=${playerTricks}`);
