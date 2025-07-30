@@ -110,44 +110,46 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20">
-        <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center">Create Game</h2>
-        <div className="space-y-3 w-full flex flex-col items-center justify-center">
-          {/* Partners/Solo Toggle with text outside */}
-          <div className="flex items-center justify-center w-full gap-2 my-2">
-            <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
-            <div
-              className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
-              onClick={() => {
-                const newMode = mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS';
-                setMode(newMode);
-                
-                // Reset gimmickType when switching modes to prevent invalid selections
-                if (newMode === 'SOLO' && gimmickType === 'SUICIDE') {
-                  setGimmickType('4 OR NIL');
-                }
-              }}
-              style={{ userSelect: 'none' }}
-            >
-              <input
-                type="checkbox"
-                id="mode-toggle"
-                className="sr-only peer"
-                checked={mode === 'SOLO'}
-                readOnly
-              />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20 max-h-[90vh] overflow-y-auto landscape:max-w-[85vw] landscape:flex-col landscape:gap-2 landscape:p-2">
+        <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center landscape:mb-2 landscape:text-lg">Create Game</h2>
+        <div className="space-y-3 w-full flex flex-col items-center justify-center landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:space-y-0">
+          {/* Left Column */}
+          <div className="w-full flex flex-col items-center space-y-3 landscape:space-y-2">
+            {/* Partners/Solo Toggle with text outside */}
+            <div className="flex items-center justify-center w-full gap-2 my-2">
+              <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
               <div
-                className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
-                style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
-              ></div>
+                className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
+                onClick={() => {
+                  const newMode = mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS';
+                  setMode(newMode);
+                  
+                  // Reset gimmickType when switching modes to prevent invalid selections
+                  if (newMode === 'SOLO' && gimmickType === 'SUICIDE') {
+                    setGimmickType('4 OR NIL');
+                  }
+                }}
+                style={{ userSelect: 'none' }}
+              >
+                <input
+                  type="checkbox"
+                  id="mode-toggle"
+                  className="sr-only peer"
+                  checked={mode === 'SOLO'}
+                  readOnly
+                />
+                <div
+                  className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
+                  style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
+                ></div>
+              </div>
+              <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-base`}>Solo</span>
             </div>
-            <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-base`}>Solo</span>
-          </div>
 
           {/* Coins with coin icon and prize display - moved above bidding options */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-yellow-500 mb-2 text-center">Coins</label>
+            <label className="block text-2xl font-bold text-yellow-500 mb-2 text-center landscape:text-base landscape:mb-1">Coins</label>
             <div className="flex items-center gap-4 justify-center">
               <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">-</button>
               <span className="w-20 text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold">
@@ -205,10 +207,14 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </div>
             </div>
           </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="w-full flex flex-col items-center space-y-3 landscape:space-y-2">
 
           {/* Game Type Radio Buttons */}
           <div className="w-full flex flex-col items-center my-2">
-            <div className="flex flex-wrap gap-4 justify-center mb-2">
+            <div className="flex flex-wrap gap-4 justify-center mb-2 landscape:gap-2">
               {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -248,7 +254,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
 
             {/* Nil and Blind Nil toggles */}
-            <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
+            <div className="flex flex-row gap-6 justify-center items-center my-2 landscape:gap-3" style={{ minHeight: '2.2rem' }}>
               <div className="flex items-center gap-2">
                 <span className="text-slate-200 text-sm">Nil:</span>
                 <div className="flex items-center gap-2">
@@ -288,8 +294,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
           {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-pink-400 mb-2 text-center">Special Rules</label>
-            <div className="flex flex-row gap-6 justify-center">
+            <label className="block text-2xl font-bold text-pink-400 mb-2 text-center landscape:text-base landscape:mb-1">Special Rules</label>
+            <div className="flex flex-row gap-6 justify-center landscape:gap-3">
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -310,21 +316,23 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </label>
             </div>
           </div>
-        </div>
+          </div>
 
-        <div className="flex justify-center gap-4 mt-4 w-full">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
-          >
-            Create Game
-          </button>
+          {/* Buttons Row */}
+          <div className="w-full flex justify-center gap-4 mt-4 landscape:col-span-2 landscape:mt-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
+            >
+              Create Game
+            </button>
+          </div>
         </div>
       </div>
     </div>
