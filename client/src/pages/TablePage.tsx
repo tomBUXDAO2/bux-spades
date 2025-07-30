@@ -398,8 +398,6 @@ export default function TablePage() {
           showBotWarning={showBotWarning}
           onCloseStartWarning={handleCloseStartWarning}
           onCloseBotWarning={handleCloseBotWarning}
-          onPlayWithBots={handlePlayWithBots}
-          onStartWithBots={handleStartWithBots}
           emptySeats={emptySeats}
           botCount={botCount}
         />

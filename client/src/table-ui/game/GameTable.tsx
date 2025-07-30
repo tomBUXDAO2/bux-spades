@@ -63,8 +63,6 @@ interface GameTableProps {
   showBotWarning?: boolean;
   onCloseStartWarning?: () => void;
   onCloseBotWarning?: () => void;
-  onPlayWithBots?: () => void;
-  onStartWithBots?: () => void;
   emptySeats?: number;
   botCount?: number;
 }
@@ -309,8 +307,6 @@ export default function GameTable({
   showBotWarning = false,
   onCloseStartWarning,
   onCloseBotWarning,
-  onPlayWithBots,
-  onStartWithBots,
   emptySeats = 0,
   botCount = 0
 }: GameTableProps) {
