@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { getSocketManager } from '../table-ui/lib/socketManager';
 import GameTable from '../table-ui/game/GameTable';
@@ -21,6 +22,12 @@ export default function TablePage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const socketManager = getSocketManager();
 
+  // Modal state
+  const [showStartWarning, setShowStartWarning] = useState(false);
+  const [showBotWarning, setShowBotWarning] = useState(false);
+  const [emptySeats, setEmptySeats] = useState(0);
+  const [botCount, setBotCount] = useState(0);
+
   // Detect spectate intent
   const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
 
@@ -28,6 +35,17 @@ export default function TablePage() {
   const isMobileOrTablet = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
            window.innerWidth <= 1024;
+  };
+
+  // Helper function to check if a player is a bot
+  const isBot = (p: any): p is any => p && p.type === 'bot';
+
+  // Helper function to count empty seats and bot players
+  const updateModalState = (gameState: GameState) => {
+    const emptySeatsCount = (gameState.players || []).filter(p => !p).length;
+    const botPlayersCount = (gameState.players || []).filter(p => p && isBot(p)).length;
+    setEmptySeats(emptySeatsCount);
+    setBotCount(botPlayersCount);
   };
 
   // Request full-screen mode (only for game table)
@@ -113,6 +131,8 @@ export default function TablePage() {
         }
         const data = await response.json();
         setGame(data);
+        // Update modal state for initial game load
+        updateModalState(data);
         
         // Request full-screen on mobile/tablet after game loads
         if (isMobileOrTablet()) {
@@ -144,6 +164,8 @@ export default function TablePage() {
     if (!socket) return;
     const handleGameUpdate = (updatedGame: any) => {
       setGame(updatedGame);
+      // Update modal state when game state changes
+      updateModalState(updatedGame);
     };
     socket.on('game_update', handleGameUpdate);
     return () => {
@@ -234,6 +256,8 @@ export default function TablePage() {
       if (!response.ok) throw new Error('Failed to join game');
       const updatedGame = await response.json();
       setGame(updatedGame);
+      // Update modal state when joining game
+      updateModalState(updatedGame);
     } catch (error) {
       console.error('Error joining game:', error);
     }
@@ -250,12 +274,82 @@ export default function TablePage() {
   };
 
   const handleStartGame = async () => {
-    if (!socket || !gameId || !user) return;
+    if (!socket || !gameId || !user || !game) return;
+    
+    // Check for empty seats first
+    if (emptySeats > 0) {
+      setShowStartWarning(true);
+      return;
+    }
+    
+    // Check for bot players
+    if (botCount > 0) {
+      setShowBotWarning(true);
+      return;
+    }
+    
     try {
       console.log('Starting game:', gameId);
       await socketApi.startGame(socket, gameId);
     } catch (error) {
       console.error('Error starting game:', error);
+    }
+  };
+
+  // Modal handlers
+  const handleCloseStartWarning = () => {
+    setShowStartWarning(false);
+  };
+
+  const handleCloseBotWarning = () => {
+    setShowBotWarning(false);
+  };
+
+  const handlePlayWithBots = async () => {
+    if (!socket || !gameId || !user || !game) return;
+    try {
+      console.log('Playing with bots:', gameId);
+      
+      // First, invite bots to all empty seats
+      const emptySeatIndexes = (game.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
+      for (const seatIndex of emptySeatIndexes) {
+        try {
+          const endpoint = game.status === 'WAITING'
+            ? `/api/games/${gameId}/invite-bot`
+            : `/api/games/${gameId}/invite-bot-midgame`;
+          
+          console.log('Inviting bot to seat:', seatIndex);
+          const res = await api.post(endpoint, { seatIndex, requesterId: user.id });
+          
+          if (!res.ok) {
+            const error = await res.json();
+            console.error('Failed to invite bot:', error);
+          } else {
+            const updatedGame = await res.json();
+            console.log('Bot invited successfully:', updatedGame);
+            setGame(updatedGame);
+          }
+        } catch (err) {
+          console.error('Error inviting bot to seat', seatIndex, ':', err);
+        }
+      }
+      
+      // Then start the game
+      await socketApi.startGame(socket, gameId);
+      setShowStartWarning(false);
+    } catch (error) {
+      console.error('Error playing with bots:', error);
+    }
+  };
+
+  const handleStartWithBots = async () => {
+    if (!socket || !gameId || !user) return;
+    try {
+      console.log('Starting game with bots:', gameId);
+      await socketApi.startGame(socket, gameId);
+      setShowBotWarning(false);
+    } catch (error) {
+      console.error('Error starting game with bots:', error);
     }
   };
 
@@ -272,34 +366,131 @@ export default function TablePage() {
   }
 
   return (
-    <div className="table-page relative">
-      <LandscapePrompt />
-      {/* Full-screen toggle button for mobile/tablet */}
-      {isMobileOrTablet() && (
-        <button
-          onClick={isFullScreen ? exitFullScreen : requestFullScreen}
-          className="fixed top-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg shadow-lg transition-colors"
-          title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}
-        >
-          {isFullScreen ? (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          )}
-        </button>
+    <>
+      <div className="table-page relative">
+        <LandscapePrompt />
+        {/* Full-screen toggle button for mobile/tablet */}
+        {isMobileOrTablet() && (
+          <button
+            onClick={isFullScreen ? exitFullScreen : requestFullScreen}
+            className="fixed top-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg shadow-lg transition-colors"
+            title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}
+          >
+            {isFullScreen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            )}
+          </button>
+        )}
+        
+        <GameTable
+          game={game}
+          joinGame={handleJoinGame}
+          onLeaveTable={handleLeaveTable}
+          startGame={handleStartGame}
+          user={user}
+          showStartWarning={showStartWarning}
+          showBotWarning={showBotWarning}
+          onCloseStartWarning={handleCloseStartWarning}
+          onCloseBotWarning={handleCloseBotWarning}
+          onPlayWithBots={handlePlayWithBots}
+          onStartWithBots={handleStartWithBots}
+          emptySeats={emptySeats}
+          botCount={botCount}
+        />
+      </div>
+
+      {/* Mobile Modals - rendered using portal at document body level */}
+      {showStartWarning && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] sm:hidden">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+            <div>
+              {/* Header with inline icon and title */}
+              <div className="flex items-center justify-center mb-4">
+                <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-white">
+                  Empty Seats Detected
+                </h3>
+              </div>
+              {/* Message - center aligned */}
+              <div className="text-center mb-6">
+                <p className="text-lg text-gray-200 mb-2 font-semibold">
+                  Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
+                </p>
+                <p className="text-gray-300">
+                  If you continue, the game will start with bot players in all empty seats and the game will not be rated.
+                </p>
+              </div>
+              {/* Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleCloseStartWarning}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePlayWithBots}
+                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  Play with Bots
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
-      
-      <GameTable
-        game={game}
-        joinGame={handleJoinGame}
-        onLeaveTable={handleLeaveTable}
-        startGame={handleStartGame}
-        user={user}
-      />
-    </div>
+
+      {showBotWarning && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] sm:hidden">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+            <div>
+              {/* Header with inline icon and title */}
+              <div className="flex items-center justify-center mb-4">
+                <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-white">
+                  Bot Players Detected
+                </h3>
+              </div>
+              {/* Message - center aligned */}
+              <div className="text-center mb-6">
+                <p className="text-lg text-gray-200 mb-2 font-semibold">
+                  Coin games require 4 human players.<br />You have {botCount} bot player{botCount !== 1 ? 's' : ''}.
+                </p>
+                <p className="text-gray-300">
+                  If you continue, the game will start but will not be rated.
+                </p>
+              </div>
+              {/* Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleCloseBotWarning}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStartWithBots}
+                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  Start Game
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 } 

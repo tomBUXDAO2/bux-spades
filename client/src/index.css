@@ -78,7 +78,7 @@
     .table-page {
       width: 100vw;
       height: 100vh;
-      overflow: hidden;
+      /* Removed overflow: hidden to allow modals to render properly */
     }
   }
 } 

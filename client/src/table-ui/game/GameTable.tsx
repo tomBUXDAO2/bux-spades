@@ -58,6 +58,15 @@ interface GameTableProps {
   onLeaveTable: () => void;
   startGame: (gameId: string, userId?: string) => Promise<void>;
   user?: any;
+  // Add modal state props
+  showStartWarning?: boolean;
+  showBotWarning?: boolean;
+  onCloseStartWarning?: () => void;
+  onCloseBotWarning?: () => void;
+  onPlayWithBots?: () => void;
+  onStartWithBots?: () => void;
+  emptySeats?: number;
+  botCount?: number;
 }
 
 // Helper function to get card image filename
@@ -294,7 +303,16 @@ export default function GameTable({
   joinGame, 
   onLeaveTable,
   startGame,
-  user: propUser
+  user: propUser,
+  // Add modal props with defaults
+  showStartWarning = false,
+  showBotWarning = false,
+  onCloseStartWarning,
+  onCloseBotWarning,
+  onPlayWithBots,
+  onStartWithBots,
+  emptySeats = 0,
+  botCount = 0
 }: GameTableProps) {
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => window.location.reload();
@@ -357,9 +375,6 @@ export default function GameTable({
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
-  const [showStartWarning, setShowStartWarning] = useState(false);
-  const [showBotWarning, setShowBotWarning] = useState(false);
-  const [botCount, setBotCount] = useState(0);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
   const [showBlindNilModal, setShowBlindNilModal] = useState(false);
@@ -1658,24 +1673,9 @@ export default function GameTable({
     }
   };
 
-  // Helper to count empty seats
-  const emptySeats = (gameState.players || []).filter(p => !p).length;
-
   // Modified start game handler
   const handleStartGame = async () => {
-    if (emptySeats > 0) {
-      setShowStartWarning(true);
-      return;
-    }
-    
-    // Check for bot players
-    const botPlayers = (gameState.players || []).filter(p => p && isBot(p)).length;
-    if (botPlayers > 0) {
-      setBotCount(botPlayers);
-      setShowBotWarning(true);
-      return;
-    }
-    
+    // Always call the parent's start game function - it will handle modal logic
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
@@ -1683,7 +1683,7 @@ export default function GameTable({
 
   // Handle starting game with bots (from bot warning modal)
   const handleStartWithBots = async () => {
-    setShowBotWarning(false);
+    onCloseBotWarning?.();
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
@@ -1695,7 +1695,7 @@ export default function GameTable({
     for (const seatIndex of emptySeatIndexes) {
       await handleInviteBot(seatIndex);
     }
-    setShowStartWarning(false);
+    onCloseStartWarning?.();
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
@@ -1927,9 +1927,9 @@ export default function GameTable({
                 </div>
               )}
 
-              {/* Start Game Warning Modal - positioned inside the actual game table (blue oval) */}
+              {/* Start Game Warning Modal - positioned inside the actual game table (blue oval) - DESKTOP ONLY */}
               {showStartWarning && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden sm:block">
                   <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
                     <div>
                       {/* Header with inline icon and title */}
@@ -1953,7 +1953,7 @@ export default function GameTable({
                       {/* Buttons */}
                       <div className="flex gap-3 justify-center">
                         <button
-                          onClick={() => setShowStartWarning(false)}
+                          onClick={onCloseStartWarning}
                           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                         >
                           Cancel
@@ -1970,9 +1970,9 @@ export default function GameTable({
                 </div>
               )}
 
-              {/* Bot Players Warning Modal */}
+              {/* Bot Players Warning Modal - DESKTOP ONLY */}
               {showBotWarning && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden sm:block">
                   <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
                     <div>
                       {/* Header with inline icon and title */}
@@ -1996,7 +1996,7 @@ export default function GameTable({
                       {/* Buttons */}
                       <div className="flex gap-3 justify-center">
                         <button
-                          onClick={() => setShowBotWarning(false)}
+                          onClick={onCloseBotWarning}
                           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                         >
                           Cancel
@@ -2724,8 +2724,9 @@ export default function GameTable({
           ) : null;
         })()}
 
-
       </div>
+
+      {/* Remove mobile modals from here - they will be handled by parent component */}
     </>
   );
 }
