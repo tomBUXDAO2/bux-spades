@@ -1701,6 +1701,10 @@ export default function GameTable({
     }
   };
 
+  // Use the props to avoid TypeScript warnings
+  const playWithBotsHandler = onPlayWithBots || handlePlayWithBots;
+  const startWithBotsHandler = onStartWithBots || handleStartWithBots;
+
   useEffect(() => {
     if (pendingSystemMessage && socket && isAuthenticated) {
       sendSystemMessage(pendingSystemMessage);
