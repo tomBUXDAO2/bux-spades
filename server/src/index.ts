@@ -1604,8 +1604,14 @@ async function updateHandStats(game: Game) {
     if (!userId) continue; // Skip if no user ID
     
     // Calculate bags for this player for this hand
-    const playerBid = player.bid || 0;
+    const playerBid = player.bid;
     const playerTricks = player.tricks || 0;
+    
+    // Skip if no bid was made (bid is undefined/null)
+    if (playerBid === undefined || playerBid === null) {
+      console.log(`Skipping stats update for user ${userId} - no bid made`);
+      continue;
+    }
     
     // For nil and blind nil, all tricks count as bags if failed
     let bags = 0;
