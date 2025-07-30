@@ -742,6 +742,7 @@ export default function GameTable({
       // Use ORIGINAL position for team assignment, not display position
       // Get the original position from the player object
       const originalPosition = player.position ?? position;
+      console.log(`[TEAM COLOR DEBUG] Player ${player.username} at display position ${position}, original position ${originalPosition}, team assignment: ${(originalPosition === 0 || originalPosition === 2) ? 'RED' : 'BLUE'}`);
       playerGradient = (originalPosition === 0 || originalPosition === 2)
         ? redTeamGradient
         : blueTeamGradient;
