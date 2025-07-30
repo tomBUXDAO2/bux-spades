@@ -110,12 +110,12 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20 max-h-[90vh] overflow-y-auto landscape:max-w-[85vw] landscape:flex-col landscape:gap-2 landscape:p-2 sm:p-4 sm:gap-4">
-        <h2 className="text-xl font-bold text-slate-200 mb-4 text-center landscape:mb-2 landscape:text-lg sm:text-2xl">Create Game</h2>
-        <div className="space-y-2 w-full flex flex-col items-center justify-center landscape:grid landscape:grid-cols-2 landscape:gap-2 landscape:space-y-0 sm:space-y-3">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center border border-white/20 max-h-[95vh] overflow-y-auto sm:p-4 sm:gap-4">
+        <h2 className="text-xl font-bold text-slate-200 mb-4 text-center sm:text-2xl">Create Game</h2>
+        <div className="space-y-2 w-full flex flex-col items-center justify-center sm:space-y-3">
           {/* Left Column */}
-          <div className="w-full flex flex-col items-center space-y-2 landscape:space-y-2 sm:space-y-3">
+          <div className="w-full flex flex-col items-center space-y-2 sm:space-y-3">
             {/* Partners/Solo Toggle with text outside */}
             <div className="flex items-center justify-center w-full gap-2 my-2">
               <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Partners</span>
@@ -149,7 +149,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
           {/* Coins with coin icon and prize display - moved above bidding options */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-lg font-bold text-yellow-500 mb-2 text-center landscape:text-base landscape:mb-1 sm:text-2xl">Coins</label>
+            <label className="block text-lg font-bold text-yellow-500 mb-2 text-center sm:text-2xl">Coins</label>
             <div className="flex items-center gap-4 justify-center">
               <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">-</button>
               <span className="w-20 text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold">
@@ -210,11 +210,11 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           </div>
 
           {/* Right Column */}
-          <div className="w-full flex flex-col items-center space-y-2 landscape:space-y-2 sm:space-y-3">
+          <div className="w-full flex flex-col items-center space-y-2 sm:space-y-3">
 
           {/* Game Type Radio Buttons */}
           <div className="w-full flex flex-col items-center my-2">
-            <div className="flex flex-wrap gap-4 justify-center mb-2 landscape:gap-2">
+            <div className="flex flex-wrap gap-4 justify-center mb-2">
               {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
                 <label key={opt} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -254,7 +254,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
 
             {/* Nil and Blind Nil toggles */}
-            <div className="flex flex-row gap-6 justify-center items-center my-2 landscape:gap-3" style={{ minHeight: '2.2rem' }}>
+            <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
               <div className="flex items-center gap-2">
                                   <span className="text-slate-200 text-xs sm:text-sm">Nil:</span>
                 <div className="flex items-center gap-2">
@@ -294,8 +294,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
           {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-lg font-bold text-pink-400 mb-2 text-center landscape:text-base landscape:mb-1 sm:text-2xl">Special Rules</label>
-            <div className="flex flex-row gap-6 justify-center landscape:gap-3">
+            <label className="block text-lg font-bold text-pink-400 mb-2 text-center sm:text-2xl">Special Rules</label>
+            <div className="flex flex-row gap-6 justify-center">
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -319,7 +319,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           </div>
 
           {/* Buttons Row */}
-          <div className="w-full flex justify-center gap-4 mt-4 landscape:col-span-2 landscape:mt-2">
+          <div className="w-full flex justify-center gap-4 mt-4 sm:mt-4">
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-slate-300 hover:text-slate-100 transition-colors text-sm sm:text-base sm:px-4 sm:py-2"
