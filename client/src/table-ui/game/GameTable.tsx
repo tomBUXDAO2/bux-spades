@@ -813,11 +813,11 @@ export default function GameTable({
     // Debug logging for tick/cross logic
     if (gameState.status === 'PLAYING' && (bidCount > 0 || madeCount > 0)) {
       if (isPartnerGame) {
-        const partnerIndex = (position + 2) % 4;
-        const partner = orderedPlayers[partnerIndex];
-        const partnerActualSeatIndex = partner?.position; // Use actual seat position
-        const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
-        const partnerMade = partner && partner.tricks ? partner.tricks : 0;
+        // Use actual seat position for partner calculation
+        const actualSeatIndex = player?.position ?? position;
+        const partnerActualSeatIndex = (actualSeatIndex + 2) % 4;
+        const partnerBid = (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0;
+        const partnerMade = gameState.players?.[partnerActualSeatIndex]?.tricks ?? 0;
         const teamBid = bidCount + partnerBid;
         const teamMade = madeCount + partnerMade;
         console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, partnerBid=${partnerBid}, partnerMade=${partnerMade}, teamBid=${teamBid}, teamMade=${teamMade}, tricksLeft=${tricksLeft}, status=${madeStatus}, canMakeBid=${teamMade + tricksLeft >= teamBid}`);
