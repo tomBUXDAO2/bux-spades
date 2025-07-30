@@ -734,11 +734,13 @@ export default function GameTable({
       playerGradient = soloColors[position];
     } else {
       // Partners mode: 2 team colors
+      // Team 1 (positions 0,2) = Red Team
+      // Team 2 (positions 1,3) = Blue Team
     const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
     const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
       playerGradient = (position === 0 || position === 2)
-      ? blueTeamGradient
-      : redTeamGradient;
+      ? redTeamGradient
+      : blueTeamGradient;
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
