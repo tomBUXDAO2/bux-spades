@@ -3,7 +3,6 @@ import { GameType } from "@/types/game";
 
 interface BiddingProps {
   onBid: (bid: number) => void;
-  currentBid?: number;
   playerId: string;
   currentPlayerTurn: string;
   gameType: GameType;
@@ -24,7 +23,6 @@ const bottomButtonClass = "bidding-bottom-button";
 
 export default function BiddingInterface({ 
   onBid, 
-  currentBid, 
   playerId, 
   currentPlayerTurn,
   gameType,

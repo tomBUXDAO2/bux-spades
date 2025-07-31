@@ -2358,7 +2358,6 @@ export default function GameTable({
                             {!showBlindNilModal && cardsRevealed && (
                               <BiddingInterface
                                 onBid={handleBid}
-                                currentBid={(gameState as any).bidding?.bids?.[0]}
                                 gameType={gameType}
                                 numSpades={currentPlayerHand ? countSpades(currentPlayerHand) : 0}
                                 numHearts={numHearts}

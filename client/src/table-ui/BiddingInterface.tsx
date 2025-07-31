@@ -3,7 +3,6 @@ import { GameType } from "../types/game";
 
 interface BiddingProps {
   onBid: (bid: number) => void;
-  currentBid?: number;
   playerId: string;
   currentPlayerTurn: string;
   gameType: GameType;
@@ -19,7 +18,6 @@ const bottomButtonClass = "bidding-bottom-button";
 
 export default function BiddingInterface({ 
   onBid, 
-  currentBid, 
   playerId, 
   currentPlayerTurn,
   gameType,
@@ -91,9 +89,6 @@ export default function BiddingInterface({
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/10 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
-            {currentBid !== undefined && (
-              <p className="text-sm max-sm:text-xs text-gray-300">Current bid: {currentBid}</p>
-            )}
           </div>
 
           <div className="space-y-2 max-sm:space-y-1.5">
