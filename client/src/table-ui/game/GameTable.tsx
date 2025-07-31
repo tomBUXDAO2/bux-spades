@@ -1680,8 +1680,9 @@ export default function GameTable({
   // Handle starting game with bots (from bot warning modal)
   const handleStartWithBots = async () => {
     onCloseBotWarning?.();
-    if (typeof startGame === 'function' && gameState?.id && user?.id) {
-      await startGame(gameState.id, user.id);
+    // Call socket API directly to start the game
+    if (socket && gameState?.id) {
+      socket.emit('start_game', { gameId: gameState.id });
     }
   };
 
@@ -1692,8 +1693,9 @@ export default function GameTable({
       await handleInviteBot(seatIndex);
     }
     onCloseStartWarning?.();
-    if (typeof startGame === 'function' && gameState?.id && user?.id) {
-      await startGame(gameState.id, user.id);
+    // Call socket API directly to start the game
+    if (socket && gameState?.id) {
+      socket.emit('start_game', { gameId: gameState.id });
     }
   };
 
@@ -1925,91 +1927,7 @@ export default function GameTable({
                 </div>
               )}
 
-              {/* Start Game Warning Modal - positioned inside the actual game table (blue oval) - DESKTOP ONLY */}
-              {showStartWarning && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden sm:block">
-                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
-                    <div>
-                      {/* Header with inline icon and title */}
-                      <div className="flex items-center justify-center mb-4">
-                        <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <h3 className="text-2xl font-bold text-white">
-                          Empty Seats Detected
-                        </h3>
-                      </div>
-                      {/* Message - center aligned */}
-                      <div className="text-center mb-6">
-                        <p className="text-lg text-gray-200 mb-2 font-semibold">
-                          Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
-                        </p>
-                        <p className="text-gray-300">
-                          If you continue, the game will start with bot players in all empty seats and the game will not be rated.
-                        </p>
-                      </div>
-                      {/* Buttons */}
-                      <div className="flex gap-3 justify-center">
-                        <button
-                          onClick={onCloseStartWarning}
-                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handlePlayWithBots}
-                          className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                        >
-                          Play with Bots
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Bot Players Warning Modal - DESKTOP ONLY */}
-              {showBotWarning && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden sm:block">
-                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
-                    <div>
-                      {/* Header with inline icon and title */}
-                      <div className="flex items-center justify-center mb-4">
-                        <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <h3 className="text-2xl font-bold text-white">
-                          Bot Players Detected
-                        </h3>
-                      </div>
-                      {/* Message - center aligned */}
-                      <div className="text-center mb-6">
-                        <p className="text-lg text-gray-200 mb-2 font-semibold">
-                          Coin games require 4 human players.<br />You have {botCount} bot player{botCount !== 1 ? 's' : ''}.
-                        </p>
-                        <p className="text-gray-300">
-                          If you continue, the game will start but will not be rated.
-                        </p>
-                      </div>
-                      {/* Buttons */}
-                      <div className="flex gap-3 justify-center">
-                        <button
-                          onClick={onCloseBotWarning}
-                          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleStartWithBots}
-                          className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                        >
-                          Start Game
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Winner/Loser Modals - positioned inside the actual game table (blue oval) */}
               {(showWinner || showLoser) && (() => {
@@ -2454,11 +2372,11 @@ export default function GameTable({
 
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
                 {gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto"
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[99999]"
                     style={{ fontSize: `${Math.floor(16 * scaleFactor)}px` }}
                   >
                     Start Game
@@ -2724,7 +2642,90 @@ export default function GameTable({
 
       </div>
 
-      {/* Remove mobile modals from here - they will be handled by parent component */}
+      {/* Mobile Modals - rendered outside the main container */}
+      {showStartWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+            <div>
+              {/* Header with inline icon and title */}
+              <div className="flex items-center justify-center mb-4">
+                <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-white">
+                  Empty Seats Detected
+                </h3>
+              </div>
+              {/* Message - center aligned */}
+              <div className="text-center mb-6">
+                <p className="text-lg text-gray-200 mb-2 font-semibold">
+                  Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
+                </p>
+                <p className="text-gray-300">
+                  If you continue, the game will start with bot players in all empty seats and the game will not be rated.
+                </p>
+              </div>
+              {/* Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={onCloseStartWarning}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePlayWithBots}
+                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  Play with Bots
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBotWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+            <div>
+              {/* Header with inline icon and title */}
+              <div className="flex items-center justify-center mb-4">
+                <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-white">
+                  Bot Players Detected
+                </h3>
+              </div>
+              {/* Message - center aligned */}
+              <div className="text-center mb-6">
+                <p className="text-lg text-gray-200 mb-2 font-semibold">
+                  Coin games require 4 human players.<br />You have {botCount} bot player{botCount !== 1 ? 's' : ''}.
+                </p>
+                <p className="text-gray-300">
+                  If you continue, the game will start but will not be rated.
+                </p>
+              </div>
+              {/* Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={onCloseBotWarning}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStartWithBots}
+                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  Start Game
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
