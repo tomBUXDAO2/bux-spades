@@ -18,7 +18,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
-  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS'>('SUICIDE');
+  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES'>('SUICIDE');
 
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
@@ -243,8 +243,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               >
                 <option value="NO GIMMICK" disabled>NO GIMMICK</option>
                 {gameType === 'GIMMICK' && (mode === 'PARTNERS' 
-                  ? ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS']
-                  : ['4 OR NIL', 'BID 3', 'BID HEARTS']
+                  ? ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES']
+                  : ['4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES']
                 ).map((option: string) => (
                   <option key={option} value={option}>
                     {option}

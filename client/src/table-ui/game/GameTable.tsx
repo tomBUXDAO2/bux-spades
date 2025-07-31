@@ -2355,6 +2355,8 @@ export default function GameTable({
                         gameType = 'BID 3';
                       } else if (forcedBid === 'BIDHEARTS') {
                         gameType = 'BID HEARTS';
+                      } else if (forcedBid === 'CRAZY ACES') {
+                        gameType = 'CRAZY ACES';
                       }
   
   console.log('[GAMETABLE DEBUG] Game state analysis:', {
@@ -2427,6 +2429,7 @@ export default function GameTable({
                                 forcedBid={(gameState as any).forcedBid}
                                 partnerBid={partnerBid}
                                 partnerBidValue={partnerBid}
+                                currentPlayerHand={currentPlayerHand}
                               />
                             )}
                           </>
@@ -2486,6 +2489,14 @@ export default function GameTable({
                              style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                           <div className="font-bold">BIDDING 3</div>
                           <div className="text-sm mt-1">All players must bid exactly 3</div>
+                        </div>
+                      );
+                    } else if (forcedBid === "CRAZY ACES") {
+                      return (
+                        <div className="px-4 py-2 bg-purple-600/80 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                             style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                          <div className="font-bold">CRAZY ACES</div>
+                          <div className="text-sm mt-1">All players must bid 3 for each ace they hold</div>
                         </div>
                       );
                     } else if (gameType === "MIRROR") {
@@ -2688,6 +2699,7 @@ export default function GameTable({
                 else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
                 else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
                 else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
+                else if ((gameState as any).forcedBid === 'CRAZY ACES') label = 'CRAZY As';
                 else label = 'GIMMICK';
               }
               return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;

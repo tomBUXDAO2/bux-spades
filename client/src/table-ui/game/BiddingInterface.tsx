@@ -13,6 +13,7 @@ interface BiddingProps {
   forcedBid?: string; // Add forcedBid prop for Suicide games
   partnerBid?: number; // Add partnerBid prop for Suicide games
   partnerBidValue?: number; // Add partnerBidValue prop to show partner's bid
+  currentPlayerHand?: Card[]; // Add currentPlayerHand prop for CRAZY ACES
 }
 
 // Assign a unique class name for direct targeting
@@ -32,7 +33,8 @@ export default function BiddingInterface({
   hasAceSpades = false, // Default to false for backward compatibility
   forcedBid = 'NONE', // Default to NONE for backward compatibility
   partnerBid = undefined, // Default to undefined for backward compatibility
-  partnerBidValue = undefined // Default to undefined for backward compatibility
+  partnerBidValue = undefined, // Default to undefined for backward compatibility
+  currentPlayerHand = undefined // Default to undefined for backward compatibility
 }: BiddingProps) {
   const [selectedBid, setSelectedBid] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,6 +135,17 @@ export default function BiddingInterface({
     console.log('[BID HEARTS DEBUG] Auto-bidding hearts count:', numHearts);
     setIsSubmitting(true);
     onBid(numHearts);
+    return null;
+  }
+
+  // For CRAZY ACES games, auto-bid 3 for each ace and show message on table
+  if (forcedBid === "CRAZY ACES") {
+    // Count aces in the player's hand
+    const acesCount = currentPlayerHand ? currentPlayerHand.filter(card => card.rank === 'A').length : 0;
+    const bidAmount = acesCount * 3;
+    console.log('[CRAZY ACES DEBUG] Auto-bidding 3 for each ace:', acesCount, 'aces =', bidAmount);
+    setIsSubmitting(true);
+    onBid(bidAmount);
     return null;
   }
 

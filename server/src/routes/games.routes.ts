@@ -44,7 +44,7 @@ router.post('/', (req, res) => {
       biddingOption: settings.biddingOption,
       specialRules: settings.specialRules,
       forcedBid,
-      finalGameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS') ? 'REG' : (settings.biddingOption || 'REG')
+      finalGameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS' || settings.biddingOption === 'CRAZY ACES') ? 'REG' : (settings.biddingOption || 'REG')
     });
     
     const newGame: Game = {
@@ -62,7 +62,7 @@ router.post('/', (req, res) => {
       rules: {
         // For gimmick games (SUICIDE, 4 OR NIL, BID 3, BID HEARTS), set gameType to 'REG'
         // and use forcedBid to distinguish between them
-        gameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS') ? 'REG' : (settings.biddingOption || 'REG'),
+        gameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS' || settings.biddingOption === 'CRAZY ACES') ? 'REG' : (settings.biddingOption || 'REG'),
         allowNil: settings.specialRules?.allowNil ?? true,
         allowBlindNil: settings.specialRules?.allowBlindNil ?? false,
         coinAmount: settings.buyIn,
@@ -662,6 +662,12 @@ function calculateBotBid(
   if (forcedBid === 'BIDHEARTS') {
     // BID HEARTS: Must bid number of hearts
     return hand.filter(c => c.suit === 'H').length;
+  }
+  
+  if (forcedBid === 'CRAZY ACES') {
+    // CRAZY ACES: Must bid 3 for each ace
+    const acesCount = hand.filter(c => c.rank === 'A').length;
+    return acesCount * 3;
   }
   
   if (forcedBid === 'SUICIDE') {
