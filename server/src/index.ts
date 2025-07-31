@@ -757,6 +757,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       });
       // If next is a bot, trigger their move
       if (game.players[next] && game.players[next].type === 'bot') {
+        console.log('[BOT BIDDING] Triggering bot bid for:', game.players[next].username, 'at index:', next);
+        setTimeout(() => {
+          botMakeMove(game, next);
+        }, 600); // Reduced delay for faster bot bidding
         botMakeMove(game, next);
       }
     }
