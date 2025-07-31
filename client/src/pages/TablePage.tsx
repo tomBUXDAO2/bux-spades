@@ -163,6 +163,12 @@ export default function TablePage() {
   useEffect(() => {
     if (!socket) return;
     const handleGameUpdate = (updatedGame: any) => {
+      console.log('[GAME UPDATE DEBUG] Received game update:', {
+        currentPlayer: updatedGame.currentPlayer,
+        status: updatedGame.status,
+        playCurrentPlayer: updatedGame.play?.currentPlayer,
+        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer
+      });
       setGame(updatedGame);
       // Update modal state when game state changes
       updateModalState(updatedGame);
