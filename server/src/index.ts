@@ -369,6 +369,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   // Join game room for real-time updates
   socket.on('join_game', ({ gameId }) => {
+    console.log('[SERVER DEBUG] join_game event received:', { 
+      gameId, 
+      socketId: socket.id, 
+      userId: socket.userId,
+      isAuthenticated: socket.isAuthenticated 
+    });
+    
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized join_game attempt:', { 
         socketId: socket.id, 
@@ -386,6 +393,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Game not found' });
         return;
       }
+      
+      console.log('[SERVER DEBUG] Found game:', { 
+        gameId, 
+        status: game.status, 
+        currentPlayer: game.currentPlayer,
+        biddingCurrentPlayer: game.bidding?.currentPlayer,
+        playCurrentPlayer: game.play?.currentPlayer
+      });
 
       // Check if user is already in the game
       const isPlayerInGame = game.players.some((player: GamePlayer | null) => 
@@ -416,7 +431,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
       // Send game update ONLY to this socket, with hand
-      socket.emit('game_update', enrichGameForClient(game, socket.userId));
+      const enrichedGame = enrichGameForClient(game, socket.userId);
+      console.log('[SERVER DEBUG] Sending game_update to client:', {
+        gameId,
+        userId: socket.userId,
+        currentPlayer: enrichedGame.currentPlayer,
+        status: enrichedGame.status
+      });
+      socket.emit('game_update', enrichedGame);
       // Notify all clients about games update
       emitGameUpdateToPlayers(game);
       io.emit('games_updated', games);
