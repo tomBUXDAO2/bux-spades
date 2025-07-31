@@ -142,7 +142,10 @@ function hasSpadeBeenPlayed(game: GameState): boolean {
     currentTrick,
     currentTrickHasSpades,
     result,
-    completedTricksLength: game.completedTricks?.length || 0
+    completedTricksLength: game.completedTricks?.length || 0,
+    gameStateKeys: Object.keys(game),
+    playKeys: game.play ? Object.keys(game.play) : 'no play object',
+    fullGameState: game
   });
   
   return result;
