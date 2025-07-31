@@ -182,7 +182,8 @@ export default function TablePage() {
         currentPlayer: updatedGame.currentPlayer,
         status: updatedGame.status,
         playCurrentPlayer: updatedGame.play?.currentPlayer,
-        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer
+        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
+        fullGameObject: updatedGame
       });
       setGame(updatedGame);
       // Update modal state when game state changes
