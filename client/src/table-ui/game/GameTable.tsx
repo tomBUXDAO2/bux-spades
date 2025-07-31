@@ -158,16 +158,30 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   if (isLeadingTrick) {
     // Check for Assassin rules first
     if (game.specialRules?.assassin) {
-      // Assassin: must lead spades when spades are broken and you have spades
+      // Assassin: cannot lead spades before they are broken, but if spades are broken and you have spades, all other cards are locked
       const spades = hand.filter(card => card.suit === '♠');
-      if (hasSpadeBeenPlayed(game) && spades.length > 0) {
-        return spades; // Must lead spades if available and spades are broken
+      const nonSpades = hand.filter(card => card.suit !== '♠');
+      
+      if (!hasSpadeBeenPlayed(game)) {
+        // Spades not broken yet - cannot lead spades unless only spades left
+        if (nonSpades.length > 0) {
+          return nonSpades; // Must lead non-spades if available
+        } else {
+          return hand; // Only spades left, can lead spades
+        }
+      } else {
+        // Spades are broken - if you have spades, all other cards are locked
+        if (spades.length > 0) {
+          return spades; // Must lead spades if available
+        } else {
+          return hand; // No spades, can lead anything
+        }
       }
     }
     
     // Check for Screamer rules
     if (game.specialRules?.screamer) {
-      // Screamer: cannot lead spades unless only spades left
+      // Screamer: cannot lead spades unless only spades left (regardless of whether spades are broken)
       const nonSpades = hand.filter(card => card.suit !== '♠');
       if (nonSpades.length > 0) {
         return nonSpades; // Must play non-spades if available
@@ -203,15 +217,17 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   
   // Void in lead suit - can play any card, but apply special rules
   if (game.specialRules?.assassin) {
-    // Assassin: must cut with spades when void in lead suit and you have spades
+    // Assassin: when void in lead suit, all cards except spades are locked
     const spades = hand.filter(card => card.suit === '♠');
     if (spades.length > 0) {
       return spades; // Must cut with spades if available
+    } else {
+      return hand; // No spades, can play anything
     }
   }
   
   if (game.specialRules?.screamer) {
-    // Screamer: cannot cut with spades unless only spades left
+    // Screamer: cannot cut with spades unless only spades left (even after spades are broken)
     const nonSpades = hand.filter(card => card.suit !== '♠');
     if (nonSpades.length > 0) {
       return nonSpades; // Must play non-spades if available
