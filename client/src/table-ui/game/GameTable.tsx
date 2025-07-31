@@ -268,17 +268,6 @@ declare global {
   }
 }
 
-// Helper function to normalize suit to Unicode symbol
-const normalizeSuit = (suit: string): string => {
-  const suitMap: Record<string, string> = {
-    'S': '♠', 'Spades': '♠',
-    'H': '♥', 'Hearts': '♥', 
-    'D': '♦', 'Diamonds': '♦',
-    'C': '♣', 'Clubs': '♣'
-  };
-  return suitMap[suit] || suit;
-};
-
 // Helper function to check if a card is a spade
 const isSpade = (card: Card): boolean => {
   return card.suit === '♠' || (card as any).suit === 'S';
