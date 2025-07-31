@@ -127,12 +127,12 @@ function getLeadSuit(trick: Card[] | undefined): Suit | null {
 function hasSpadeBeenPlayed(game: GameState): boolean {
   // Check if any completed trick contained a spade
   const completedTricksHaveSpades = game.completedTricks?.some((trick: any) =>
-    Array.isArray(trick.cards) && trick.cards.some((card: Card) => card.suit === '♠')
+    Array.isArray(trick.cards) && trick.cards.some((card: Card) => isSpade(card))
   ) || false;
   
   // Also check if current trick has spades
   const currentTrick = (game as any).play?.currentTrick || [];
-  const currentTrickHasSpades = currentTrick.some((card: Card) => card.suit === '♠');
+  const currentTrickHasSpades = currentTrick.some((card: Card) => isSpade(card));
   
   return completedTricksHaveSpades || currentTrickHasSpades;
 }
@@ -141,14 +141,14 @@ function canLeadSpades(game: GameState, hand: Card[]): boolean {
   // Check for Screamer rules first
   if (game.specialRules?.screamer) {
     // Screamer: cannot lead spades unless only spades left
-    const nonSpades = hand.filter(card => card.suit !== '♠');
+    const nonSpades = hand.filter(card => !isSpade(card));
     return nonSpades.length === 0; // Only can lead spades if no other cards
   }
   
   // Normal rules: Can lead spades if:
   // 1. Spades have been broken, or
   // 2. Player only has spades left
-  return hasSpadeBeenPlayed(game) || hand.every(card => card.suit === '♠');
+  return hasSpadeBeenPlayed(game) || hand.every(isSpade);
 }
 
 function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean, trickCompleted: boolean = false): Card[] {
@@ -159,8 +159,8 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     // Check for Assassin rules first
     if (game.specialRules?.assassin) {
       // Assassin: cannot lead spades before they are broken, but if spades are broken and you have spades, all other cards are locked
-      const spades = hand.filter(card => card.suit === '♠');
-      const nonSpades = hand.filter(card => card.suit !== '♠');
+      const spades = hand.filter(isSpade);
+      const nonSpades = hand.filter(card => !isSpade(card));
       
       if (!hasSpadeBeenPlayed(game)) {
         // Spades not broken yet - cannot lead spades unless only spades left
@@ -182,7 +182,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     // Check for Screamer rules
     if (game.specialRules?.screamer) {
       // Screamer: cannot lead spades unless only spades left (regardless of whether spades are broken)
-      const nonSpades = hand.filter(card => card.suit !== '♠');
+      const nonSpades = hand.filter(card => !isSpade(card));
       if (nonSpades.length > 0) {
         return nonSpades; // Must play non-spades if available
       } else {
@@ -226,7 +226,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   
   if (game.specialRules?.assassin) {
     // Assassin: when void in lead suit, all cards except spades are locked
-    const spades = hand.filter(card => card.suit === '♠');
+    const spades = hand.filter(isSpade);
     if (spades.length > 0) {
       return spades; // Must cut with spades if available
     } else {
@@ -236,12 +236,13 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   
   if (game.specialRules?.screamer) {
     // Screamer: cannot cut with spades unless only spades left (even after spades are broken)
-    const nonSpades = hand.filter(card => card.suit !== '♠');
+    const nonSpades = hand.filter(card => !isSpade(card));
     console.log('[SCREAMER DEBUG] Void in lead suit, Screamer active:', {
       hand: hand.map(card => `${card.rank}${card.suit}`),
       nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
       nonSpadesCount: nonSpades.length,
-      leadSuit
+      leadSuit,
+      cardSuits: hand.map(card => card.suit)
     });
     if (nonSpades.length > 0) {
       console.log('[SCREAMER DEBUG] Returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
@@ -267,10 +268,26 @@ declare global {
   }
 }
 
+// Helper function to normalize suit to Unicode symbol
+const normalizeSuit = (suit: string): string => {
+  const suitMap: Record<string, string> = {
+    'S': '♠', 'Spades': '♠',
+    'H': '♥', 'Hearts': '♥', 
+    'D': '♦', 'Diamonds': '♦',
+    'C': '♣', 'Clubs': '♣'
+  };
+  return suitMap[suit] || suit;
+};
+
+// Helper function to check if a card is a spade
+const isSpade = (card: Card): boolean => {
+  return card.suit === '♠' || (card as any).suit === 'S';
+};
+
 // Helper function to count spades in a hand
 const countSpades = (hand: Card[] | undefined): number => {
   if (!hand || !Array.isArray(hand)) return 0;
-  return hand.filter(card => card.suit === '♠' || (card as any).suit === 'S').length;
+  return hand.filter(isSpade).length;
 };
 
 // Helper function to determine if the current user can invite a bot for a seat
