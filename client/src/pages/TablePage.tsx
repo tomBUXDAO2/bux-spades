@@ -19,6 +19,7 @@ export default function TablePage() {
   
   // Debug logging for game state changes
   useEffect(() => {
+    console.log('[REFRESH DEBUG] Component mounted/updated, game state:', game ? 'exists' : 'null');
     if (game) {
       console.log('[GAME STATE DEBUG] Game state updated:', {
         currentPlayer: game.currentPlayer,
@@ -259,6 +260,12 @@ export default function TablePage() {
 
   // Ensure player always (re)joins the game room on socket connect or refresh
   useEffect(() => {
+    console.log('[REFRESH DEBUG] Socket effect triggered:', { 
+      hasSocket: !!socket, 
+      isConnected: socket?.connected, 
+      hasUser: !!user, 
+      hasGameId: !!gameId 
+    });
     if (socket && socket.connected && user && gameId) {
       console.log('[SOCKET DEBUG] Emitting join_game:', { gameId, userId: user.id });
       socket.emit('join_game', { gameId, userId: user.id });
