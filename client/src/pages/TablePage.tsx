@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
 
 export default function TablePage() {
-  console.log('🔥🔥🔥 [HARD REFRESH TEST] TablePage component loaded at:', new Date().toISOString());
+  console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -185,6 +185,14 @@ export default function TablePage() {
         biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
         fullGameObject: updatedGame
       });
+      
+      // Ensure currentPlayer is set correctly
+      if (updatedGame.status === 'BIDDING' && updatedGame.bidding?.currentPlayer) {
+        updatedGame.currentPlayer = updatedGame.bidding.currentPlayer;
+      } else if (updatedGame.status === 'PLAYING' && updatedGame.play?.currentPlayer) {
+        updatedGame.currentPlayer = updatedGame.play.currentPlayer;
+      }
+      
       setGame(updatedGame);
       // Update modal state when game state changes
       updateModalState(updatedGame);
