@@ -206,7 +206,11 @@ export default function TablePage() {
       // Update modal state when game state changes
       updateModalState(updatedGame);
     };
+    
+    // Remove any existing listeners first to prevent duplicates
+    socket.off('game_update', handleGameUpdate);
     socket.on('game_update', handleGameUpdate);
+    
     return () => {
       console.log('[SOCKET DEBUG] Cleaning up game_update listener');
       socket.off('game_update', handleGameUpdate);
@@ -217,19 +221,31 @@ export default function TablePage() {
   useEffect(() => {
     if (!socket) return;
     const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
-      setGame(prev => prev ? ({
-        ...prev,
-        bidding: {
-          ...prev.bidding,
-          currentBidderIndex: bidding.currentBidderIndex,
-          currentPlayer: prev.players[bidding.currentBidderIndex]?.id ?? '',
-          bids: bidding.bids,
-        },
-        // --- FIX: Also update root-level currentPlayer! ---
-        currentPlayer: prev.players[bidding.currentBidderIndex]?.id ?? '',
-      }) : prev);
+      console.log('[BIDDING UPDATE DEBUG] Received bidding update:', bidding);
+      setGame(prev => {
+        if (!prev) return prev;
+        
+        const nextPlayer = prev.players[bidding.currentBidderIndex];
+        console.log('[BIDDING UPDATE DEBUG] Next player:', nextPlayer?.username, 'at index:', bidding.currentBidderIndex);
+        
+        return {
+          ...prev,
+          bidding: {
+            ...prev.bidding,
+            currentBidderIndex: bidding.currentBidderIndex,
+            currentPlayer: nextPlayer?.id ?? '',
+            bids: bidding.bids,
+          },
+          // --- CRITICAL FIX: Update root-level currentPlayer! ---
+          currentPlayer: nextPlayer?.id ?? '',
+        };
+      });
     };
+    
+    // Remove any existing listeners first to prevent duplicates
+    socket.off('bidding_update', handleBiddingUpdate);
     socket.on('bidding_update', handleBiddingUpdate);
+    
     return () => {
       socket.off('bidding_update', handleBiddingUpdate);
     };
@@ -271,7 +287,11 @@ export default function TablePage() {
         // Don't update currentPlayer from play_update - let game_update handle that
       }) : prev);
     };
+    
+    // Remove any existing listeners first to prevent duplicates
+    socket.off('play_update', handlePlayUpdate);
     socket.on('play_update', handlePlayUpdate);
+    
     return () => {
       socket.off('play_update', handlePlayUpdate);
     };
