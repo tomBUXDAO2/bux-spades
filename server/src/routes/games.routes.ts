@@ -860,7 +860,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
           botMakeMove(game, next);
         }
       }
-    }, 1000);
+    }, 600);
   } else {
     console.log('[BOT DEBUG] Conditions not met for bot to bid. Status:', game.status, 'currentBidderIndex:', game.bidding?.currentBidderIndex, 'seatIndex:', seatIndex, 'bid already made:', game.bidding?.bids ? game.bidding.bids[seatIndex] : undefined);
   }
@@ -1422,7 +1422,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Emit clear trick event after animation delay
         setTimeout(() => {
           io.to(game.id).emit('clear_trick');
-        }, 2000); // 2 second delay to match frontend animation
+        }, 1200); // Reduced delay for faster animation
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
@@ -1773,7 +1773,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         console.log('[BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
         setTimeout(() => {
           botPlayCard(game, nextPlayerIndex);
-        }, 1500); // 1.5 second delay
+        }, 800); // Reduced delay for faster bot play
       } else {
         console.log('[BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', nextPlayerIndex, '- waiting for human input');
       }

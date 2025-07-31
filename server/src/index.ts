@@ -1217,7 +1217,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
             botPlayCard(game, game.play.currentPlayerIndex);
           }
-        }, 1500); // 1.5 second delay
+        }, 800); // Reduced delay for faster bot play
       }
       // If the next player is a human, DO NOT trigger any bot moves - wait for human input
       
@@ -1277,7 +1277,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               game.players[nextPlayerIndex] && game.players[nextPlayerIndex]!.type === 'bot') {
             botPlayCard(game, nextPlayerIndex);
           }
-        }, 1500); // Increased delay to 1.5 seconds
+        }, 800); // Reduced delay for faster bot play
       }
       // If the next player is a human, DO NOT trigger any bot moves - wait for human input
     }
@@ -1372,9 +1372,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (firstBidder && firstBidder.type === 'bot') {
         setTimeout(() => {
           botMakeMove(game, game.bidding.currentBidderIndex);
-          }, 1000); // Additional delay for bot bidding
+          }, 600); // Reduced delay for faster bot bidding
       }
-      }, 2000); // 2 second delay after dealing
+      }, 1200); // Reduced delay after dealing
 
     } catch (error) {
       console.error('Error in start_new_hand:', error);

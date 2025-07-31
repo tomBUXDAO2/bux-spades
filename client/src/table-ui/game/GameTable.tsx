@@ -656,22 +656,22 @@ export default function GameTable({
     const player = orderedPlayers[position];
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
-      // Base positioning
+      // Base positioning - moved to edge of table
       const basePositions = [
-        'bottom-4 left-1/2 -translate-x-1/2',  // South (bottom)
-        'left-4 top-1/2 -translate-y-1/2',     // West (left)
-        'top-4 left-1/2 -translate-x-1/2',     // North (top)
-        'right-4 top-1/2 -translate-y-1/2'     // East (right)
+        'bottom-0 left-1/2 -translate-x-1/2',  // South (bottom)
+        'left-0 top-1/2 -translate-y-1/2',     // West (left)
+        'top-0 left-1/2 -translate-x-1/2',     // North (top)
+        'right-0 top-1/2 -translate-y-1/2'     // East (right)
       ];
       
       // Apply responsive adjustments
       if (windowSize.width < 768) {
-        // Tighter positioning for smaller screens
+        // Tighter positioning for smaller screens - also at edge
         const mobilePositions = [
-          'bottom-2 left-1/2 -translate-x-1/2',  // South
-          'left-2 top-1/2 -translate-y-1/2',     // West
-          'top-2 left-1/2 -translate-x-1/2',     // North
-          'right-2 top-1/2 -translate-y-1/2'     // East
+          'bottom-0 left-1/2 -translate-x-1/2',  // South
+          'left-0 top-1/2 -translate-y-1/2',     // West
+          'top-0 left-1/2 -translate-x-1/2',     // North
+          'right-0 top-1/2 -translate-y-1/2'     // East
         ];
         return mobilePositions[pos];
       }
@@ -1309,55 +1309,8 @@ export default function GameTable({
     }
   }, [gameState.status, gameState.team1TotalScore, gameState.team2TotalScore, handSummaryData, showHandSummary]);
 
-  // Fallback: Check if hand is complete but no event was received
-  useEffect(() => {
-    // Only run fallback if we haven't already shown hand summary and no hand summary data exists
-    // AND all 13 tricks have been played (hand is actually complete)
-    const totalTricksPlayed = gameState.players?.reduce((total, p) => total + (p?.tricks || 0), 0) || 0;
-    
-    if ((gameState.status === "PLAYING" || gameState.status === "HAND_COMPLETED") && 
-        !showHandSummary && 
-        !handSummaryData &&
-        totalTricksPlayed === 13) {
-      console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
-      
-      // Add a flag to prevent multiple fallback triggers
-      if ((window as any).__fallbackTriggered) {
-        console.log('[FALLBACK] Fallback already triggered, skipping');
-        return;
-      }
-      (window as any).__fallbackTriggered = true;
-      
-      // Calculate scores manually from game state
-      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
-      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
-      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
-      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-      
-      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
-      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
-      
-      const fallbackData = {
-        team1Score,
-        team2Score,
-        team1Bags: Math.max(0, team1Tricks - team1Bid),
-        team2Bags: Math.max(0, team2Tricks - team2Bid),
-        team1TotalScore: gameState.team1TotalScore || team1Score,
-        team2TotalScore: gameState.team2TotalScore || team2Score,
-        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
-      };
-      
-      console.log('[FALLBACK] Calculated fallback data:', fallbackData);
-      
-      // Store the hand summary data
-      setHandSummaryData(fallbackData);
-      
-      // Add delay to allow trick completion animation to finish before showing hand summary
-      setTimeout(() => {
-        setShowHandSummary(true);
-      }, 3000);
-    }
-  }, [gameState.status, sanitizedPlayers, showHandSummary, handSummaryData, gameState.players, gameState.bidding]);
+  // Fallback mechanism disabled - only use server-provided hand completion data
+  // This prevents duplicate hand summary modals with random data
 
   // Effect to handle new hand started
   useEffect(() => {
@@ -1370,9 +1323,6 @@ export default function GameTable({
       setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
       setHandSummaryData(null); // Clear hand summary data
-      
-      // Clear the fallback flag when a new hand starts
-      (window as any).__fallbackTriggered = false;
       
       // Reset blind nil state for new hand
       setCardsRevealed(false);
@@ -2233,89 +2183,15 @@ export default function GameTable({
                     <IoInformationCircleOutline className="h-5 w-5" />
                   </button>
 
-                  {showGameInfo && (
-                    <div className="absolute left-0 mt-2 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-50 text-sm text-white">
-                      <div className="font-bold mb-2 flex items-center gap-2">
-                        <IoInformationCircleOutline className="inline-block h-4 w-4 text-blue-400" />
-                        Table Details
-                      </div>
-                      {/* GameTile-style info header */}
-                      <div className="flex items-center gap-2 text-sm mb-2">
-                        {/* Game type brick */}
-                        {(() => {
-                          const type = (gameState as any).rules?.gameType || 'REGULAR';
-                          let color = 'bg-green-600';
-                          let label = 'REGULAR';
-                          if (type === 'WHIZ') {
-                            color = 'bg-blue-600';
-                            label = 'WHIZ';
-                          } else if (type === 'MIRROR') {
-                            color = 'bg-red-600';
-                            label = 'MIRRORS';
-                          } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
-                            color = 'bg-orange-500';
-                                                          if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
-                            else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
-                            else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
-                            else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
-                            else label = 'GIMMICK';
-                          }
-                          return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
-                        })()}
-                        {/* Points */}
-                        <span className="text-slate-300 font-medium">{gameState.minPoints}/{gameState.maxPoints}</span>
-                        {/* Nil and bn (blind nil) with inline check/cross */}
-                        {gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
-                        {!gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
-                        <span className="text-slate-300 ml-2">bn <span className="align-middle">{gameState.rules?.allowBlindNil ? '☑️' : '❌'}</span></span>
-                      </div>
-                      {/* Line 2: Buy-in, game mode, and special bricks */}
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? (gameState as any).rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
-                        <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{gameState.gameMode || (gameState.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
-                        {/* Special bricks for assassin/screamer */}
-                        {gameState.specialRules?.assassin && (
-                          <span className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
-                        )}
-                        {gameState.specialRules?.screamer && (
-                          <span className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
-                        )}
-                      </div>
-                      {/* Prize info */}
-                      <div className="mt-2 pt-2 border-t border-gray-700">
-                        <div className="text-sm">
-                          <span className="text-gray-400">Prize:</span>
-                          <span className="font-bold text-yellow-400 ml-2">
-                            {(() => {
-                              const buyIn = (gameState as any).rules?.coinAmount || 100000;
-                              const prizePot = buyIn * 4 * 0.9;
-                              // Check gameMode for Partners vs Solo, not gameType
-                              const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
-                              if (isPartnersMode) {
-                                return `${formatCoins(prizePot / 2)} each`;
-                              } else {
-                                // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
-                                const secondPlacePrize = buyIn; // Exactly their stake back
-                                const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
-                                return `1st: ${formatCoins(firstPlacePrize)}, 2nd: ${formatCoins(secondPlacePrize)}`;
-                              }
-                            })()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+
                 </div>
               </div>
               
               {/* Scoreboard in top right corner - inside the table */}
-              <div className="absolute top-4 right-4 z-10 flex flex-col items-center gap-2 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
+              <div className="absolute top-4 right-4 z-10 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
                 {gameState.gameMode === 'SOLO' ? (
-                  // Solo mode - 4 individual players
-                  <>
+                  // Solo mode - 4 individual players in 2 columns
+                  <div className="grid grid-cols-2 gap-2">
                     {[0, 1, 2, 3].map((playerIndex) => {
                       const playerScore = gameState.playerScores?.[playerIndex] || 0;
                       const playerBags = gameState.playerBags?.[playerIndex] || 0;
@@ -2325,7 +2201,7 @@ export default function GameTable({
                       return (
                         <div key={playerIndex} className="flex items-center">
                           <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-1`}></div>
-                          <span className="text-white font-bold mr-1 text-sm">{playerScore}</span>
+                          <span className="text-white font-bold mr-1 text-sm w-8 text-right">{playerScore}</span>
                           {/* Player Bags */}
                           <div className="flex items-center text-yellow-300 ml-2" title={`${playerName} Bags: ${playerBags}`}> 
                             <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
@@ -2334,27 +2210,27 @@ export default function GameTable({
                         </div>
                       );
                     })}
-                  </>
+                  </div>
                 ) : (
                   // Partners mode - 2 teams
                   <>
-                    {/* Blue Team Score and Bags */}
+                    {/* Red Team Score and Bags */}
                 <div className="flex items-center">
-                      <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-                  <span className="text-white font-bold mr-1 text-sm">{team1Score}</span>
-                      {/* Blue Team Bags */}
-                      <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team1Bags}`}> 
+                      <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
+                  <span className="text-white font-bold mr-1 text-sm w-8 text-right">{team1Score}</span>
+                      {/* Red Team Bags */}
+                      <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team1Bags}`}> 
                     <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
                     <span className="text-xs font-bold">{team1Bags}</span>
                   </div>
                 </div>
 
-                    {/* Red Team Score and Bags */}
+                    {/* Blue Team Score and Bags */}
                 <div className="flex items-center">
-                      <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-                  <span className="text-white font-bold mr-1 text-sm">{team2Score}</span>
-                      {/* Red Team Bags */}
-                      <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team2Bags}`}> 
+                      <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
+                  <span className="text-white font-bold mr-1 text-sm w-8 text-right">{team2Score}</span>
+                      {/* Blue Team Bags */}
+                      <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team2Bags}`}> 
                     <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
                     <span className="text-xs font-bold">{team2Bags}</span>
                   </div>
@@ -2492,6 +2368,7 @@ export default function GameTable({
                                 hasAceSpades={hasAceSpades}
                                 forcedBid={(gameState as any).forcedBid}
                                 partnerBid={partnerBid}
+                                partnerBidValue={partnerBid}
                               />
                             )}
                           </>
@@ -2722,6 +2599,83 @@ export default function GameTable({
                   Start Game
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Details Modal - rendered outside the main container */}
+      {showGameInfo && (
+        <div className="fixed left-4 top-20 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-[999999] text-sm text-white">
+          <div className="font-bold mb-2 flex items-center gap-2">
+            <IoInformationCircleOutline className="inline-block h-4 w-4 text-blue-400" />
+            Table Details
+          </div>
+          {/* GameTile-style info header */}
+          <div className="flex items-center gap-2 text-sm mb-2">
+            {/* Game type brick */}
+            {(() => {
+              const type = (gameState as any).rules?.gameType || 'REGULAR';
+              let color = 'bg-green-600';
+              let label = 'REGULAR';
+              if (type === 'WHIZ') {
+                color = 'bg-blue-600';
+                label = 'WHIZ';
+              } else if (type === 'MIRROR') {
+                color = 'bg-red-600';
+                label = 'MIRRORS';
+              } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
+                color = 'bg-orange-500';
+                if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
+                else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
+                else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
+                else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
+                else label = 'GIMMICK';
+              }
+              return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
+            })()}
+            {/* Points */}
+            <span className="text-slate-300 font-medium">{gameState.minPoints}/{gameState.maxPoints}</span>
+            {/* Nil and bn (blind nil) with inline check/cross */}
+            {gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
+            {!gameState.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
+            <span className="text-slate-300 ml-2">bn <span className="align-middle">{gameState.rules?.allowBlindNil ? '☑️' : '❌'}</span></span>
+          </div>
+          {/* Line 2: Buy-in, game mode, and special bricks */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? (gameState as any).rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
+            <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{gameState.gameMode || (gameState.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+            {/* Special bricks for assassin/screamer */}
+            {gameState.specialRules?.assassin && (
+              <span className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
+            )}
+            {gameState.specialRules?.screamer && (
+              <span className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
+            )}
+          </div>
+          {/* Prize info */}
+          <div className="mt-2 pt-2 border-t border-gray-700">
+            <div className="text-sm">
+              <span className="text-gray-400">Prize:</span>
+              <span className="font-bold text-yellow-400 ml-2">
+                {(() => {
+                  const buyIn = (gameState as any).rules?.coinAmount || 100000;
+                  const prizePot = buyIn * 4 * 0.9;
+                  // Check gameMode for Partners vs Solo, not gameType
+                  const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
+                  if (isPartnersMode) {
+                    return `${formatCoins(prizePot / 2)} each`;
+                  } else {
+                    // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
+                    const secondPlacePrize = buyIn; // Exactly their stake back
+                    const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
+                    return `1st: ${formatCoins(firstPlacePrize)}, 2nd: ${formatCoins(secondPlacePrize)}`;
+                  }
+                })()}
+              </span>
             </div>
           </div>
         </div>

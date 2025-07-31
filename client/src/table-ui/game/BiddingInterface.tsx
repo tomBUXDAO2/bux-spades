@@ -13,6 +13,7 @@ interface BiddingProps {
   hasAceSpades?: boolean; // Add hasAceSpades prop for Whiz games
   forcedBid?: string; // Add forcedBid prop for Suicide games
   partnerBid?: number; // Add partnerBid prop for Suicide games
+  partnerBidValue?: number; // Add partnerBidValue prop to show partner's bid
 }
 
 // Assign a unique class name for direct targeting
@@ -32,7 +33,8 @@ export default function BiddingInterface({
   allowNil = true, // Default to true for backward compatibility
   hasAceSpades = false, // Default to false for backward compatibility
   forcedBid = 'NONE', // Default to NONE for backward compatibility
-  partnerBid = undefined // Default to undefined for backward compatibility
+  partnerBid = undefined, // Default to undefined for backward compatibility
+  partnerBidValue = undefined // Default to undefined for backward compatibility
 }: BiddingProps) {
   const [selectedBid, setSelectedBid] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,68 +198,55 @@ export default function BiddingInterface({
   return (
     <>
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
-        <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
-          <div className="text-center mb-3 max-sm:mb-2">
+        <div className={`${modalContentClass} w-[420px] md:w-[400px] sm:w-[360px] max-sm:w-[320px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 max-sm:p-2 shadow-xl`}>
+          <div className="text-center mb-2 max-sm:mb-1">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
-            {currentBid !== undefined && (
-              <p className="text-sm max-sm:text-xs text-gray-300">Current bid: {currentBid}</p>
+            {partnerBidValue !== undefined && (
+              <p className="text-sm max-sm:text-xs text-blue-300">Partner bid: {partnerBidValue}</p>
             )}
           </div>
 
           <div className="space-y-2 max-sm:space-y-1.5">
-            {/* Row 1: 1-4 */}
-            <div className="flex justify-center gap-3 max-sm:gap-2">
-              {[1, 2, 3, 4].map((bid) => (
-                <button
-                  key={bid}
-                  onClick={() => setSelectedBid(bid)}
-                  className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                >
-                  {bid}
-                </button>
-              ))}
-            </div>
-
-            {/* Row 2: 5-9 */}
-            <div className="flex justify-center gap-3 max-sm:gap-2">
-              {[5, 6, 7, 8, 9].map((bid) => (
-                <button
-                  key={bid}
-                  onClick={() => setSelectedBid(bid)}
-                  className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                >
-                  {bid}
-                </button>
-              ))}
-            </div>
-
-            {/* Row 3: 10-13 */}
-            <div className="flex justify-center gap-3 max-sm:gap-2">
-              {[10, 11, 12, 13].map((bid) => (
-                <button
-                  key={bid}
-                  onClick={() => setSelectedBid(bid)}
-                  className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                >
-                  {bid}
-                </button>
-              ))}
-            </div>
-
-            {/* Bottom row: Nil and Submit */}
-            <div className="flex justify-center gap-3 max-sm:gap-2 mt-3">
+            {/* Row 1: Nil, 1-6 */}
+            <div className="flex justify-center gap-2 max-sm:gap-1">
               {allowNil && (
                 <button
                   onClick={() => setSelectedBid(0)}
-                  className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
                 >
                   Nil
                 </button>
               )}
+              {[1, 2, 3, 4, 5, 6].map((bid) => (
+                <button
+                  key={bid}
+                  onClick={() => setSelectedBid(bid)}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+                >
+                  {bid}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 2: 7-13 */}
+            <div className="flex justify-center gap-2 max-sm:gap-1">
+              {[7, 8, 9, 10, 11, 12, 13].map((bid) => (
+                <button
+                  key={bid}
+                  onClick={() => setSelectedBid(bid)}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+                >
+                  {bid}
+                </button>
+              ))}
+            </div>
+
+            {/* Row 3: Confirm */}
+            <div className="flex justify-center mt-2">
               <button
                 onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
                 disabled={selectedBid === null}
-                className={`${bottomButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+                className={`${bottomButtonClass} px-8 h-9 md:px-6 md:h-8 sm:px-4 sm:h-7 max-sm:px-3 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
               >
                 Confirm
               </button>
