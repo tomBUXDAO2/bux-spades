@@ -216,6 +216,14 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   }
   
   // Void in lead suit - can play any card, but apply special rules
+  console.log('[CARD LOCKING DEBUG] Void in lead suit, checking special rules:', {
+    specialRules: game.specialRules,
+    assassin: game.specialRules?.assassin,
+    screamer: game.specialRules?.screamer,
+    leadSuit,
+    hand: hand.map(card => `${card.rank}${card.suit}`)
+  });
+  
   if (game.specialRules?.assassin) {
     // Assassin: when void in lead suit, all cards except spades are locked
     const spades = hand.filter(card => card.suit === '♠');
@@ -229,9 +237,17 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   if (game.specialRules?.screamer) {
     // Screamer: cannot cut with spades unless only spades left (even after spades are broken)
     const nonSpades = hand.filter(card => card.suit !== '♠');
+    console.log('[SCREAMER DEBUG] Void in lead suit, Screamer active:', {
+      hand: hand.map(card => `${card.rank}${card.suit}`),
+      nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
+      nonSpadesCount: nonSpades.length,
+      leadSuit
+    });
     if (nonSpades.length > 0) {
+      console.log('[SCREAMER DEBUG] Returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
       return nonSpades; // Must play non-spades if available
     } else {
+      console.log('[SCREAMER DEBUG] Only spades left, returning all cards');
       return hand; // Only spades left, can play spades
     }
   }
