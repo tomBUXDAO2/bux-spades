@@ -16,6 +16,18 @@ export default function TablePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
+  
+  // Debug logging for game state changes
+  useEffect(() => {
+    if (game) {
+      console.log('[GAME STATE DEBUG] Game state updated:', {
+        currentPlayer: game.currentPlayer,
+        status: game.status,
+        playCurrentPlayer: game.play?.currentPlayer,
+        biddingCurrentPlayer: game.bidding?.currentPlayer
+      });
+    }
+  }, [game]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -162,6 +174,7 @@ export default function TablePage() {
   // Listen for game_update events and update local game state
   useEffect(() => {
     if (!socket) return;
+    console.log('[SOCKET DEBUG] Setting up game_update listener');
     const handleGameUpdate = (updatedGame: any) => {
       console.log('[GAME UPDATE DEBUG] Received game update:', {
         currentPlayer: updatedGame.currentPlayer,
@@ -175,6 +188,7 @@ export default function TablePage() {
     };
     socket.on('game_update', handleGameUpdate);
     return () => {
+      console.log('[SOCKET DEBUG] Cleaning up game_update listener');
       socket.off('game_update', handleGameUpdate);
     };
   }, [socket]);
@@ -246,6 +260,7 @@ export default function TablePage() {
   // Ensure player always (re)joins the game room on socket connect or refresh
   useEffect(() => {
     if (socket && socket.connected && user && gameId) {
+      console.log('[SOCKET DEBUG] Emitting join_game:', { gameId, userId: user.id });
       socket.emit('join_game', { gameId, userId: user.id });
     }
   }, [socket, user, gameId]);
