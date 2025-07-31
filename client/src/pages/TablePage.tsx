@@ -17,19 +17,6 @@ export default function TablePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
-  
-  // Debug logging for game state changes
-  useEffect(() => {
-    console.log('[REFRESH DEBUG] Component mounted/updated, game state:', game ? 'exists' : 'null');
-    if (game) {
-      console.log('[GAME STATE DEBUG] Game state updated:', {
-        currentPlayer: game.currentPlayer,
-        status: game.status,
-        playCurrentPlayer: game.play?.currentPlayer,
-        biddingCurrentPlayer: game.bidding?.currentPlayer
-      });
-    }
-  }, [game]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -113,139 +100,6 @@ export default function TablePage() {
     };
   }, []);
 
-  // Fetch initial game state
-  useEffect(() => {
-    const fetchGame = async () => {
-      if (!gameId) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await api.get(`/games/${gameId}`);
-        const gameData = response.data;
-        
-        // Ensure currentPlayer is set correctly
-        if (gameData.status === 'BIDDING' && gameData.bidding?.currentPlayer) {
-          gameData.currentPlayer = gameData.bidding.currentPlayer;
-        } else if (gameData.status === 'PLAYING' && gameData.play?.currentPlayer) {
-          gameData.currentPlayer = gameData.play.currentPlayer;
-        }
-        
-        setGame(gameData);
-        updateModalState(gameData);
-      } catch (error: any) {
-        console.error('Failed to fetch game:', error);
-        setError(error.response?.data?.message || 'Failed to load game');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchGame();
-  }, [gameId]);
-
-  // Listen for game_update events and update local game state
-  useEffect(() => {
-    if (!socket) return;
-    console.log('[SOCKET DEBUG] Setting up game_update listener');
-    const handleGameUpdate = (updatedGame: any) => {
-      console.log('[GAME UPDATE DEBUG] Received game update:', {
-        currentPlayer: updatedGame.currentPlayer,
-        status: updatedGame.status,
-        playCurrentPlayer: updatedGame.play?.currentPlayer,
-        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
-        fullGameObject: updatedGame
-      });
-      
-      // Ensure currentPlayer is set correctly
-      if (updatedGame.status === 'BIDDING' && updatedGame.bidding?.currentPlayer) {
-        updatedGame.currentPlayer = updatedGame.bidding.currentPlayer;
-      } else if (updatedGame.status === 'PLAYING' && updatedGame.play?.currentPlayer) {
-        updatedGame.currentPlayer = updatedGame.play.currentPlayer;
-      }
-      
-      setGame(updatedGame);
-      // Update modal state when game state changes
-      updateModalState(updatedGame);
-    };
-    socket.on('game_update', handleGameUpdate);
-    return () => {
-      console.log('[SOCKET DEBUG] Cleaning up game_update listener');
-      socket.off('game_update', handleGameUpdate);
-    };
-  }, [socket]);
-
-  // Listen for bidding updates
-  useEffect(() => {
-    if (!socket) return;
-    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
-      console.log('[BIDDING UPDATE] Received bidding update:', bidding);
-      if (game) {
-        const updatedGame = { ...game, bidding: { ...game.bidding, ...bidding } };
-        setGame(updatedGame);
-      }
-    };
-    socket.on('bidding_update', handleBiddingUpdate);
-    return () => socket.off('bidding_update', handleBiddingUpdate);
-  }, [socket, game]);
-
-  // Play card sound effect
-  const playCardSound = () => {
-    try {
-      const audio = new Audio('/sounds/card.wav');
-      audio.volume = 0.3;
-      audio.play().catch(() => {});
-    } catch (error) {
-      console.log('Failed to play card sound:', error);
-    }
-  };
-
-  // Listen for play updates
-  useEffect(() => {
-    if (!socket) return;
-    const handlePlayUpdate = (data: { currentPlayerIndex: number, currentTrick: any[], hands: any[] }) => {
-      console.log('[PLAY UPDATE] Received play update:', data);
-      if (game) {
-        const updatedGame = { 
-          ...game, 
-          play: { 
-            ...game.play, 
-            currentPlayerIndex: data.currentPlayerIndex,
-            currentTrick: data.currentTrick
-          },
-          hands: data.hands
-        };
-        
-        // Ensure currentPlayer is set correctly
-        if (updatedGame.status === 'PLAYING' && updatedGame.play?.currentPlayer) {
-          updatedGame.currentPlayer = updatedGame.play.currentPlayer;
-        }
-        
-        setGame(updatedGame);
-        playCardSound();
-      }
-    };
-    socket.on('play_update', handlePlayUpdate);
-    return () => socket.off('play_update', handlePlayUpdate);
-  }, [socket, game]);
-
-  // Ensure player always (re)joins the game room on socket connect or refresh
-  useEffect(() => {
-    console.log('[REFRESH DEBUG] Socket effect triggered:', { 
-      hasSocket: !!socket, 
-      isConnected: socket?.connected, 
-      hasUser: !!user, 
-      hasGameId: !!gameId 
-    });
-    if (socket && socket.connected && user && gameId) {
-      console.log('[SOCKET DEBUG] Emitting join_game:', { gameId, userId: user.id });
-      socket.emit('join_game', { gameId, userId: user.id });
-    }
-  }, [socket, user, gameId]);
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [game, setGame] = useState<GameState | null>(null);
-  
   // Debug logging for game state changes
   useEffect(() => {
     console.log('[REFRESH DEBUG] Component mounted/updated, game state:', game ? 'exists' : 'null');
@@ -258,89 +112,8 @@ export default function TablePage() {
       });
     }
   }, [game]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const socketManager = getSocketManager();
 
-  // Modal state
-  const [showStartWarning, setShowStartWarning] = useState(false);
-  const [showBotWarning, setShowBotWarning] = useState(false);
-  const [emptySeats, setEmptySeats] = useState(0);
-  const [botCount, setBotCount] = useState(0);
-
-  // Detect spectate intent
-  const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
-
-  // Check if device is mobile or tablet
-  const isMobileOrTablet = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           window.innerWidth <= 1024;
-  };
-
-  // Helper function to check if a player is a bot
-  const isBot = (p: any): p is any => p && p.type === 'bot';
-
-  // Helper function to count empty seats and bot players
-  const updateModalState = (gameState: GameState) => {
-    const emptySeatsCount = (gameState.players || []).filter(p => !p).length;
-    const botPlayersCount = (gameState.players || []).filter(p => p && isBot(p)).length;
-    setEmptySeats(emptySeatsCount);
-    setBotCount(botPlayersCount);
-  };
-
-  // Request full-screen mode (only for game table)
-  const requestFullScreen = async () => {
-    if (isMobileOrTablet()) {
-      try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-        } else if ((document.documentElement as any).webkitRequestFullscreen) {
-          await (document.documentElement as any).webkitRequestFullscreen();
-        } else if ((document.documentElement as any).msRequestFullscreen) {
-          await (document.documentElement as any).msRequestFullscreen();
-        }
-        setIsFullScreen(true);
-      } catch (error) {
-        console.log('Full-screen request failed:', error);
-      }
-    }
-  };
-
-  // Exit full-screen mode
-  const exitFullScreen = async () => {
-    try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        await (document as any).webkitExitFullscreen();
-      } else if ((document as any).msExitFullscreen) {
-        await (document as any).msExitFullscreen();
-      }
-      setIsFullScreen(false);
-    } catch (error) {
-      console.log('Exit full-screen failed:', error);
-    }
-  };
-
-  // Listen for full-screen changes
-  useEffect(() => {
-    const handleFullScreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullScreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullScreenChange);
-    document.addEventListener('msfullscreenchange', handleFullScreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullScreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullScreenChange);
-      document.removeEventListener('msfullscreenchange', handleFullScreenChange);
-    };
-  }, []);
-
+  // Initialize socket and fetch game
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -372,6 +145,14 @@ export default function TablePage() {
           throw new Error('Failed to fetch game');
         }
         const data = await response.json();
+        
+        // Ensure currentPlayer is set correctly
+        if (data.status === 'BIDDING' && data.bidding?.currentPlayer) {
+          data.currentPlayer = data.bidding.currentPlayer;
+        } else if (data.status === 'PLAYING' && data.play?.currentPlayer) {
+          data.currentPlayer = data.play.currentPlayer;
+        }
+        
         setGame(data);
         // Update modal state for initial game load
         updateModalState(data);
