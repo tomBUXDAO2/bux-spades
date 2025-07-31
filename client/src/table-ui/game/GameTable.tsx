@@ -125,27 +125,21 @@ function getLeadSuit(trick: Card[] | undefined): Suit | null {
 }
 
 function hasSpadeBeenPlayed(game: GameState): boolean {
-  // Check if any completed trick contained a spade
-  const completedTricksHaveSpades = game.completedTricks?.some((trick: any) =>
-    Array.isArray(trick.cards) && trick.cards.some((card: Card) => isSpade(card))
-  ) || false;
+  // Check the server's spadesBroken flag (this is what the server uses)
+  const spadesBroken = (game as any).play?.spadesBroken || false;
   
-  // Also check if current trick has spades
+  // Also check if current trick has spades (for immediate feedback)
   const currentTrick = (game as any).play?.currentTrick || [];
   const currentTrickHasSpades = currentTrick.some((card: Card) => isSpade(card));
   
-  const result = completedTricksHaveSpades || currentTrickHasSpades;
+  const result = spadesBroken || currentTrickHasSpades;
   
   console.log('[SPADE BREAKING DEBUG] hasSpadeBeenPlayed check:', {
-    completedTricks: game.completedTricks,
-    completedTricksHaveSpades,
+    spadesBroken,
     currentTrick,
     currentTrickHasSpades,
     result,
-    completedTricksLength: game.completedTricks?.length || 0,
-    gameStateKeys: Object.keys(game),
-    playKeys: game.play ? Object.keys(game.play) : 'no play object',
-    fullGameState: game
+    playObject: (game as any).play
   });
   
   return result;
