@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
 
 export default function TablePage() {
-  console.log('[HARD REFRESH DEBUG] TablePage component loaded at:', new Date().toISOString());
+  console.log('🔥🔥🔥 [HARD REFRESH TEST] TablePage component loaded at:', new Date().toISOString());
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
