@@ -30,7 +30,7 @@ export interface Game {
   maxPoints: number;
   minPoints: number;
   buyIn: number;
-  forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'NONE';
+  forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES' | 'NONE';
   specialRules: {
     screamer?: boolean;
     assassin?: boolean;

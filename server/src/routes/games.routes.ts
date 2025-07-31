@@ -27,7 +27,7 @@ router.post('/', (req, res) => {
       type: 'human' as const,
     };
     // Determine forcedBid based on bidding option
-    let forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'NONE' = 'NONE';
+    let forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES' | 'NONE' = 'NONE';
     
     if (settings.biddingOption === 'SUICIDE') {
       forcedBid = 'SUICIDE';
@@ -37,6 +37,8 @@ router.post('/', (req, res) => {
       forcedBid = 'BID3';
     } else if (settings.biddingOption === 'BID HEARTS') {
       forcedBid = 'BIDHEARTS';
+    } else if (settings.biddingOption === 'CRAZY ACES') {
+      forcedBid = 'CRAZY ACES';
     }
     
     console.log('[GAME CREATION DEBUG] Creating game with settings:', {
