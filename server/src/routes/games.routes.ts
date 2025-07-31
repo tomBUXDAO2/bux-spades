@@ -800,6 +800,10 @@ export function botMakeMove(game: Game, seatIndex: number) {
             // BID HEARTS games: bot must bid number of hearts
             bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
             console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
+          } else if (game.forcedBid === 'CRAZY ACES') {
+            // CRAZY ACES games: bot must bid 3 for each ace
+            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'CRAZY ACES', game.rules.allowNil, game.rules.allowBlindNil);
+            console.log('[BOT DEBUG] CRAZY ACES game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.rank === 'A').length, 'aces, bidding', bid);
           } else if (game.rules.bidType === 'REG') {
             // Regular games: use complex bidding logic
             bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
