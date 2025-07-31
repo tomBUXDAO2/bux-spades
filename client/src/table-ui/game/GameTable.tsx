@@ -162,18 +162,31 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
       const spades = hand.filter(isSpade);
       const nonSpades = hand.filter(card => !isSpade(card));
       
+      console.log('[ASSASSIN DEBUG] Leading in Assassin mode:', {
+        hand: hand.map(card => `${card.rank}${card.suit}`),
+        spades: spades.map(card => `${card.rank}${card.suit}`),
+        nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
+        spadesBroken: hasSpadeBeenPlayed(game),
+        spadesCount: spades.length,
+        nonSpadesCount: nonSpades.length
+      });
+      
       if (!hasSpadeBeenPlayed(game)) {
         // Spades not broken yet - cannot lead spades unless only spades left
         if (nonSpades.length > 0) {
+          console.log('[ASSASSIN DEBUG] Spades not broken, returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
           return nonSpades; // Must lead non-spades if available
         } else {
+          console.log('[ASSASSIN DEBUG] Spades not broken, only spades left, returning all cards');
           return hand; // Only spades left, can lead spades
         }
       } else {
         // Spades are broken - if you have spades, all other cards are locked
         if (spades.length > 0) {
+          console.log('[ASSASSIN DEBUG] Spades broken and have spades, returning spades only:', spades.map(card => `${card.rank}${card.suit}`));
           return spades; // Must lead spades if available
         } else {
+          console.log('[ASSASSIN DEBUG] Spades broken but no spades in hand, returning all cards');
           return hand; // No spades, can lead anything
         }
       }
