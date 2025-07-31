@@ -134,7 +134,18 @@ function hasSpadeBeenPlayed(game: GameState): boolean {
   const currentTrick = (game as any).play?.currentTrick || [];
   const currentTrickHasSpades = currentTrick.some((card: Card) => isSpade(card));
   
-  return completedTricksHaveSpades || currentTrickHasSpades;
+  const result = completedTricksHaveSpades || currentTrickHasSpades;
+  
+  console.log('[SPADE BREAKING DEBUG] hasSpadeBeenPlayed check:', {
+    completedTricks: game.completedTricks,
+    completedTricksHaveSpades,
+    currentTrick,
+    currentTrickHasSpades,
+    result,
+    completedTricksLength: game.completedTricks?.length || 0
+  });
+  
+  return result;
 }
 
 function canLeadSpades(game: GameState, hand: Card[]): boolean {
