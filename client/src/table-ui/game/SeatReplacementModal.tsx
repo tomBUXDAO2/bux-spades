@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FaRobot, FaClock } from 'react-icons/fa';
 
 interface SeatReplacementModalProps {
