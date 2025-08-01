@@ -462,13 +462,81 @@ export default function GameTable({
     
     // Auto-play logic
     if (game.status === 'BIDDING') {
-      // Auto-bid 0 (nil)
-      console.log('[TIMER] Auto-bidding nil for timeout');
+      // Use bot bidding logic instead of just bidding nil
+      console.log('[TIMER] Auto-bidding using bot logic for timeout');
+      
+      // Get the player's hand
+      const myHand = game.hands?.find((_, index) => game.players[index]?.id === currentPlayerId);
+      if (!myHand) {
+        console.log('[AUTO PLAY DEBUG] No hand found for auto-bid');
+        return;
+      }
+      
+      // Calculate bot bid using the same logic as bot players
+      let bid = 0;
+      
+      // Check for forced bid games
+      if (game.forcedBid === 'SUICIDE') {
+        // Suicide logic: bid 0 if partner bid something, otherwise use normal logic
+        const partnerIndex = (game.players.findIndex(p => p?.id === currentPlayerId) + 2) % 4;
+        const partnerBid = game.bidding?.bids?.[partnerIndex];
+        if (partnerBid !== undefined && partnerBid > 0) {
+          bid = 0; // Partner bid something, must nil
+        } else {
+          // Use normal bidding logic
+          const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
+          const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
+          bid = Math.min(13, Math.max(0, expectedTricks));
+        }
+      } else if (game.forcedBid === 'BID4NIL') {
+        // 4 OR NIL: bid 4 or nil
+        const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
+        bid = spadesCount > 0 ? 4 : 0;
+      } else if (game.forcedBid === 'BID3') {
+        // BID 3: always bid 3
+        bid = 3;
+      } else if (game.forcedBid === 'BIDHEARTS') {
+        // BID HEARTS: bid number of hearts
+        bid = myHand.filter((c: Card) => c.suit === '♥').length;
+      } else if (game.forcedBid === 'CRAZY ACES') {
+        // CRAZY ACES: bid 3 for each ace
+        const acesCount = myHand.filter((c: Card) => c.rank === 'A').length;
+        bid = acesCount * 3;
+      } else if (game.rules?.gameType === 'MIRROR') {
+        // Mirror: bid number of spades
+        bid = myHand.filter((c: Card) => isSpade(c)).length;
+      } else if (game.rules?.gameType === 'WHIZ') {
+        // Whiz: bid number of spades, or nil if no spades
+        const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
+        const hasAceSpades = myHand.some((c: Card) => isSpade(c) && c.rank === 'A');
+        if (spadesCount === 0) {
+          bid = 0; // Must nil if no spades
+        } else if (hasAceSpades) {
+          bid = spadesCount; // Must bid spades if have ace
+        } else {
+          // Can choose between spades count or nil
+          const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
+          bid = expectedTricks >= spadesCount ? spadesCount : 0;
+        }
+      } else {
+        // Regular bidding: use bot logic
+        const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
+        const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
+        bid = Math.min(13, Math.max(0, expectedTricks));
+        
+        // Consider nil if it makes sense
+        if (spadesCount === 0 && game.rules?.allowNil) {
+          bid = 0; // Nil if no spades
+        }
+      }
+      
+      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.gameType, 'forced bid:', game.forcedBid);
+      
       if (socket) {
         socket.emit('make_bid', { 
           gameId: game.id, 
           userId: currentPlayerId, 
-          bid: 0 
+          bid: bid 
         });
       }
     } else if (game.status === 'PLAYING') {
