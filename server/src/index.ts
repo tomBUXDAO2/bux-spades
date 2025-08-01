@@ -562,6 +562,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     if (playerIdx !== -1) {
       game.players[playerIdx] = null;
       
+      // Track if host replacement occurred
+      let hostReplaced = false;
+      
       // If the host (seat 0) was removed, appoint a new host
       if (playerIdx === 0) {
         console.log('[HOST REPLACEMENT] Host was removed, appointing new host');
@@ -572,6 +575,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           game.players[newHostIndex] = null;
           game.players[0] = newHost;
           console.log(`[HOST REPLACEMENT] New host appointed: ${newHost?.username} at seat 0`);
+          
+          // Start seat replacement for the now-empty seat (the seat where the new host came from)
+          startSeatReplacement(game, newHostIndex);
+          hostReplaced = true;
         }
       }
       
@@ -584,12 +591,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           console.log(`[REMOVE PLAYER] Removed ${removedPlayer.username} from spectators`);
         }
       }
-        socket.leave(gameId);
-        
-          // Start seat replacement process for the empty seat
-  console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
-  console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
-  startSeatReplacement(game, playerIdx);
+      
+      socket.leave(gameId);
+      
+      // Start seat replacement process for the empty seat (only if host wasn't replaced)
+      if (!hostReplaced) {
+        console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
+        console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
+        startSeatReplacement(game, playerIdx);
+      }
         
         // Emit game_update to the game room for real-time sync
         io.to(gameId).emit('game_update', enrichGameForClient(game));
@@ -743,6 +753,26 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     const removedPlayer = game.players[playerIndex];
     game.players[playerIndex] = null;
     
+    // Track if host replacement occurred
+    let hostReplaced = false;
+    
+    // If the host (seat 0) was removed, appoint a new host
+    if (playerIndex === 0) {
+      console.log('[HOST REPLACEMENT] Host was removed, appointing new host');
+      const newHostIndex = game.players.findIndex((p, i) => p && p.type === 'human' && i !== 0);
+      if (newHostIndex !== -1) {
+        // Move the new host to seat 0
+        const newHost = game.players[newHostIndex];
+        game.players[newHostIndex] = null;
+        game.players[0] = newHost;
+        console.log(`[HOST REPLACEMENT] New host appointed: ${newHost?.username} at seat 0`);
+        
+        // Start seat replacement for the now-empty seat (the seat where the new host came from)
+        startSeatReplacement(game, newHostIndex);
+        hostReplaced = true;
+      }
+    }
+    
     // Send system message
     if (removedPlayer) {
       io.to(game.id).emit('system_message', {
@@ -765,10 +795,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
-    // Start seat replacement process
-    console.log(`[REMOVE PLAYER DEBUG] About to start seat replacement for seat ${playerIndex}`);
-    console.log(`[REMOVE PLAYER DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
-    startSeatReplacement(game, playerIndex);
+    // Start seat replacement process (only if host wasn't replaced)
+    if (!hostReplaced) {
+      console.log(`[REMOVE PLAYER DEBUG] About to start seat replacement for seat ${playerIndex}`);
+      console.log(`[REMOVE PLAYER DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
+      startSeatReplacement(game, playerIndex);
+    } else {
+      console.log(`[REMOVE PLAYER DEBUG] Host was replaced, skipping seat replacement for original seat`);
+    }
     
       // Update all clients
   io.to(game.id).emit('game_update', enrichGameForClient(game));
@@ -1593,6 +1627,7 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         game.players[playerIndex] = null;
         
         // If the host (seat 0) was removed, appoint a new host
+        let hostReplaced = false;
         if (playerIndex === 0) {
           console.log('[HOST REPLACEMENT] Host was removed, appointing new host');
           const newHostIndex = game.players.findIndex((p, i) => p && p.type === 'human' && i !== 0);
@@ -1602,6 +1637,10 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
             game.players[newHostIndex] = null;
             game.players[0] = newHost;
             console.log(`[HOST REPLACEMENT] New host appointed: ${newHost?.username} at seat 0`);
+            
+            // Start seat replacement for the now-empty seat (the seat where the new host came from)
+            startSeatReplacement(game, newHostIndex);
+            hostReplaced = true;
           }
         }
         
@@ -1619,10 +1658,12 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         console.log(`[DISCONNECT DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
         console.log(`[DISCONNECT DEBUG] Game status:`, game.status);
         
-        // Only show modal if game is in progress (BIDDING, PLAYING, etc.)
-        if (game.status !== 'WAITING') {
+        // Only show modal if game is in progress (BIDDING, PLAYING, etc.) and host wasn't replaced
+        if (game.status !== 'WAITING' && !hostReplaced) {
           console.log(`[DISCONNECT DEBUG] Game is in progress, starting seat replacement`);
           startSeatReplacement(game, playerIndex);
+        } else if (game.status !== 'WAITING' && hostReplaced) {
+          console.log(`[DISCONNECT DEBUG] Game is in progress but host was replaced, skipping seat replacement for original seat`);
         } else {
           console.log(`[DISCONNECT DEBUG] Game is waiting, skipping seat replacement (likely join-related)`);
         }
