@@ -9,6 +9,7 @@ interface SoloWinnerModalProps {
   winningPlayer: number;
   onPlayAgain?: () => void;
   userPlayerIndex?: number; // The current user's player index
+  humanPlayerCount?: number; // Number of human players in the game
 }
 
 export default function SoloWinnerModal({ 
@@ -17,7 +18,8 @@ export default function SoloWinnerModal({
   playerScores, 
   winningPlayer, 
   onPlayAgain, 
-  userPlayerIndex 
+  userPlayerIndex,
+  humanPlayerCount = 1
 }: SoloWinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -126,8 +128,14 @@ export default function SoloWinnerModal({
           </div>
         ) : (
           <div className="mt-4 text-center">
-            <p className="text-sm font-medium text-white">Waiting for other players...</p>
-            <p className="text-xs text-gray-400 mt-1">You can leave the table if you don't want to wait</p>
+            {humanPlayerCount > 1 ? (
+              <>
+                <p className="text-sm font-medium text-white">Waiting for other players...</p>
+                <p className="text-xs text-gray-400 mt-1">You can leave the table if you don't want to wait</p>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-white">Starting new game...</p>
+            )}
             <button
               onClick={handleLeave}
               className="mt-3 w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"

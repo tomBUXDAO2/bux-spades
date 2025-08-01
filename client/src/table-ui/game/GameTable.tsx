@@ -2892,6 +2892,7 @@ export default function GameTable({
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
         coinsWon={gameState.buyIn ? gameState.buyIn * 2 : 0} // TODO: Calculate actual coins won
+        humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
       />
 
       {/* Loser Modal - rendered outside the table */}
@@ -2905,6 +2906,7 @@ export default function GameTable({
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
         coinsWon={0} // No coins won when losing
+        humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
       />
     </>
   );
