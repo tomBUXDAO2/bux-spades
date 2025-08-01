@@ -135,7 +135,32 @@ export default function TablePage() {
             username: user.username,
             avatar: user.avatar
           });
+        } else {
+          // If not spectating, automatically join the game
+          try {
+            // First get the current game state to find an available seat
+            const gameResponse = await api.get(`/api/games/${gameId}`);
+            if (gameResponse.ok) {
+              const gameData = await gameResponse.json();
+              const availableSeat = gameData.players.findIndex((p: any) => p === null);
+              
+              if (availableSeat !== -1) {
+                await api.post(`/api/games/${gameId}/join`, {
+                  id: user.id,
+                  username: user.username,
+                  avatar: user.avatar,
+                  seat: availableSeat
+                });
+              } else {
+                console.log('No available seats in the game');
+              }
+            }
+          } catch (joinError) {
+            console.log('User already in game or join failed:', joinError);
+            // Continue anyway, the user might already be in the game
+          }
         }
+        
         const response = await api.get(`/api/games/${gameId}`);
         if (response.status === 404) {
           navigate('/'); // Redirect to lobby if not found
