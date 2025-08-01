@@ -369,8 +369,127 @@ export default function GameTable({
   emptySeats = 0,
   botCount = 0
 }: GameTableProps) {
+  // Turn timer state
+  const [turnTimer, setTurnTimer] = useState<number>(30);
+  const [isMyTurn, setIsMyTurn] = useState(false);
+  const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => window.location.reload();
+
+  // Turn timer effect
+  useEffect(() => {
+    if (!game || game.status !== 'PLAYING') {
+      setTurnTimer(30);
+      setIsMyTurn(false);
+      return;
+    }
+
+    const currentPlayerId = game.currentPlayer;
+    const currentPlayer = game.players.find(p => p?.id === currentPlayerId);
+    const isMyTurnNow = currentPlayerId === currentPlayerId;
+    
+    console.log('[TIMER DEBUG] Timer effect triggered:', {
+      currentPlayerId,
+      isMyTurnNow,
+      isBot: currentPlayer ? isBot(currentPlayer) : false,
+      status: game.status
+    });
+    
+    if (isMyTurnNow && currentPlayer && !isBot(currentPlayer)) {
+      setIsMyTurn(true);
+      setTurnTimer(30);
+      
+      const interval = setInterval(() => {
+        setTurnTimer(prev => {
+          console.log('[TIMER DEBUG] Timer tick:', prev);
+          if (prev <= 1) {
+            // Time's up - auto-play for human player
+            console.log('[TIMER] Time expired for human player, auto-playing');
+            handleAutoPlay();
+            return 30;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setIsMyTurn(false);
+      setTurnTimer(30);
+    }
+  }, [game?.currentPlayer, game?.status]);
+
+  // Auto-play handler
+  const handleAutoPlay = () => {
+    console.log('[AUTO PLAY DEBUG] handleAutoPlay called');
+    if (!game) {
+      console.log('[AUTO PLAY DEBUG] No game state');
+      return;
+    }
+    
+    const currentPlayerId = game.currentPlayer;
+    const currentPlayer = game.players.find(p => p?.id === currentPlayerId);
+    
+    console.log('[AUTO PLAY DEBUG] Current player:', currentPlayer);
+    
+    if (!currentPlayer || isBot(currentPlayer)) {
+      console.log('[AUTO PLAY DEBUG] Not a human player or no player found');
+      return;
+    }
+    
+    // Increment auto-play count
+    setAutoPlayCount(prev => ({
+      ...prev,
+      [currentPlayerId]: (prev[currentPlayerId] || 0) + 1
+    }));
+    
+    // If 3 auto-plays in a row, remove player
+    const currentAutoPlayCount = (autoPlayCount[currentPlayerId] || 0) + 1;
+    console.log('[AUTO PLAY DEBUG] Auto-play count:', currentAutoPlayCount);
+    
+    if (currentAutoPlayCount >= 3) {
+      console.log('[TIMER] Player auto-played 3 times, removing from table');
+      // Emit remove player event
+      if (socket) {
+        socket.emit('remove_player', { 
+          gameId: game.id, 
+          playerId: currentPlayerId,
+          reason: 'timeout'
+        });
+      }
+      return;
+    }
+    
+    // Auto-play logic
+    if (game.status === 'BIDDING') {
+      // Auto-bid 0 (nil)
+      console.log('[TIMER] Auto-bidding nil for timeout');
+      if (socket) {
+        socket.emit('make_bid', { 
+          gameId: game.id, 
+          userId: currentPlayerId, 
+          bid: 0 
+        });
+      }
+    } else if (game.status === 'PLAYING') {
+      // Auto-play first playable card
+      const myHand = game.hands?.find((_, index) => game.players[index]?.id === currentPlayerId);
+      console.log('[AUTO PLAY DEBUG] My hand:', myHand);
+      
+      if (myHand && myHand.length > 0) {
+        const playableCards = getPlayableCards(game, myHand, game.play?.currentTrick?.length === 0, false);
+        const cardToPlay = playableCards.length > 0 ? playableCards[0] : myHand[0];
+        console.log('[TIMER] Auto-playing card:', cardToPlay);
+        if (socket) {
+          socket.emit('play_card', { 
+            gameId: game.id, 
+            userId: currentPlayerId, 
+            card: cardToPlay 
+          });
+        }
+      }
+    }
+  };
 
   // Function to start a new hand
   const handleStartNewHand = () => {
@@ -712,6 +831,9 @@ export default function GameTable({
 
   // Update the player tricks display
   const renderPlayerPosition = (position: number) => {
+    // Check if this player is on timer
+    const currentPlayer = game.players[position];
+    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && isMyTurn && game.currentPlayer === currentPlayer.id && turnTimer <= 10;
     const player = orderedPlayers[position];
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
@@ -964,6 +1086,12 @@ export default function GameTable({
                         </div>
                       </div>
                     </>
+                  )}
+                  {/* Timer overlay for last 10 seconds */}
+                  {isPlayerOnTimer && (
+                    <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{turnTimer}</span>
+                    </div>
                   )}
                 </div>
               </div>

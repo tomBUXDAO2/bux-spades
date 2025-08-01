@@ -657,6 +657,45 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   // --- Game-related socket events ---
   
+  // Remove player event (for timeout)
+  socket.on('remove_player', ({ gameId, playerId, reason }) => {
+    console.log('[REMOVE PLAYER] Received remove_player event:', { gameId, playerId, reason });
+    
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized remove_player attempt');
+      socket.emit('error', { message: 'Not authorized' });
+      return;
+    }
+    
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    // Find the player to remove
+    const playerIndex = game.players.findIndex(p => p && p.id === playerId);
+    if (playerIndex === -1) {
+      socket.emit('error', { message: 'Player not found in game' });
+      return;
+    }
+    
+    // Remove the player
+    game.players[playerIndex] = null;
+    
+    // Send system message
+    const player = game.players[playerIndex];
+    if (player) {
+      io.to(game.id).emit('system_message', {
+        message: `${player.username} was removed for inactivity`,
+        type: 'warning'
+      });
+    }
+    
+    // Update all clients
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+  });
+
   // Make bid event
   socket.on('make_bid', ({ gameId, userId, bid }) => {
     console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, socketId: socket.id });
