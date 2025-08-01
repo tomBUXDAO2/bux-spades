@@ -1513,12 +1513,27 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Check if only bots remain
         const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
         
+        // Only delete the game if no human players remain and it's been abandoned for a while
+        // This prevents deleting games when players are just navigating between pages
         if (remainingHumanPlayers.length === 0) {
-          console.log('[DISCONNECT] No human players remaining, closing game:', game.id);
-          // Remove the game from the array
-          games.splice(gameIndex, 1);
-          // Notify remaining players
-          io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+          // Set a timeout to delete the game after 30 seconds if no humans rejoin
+          setTimeout(() => {
+            const gameStillExists = games.find(g => g.id === game.id);
+            if (gameStillExists) {
+              const stillNoHumans = gameStillExists.players.filter(p => p && p.type === 'human').length === 0;
+              if (stillNoHumans) {
+                console.log('[DISCONNECT] Game abandoned for 30 seconds, closing game:', game.id);
+                const gameIndex = games.findIndex(g => g.id === game.id);
+                if (gameIndex !== -1) {
+                  games.splice(gameIndex, 1);
+                  io.to(game.id).emit('game_closed', { reason: 'game_abandoned' });
+                }
+              }
+            }
+          }, 30000); // 30 second timeout
+          
+          // Update the game for remaining players
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
         } else {
           // Update the game for remaining players
           io.to(game.id).emit('game_update', enrichGameForClient(game));
