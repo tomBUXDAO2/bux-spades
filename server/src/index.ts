@@ -563,8 +563,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         game.players[playerIdx] = null;
         socket.leave(gameId);
         
-        // Start seat replacement process for the empty seat
-        startSeatReplacement(game, playerIdx);
+          // Start seat replacement process for the empty seat
+  console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
+  console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
+  startSeatReplacement(game, playerIdx);
         
         // Emit game_update to the game room for real-time sync
         io.to(gameId).emit('game_update', enrichGameForClient(game));
@@ -692,6 +694,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   
   // Remove player event (for timeout)
   socket.on('remove_player', ({ gameId, playerId, reason }) => {
+  console.log(`[REMOVE PLAYER DEBUG] remove_player event received:`, { gameId, playerId, reason, socketId: socket.id, socketUserId: socket.userId });
     console.log('[REMOVE PLAYER] Received remove_player event:', { gameId, playerId, reason });
     
     if (!socket.isAuthenticated || !socket.userId) {
@@ -740,7 +743,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
     
     // Start seat replacement process
-    startSeatReplacement(game, playerIndex);
+    console.log(`[REMOVE PLAYER DEBUG] About to start seat replacement for seat ${playerIndex}`);
+    console.log(`[REMOVE PLAYER DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
+    // TEMPORARILY DISABLED: startSeatReplacement(game, playerIndex);
+    console.log(`[REMOVE PLAYER DEBUG] Seat replacement DISABLED for debugging`);
     
       // Update all clients
   io.to(game.id).emit('game_update', enrichGameForClient(game));
@@ -1614,6 +1620,7 @@ const seatReplacements = new Map<string, { gameId: string, seatIndex: number, ti
 function startSeatReplacement(game: Game, seatIndex: number) {
   console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
   console.log(`[SEAT REPLACEMENT DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
+  console.log(`[SEAT REPLACEMENT DEBUG] Seat ${seatIndex} value:`, game.players[seatIndex]);
   
   // Check if seat is actually empty
   if (game.players[seatIndex] !== null) {
