@@ -726,9 +726,38 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
-    // Update all clients
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-  });
+    // Start seat replacement process
+    startSeatReplacement(game, playerIndex);
+    
+      // Update all clients
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
+});
+
+// Fill seat with bot event (manual replacement)
+socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
+  console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
+  
+  if (!socket.isAuthenticated || !socket.userId) {
+    console.log('Unauthorized fill_seat_with_bot attempt');
+    socket.emit('error', { message: 'Not authorized' });
+    return;
+  }
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit('error', { message: 'Game not found' });
+    return;
+  }
+  
+  // Check if seat is empty
+  if (game.players[seatIndex] !== null) {
+    socket.emit('error', { message: 'Seat is not empty' });
+    return;
+  }
+  
+  // Fill the seat with a bot
+  fillSeatWithBot(game, seatIndex);
+});
 
   // Make bid event
   socket.on('make_bid', ({ gameId, userId, bid }) => {
@@ -1562,6 +1591,79 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     });
   });
 });
+
+// Seat replacement management
+const seatReplacements = new Map<string, { gameId: string, seatIndex: number, timer: NodeJS.Timeout, expiresAt: number }>();
+
+function startSeatReplacement(game: Game, seatIndex: number) {
+  const replacementId = `${game.id}-${seatIndex}`;
+  
+  // Cancel any existing replacement for this seat
+  const existing = seatReplacements.get(replacementId);
+  if (existing) {
+    clearTimeout(existing.timer);
+  }
+  
+  // Set 2-minute timer
+  const expiresAt = Date.now() + 120000; // 2 minutes
+  const timer = setTimeout(() => {
+    console.log(`[SEAT REPLACEMENT] Timer expired for seat ${seatIndex} in game ${game.id}`);
+    fillSeatWithBot(game, seatIndex);
+  }, 120000);
+  
+  seatReplacements.set(replacementId, { gameId: game.id, seatIndex, timer, expiresAt });
+  
+  // Notify clients about seat replacement
+  io.to(game.id).emit('seat_replacement_started', {
+    gameId: game.id,
+    seatIndex,
+    expiresAt
+  });
+  
+  console.log(`[SEAT REPLACEMENT] Started replacement for seat ${seatIndex} in game ${game.id}`);
+}
+
+function fillSeatWithBot(game: Game, seatIndex: number) {
+  const replacementId = `${game.id}-${seatIndex}`;
+  const replacement = seatReplacements.get(replacementId);
+  
+  if (!replacement) {
+    console.log(`[SEAT REPLACEMENT] No replacement found for ${replacementId}`);
+    return;
+  }
+  
+  // Clear the replacement
+  seatReplacements.delete(replacementId);
+  
+  // Check if seat is still empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[SEAT REPLACEMENT] Seat ${seatIndex} is no longer empty`);
+    return;
+  }
+  
+  // Create bot
+  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const botNumber = Math.floor(Math.random() * 1000);
+  
+  game.players[seatIndex] = {
+    id: botId,
+    username: `Bot ${botNumber}`,
+    avatar: '/bot-avatar.jpg',
+    type: 'bot',
+    position: seatIndex
+  };
+  
+  // Send system message
+  io.to(game.id).emit('system_message', {
+    message: `A bot was automatically added to seat ${seatIndex + 1}`,
+    type: 'info'
+  });
+  
+  // Update all clients
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
+  
+  console.log(`[SEAT REPLACEMENT] Bot added to seat ${seatIndex} in game ${game.id}`);
+}
 
 // Add error handling for the HTTP server
 httpServer.on('error', (error: Error) => {

@@ -6,6 +6,7 @@ import type { ChatMessage } from '../Chat';
 import BlindNilModal from './BlindNilModal';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
+import SeatReplacementModal from './SeatReplacementModal';
 
 import BiddingInterface from './BiddingInterface';
 
@@ -323,7 +324,16 @@ function canInviteBot({
     // Mid-game: only the partner of the empty seat can invite a bot
     // Partner is seat (seatIndex + 2) % 4
     const partnerIndex = (seatIndex + 2) % 4;
-    return sanitizedPlayers[partnerIndex]?.id === currentPlayerId && gameState.status === 'PLAYING';
+    const partner = sanitizedPlayers[partnerIndex];
+    
+    // Check if partner is human (not bot)
+    if (partner && isBot(partner)) {
+      // If partner is a bot, only the host (seat 0) can invite bots
+      return sanitizedPlayers[0]?.id === currentPlayerId && (gameState.status === 'PLAYING' || gameState.status === 'BIDDING');
+    } else {
+      // If partner is human, only the partner can invite bots
+      return partner?.id === currentPlayerId && (gameState.status === 'PLAYING' || gameState.status === 'BIDDING');
+    }
   }
 }
 
@@ -654,6 +664,17 @@ export default function GameTable({
   const [cardsRevealed, setCardsRevealed] = useState(false);
   const [blindNilDismissed, setBlindNilDismissed] = useState(false);
   
+  // Seat replacement state
+  const [seatReplacement, setSeatReplacement] = useState<{
+    isOpen: boolean;
+    seatIndex: number;
+    expiresAt: number;
+  }>({
+    isOpen: false,
+    seatIndex: -1,
+    expiresAt: 0
+  });
+  
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
@@ -925,6 +946,22 @@ export default function GameTable({
     } catch (err) {
       alert('Failed to remove bot');
     }
+  };
+
+  // Seat replacement handlers
+  const handleFillSeatWithBot = () => {
+    if (!socket) return;
+    
+    socket.emit('fill_seat_with_bot', {
+      gameId: gameState.id,
+      seatIndex: seatReplacement.seatIndex
+    });
+    
+    setSeatReplacement(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleCloseSeatReplacement = () => {
+    setSeatReplacement(prev => ({ ...prev, isOpen: false }));
   };
 
   // Update the player tricks display
@@ -1653,6 +1690,26 @@ export default function GameTable({
     return () => {
       socket.off('new_hand_started', handleNewHandStarted);
       socket.off('bidding_ready', handleBiddingReady);
+    };
+  }, [socket]);
+
+  // Effect to handle seat replacement events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleSeatReplacementStarted = (data: { gameId: string; seatIndex: number; expiresAt: number }) => {
+      console.log('[SEAT REPLACEMENT] Seat replacement started:', data);
+      setSeatReplacement({
+        isOpen: true,
+        seatIndex: data.seatIndex,
+        expiresAt: data.expiresAt
+      });
+    };
+
+    socket.on('seat_replacement_started', handleSeatReplacementStarted);
+
+    return () => {
+      socket.off('seat_replacement_started', handleSeatReplacementStarted);
     };
   }, [socket]);
 
@@ -2993,6 +3050,15 @@ export default function GameTable({
           </div>
         </div>
       )}
+
+      {/* Seat Replacement Modal */}
+      <SeatReplacementModal
+        isOpen={seatReplacement.isOpen}
+        onClose={handleCloseSeatReplacement}
+        seatIndex={seatReplacement.seatIndex}
+        expiresAt={seatReplacement.expiresAt}
+        onFillSeat={handleFillSeatWithBot}
+      />
     </>
   );
 }
