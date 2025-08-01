@@ -1571,7 +1571,10 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         game.players[playerIndex] = null;
         
         // Start seat replacement process for the empty seat
-        startSeatReplacement(game, playerIndex);
+        console.log(`[DISCONNECT DEBUG] About to start seat replacement for seat ${playerIndex}`);
+        console.log(`[DISCONNECT DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
+        // TEMPORARILY DISABLED: startSeatReplacement(game, playerIndex);
+        console.log(`[DISCONNECT DEBUG] Seat replacement DISABLED for debugging`);
         
         // Send system message
         if (disconnectedPlayer) {
