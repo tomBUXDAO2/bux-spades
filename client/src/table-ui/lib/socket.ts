@@ -7,8 +7,8 @@ export const getSocket = (): Socket | null => {
   return socketManager.getSocket();
 };
 
-export const initializeSocket = (userId: string, username: string): void => {
-  socketManager.initialize(userId, username);
+export const initializeSocket = (userId: string, username: string, avatar?: string): void => {
+  socketManager.initialize(userId, username, avatar);
 };
 
 export const disconnectSocket = (): void => {

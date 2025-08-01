@@ -49,7 +49,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSocket(socketManager.getSocket());
     });
 
-    socketManager.initialize(user.id, user.username);
+    socketManager.initialize(user.id, user.username, user.avatar);
 
     return () => {
       socketManager.disconnect();

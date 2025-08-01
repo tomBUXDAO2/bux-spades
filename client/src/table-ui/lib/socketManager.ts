@@ -83,7 +83,7 @@ export class SocketManager {
     };
   }
 
-  public initialize(userId: string, username: string): void {
+  public initialize(userId: string, username: string, avatar?: string): void {
     console.log('SocketManager: Initializing with user:', { userId, username });
     console.log('SocketManager: localStorage contents:', {
       sessionToken: localStorage.getItem('sessionToken'),
@@ -121,7 +121,8 @@ export class SocketManager {
       auth: {
         token,
         userId,
-        username
+        username,
+        avatar
       },
       reconnection: true,
       reconnectionAttempts: 10, // Increased from 5
@@ -310,7 +311,7 @@ export async function handleAuthenticatedSession() {
           token: sessionWithToken.user.sessionToken // Log the actual token for debugging
         });
         
-        socketManager.initialize(sessionWithToken.user.id, sessionWithToken.user.username);
+        socketManager.initialize(sessionWithToken.user.id, sessionWithToken.user.username, sessionWithToken.user.avatar);
       } else {
         console.error('Invalid session response:', session);
         // Clear invalid token

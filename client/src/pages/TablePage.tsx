@@ -120,7 +120,7 @@ export default function TablePage() {
       return;
     }
 
-    socketManager.initialize(user.id, user.username);
+    socketManager.initialize(user.id, user.username, user.avatar);
     const newSocket = socketManager.getSocket();
     if (newSocket) {
       setSocket(newSocket);
