@@ -378,7 +378,7 @@ export default function GameTable({
 
   // Turn timer effect
   useEffect(() => {
-    if (!game || game.status !== 'PLAYING') {
+    if (!game || (game.status !== 'PLAYING' && game.status !== 'BIDDING')) {
       setTurnTimer(30);
       setIsMyTurn(false);
       return;
@@ -833,7 +833,7 @@ export default function GameTable({
   const renderPlayerPosition = (position: number) => {
     // Check if this player is on timer
     const currentPlayer = game.players[position];
-    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && isMyTurn && game.currentPlayer === currentPlayer.id && turnTimer <= 10;
+    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && isMyTurn && game.currentPlayer === currentPlayer.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
     const player = orderedPlayers[position];
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
