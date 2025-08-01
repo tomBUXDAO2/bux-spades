@@ -585,6 +585,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               console.log(`[HOST REPLACEMENT] Updated current player to new host: ${newHost.username}`);
             }
             
+            // Update current bidder if it was the old host
+            if (game.bidding && game.bidding.currentBidderIndex === playerIdx) {
+              game.bidding.currentBidderIndex = 0;
+              console.log(`[HOST REPLACEMENT] Updated current bidder to new host: ${newHost.username}`);
+            }
+            
             // Start seat replacement for the now-empty seat (the seat where the new host came from)
             startSeatReplacement(game, newHostIndex);
             hostReplaced = true;
@@ -1651,6 +1657,12 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
               game.play.currentPlayer = newHost.id;
               game.play.currentPlayerIndex = 0;
               console.log(`[HOST REPLACEMENT] Updated current player to new host: ${newHost.username}`);
+            }
+            
+            // Update current bidder if it was the old host
+            if (game.bidding && game.bidding.currentBidderIndex === playerIndex) {
+              game.bidding.currentBidderIndex = 0;
+              console.log(`[HOST REPLACEMENT] Updated current bidder to new host: ${newHost.username}`);
             }
             
             // Start seat replacement for the now-empty seat (the seat where the new host came from)
