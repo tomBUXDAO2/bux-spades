@@ -383,7 +383,7 @@ export default function GameTable({
 }: GameTableProps) {
   // Turn timer state
   const [turnTimer, setTurnTimer] = useState<number>(30);
-  const [isMyTurn, setIsMyTurn] = useState(false);
+
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => window.location.reload();
@@ -392,13 +392,12 @@ export default function GameTable({
   useEffect(() => {
     if (!game || (game.status !== 'PLAYING' && game.status !== 'BIDDING')) {
       setTurnTimer(30);
-      setIsMyTurn(false);
       return;
     }
 
     const currentPlayerId = game.currentPlayer;
     const currentPlayer = game.players.find(p => p?.id === currentPlayerId);
-    const isMyTurnNow = currentPlayerId === currentPlayerId;
+    const isMyTurnNow = currentPlayerId === propUser?.id;
     
     console.log('[TIMER DEBUG] Timer effect triggered:', {
       currentPlayerId,
@@ -408,7 +407,6 @@ export default function GameTable({
     });
     
     if (isMyTurnNow && currentPlayer && !isBot(currentPlayer)) {
-      setIsMyTurn(true);
       setTurnTimer(30);
       
       const interval = setInterval(() => {
@@ -426,7 +424,6 @@ export default function GameTable({
 
       return () => clearInterval(interval);
     } else {
-      setIsMyTurn(false);
       setTurnTimer(30);
     }
   }, [game?.currentPlayer, game?.status]);
@@ -968,7 +965,7 @@ export default function GameTable({
   const renderPlayerPosition = (position: number) => {
     // Check if this player is on timer
     const currentPlayer = game.players[position];
-    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && isMyTurn && game.currentPlayer === currentPlayer.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
+    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && game.currentPlayer === currentPlayer.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
     const player = orderedPlayers[position];
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {

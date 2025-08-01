@@ -1569,10 +1569,18 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         // Remove the player
         game.players[playerIndex] = null;
         
-        // Start seat replacement process for the empty seat
+        // Only start seat replacement if the game is in progress (not during join)
         console.log(`[DISCONNECT DEBUG] About to start seat replacement for seat ${playerIndex}`);
         console.log(`[DISCONNECT DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
-        startSeatReplacement(game, playerIndex);
+        console.log(`[DISCONNECT DEBUG] Game status:`, game.status);
+        
+        // Only show modal if game is in progress (BIDDING, PLAYING, etc.)
+        if (game.status !== 'WAITING') {
+          console.log(`[DISCONNECT DEBUG] Game is in progress, starting seat replacement`);
+          startSeatReplacement(game, playerIndex);
+        } else {
+          console.log(`[DISCONNECT DEBUG] Game is waiting, skipping seat replacement (likely join-related)`);
+        }
         
         // Send system message
         if (disconnectedPlayer) {
@@ -1694,9 +1702,38 @@ function fillSeatWithBot(game: Game, seatIndex: number) {
   });
   
   // Update all clients
-  io.to(game.id).emit('game_update', enrichGameForClient(game));
+  const enrichedGame = enrichGameForClient(game);
+  console.log(`[SEAT REPLACEMENT] Emitting game_update after bot addition:`, {
+    gameId: game.id,
+    currentPlayerIndex: enrichedGame.play?.currentPlayerIndex,
+    players: enrichedGame.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`),
+    hands: enrichedGame.hands?.map((h, i) => `${i}: ${h?.length || 0} cards`)
+  });
+  io.to(game.id).emit('game_update', enrichedGame);
   
   console.log(`[SEAT REPLACEMENT] Bot added to seat ${seatIndex} in game ${game.id}`);
+  
+  // Check if it's the bot's turn to play
+  if (game.play && game.play.currentPlayerIndex === seatIndex) {
+    console.log(`[SEAT REPLACEMENT] Bot at seat ${seatIndex} is current player, triggering bot play`);
+    setTimeout(() => {
+      botPlayCard(game, seatIndex);
+    }, 1000); // 1 second delay
+  }
+  
+  // Check if only bots remain after adding this bot
+  const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+  if (remainingHumanPlayers.length === 0) {
+    console.log('[SEAT REPLACEMENT] No human players remaining after bot addition, closing game');
+    // Remove game from games array
+    const gameIndex = games.findIndex(g => g.id === game.id);
+    if (gameIndex !== -1) {
+      games.splice(gameIndex, 1);
+    }
+    // Notify all clients that game is closed
+    io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+    return;
+  }
 }
 
 // Add error handling for the HTTP server
