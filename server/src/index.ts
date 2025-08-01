@@ -822,31 +822,65 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   io.to(game.id).emit('game_update', enrichGameForClient(game));
 });
 
-// Fill seat with bot event (manual replacement)
-socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
-  console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
-  
-  if (!socket.isAuthenticated || !socket.userId) {
-    console.log('Unauthorized fill_seat_with_bot attempt');
-    socket.emit('error', { message: 'Not authorized' });
-    return;
-  }
-  
-  const game = games.find(g => g.id === gameId);
-  if (!game) {
-    socket.emit('error', { message: 'Game not found' });
-    return;
-  }
-  
-  // Check if seat is empty
-  if (game.players[seatIndex] !== null) {
-    socket.emit('error', { message: 'Seat is not empty' });
-    return;
-  }
-  
-  // Fill the seat with a bot
-  fillSeatWithBot(game, seatIndex);
-});
+  // Fill seat with bot event (manual replacement)
+  socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
+    console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
+    
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized fill_seat_with_bot attempt');
+      socket.emit('error', { message: 'Not authorized' });
+      return;
+    }
+    
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    // Check if seat is empty
+    if (game.players[seatIndex] !== null) {
+      socket.emit('error', { message: 'Seat is not empty' });
+      return;
+    }
+    
+    // Fill the seat with a bot
+    fillSeatWithBot(game, seatIndex);
+  });
+
+  // Play again event
+  socket.on('play_again', ({ gameId }) => {
+    console.log('[PLAY AGAIN] Received play_again event:', { gameId, userId: socket.userId });
+    
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized play_again attempt');
+      socket.emit('error', { message: 'Not authorized' });
+      return;
+    }
+    
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    // Add player to responses
+    if (!playAgainResponses.has(gameId)) {
+      playAgainResponses.set(gameId, new Set());
+    }
+    playAgainResponses.get(gameId)!.add(socket.userId);
+    
+    console.log(`[PLAY AGAIN] Player ${socket.userId} responded to play again for game ${gameId}`);
+    
+    // Check if all human players have responded
+    const humanPlayers = game.players.filter(p => p && p.type === 'human');
+    const responses = playAgainResponses.get(gameId) || new Set();
+    
+    if (responses.size >= humanPlayers.length) {
+      console.log(`[PLAY AGAIN] All human players responded, resetting game ${gameId}`);
+      resetGameForNewRound(game);
+    }
+  });
 
   // Make bid event
   socket.on('make_bid', ({ gameId, userId, bid }) => {
@@ -1285,6 +1319,10 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
             team2Score: game.team2TotalScore,
             winningTeam,
           });
+          
+          // Start play again timer
+          startPlayAgainTimer(game);
+          
           // Update stats and coins in DB
           updateStatsAndCoins(game, winningTeam).catch(err => {
             console.error('Failed to update stats/coins:', err);
@@ -1739,6 +1777,10 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
 // Seat replacement management
 const seatReplacements = new Map<string, { gameId: string, seatIndex: number, timer: NodeJS.Timeout, expiresAt: number }>();
 
+// Play again management
+const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
+const playAgainResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who responded
+
 function startSeatReplacement(game: Game, seatIndex: number) {
   console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
   console.log(`[SEAT REPLACEMENT DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
@@ -1847,6 +1889,108 @@ function fillSeatWithBot(game: Game, seatIndex: number) {
     io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
     return;
   }
+}
+
+function startPlayAgainTimer(game: Game) {
+  console.log(`[PLAY AGAIN] Starting 30-second timer for game ${game.id}`);
+  
+  // Clear any existing timer
+  const existingTimer = playAgainTimers.get(game.id);
+  if (existingTimer) {
+    clearTimeout(existingTimer.timer);
+  }
+  
+  // Set 30-second timer
+  const expiresAt = Date.now() + 30000; // 30 seconds
+  const timer = setTimeout(() => {
+    console.log(`[PLAY AGAIN] Timer expired for game ${game.id}, auto-removing non-responding players`);
+    
+    // Get human players who didn't respond
+    const humanPlayers = game.players.filter(p => p && p.type === 'human');
+    const responses = playAgainResponses.get(game.id) || new Set();
+    const nonRespondingPlayers = humanPlayers.filter(p => !responses.has(p!.id));
+    
+    // Remove non-responding players
+    nonRespondingPlayers.forEach(player => {
+      const playerIndex = game.players.findIndex(p => p && p.id === player!.id);
+      if (playerIndex !== -1) {
+        console.log(`[PLAY AGAIN] Auto-removing player ${player!.username} from game ${game.id}`);
+        game.players[playerIndex] = null;
+        
+        // Start seat replacement for the empty seat
+        startSeatReplacement(game, playerIndex);
+      }
+    });
+    
+    // Clear timer and responses
+    playAgainTimers.delete(game.id);
+    playAgainResponses.delete(game.id);
+    
+    // Check if any human players remain
+    const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+    if (remainingHumanPlayers.length === 0) {
+      console.log(`[PLAY AGAIN] No human players remaining in game ${game.id}, closing game`);
+      const gameIndex = games.findIndex(g => g.id === game.id);
+      if (gameIndex !== -1) {
+        games.splice(gameIndex, 1);
+      }
+      io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+      return;
+    }
+    
+    // Reset game for remaining players
+    resetGameForNewRound(game);
+  }, 30000);
+  
+  playAgainTimers.set(game.id, { gameId: game.id, timer, expiresAt });
+  playAgainResponses.set(game.id, new Set());
+  
+  console.log(`[PLAY AGAIN] Timer started for game ${game.id}, expires at ${new Date(expiresAt).toISOString()}`);
+}
+
+function resetGameForNewRound(game: Game) {
+  console.log(`[PLAY AGAIN] Resetting game ${game.id} for new round`);
+  
+  // Clear play again timer and responses
+  const timer = playAgainTimers.get(game.id);
+  if (timer) {
+    clearTimeout(timer.timer);
+    playAgainTimers.delete(game.id);
+  }
+  playAgainResponses.delete(game.id);
+  
+  // Reset game state to WAITING
+  game.status = 'WAITING';
+  game.play = undefined;
+  game.bidding = undefined;
+  game.hands = undefined;
+  game.team1TotalScore = 0;
+  game.team2TotalScore = 0;
+  game.winningTeam = undefined;
+  game.winningPlayer = undefined;
+  game.playerScores = undefined;
+  game.dealerIndex = undefined;
+  game.isBotGame = game.players.filter(p => p && p.type === 'bot').length > 0;
+  
+  // Remove any bots that were added during the game
+  game.players = game.players.map(p => {
+    if (p && p.type === 'bot') {
+      return null; // Remove bots
+    }
+    return p;
+  });
+  
+  // Send system message
+  io.to(game.id).emit('system_message', {
+    message: 'Game reset for new round',
+    type: 'info'
+  });
+  
+  // Update all clients
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
+  io.emit('games_updated', games);
+  
+  console.log(`[PLAY AGAIN] Game ${game.id} reset successfully`);
 }
 
 // Add error handling for the HTTP server

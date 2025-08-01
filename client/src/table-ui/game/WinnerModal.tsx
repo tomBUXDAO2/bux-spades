@@ -9,9 +9,21 @@ interface WinnerModalProps {
   winningTeam: number;
   onPlayAgain?: () => void;
   userTeam?: number; // 1 for Blue Team, 2 for Red Team
+  isCoinGame?: boolean; // Whether this is a coin game (4 human players)
+  coinsWon?: number; // Number of coins won
 }
 
-export default function WinnerModal({ isOpen, onClose, team1Score, team2Score, winningTeam, onPlayAgain, userTeam }: WinnerModalProps) {
+export default function WinnerModal({ 
+  isOpen, 
+  onClose, 
+  team1Score, 
+  team2Score, 
+  winningTeam, 
+  onPlayAgain, 
+  userTeam,
+  isCoinGame = false,
+  coinsWon = 0
+}: WinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
 
@@ -29,6 +41,7 @@ export default function WinnerModal({ isOpen, onClose, team1Score, team2Score, w
   useEffect(() => {
     if (!isOpen) {
       setTimeRemaining(30);
+      setShowPlayAgainPrompt(false);
       return;
     }
 
@@ -52,15 +65,22 @@ export default function WinnerModal({ isOpen, onClose, team1Score, team2Score, w
   if (!isOpen) return null;
 
   return (
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
-          <h2 className="text-lg font-bold text-white text-center">{userWon ? 'YOU WIN!' : 'YOU LOSE!'}</h2>
+          <h2 className="text-lg font-bold text-white text-center">
+            {userWon ? 'YOU WIN!' : 'YOU LOSE!'}
+            {isCoinGame && userWon && (
+              <span className="block text-sm text-yellow-400 mt-1">
+                +{coinsWon.toLocaleString()} coins
+              </span>
+            )}
+          </h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {/* Team 1 (Red) */}
+          {/* Team 1 (Blue) */}
           <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
             <div className="flex items-center mb-1">
               <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
@@ -74,7 +94,7 @@ export default function WinnerModal({ isOpen, onClose, team1Score, team2Score, w
             </div>
           </div>
 
-          {/* Team 2 (Blue) */}
+          {/* Team 2 (Red) */}
           <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
             <div className="flex items-center mb-1">
               <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>

@@ -7,6 +7,7 @@ import BlindNilModal from './BlindNilModal';
 import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import SeatReplacementModal from './SeatReplacementModal';
+import WinnerModal from './WinnerModal';
 
 import BiddingInterface from './BiddingInterface';
 
@@ -386,7 +387,12 @@ export default function GameTable({
 
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
   // Add dummy handlePlayAgain to fix missing reference error
-  const handlePlayAgain = () => window.location.reload();
+  const handlePlayAgain = () => {
+    console.log('[PLAY AGAIN] User clicked play again');
+    if (socket) {
+      socket.emit('play_again', { gameId: gameState.id });
+    }
+  };
 
   // Turn timer effect
   useEffect(() => {
@@ -2333,98 +2339,7 @@ export default function GameTable({
                   // Partners mode - use existing Winner/Loser modals
                   
                   if (showWinner) {
-                    return (
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-                        <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <svg className="h-6 w-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                            </svg>
-                            <h2 className="text-lg font-bold text-white text-center">YOU WIN!</h2>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            {/* Blue Team */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-blue-500">
-                              <div className="flex items-center mb-2">
-                                <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-                                <h3 className="text-base font-semibold text-white">Blue Team</h3>
-                              </div>
-                              {/* Player Details */}
-                              <div className="space-y-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={getPlayerAvatar(0, gameState)} 
-                                    alt={getPlayerName(0, gameState)} 
-                                    className="w-5 h-5 rounded-full border border-white/20"
-                                  />
-                                  <span className="text-xs text-gray-300">{getPlayerName(0, gameState)}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={getPlayerAvatar(2, gameState)} 
-                                    alt={getPlayerName(2, gameState)} 
-                                    className="w-5 h-5 rounded-full border border-white/20"
-                                  />
-                                  <span className="text-xs text-gray-300">{getPlayerName(2, gameState)}</span>
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-gray-400">Final Score</span>
-                                  <span className="font-medium text-white">{gameState.team1TotalScore || 0}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Red Team */}
-                            <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border-2 border-red-500">
-                              <div className="flex items-center mb-2">
-                                <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-                                <h3 className="text-base font-semibold text-white">Red Team</h3>
-                              </div>
-                              {/* Player Details */}
-                              <div className="space-y-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={getPlayerAvatar(1, gameState)} 
-                                    alt={getPlayerName(1, gameState)} 
-                                    className="w-5 h-5 rounded-full border border-white/20"
-                                  />
-                                  <span className="text-xs text-gray-300">{getPlayerName(1, gameState)}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={getPlayerAvatar(3, gameState)} 
-                                    alt={getPlayerName(3, gameState)} 
-                                    className="w-5 h-5 rounded-full border border-white/20"
-                                  />
-                                  <span className="text-xs text-gray-300">{getPlayerName(3, gameState)}</span>
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-gray-400">Final Score</span>
-                                  <span className="font-medium text-white">{gameState.team2TotalScore || 0}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-4 flex flex-col gap-2">
-                            <button
-                              onClick={handlePlayAgain}
-                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
-                            >
-                              Play Again
-                            </button>
-                            <button
-                              onClick={handleLeaveTable}
-                              className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
-                            >
-                              Leave Table
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
+                    return null; // WinnerModal will be rendered outside the table
                   } else if (showLoser) {
                     return (
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
@@ -3055,6 +2970,19 @@ export default function GameTable({
         seatIndex={seatReplacement.seatIndex}
         expiresAt={seatReplacement.expiresAt}
         onFillSeat={handleFillSeatWithBot}
+      />
+
+      {/* Winner Modal - rendered outside the table */}
+      <WinnerModal
+        isOpen={showWinner}
+        onClose={() => setShowWinner(false)}
+        team1Score={gameState.team1TotalScore || 0}
+        team2Score={gameState.team2TotalScore || 0}
+        winningTeam={1}
+        onPlayAgain={handlePlayAgain}
+        userTeam={1} // TODO: Calculate user's team
+        isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
+        coinsWon={gameState.buyIn ? gameState.buyIn * 2 : 0} // TODO: Calculate actual coins won
       />
     </>
   );
