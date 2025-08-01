@@ -178,6 +178,15 @@ io.use((socket: AuthenticatedSocket, next) => {
         username: auth.username || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined),
         avatar: auth.avatar || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined)
       };
+      
+      console.log('Socket auth debug:', {
+        authUsername: auth.username,
+        authAvatar: auth.avatar,
+        authUserIdType: typeof auth.userId,
+        authUserIdUser: typeof auth.userId === 'object' ? auth.userId.user : null,
+        finalUsername: socket.auth.username,
+        finalAvatar: socket.auth.avatar
+      });
       socket.isAuthenticated = true;
       console.log('Socket authenticated successfully:', {
         userId: socket.userId,
@@ -417,10 +426,21 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
 
         // Add player to the game
+        const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
+        const playerUsername = socket.auth?.username || 'Unknown';
+        
+        console.log('Socket join debug:', {
+          socketUserId: socket.userId,
+          socketAuthUsername: socket.auth?.username,
+          socketAuthAvatar: socket.auth?.avatar,
+          finalUsername: playerUsername,
+          finalAvatar: playerAvatar
+        });
+        
         game.players[emptySeatIndex] = {
           id: socket.userId,
-          username: socket.auth?.username || 'Unknown',
-          avatar: socket.auth?.avatar || '/default-avatar.png',
+          username: playerUsername,
+          avatar: playerAvatar,
           type: 'human',
         };
       }
