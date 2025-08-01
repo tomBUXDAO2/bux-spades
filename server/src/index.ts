@@ -553,6 +553,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (playerIdx !== -1) {
         game.players[playerIdx] = null;
         socket.leave(gameId);
+        
+        // Start seat replacement process for the empty seat
+        startSeatReplacement(game, playerIdx);
+        
         // Emit game_update to the game room for real-time sync
         io.to(gameId).emit('game_update', enrichGameForClient(game));
         io.emit('games_updated', games);
