@@ -65,6 +65,7 @@ interface GameTableProps {
   onCloseBotWarning?: () => void;
   emptySeats?: number;
   botCount?: number;
+  isSpectator?: boolean;
 }
 
 // Helper function to get card image filename
@@ -367,7 +368,8 @@ export default function GameTable({
   onCloseStartWarning,
   onCloseBotWarning,
   emptySeats = 0,
-  botCount = 0
+  botCount = 0,
+  isSpectator = false
 }: GameTableProps) {
   // Turn timer state
   const [turnTimer, setTurnTimer] = useState<number>(30);
@@ -670,7 +672,7 @@ export default function GameTable({
   
   // After getting the players array:
   const sanitizedPlayers = (gameState.players || []);
-  const isObserver = !sanitizedPlayers.some((p): p is Player | Bot => !!p && p.id === currentPlayerId);
+      const isObserver = isSpectator;
   console.log('game.players:', gameState.players); // Debug log to catch nulls
 
   // Find the current player's position and team
@@ -957,8 +959,8 @@ export default function GameTable({
     };
 
     console.log('Rendering player position', position, player);
-    // If observer and seat is empty, show join button
-    if (isObserver && !player) {
+    // If not spectator and seat is empty and user is not in game, show join button
+    if (!isSpectator && !player && myPlayerIndex === -1) {
       return (
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
           <button
@@ -2578,7 +2580,7 @@ export default function GameTable({
                     biddingReady,
                     isBiddingPhase: gameState.status === "BIDDING",
                     isMyTurn: gameState.currentPlayer === currentPlayerId,
-                    isSpectator: myPlayerIndex === -1,
+                    isSpectator: isSpectator,
                     shouldShowBiddingInterface: gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1
                   });
                   return null;
@@ -2800,7 +2802,7 @@ export default function GameTable({
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
                 spectators={(gameState as any).spectators || []}
-                isSpectator={myPlayerIndex === -1}
+                isSpectator={isSpectator}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 text-lg">Connecting chat...</div>
