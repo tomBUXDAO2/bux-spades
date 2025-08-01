@@ -844,8 +844,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
-    // Fill the seat with a bot
-    fillSeatWithBot(game, seatIndex);
+    // Fill the seat with a bot (manual invitation)
+    addBotToSeat(game, seatIndex);
   });
 
   // Play again event
@@ -1818,6 +1818,70 @@ function startSeatReplacement(game: Game, seatIndex: number) {
   });
   
   console.log(`[SEAT REPLACEMENT] Started replacement for seat ${seatIndex} in game ${game.id}`);
+}
+
+
+
+function addBotToSeat(game: Game, seatIndex: number) {
+  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
+  
+  // Check if seat is empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
+    return;
+  }
+  
+  // Create bot
+  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const botNumber = Math.floor(Math.random() * 1000);
+  
+  game.players[seatIndex] = {
+    id: botId,
+    username: `Bot ${botNumber}`,
+    avatar: '/bot-avatar.jpg',
+    type: 'bot',
+    position: seatIndex
+  };
+  
+  // Send system message
+  io.to(game.id).emit('system_message', {
+    message: `A bot was invited to seat ${seatIndex + 1}`,
+    type: 'info'
+  });
+  
+  // Update all clients
+  const enrichedGame = enrichGameForClient(game);
+  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
+    gameId: game.id,
+    currentPlayerIndex: enrichedGame.play?.currentPlayerIndex,
+    players: enrichedGame.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`),
+    hands: enrichedGame.hands?.map((h, i) => `${i}: ${h?.length || 0} cards`)
+  });
+  io.to(game.id).emit('game_update', enrichedGame);
+  
+  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
+  
+  // Check if it's the bot's turn to play
+  if (game.play && game.play.currentPlayerIndex === seatIndex) {
+    console.log(`[BOT INVITATION] Bot at seat ${seatIndex} is current player, triggering bot play`);
+    setTimeout(() => {
+      botPlayCard(game, seatIndex);
+    }, 1000); // 1 second delay
+  }
+  
+  // Check if only bots remain after adding this bot
+  const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+  if (remainingHumanPlayers.length === 0) {
+    console.log('[BOT INVITATION] No human players remaining after bot addition, closing game');
+    // Remove game from games array
+    const gameIndex = games.findIndex(g => g.id === game.id);
+    if (gameIndex !== -1) {
+      games.splice(gameIndex, 1);
+    }
+    // Notify all clients that game is closed
+    io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+    return;
+  }
 }
 
 function fillSeatWithBot(game: Game, seatIndex: number) {
