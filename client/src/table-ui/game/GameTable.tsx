@@ -449,6 +449,31 @@ export default function GameTable({
     
     if (currentAutoPlayCount >= 3) {
       console.log('[TIMER] Player auto-played 3 times, removing from table');
+      
+      // Check if this is the current user being removed
+      if (currentPlayerId === currentPlayerId) {
+        console.log('[TIMER] Current user is being removed, closing window');
+        // Close the window/tab for the removed player
+        window.close();
+        // Fallback if window.close() doesn't work
+        window.location.href = '/';
+        return;
+      }
+      
+      // Check if only bots remain after removal
+      const remainingPlayers = game.players.filter(p => p && p.id !== currentPlayerId);
+      const remainingHumanPlayers = remainingPlayers.filter(p => p && !isBot(p));
+      
+      if (remainingHumanPlayers.length === 0) {
+        console.log('[TIMER] No human players remaining, closing table for all');
+        // Close table for all remaining players (they're all bots)
+        if (socket) {
+          socket.emit('close_table', { gameId: game.id, reason: 'no_humans_remaining' });
+        }
+        window.location.href = '/';
+        return;
+      }
+      
       // Emit remove player event
       if (socket) {
         socket.emit('remove_player', { 
@@ -2098,6 +2123,23 @@ export default function GameTable({
       />
     );
   };
+
+  // Listen for game_closed events
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleGameClosed = (data: { reason: string }) => {
+      console.log('[GAME CLOSED] Game was closed:', data.reason);
+      // Redirect to home page
+      window.location.href = '/';
+    };
+    
+    socket.on('game_closed', handleGameClosed);
+    
+    return () => {
+      socket.off('game_closed', handleGameClosed);
+    };
+  }, [socket]);
 
   return (
     <>

@@ -681,15 +681,29 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
     
     // Remove the player
+    const removedPlayer = game.players[playerIndex];
     game.players[playerIndex] = null;
     
     // Send system message
-    const player = game.players[playerIndex];
-    if (player) {
+    if (removedPlayer) {
       io.to(game.id).emit('system_message', {
-        message: `${player.username} was removed for inactivity`,
+        message: `${removedPlayer.username} was removed for inactivity`,
         type: 'warning'
       });
+    }
+    
+    // Check if only bots remain
+    const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+    if (remainingHumanPlayers.length === 0) {
+      console.log('[REMOVE PLAYER] No human players remaining, closing game');
+      // Remove game from games array
+      const gameIndex = games.findIndex(g => g.id === gameId);
+      if (gameIndex !== -1) {
+        games.splice(gameIndex, 1);
+      }
+      // Notify all clients that game is closed
+      io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+      return;
     }
     
     // Update all clients
@@ -1445,6 +1459,32 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.error('Error in start_new_hand:', error);
       socket.emit('error', { message: 'Internal server error' });
     }
+  });
+
+  // Close table event
+  socket.on('close_table', ({ gameId, reason }) => {
+    console.log('[CLOSE TABLE] Received close_table event:', { gameId, reason });
+    
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized close_table attempt');
+      socket.emit('error', { message: 'Not authorized' });
+      return;
+    }
+    
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    // Remove game from games array
+    const gameIndex = games.findIndex(g => g.id === gameId);
+    if (gameIndex !== -1) {
+      games.splice(gameIndex, 1);
+    }
+    
+    // Notify all clients that game is closed
+    io.to(game.id).emit('game_closed', { reason });
   });
 });
 
