@@ -1579,6 +1579,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
       console.log('[START NEW HAND] Starting new hand for game:', gameId);
 
+      // Check if all seats are filled
+      const filledSeats = game.players.filter(p => p !== null).length;
+      if (filledSeats < 4) {
+        console.log('[START NEW HAND] Not all seats are filled, cannot start new hand');
+        socket.emit('error', { message: 'All seats must be filled before starting a new hand' });
+        return;
+      }
+
       // Move dealer to the left (next position)
       const newDealerIndex = (game.dealerIndex + 1) % 4;
       game.dealerIndex = newDealerIndex;
