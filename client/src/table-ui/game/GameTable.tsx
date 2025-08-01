@@ -1777,6 +1777,12 @@ export default function GameTable({
       } else {
         setShowLoser(true);
       }
+    } else if (gameState.status === "WAITING") {
+      // Close winner/loser modals when game resets to WAITING status
+      setShowWinner(false);
+      setShowLoser(false);
+      setShowHandSummary(false);
+      setHandSummaryData(null);
     }
   }, [gameState.status, gameState.winningTeam]);
 
