@@ -443,6 +443,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           avatar: playerAvatar,
           type: 'human',
         };
+        
+        // Clear any existing seat replacement for this seat
+        const replacementId = `${game.id}-${emptySeatIndex}`;
+        const existingReplacement = seatReplacements.get(replacementId);
+        if (existingReplacement) {
+          console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat ${emptySeatIndex} as player joined`);
+          clearTimeout(existingReplacement.timer);
+          seatReplacements.delete(replacementId);
+        }
       }
 
       // Join the game room
@@ -1603,11 +1612,21 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
 const seatReplacements = new Map<string, { gameId: string, seatIndex: number, timer: NodeJS.Timeout, expiresAt: number }>();
 
 function startSeatReplacement(game: Game, seatIndex: number) {
+  console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
+  console.log(`[SEAT REPLACEMENT DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
+  
+  // Check if seat is actually empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[SEAT REPLACEMENT DEBUG] Seat ${seatIndex} is not empty, skipping replacement`);
+    return;
+  }
+  
   const replacementId = `${game.id}-${seatIndex}`;
   
   // Cancel any existing replacement for this seat
   const existing = seatReplacements.get(replacementId);
   if (existing) {
+    console.log(`[SEAT REPLACEMENT DEBUG] Cancelling existing replacement for seat ${seatIndex}`);
     clearTimeout(existing.timer);
   }
   

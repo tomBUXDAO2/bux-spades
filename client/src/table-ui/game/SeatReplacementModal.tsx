@@ -47,38 +47,36 @@ export default function SeatReplacementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <FaClock className="text-orange-500 text-2xl mr-2" />
-            <h2 className="text-xl font-bold text-gray-800">Seat Replacement</h2>
-          </div>
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+      <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <FaClock className="h-6 w-6 text-orange-500" />
+          <h2 className="text-lg font-bold text-white text-center">Seat Replacement</h2>
+        </div>
+
+        <p className="text-sm text-gray-300 text-center mb-4">
+          Seat {seatIndex + 1} will be filled by a bot in:
+        </p>
+
+        <div className="text-3xl font-bold text-orange-500 text-center mb-6">
+          {formatTime(timeRemaining)}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={onFillSeat}
+            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all flex items-center justify-center"
+          >
+            <FaRobot className="mr-2" />
+            Fill Seat Now
+          </button>
           
-          <p className="text-gray-600 mb-4">
-            Seat {seatIndex + 1} will be filled by a bot in:
-          </p>
-          
-          <div className="text-3xl font-bold text-orange-500 mb-6">
-            {formatTime(timeRemaining)}
-          </div>
-          
-          <div className="flex space-x-3">
-            <button
-              onClick={onFillSeat}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center"
-            >
-              <FaRobot className="mr-2" />
-              Fill Seat Now
-            </button>
-            
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg"
-            >
-              Close
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
