@@ -438,20 +438,24 @@ export default function GameTable({
     }
     
     // Increment auto-play count
-    setAutoPlayCount(prev => ({
-      ...prev,
-      [currentPlayerId]: (prev[currentPlayerId] || 0) + 1
-    }));
+    setAutoPlayCount(prev => {
+      const newCount = (prev[currentPlayerId] || 0) + 1;
+      console.log('[AUTO PLAY DEBUG] Updated auto-play count for', currentPlayerId, ':', newCount);
+      return {
+        ...prev,
+        [currentPlayerId]: newCount
+      };
+    });
     
     // If 3 auto-plays in a row, remove player
     const currentAutoPlayCount = (autoPlayCount[currentPlayerId] || 0) + 1;
-    console.log('[AUTO PLAY DEBUG] Auto-play count:', currentAutoPlayCount);
+    console.log('[AUTO PLAY DEBUG] Auto-play count:', currentAutoPlayCount, 'for player:', currentPlayerId);
     
     if (currentAutoPlayCount >= 3) {
       console.log('[TIMER] Player auto-played 3 times, removing from table');
       
       // Check if this is the current user being removed
-      if (currentPlayerId === currentPlayerId) {
+      if (currentPlayerId === propUser?.id) {
         console.log('[TIMER] Current user is being removed, closing window');
         // Close the window/tab for the removed player
         window.close();
