@@ -175,8 +175,8 @@ io.use((socket: AuthenticatedSocket, next) => {
         ...auth, 
         token,
         userId: authUserId,
-        username: typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined,
-        avatar: typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined
+        username: auth.username || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined),
+        avatar: auth.avatar || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined)
       };
       socket.isAuthenticated = true;
       console.log('Socket authenticated successfully:', {
