@@ -672,7 +672,7 @@ export default function GameTable({
   
   // After getting the players array:
   const sanitizedPlayers = (gameState.players || []);
-      const isObserver = isSpectator;
+  
   console.log('game.players:', gameState.players); // Debug log to catch nulls
 
   // Find the current player's position and team
