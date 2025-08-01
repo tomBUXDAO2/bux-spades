@@ -745,8 +745,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Start seat replacement process
     console.log(`[REMOVE PLAYER DEBUG] About to start seat replacement for seat ${playerIndex}`);
     console.log(`[REMOVE PLAYER DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
-    // TEMPORARILY DISABLED: startSeatReplacement(game, playerIndex);
-    console.log(`[REMOVE PLAYER DEBUG] Seat replacement DISABLED for debugging`);
+    startSeatReplacement(game, playerIndex);
     
       // Update all clients
   io.to(game.id).emit('game_update', enrichGameForClient(game));
@@ -1573,8 +1572,7 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         // Start seat replacement process for the empty seat
         console.log(`[DISCONNECT DEBUG] About to start seat replacement for seat ${playerIndex}`);
         console.log(`[DISCONNECT DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
-        // TEMPORARILY DISABLED: startSeatReplacement(game, playerIndex);
-        console.log(`[DISCONNECT DEBUG] Seat replacement DISABLED for debugging`);
+        startSeatReplacement(game, playerIndex);
         
         // Send system message
         if (disconnectedPlayer) {
