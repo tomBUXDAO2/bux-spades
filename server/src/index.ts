@@ -1555,6 +1555,9 @@ socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
         // Remove the player
         game.players[playerIndex] = null;
         
+        // Start seat replacement process for the empty seat
+        startSeatReplacement(game, playerIndex);
+        
         // Send system message
         if (disconnectedPlayer) {
           io.to(game.id).emit('system_message', {
