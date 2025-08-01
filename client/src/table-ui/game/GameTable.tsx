@@ -903,24 +903,20 @@ export default function GameTable({
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
     try {
-      const endpoint = gameState.status === 'WAITING'
-        ? `/api/games/${gameState.id}/invite-bot`
-        : `/api/games/${gameState.id}/invite-bot-midgame`;
-      
-      console.log('Inviting bot to seat:', seatIndex);
-      const res = await api.post(endpoint, { seatIndex, requesterId: currentPlayerId });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        console.error('Failed to invite bot:', error);
-        alert('Failed to invite bot: ' + (error.error || 'Unknown error'));
-      } else {
-        const updatedGame = await res.json();
-        console.log('Bot invited successfully:', updatedGame);
-        setGameState(updatedGame);
+      if (socket) {
+        console.log('Inviting bot to seat:', seatIndex);
+        socket.emit('fill_seat_with_bot', {
+          gameId: gameState.id,
+          seatIndex: seatIndex
+        });
+        
+        // The game state will be updated via socket events
         if (typeof setPendingSystemMessage === 'function') {
           setPendingSystemMessage(`A bot was invited to seat ${seatIndex + 1}.`);
         }
+      } else {
+        console.error('Socket not available');
+        alert('Connection error - please refresh the page');
       }
     } catch (err) {
       console.error('Error inviting bot:', err);
