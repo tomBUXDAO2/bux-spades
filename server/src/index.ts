@@ -1486,6 +1486,46 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Notify all clients that game is closed
     io.to(game.id).emit('game_closed', { reason });
   });
+
+  // Handle socket disconnection
+  socket.on('disconnect', () => {
+    console.log('[DISCONNECT] Socket disconnected:', socket.id);
+    
+    // Find all games this user was in
+    games.forEach((game, gameIndex) => {
+      const playerIndex = game.players.findIndex(p => p && p.id === socket.userId);
+      
+      if (playerIndex !== -1) {
+        const disconnectedPlayer = game.players[playerIndex];
+        console.log('[DISCONNECT] Removing player from game:', disconnectedPlayer?.username, 'from game:', game.id);
+        
+        // Remove the player
+        game.players[playerIndex] = null;
+        
+        // Send system message
+        if (disconnectedPlayer) {
+          io.to(game.id).emit('system_message', {
+            message: `${disconnectedPlayer.username} disconnected`,
+            type: 'warning'
+          });
+        }
+        
+        // Check if only bots remain
+        const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+        
+        if (remainingHumanPlayers.length === 0) {
+          console.log('[DISCONNECT] No human players remaining, closing game:', game.id);
+          // Remove the game from the array
+          games.splice(gameIndex, 1);
+          // Notify remaining players
+          io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+        } else {
+          // Update the game for remaining players
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
+        }
+      }
+    });
+  });
 });
 
 // Add error handling for the HTTP server
