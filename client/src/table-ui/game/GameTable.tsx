@@ -484,7 +484,6 @@ export default function GameTable({
           bid = 0; // Partner bid something, must nil
         } else {
           // Use normal bidding logic
-          const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
           const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
           bid = Math.min(13, Math.max(0, expectedTricks));
         }
