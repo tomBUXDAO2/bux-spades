@@ -306,8 +306,8 @@ export default function TablePage() {
       hasGameId: !!gameId 
     });
     if (socket && socket.connected && user && gameId) {
-      console.log('[SOCKET DEBUG] Emitting join_game:', { gameId, userId: user.id });
-      socket.emit('join_game', { gameId, userId: user.id });
+      console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
+      socket.emit('join_game', { gameId });
     }
   }, [socket, user, gameId]);
 
