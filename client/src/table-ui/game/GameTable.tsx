@@ -777,6 +777,17 @@ export default function GameTable({
       return;
     }
     
+    console.log('[CARDS REVEALED DEBUG] Checking conditions:', {
+      gameStateStatus: gameState.status,
+      currentPlayer: gameState.currentPlayer,
+      currentPlayerId,
+      dealingComplete,
+      biddingReady,
+      cardsRevealed,
+      showBlindNilModal,
+      isBlindNil
+    });
+    
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
@@ -2558,7 +2569,15 @@ export default function GameTable({
                             />
                             
                             {/* Bidding Interface */}
-                            {!showBlindNilModal && cardsRevealed && (
+                            {(() => {
+                              const shouldShow = !showBlindNilModal && cardsRevealed;
+                              console.log('[BIDDING INTERFACE DEBUG] Rendering condition:', {
+                                showBlindNilModal,
+                                cardsRevealed,
+                                shouldShow
+                              });
+                              return shouldShow;
+                            })() && (
                               <BiddingInterface
                                 onBid={handleBid}
                                 gameType={gameType}
