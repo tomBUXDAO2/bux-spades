@@ -373,7 +373,8 @@ export default function TablePage() {
     };
 
     // Listen for socket authenticated event
-    const handleAuthenticated = (data: any) => {
+    // @ts-ignore
+    const handleAuthenticated = () => {
       console.log('[SOCKET AUTHENTICATED] Socket authenticated, rejoining game:', { gameId });
       if (user && gameId && !isSpectator) {
         socket.emit('join_game', { gameId });
