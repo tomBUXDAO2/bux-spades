@@ -496,6 +496,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.log(`User ${socket.userId} joined game ${gameId}`);
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
+      
+      // Emit game update to ALL players in the game
+      console.log('[SERVER DEBUG] Emitting game update to all players after user joined');
+      emitGameUpdateToPlayers(game);
+      
       // Send game update ONLY to this socket, with hand
       const enrichedGame = enrichGameForClient(game, socket.userId);
       console.log('[SERVER DEBUG] Sending game_update to client:', {
