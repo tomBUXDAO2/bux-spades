@@ -2044,10 +2044,14 @@ function resetGameForNewRound(game: Game) {
   game.dealerIndex = undefined;
   game.isBotGame = game.players.filter(p => p && p.type === 'bot').length > 0;
   
-  // Remove any bots that were added during the game
+  // Remove any bots that were added during the game and reset player trick counts
   game.players = game.players.map(p => {
     if (p && p.type === 'bot') {
       return null; // Remove bots
+    }
+    if (p) {
+      // Reset trick count for human players
+      p.tricks = 0;
     }
     return p;
   });
