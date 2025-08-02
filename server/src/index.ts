@@ -2635,6 +2635,7 @@ function getActiveGames() {
 
 // Helper to emit game update to all players with their own hands
 function emitGameUpdateToPlayers(game: Game) {
+  // Send individual game updates to each player with their own hand
   for (const player of game.players.filter(isNonNull)) {
     const playerSocket = authenticatedSockets.get(player.id);
     if (playerSocket) {

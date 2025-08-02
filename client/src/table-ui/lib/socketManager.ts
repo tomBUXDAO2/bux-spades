@@ -46,11 +46,12 @@ export class SocketManager {
   };
   private session: { token: string; userId: string; username: string } | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10; // Increased from 5
   private reconnectDelay = 1000;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private stateChangeCallbacks: ((state: SocketState) => void)[] = [];
   private initialized = false;
+  private onConnectCallbacks: (() => void)[] = [];
 
   private constructor() {
     // Private constructor to enforce singleton
@@ -69,9 +70,17 @@ export class SocketManager {
     callback(this.getState());
   }
 
+  public onConnect(callback: () => void) {
+    this.onConnectCallbacks.push(callback);
+  }
+
   private notifyStateChange() {
     const state = this.getState();
     this.stateChangeCallbacks.forEach(callback => callback(state));
+  }
+
+  private notifyConnect() {
+    this.onConnectCallbacks.forEach(callback => callback());
   }
 
   public getState(): SocketState {
@@ -125,14 +134,16 @@ export class SocketManager {
         avatar
       },
       reconnection: true,
-      reconnectionAttempts: 10, // Increased from 5
+      reconnectionAttempts: 15, // Increased from 10
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000, // Increased from 10000
+      reconnectionDelayMax: 10000, // Increased from 5000
+      timeout: 30000, // Increased from 20000
       autoConnect: true,
       forceNew: true, // Force new connection
       upgrade: true, // Allow transport upgrade
-      rememberUpgrade: true
+      rememberUpgrade: true,
+      // Add more robust settings for page refresh scenarios
+      closeOnBeforeunload: false // Don't close on page unload
     });
 
     this.setupSocketListeners();
@@ -159,6 +170,7 @@ export class SocketManager {
       }
       
       this.notifyStateChange();
+      this.notifyConnect();
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -173,7 +185,20 @@ export class SocketManager {
         this.reconnectTimer = null;
       }
 
-      // Attempt to reconnect if we have a session
+      // For page refresh scenarios, don't attempt manual reconnection
+      // Let Socket.IO handle it automatically
+      if (reason === 'io client disconnect') {
+        console.log('Socket disconnected by client - not attempting reconnection');
+        return;
+      }
+
+      // For page refresh scenarios (transport close), let Socket.IO handle reconnection
+      if (reason === 'transport close') {
+        console.log('Socket transport closed (likely page refresh) - letting Socket.IO handle reconnection');
+        // Don't return here - let the automatic reconnection logic continue
+      }
+
+      // Attempt to reconnect if we have a session and it wasn't a manual disconnect
       if (this.session && this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectTimer = setTimeout(() => {
           this.reconnectAttempts++;
@@ -249,6 +274,34 @@ export class SocketManager {
     this.state.isAuthenticated = false;
     this.state.isReady = false;
     this.session = null;
+    this.notifyStateChange();
+  }
+
+  public forceReconnect(): void {
+    console.log('SocketManager: Force reconnecting...');
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    
+    // Reset state
+    this.state.isConnected = false;
+    this.state.isAuthenticated = false;
+    this.state.isReady = false;
+    this.reconnectAttempts = 0;
+    
+    // Clear any existing timers
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    // Reinitialize if we have a session
+    if (this.session) {
+      console.log('SocketManager: Reinitializing with existing session');
+      this.initialize(this.session.userId, this.session.username);
+    }
+    
     this.notifyStateChange();
   }
 

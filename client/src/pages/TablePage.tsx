@@ -113,6 +113,10 @@ export default function TablePage() {
     }
   }, [game]);
 
+
+
+
+
   // Initialize socket and fetch game
   useEffect(() => {
     if (!user) {
@@ -120,6 +124,8 @@ export default function TablePage() {
       return;
     }
 
+    console.log('[INIT] Starting initialization sequence for game:', gameId);
+    
     socketManager.initialize(user.id, user.username, user.avatar || undefined);
     const newSocket = socketManager.getSocket();
     if (newSocket) {
@@ -163,6 +169,19 @@ export default function TablePage() {
             requestFullScreen();
           }, 1000); // Small delay to ensure game is loaded
         }
+
+        // After fetching game, ensure we join the socket room if socket is ready
+        const currentSocket = socketManager.getSocket();
+        if (currentSocket && currentSocket.connected && !isSpectator) {
+          console.log('[FETCH GAME] Socket is ready, joining game room after fetch');
+          setTimeout(() => {
+            if (currentSocket && currentSocket.connected) {
+              currentSocket.emit('join_game', { gameId });
+            }
+          }, 500);
+        } else {
+          console.log('[FETCH GAME] Socket not ready yet, will join when ready');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load game');
       } finally {
@@ -173,7 +192,7 @@ export default function TablePage() {
     fetchGame();
 
     return () => {
-      socketManager.disconnect();
+      // Don't disconnect socket here - it will be handled by the SocketContext cleanup
       setSocket(null);
       // Exit full-screen when leaving the page
       if (isFullScreen) {
@@ -183,17 +202,11 @@ export default function TablePage() {
   }, [gameId, user, navigate, isSpectator]);
 
   // Listen for game_update events and update local game state
+  // Listen for game_update events and update local game state
   useEffect(() => {
     if (!socket) return;
-    console.log('[SOCKET DEBUG] Setting up game_update listener');
+    
     const handleGameUpdate = (updatedGame: any) => {
-      console.log('[GAME UPDATE DEBUG] Received game update:', {
-        currentPlayer: updatedGame.currentPlayer,
-        status: updatedGame.status,
-        playCurrentPlayer: updatedGame.play?.currentPlayer,
-        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
-        fullGameObject: updatedGame
-      });
       
       // Ensure currentPlayer is set correctly
       if (updatedGame.status === 'BIDDING' && updatedGame.bidding?.currentPlayer) {
@@ -203,6 +216,7 @@ export default function TablePage() {
       }
       
       setGame(updatedGame);
+      
       // Update modal state when game state changes
       updateModalState(updatedGame);
     };
@@ -211,8 +225,9 @@ export default function TablePage() {
     socket.off('game_update', handleGameUpdate);
     socket.on('game_update', handleGameUpdate);
     
+
+    
     return () => {
-      console.log('[SOCKET DEBUG] Cleaning up game_update listener');
       socket.off('game_update', handleGameUpdate);
     };
   }, [socket]);
@@ -220,63 +235,67 @@ export default function TablePage() {
   // Listen for bidding_update events and update only the bidding part of the game state
   useEffect(() => {
     if (!socket) return;
-    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
-      console.log('[BIDDING UPDATE DEBUG] Received bidding update:', bidding);
-      setGame(prev => {
-        if (!prev) return prev;
-        
-        const nextPlayer = prev.players[bidding.currentBidderIndex];
-        console.log('[BIDDING UPDATE DEBUG] Next player:', nextPlayer?.username, 'at index:', bidding.currentBidderIndex);
-        
-        return {
-          ...prev,
-          bidding: {
-            ...prev.bidding,
-            currentBidderIndex: bidding.currentBidderIndex,
-            currentPlayer: nextPlayer?.id ?? '',
-            bids: bidding.bids,
-          },
-          // --- CRITICAL FIX: Update root-level currentPlayer! ---
+      const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
+    setGame(prev => {
+      if (!prev) return prev;
+      
+      const nextPlayer = prev.players[bidding.currentBidderIndex];
+      
+      const updatedGame = {
+        ...prev,
+        bidding: {
+          ...prev.bidding,
+          currentBidderIndex: bidding.currentBidderIndex,
           currentPlayer: nextPlayer?.id ?? '',
-        };
-      });
-    };
+          bids: bidding.bids,
+        },
+        // --- CRITICAL FIX: Update root-level currentPlayer! ---
+        currentPlayer: nextPlayer?.id ?? '',
+      };
+      
+      return updatedGame;
+    });
+  };
     
     // Handle bidding completion
-    const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
-      console.log('[BIDDING COMPLETE DEBUG] Received bidding complete:', data);
-      setGame(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          status: 'PLAYING',
-          bidding: {
-            ...prev.bidding,
-            bids: data.bids,
-          }
-        };
-      });
-    };
+      const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
+    setGame(prev => {
+      if (!prev) return prev;
+      
+      const updatedGame = {
+        ...prev,
+        status: 'PLAYING',
+        bidding: {
+          ...prev.bidding,
+          bids: data.bids,
+        }
+      };
+      
+      return updatedGame;
+    });
+  };
     
     // Handle play start
-    const handlePlayStart = (data: { gameId: string, currentPlayerIndex: number, currentTrick: any[], trickNumber: number }) => {
-      console.log('[PLAY START DEBUG] Received play start:', data);
-      setGame(prev => {
-        if (!prev) return prev;
-        const currentPlayer = prev.players[data.currentPlayerIndex];
-        return {
-          ...prev,
-          status: 'PLAYING',
-          play: {
-            currentPlayer: currentPlayer?.id ?? '',
-            currentPlayerIndex: data.currentPlayerIndex,
-            currentTrick: data.currentTrick,
-            trickNumber: data.trickNumber,
-            spadesBroken: false
-          }
-        };
-      });
-    };
+      const handlePlayStart = (data: { gameId: string, currentPlayerIndex: number, currentTrick: any[], trickNumber: number }) => {
+    setGame(prev => {
+      if (!prev) return prev;
+      const currentPlayer = prev.players[data.currentPlayerIndex];
+      
+      const updatedGame = {
+        ...prev,
+        status: 'PLAYING',
+        play: {
+          currentPlayer: currentPlayer?.id ?? '',
+          currentPlayerIndex: data.currentPlayerIndex,
+          currentTrick: data.currentTrick,
+          trickNumber: data.trickNumber,
+          spadesBroken: false
+        }
+      };
+      
+      return updatedGame;
+    });
+  };
     
     // Remove any existing listeners first to prevent duplicates
     socket.off('bidding_update', handleBiddingUpdate);
@@ -368,21 +387,15 @@ export default function TablePage() {
       console.log('[SOCKET STATE CHANGE] Socket state changed:', state);
       if (state.isConnected && state.isAuthenticated && state.isReady && user && gameId) {
         console.log('[SOCKET STATE CHANGE] Socket is ready, rejoining game:', { gameId });
-        socket.emit('join_game', { gameId });
-      }
-    };
-
-    // Listen for socket authenticated event
-    const handleAuthenticated = (data: any) => {
-      console.log('[SOCKET AUTHENTICATED] Socket authenticated, rejoining game:', { gameId, data });
-      if (user && gameId && !isSpectator) {
-        // Add a small delay to ensure game state is properly loaded
-        setTimeout(() => {
-          if (socket && socket.connected) {
-            console.log('[SOCKET AUTHENTICATED] Emitting join_game after delay');
-            socket.emit('join_game', { gameId });
-          }
-        }, 500);
+        // Join immediately when socket is ready
+        if (socket && socket.connected) {
+          console.log('[SOCKET STATE CHANGE] Emitting join_game immediately');
+          socket.emit('join_game', {
+            gameId,
+            userId: user.id,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     };
 
@@ -390,12 +403,8 @@ export default function TablePage() {
     const socketManager = getSocketManager();
     socketManager.onStateChange(handleSocketStateChange);
 
-    // Listen for authenticated event
-    socket.on('authenticated', handleAuthenticated);
-
     return () => {
-      // Clean up the listener
-      socket.off('authenticated', handleAuthenticated);
+      // Clean up is handled by the socket manager
     };
   }, [socket, user, gameId, isSpectator]);
 
@@ -423,8 +432,14 @@ export default function TablePage() {
       
       // After successful HTTP join, emit socket join
       if (socket && socket.connected) {
-        console.log('[HTTP JOIN] Emitting socket join after successful HTTP join');
-        socket.emit('join_game', { gameId });
+        console.log('[HTTP JOIN] Emitting socket join after successful HTTP join, socket connected:', socket.connected);
+        socket.emit('join_game', {
+          gameId,
+          userId: user.id,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.log('[HTTP JOIN] Socket not connected, cannot emit join_game');
       }
     } catch (error) {
       console.error('Error joining game:', error);
@@ -524,10 +539,7 @@ export default function TablePage() {
   // Check if user should be in the game but isn't
   const shouldShowRejoinButton = false;
 
-  // Rejoin game function
-  const handleRejoinGame = async () => {
-    // Remove this function
-  };
+
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -577,8 +589,7 @@ export default function TablePage() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={isSpectator}
-          shouldShowRejoinButton={shouldShowRejoinButton}
-          onRejoinGame={handleRejoinGame}
+
         />
       </div>
 

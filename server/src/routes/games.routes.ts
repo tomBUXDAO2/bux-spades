@@ -6,6 +6,8 @@ import { games } from '../gamesStore';
 import { PrismaClient } from '@prisma/client';
 import type { AuthenticatedSocket } from '../index';
 
+
+
 const router = Router();
 const prisma = new PrismaClient();
 
@@ -1462,9 +1464,10 @@ export function botPlayCard(game: Game, seatIndex: number) {
         game.play!.currentTrick = [];
         
         // Emit immediate game update with cleared trick and updated trick counts
-        const enrichedGame = enrichGameForClient(game);
-        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-        io.to(game.id).emit('game_update', enrichedGame);
+        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', game.play?.currentPlayer, 'currentPlayerIndex:', game.play?.currentPlayerIndex);
+        
+        // Send game update to all players in the room
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
         
         // Emit trick complete with the stored trick data for animation
         io.to(game.id).emit('trick_complete', {
