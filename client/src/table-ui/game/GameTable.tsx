@@ -1519,7 +1519,15 @@ export default function GameTable({
                   pointerEvents: 'auto',
                   opacity: isVisible ? 1 : 0,
                 }}
-                onClick={() => isPlayable && gameState.status === "PLAYING" && handlePlayCard(card)}
+                onClick={() => {
+                  console.log('[CARD CLICK DEBUG] Card clicked:', card, 'isPlayable:', isPlayable, 'gameState.status:', gameState.status);
+                  if (isPlayable && gameState.status === "PLAYING") {
+                    console.log('[CARD CLICK DEBUG] Calling handlePlayCard');
+                    handlePlayCard(card);
+                  } else {
+                    console.log('[CARD CLICK DEBUG] Click ignored - not playable or wrong game state');
+                  }
+                }}
               >
                 <div className="relative">
                   <CardImage
