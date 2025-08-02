@@ -1988,6 +1988,18 @@ export default function GameTable({
     }
   };
 
+  // Handle timer expiration - remove player from table via socket
+  const handleTimerExpire = () => {
+    console.log('[GAME TABLE] Timer expired, removing player from table');
+    if (socket && gameState?.id && user?.id) {
+      socket.emit('leave_game', { gameId: gameState.id, userId: user.id });
+    }
+    // Also call the parent's onLeaveTable for cleanup
+    if (typeof onLeaveTable === 'function') {
+      onLeaveTable();
+    }
+  };
+
   // Modified start game handler
   const handleStartGame = async () => {
     // Always call the parent's start game function - it will handle modal logic
@@ -2556,7 +2568,7 @@ export default function GameTable({
                             />
                             
                             {/* Bidding Interface */}
-                            {!showBlindNilModal && cardsRevealed && (
+                            {!showBlindNilModal && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady)) && (
                               <BiddingInterface
                                 onBid={handleBid}
                                 gameType={gameType}
@@ -2912,6 +2924,7 @@ export default function GameTable({
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
         coinsWon={gameState.buyIn ? gameState.buyIn * 2 : 0} // TODO: Calculate actual coins won
         humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+        onTimerExpire={handleTimerExpire}
       />
 
       {/* Loser Modal - rendered outside the table */}
@@ -2926,6 +2939,7 @@ export default function GameTable({
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
         coinsWon={0} // No coins won when losing
         humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+        onTimerExpire={handleTimerExpire}
       />
     </>
   );

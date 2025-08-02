@@ -10,6 +10,7 @@ interface SoloWinnerModalProps {
   onPlayAgain?: () => void;
   userPlayerIndex?: number; // The current user's player index
   humanPlayerCount?: number; // Number of human players in the game
+  onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
 }
 
 export default function SoloWinnerModal({ 
@@ -19,7 +20,8 @@ export default function SoloWinnerModal({
   winningPlayer, 
   onPlayAgain, 
   userPlayerIndex,
-  humanPlayerCount = 1
+  humanPlayerCount = 1,
+  onTimerExpire
 }: SoloWinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -45,7 +47,12 @@ export default function SoloWinnerModal({
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           console.log('[SOLO WINNER MODAL] Timer expired, auto-leaving');
-          onClose();
+          // Call the timer expire function if provided, otherwise fall back to onClose
+          if (onTimerExpire) {
+            onTimerExpire();
+          } else {
+            onClose();
+          }
           return 0;
         }
         return prev - 1;
@@ -53,7 +60,7 @@ export default function SoloWinnerModal({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, onTimerExpire]);
 
   // Sort players by score in descending order
   const sortedPlayers = playerScores

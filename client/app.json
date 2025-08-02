@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Bux Spades",
+    "slug": "bux-spades",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./public/bux-logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./public/bux-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1f2937"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.buxspades.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./public/bux-logo.png",
+        "backgroundColor": "#1f2937"
+      },
+      "package": "com.buxspades.app"
+    },
+    "web": {
+      "favicon": "./public/favicon.ico",
+      "bundler": "vite"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "bux-spades"
+  }
+} 

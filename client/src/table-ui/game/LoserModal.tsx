@@ -9,9 +9,10 @@ interface LoserModalProps {
   winningTeam: number;
   onPlayAgain?: () => void;
   userTeam?: number; // 1 for Blue Team, 2 for Red Team
+  onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
 }
 
-export default function LoserModal({ isOpen, onClose, team1Score, team2Score, winningTeam, onPlayAgain, userTeam }: LoserModalProps) {
+export default function LoserModal({ isOpen, onClose, team1Score, team2Score, winningTeam, onPlayAgain, userTeam, onTimerExpire }: LoserModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
 
@@ -36,7 +37,12 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           console.log('[LOSER MODAL] Timer expired, auto-leaving');
-          onClose();
+          // Call the timer expire function if provided, otherwise fall back to onClose
+          if (onTimerExpire) {
+            onTimerExpire();
+          } else {
+            onClose();
+          }
           return 0;
         }
         return prev - 1;
@@ -44,7 +50,7 @@ export default function LoserModal({ isOpen, onClose, team1Score, team2Score, wi
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, onTimerExpire]);
 
   // Determine if user won
   const userWon = userTeam === winningTeam;

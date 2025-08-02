@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import mobile-specific styles */
+@import './mobile.css';
+
 @layer base {
   :root {
     --background: 15 23 42; /* slate-900 */

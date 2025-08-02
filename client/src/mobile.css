@@ -1,0 +1,108 @@
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Touch-friendly button sizes */
+  button, .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+
+  /* Larger touch targets for cards */
+  .card {
+    min-height: 60px;
+    min-width: 40px;
+  }
+
+  /* Better spacing for mobile */
+  .container {
+    padding: 16px;
+  }
+
+  /* Landscape orientation optimization */
+  @media (orientation: landscape) {
+    .game-table {
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    .player-hand {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 120px;
+      overflow-x: auto;
+    }
+  }
+
+  /* Portrait orientation adjustments */
+  @media (orientation: portrait) {
+    .game-table {
+      transform: rotate(90deg);
+      width: 100vh;
+      height: 100vw;
+    }
+  }
+
+  /* Prevent zoom on input focus */
+  input, textarea, select {
+    font-size: 16px;
+  }
+
+  /* Better scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Hide scrollbars on mobile */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* React Native Web specific styles */
+.rnw-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.rnw-button {
+  background-color: #3b82f6;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.rnw-button:active {
+  background-color: #2563eb;
+}
+
+.rnw-input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 16px;
+  background-color: white;
+}
+
+.rnw-text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1f2937;
+}
+
+.rnw-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.rnw-scroll-view {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+} 

@@ -93,7 +93,7 @@ router.get('/', (_req, res) => {
 router.get('/:id', (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
-  res.json(game);
+  res.json(enrichGameForClient(game));
 });
 
   // Join a game
@@ -847,7 +847,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
         next = (next + 1) % 4;
       }
       if (game.bidding.bids.every(b => b !== null)) {
-        // All bids in, move to play phase (let existing logic handle this)
+        // All bids in, move to play phase
         // --- Play phase state ---
         if (typeof game.dealerIndex !== 'number') {
           io.to(game.id).emit('error', { message: 'Invalid game state: no dealer assigned' });
@@ -858,6 +858,8 @@ export function botMakeMove(game: Game, seatIndex: number) {
           io.to(game.id).emit('error', { message: 'Invalid game state' });
           return;
         }
+        
+        // CRITICAL FIX: Ensure game status is properly updated
         game.status = 'PLAYING';
         game.play = {
           currentPlayer: firstPlayer.id ?? '',
@@ -867,6 +869,9 @@ export function botMakeMove(game: Game, seatIndex: number) {
           trickNumber: 0,
           spadesBroken: false
         };
+        
+        console.log('[BIDDING COMPLETE - BOT] Moving to play phase, first player:', firstPlayer.username, 'at index:', (game.dealerIndex + 1) % 4, 'game.status:', game.status);
+        
         // Emit game_update for client sync
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         io.to(game.id).emit('bidding_complete', { currentBidderIndex: null, bids: game.bidding.bids });
@@ -876,19 +881,20 @@ export function botMakeMove(game: Game, seatIndex: number) {
           currentTrick: game.play.currentTrick,
           trickNumber: game.play.trickNumber,
         });
-              // If first player is a bot, trigger bot card play
-      if (firstPlayer.type === 'bot') {
-        console.log('[BOT DEBUG] (ROUTES) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
-        setTimeout(() => {
-          botPlayCard(game, (game.dealerIndex + 1) % 4);
-        }, 500);
-      } else if (firstPlayer.type === 'human') {
-        // Start timeout for human players in playing phase using the main timeout system
-        console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', firstPlayer.username);
-        // Import the timeout function from index.ts
-        const { startTurnTimeout } = require('../index');
-        startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
-      }
+        
+        // If first player is a bot, trigger bot card play
+        if (firstPlayer.type === 'bot') {
+          console.log('[BOT DEBUG] (ROUTES) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
+          setTimeout(() => {
+            botPlayCard(game, (game.dealerIndex + 1) % 4);
+          }, 500);
+        } else if (firstPlayer.type === 'human') {
+          // Start timeout for human players in playing phase using the main timeout system
+          console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', firstPlayer.username);
+          // Import the timeout function from index.ts
+          const { startTurnTimeout } = require('../index');
+          startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
+        }
         return;
       } else {
         if (!game.bidding) return; // Guard for undefined

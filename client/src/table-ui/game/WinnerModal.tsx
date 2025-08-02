@@ -12,6 +12,7 @@ interface WinnerModalProps {
   isCoinGame?: boolean; // Whether this is a coin game (4 human players)
   coinsWon?: number; // Number of coins won
   humanPlayerCount?: number; // Number of human players in the game
+  onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
 }
 
 export default function WinnerModal({ 
@@ -24,7 +25,8 @@ export default function WinnerModal({
   userTeam,
   isCoinGame = false,
   coinsWon = 0,
-  humanPlayerCount = 1
+  humanPlayerCount = 1,
+  onTimerExpire
 }: WinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -51,7 +53,12 @@ export default function WinnerModal({
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           console.log('[WINNER MODAL] Timer expired, auto-leaving');
-          onClose();
+          // Call the timer expire function if provided, otherwise fall back to onClose
+          if (onTimerExpire) {
+            onTimerExpire();
+          } else {
+            onClose();
+          }
           return 0;
         }
         return prev - 1;
@@ -59,7 +66,7 @@ export default function WinnerModal({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, onTimerExpire]);
 
   // Determine if user won
   const userWon = userTeam === winningTeam;
