@@ -499,6 +499,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Emit game update to ALL players in the game
       console.log('[SERVER DEBUG] Emitting game update to all players after user joined');
+      console.log('[SERVER DEBUG] Current game players after join:', game.players.map((p, i) => `${i}: ${p ? p.id : 'null'}`));
       emitGameUpdateToPlayers(game);
       
       // Send game update ONLY to this socket, with hand
