@@ -806,6 +806,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
       // Notify all clients that game is closed
       io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+      // Update lobby for all clients
+      io.emit('games_updated', games);
       return;
     }
     
@@ -1959,6 +1961,8 @@ function fillSeatWithBot(game: Game, seatIndex: number) {
     }
     // Notify all clients that game is closed
     io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+    // Update lobby for all clients
+    io.emit('games_updated', games);
     return;
   }
 }
