@@ -417,40 +417,68 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       );
 
       if (!isPlayerInGame) {
-        // Find an empty seat
-        const emptySeatIndex = game.players.findIndex((player: GamePlayer | null) => player === null);
-        if (emptySeatIndex === -1) {
-          console.log(`Game ${gameId} is full`);
-          socket.emit('error', { message: 'Game is full' });
-          return;
-        }
+        // Check if this user is the current player (they were removed but game state wasn't updated)
+        const isCurrentPlayer = game.currentPlayer === socket.userId;
+        
+        if (isCurrentPlayer) {
+          // User is the current player but not in a seat - restore them to seat 0
+          console.log(`[RECONNECT] Restoring current player ${socket.userId} to seat 0`);
+          const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
+          const playerUsername = socket.auth?.username || 'Unknown';
+          
+          game.players[0] = {
+            id: socket.userId,
+            username: playerUsername,
+            avatar: playerAvatar,
+            type: 'human',
+            position: 0
+          };
+          
+          // Clear any existing seat replacement for seat 0
+          const replacementId = `${game.id}-0`;
+          const existingReplacement = seatReplacements.get(replacementId);
+          if (existingReplacement) {
+            console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat 0 as current player reconnected`);
+            clearTimeout(existingReplacement.timer);
+            seatReplacements.delete(replacementId);
+          }
+        } else {
+          // User is not in the game, try to find an empty seat
+          const emptySeatIndex = game.players.findIndex((player: GamePlayer | null) => player === null);
+          if (emptySeatIndex === -1) {
+            console.log(`Game ${gameId} is full`);
+            socket.emit('error', { message: 'Game is full' });
+            return;
+          }
 
-        // Add player to the game
-        const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
-        const playerUsername = socket.auth?.username || 'Unknown';
-        
-        console.log('Socket join debug:', {
-          socketUserId: socket.userId,
-          socketAuthUsername: socket.auth?.username,
-          socketAuthAvatar: socket.auth?.avatar,
-          finalUsername: playerUsername,
-          finalAvatar: playerAvatar
-        });
-        
-        game.players[emptySeatIndex] = {
-          id: socket.userId,
-          username: playerUsername,
-          avatar: playerAvatar,
-          type: 'human',
-        };
-        
-        // Clear any existing seat replacement for this seat
-        const replacementId = `${game.id}-${emptySeatIndex}`;
-        const existingReplacement = seatReplacements.get(replacementId);
-        if (existingReplacement) {
-          console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat ${emptySeatIndex} as player joined`);
-          clearTimeout(existingReplacement.timer);
-          seatReplacements.delete(replacementId);
+          // Add player to the game
+          const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
+          const playerUsername = socket.auth?.username || 'Unknown';
+          
+          console.log('Socket join debug:', {
+            socketUserId: socket.userId,
+            socketAuthUsername: socket.auth?.username,
+            socketAuthAvatar: socket.auth?.avatar,
+            finalUsername: playerUsername,
+            finalAvatar: playerAvatar
+          });
+          
+          game.players[emptySeatIndex] = {
+            id: socket.userId,
+            username: playerUsername,
+            avatar: playerAvatar,
+            type: 'human',
+            position: emptySeatIndex
+          };
+          
+          // Clear any existing seat replacement for this seat
+          const replacementId = `${game.id}-${emptySeatIndex}`;
+          const existingReplacement = seatReplacements.get(replacementId);
+          if (existingReplacement) {
+            console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat ${emptySeatIndex} as player joined`);
+            clearTimeout(existingReplacement.timer);
+            seatReplacements.delete(replacementId);
+          }
         }
       }
 
