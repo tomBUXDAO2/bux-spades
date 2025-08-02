@@ -2038,6 +2038,9 @@ function resetGameForNewRound(game: Game) {
   game.hands = undefined;
   game.team1TotalScore = 0;
   game.team2TotalScore = 0;
+  game.team1Bags = 0;
+  game.team2Bags = 0;
+  game.playerBags = [0, 0, 0, 0];
   game.winningTeam = undefined;
   game.winningPlayer = undefined;
   game.playerScores = undefined;
