@@ -777,16 +777,7 @@ export default function GameTable({
       return;
     }
     
-    console.log('[CARDS REVEALED DEBUG] Checking conditions:', {
-      gameStateStatus: gameState.status,
-      currentPlayer: gameState.currentPlayer,
-      currentPlayerId,
-      dealingComplete,
-      biddingReady,
-      cardsRevealed,
-      showBlindNilModal,
-      isBlindNil
-    });
+
     
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
@@ -888,11 +879,7 @@ export default function GameTable({
     
     playBidSound();
     const payload = { gameId: gameState.id, userId: currentPlayerId, bid };
-    console.log('[BID DEBUG] About to emit make_bid:', payload, 'Socket connected:', socket?.connected);
     socket?.emit("make_bid", payload);
-    console.log('[BID DEBUG] make_bid emitted:', payload);
-    console.log('Game status:', gameState.status, 'Current player:', gameState.currentPlayer);
-    console.log('Socket connected:', socket?.connected);
     
     // Reveal cards after bidding if not blind nil
     if (!isBlindNil) {
@@ -2569,15 +2556,7 @@ export default function GameTable({
                             />
                             
                             {/* Bidding Interface */}
-                            {(() => {
-                              const shouldShow = !showBlindNilModal && cardsRevealed;
-                              console.log('[BIDDING INTERFACE DEBUG] Rendering condition:', {
-                                showBlindNilModal,
-                                cardsRevealed,
-                                shouldShow
-                              });
-                              return shouldShow;
-                            })() && (
+                            {!showBlindNilModal && cardsRevealed && (
                               <BiddingInterface
                                 onBid={handleBid}
                                 gameType={gameType}
