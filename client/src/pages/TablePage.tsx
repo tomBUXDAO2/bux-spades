@@ -376,7 +376,13 @@ export default function TablePage() {
     const handleAuthenticated = (data: any) => {
       console.log('[SOCKET AUTHENTICATED] Socket authenticated, rejoining game:', { gameId, data });
       if (user && gameId && !isSpectator) {
-        socket.emit('join_game', { gameId });
+        // Add a small delay to ensure game state is properly loaded
+        setTimeout(() => {
+          if (socket && socket.connected) {
+            console.log('[SOCKET AUTHENTICATED] Emitting join_game after delay');
+            socket.emit('join_game', { gameId });
+          }
+        }, 500);
       }
     };
 
