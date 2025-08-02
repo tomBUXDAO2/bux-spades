@@ -219,11 +219,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       // Join the game room if needed
       if (isAuthenticated && chatType === 'game') {
         console.log('Chat: Joining game:', gameId, 'as', isSpectator ? 'spectator' : 'player');
+        // Only join as spectator if user is actually a spectator
         if (isSpectator) {
           socket.emit('join_game_as_spectator', { gameId });
-        } else {
-        socket.emit('join_game', { gameId });
         }
+        // If user is a player, they should already be in the game room from the main game join
       }
     }
 

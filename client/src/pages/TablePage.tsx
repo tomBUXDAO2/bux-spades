@@ -242,12 +242,55 @@ export default function TablePage() {
       });
     };
     
+    // Handle bidding completion
+    const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
+      console.log('[BIDDING COMPLETE DEBUG] Received bidding complete:', data);
+      setGame(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: 'PLAYING',
+          bidding: {
+            ...prev.bidding,
+            bids: data.bids,
+          }
+        };
+      });
+    };
+    
+    // Handle play start
+    const handlePlayStart = (data: { gameId: string, currentPlayerIndex: number, currentTrick: any[], trickNumber: number }) => {
+      console.log('[PLAY START DEBUG] Received play start:', data);
+      setGame(prev => {
+        if (!prev) return prev;
+        const currentPlayer = prev.players[data.currentPlayerIndex];
+        return {
+          ...prev,
+          status: 'PLAYING',
+          play: {
+            currentPlayer: currentPlayer?.id ?? '',
+            currentPlayerIndex: data.currentPlayerIndex,
+            currentTrick: data.currentTrick,
+            trickNumber: data.trickNumber,
+            spadesBroken: false
+          }
+        };
+      });
+    };
+    
     // Remove any existing listeners first to prevent duplicates
     socket.off('bidding_update', handleBiddingUpdate);
+    socket.off('bidding_complete', handleBiddingComplete);
+    socket.off('play_start', handlePlayStart);
+    
     socket.on('bidding_update', handleBiddingUpdate);
+    socket.on('bidding_complete', handleBiddingComplete);
+    socket.on('play_start', handlePlayStart);
     
     return () => {
       socket.off('bidding_update', handleBiddingUpdate);
+      socket.off('bidding_complete', handleBiddingComplete);
+      socket.off('play_start', handlePlayStart);
     };
   }, [socket]);
 
@@ -306,25 +349,77 @@ export default function TablePage() {
       hasGameId: !!gameId 
     });
     if (socket && socket.connected && user && gameId) {
-      console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
-      socket.emit('join_game', { gameId });
+      // Only join via socket if we're not spectating and the game exists
+      if (!isSpectator) {
+        console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
+        socket.emit('join_game', { gameId });
+      } else {
+        console.log('[SOCKET DEBUG] Emitting join_game_as_spectator:', { gameId });
+        socket.emit('join_game_as_spectator', { gameId });
+      }
     }
-  }, [socket, user, gameId]);
+  }, [socket, user, gameId, isSpectator]);
+
+  // Listen for socket state changes and rejoin when ready
+  useEffect(() => {
+    if (!socket || !user || !gameId || isSpectator) return;
+
+    const handleSocketStateChange = (state: any) => {
+      console.log('[SOCKET STATE CHANGE] Socket state changed:', state);
+      if (state.isConnected && state.isAuthenticated && state.isReady && user && gameId) {
+        console.log('[SOCKET STATE CHANGE] Socket is ready, rejoining game:', { gameId });
+        socket.emit('join_game', { gameId });
+      }
+    };
+
+    // Listen for socket authenticated event
+    const handleAuthenticated = (data: any) => {
+      console.log('[SOCKET AUTHENTICATED] Socket authenticated, rejoining game:', { gameId });
+      if (user && gameId && !isSpectator) {
+        socket.emit('join_game', { gameId });
+      }
+    };
+
+    // Get the socket manager and listen for state changes
+    const socketManager = getSocketManager();
+    socketManager.onStateChange(handleSocketStateChange);
+
+    // Listen for authenticated event
+    socket.on('authenticated', handleAuthenticated);
+
+    return () => {
+      // Clean up the listener
+      socket.off('authenticated', handleAuthenticated);
+    };
+  }, [socket, user, gameId, isSpectator]);
 
   // Only join as a player if not spectating
   const handleJoinGame = async () => {
     if (!user || !gameId || isSpectator) return;
     try {
+      console.log('[HTTP JOIN] Attempting to join game via HTTP:', { gameId, userId: user.id });
       const response = await api.post(`/api/games/${gameId}/join`, {
         id: user.id,
         username: user.username,
         avatar: user.avatar
       });
-      if (!response.ok) throw new Error('Failed to join game');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[HTTP JOIN] Failed to join game:', errorData);
+        throw new Error(`Failed to join game: ${errorData.error || 'Unknown error'}`);
+      }
       const updatedGame = await response.json();
+      console.log('[HTTP JOIN] Successfully joined game:', updatedGame);
+      console.log('[HTTP JOIN] Game players after join:', updatedGame.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
       setGame(updatedGame);
       // Update modal state when joining game
       updateModalState(updatedGame);
+      
+      // After successful HTTP join, emit socket join
+      if (socket && socket.connected) {
+        console.log('[HTTP JOIN] Emitting socket join after successful HTTP join');
+        socket.emit('join_game', { gameId });
+      }
     } catch (error) {
       console.error('Error joining game:', error);
     }
@@ -420,6 +515,14 @@ export default function TablePage() {
     }
   };
 
+  // Check if user should be in the game but isn't
+  const shouldShowRejoinButton = false;
+
+  // Rejoin game function
+  const handleRejoinGame = async () => {
+    // Remove this function
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -468,6 +571,8 @@ export default function TablePage() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={isSpectator}
+          shouldShowRejoinButton={shouldShowRejoinButton}
+          onRejoinGame={handleRejoinGame}
         />
       </div>
 

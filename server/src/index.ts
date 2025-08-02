@@ -9,14 +9,15 @@ import passport from 'passport';
 import session from 'express-session';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-
+import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
+import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { games, assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner } from './routes/games.routes';
+import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
-import type { Game, GamePlayer, Card } from './types/game';
+import { enrichGameForClient } from './routes/games.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -94,8 +95,9 @@ export interface AuthenticatedSocket extends Socket {
   };
 }
 
-const onlineUsers = new Set<string>();
+// Global state
 const authenticatedSockets = new Map<string, AuthenticatedSocket>();
+const onlineUsers = new Set<string>();
 
 // Export io for use in routes
 export { io, onlineUsers };
@@ -382,7 +384,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       gameId, 
       socketId: socket.id, 
       userId: socket.userId,
-      isAuthenticated: socket.isAuthenticated 
+      isAuthenticated: socket.isAuthenticated,
+      timestamp: new Date().toISOString()
     });
     
     if (!socket.isAuthenticated || !socket.userId) {
@@ -396,6 +399,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
 
     try {
+      console.log('[JOIN GAME DEBUG] Looking for game:', gameId);
+      console.log('[JOIN GAME DEBUG] Available games:', games.map(g => ({ id: g.id, status: g.status, players: g.players.map(p => p ? p.id : 'null') })));
+      
       const game = games.find((g: Game) => g.id === gameId);
       if (!game) {
         console.log(`Game ${gameId} not found`);
@@ -412,47 +418,98 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       });
 
       // Check if user is already in the game
-      const isPlayerInGame = game.players.some((player: GamePlayer | null) => 
+      const isPlayerInGame = game.players.some((player: GamePlayer | null, _i: number) => 
         player && player.id === socket.userId
       );
 
-      if (!isPlayerInGame) {
-              // Check if this user is the current player (they were removed but game state wasn't updated)
-      const isCurrentPlayer = game.currentPlayer === socket.userId;
-      
-      console.log(`[JOIN GAME DEBUG] User ${socket.userId} reconnection check:`, {
-        isCurrentPlayer,
+      console.log(`[JOIN GAME DEBUG] User ${socket.userId} join check:`, {
+        isPlayerInGame,
         gameCurrentPlayer: game.currentPlayer,
         gameStatus: game.status,
-        players: game.players.map((p, i) => `${i}: ${p ? p.id : 'null'}`)
+        players: game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`)
       });
-      
-      if (isCurrentPlayer) {
-        // User is the current player but not in a seat - restore them to seat 0
-        console.log(`[RECONNECT] Restoring current player ${socket.userId} to seat 0`);
-        const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
-        const playerUsername = socket.auth?.username || 'Unknown';
+
+      if (!isPlayerInGame) {
+        // Check if this user is the current player (they were removed but game state wasn't updated)
+        const isCurrentPlayer = game.currentPlayer === socket.userId;
         
-        game.players[0] = {
-          id: socket.userId,
-          username: playerUsername,
-          avatar: playerAvatar,
-          type: 'human',
-          position: 0
-        };
-        
-        console.log(`[RECONNECT] Player restored to seat 0:`, game.players[0]);
-        
-        // Clear any existing seat replacement for seat 0
-        const replacementId = `${game.id}-0`;
-        const existingReplacement = seatReplacements.get(replacementId);
-        if (existingReplacement) {
-          console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat 0 as current player reconnected`);
-          clearTimeout(existingReplacement.timer);
-          seatReplacements.delete(replacementId);
-        }
-      } else {
-          // User is not in the game, try to find an empty seat
+        if (isCurrentPlayer) {
+          // User is the current player but not in a seat - restore them to their EXACT original seat
+          console.log(`[RECONNECT] Restoring current player ${socket.userId} to their EXACT original seat`);
+          
+          // The current player should be in seat 0 (the first seat)
+          const originalSeatIndex = 0;
+          
+          const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
+          const playerUsername = socket.auth?.username || 'Unknown';
+          
+          // Remove any existing player/bot from this seat and put the current player back
+          const existingPlayer = game.players[originalSeatIndex];
+          if (existingPlayer) {
+            console.log(`[RECONNECT] Removing existing player from seat ${originalSeatIndex}:`, existingPlayer);
+          }
+          
+          game.players[originalSeatIndex] = {
+            id: socket.userId,
+            username: playerUsername,
+            avatar: playerAvatar,
+            type: 'human',
+            position: originalSeatIndex
+          };
+          
+          console.log(`[RECONNECT] Player restored to their EXACT original seat ${originalSeatIndex}:`, game.players[originalSeatIndex]);
+          console.log(`[RECONNECT] Game players after restoration:`, game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`));
+          
+          // Clear any existing seat replacement for this seat
+          const replacementId = `${game.id}-${originalSeatIndex}`;
+          const existingReplacement = seatReplacements.get(replacementId);
+          if (existingReplacement) {
+            console.log(`[SEAT REPLACEMENT DEBUG] Clearing replacement for seat ${originalSeatIndex} as current player reconnected`);
+            clearTimeout(existingReplacement.timer);
+            seatReplacements.delete(replacementId);
+          }
+          
+          // Clear any disconnect timeout for this player
+          const disconnectTimeoutKey = `${game.id}-${originalSeatIndex}`;
+          const existingDisconnectTimeout = disconnectTimeouts.get(disconnectTimeoutKey);
+          if (existingDisconnectTimeout) {
+            console.log(`[RECONNECT] Clearing disconnect timeout for player ${socket.userId}`);
+            clearTimeout(existingDisconnectTimeout);
+            disconnectTimeouts.delete(disconnectTimeoutKey);
+          }
+          
+          // Fix bidding state if the game is in bidding phase
+          if (game.status === 'BIDDING' && game.bidding) {
+            console.log(`[RECONNECT] Fixing bidding state for reconnected player`);
+            console.log(`[RECONNECT] Before fix - currentBidderIndex: ${game.bidding.currentBidderIndex}, currentPlayer: ${game.currentPlayer}`);
+            
+            // If the current player is the reconnected player, make sure bidding state reflects this
+            if (game.currentPlayer === socket.userId) {
+              // Check if bidding has moved past this player's turn
+              if (game.bidding.currentBidderIndex !== originalSeatIndex) {
+                console.log(`[RECONNECT] Bidding has moved past player's turn, advancing back to player's turn`);
+                console.log(`[RECONNECT] Current bidder index: ${game.bidding.currentBidderIndex}, Player's seat: ${originalSeatIndex}`);
+                
+                // Advance bidding back to this player's turn
+                game.bidding.currentBidderIndex = originalSeatIndex;
+                console.log(`[RECONNECT] Updated bidding currentBidderIndex to ${originalSeatIndex} for reconnected player`);
+              } else {
+                console.log(`[RECONNECT] Bidding is already at player's turn`);
+              }
+            }
+            
+            console.log(`[RECONNECT] After fix - currentBidderIndex: ${game.bidding.currentBidderIndex}, currentPlayer: ${game.currentPlayer}`);
+          }
+        } else {
+          // User is not in the game and not the current player
+          // Only add them if the game is in WAITING status
+          if (game.status !== 'WAITING') {
+            console.log(`[JOIN GAME DEBUG] User ${socket.userId} cannot join game in ${game.status} status - game has already started`);
+            socket.emit('error', { message: 'Game has already started' });
+            return;
+          }
+          
+          // Try to find an empty seat
           const emptySeatIndex = game.players.findIndex((player: GamePlayer | null) => player === null);
           if (emptySeatIndex === -1) {
             console.log(`Game ${gameId} is full`);
@@ -464,12 +521,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
           const playerUsername = socket.auth?.username || 'Unknown';
           
-          console.log('Socket join debug:', {
+          console.log('[SOCKET JOIN DEBUG] Adding player to game:', {
             socketUserId: socket.userId,
             socketAuthUsername: socket.auth?.username,
             socketAuthAvatar: socket.auth?.avatar,
             finalUsername: playerUsername,
-            finalAvatar: playerAvatar
+            finalAvatar: playerAvatar,
+            seatIndex: emptySeatIndex
           });
           
           game.players[emptySeatIndex] = {
@@ -489,6 +547,21 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             seatReplacements.delete(replacementId);
           }
         }
+      } else {
+        // User is already in the game - allow them to join the socket room
+        console.log(`[SOCKET JOIN DEBUG] User ${socket.userId} is already in the game, allowing socket join`);
+        
+        // Clear any disconnect timeout for this player since they reconnected
+        const playerIndex = game.players.findIndex(p => p && p.id === socket.userId);
+        if (playerIndex !== -1) {
+          const disconnectTimeoutKey = `${game.id}-${playerIndex}`;
+          const existingDisconnectTimeout = disconnectTimeouts.get(disconnectTimeoutKey);
+          if (existingDisconnectTimeout) {
+            console.log(`[RECONNECT] Clearing disconnect timeout for player ${socket.userId} (already in game)`);
+            clearTimeout(existingDisconnectTimeout);
+            disconnectTimeouts.delete(disconnectTimeoutKey);
+          }
+        }
       }
 
       // Join the game room
@@ -499,7 +572,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Emit game update to ALL players in the game
       console.log('[SERVER DEBUG] Emitting game update to all players after user joined');
-      console.log('[SERVER DEBUG] Current game players after join:', game.players.map((p, i) => `${i}: ${p ? p.id : 'null'}`));
+      console.log('[SERVER DEBUG] Current game players after join:', game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`));
       emitGameUpdateToPlayers(game);
       
       // Send game update ONLY to this socket, with hand
@@ -541,7 +614,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
       // Check if user is already a spectator
       const isAlreadySpectator = game.spectators.some(
-        (spectator: any) => spectator.id === socket.userId
+        (spectator: any, _i: number) => spectator.id === socket.userId
       );
 
       console.log('Spectator join debug:', {
@@ -700,6 +773,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       setTimeout(() => {
         botPlayCard(game, game.play.currentPlayerIndex);
       }, 1000);
+    } else if (currentPlayer && currentPlayer.type === 'human') {
+      // Start timeout for human players in playing phase using the main timeout system
+      console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', currentPlayer.username);
+      startTurnTimeout(game, game.play.currentPlayerIndex, 'playing');
     }
   });
 
@@ -773,6 +850,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (firstBidder.type === 'bot') {
         console.log('[DEBUG] (SOCKET) About to call botMakeMove for seat', (dealerIndex + 1) % 4, 'bot:', firstBidder.username);
         botMakeMove(game, (dealerIndex + 1) % 4);
+      } else {
+        // Start turn timeout for human players when bidding phase begins
+        console.log('[TIMEOUT DEBUG] Starting timeout for first human bidder:', firstBidder.username);
+        startTurnTimeout(game, (dealerIndex + 1) % 4, 'bidding');
       }
     } catch (err) {
       console.error('Error in start_game handler:', err);
@@ -850,7 +931,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Notify all clients that game is closed
       io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
       // Update lobby for all clients
-      io.emit('games_updated', games);
+      io.emit('games_updated', getActiveGames());
       return;
     }
     
@@ -939,7 +1020,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
     
     const game = games.find(g => g.id === gameId);
+    console.log('[BID DEBUG] Game lookup result:', { 
+      gameFound: !!game, 
+      gameId, 
+      availableGames: games.map(g => ({ id: g.id, status: g.status })),
+      gameStatus: game?.status,
+      hasBidding: !!game?.bidding
+    });
+    
     if (!game || !game.bidding) {
+      console.log('[BID DEBUG] Game or bidding not found:', { gameFound: !!game, hasBidding: !!game?.bidding });
       socket.emit('error', { message: 'Game not found or invalid state' });
       return;
     }
@@ -971,6 +1061,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     
     // Store the bid
     game.bidding.bids[playerIndex] = finalBid;
+    
+    // Clear turn timeout for this player since they acted
+    clearTurnTimeout(game, userId);
     
     // Find next player who hasn't bid
     let next = (playerIndex + 1) % 4;
@@ -1017,6 +1110,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         setTimeout(() => {
           botPlayCard(game, (game.dealerIndex + 1) % 4);
         }, 1000);
+      } else {
+        // Start turn timeout for human players when play phase begins
+        startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
       }
     } else {
       game.bidding.currentBidderIndex = next;
@@ -1025,6 +1121,24 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         currentBidderIndex: next,
         bids: game.bidding.bids,
       });
+      
+      // Start timeout for human players after bidding update
+      const nextPlayer = game.players[next];
+      console.log(`[TIMEOUT DEBUG] Next player after bidding update: ${nextPlayer?.username}, type: ${nextPlayer?.type}, index: ${next}`);
+      if (nextPlayer && nextPlayer.type === 'human') {
+        console.log(`[TIMEOUT DEBUG] Starting timeout for human player ${nextPlayer.username}`);
+        startTurnTimeout(game, next, 'bidding');
+      }
+      
+      // Start turn timeout for human players (duplicate code removed)
+      console.log(`[TIMEOUT DEBUG] Next player: ${nextPlayer?.username}, type: ${nextPlayer?.type}, index: ${next}`);
+      if (nextPlayer && nextPlayer.type === 'human') {
+        console.log(`[TIMEOUT DEBUG] Starting timeout for human player ${nextPlayer.username}`);
+        startTurnTimeout(game, next, 'bidding');
+      } else {
+        console.log(`[TIMEOUT DEBUG] Not starting timeout - player is bot or null`);
+      }
+      
       // If next is a bot, trigger their move
       if (game.players[next] && game.players[next].type === 'bot') {
         console.log('[BOT BIDDING] Triggering bot bid for:', game.players[next].username, 'at index:', next);
@@ -1038,6 +1152,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Emit game update to ensure frontend has latest state
     io.to(game.id).emit('game_update', enrichGameForClient(game));
   });
+
+
 
   // Play card event
   socket.on('play_card', ({ gameId, userId, card }) => {
@@ -1151,11 +1267,20 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       game.play.spadesBroken = true;
     }
     
+    // Clear turn timeout for this player since they successfully played a card
+    clearTurnTimeout(game, userId);
+    
     // Advance to the next player immediately after playing the card
     let nextPlayerIndex = (playerIndex + 1) % 4;
     game.play.currentPlayerIndex = nextPlayerIndex;
     game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
     console.log('[PLAY TURN DEBUG] Human played card, advancing to next player:', nextPlayerIndex, game.players[nextPlayerIndex]?.username);
+    
+    // Start turn timeout for human players during playing phase
+    const nextPlayer = game.players[nextPlayerIndex];
+    if (nextPlayer && nextPlayer.type === 'human') {
+      startTurnTimeout(game, nextPlayerIndex, 'playing');
+    }
 
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
@@ -1177,6 +1302,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
       console.log('[TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
+      
+      // Start turn timeout for human players when trick is complete
+      const winnerPlayer = game.players[winnerIndex];
+      if (winnerPlayer && winnerPlayer.type === 'human') {
+        startTurnTimeout(game, winnerIndex, 'playing');
+      }
       
       // Update player trick counts
       if (game.players[winnerIndex]) {
@@ -1714,6 +1845,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     
     // Notify all clients that game is closed
     io.to(game.id).emit('game_closed', { reason });
+    
+    // Update lobby for all clients
+    const activeGames = games.filter(game => game.players.every(player => player !== null));
+    io.emit('games_updated', activeGames);
   });
 
   // Handle socket disconnection
@@ -1726,65 +1861,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       if (playerIndex !== -1) {
         const disconnectedPlayer = game.players[playerIndex];
-        console.log('[DISCONNECT] Removing player from game:', disconnectedPlayer?.username, 'from game:', game.id);
-        
-        // Remove the player
-        game.players[playerIndex] = null;
-        
-        // If the host (seat 0) was removed, appoint a new host
-        let hostReplaced = false;
-        if (playerIndex === 0) {
-          console.log('[HOST REPLACEMENT] Host was removed, appointing new host');
-          const newHostIndex = game.players.findIndex((p, i) => p && p.type === 'human' && i !== 0);
-          if (newHostIndex !== -1) {
-            // Move the new host to seat 0
-            const newHost = game.players[newHostIndex];
-            game.players[newHostIndex] = null;
-            game.players[0] = newHost;
-            console.log(`[HOST REPLACEMENT] New host appointed: ${newHost?.username} at seat 0`);
-            
-            // Update current player if it was the old host
-            if (game.play && game.play.currentPlayer === disconnectedPlayer?.id) {
-              game.play.currentPlayer = newHost.id;
-              game.play.currentPlayerIndex = 0;
-              console.log(`[HOST REPLACEMENT] Updated current player to new host: ${newHost.username}`);
-            }
-            
-            // Update current bidder if it was the old host
-            if (game.bidding && game.bidding.currentBidderIndex === playerIndex) {
-              game.bidding.currentBidderIndex = 0;
-              console.log(`[HOST REPLACEMENT] Updated current bidder to new host: ${newHost.username}`);
-            }
-            
-            // Start seat replacement for the now-empty seat (the seat where the new host came from)
-            startSeatReplacement(game, newHostIndex);
-            hostReplaced = true;
-          }
-        }
-        
-        // Remove the player from spectators if they're there
-        if (disconnectedPlayer) {
-          const spectatorIndex = game.spectators?.findIndex(s => s.id === disconnectedPlayer.id);
-          if (spectatorIndex !== -1) {
-            game.spectators.splice(spectatorIndex, 1);
-            console.log(`[DISCONNECT] Removed ${disconnectedPlayer.username} from spectators`);
-          }
-        }
-        
-        // Only start seat replacement if the game is in progress (not during join)
-        console.log(`[DISCONNECT DEBUG] About to start seat replacement for seat ${playerIndex}`);
-        console.log(`[DISCONNECT DEBUG] Seat ${playerIndex} is now:`, game.players[playerIndex]);
-        console.log(`[DISCONNECT DEBUG] Game status:`, game.status);
-        
-        // Only show modal if game is in progress (BIDDING, PLAYING, etc.) and host wasn't replaced
-        if (game.status !== 'WAITING' && !hostReplaced) {
-          console.log(`[DISCONNECT DEBUG] Game is in progress, starting seat replacement`);
-          startSeatReplacement(game, playerIndex);
-        } else if (game.status !== 'WAITING' && hostReplaced) {
-          console.log(`[DISCONNECT DEBUG] Game is in progress but host was replaced, skipping seat replacement for original seat`);
-        } else {
-          console.log(`[DISCONNECT DEBUG] Game is waiting, skipping seat replacement (likely join-related)`);
-        }
+        console.log('[DISCONNECT] Player disconnected from game:', disconnectedPlayer?.username, 'from game:', game.id);
         
         // Send system message
         if (disconnectedPlayer) {
@@ -1811,24 +1888,49 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                 if (gameIndex !== -1) {
                   games.splice(gameIndex, 1);
                   io.to(game.id).emit('game_closed', { reason: 'game_abandoned' });
+                  // Update lobby for all clients
+                  const activeGames = games.filter(game => game.players.every(player => player !== null));
+                  io.emit('games_updated', activeGames);
                 }
               }
             }
           }, 30000); // 30 second timeout
-          
-          // Update the game for remaining players
-          io.to(game.id).emit('game_update', enrichGameForClient(game));
-        } else {
-          // Update the game for remaining players
-          io.to(game.id).emit('game_update', enrichGameForClient(game));
         }
       }
     });
   });
+
+  // Listen for bidding updates to start timeouts for human players
+  socket.on('bidding_update', (data: { currentBidderIndex: number, bids: (number | null)[] }) => {
+    console.log('[TIMEOUT DEBUG] Bidding update received:', data);
+    // Find the game that this socket is in
+    const game = games.find(g => g.players.some(p => p && p.id === socket.userId));
+    if (!game || game.status !== 'BIDDING') return;
+    
+    const currentBidder = game.players[data.currentBidderIndex];
+    console.log('[TIMEOUT DEBUG] Current bidder:', currentBidder?.username, 'type:', currentBidder?.type);
+    
+    if (currentBidder && currentBidder.type === 'human') {
+      console.log('[TIMEOUT DEBUG] Starting timeout for human player:', currentBidder.username);
+      startTurnTimeout(game, data.currentBidderIndex, 'bidding');
+    }
+  });
+
+  // Listen for timeout start events from bot bidding logic
+  socket.on('start_timeout', (data: { playerIndex: number, phase: 'bidding' | 'playing' }) => {
+    console.log('[TIMEOUT DEBUG] start_timeout event received:', data);
+    const game = games.find(g => g.players.some(p => p && p.id === socket.userId));
+    if (!game) return;
+    
+    const player = game.players[data.playerIndex];
+    if (player && player.type === 'human') {
+      console.log('[TIMEOUT DEBUG] Starting timeout from bot bidding logic for:', player.username);
+      startTurnTimeout(game, data.playerIndex, data.phase);
+    }
+  });
 });
 
-// Seat replacement management
-const seatReplacements = new Map<string, { gameId: string, seatIndex: number, timer: NodeJS.Timeout, expiresAt: number }>();
+// Seat replacement management - already declared above
 
 // Play again management
 const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
@@ -2520,42 +2622,15 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
   }
 }
 
-// Helper to enrich game object for client
-function enrichGameForClient(game: Game, userId?: string): Game {
-  if (!game) return game;
-  const hands = game.hands || [];
-  const dealerIndex = game.dealerIndex;
-
-  // Patch: Always set top-level currentPlayer for frontend
-  let currentPlayer: string | undefined = undefined;
-  if (game.status === 'BIDDING' && game.bidding) {
-    currentPlayer = game.bidding.currentPlayer ?? '';
-  } else if (game.status === 'PLAYING' && game.play) {
-    currentPlayer = game.play.currentPlayer ?? '';
-  }
-
-  return {
-    ...game,
-    currentPlayer, // Always present for frontend
-    // Include Solo mode properties
-    playerScores: game.playerScores,
-    playerBags: game.playerBags,
-    winningPlayer: game.winningPlayer,
-    players: (game.players || []).map((p: GamePlayer | null, i: number) => {
-      if (!p) return null;
-      return {
-        ...p,
-        position: i, // Always include position for seat order
-        hand: userId && p.id === userId ? hands[i] || [] : undefined,
-        isDealer: dealerIndex !== undefined ? i === dealerIndex : !!p.isDealer,
-        tricks: p.tricks || 0, // Always include trick count!
-      };
-    })
-  };
-}
+// Helper to enrich game object for client - imported from games.routes.ts
 
 function isNonNull<T>(value: T | null | undefined): value is T {
   return value != null;
+}
+
+// Helper to get active games (no null players)
+function getActiveGames() {
+  return games.filter(game => game.players.every(player => player !== null));
 }
 
 // Helper to emit game update to all players with their own hands
@@ -2565,6 +2640,124 @@ function emitGameUpdateToPlayers(game: Game) {
     if (playerSocket) {
       playerSocket.emit('game_update', enrichGameForClient(game, player.id));
     }
+  }
+}
+
+// Start turn timeout for human players
+export function startTurnTimeout(game: Game, playerIndex: number, phase: 'bidding' | 'playing') {
+  console.log(`[TIMEOUT DEBUG] startTurnTimeout called for playerIndex: ${playerIndex}, phase: ${phase}`);
+  const player = game.players[playerIndex];
+  console.log(`[TIMEOUT DEBUG] Player found: ${player?.username}, type: ${player?.type}`);
+  if (!player || player.type !== 'human') {
+    console.log(`[TIMEOUT DEBUG] Not starting timeout - player is null or not human`);
+    return;
+  }
+  
+  const timeoutKey = `${game.id}-${player.id}`;
+  
+  console.log(`[TURN TIMEOUT DEBUG] Starting timeout for player ${player.username} (${player.id}) at seat ${playerIndex}, phase: ${phase}`);
+  
+  // Clear any existing timeout
+  const existingTimeout = turnTimeouts.get(timeoutKey);
+  if (existingTimeout) {
+    console.log(`[TURN TIMEOUT DEBUG] Clearing existing timeout for ${player.username}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
+    clearTimeout(existingTimeout.timer);
+  }
+  
+  // Start 30-second timeout
+  console.log(`[TURN TIMEOUT DEBUG] Starting 30-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
+  const timer = setTimeout(() => {
+    console.log(`[TURN TIMEOUT] Player ${player.username} timed out on ${phase} turn`);
+    
+    // Get current consecutive timeouts
+    const currentTimeouts = turnTimeouts.get(timeoutKey);
+    const consecutiveTimeouts = (currentTimeouts?.consecutiveTimeouts || 0) + 1;
+    
+    console.log(`[TURN TIMEOUT] Player ${player.username} consecutive timeouts: ${consecutiveTimeouts}`);
+    
+    if (consecutiveTimeouts >= 3) {
+      // Remove player after 3 consecutive timeouts
+      console.log(`[TURN TIMEOUT] Player ${player.username} removed after 3 consecutive timeouts`);
+      game.players[playerIndex] = null;
+      turnTimeouts.delete(timeoutKey);
+      
+      // Check if any human players remain
+      const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
+      if (remainingHumanPlayers.length === 0) {
+        console.log(`[TURN TIMEOUT] No human players remaining in game ${game.id}, closing game`);
+        const gameIndex = games.findIndex(g => g.id === game.id);
+        if (gameIndex !== -1) {
+          games.splice(gameIndex, 1);
+        }
+        io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
+        return;
+      }
+      
+      // Start seat replacement
+      if (game.status !== 'WAITING') {
+        startSeatReplacement(game, playerIndex);
+      }
+      
+      io.to(game.id).emit('system_message', {
+        message: `${player.username} was removed due to inactivity`,
+        type: 'warning'
+      });
+      
+      // Update all clients to reflect the player removal
+      emitGameUpdateToPlayers(game);
+      
+      // Update lobby for all clients
+      io.emit('games_updated', games);
+    } else {
+      // Bot acts for player
+      console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
+      if (phase === 'bidding') {
+        console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
+        botMakeMove(game, playerIndex);
+      } else if (phase === 'playing') {
+        console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
+        // Use the dedicated human timeout handler
+        const { handleHumanTimeout } = require('./routes/games.routes');
+        handleHumanTimeout(game, playerIndex);
+      }
+      
+      // Clear the timeout timer but keep the consecutive count
+      clearTurnTimeoutOnly(game, player.id);
+      
+      // Update consecutive timeouts (don't reset to 0)
+      turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: null, consecutiveTimeouts });
+      console.log(`[TURN TIMEOUT DEBUG] Updated timeout count for ${player.username}: ${consecutiveTimeouts}`);
+    }
+  }, 30000); // 30 seconds
+  
+  // Initialize with current consecutive timeouts (don't reset to 0)
+  const currentTimeouts = turnTimeouts.get(timeoutKey);
+  const currentConsecutiveTimeouts = currentTimeouts?.consecutiveTimeouts || 0;
+  turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer, consecutiveTimeouts: currentConsecutiveTimeouts });
+  console.log(`[TURN TIMEOUT DEBUG] Set timeout for ${player.username} with consecutive timeouts: ${currentConsecutiveTimeouts}`);
+}
+
+// Clear turn timeout when player acts
+export function clearTurnTimeout(game: Game, playerId: string) {
+  const timeoutKey = `${game.id}-${playerId}`;
+  const existingTimeout = turnTimeouts.get(timeoutKey);
+  if (existingTimeout) {
+    console.log(`[TURN TIMEOUT DEBUG] Clearing timeout for player ${playerId}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
+    clearTimeout(existingTimeout.timer);
+    // Reset consecutive timeouts when player acts
+    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: playerId, timer: null, consecutiveTimeouts: 0 });
+    console.log(`[TURN TIMEOUT DEBUG] Reset consecutive timeouts to 0 for player ${playerId}`);
+  }
+}
+
+// Clear turn timeout without resetting consecutive count (for bot actions)
+export function clearTurnTimeoutOnly(game: Game, playerId: string) {
+  const timeoutKey = `${game.id}-${playerId}`;
+  const existingTimeout = turnTimeouts.get(timeoutKey);
+  if (existingTimeout) {
+    clearTimeout(existingTimeout.timer);
+    // Don't reset consecutive timeouts, just clear the timer
+    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: playerId, timer: null, consecutiveTimeouts: existingTimeout.consecutiveTimeouts });
   }
 }
 

@@ -68,6 +68,9 @@ interface GameTableProps {
   emptySeats?: number;
   botCount?: number;
   isSpectator?: boolean;
+  // Add rejoin button props
+  shouldShowRejoinButton?: boolean;
+  onRejoinGame?: () => void;
 }
 
 // Helper function to get card image filename
@@ -382,10 +385,45 @@ export default function GameTable({
   botCount = 0,
   isSpectator = false
 }: GameTableProps) {
-  // Turn timer state
+  // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
-
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
+  
+  // Timer effect for turn countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (game.status === 'BIDDING' || game.status === 'PLAYING') {
+      const isCurrentPlayer = game.currentPlayer === propUser?.id;
+      
+      if (isCurrentPlayer) {
+        // Start timer for human players
+        setTurnTimer(30); // Reset to 30 when it becomes your turn
+        interval = setInterval(() => {
+          setTurnTimer((prev) => {
+            if (prev <= 1) {
+              return 30; // Reset to 30 when it reaches 0
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setTurnTimer(30); // Reset timer when not current player's turn
+      }
+    } else {
+      setTurnTimer(30); // Reset timer when not in active game state
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [game.status, game.currentPlayer, propUser?.id]);
+  
+  const isMyTurn = game.currentPlayer === propUser?.id;
+  const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
+  
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => {
     console.log('[PLAY AGAIN] User clicked play again');
@@ -403,48 +441,10 @@ export default function GameTable({
     return myPlayerIndex === 0 || myPlayerIndex === 2 ? 1 : 2;
   };
 
-  // Turn timer effect
-  useEffect(() => {
-    if (!game || (game.status !== 'PLAYING' && game.status !== 'BIDDING')) {
-      setTurnTimer(30);
-      return;
-    }
-
-    const currentPlayerId = game.currentPlayer;
-    const currentPlayer = game.players.find(p => p?.id === currentPlayerId);
-    const isMyTurnNow = currentPlayerId === propUser?.id;
-    
-    console.log('[TIMER DEBUG] Timer effect triggered:', {
-      currentPlayerId,
-      isMyTurnNow,
-      isBot: currentPlayer ? isBot(currentPlayer) : false,
-      status: game.status
-    });
-    
-    // Start timer for any human player's turn (not just current user)
-    if (currentPlayer && !isBot(currentPlayer)) {
-      setTurnTimer(30);
-      
-      const interval = setInterval(() => {
-        setTurnTimer(prev => {
-          console.log('[TIMER DEBUG] Timer tick:', prev);
-          if (prev <= 1) {
-            // Time's up - auto-play for human player
-            console.log('[TIMER] Time expired for human player, auto-playing');
-            if (isMyTurnNow) {
-              handleAutoPlay();
-            }
-            return 30;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    } else {
-      setTurnTimer(30);
-    }
-  }, [game?.currentPlayer, game?.status]);
+  // Turn timer effect - removed, handled by server now
+  // useEffect(() => {
+  //   // Server handles timeouts now
+  // }, [game?.currentPlayer, game?.status]);
 
   // Auto-play handler
   const handleAutoPlay = () => {
@@ -979,8 +979,10 @@ export default function GameTable({
   const renderPlayerPosition = (position: number) => {
     const player = orderedPlayers[position];
     
-    // Check if this player is on timer - use the player from orderedPlayers (rotated view)
-    const isPlayerOnTimer = player && !isBot(player) && game.currentPlayer === player.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
+          // Check if this specific player is on timer - only show overlay for current player who is timing out
+      const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
+      const isCurrentPlayer = player && player.id === propUser?.id;
+      const isPlayerOnTimer = isCurrentPlayer && shouldShowTimer && turnTimer <= 10;
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
@@ -1236,7 +1238,7 @@ export default function GameTable({
                   {/* Timer overlay for last 10 seconds */}
                   {isPlayerOnTimer && (
                     <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{turnTimer}</span>
+                                             <span className="text-white font-bold text-lg">{turnTimer}</span>
                     </div>
                   )}
                 </div>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
+import { games } from '../gamesStore';
 import { PrismaClient } from '@prisma/client';
 import type { AuthenticatedSocket } from '../index';
 
@@ -13,8 +14,7 @@ function isNonNull<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
-// In-memory games store
-export const games: Game[] = [];
+// Games store is now imported from index.ts to avoid circular dependency
 
 // Create a new game
 router.post('/', (req, res) => {
@@ -96,12 +96,15 @@ router.get('/:id', (req, res) => {
   res.json(game);
 });
 
-// Join a game
-router.post('/:id/join', async (req, res) => {
-  const game = games.find(g => g.id === req.params.id);
-  if (!game) return res.status(404).json({ error: 'Game not found' });
+  // Join a game
+  router.post('/:id/join', async (req, res) => {
+    console.log('[HTTP JOIN DEBUG] Join request:', { gameId: req.params.id, body: req.body });
+    console.log('[HTTP JOIN DEBUG] Available games:', games.map(g => ({ id: g.id, status: g.status, players: g.players.map(p => p ? p.id : 'null') })));
+    
+    const game = games.find(g => g.id === req.params.id);
+    if (!game) return res.status(404).json({ error: 'Game not found' });
 
-  // Use requested seat if provided and available
+  // Use requested seat if provided and available, otherwise find first empty seat
   const requestedSeat = typeof req.body.seat === 'number' ? req.body.seat : null;
   const playerId = req.body.id;
   const player = {
@@ -128,19 +131,33 @@ router.post('/:id/join', async (req, res) => {
     return res.status(500).json({ error: 'Failed to check coin balance' });
   }
 
-  // Use requested seat if provided and available
-  if (
-    requestedSeat !== null &&
-    requestedSeat >= 0 &&
-    requestedSeat < 4
-  ) {
-    if (game.players[requestedSeat] !== null) {
+  // Find seat for player
+  let seatIndex = -1;
+  
+  if (requestedSeat !== null && requestedSeat >= 0 && requestedSeat < 4) {
+    // Use requested seat if available
+    if (game.players[requestedSeat] === null) {
+      seatIndex = requestedSeat;
+    } else {
       return res.status(400).json({ error: 'Seat is already taken' });
     }
-    game.players[requestedSeat] = player;
   } else {
-    return res.status(400).json({ error: 'Invalid seat selection' });
+    // Find first empty seat
+    seatIndex = game.players.findIndex(p => p === null);
+    if (seatIndex === -1) {
+      return res.status(400).json({ error: 'Game is full' });
+    }
   }
+  
+  // Assign player to seat
+  player.position = seatIndex;
+  game.players[seatIndex] = player;
+  
+  console.log('[HTTP JOIN DEBUG] Player added to game:', { 
+    playerId: player.id, 
+    seatIndex, 
+    gamePlayers: game.players.map(p => p ? p.id : 'null') 
+  });
 
   res.json(game);
   io.emit('games_updated', games);
@@ -755,62 +772,71 @@ function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allo
 export function botMakeMove(game: Game, seatIndex: number) {
   const bot = game.players[seatIndex];
   console.log('[BOT DEBUG] botMakeMove called for seat', seatIndex, 'bot:', bot && bot.username, 'game.status:', game.status, 'bidding:', !!game.bidding, 'currentBidderIndex:', game.bidding?.currentBidderIndex, 'bids:', game.bidding?.bids);
-  if (!bot || bot.type !== 'bot') {
-    console.log('[BOT DEBUG] Not a bot or no player at seat', seatIndex);
+  if (!bot) {
+    console.log('[BOT DEBUG] No player at seat', seatIndex);
     return;
+  }
+  
+  // Handle both bot moves and human timeout moves
+  if (bot.type !== 'bot') {
+    console.log('[BOT DEBUG] Player is human, acting for timeout:', bot.username);
   }
   // Only act if it's the bot's turn to bid
   if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
     setTimeout(() => {
       if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
-      // Calculate bid based on game type
+      // Calculate bid based on game type - always use intelligent bidding
       let bid = 1;
-              if (game.rules && game.hands && game.hands[seatIndex]) {
-          // Get partner bid for smart bidding logic
-          let partnerBid: number | undefined;
-          if ((game.rules.bidType === 'WHIZ' || game.forcedBid === 'SUICIDE') && game.bidding && game.bidding.bids) {
-            // In partners mode, partner is at seatIndex + 2 (opposite side)
-            const partnerIndex = (seatIndex + 2) % 4;
-            partnerBid = game.bidding.bids[partnerIndex];
-          }
-          
-          if (game.rules.bidType === 'MIRROR') {
-            // Mirror games: bid the number of spades in hand
-            const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
-            bid = spades.length;
-            console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
-          } else if (game.rules.bidType === 'WHIZ') {
-            // Whiz games: use simplified bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'WHIZ', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
-          } else if (game.forcedBid === 'SUICIDE') {
-            // Suicide games: implement suicide bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'SUICIDE', game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
-          } else if (game.forcedBid === 'BID4NIL') {
-            // 4 OR NIL games: bot must bid 4 or nil
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID4NIL', game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] 4 OR NIL game - Bot', bot.username, 'bidding', bid);
-          } else if (game.forcedBid === 'BID3') {
-            // BID 3 games: bot must bid exactly 3
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID3', game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] BID 3 game - Bot', bot.username, 'bidding', bid);
-          } else if (game.forcedBid === 'BIDHEARTS') {
-            // BID HEARTS games: bot must bid number of hearts
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
-          } else if (game.forcedBid === 'CRAZY ACES') {
-            // CRAZY ACES games: bot must bid 3 for each ace
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'CRAZY ACES', game.rules.allowNil, game.rules.allowBlindNil);
-            console.log('[BOT DEBUG] CRAZY ACES game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.rank === 'A').length, 'aces, bidding', bid);
-          } else if (game.rules.bidType === 'REG') {
-            // Regular games: use complex bidding logic
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
-          } else {
-            // Default fallback
-            bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
-          }
+      if (game.rules && game.hands && game.hands[seatIndex]) {
+        // Get partner bid for smart bidding logic
+        let partnerBid: number | undefined;
+        if ((game.rules.bidType === 'WHIZ' || game.forcedBid === 'SUICIDE') && game.bidding && game.bidding.bids) {
+          // In partners mode, partner is at seatIndex + 2 (opposite side)
+          const partnerIndex = (seatIndex + 2) % 4;
+          partnerBid = game.bidding.bids[partnerIndex];
+        }
+        
+        if (game.rules.bidType === 'MIRROR') {
+          // Mirror games: bid the number of spades in hand
+          const spades = game.hands[seatIndex].filter(c => c.suit === 'S');
+          bid = spades.length;
+          console.log('[BOT DEBUG] Mirror game - Bot', bot.username, 'has', spades.length, 'spades, bidding', bid);
+        } else if (game.rules.bidType === 'WHIZ') {
+          // Whiz games: use simplified bidding logic
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'WHIZ', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] Whiz game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
+        } else if (game.forcedBid === 'SUICIDE') {
+          // Suicide games: implement suicide bidding logic
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'SUICIDE', game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] Suicide game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'S').length, 'spades, partner bid:', partnerBid, 'bidding', bid);
+        } else if (game.forcedBid === 'BID4NIL') {
+          // 4 OR NIL games: bot must bid 4 or nil
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID4NIL', game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] 4 OR NIL game - Bot', bot.username, 'bidding', bid);
+        } else if (game.forcedBid === 'BID3') {
+          // BID 3 games: bot must bid exactly 3
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BID3', game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] BID 3 game - Bot', bot.username, 'bidding', bid);
+        } else if (game.forcedBid === 'BIDHEARTS') {
+          // BID HEARTS games: bot must bid number of hearts
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'BIDHEARTS', game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] BID HEARTS game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.suit === 'H').length, 'hearts, bidding', bid);
+        } else if (game.forcedBid === 'CRAZY ACES') {
+          // CRAZY ACES games: bot must bid 3 for each ace
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, 'CRAZY ACES', game.rules.allowNil, game.rules.allowBlindNil);
+          console.log('[BOT DEBUG] CRAZY ACES game - Bot', bot.username, 'has', game.hands[seatIndex].filter(c => c.rank === 'A').length, 'aces, bidding', bid);
+        } else if (game.rules.bidType === 'REG') {
+          // Regular games: use complex bidding logic
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+        } else {
+          // Default fallback - still use intelligent bidding
+          bid = calculateBotBid(game.hands[seatIndex], game, seatIndex, 'REG', partnerBid, undefined, game.rules.allowNil, game.rules.allowBlindNil);
+        }
+      } else {
+        // Fallback if game state is incomplete - still try to use intelligent bidding
+        console.log('[BOT DEBUG] Game state incomplete, using fallback bidding for', bot.username);
+        bid = calculateBotBid([], game, seatIndex, 'REG', undefined, undefined, true, false);
       }
       // Simulate bot making a bid
       game.bidding.bids[seatIndex] = bid;
@@ -856,6 +882,12 @@ export function botMakeMove(game: Game, seatIndex: number) {
         setTimeout(() => {
           botPlayCard(game, (game.dealerIndex + 1) % 4);
         }, 500);
+      } else if (firstPlayer.type === 'human') {
+        // Start timeout for human players in playing phase using the main timeout system
+        console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', firstPlayer.username);
+        // Import the timeout function from index.ts
+        const { startTurnTimeout } = require('../index');
+        startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
       }
         return;
       } else {
@@ -870,6 +902,12 @@ export function botMakeMove(game: Game, seatIndex: number) {
         // If next is a bot, trigger their move
         if (game.players[next] && game.players[next].type === 'bot') {
           botMakeMove(game, next);
+        } else if (game.players[next] && game.players[next].type === 'human') {
+          // Start timeout for human players using the main timeout system
+          console.log('[TIMEOUT DEBUG] Starting timeout for human player in bot bidding logic:', game.players[next].username);
+          // Import the timeout function from index.ts
+          const { startTurnTimeout } = require('../index');
+          startTurnTimeout(game, next, 'bidding');
         }
       }
     }, 600);
@@ -1426,7 +1464,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         io.to(game.id).emit('trick_complete', {
           trick: {
             cards: completedTrick,
-            winnerIndex: winnerIndex,
+            winnerIndex,
           },
           trickNumber: game.play.trickNumber,
         });
@@ -1788,6 +1826,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
         }, 800); // Reduced delay for faster bot play
       } else {
         console.log('[BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', nextPlayerIndex, '- waiting for human input');
+        // Start timeout for human players in playing phase using the main timeout system
+        console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
+        // Import the timeout function from index.ts
+        const { startTurnTimeout } = require('../index');
+        startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
   }, 300);
@@ -2179,7 +2222,7 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
 }
 
 // Helper to enrich game object for client
-function enrichGameForClient(game: Game, userId?: string): Game {
+export function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
   const hands = game.hands || [];
   const dealerIndex = game.dealerIndex;
@@ -2210,6 +2253,238 @@ function enrichGameForClient(game: Game, userId?: string): Game {
       };
     })
   };
+}
+
+// Function to handle human player timeouts in playing phase
+export function handleHumanTimeout(game: Game, seatIndex: number) {
+  const player = game.players[seatIndex];
+  if (!player || !game.hands || !game.play) return;
+  
+  // Guard: Make sure it's actually this player's turn
+  if (game.play.currentPlayerIndex !== seatIndex) {
+    console.log('[HUMAN TIMEOUT GUARD] Player', player.username, 'at seat', seatIndex, 'tried to play but current player is', game.play.currentPlayerIndex);
+    return;
+  }
+  
+  const hand = game.hands[seatIndex]!;
+  if (!hand || hand.length === 0) return;
+  
+  // Determine lead suit for this trick
+  const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
+  
+  // Find playable cards with special rules consideration
+  let playableCards: Card[] = [];
+  const specialRules = game.specialRules;
+  
+  console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} at seat ${seatIndex} - specialRules:`, specialRules);
+  console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} hand:`, hand.map(c => `${c.rank}${c.suit}`));
+  console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} leadSuit:`, leadSuit);
+  
+  if (leadSuit) {
+    // Following suit - must follow lead suit if possible
+    playableCards = hand.filter(c => c.suit === leadSuit);
+    if (playableCards.length === 0) {
+      // Void in lead suit - can play any card, but apply special rules
+      if (specialRules?.screamer) {
+        // Screamer: cannot cut with spades unless only spades left
+        const nonSpades = hand.filter(c => c.suit !== 'S');
+        if (nonSpades.length > 0) {
+          playableCards = nonSpades; // Must play non-spades if available
+        } else {
+          playableCards = hand; // Only spades left, can play spades
+        }
+      } else {
+        playableCards = hand; // No special rules, can play anything
+      }
+    }
+  } else {
+    // Player is leading
+    if (specialRules?.screamer) {
+      // Screamer: cannot lead spades unless only spades left
+      const nonSpades = hand.filter(c => c.suit !== 'S');
+      if (nonSpades.length > 0) {
+        playableCards = nonSpades; // Must lead non-spades if available
+      } else {
+        playableCards = hand; // Only spades left, can lead spades
+      }
+    } else {
+      // Normal rules: cannot lead spades unless spades broken or only spades left
+      if (game.play.spadesBroken || hand.every(c => c.suit === 'S')) {
+        playableCards = hand; // Can lead any card
+      } else {
+        // Cannot lead spades unless only spades left
+        playableCards = hand.filter(c => c.suit !== 'S');
+        if (playableCards.length === 0) {
+          playableCards = hand; // Only spades left, must lead spades
+        }
+      }
+    }
+  }
+  
+  console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} final playableCards:`, playableCards.map(c => `${c.rank}${c.suit}`));
+  
+  // Apply additional special rules filtering (like Assassin)
+  playableCards = applySpecialRules(playableCards, hand, game.play.currentTrick, game, seatIndex);
+  
+  // Smart card selection based on game type and bidding
+  let card: Card;
+  
+  // Get player's bid and partner's bid to determine strategy
+  const playerBid = game.bidding?.bids[seatIndex];
+  const partnerIndex = (seatIndex + 2) % 4; // Partner is 2 seats away
+  const partnerBid = game.bidding?.bids[partnerIndex];
+  
+  // Check if this is a Suicide game
+  if (game.forcedBid === 'SUICIDE') {
+    if (playerBid === 0) {
+      // Player is nil - try to avoid winning tricks
+      card = selectCardForNil(playableCards, game.play.currentTrick, hand);
+    } else if (partnerBid === 0) {
+      // Partner is nil - try to cover partner
+      card = selectCardToCoverPartner(playableCards, game.play.currentTrick, hand, game.hands[partnerIndex] || [], game, seatIndex);
+    } else {
+      // Normal bidding - play to win
+      card = selectCardToWin(playableCards, game.play.currentTrick, hand, game, seatIndex);
+    }
+  } else {
+    // All other game types - check for nil players
+    if (playerBid === 0) {
+      // Player is nil - try to avoid winning tricks
+      card = selectCardForNil(playableCards, game.play.currentTrick, hand);
+    } else if (partnerBid === 0) {
+      // Partner is nil - try to cover partner
+      card = selectCardToCoverPartner(playableCards, game.play.currentTrick, hand, game.hands[partnerIndex] || [], game, seatIndex);
+    } else {
+      // Normal bidding - play to win
+      card = selectCardToWin(playableCards, game.play.currentTrick, hand, game, seatIndex);
+    }
+  }
+  
+  if (!card) return;
+  
+  console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} selected card:`, `${card.rank}${card.suit}`);
+  
+  // Simulate playing the card
+  setTimeout(() => {
+    if (!game.play) return; // Guard for undefined
+    console.log(`[HUMAN TIMEOUT] Player ${player.username} is playing card:`, card);
+    
+    // This logic is similar to the play_card socket handler
+    const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
+    if (cardIndex === -1) return;
+    hand.splice(cardIndex, 1);
+    game.play.currentTrick.push({ ...card, playerIndex: seatIndex });
+    
+    // Set spadesBroken if a spade is played
+    if (card.suit === 'S') {
+      game.play.spadesBroken = true;
+    }
+    
+    // If trick is complete (4 cards)
+    if (game.play.currentTrick.length === 4) {
+      console.log('[HUMAN TIMEOUT TRICK DEBUG] Determining winner for timeout trick:', game.play.currentTrick);
+      const winnerIndex = determineTrickWinner(game.play.currentTrick);
+      console.log('[HUMAN TIMEOUT TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
+      if (winnerIndex === undefined) return;
+      
+      game.play.tricks.push({
+        cards: game.play.currentTrick,
+        winnerIndex,
+      });
+      game.play.trickNumber += 1;
+      console.log('[HUMAN TIMEOUT TRICK DEBUG] Trick completed, new trickNumber:', game.play.trickNumber);
+      game.play.currentPlayerIndex = winnerIndex;
+      game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
+      console.log('[HUMAN TIMEOUT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
+      
+      // Update player trick counts
+      if (game.players[winnerIndex]) {
+        game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
+        console.log('[HUMAN TIMEOUT TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
+      }
+      
+      // Log all player trick counts
+      const trickCounts = game.players.map((p, i) => `${i}: ${p?.username} = ${p?.tricks || 0}`);
+      console.log('[HUMAN TIMEOUT TRICK COUNT DEBUG] All player trick counts:', trickCounts);
+      
+      // Check if hand is complete
+      if (game.play.trickNumber === 13) {
+        console.log('[HUMAN TIMEOUT HAND COMPLETION] Hand complete, calculating scores');
+        // Calculate scores and determine winner
+        try {
+          if (game.rules?.gameType === 'SOLO') {
+            calculateSoloHandScore(game);
+          } else {
+            calculatePartnersHandScore(game);
+          }
+        } catch (error) {
+          console.error('[HUMAN TIMEOUT HAND COMPLETION ERROR] Error calculating scores:', error);
+        }
+        return;
+      }
+      
+      // Emit game update
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      io.to(game.id).emit('play_update', {
+        currentPlayerIndex: winnerIndex,
+        currentTrick: game.play.currentTrick,
+        hands: game.hands.map((h, i) => ({
+          playerId: game.players[i]?.id,
+          handCount: h.length,
+        })),
+      });
+      
+      // If the next player is a bot, trigger their move with a delay
+      const nextPlayer = game.players[winnerIndex];
+      if (nextPlayer && nextPlayer.type === 'bot') {
+        console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', winnerIndex, 'to play after delay');
+        setTimeout(() => {
+          botPlayCard(game, winnerIndex);
+        }, 800); // Reduced delay for faster bot play
+      } else {
+        console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', winnerIndex, '- waiting for human input');
+        // Start timeout for human players in playing phase using the main timeout system
+        console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
+        // Import the timeout function from index.ts
+        const { startTurnTimeout } = require('../index');
+        startTurnTimeout(game, winnerIndex, 'playing');
+      }
+    } else {
+      // Trick is not complete, advance to next player
+      let nextPlayerIndex = (seatIndex + 1) % 4;
+      game.play.currentPlayerIndex = nextPlayerIndex;
+      game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
+      
+      // Emit play_update to notify frontend about the card being played
+      io.to(game.id).emit('play_update', {
+        currentPlayerIndex: nextPlayerIndex,
+        currentTrick: game.play.currentTrick,
+        hands: game.hands.map((h, i) => ({
+          playerId: game.players[i]?.id,
+          handCount: h.length,
+        })),
+      });
+      
+      // Emit game update to ensure frontend has latest state
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      
+      // If the next player is a bot, trigger their move with a delay
+      const nextPlayer = game.players[nextPlayerIndex];
+      if (nextPlayer && nextPlayer.type === 'bot') {
+        console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
+        setTimeout(() => {
+          botPlayCard(game, nextPlayerIndex);
+        }, 800); // Reduced delay for faster bot play
+      } else {
+        console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', nextPlayerIndex, '- waiting for human input');
+        // Start timeout for human players in playing phase using the main timeout system
+        console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
+        // Import the timeout function from index.ts
+        const { startTurnTimeout } = require('../index');
+        startTurnTimeout(game, nextPlayerIndex, 'playing');
+      }
+    }
+  }, 300);
 }
 
 export default router; 
