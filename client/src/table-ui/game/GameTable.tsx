@@ -421,7 +421,8 @@ export default function GameTable({
       status: game.status
     });
     
-    if (isMyTurnNow && currentPlayer && !isBot(currentPlayer)) {
+    // Start timer for any human player's turn (not just current user)
+    if (currentPlayer && !isBot(currentPlayer)) {
       setTurnTimer(30);
       
       const interval = setInterval(() => {
@@ -430,7 +431,9 @@ export default function GameTable({
           if (prev <= 1) {
             // Time's up - auto-play for human player
             console.log('[TIMER] Time expired for human player, auto-playing');
-            handleAutoPlay();
+            if (isMyTurnNow) {
+              handleAutoPlay();
+            }
             return 30;
           }
           return prev - 1;
@@ -974,10 +977,10 @@ export default function GameTable({
 
   // Update the player tricks display
   const renderPlayerPosition = (position: number) => {
-    // Check if this player is on timer
-    const currentPlayer = game.players[position];
-    const isPlayerOnTimer = currentPlayer && !isBot(currentPlayer) && game.currentPlayer === currentPlayer.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
     const player = orderedPlayers[position];
+    
+    // Check if this player is on timer - use the player from orderedPlayers (rotated view)
+    const isPlayerOnTimer = player && !isBot(player) && game.currentPlayer === player.id && turnTimer <= 10 && (game.status === 'BIDDING' || game.status === 'PLAYING');
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
