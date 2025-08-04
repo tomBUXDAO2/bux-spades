@@ -403,8 +403,22 @@ export default function TablePage() {
     const socketManager = getSocketManager();
     socketManager.onStateChange(handleSocketStateChange);
 
+    // Also try to rejoin on socket connect event for production
+    const handleConnect = () => {
+      console.log('[SOCKET CONNECT] Socket connected, attempting to rejoin game:', { gameId });
+      if (socket && socket.connected && user && gameId) {
+        socket.emit('join_game', {
+          gameId,
+          userId: user.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+    };
+
+    socket.on('connect', handleConnect);
+
     return () => {
-      // Clean up is handled by the socket manager
+      socket.off('connect', handleConnect);
     };
   }, [socket, user, gameId, isSpectator]);
 
