@@ -262,14 +262,14 @@ export default function TablePage() {
     setGame(prev => {
       if (!prev) return prev;
       
-      const updatedGame = {
-        ...prev,
-        status: 'PLAYING',
-        bidding: {
-          ...prev.bidding,
-          bids: data.bids,
-        }
-      };
+              const updatedGame = {
+          ...prev,
+          status: 'PLAYING' as const,
+          bidding: {
+            ...prev.bidding,
+            bids: data.bids,
+          }
+        };
       
       return updatedGame;
     });
@@ -283,7 +283,7 @@ export default function TablePage() {
       
       const updatedGame = {
         ...prev,
-        status: 'PLAYING',
+        status: 'PLAYING' as const,
         play: {
           currentPlayer: currentPlayer?.id ?? '',
           currentPlayerIndex: data.currentPlayerIndex,
@@ -536,8 +536,7 @@ export default function TablePage() {
     }
   };
 
-  // Check if user should be in the game but isn't
-  const shouldShowRejoinButton = false;
+
 
 
 
