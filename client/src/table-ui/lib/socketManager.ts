@@ -45,10 +45,7 @@ export class SocketManager {
     error: null
   };
   private session: { token: string; userId: string; username: string } | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10; // Increased from 5
-  private reconnectDelay = 1000;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+
   private stateChangeCallbacks: ((state: SocketState) => void)[] = [];
   private initialized = false;
   private onConnectCallbacks: (() => void)[] = [];
@@ -157,7 +154,6 @@ export class SocketManager {
     this.socket.on('connect', () => {
       console.log('Socket connected successfully');
       this.state.isConnected = true;
-      this.reconnectAttempts = 0;
       
       // If we have a session, authenticate immediately
       if (this.session) {
@@ -179,33 +175,8 @@ export class SocketManager {
       this.state.isAuthenticated = false;
       this.state.isReady = false;
       
-      // Clear any existing reconnect timer
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
-
-      // For page refresh scenarios, don't attempt manual reconnection
-      // Let Socket.IO handle it automatically
-      if (reason === 'io client disconnect') {
-        console.log('Socket disconnected by client - not attempting reconnection');
-        return;
-      }
-
-      // For page refresh scenarios (transport close), let Socket.IO handle reconnection
-      if (reason === 'transport close') {
-        console.log('Socket transport closed (likely page refresh) - letting Socket.IO handle reconnection');
-        // Don't return here - let the automatic reconnection logic continue
-      }
-
-      // Attempt to reconnect if we have a session and it wasn't a manual disconnect
-      if (this.session && this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectTimer = setTimeout(() => {
-          this.reconnectAttempts++;
-          console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-          this.socket?.connect();
-        }, this.reconnectDelay * Math.pow(2, this.reconnectAttempts));
-      }
+      // Let Socket.IO handle all reconnection automatically
+      // No manual reconnection logic to interfere
       
       this.notifyStateChange();
     });
@@ -219,7 +190,6 @@ export class SocketManager {
     this.socket.on('reconnect', (attemptNumber) => {
       console.log('Socket reconnected after', attemptNumber, 'attempts');
       this.state.isConnected = true;
-      this.reconnectAttempts = 0;
       
       // Re-authenticate after reconnection
       if (this.session) {
@@ -288,13 +258,7 @@ export class SocketManager {
     this.state.isConnected = false;
     this.state.isAuthenticated = false;
     this.state.isReady = false;
-    this.reconnectAttempts = 0;
-    
-    // Clear any existing timers
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+
     
     // Reinitialize if we have a session
     if (this.session) {
