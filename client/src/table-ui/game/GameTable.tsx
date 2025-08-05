@@ -1901,18 +1901,30 @@ export default function GameTable({
   useEffect(() => {
     if (!socket || !isAuthenticated || !gameState?.id || !user?.username) return;
 
-    // Only send the join system message once per session
-    if (window.__sentJoinSystemMessage !== gameState.id) {
-      const systemMessage = {
-        id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        userId: 'system',
-        userName: 'System',
-        message: `${user.username} joined the game.`,
-        timestamp: Date.now(),
-        isGameMessage: true
-      };
-      socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
-      window.__sentJoinSystemMessage = gameState.id;
+    // Clear the flag when socket reconnects to allow system message on rejoin
+    if (socket.connected && isAuthenticated) {
+      // Clear the flag on reconnection to allow system message
+      if (window.__sentJoinSystemMessage === gameState.id) {
+        console.log('[SYSTEM MESSAGE] Clearing flag for reconnection');
+        window.__sentJoinSystemMessage = null;
+      }
+      
+      // Only send the join system message once per session, but allow it on reconnection
+      if (window.__sentJoinSystemMessage !== gameState.id) {
+        const systemMessage = {
+          id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          userId: 'system',
+          userName: 'System',
+          message: `${user.username} joined the game.`,
+          timestamp: Date.now(),
+          isGameMessage: true
+        };
+        console.log('[SYSTEM MESSAGE] Sending join system message:', systemMessage);
+        socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
+        window.__sentJoinSystemMessage = gameState.id;
+      } else {
+        console.log('[SYSTEM MESSAGE] System message already sent for this game, skipping');
+      }
     }
   }, [socket, isAuthenticated, gameState?.id, user?.username]);
 
