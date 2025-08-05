@@ -1825,8 +1825,8 @@ export default function GameTable({
         >
           <CardImage
             card={card}
-            width={Math.floor(isMobile ? 75 * scaleFactor : 80 * scaleFactor)}
-            height={Math.floor(isMobile ? 105 * scaleFactor : 115 * scaleFactor)}
+            width={Math.floor(isMobile ? 85 * scaleFactor : 90 * scaleFactor)}
+            height={Math.floor(isMobile ? 120 * scaleFactor : 130 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
