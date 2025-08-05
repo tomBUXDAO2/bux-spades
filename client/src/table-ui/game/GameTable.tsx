@@ -1445,6 +1445,7 @@ export default function GameTable({
           paddingTop: '12px',
           overflow: 'visible',
           pointerEvents: 'none',
+          zIndex: 50,
         }}
       >
         <div className="flex">
@@ -1478,7 +1479,7 @@ export default function GameTable({
                   width: `${cardUIWidth}px`,
                   height: `${cardUIHeight}px`,
                   marginLeft: index > 0 ? `${overlapOffset}px` : '0',
-                  zIndex: index,
+                  zIndex: 50 + index,
                   pointerEvents: 'auto',
                   opacity: isVisible ? 1 : 0,
                 }}
