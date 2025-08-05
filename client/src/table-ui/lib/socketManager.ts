@@ -90,8 +90,8 @@ export class SocketManager {
   }
 
   public initialize(userId: string, username: string, avatar?: string): void {
-    console.log('SocketManager: Initializing with user:', { userId, username });
-    console.log('SocketManager: localStorage contents:', {
+    console.log('SOCKET INITIALIZE CALLED:', { userId, username });
+    console.log('SOCKET INITIALIZE - localStorage contents:', {
       sessionToken: localStorage.getItem('sessionToken'),
       userData: localStorage.getItem('userData'),
       token: localStorage.getItem('token')
@@ -152,7 +152,7 @@ export class SocketManager {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('Socket connected successfully');
+      console.log('SOCKET CONNECTED SUCCESSFULLY');
       this.state.isConnected = true;
       
       // If we have a session, authenticate immediately
@@ -163,6 +163,8 @@ export class SocketManager {
           userId: this.session.userId,
           username: this.session.username
         });
+      } else {
+        console.log('NO SESSION FOR AUTHENTICATION');
       }
       
       this.notifyStateChange();
@@ -217,8 +219,10 @@ export class SocketManager {
     });
 
     this.socket.on('authenticated', (data: { success: boolean; userId: string; games: any[] }) => {
+      console.log('SOCKET AUTHENTICATED:', data);
       this.state.isAuthenticated = data.success;
       this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
+      console.log('SOCKET STATE AFTER AUTH:', { isConnected: this.state.isConnected, isAuthenticated: this.state.isAuthenticated, isReady: this.state.isReady });
       this.notifyStateChange();
     });
 
