@@ -32,7 +32,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   useEffect(() => {
+    console.log('SOCKET CONTEXT - User changed:', user);
     if (!user) {
+      console.log('SOCKET CONTEXT - No user, clearing socket');
       setSocket(null);
       setState({
         isConnected: false,
@@ -43,8 +45,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    console.log('SOCKET CONTEXT - Initializing socket for user:', { id: user.id, username: user.username });
     const socketManager = getSocketManager();
     socketManager.onStateChange((newState) => {
+      console.log('SOCKET CONTEXT - State changed:', newState);
       setState(newState);
       setSocket(socketManager.getSocket());
     });
