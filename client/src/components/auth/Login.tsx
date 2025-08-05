@@ -27,7 +27,7 @@ const Login: React.FC = () => {
       } else {
         console.log('Attempting to login...');
         const result = await login(email, password);
-        console.log('Login successful');
+        console.log('Login successful, result:', result);
         
         // Check if user has an active game
         if (result.activeGame) {

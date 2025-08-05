@@ -27,7 +27,15 @@ const AuthCallback: React.FC = () => {
           };
           setUser(userData);
           localStorage.setItem('userData', JSON.stringify(userData));
-          navigate('/', { replace: true });
+          
+          // Check if user has an active game
+          if (response.data.activeGame) {
+            console.log('User has active game, redirecting to game table:', response.data.activeGame);
+            navigate(`/table/${response.data.activeGame.id}`, { replace: true });
+          } else {
+            console.log('No active game, redirecting to lobby');
+            navigate('/', { replace: true });
+          }
         } else {
           console.error('Invalid profile response:', response.data);
           localStorage.removeItem('sessionToken');

@@ -133,9 +133,25 @@ export const login = async (req: Request, res: Response) => {
     } as any);
 
     // Check if user is in an active game
-    const activeGame = games.find((game: Game) => 
-      game.players.some((player: any) => player && player.id === user.id && player.type === 'human')
-    );
+    console.log('[ACTIVE GAME DEBUG] Checking for active games for user:', user.id);
+    console.log('[ACTIVE GAME DEBUG] Available games:', games.map(g => ({ 
+      id: g.id, 
+      status: g.status, 
+      players: g.players.map(p => p ? { id: p.id, type: p.type } : null)
+    })));
+    
+    const activeGame = games.find((game: Game) => {
+      const isPlayer = game.players.some((player: any) => 
+        player && player.id === user.id && player.type === 'human'
+      );
+      const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
+      
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isActiveGame=${isActiveGame}`);
+      
+      return isPlayer && isActiveGame;
+    });
+    
+    console.log('[ACTIVE GAME DEBUG] Found active game:', activeGame ? { id: activeGame.id, status: activeGame.status } : null);
 
     res.json({
       token,
@@ -183,6 +199,27 @@ export const getProfile = async (req: Request, res: Response) => {
       });
     }
 
+    // Check if user is in an active game
+    console.log('[ACTIVE GAME DEBUG] Checking for active games for user in getProfile:', userId);
+    console.log('[ACTIVE GAME DEBUG] Available games:', games.map(g => ({ 
+      id: g.id, 
+      status: g.status, 
+      players: g.players.map(p => p ? { id: p.id, type: p.type } : null)
+    })));
+    
+    const activeGame = games.find((game: Game) => {
+      const isPlayer = game.players.some((player: any) => 
+        player && player.id === userId && player.type === 'human'
+      );
+      const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
+      
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isActiveGame=${isActiveGame}`);
+      
+      return isPlayer && isActiveGame;
+    });
+    
+    console.log('[ACTIVE GAME DEBUG] Found active game in getProfile:', activeGame ? { id: activeGame.id, status: activeGame.status } : null);
+
     res.json({
       user: {
         id: user.id,
@@ -192,6 +229,10 @@ export const getProfile = async (req: Request, res: Response) => {
         coins: user.coins,
         stats: user.stats,
       },
+      activeGame: activeGame ? {
+        id: activeGame.id,
+        status: activeGame.status
+      } : null,
     });
   } catch (error) {
     console.error('Get profile error:', error);
