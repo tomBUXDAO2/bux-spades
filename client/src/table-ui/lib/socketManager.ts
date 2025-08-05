@@ -157,7 +157,6 @@ export class SocketManager {
       
       // If we have a session, authenticate immediately
       if (this.session) {
-        console.log('SocketManager: Authenticating with session');
         this.socket?.emit('authenticate', {
           token: this.session.token,
           userId: this.session.userId,
@@ -217,7 +216,6 @@ export class SocketManager {
     });
 
     this.socket.on('authenticated', (data: { success: boolean; userId: string; games: any[] }) => {
-      console.log('Socket authenticated:', data);
       this.state.isAuthenticated = data.success;
       this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
       this.notifyStateChange();

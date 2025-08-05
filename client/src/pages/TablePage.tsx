@@ -175,10 +175,8 @@ export default function TablePage() {
         // After fetching game, ensure we join the socket room if socket is ready
         const currentSocket = socketManager.getSocket();
         if (currentSocket && currentSocket.connected && !isSpectator) {
-          console.log('[FETCH GAME] Socket is ready, joining game room after fetch');
           setTimeout(() => {
             if (currentSocket && currentSocket.connected) {
-              console.log('[FETCH GAME] Emitting join_game after fetch');
               currentSocket.emit('join_game', {
                 gameId,
                 userId: user.id,
@@ -186,8 +184,6 @@ export default function TablePage() {
               });
             }
           }, 500);
-        } else {
-          console.log('[FETCH GAME] Socket not ready yet, will join when ready');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load game');
@@ -202,7 +198,6 @@ export default function TablePage() {
     const fallbackJoinGame = () => {
       const currentSocket = socketManager.getSocket();
       if (currentSocket && currentSocket.connected && !isSpectator) {
-        console.log('[FALLBACK] Emitting join_game as fallback');
         currentSocket.emit('join_game', {
           gameId,
           userId: user.id,
@@ -415,46 +410,23 @@ export default function TablePage() {
     if (!socket || !user || !gameId || isSpectator) return;
 
     const handleSocketStateChange = (state: any) => {
-      console.log('[SOCKET STATE CHANGE] Socket state changed:', state);
       if (state.isConnected && state.isAuthenticated && state.isReady && user && gameId) {
-        console.log('[SOCKET STATE CHANGE] Socket is ready, rejoining game:', { gameId });
-        // Join immediately when socket is ready
         if (socket && socket.connected) {
-          console.log('[SOCKET STATE CHANGE] Emitting join_game immediately');
-          console.log('[SOCKET STATE CHANGE] Socket connection status:', {
-            socketConnected: socket.connected,
-            socketId: socket.id,
-            gameId,
-            userId: user.id
-          });
           socket.emit('join_game', {
             gameId,
             userId: user.id,
             timestamp: new Date().toISOString()
           });
-        } else {
-          console.log('[SOCKET STATE CHANGE] Socket not connected, cannot emit join_game');
         }
-      } else {
-        console.log('[SOCKET STATE CHANGE] Socket not ready yet:', {
-          isConnected: state.isConnected,
-          isAuthenticated: state.isAuthenticated,
-          isReady: state.isReady,
-          hasUser: !!user,
-          hasGameId: !!gameId
-        });
       }
     };
 
     // Get the socket manager and listen for state changes
     const socketManager = getSocketManager();
-    console.log('[SOCKET STATE CHANGE] Setting up state change listener for game:', { gameId, userId: user.id });
     
     // Check if socket is already ready
     const currentState = socketManager.getState();
-    console.log('[SOCKET STATE CHANGE] Current socket state:', currentState);
     if (currentState.isConnected && currentState.isAuthenticated && currentState.isReady) {
-      console.log('[SOCKET STATE CHANGE] Socket already ready, joining game immediately');
       if (socket && socket.connected) {
         socket.emit('join_game', {
           gameId,
@@ -468,22 +440,12 @@ export default function TablePage() {
 
     // Also try to rejoin on socket connect event for production
     const handleConnect = () => {
-      console.log('[SOCKET CONNECT] Socket connected, attempting to rejoin game:', { gameId });
-      console.log('[SOCKET CONNECT] Socket connection status:', {
-        socketConnected: socket?.connected,
-        socketId: socket?.id,
-        hasUser: !!user,
-        hasGameId: !!gameId
-      });
       if (socket && socket.connected && user && gameId) {
-        console.log('[SOCKET CONNECT] Emitting join_game');
         socket.emit('join_game', {
           gameId,
           userId: user.id,
           timestamp: new Date().toISOString()
         });
-      } else {
-        console.log('[SOCKET CONNECT] Cannot emit join_game - missing requirements');
       }
     };
 
