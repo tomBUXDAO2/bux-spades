@@ -1440,9 +1440,10 @@ export default function GameTable({
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: isMobile ? '0px' : '-40px',
-          height: isMobile ? `${Math.floor(cardUIHeight * 0.4)}px` : 'auto',
-          overflow: 'hidden',
+          bottom: isMobile ? '-50px' : '-40px',
+          height: `${Math.floor(cardUIHeight * 1)}px`,
+          paddingTop: '12px',
+          overflow: 'visible',
           pointerEvents: 'none',
         }}
       >
@@ -1824,8 +1825,8 @@ export default function GameTable({
         >
           <CardImage
             card={card}
-            width={Math.floor(isMobile ? 65 * scaleFactor : 70 * scaleFactor)}
-            height={Math.floor(isMobile ? 90 * scaleFactor : 100 * scaleFactor)}
+            width={Math.floor(isMobile ? 75 * scaleFactor : 80 * scaleFactor)}
+            height={Math.floor(isMobile ? 105 * scaleFactor : 115 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
@@ -2229,8 +2230,8 @@ export default function GameTable({
       >
         {/* Top left corner */}
         <div className={`absolute ${cornerPosition} font-bold ${cornerWidth} text-center`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '0.9rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.7rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.0rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.8rem' } : {})}>{suitSymbol}</div>
         </div>
 
         {/* Center large suit */}
@@ -2240,8 +2241,8 @@ export default function GameTable({
 
         {/* Bottom right corner (rotated) */}
         <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '0.9rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.7rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.0rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.8rem' } : {})}>{suitSymbol}</div>
         </div>
       </div>
     );
@@ -2267,13 +2268,13 @@ export default function GameTable({
   return (
     <>
       <LandscapePrompt />
-      <div className="fixed inset-0 overflow-hidden bg-gray-900">
+      <div className="fixed inset-0 bg-gray-900">
         {/* Main content area - full height */}
-        <div className="flex h-full overflow-hidden">
+        <div className="flex h-full">
           {/* Game table area - add padding on top and bottom */}
-          <div className="w-[70%] p-2 flex flex-col h-full overflow-hidden">
+          <div className="w-[70%] p-2 flex flex-col h-full">
             {/* Game table with more space top and bottom */}
-            <div className="relative mb-2 overflow-hidden" style={{ 
+            <div className="relative mb-2" style={{ 
               background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
               borderRadius: `${Math.floor(64 * scaleFactor)}px`,
               border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
