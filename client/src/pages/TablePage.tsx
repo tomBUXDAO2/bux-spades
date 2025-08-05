@@ -400,12 +400,28 @@ export default function TablePage() {
         // Join immediately when socket is ready
         if (socket && socket.connected) {
           console.log('[SOCKET STATE CHANGE] Emitting join_game immediately');
+          console.log('[SOCKET STATE CHANGE] Socket connection status:', {
+            socketConnected: socket.connected,
+            socketId: socket.id,
+            gameId,
+            userId: user.id
+          });
           socket.emit('join_game', {
             gameId,
             userId: user.id,
             timestamp: new Date().toISOString()
           });
+        } else {
+          console.log('[SOCKET STATE CHANGE] Socket not connected, cannot emit join_game');
         }
+      } else {
+        console.log('[SOCKET STATE CHANGE] Socket not ready yet:', {
+          isConnected: state.isConnected,
+          isAuthenticated: state.isAuthenticated,
+          isReady: state.isReady,
+          hasUser: !!user,
+          hasGameId: !!gameId
+        });
       }
     };
 
@@ -416,12 +432,21 @@ export default function TablePage() {
     // Also try to rejoin on socket connect event for production
     const handleConnect = () => {
       console.log('[SOCKET CONNECT] Socket connected, attempting to rejoin game:', { gameId });
+      console.log('[SOCKET CONNECT] Socket connection status:', {
+        socketConnected: socket?.connected,
+        socketId: socket?.id,
+        hasUser: !!user,
+        hasGameId: !!gameId
+      });
       if (socket && socket.connected && user && gameId) {
+        console.log('[SOCKET CONNECT] Emitting join_game');
         socket.emit('join_game', {
           gameId,
           userId: user.id,
           timestamp: new Date().toISOString()
         });
+      } else {
+        console.log('[SOCKET CONNECT] Cannot emit join_game - missing requirements');
       }
     };
 
