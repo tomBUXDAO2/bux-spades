@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
-import type { Socket } from 'socket.io-client';
+
 import { socketApi } from '../table-ui/lib/socketApi';
 import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
@@ -404,23 +404,7 @@ export default function TablePage() {
   useEffect(() => {
     if (!socket || !user || !gameId || isSpectator) return;
 
-    const handleSocketStateChange = (state: any) => {
-      console.log('SOCKET STATE CHANGE:', state);
-      if (state.isConnected && state.isAuthenticated && state.isReady && user && gameId) {
-        console.log('SOCKET READY - SENDING JOIN_GAME');
-        if (socket && socket.connected) {
-          socket.emit('join_game', {
-            gameId,
-            userId: user.id,
-            timestamp: new Date().toISOString()
-          });
-        } else {
-          console.log('SOCKET NOT CONNECTED');
-        }
-      } else {
-        console.log('SOCKET NOT READY:', { isConnected: state.isConnected, isAuthenticated: state.isAuthenticated, isReady: state.isReady, hasUser: !!user, hasGameId: !!gameId });
-      }
-    };
+
 
     // Check if socket is already ready
     console.log('IMMEDIATE SOCKET CHECK:', { isConnected, isAuthenticated, isReady });
