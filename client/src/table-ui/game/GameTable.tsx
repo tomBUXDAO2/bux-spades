@@ -1472,7 +1472,7 @@ export default function GameTable({
             return (
               <div
                 key={`${card.suit}${card.rank}`}
-                className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer hover:z-20 hover:-translate-y-5 hover:shadow-lg' : 'cursor-not-allowed'} ${!isPlayable && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+                className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer hover:z-20 hover:-translate-y-3 hover:shadow-lg' : 'cursor-not-allowed'} ${!isPlayable && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
                 style={{
                   width: `${cardUIWidth}px`,
                   height: `${cardUIHeight}px`,
@@ -1824,8 +1824,8 @@ export default function GameTable({
         >
           <CardImage
             card={card}
-            width={Math.floor(isMobile ? 50 * scaleFactor : 70 * scaleFactor)}
-            height={Math.floor(isMobile ? 70 * scaleFactor : 100 * scaleFactor)}
+            width={Math.floor(isMobile ? 65 * scaleFactor : 70 * scaleFactor)}
+            height={Math.floor(isMobile ? 90 * scaleFactor : 100 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
