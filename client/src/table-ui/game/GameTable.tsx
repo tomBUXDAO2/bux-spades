@@ -1426,7 +1426,7 @@ export default function GameTable({
     }
     const cardUIWidth = Math.floor(isMobile ? 65 : 100 * scaleFactor);
     const cardUIHeight = Math.floor(isMobile ? 90 : 140 * scaleFactor);
-    const overlapOffset = Math.floor(isMobile ? -40 : -40 * scaleFactor);
+    const overlapOffset = Math.floor(isMobile ? -35 : -40 * scaleFactor);
 
     // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
