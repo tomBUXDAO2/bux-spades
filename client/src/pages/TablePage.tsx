@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import { getSocketManager } from '../table-ui/lib/socketManager';
+import { useSocket } from '../context/SocketContext';
 import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
 import type { Socket } from 'socket.io-client';
@@ -15,14 +15,13 @@ export default function TablePage() {
   console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
+  const { socket, isConnected, isAuthenticated, isReady } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const socketManager = getSocketManager();
 
   // Modal state
   const [showStartWarning, setShowStartWarning] = useState(false);
@@ -128,11 +127,7 @@ export default function TablePage() {
 
     console.log('[INIT] Starting initialization sequence for game:', gameId);
     
-    socketManager.initialize(user.id, user.username, user.avatar || undefined);
-    const newSocket = socketManager.getSocket();
-    if (newSocket) {
-      setSocket(newSocket);
-    }
+    // Socket is now managed by SocketContext
 
     const fetchGame = async () => {
       try {
@@ -173,11 +168,10 @@ export default function TablePage() {
         }
 
         // After fetching game, ensure we join the socket room if socket is ready
-        const currentSocket = socketManager.getSocket();
-        if (currentSocket && currentSocket.connected && !isSpectator) {
+        if (socket && socket.connected && !isSpectator) {
           setTimeout(() => {
-            if (currentSocket && currentSocket.connected) {
-              currentSocket.emit('join_game', {
+            if (socket && socket.connected) {
+              socket.emit('join_game', {
                 gameId,
                 userId: user.id,
                 timestamp: new Date().toISOString()
@@ -196,10 +190,9 @@ export default function TablePage() {
 
     // Add a fallback mechanism to ensure join_game is sent
     const fallbackJoinGame = () => {
-      const currentSocket = socketManager.getSocket();
-      if (currentSocket && currentSocket.connected && !isSpectator) {
+      if (socket && socket.connected && !isSpectator) {
         console.log('SENDING JOIN_GAME EVENT');
-        currentSocket.emit('join_game', {
+        socket.emit('join_game', {
           gameId,
           userId: user.id,
           timestamp: new Date().toISOString()
@@ -213,8 +206,7 @@ export default function TablePage() {
     setTimeout(fallbackJoinGame, 2000);
 
     return () => {
-      // Don't disconnect socket here - it will be handled by the SocketContext cleanup
-      setSocket(null);
+      // Socket cleanup is handled by SocketContext
       // Exit full-screen when leaving the page
       if (isFullScreen) {
         exitFullScreen();
@@ -430,13 +422,9 @@ export default function TablePage() {
       }
     };
 
-    // Get the socket manager and listen for state changes
-    const socketManager = getSocketManager();
-    
     // Check if socket is already ready
-    const currentState = socketManager.getState();
-    console.log('IMMEDIATE SOCKET CHECK:', currentState);
-    if (currentState.isConnected && currentState.isAuthenticated && currentState.isReady) {
+    console.log('IMMEDIATE SOCKET CHECK:', { isConnected, isAuthenticated, isReady });
+    if (isConnected && isAuthenticated && isReady) {
       console.log('SOCKET ALREADY READY - SENDING JOIN_GAME');
       if (socket && socket.connected) {
         socket.emit('join_game', {
@@ -450,8 +438,6 @@ export default function TablePage() {
     } else {
       console.log('SOCKET NOT READY FOR IMMEDIATE JOIN');
     }
-    
-    socketManager.onStateChange(handleSocketStateChange);
 
     // Also try to rejoin on socket connect event for production
     const handleConnect = () => {
