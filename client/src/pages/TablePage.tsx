@@ -178,7 +178,12 @@ export default function TablePage() {
           console.log('[FETCH GAME] Socket is ready, joining game room after fetch');
           setTimeout(() => {
             if (currentSocket && currentSocket.connected) {
-              currentSocket.emit('join_game', { gameId });
+              console.log('[FETCH GAME] Emitting join_game after fetch');
+              currentSocket.emit('join_game', {
+                gameId,
+                userId: user.id,
+                timestamp: new Date().toISOString()
+              });
             }
           }, 500);
         } else {
@@ -192,6 +197,22 @@ export default function TablePage() {
     };
 
     fetchGame();
+
+    // Add a fallback mechanism to ensure join_game is sent
+    const fallbackJoinGame = () => {
+      const currentSocket = socketManager.getSocket();
+      if (currentSocket && currentSocket.connected && !isSpectator) {
+        console.log('[FALLBACK] Emitting join_game as fallback');
+        currentSocket.emit('join_game', {
+          gameId,
+          userId: user.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+    };
+
+    // Try to join game after a delay as fallback
+    setTimeout(fallbackJoinGame, 2000);
 
     return () => {
       // Don't disconnect socket here - it will be handled by the SocketContext cleanup
@@ -427,6 +448,22 @@ export default function TablePage() {
 
     // Get the socket manager and listen for state changes
     const socketManager = getSocketManager();
+    console.log('[SOCKET STATE CHANGE] Setting up state change listener for game:', { gameId, userId: user.id });
+    
+    // Check if socket is already ready
+    const currentState = socketManager.getState();
+    console.log('[SOCKET STATE CHANGE] Current socket state:', currentState);
+    if (currentState.isConnected && currentState.isAuthenticated && currentState.isReady) {
+      console.log('[SOCKET STATE CHANGE] Socket already ready, joining game immediately');
+      if (socket && socket.connected) {
+        socket.emit('join_game', {
+          gameId,
+          userId: user.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
     socketManager.onStateChange(handleSocketStateChange);
 
     // Also try to rejoin on socket connect event for production

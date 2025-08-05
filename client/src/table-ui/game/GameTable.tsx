@@ -1439,7 +1439,7 @@ export default function GameTable({
     const isLeadingTrick = currentTrick.length === 0;
     const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted) : [];
     // --- FIX: If it's your turn and playableCards is empty, allow all cards ---
-    const isMyTurn = gameState.status === "PLAYING" && gameState.currentPlayer === currentPlayerId;
+    const isMyTurn = (gameState.status === "PLAYING" || gameState.status === "BIDDING") && gameState.currentPlayer === currentPlayerId;
     // Only log if these exist
     if (typeof playableCards !== 'undefined' && typeof myHand !== 'undefined') {
       console.log('[DEBUG] isMyTurn:', isMyTurn);
