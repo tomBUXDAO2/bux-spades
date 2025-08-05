@@ -243,7 +243,7 @@ export default function TablePage() {
       console.log('[INACTIVITY] Table inactive event received:', data);
       setShowInactivityModal(true);
     };
-    
+
     socket.off('table_inactive', handleTableInactive);
     socket.on('table_inactive', handleTableInactive);
     
@@ -410,12 +410,12 @@ export default function TablePage() {
     console.log('IMMEDIATE SOCKET CHECK:', { isConnected, isAuthenticated, isReady });
     if (isConnected && isAuthenticated && isReady) {
       console.log('SOCKET ALREADY READY - SENDING JOIN_GAME');
-      if (socket && socket.connected) {
-        socket.emit('join_game', {
-          gameId,
-          userId: user.id,
-          timestamp: new Date().toISOString()
-        });
+        if (socket && socket.connected) {
+          socket.emit('join_game', {
+            gameId,
+            userId: user.id,
+            timestamp: new Date().toISOString()
+          });
       } else {
         console.log('SOCKET NOT CONNECTED FOR IMMEDIATE JOIN');
       }

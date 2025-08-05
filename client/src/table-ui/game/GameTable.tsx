@@ -73,19 +73,7 @@ interface GameTableProps {
   onRejoinGame?: () => void;
 }
 
-// Helper function to get card image filename
-function getCardImage(card: Card): string {
-  if (!card) return 'back.png';
-  // Accepts suit as symbol, letter, or word
-  const suitMap: Record<string, string> = {
-    '♠': 'S', 'Spades': 'S', 'S': 'S',
-    '♥': 'H', 'Hearts': 'H', 'H': 'H',
-    '♦': 'D', 'Diamonds': 'D', 'D': 'D',
-    '♣': 'C', 'Clubs': 'C', 'C': 'C',
-  };
-  const suitLetter = suitMap[card.suit] || card.suit || 'X';
-  return `${card.rank}${suitLetter}.png`;
-}
+
 
 // Helper function to get card rank value
 function getCardValue(rank: string | number): number {
@@ -1283,44 +1271,18 @@ export default function GameTable({
   // --- Card dealing animation state ---
   const [handImagesLoaded, setHandImagesLoaded] = useState(false);
   const [dealtCardCount, setDealtCardCount] = useState(0);
-  const handImageRefs = useRef<{ [key: string]: boolean }>({});
+
   const dealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Preload card images when hand changes
+  // Set hand images as loaded immediately since we're using CSS-based cards
   useEffect(() => {
     if (!currentPlayer || !currentPlayer.hand) {
       setHandImagesLoaded(false);
       setDealtCardCount(0);
-      handImageRefs.current = {};
       return;
     }
-    const sortedHand = sortCards(currentPlayer.hand);
-    let loadedCount = 0;
-    handImageRefs.current = {};
-    setHandImagesLoaded(false);
+          setHandImagesLoaded(true);
     setDealtCardCount(0);
-    sortedHand.forEach((card) => {
-      const img = new window.Image();
-      img.src = `/cards/${getCardImage(card)}`;
-      img.onload = () => {
-        handImageRefs.current[`${card.suit}${card.rank}`] = true;
-        loadedCount++;
-        if (loadedCount === sortedHand.length) {
-          setHandImagesLoaded(true);
-        }
-      };
-      img.onerror = () => {
-        handImageRefs.current[`${card.suit}${card.rank}`] = false;
-        loadedCount++;
-        if (loadedCount === sortedHand.length) {
-          setHandImagesLoaded(true);
-        }
-      };
-    });
-    // Cleanup on hand change
-    return () => {
-      if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
-    };
   }, [currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
 
   // Animate dealing cards after images are loaded
@@ -1462,9 +1424,9 @@ export default function GameTable({
     } else if (Array.isArray(playableCards)) {
       effectivePlayableCards = playableCards;
     }
-    const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
-    const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
-    const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
+    const cardUIWidth = Math.floor(isMobile ? 65 : 100 * scaleFactor);
+    const cardUIHeight = Math.floor(isMobile ? 90 : 140 * scaleFactor);
+    const overlapOffset = Math.floor(isMobile ? -40 : -40 * scaleFactor);
 
     // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
@@ -1478,7 +1440,9 @@ export default function GameTable({
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: '-40px',
+          bottom: isMobile ? '0px' : '-40px',
+          height: isMobile ? `${Math.floor(cardUIHeight * 0.4)}px` : 'auto',
+          overflow: 'hidden',
           pointerEvents: 'none',
         }}
       >
@@ -1556,15 +1520,17 @@ export default function GameTable({
     
     if (!bottomPlayerHand || bottomPlayerHand.length === 0) return null;
     
-    const cardUIWidth = Math.floor(isMobile ? 80 : 100 * scaleFactor);
-    const cardUIHeight = Math.floor(isMobile ? 110 : 140 * scaleFactor);
-    const overlapOffset = Math.floor(isMobile ? -48 : -40 * scaleFactor);
+    const cardUIWidth = Math.floor(isMobile ? 65 : 100 * scaleFactor);
+    const cardUIHeight = Math.floor(isMobile ? 90 : 140 * scaleFactor);
+    const overlapOffset = Math.floor(isMobile ? -40 : -40 * scaleFactor);
 
     return (
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: '-40px',
+          bottom: isMobile ? '0px' : '-40px',
+          height: isMobile ? `${Math.floor(cardUIHeight * 0.15)}px` : 'auto',
+          overflow: 'hidden',
           pointerEvents: 'none',
         }}
       >
@@ -1856,18 +1822,12 @@ export default function GameTable({
           className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
           style={{ pointerEvents: 'none' }}
         >
-          <img
-            src={`/cards/${getCardImage(card)}`}
-            alt={`${card.rank} of ${card.suit}`}
+          <CardImage
+            card={card}
+            width={Math.floor(isMobile ? 50 * scaleFactor : 70 * scaleFactor)}
+            height={Math.floor(isMobile ? 70 * scaleFactor : 100 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
-            style={{ 
-              width: 70, 
-              height: 100, 
-              objectFit: 'contain', 
-              borderRadius: 8, 
-              boxShadow: isWinningCard ? '0 0 20px 4px gold' : '0 2px 8px #0004',
-              zIndex: isWinningCard ? 30 : 20
-            }}
+            alt={`${card.rank} of ${card.suit}`}
           />
           {isWinningCard && (
             <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
@@ -1910,18 +1870,18 @@ export default function GameTable({
       }
       
       // Only send the join system message once per session, but allow it on reconnection
-      if (window.__sentJoinSystemMessage !== gameState.id) {
-        const systemMessage = {
-          id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          userId: 'system',
-          userName: 'System',
-          message: `${user.username} joined the game.`,
-          timestamp: Date.now(),
-          isGameMessage: true
-        };
+    if (window.__sentJoinSystemMessage !== gameState.id) {
+      const systemMessage = {
+        id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: 'system',
+        userName: 'System',
+        message: `${user.username} joined the game.`,
+        timestamp: Date.now(),
+        isGameMessage: true
+      };
         console.log('[SYSTEM MESSAGE] Sending join system message:', systemMessage);
-        socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
-        window.__sentJoinSystemMessage = gameState.id;
+      socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
+      window.__sentJoinSystemMessage = gameState.id;
       } else {
         console.log('[SYSTEM MESSAGE] System message already sent for this game, skipping');
       }
@@ -2189,30 +2149,7 @@ export default function GameTable({
 
   // Preload all card images on component mount
   useEffect(() => {
-    const preloadCardImages = async () => {
-      // Define all possible card images
-      const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-      const suits = ['S', 'H', 'D', 'C'];
-      const cardFiles = [
-        'blue_back.png',
-        ...ranks.map(rank => suits.map(suit => `${rank}${suit}.png`)).flat()
-      ];
-      
-      // Preload each image
-      const preloadPromises = cardFiles.map(filename => {
-        return new Promise<void>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = `/cards/${filename}`;
-        });
-      });
-      
-      await Promise.all(preloadPromises);
-      console.log(`[IMAGE PRELOAD] Preloaded ${cardFiles.length} card images`);
-    };
-    
-    preloadCardImages();
+    // No longer need to preload images since we're using CSS-based cards
   }, []);
 
   // Simple stateless card image component to prevent flickering
@@ -2224,17 +2161,89 @@ export default function GameTable({
     alt?: string;
     faceDown?: boolean;
   }) => {
-    const imageSrc = faceDown ? '/cards/blue_back.png' : `/cards/${getCardImage(card)}`;
+    if (faceDown) {
     return (
-      <img
-        src={imageSrc}
-        alt={alt || (faceDown ? 'Card Back' : `${card.rank}${card.suit}`)}
-        width={width}
-        height={height}
-        className={className}
-        style={{ objectFit: 'cover' }}
-        loading="eager"
-      />
+        <div
+          className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
+          style={{ width, height }}
+        >
+          <div className="text-white text-2xl font-bold">🂠</div>
+        </div>
+      );
+    }
+
+    // Get suit symbol and color
+    const getSuitSymbol = (suit: string) => {
+      const suitMap: Record<string, string> = {
+        '♠': '♠️', 'Spades': '♠️', 'S': '♠️',
+        '♥': '♥️', 'Hearts': '♥️', 'H': '♥️',
+        '♦': '♦️', 'Diamonds': '♦️', 'D': '♦️',
+        '♣': '♣️', 'Clubs': '♣️', 'C': '♣️',
+      };
+      return suitMap[suit] || suit;
+    };
+
+    const getSuitColor = (suit: string) => {
+      const suitMap: Record<string, string> = {
+        '♠': 'text-black', 'Spades': 'text-black', 'S': 'text-black',
+        '♥': 'text-red-600', 'Hearts': 'text-red-600', 'H': 'text-red-600',
+        '♦': 'text-red-600', 'Diamonds': 'text-red-600', 'D': 'text-red-600',
+        '♣': 'text-black', 'Clubs': 'text-black', 'C': 'text-black',
+      };
+      return suitMap[suit] || 'text-black';
+    };
+
+    const suitSymbol = getSuitSymbol(card.suit);
+    const suitColor = getSuitColor(card.suit);
+
+    // Determine if this is a table card (smaller) or hand card (larger)
+    const isTableCard = width <= 80; // Table cards are typically 70px wide, hand cards are larger
+    
+    // Check if we're on mobile (small screen)
+    const isMobile = window.innerWidth < 640;
+    
+
+    
+    // Adjust sizing based on card type and screen size
+    const cornerRankSize = isTableCard 
+      ? (isMobile ? 'text-xs' : 'text-sm') 
+      : (isMobile ? 'text-lg' : 'text-base');
+    const cornerSuitSize = isTableCard 
+      ? (isMobile ? 'text-xs' : 'text-xs') 
+      : (isMobile ? 'text-base' : 'text-xs');
+    const centerSuitSize = isTableCard 
+      ? (isMobile ? 'text-lg' : 'text-2xl') 
+      : (isMobile ? 'text-2xl' : 'text-3xl');
+    const cornerPosition = isTableCard 
+      ? (isMobile ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5') 
+      : (isMobile ? 'top-1 left-1' : 'top-1 left-1');
+    const cornerWidth = isTableCard 
+      ? (isMobile ? 'w-3' : 'w-5') 
+      : (isMobile ? 'w-5' : 'w-6');
+
+    return (
+      <div
+        className={`${className} bg-white rounded-lg relative overflow-hidden`}
+        style={{ width, height }}
+        title={alt || `${card.rank}${card.suit}`}
+      >
+        {/* Top left corner */}
+        <div className={`absolute ${cornerPosition} font-bold ${cornerWidth} text-center`}>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '0.9rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.7rem' } : {})}>{suitSymbol}</div>
+        </div>
+
+        {/* Center large suit */}
+        <div className={`absolute inset-0 flex items-center justify-center ${suitColor}`}>
+          <div className={`${centerSuitSize} font-bold`}>{suitSymbol}</div>
+        </div>
+
+        {/* Bottom right corner (rotated) */}
+        <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '0.9rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.7rem' } : {})}>{suitSymbol}</div>
+        </div>
+      </div>
     );
   };
 
@@ -2268,24 +2277,14 @@ export default function GameTable({
               background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
               borderRadius: `${Math.floor(64 * scaleFactor)}px`,
               border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
-              height: '100%'
+              height: isMobile ? 'calc(100% - 30px)' : '100%'
             }}>
               {/* Trick cards overlay - covers the whole table area */}
               <div className="absolute inset-0 pointer-events-none z-20">
                 {renderTrickCards()}
               </div>
               
-              {/* Trick winner announcement */}
-              {animatingTrick && trickWinner !== null && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
-                  <div className="bg-yellow-400 text-black px-6 py-3 rounded-lg shadow-lg font-bold text-lg animate-pulse">
-                    {(() => {
-                      const winner = gameState.players[trickWinner];
-                      return winner ? `${winner.username} wins the trick!` : 'Trick won!';
-                    })()}
-                  </div>
-                </div>
-              )}
+
 
 
 
@@ -2698,7 +2697,7 @@ export default function GameTable({
             {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
               <div className="bg-gray-800/50 rounded-lg relative mb-0" 
                    style={{ 
-                     height: `${Math.floor(110 * scaleFactor)}px`
+                     height: isMobile ? `${Math.floor(30 * scaleFactor)}px` : `${Math.floor(110 * scaleFactor)}px`
                    }}>
                 {myPlayerIndex !== -1 ? (
                   renderPlayerHand()

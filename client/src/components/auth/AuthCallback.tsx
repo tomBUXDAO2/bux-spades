@@ -34,7 +34,7 @@ const AuthCallback: React.FC = () => {
             navigate(`/table/${response.data.activeGame.id}`, { replace: true });
           } else {
             console.log('No active game, redirecting to lobby');
-            navigate('/', { replace: true });
+          navigate('/', { replace: true });
           }
         } else {
           console.error('Invalid profile response:', response.data);

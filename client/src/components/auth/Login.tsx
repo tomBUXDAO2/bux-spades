@@ -35,7 +35,7 @@ const Login: React.FC = () => {
           navigate(`/table/${result.activeGame.id}`);
         } else {
           console.log('No active game, redirecting to lobby');
-          navigate('/');
+        navigate('/');
         }
       }
     } catch (error: any) {
