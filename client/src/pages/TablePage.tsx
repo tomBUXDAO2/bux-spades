@@ -9,6 +9,7 @@ import type { Socket } from 'socket.io-client';
 import { socketApi } from '../table-ui/lib/socketApi';
 import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
+import TableInactivityModal from '../components/modals/TableInactivityModal';
 
 export default function TablePage() {
   console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
@@ -28,6 +29,7 @@ export default function TablePage() {
   const [showBotWarning, setShowBotWarning] = useState(false);
   const [emptySeats, setEmptySeats] = useState(0);
   const [botCount, setBotCount] = useState(0);
+  const [showInactivityModal, setShowInactivityModal] = useState(false);
 
   // Detect spectate intent
   const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
@@ -225,10 +227,18 @@ export default function TablePage() {
     socket.off('game_update', handleGameUpdate);
     socket.on('game_update', handleGameUpdate);
     
-
+    // Handle table inactivity
+    const handleTableInactive = (data: { reason: string; message: string }) => {
+      console.log('[INACTIVITY] Table inactive event received:', data);
+      setShowInactivityModal(true);
+    };
+    
+    socket.off('table_inactive', handleTableInactive);
+    socket.on('table_inactive', handleTableInactive);
     
     return () => {
       socket.off('game_update', handleGameUpdate);
+      socket.off('table_inactive', handleTableInactive);
     };
   }, [socket]);
 
@@ -692,6 +702,15 @@ export default function TablePage() {
         </div>,
         document.body
       )}
+
+      {/* Inactivity Modal */}
+      <TableInactivityModal
+        isOpen={showInactivityModal}
+        onClose={() => {
+          setShowInactivityModal(false);
+          navigate('/'); // Redirect to lobby after closing modal
+        }}
+      />
     </>
   );
 } 

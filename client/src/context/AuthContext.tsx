@@ -65,10 +65,12 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   setUser: (user: User | null) => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ activeGame?: { id: string; status: string } }>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (username: string, avatar: string) => Promise<void>;
+  showSessionInvalidatedModal: boolean;
+  setShowSessionInvalidatedModal: (show: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('sessionToken');
@@ -85,6 +88,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setLoading(false);
     }
+  }, []);
+
+  // Listen for session invalidation events
+  useEffect(() => {
+    const handleSessionInvalidated = (event: CustomEvent) => {
+      console.log('Session invalidated event received:', event.detail);
+      setShowSessionInvalidatedModal(true);
+      // Clear user data
+      setUser(null);
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('userData');
+    };
+
+    window.addEventListener('sessionInvalidated', handleSessionInvalidated as EventListener);
+    
+    return () => {
+      window.removeEventListener('sessionInvalidated', handleSessionInvalidated as EventListener);
+    };
   }, []);
 
   const fetchProfile = async () => {
@@ -145,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(userData);
         localStorage.setItem('userData', JSON.stringify(userData));
+        
+        // Return active game information if available
+        return { activeGame: response.data.activeGame };
       } else {
         console.error('Invalid login response:', response.data);
         throw new Error('Invalid response from server');
@@ -249,6 +273,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         updateProfile,
+        showSessionInvalidatedModal,
+        setShowSessionInvalidatedModal,
       }}
     >
       {children}

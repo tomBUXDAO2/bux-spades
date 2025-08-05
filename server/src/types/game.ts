@@ -84,4 +84,5 @@ export interface Game {
   winningPlayer?: number;
   winningTeam?: 'team1' | 'team2';
   currentPlayer?: string;
+  lastActivity?: number; // Timestamp of last activity
 } 

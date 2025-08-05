@@ -26,9 +26,17 @@ const Login: React.FC = () => {
         navigate('/');
       } else {
         console.log('Attempting to login...');
-        await login(email, password);
+        const result = await login(email, password);
         console.log('Login successful');
-        navigate('/');
+        
+        // Check if user has an active game
+        if (result.activeGame) {
+          console.log('User has active game, redirecting to game table:', result.activeGame);
+          navigate(`/table/${result.activeGame.id}`);
+        } else {
+          console.log('No active game, redirecting to lobby');
+          navigate('/');
+        }
       }
     } catch (error: any) {
       console.error('Auth error:', error);

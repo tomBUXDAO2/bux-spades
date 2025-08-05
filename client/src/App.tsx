@@ -11,6 +11,7 @@ import AuthCallback from '@/components/auth/AuthCallback';
 import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
 import { SocketProvider } from './context/SocketContext';
+import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;
@@ -89,9 +90,22 @@ const router = createBrowserRouter(
 );
 
 const AppWithSocket: React.FC = () => {
+  const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();
+  
   return (
     <SocketProvider>
       <RouterProvider router={router} />
+      <SessionInvalidatedModal
+        isOpen={showSessionInvalidatedModal}
+        onClose={() => {
+          setShowSessionInvalidatedModal(false);
+          window.location.href = '/login';
+        }}
+        onLogin={() => {
+          setShowSessionInvalidatedModal(false);
+          window.location.href = '/login';
+        }}
+      />
     </SocketProvider>
   );
 };

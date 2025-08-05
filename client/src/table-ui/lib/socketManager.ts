@@ -229,6 +229,27 @@ export class SocketManager {
       this.state.error = error.message;
       this.notifyStateChange();
     });
+
+    this.socket.on('session_invalidated', (data: { reason: string; message: string }) => {
+      console.log('Session invalidated:', data);
+      this.state.isAuthenticated = false;
+      this.state.isReady = false;
+      this.state.error = 'Session invalidated';
+      
+      // Clear session data
+      this.session = null;
+      
+      // Disconnect socket
+      if (this.socket) {
+        this.socket.disconnect();
+        this.socket = null;
+      }
+      
+      this.notifyStateChange();
+      
+      // Dispatch custom event for AuthContext to handle
+      window.dispatchEvent(new CustomEvent('sessionInvalidated', { detail: data }));
+    });
   }
 
   public getSocket(): Socket | null {

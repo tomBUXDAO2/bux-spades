@@ -99,6 +99,14 @@ export interface AuthenticatedSocket extends Socket {
 const authenticatedSockets = new Map<string, AuthenticatedSocket>();
 const onlineUsers = new Set<string>();
 
+// Session management
+const userSessions = new Map<string, string>(); // userId -> sessionId
+const sessionToUser = new Map<string, string>(); // sessionId -> userId
+
+// Inactivity tracking
+const tableInactivityTimers = new Map<string, NodeJS.Timeout>();
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+
 // Export io for use in routes
 export { io, onlineUsers };
 
@@ -213,16 +221,21 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   if (socket.userId) {
+    // Create new session for this user
+    const sessionId = createUserSession(socket.userId);
+    
     authenticatedSockets.set(socket.userId, socket);
     onlineUsers.add(socket.userId);
     io.emit('online_users', Array.from(onlineUsers));
     console.log('User connected:', {
       userId: socket.userId,
+      sessionId,
       onlineUsers: Array.from(onlineUsers)
     });
     socket.emit('authenticated', { 
       success: true, 
       userId: socket.userId,
+      sessionId,
       games: Array.from(socket.rooms).filter(room => room !== socket.id)
     });
   }
@@ -231,6 +244,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   socket.on('chat_message', async ({ gameId, message }) => {
     console.log('=== CHAT MESSAGE EVENT RECEIVED ===');
     console.log('Chat message received:', { gameId, message, socketId: socket.id, userId: socket.userId });
+    
+    // Update game activity
+    const game = games.find((g: Game) => g.id === gameId);
+    if (game) {
+      game.lastActivity = Date.now();
+      updateGameActivity(gameId);
+    }
     
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized chat message attempt:', { 
@@ -254,7 +274,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
 
     // Find the game and get the player's username from the game state
-    const game = games.find((g: Game) => g.id === gameId);
     let userName = 'Unknown';
     
     console.log('Chat message debug:', {
@@ -370,6 +389,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     if (socket.userId) {
       authenticatedSockets.delete(socket.userId);
       onlineUsers.delete(socket.userId);
+      // Don't invalidate session on disconnect - let it persist for reconnection
       io.emit('online_users', Array.from(onlineUsers));
       console.log('User disconnected:', {
         userId: socket.userId,
@@ -408,6 +428,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Game not found' });
         return;
       }
+      
+      // Update game activity
+      game.lastActivity = Date.now();
+      updateGameActivity(gameId);
       
       console.log('[SERVER DEBUG] Found game:', { 
         gameId, 
@@ -1034,6 +1058,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
+    // Update game activity
+    game.lastActivity = Date.now();
+    updateGameActivity(gameId);
+    
     const playerIndex = game.players.findIndex(p => p && p.id === userId);
     console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, playerIndex, currentBidderIndex: game.bidding.currentBidderIndex, bids: game.bidding.bids });
     if (playerIndex === -1) {
@@ -1164,6 +1192,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.emit('error', { message: 'Invalid game state' });
       return;
     }
+    
+    // Update game activity
+    game.lastActivity = Date.now();
+    updateGameActivity(gameId);
     
     const playerIndex = game.players.findIndex(p => p && p.id === userId);
     if (playerIndex === -1) {
@@ -2220,6 +2252,115 @@ function resetGameForNewRound(game: Game) {
   
   console.log(`[PLAY AGAIN] Game ${game.id} reset successfully`);
 }
+
+// Session management functions
+function createUserSession(userId: string): string {
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Invalidate any existing session for this user
+  const existingSessionId = userSessions.get(userId);
+  if (existingSessionId) {
+    sessionToUser.delete(existingSessionId);
+    
+    // Notify the old session that it's been invalidated
+    const oldSocket = authenticatedSockets.get(userId);
+    if (oldSocket) {
+      oldSocket.emit('session_invalidated', {
+        reason: 'new_login',
+        message: 'You have logged in to your account on another device and have been logged out here'
+      });
+      oldSocket.disconnect();
+    }
+  }
+  
+  // Create new session
+  userSessions.set(userId, sessionId);
+  sessionToUser.set(sessionId, userId);
+  
+  console.log(`[SESSION] Created new session for user ${userId}: ${sessionId}`);
+  return sessionId;
+}
+
+function validateUserSession(userId: string, sessionId: string): boolean {
+  const currentSessionId = userSessions.get(userId);
+  return currentSessionId === sessionId;
+}
+
+function invalidateUserSession(userId: string) {
+  const sessionId = userSessions.get(userId);
+  if (sessionId) {
+    sessionToUser.delete(sessionId);
+    userSessions.delete(userId);
+    console.log(`[SESSION] Invalidated session for user ${userId}: ${sessionId}`);
+  }
+}
+
+// Inactivity management functions
+function updateGameActivity(gameId: string) {
+  // Clear existing timer
+  const existingTimer = tableInactivityTimers.get(gameId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+  
+  // Set new timer
+  const timer = setTimeout(() => {
+    console.log(`[INACTIVITY] Game ${gameId} inactive for 10 minutes, closing table`);
+    closeInactiveTable(gameId);
+  }, INACTIVITY_TIMEOUT);
+  
+  tableInactivityTimers.set(gameId, timer);
+}
+
+function closeInactiveTable(gameId: string) {
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    console.log(`[INACTIVITY] Game ${gameId} not found, already closed`);
+    return;
+  }
+  
+  // Remove game from games array
+  const gameIndex = games.findIndex(g => g.id === gameId);
+  if (gameIndex !== -1) {
+    games.splice(gameIndex, 1);
+  }
+  
+  // Clear timer
+  tableInactivityTimers.delete(gameId);
+  
+  // Notify all players that table was closed due to inactivity
+  io.to(gameId).emit('table_inactive', { 
+    reason: 'inactivity',
+    message: 'Your table was closed due to inactivity.'
+  });
+  
+  // Update lobby for all clients
+  io.emit('games_updated', games);
+  
+  console.log(`[INACTIVITY] Table ${gameId} closed due to inactivity`);
+}
+
+// Start inactivity monitoring for all games
+function startInactivityMonitoring() {
+  console.log('[INACTIVITY] Starting inactivity monitoring system');
+  
+  // Check for inactive games every minute
+  setInterval(() => {
+    const now = Date.now();
+    games.forEach(game => {
+      if (game.status === 'WAITING' && game.lastActivity) {
+        const timeSinceActivity = now - game.lastActivity;
+        if (timeSinceActivity >= INACTIVITY_TIMEOUT) {
+          console.log(`[INACTIVITY] Game ${game.id} has been inactive for ${Math.round(timeSinceActivity / 1000 / 60)} minutes`);
+          closeInactiveTable(game.id);
+        }
+      }
+    });
+  }, 60000); // Check every minute
+}
+
+// Start inactivity monitoring
+startInactivityMonitoring();
 
 // Add error handling for the HTTP server
 httpServer.on('error', (error: Error) => {

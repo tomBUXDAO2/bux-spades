@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import { games } from '../gamesStore';
+import type { Game } from '../types/game';
 
 const prisma = new PrismaClient();
 
@@ -130,6 +132,11 @@ export const login = async (req: Request, res: Response) => {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     } as any);
 
+    // Check if user is in an active game
+    const activeGame = games.find((game: Game) => 
+      game.players.some((player: any) => player && player.id === user.id && player.type === 'human')
+    );
+
     res.json({
       token,
       user: {
@@ -140,6 +147,10 @@ export const login = async (req: Request, res: Response) => {
         coins: user.coins,
         stats: user.stats,
       },
+      activeGame: activeGame ? {
+        id: activeGame.id,
+        status: activeGame.status
+      } : null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

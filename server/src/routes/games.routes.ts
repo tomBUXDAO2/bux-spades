@@ -64,6 +64,7 @@ router.post('/', (req, res) => {
       spectators: [],
       status: 'WAITING' as Game['status'],
       completedTricks: [],
+      lastActivity: Date.now(), // Initialize with current timestamp
       rules: {
         // For gimmick games (SUICIDE, 4 OR NIL, BID 3, BID HEARTS), set gameType to 'REG'
         // and use forcedBid to distinguish between them
