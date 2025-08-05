@@ -1936,7 +1936,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
 const playAgainResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who responded
 
-function startSeatReplacement(game: Game, seatIndex: number) {
+export function startSeatReplacement(game: Game, seatIndex: number) {
   console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
   console.log(`[SEAT REPLACEMENT DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
   console.log(`[SEAT REPLACEMENT DEBUG] Seat ${seatIndex} value:`, game.players[seatIndex]);

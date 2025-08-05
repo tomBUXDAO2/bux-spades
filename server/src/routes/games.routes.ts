@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
 import { games } from '../gamesStore';
+import { startSeatReplacement } from "../index";
 import { PrismaClient } from '@prisma/client';
 import type { AuthenticatedSocket } from '../index';
 
@@ -228,6 +229,7 @@ router.post('/:id/spectate', async (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   const userId = req.body.id;
+  let hostReplaced = false;
   if (!userId) return res.status(400).json({ error: 'Missing user id' });
   // Prevent duplicate spectate
   if (game.spectators.some(s => s.id === userId)) {
@@ -254,15 +256,46 @@ router.post('/:id/leave', (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   const userId = req.body.id;
+  let hostReplaced = false;
+  
   // Remove from players
   const playerIdx = game.players.findIndex(p => p && p.id === userId);
   if (playerIdx !== -1) {
+    // Get the player before removing them
+    const removedPlayer = game.players[playerIdx];
     game.players[playerIdx] = null;
+    
+    // Track if host replacement occurred
+    
+    // If the host (seat 0) was removed, appoint a new host
+    if (playerIdx === 0) {
+      const newHostIndex = game.players.findIndex((p: GamePlayer | null) => p && p.type === 'human');
+      if (newHostIndex !== -1) {
+        console.log(`[HTTP LEAVE] Host removed, appointing new host at seat ${newHostIndex}`);
+        // Move the new host to seat 0
+        const newHost = game.players[newHostIndex];
+        game.players[newHostIndex] = null;
+        game.players[0] = newHost;
+        newHost.position = 0;
+        hostReplaced = true;
+        
+        // Start seat replacement for the new host's old seat
+        startSeatReplacement(game, newHostIndex);
+      }
+    }
   }
+  
   // Remove from spectators
   const specIdx = game.spectators.findIndex(s => s.id === userId);
   if (specIdx !== -1) {
     game.spectators.splice(specIdx, 1);
+  }
+  
+  // Start seat replacement process for the empty seat (only if host wasn't replaced)
+  if (playerIdx !== -1 && !hostReplaced) {
+    console.log(`[HTTP LEAVE DEBUG] About to start seat replacement for seat ${playerIdx}`);
+    console.log(`[HTTP LEAVE DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
+    startSeatReplacement(game, playerIdx);
   }
   
   // Check if there are any human players left
