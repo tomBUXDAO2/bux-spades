@@ -10,7 +10,7 @@ export const useWindowSize = (): WindowSize => {
   const [windowSize, setWindowSize] = useState<WindowSize>({
     width: window.innerWidth,
     height: window.innerHeight,
-    isMobile: window.innerWidth < 640
+    isMobile: window.innerWidth < 900
   });
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export const useWindowSize = (): WindowSize => {
       setWindowSize({
         width: window.innerWidth,
         height: window.innerHeight,
-        isMobile: window.innerWidth < 640
+        isMobile: window.innerWidth < 900
       });
     };
 

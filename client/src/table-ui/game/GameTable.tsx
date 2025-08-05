@@ -2200,7 +2200,7 @@ export default function GameTable({
     const isTableCard = width <= 80; // Table cards are typically 70px wide, hand cards are larger
     
     // Check if we're on mobile (small screen)
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 900;
     
 
     
