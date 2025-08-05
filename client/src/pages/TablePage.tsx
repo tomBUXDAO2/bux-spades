@@ -198,11 +198,14 @@ export default function TablePage() {
     const fallbackJoinGame = () => {
       const currentSocket = socketManager.getSocket();
       if (currentSocket && currentSocket.connected && !isSpectator) {
+        console.log('SENDING JOIN_GAME EVENT');
         currentSocket.emit('join_game', {
           gameId,
           userId: user.id,
           timestamp: new Date().toISOString()
         });
+      } else {
+        console.log('SOCKET NOT READY FOR JOIN_GAME');
       }
     };
 

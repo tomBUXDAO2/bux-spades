@@ -157,6 +157,7 @@ export class SocketManager {
       
       // If we have a session, authenticate immediately
       if (this.session) {
+        console.log('SENDING AUTHENTICATE EVENT');
         this.socket?.emit('authenticate', {
           token: this.session.token,
           userId: this.session.userId,
