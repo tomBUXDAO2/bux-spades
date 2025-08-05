@@ -413,14 +413,20 @@ export default function TablePage() {
     if (!socket || !user || !gameId || isSpectator) return;
 
     const handleSocketStateChange = (state: any) => {
+      console.log('SOCKET STATE CHANGE:', state);
       if (state.isConnected && state.isAuthenticated && state.isReady && user && gameId) {
+        console.log('SOCKET READY - SENDING JOIN_GAME');
         if (socket && socket.connected) {
           socket.emit('join_game', {
             gameId,
             userId: user.id,
             timestamp: new Date().toISOString()
           });
+        } else {
+          console.log('SOCKET NOT CONNECTED');
         }
+      } else {
+        console.log('SOCKET NOT READY:', { isConnected: state.isConnected, isAuthenticated: state.isAuthenticated, isReady: state.isReady, hasUser: !!user, hasGameId: !!gameId });
       }
     };
 
@@ -429,14 +435,20 @@ export default function TablePage() {
     
     // Check if socket is already ready
     const currentState = socketManager.getState();
+    console.log('IMMEDIATE SOCKET CHECK:', currentState);
     if (currentState.isConnected && currentState.isAuthenticated && currentState.isReady) {
+      console.log('SOCKET ALREADY READY - SENDING JOIN_GAME');
       if (socket && socket.connected) {
         socket.emit('join_game', {
           gameId,
           userId: user.id,
           timestamp: new Date().toISOString()
         });
+      } else {
+        console.log('SOCKET NOT CONNECTED FOR IMMEDIATE JOIN');
       }
+    } else {
+      console.log('SOCKET NOT READY FOR IMMEDIATE JOIN');
     }
     
     socketManager.onStateChange(handleSocketStateChange);
