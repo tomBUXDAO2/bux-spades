@@ -5,7 +5,7 @@ import NewUserWelcomeModal from '@/components/modals/NewUserWelcomeModal';
 import Header from '@/components/common/Header';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import Picker from '@emoji-mart/react';
-import data from '@emoji-mart/data/sets/15/native.json';
+import data from '@emoji-mart/data';
 import type { GameState, Player, Bot } from '../types/game';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';

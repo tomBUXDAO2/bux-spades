@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import data from '@emoji-mart/data/sets/15/native.json';
+import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
 
@@ -55,6 +55,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Debug emoji data
+  useEffect(() => {
+    console.log('Emoji data loaded:', data);
+  }, []);
 
   // Add responsive sizing state
   const [screenSize, setScreenSize] = useState({
@@ -378,7 +383,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   }, [socket, isAuthenticated]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 overflow-hidden border-l border-gray-600">
+    <div className="flex flex-col h-full bg-gray-800 border-l border-gray-600">
       {/* Chat/Players Header */}
       <div className="flex items-center justify-between bg-gray-900 p-2 border-b border-gray-600">
         <div className="flex items-center gap-2">
@@ -495,12 +500,15 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {showLobbyEmojiPicker && (
-                  <div className="absolute bottom-full right-0 mb-2 z-10 max-h-96 overflow-y-auto">
+                  <div className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
                     <Picker
                       data={data}
-                      onEmojiSelect={(emoji: EmojiData) => setLobbyInputValue(prev => prev + emoji.native)}
+                      onEmojiSelect={(emoji: EmojiData) => {
+                        console.log('Emoji selected:', emoji);
+                        setLobbyInputValue(prev => prev + emoji.native);
+                      }}
                       theme="dark"
-                      set="twitter"
+                      set="native"
                       previewPosition="none"
                       skinTonePosition="none"
                       autoFocus
@@ -538,12 +546,15 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {isEmojiPickerOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 z-10 max-h-96 overflow-y-auto">
+                  <div className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
                     <Picker
                       data={data}
-                      onEmojiSelect={(emoji: EmojiData) => setNewMessage(prev => prev + emoji.native)}
+                      onEmojiSelect={(emoji: EmojiData) => {
+                        console.log('Emoji selected:', emoji);
+                        setNewMessage(prev => prev + emoji.native);
+                      }}
                       theme="dark"
-                      set="twitter"
+                      set="native"
                       previewPosition="none"
                       skinTonePosition="none"
                       autoFocus
