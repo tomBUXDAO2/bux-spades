@@ -1826,8 +1826,8 @@ export default function GameTable({
         >
           <CardImage
             card={card}
-            width={Math.floor(isMobile ? 60 * scaleFactor : 90 * scaleFactor)}
-            height={Math.floor(isMobile ? 85 * scaleFactor : 130 * scaleFactor)}
+            width={Math.floor(isMobile ? 75 * scaleFactor : 90 * scaleFactor)}
+            height={Math.floor(isMobile ? 105 * scaleFactor : 130 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
@@ -2266,8 +2266,8 @@ export default function GameTable({
       >
         {/* Top left corner */}
         <div className={`absolute ${cornerPosition} font-bold ${cornerWidth} text-center`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.4rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.2rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '2.0rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.8rem' } : {})}>{suitSymbol}</div>
         </div>
 
         {/* Center large suit */}
@@ -2277,8 +2277,8 @@ export default function GameTable({
 
         {/* Bottom right corner (rotated) */}
         <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.4rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.2rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '2.0rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.8rem' } : {})}>{suitSymbol}</div>
         </div>
       </div>
     );
