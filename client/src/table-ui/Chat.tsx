@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import data from '@emoji-mart/data';
+import data from '@emoji-mart/data/sets/15/native.json';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
 
@@ -495,7 +495,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {showLobbyEmojiPicker && (
-                  <div className="absolute bottom-full right-0 mb-2 z-10">
+                  <div className="absolute bottom-full right-0 mb-2 z-10 max-h-96 overflow-y-auto">
                     <Picker
                       data={data}
                       onEmojiSelect={(emoji: EmojiData) => setLobbyInputValue(prev => prev + emoji.native)}
@@ -504,6 +504,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                       previewPosition="none"
                       skinTonePosition="none"
                       autoFocus
+                      maxFrequentRows={4}
+                      maxSearchResults={20}
                     />
                   </div>
                 )}
@@ -536,7 +538,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {isEmojiPickerOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 z-10">
+                  <div className="absolute bottom-full right-0 mb-2 z-10 max-h-96 overflow-y-auto">
                     <Picker
                       data={data}
                       onEmojiSelect={(emoji: EmojiData) => setNewMessage(prev => prev + emoji.native)}
@@ -545,6 +547,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                       previewPosition="none"
                       skinTonePosition="none"
                       autoFocus
+                      maxFrequentRows={4}
+                      maxSearchResults={20}
                     />
                   </div>
                 )}
