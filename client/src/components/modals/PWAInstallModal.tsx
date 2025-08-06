@@ -38,8 +38,8 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
         return {
           title: 'Install on iPhone/iPad',
           steps: [
-            'Tap the Share button (square with arrow)',
-            'Scroll down and tap "Add to Home Screen"',
+            'Tap the share button 📤',
+            'Tap "Add to Home Screen"',
             'Tap "Add" to install'
           ],
           icon: '📱'
@@ -48,7 +48,7 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
         return {
           title: 'Install on Android',
           steps: [
-            'Tap the menu (three dots)',
+            'Tap the menu button ⋮',
             'Tap "Add to Home screen"',
             'Tap "Add" to install'
           ],
@@ -58,7 +58,7 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
         return {
           title: 'Install App',
           steps: [
-            'Look for the install button in your browser',
+            'Look for the install button 📲',
             'Or use the browser menu to add to home screen'
           ],
           icon: '💻'
