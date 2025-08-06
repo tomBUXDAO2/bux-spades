@@ -1992,16 +1992,26 @@ function calculatePartnersHandScore(game: Game) {
   console.log('[SCORING DEBUG] Tricks per player:', tricksPerPlayer);
   console.log('[SCORING DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
   
-  // Calculate team bids and tricks
+  // Calculate team tricks
   for (const i of team1) {
-    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
-    team1Bid += bid;
     team1Tricks += tricksPerPlayer[i];
   }
   for (const i of team2) {
-    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
-    team2Bid += bid;
     team2Tricks += tricksPerPlayer[i];
+  }
+  
+  // Calculate team bids (excluding nil bids)
+  for (const i of team1) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team1Bid += bid;
+    }
+  }
+  for (const i of team2) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team2Bid += bid;
+    }
   }
   
   console.log('[SCORING DEBUG] Team 1 bid:', team1Bid, 'tricks:', team1Tricks);
@@ -2014,7 +2024,7 @@ function calculatePartnersHandScore(game: Game) {
     team1Score += team1Bags;
   } else {
     team1Score -= team1Bid * 10;
-    team1Bags = 0;
+    team1Bags = 0; // No bags for failed bids
   }
   // Team 2 scoring
   if (team2Tricks >= team2Bid) {
@@ -2023,7 +2033,7 @@ function calculatePartnersHandScore(game: Game) {
     team2Score += team2Bags;
   } else {
     team2Score -= team2Bid * 10;
-    team2Bags = 0;
+    team1Bags = 0; // No bags for failed bids
   }
   
   // Nil and Blind Nil

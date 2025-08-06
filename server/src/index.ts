@@ -594,11 +594,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
       
-      // Emit game update to ALL players in the game
-      console.log('[SERVER DEBUG] Emitting game update to all players after user joined');
-      console.log('[SERVER DEBUG] Current game players after join:', game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`));
-      emitGameUpdateToPlayers(game);
-      
       // Send game update ONLY to this socket, with hand
       const enrichedGame = enrichGameForClient(game, socket.userId);
       console.log('[SERVER DEBUG] Sending game_update to client:', {
@@ -608,8 +603,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         status: enrichedGame.status
       });
       socket.emit('game_update', enrichedGame);
-      // Notify all clients about games update
-      emitGameUpdateToPlayers(game);
+      
+      // Emit to all other players in the game room
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
       io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game:', error);
@@ -867,9 +863,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         })),
         bidding: game.bidding,
       });
-      // Emit game_update for client sync
-      console.log('[DEBUG] Emitting game_update:', JSON.stringify(game, null, 2));
-      emitGameUpdateToPlayers(game);
+          // Emit game_update for client sync
+    console.log('[DEBUG] Emitting game_update to all players');
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
       // --- FIX: If first bidder is a bot, trigger bot bidding immediately ---
       if (firstBidder.type === 'bot') {
         console.log('[DEBUG] (SOCKET) About to call botMakeMove for seat', (dealerIndex + 1) % 4, 'bot:', firstBidder.username);
@@ -1173,12 +1169,26 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         setTimeout(() => {
           botMakeMove(game, next);
         }, 600); // Reduced delay for faster bot bidding
-        botMakeMove(game, next);
       }
     }
     
     // Emit game update to ensure frontend has latest state
     io.to(game.id).emit('game_update', enrichGameForClient(game));
+    
+    // Also emit bidding_update for immediate UI feedback
+    io.to(game.id).emit('bidding_update', {
+      currentBidderIndex: game.bidding.currentBidderIndex,
+      bids: game.bidding.bids,
+    });
+    
+    // Log the current game state for debugging
+    console.log('[BIDDING DEBUG] Current game state after bid:', {
+      gameId: game.id,
+      currentBidderIndex: game.bidding.currentBidderIndex,
+      currentPlayer: game.bidding.currentPlayer,
+      bids: game.bidding.bids,
+      allBidsComplete: game.bidding.bids.every(b => b !== null)
+    });
   });
 
 
@@ -2471,16 +2481,26 @@ function calculatePartnersHandScore(game: Game) {
   console.log('[SCORING DEBUG] Tricks per player:', tricksPerPlayer);
   console.log('[SCORING DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
   
-  // Calculate team bids and tricks
+  // Calculate team tricks
   for (const i of team1) {
-    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
-    team1Bid += bid;
     team1Tricks += tricksPerPlayer[i];
   }
   for (const i of team2) {
-    const bid = game.bidding.bids[i] ?? 0; // Default to 0 if bid is null
-    team2Bid += bid;
     team2Tricks += tricksPerPlayer[i];
+  }
+  
+  // Calculate team bids (excluding nil bids)
+  for (const i of team1) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team1Bid += bid;
+    }
+  }
+  for (const i of team2) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team2Bid += bid;
+    }
   }
   
   console.log('[SCORING DEBUG] Team 1 bid:', team1Bid, 'tricks:', team1Tricks);
@@ -2493,7 +2513,7 @@ function calculatePartnersHandScore(game: Game) {
     team1Score += team1Bags;
   } else {
     team1Score -= team1Bid * 10;
-    team1Bags = 0;
+    team1Bags = 0; // No bags for failed bids
   }
   // Team 2 scoring
   if (team2Tricks >= team2Bid) {
@@ -2502,7 +2522,7 @@ function calculatePartnersHandScore(game: Game) {
     team2Score += team2Bags;
   } else {
     team2Score -= team2Bid * 10;
-    team2Bags = 0;
+    team2Bags = 0; // No bags for failed bids
   }
   
   // Nil and Blind Nil
@@ -2919,4 +2939,4 @@ httpServer.listen(PORT, '0.0.0.0', () => {
       transports: ['polling', 'websocket']
     }
   });
-}); 
+});

@@ -215,11 +215,16 @@ export default function TablePage() {
   }, [gameId, user, navigate, isSpectator]);
 
   // Listen for game_update events and update local game state
-  // Listen for game_update events and update local game state
   useEffect(() => {
     if (!socket) return;
     
     const handleGameUpdate = (updatedGame: any) => {
+      console.log('[GAME UPDATE] Received game update:', {
+        status: updatedGame.status,
+        currentPlayer: updatedGame.currentPlayer,
+        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
+        playCurrentPlayer: updatedGame.play?.currentPlayer
+      });
       
       // Ensure currentPlayer is set correctly
       if (updatedGame.status === 'BIDDING' && updatedGame.bidding?.currentPlayer) {
@@ -256,27 +261,36 @@ export default function TablePage() {
   // Listen for bidding_update events and update only the bidding part of the game state
   useEffect(() => {
     if (!socket) return;
-      const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
-    setGame(prev => {
-      if (!prev) return prev;
+    
+    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
+      console.log('[BIDDING UPDATE] Received bidding update:', bidding);
       
-      const nextPlayer = prev.players[bidding.currentBidderIndex];
-      
-      const updatedGame = {
-        ...prev,
-        bidding: {
-          ...prev.bidding,
-          currentBidderIndex: bidding.currentBidderIndex,
+      setGame(prev => {
+        if (!prev) return prev;
+        
+        const nextPlayer = prev.players[bidding.currentBidderIndex];
+        
+        const updatedGame = {
+          ...prev,
+          bidding: {
+            ...prev.bidding,
+            currentBidderIndex: bidding.currentBidderIndex,
+            currentPlayer: nextPlayer?.id ?? '',
+            bids: bidding.bids,
+          },
+          // --- CRITICAL FIX: Update root-level currentPlayer! ---
           currentPlayer: nextPlayer?.id ?? '',
-          bids: bidding.bids,
-        },
-        // --- CRITICAL FIX: Update root-level currentPlayer! ---
-        currentPlayer: nextPlayer?.id ?? '',
-      };
-      
-      return updatedGame;
-    });
-  };
+        };
+        
+        console.log('[BIDDING UPDATE] Updated game state:', {
+          currentBidderIndex: updatedGame.bidding.currentBidderIndex,
+          currentPlayer: updatedGame.currentPlayer,
+          bids: updatedGame.bidding.bids
+        });
+        
+        return updatedGame;
+      });
+    };
     
     // Handle bidding completion
       const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
@@ -388,6 +402,7 @@ export default function TablePage() {
       hasUser: !!user, 
       hasGameId: !!gameId 
     });
+    
     if (socket && socket.connected && user && gameId) {
       // Only join via socket if we're not spectating and the game exists
       if (!isSpectator) {
@@ -398,47 +413,6 @@ export default function TablePage() {
         socket.emit('join_game_as_spectator', { gameId });
       }
     }
-  }, [socket, user, gameId, isSpectator]);
-
-  // Listen for socket state changes and rejoin when ready
-  useEffect(() => {
-    if (!socket || !user || !gameId || isSpectator) return;
-
-
-
-    // Check if socket is already ready
-    console.log('IMMEDIATE SOCKET CHECK:', { isConnected, isAuthenticated, isReady });
-    if (isConnected && isAuthenticated && isReady) {
-      console.log('SOCKET ALREADY READY - SENDING JOIN_GAME');
-        if (socket && socket.connected) {
-          socket.emit('join_game', {
-            gameId,
-            userId: user.id,
-            timestamp: new Date().toISOString()
-          });
-      } else {
-        console.log('SOCKET NOT CONNECTED FOR IMMEDIATE JOIN');
-      }
-    } else {
-      console.log('SOCKET NOT READY FOR IMMEDIATE JOIN');
-    }
-
-    // Also try to rejoin on socket connect event for production
-    const handleConnect = () => {
-      if (socket && socket.connected && user && gameId) {
-        socket.emit('join_game', {
-          gameId,
-          userId: user.id,
-          timestamp: new Date().toISOString()
-        });
-      }
-    };
-
-    socket.on('connect', handleConnect);
-
-    return () => {
-      socket.off('connect', handleConnect);
-    };
   }, [socket, user, gameId, isSpectator]);
 
   // Only join as a player if not spectating
