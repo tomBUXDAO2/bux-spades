@@ -486,7 +486,7 @@ function countHighCards(hand: Card[]): number {
   return hand.filter(c => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
 }
 
-// Helper function to calculate expected tricks based on hand strength
+// Improved function to calculate expected tricks based on hand strength
 function calculateExpectedTricks(hand: Card[]): number {
   let bid = 0;
   
@@ -494,8 +494,9 @@ function calculateExpectedTricks(hand: Card[]): number {
   const spades = hand.filter(c => c.suit === 'S');
   const spadesCount = spades.length;
   
+  // More aggressive spades counting
   if (spadesCount > 0) {
-    // Count Ace of Spades
+    // Always count Ace of Spades
     if (spades.some(c => c.rank === 'A')) bid += 1;
     
     // Count King of Spades (if at least 2 spades)
@@ -533,36 +534,47 @@ function calculateExpectedTricks(hand: Card[]): number {
     
     // Count 2 of Spades (if all 13 spades)
     if (spadesCount === 13 && spades.some(c => c.rank === '2')) bid += 1;
+    
+    // Bonus for having multiple spades (trump control)
+    if (spadesCount >= 3) bid += Math.floor(spadesCount / 3);
   }
   
-  // Count other suit Aces (if less than 5 cards in that suit)
+  // More aggressive counting of other suits
   const suits = ['H', 'D', 'C'];
   for (const suit of suits) {
     const suitCards = hand.filter(c => c.suit === suit);
-    if (suitCards.length < 5 && suitCards.some(c => c.rank === 'A')) {
+    const suitCount = suitCards.length;
+    
+    // Count Aces more liberally
+    if (suitCards.some(c => c.rank === 'A')) {
+      if (suitCount <= 4) bid += 1; // Always count if short suit
+      else if (suitCount <= 6) bid += 0.5; // Partial credit for medium suit
+    }
+    
+    // Count Kings more liberally
+    if (suitCards.some(c => c.rank === 'K')) {
+      if (suitCount <= 3) bid += 1; // Always count if very short
+      else if (suitCount <= 5) bid += 0.5; // Partial credit for short suit
+    }
+    
+    // Count Queens in short suits
+    if (suitCards.some(c => c.rank === 'Q') && suitCount <= 3) {
+      bid += 0.5;
+    }
+    
+    // Bonus for void suits (if we have spades)
+    if (suitCount === 0 && spadesCount > 1) {
       bid += 1;
     }
-  }
-  
-  // Count other suit Kings (if less than 4 cards in that suit)
-  for (const suit of suits) {
-    const suitCards = hand.filter(c => c.suit === suit);
-    if (suitCards.length < 4 && suitCards.some(c => c.rank === 'K')) {
-      bid += 1;
+    
+    // Bonus for singleton suits (if we have spades)
+    if (suitCount === 1 && spadesCount > 1) {
+      bid += 0.5;
     }
   }
   
-  // Add 1 for each void suit (if more than 1 spade)
-  if (spadesCount > 1) {
-    for (const suit of suits) {
-      const suitCards = hand.filter(c => c.suit === suit);
-      if (suitCards.length === 0) {
-        bid += 1;
-      }
-    }
-  }
-  
-  return Math.max(0, Math.min(13, bid));
+  // Round up for more aggressive bidding
+  return Math.max(1, Math.min(13, Math.ceil(bid)));
 }
 
 // Helper function to analyze score position
@@ -582,18 +594,18 @@ function analyzeScorePosition(game: Game, playerIndex: number): 'WINNING' | 'LOS
   return 'CLOSE';
 }
 
-// Helper function to analyze bag risk
+// Improved function to analyze bag risk
 function analyzeBagRisk(game: Game, playerIndex: number): 'HIGH' | 'MEDIUM' | 'LOW' {
   const teamIndex = playerIndex % 2;
   const team1Bags = game.team1Bags || 0;
   const team2Bags = game.team2Bags || 0;
   
   if (teamIndex === 0) { // Team 1
-    if (team1Bags >= 8) return 'HIGH';
-    if (team2Bags >= 8) return 'LOW'; // Opponents have bags, we can be aggressive
+    if (team1Bags >= 7) return 'HIGH'; // Lower threshold for high risk
+    if (team2Bags >= 5) return 'LOW'; // Opponents have bags, we can be aggressive
   } else { // Team 2
-    if (team2Bags >= 8) return 'HIGH';
-    if (team1Bags >= 8) return 'LOW'; // Opponents have bags, we can be aggressive
+    if (team2Bags >= 7) return 'HIGH'; // Lower threshold for high risk
+    if (team1Bags >= 5) return 'LOW'; // Opponents have bags, we can be aggressive
   }
   
   return 'MEDIUM';
@@ -621,7 +633,7 @@ function getPartnerBid(game: Game, playerIndex: number): number | null {
   return partner.bid !== undefined ? partner.bid : null;
 }
 
-// Helper function to determine bidding strategy
+// Improved function to determine bidding strategy
 function determineBiddingStrategy(
   scorePosition: 'WINNING' | 'LOSING' | 'CLOSE',
   bagRisk: 'HIGH' | 'MEDIUM' | 'LOW',
@@ -648,10 +660,15 @@ function determineBiddingStrategy(
     return 'AGGRESSIVE'; // Partner bid high, can be aggressive
   }
   
+  // Default to more aggressive bidding to avoid low table bids
+  if (bagRisk === 'MEDIUM' && scorePosition === 'CLOSE') {
+    return 'AGGRESSIVE';
+  }
+  
   return 'BALANCED';
 }
 
-// Helper function to determine if should consider nil
+// Improved function to determine if should consider nil
 function shouldConsiderNil(
   expectedTricks: number,
   spadesCount: number,
@@ -665,13 +682,13 @@ function shouldConsiderNil(
   // Never nil with Ace of Spades
   if (hasAceSpades) return false;
   
-  // Never nil with many spades
-  if (spadesCount > 2) return false;
+  // Never nil with many spades (more conservative)
+  if (spadesCount > 1) return false;
   
   // Only consider nil if very weak hand (0-1 expected tricks)
   if (expectedTricks > 1) return false;
   
-  // Conservative strategy favors nil
+  // Strategic nil considerations
   if (strategy === 'CONSERVATIVE' && expectedTricks <= 1) {
     return true;
   }
@@ -685,6 +702,16 @@ function shouldConsiderNil(
   if (partnerBid !== null && partnerBid >= 5) {
     // Partner bid high, consider nil if very weak
     return expectedTricks <= 1;
+  }
+  
+  // Strategic nil when we have bags and hand is weak
+  if (strategy === 'CONSERVATIVE' && expectedTricks <= 1) {
+    return true;
+  }
+  
+  // Aggressive nil when opponents have bags and hand is weak
+  if (strategy === 'AGGRESSIVE' && expectedTricks <= 0.5) {
+    return true;
   }
   
   return false;
@@ -779,14 +806,14 @@ function calculateWhizBid(hand: Card[], allowNil?: boolean): number {
   return spadesCount;
 }
 
-// Generic bidding logic for all other game types
+// Improved generic bidding logic for all other game types
 function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allowNil?: boolean): number {
-  // 1. Calculate base bid using the new counting system
+  // 1. Calculate base bid using the improved counting system
   const baseBid = calculateExpectedTricks(hand);
   const spadesCount = countSpades(hand);
   const hasAceSpades = hasAceOfSpades(hand);
   
-  // 2. Analyze game state for nil consideration
+  // 2. Analyze game state for strategic decisions
   const scorePosition = analyzeScorePosition(game, playerIndex);
   const bagRisk = analyzeBagRisk(game, playerIndex);
   const biddingPosition = getBiddingPosition(game, playerIndex);
@@ -795,13 +822,55 @@ function calculateGenericBid(hand: Card[], game: Game, playerIndex: number, allo
   // 3. Determine bidding strategy
   const strategy = determineBiddingStrategy(scorePosition, bagRisk, biddingPosition, partnerBid);
   
-  // 4. Nil consideration - only consider nil if hand is very weak
+  // 4. Strategic nil consideration
   if (shouldConsiderNil(baseBid, spadesCount, hasAceSpades, strategy, partnerBid, allowNil || false)) {
     return 0; // Nil
   }
   
-  // 5. Return the calculated bid (no strategy adjustments to inflate bids)
-  return Math.max(0, Math.min(13, baseBid));
+  // 5. Apply strategic adjustments based on game state
+  let finalBid = baseBid;
+  
+  // Aggressive bidding when opponents have bags
+  if (bagRisk === 'LOW') {
+    finalBid = Math.min(13, Math.ceil(baseBid * 1.2)); // 20% boost
+  }
+  
+  // Conservative bidding when we have bags
+  if (bagRisk === 'HIGH') {
+    finalBid = Math.max(1, Math.floor(baseBid * 0.8)); // 20% reduction
+  }
+  
+  // Partner considerations
+  if (partnerBid !== null) {
+    const totalTeamBid = partnerBid + finalBid;
+    
+    // If partner bid high, we can be more conservative
+    if (partnerBid >= 5) {
+      finalBid = Math.max(1, Math.floor(finalBid * 0.9));
+    }
+    
+    // If partner bid low, we should be more aggressive
+    if (partnerBid <= 2) {
+      finalBid = Math.min(13, Math.ceil(finalBid * 1.1));
+    }
+    
+    // Avoid very low table bids (aim for 10-13 total)
+    if (totalTeamBid < 8 && baseBid >= 3) {
+      finalBid = Math.max(finalBid, 4); // Minimum bid of 4 if we have decent hand
+    }
+  }
+  
+  // Bidding position adjustments
+  if (biddingPosition === 'LATE') {
+    // Late bidders can be more aggressive if table bid is low
+    const currentTableBid = game.bidding?.bids?.reduce((sum, bid) => sum + (bid || 0), 0) || 0;
+    if (currentTableBid < 8 && baseBid >= 3) {
+      finalBid = Math.max(finalBid, 4);
+    }
+  }
+  
+  // Ensure minimum bid of 1 (unless nil)
+  return Math.max(1, Math.min(13, Math.round(finalBid)));
 }
 
 // --- Basic Bot Engine ---
