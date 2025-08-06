@@ -53,6 +53,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'players'>('chat');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const lobbyEmojiPickerRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -60,6 +62,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   useEffect(() => {
     console.log('Emoji data loaded:', data);
   }, []);
+
+
 
   // Add responsive sizing state
   const [screenSize, setScreenSize] = useState({
@@ -299,6 +303,32 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   const [showLobbyEmojiPicker, setShowLobbyEmojiPicker] = useState(false);
   const lobbyMessagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Handle clicks outside emoji pickers
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      
+      // Close game emoji picker if clicking outside
+      if (isEmojiPickerOpen && emojiPickerRef.current && !emojiPickerRef.current.contains(target)) {
+        setIsEmojiPickerOpen(false);
+      }
+      
+      // Close lobby emoji picker if clicking outside
+      if (showLobbyEmojiPicker && lobbyEmojiPickerRef.current && !lobbyEmojiPickerRef.current.contains(target)) {
+        setShowLobbyEmojiPicker(false);
+      }
+    };
+
+    // Add event listener if either picker is open
+    if (isEmojiPickerOpen || showLobbyEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEmojiPickerOpen, showLobbyEmojiPicker]);
+
   // Use correct socket/messages depending on chatType
   const isLobby = chatType === 'lobby';
   const activeMessages = isLobby && lobbyMessages ? lobbyMessages : messages;
@@ -309,6 +339,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       lobbyMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [isLobby, lobbyMessages]);
+
+  // Scroll to bottom for game chat
+  useEffect(() => {
+    if (!isLobby && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isLobby, messages]);
 
   // Handle lobby chat send
   const handleLobbySubmit = (e: React.FormEvent) => {
@@ -500,7 +537,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {showLobbyEmojiPicker && (
-                  <div className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
+                  <div ref={lobbyEmojiPickerRef} className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
                     <Picker
                       data={data}
                       onEmojiSelect={(emoji: EmojiData) => {
@@ -546,7 +583,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   😊
                 </button>
                 {isEmojiPickerOpen && (
-                  <div className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
+                  <div ref={emojiPickerRef} className="fixed bottom-20 right-4 z-50" style={{ maxHeight: '400px', minHeight: '300px' }}>
                     <Picker
                       data={data}
                       onEmojiSelect={(emoji: EmojiData) => {
