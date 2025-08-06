@@ -44,6 +44,14 @@ model Game {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Game settings for stats tracking
+  solo          Boolean   @default(false)
+  whiz          Boolean   @default(false)
+  mirror        Boolean   @default(false)
+  gimmick       Boolean   @default(false)
+  screamer      Boolean   @default(false)
+  assassin      Boolean   @default(false)
+
   players       GamePlayer[]
   rounds        Round[]
 }

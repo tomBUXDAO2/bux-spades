@@ -2252,6 +2252,104 @@ async function updateHandStats(game: Game) {
   }
 }
 
+// --- Game logging helper ---
+async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
+  // Check if this is an all-human game (no bots)
+  const humanPlayers = game.players.filter(p => p && p.type === 'human');
+  const isAllHumanGame = humanPlayers.length === 4;
+  
+  if (!isAllHumanGame) {
+    console.log('Skipping game logging - not an all-human game');
+    return;
+  }
+  
+  console.log('Logging completed game to database');
+  
+  try {
+    // Determine game settings based on game rules
+    const gameMode = game.gameMode;
+    const bidType = game.rules?.bidType || 'REG';
+    const specialRules = game.specialRules || {};
+    
+    // Determine boolean flags
+    const solo = gameMode === 'SOLO';
+    const whiz = bidType === 'WHIZ';
+    const mirror = bidType === 'MIRROR';
+    const gimmick = bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES';
+    const screamer = specialRules.screamer === true;
+    const assassin = specialRules.assassin === true;
+    
+    // Get creator ID from the first human player
+    const creatorPlayer = humanPlayers[0];
+    const creatorId = creatorPlayer?.id;
+    
+    if (!creatorId) {
+      console.error('No creator ID found for game logging');
+      return;
+    }
+    
+    // Create game record in database
+    const dbGame = await prisma.game.create({
+      data: {
+        creatorId,
+        status: 'FINISHED',
+        gameMode: gameMode as any, // Cast to enum
+        bidType: bidType as any, // Cast to enum
+        specialRules: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[],
+        minPoints: game.rules?.minPoints || 0,
+        maxPoints: game.rules?.maxPoints || 0,
+        buyIn: game.buyIn || 0,
+        solo,
+        whiz,
+        mirror,
+        gimmick,
+        screamer,
+        assassin
+      }
+    });
+    
+    console.log(`Logged game ${dbGame.id} with settings: solo=${solo}, whiz=${whiz}, mirror=${mirror}, gimmick=${gimmick}, screamer=${screamer}, assassin=${assassin}`);
+    
+    // Create game player records
+    for (let i = 0; i < 4; i++) {
+      const player = game.players[i];
+      if (!player || player.type !== 'human') continue;
+      
+      const userId = player.id;
+      if (!userId) continue;
+      
+      // Determine team for partners games
+      let team = null;
+      if (gameMode === 'PARTNERS') {
+        team = (i === 0 || i === 2) ? 1 : 2;
+      }
+      
+      // Calculate final stats for this player
+      const finalBid = player.bid || 0;
+      const finalTricks = player.tricks || 0;
+      const finalBags = Math.max(0, finalTricks - finalBid); // Calculate bags from tricks and bid
+      const finalPoints = 0; // Points are calculated per hand, not stored per player
+      
+      await prisma.gamePlayer.create({
+        data: {
+          gameId: dbGame.id,
+          userId,
+          position: i,
+          team,
+          bid: finalBid,
+          bags: finalBags,
+          points: finalPoints
+        }
+      });
+    }
+    
+    console.log(`Created game player records for game ${dbGame.id}`);
+    
+  } catch (err) {
+    console.error('Failed to log completed game:', err);
+  }
+}
+
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
   // Check if this is an all-human game (no bots)
@@ -2264,6 +2362,9 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
   }
   
   console.log('Updating stats and coins for all-human game');
+  
+  // Log the completed game to database
+  await logCompletedGame(game, winningTeamOrPlayer);
   
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];

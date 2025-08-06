@@ -604,8 +604,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       });
       socket.emit('game_update', enrichedGame);
       
-      // Emit to all other players in the game room
-      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      // Emit to all other players in the game room (excluding this socket)
+      socket.to(game.id).emit('game_update', enrichGameForClient(game));
       io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game:', error);
@@ -665,11 +665,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
       
-      // Send game update to this spectator
+      // Send game update to this spectator only
       socket.emit('game_update', enrichGameForClient(game, socket.userId));
       
-      // Notify all clients about games update
-      emitGameUpdateToPlayers(game);
+      // Only emit games_updated to notify lobby of spectator change
       io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game_as_spectator:', error);
