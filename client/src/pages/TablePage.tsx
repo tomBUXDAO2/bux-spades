@@ -15,7 +15,7 @@ export default function TablePage() {
   console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
-  const { socket, isConnected, isAuthenticated, isReady } = useSocket();
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
