@@ -86,9 +86,9 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
   // Calculate scale factor based on screen size
   const getScaleFactor = () => {
-    if (screenSize.width < 640) {
+    if (screenSize.width < 900) {
       return 0.8;
-    } else if (screenSize.width < 768) {
+    } else if (screenSize.width < 1024) {
       return 0.9;
     }
     return 1;
@@ -97,7 +97,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   // Update scale factor when screen size changes
   useEffect(() => {
     setScaleFactor(getScaleFactor());
-    setIsMobile(screenSize.width < 640);
+    setIsMobile(screenSize.width < 900);
   }, [screenSize]);
 
   // Calculate font sizes based on scale factor
@@ -425,33 +425,33 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       <div className="flex items-center justify-between bg-gray-900 p-2 border-b border-gray-600">
         <div className="flex items-center gap-2">
           <button
-            className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`${isMobile ? 'w-12 h-8' : 'w-20 h-10'} flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
             onClick={() => setActiveTab('chat')}
             aria-label="Chat"
           >
-            <img src="/chat.svg" alt="Chat" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            <img src="/chat.svg" alt="Chat" className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'}`} style={{ filter: 'invert(1) brightness(2)' }} />
           </button>
           {showPlayerListTab && (
             <button
-              className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+              className={`${isMobile ? 'w-12 h-8' : 'w-20 h-10'} flex items-center justify-center rounded-md text-sm font-semibold transition ${activeTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
               onClick={() => setActiveTab('players')}
               aria-label="Players"
             >
-              <img src="/players.svg" alt="Players" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+              <img src="/players.svg" alt="Players" className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'}`} style={{ filter: 'invert(1) brightness(2)' }} />
             </button>
           )}
+          {/* Toggle switch for chat type */}
+          {onToggleChatType && (
+            <div className="flex items-center gap-2 ml-2">
+              <span className="text-xs font-semibold text-indigo-400">{isLobby ? 'Lobby' : 'Game'}</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={isLobby} onChange={onToggleChatType} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-all"></div>
+                <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isLobby ? 'translate-x-5' : ''}`}></div>
+              </label>
+            </div>
+          )}
         </div>
-        {/* Toggle switch for chat type */}
-        {onToggleChatType && (
-          <div className="flex items-center gap-2 pr-4">
-            <span className="text-xs font-semibold text-indigo-400">{isLobby ? 'Lobby' : 'Game'}</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={isLobby} onChange={onToggleChatType} className="sr-only peer" />
-              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-all"></div>
-              <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isLobby ? 'translate-x-5' : ''}`}></div>
-            </label>
-          </div>
-        )}
       </div>
       {/* Tab Content */}
       {activeTab === 'chat' ? (
@@ -469,7 +469,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     key={msg.id || index}
                     className="w-full text-center my-2"
                   >
-                    <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: `${mobileFontSize + 2}px` }}>
+                    <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: isMobile ? `${mobileFontSize - 1}px` : `${mobileFontSize + 2}px` }}>
                       {msg.message || msg.text}
                       {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes(s.username || s.name)) && <EyeIcon />}
                     </span>
@@ -525,7 +525,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   type="text"
                   value={lobbyInputValue}
                   onChange={(e) => setLobbyInputValue(e.target.value)}
-                  placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
+                  placeholder={screenSize.width < 900 ? "Type..." : "Type a message..."}
                   className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0 pr-10"
                   style={{ fontSize: `${fontSize}px` }}
                 />
@@ -571,7 +571,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
+                  placeholder={screenSize.width < 900 ? "Type..." : "Type a message..."}
                   className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0 pr-10"
                   style={{ fontSize: `${fontSize}px` }}
                 />
