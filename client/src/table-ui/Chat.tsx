@@ -526,7 +526,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   value={lobbyInputValue}
                   onChange={(e) => setLobbyInputValue(e.target.value)}
                   placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
-                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
+                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0 pr-10"
                   style={{ fontSize: `${fontSize}px` }}
                 />
                 <button
@@ -572,7 +572,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder={screenSize.width < 640 ? "Type..." : "Type a message..."}
-                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0"
+                  className="bg-gray-700 text-white rounded-l w-full px-3 py-2 outline-none border-0 pr-10"
                   style={{ fontSize: `${fontSize}px` }}
                 />
                 <button
