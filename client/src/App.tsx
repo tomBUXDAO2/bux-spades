@@ -12,6 +12,8 @@ import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
 import { SocketProvider } from './context/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
+import PWAInstallModal from './components/modals/PWAInstallModal';
+import { usePWAInstall } from './hooks/usePWAInstall';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;
@@ -91,6 +93,7 @@ const router = createBrowserRouter(
 
 const AppWithSocket: React.FC = () => {
   const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();
+  const { showInstallPrompt, dismissPrompt } = usePWAInstall();
   
   return (
     <SocketProvider>
@@ -105,6 +108,10 @@ const AppWithSocket: React.FC = () => {
           setShowSessionInvalidatedModal(false);
           window.location.href = '/login';
         }}
+      />
+      <PWAInstallModal
+        isOpen={showInstallPrompt}
+        onClose={dismissPrompt}
       />
     </SocketProvider>
   );
