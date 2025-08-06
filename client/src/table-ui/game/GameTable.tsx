@@ -1826,8 +1826,8 @@ export default function GameTable({
         >
           <CardImage
             card={card}
-            width={Math.floor(isMobile ? 85 * scaleFactor : 90 * scaleFactor)}
-            height={Math.floor(isMobile ? 120 * scaleFactor : 130 * scaleFactor)}
+            width={Math.floor(isMobile ? 60 * scaleFactor : 90 * scaleFactor)}
+            height={Math.floor(isMobile ? 85 * scaleFactor : 130 * scaleFactor)}
             className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
@@ -2244,19 +2244,19 @@ export default function GameTable({
     // Adjust sizing based on card type and screen size
     const cornerRankSize = isTableCard 
       ? (isMobile ? 'text-xs' : 'text-sm') 
-      : (isMobile ? 'text-lg' : 'text-base');
+      : (isMobile ? 'text-xl' : 'text-base');
     const cornerSuitSize = isTableCard 
       ? (isMobile ? 'text-xs' : 'text-xs') 
-      : (isMobile ? 'text-base' : 'text-xs');
+      : (isMobile ? 'text-lg' : 'text-xs');
     const centerSuitSize = isTableCard 
       ? (isMobile ? 'text-lg' : 'text-2xl') 
-      : (isMobile ? 'text-2xl' : 'text-3xl');
+      : (isMobile ? 'text-3xl' : 'text-3xl');
     const cornerPosition = isTableCard 
       ? (isMobile ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5') 
       : (isMobile ? 'top-1 left-1' : 'top-1 left-1');
     const cornerWidth = isTableCard 
       ? (isMobile ? 'w-3' : 'w-5') 
-      : (isMobile ? 'w-5' : 'w-6');
+      : (isMobile ? 'w-6' : 'w-6');
 
     return (
       <div
@@ -2266,8 +2266,8 @@ export default function GameTable({
       >
         {/* Top left corner */}
         <div className={`absolute ${cornerPosition} font-bold ${cornerWidth} text-center`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.0rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.8rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.4rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.2rem' } : {})}>{suitSymbol}</div>
         </div>
 
         {/* Center large suit */}
@@ -2277,8 +2277,8 @@ export default function GameTable({
 
         {/* Bottom right corner (rotated) */}
         <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.0rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '0.8rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '1.4rem' } : {})}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.4rem' } : (isMobile ? { fontSize: '1.2rem' } : {})}>{suitSymbol}</div>
         </div>
       </div>
     );
