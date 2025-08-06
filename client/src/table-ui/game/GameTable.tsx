@@ -2149,10 +2149,32 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // Preload all card images on component mount
+  // Preload all card images on component mount for large screens
   useEffect(() => {
-    // No longer need to preload images since we're using CSS-based cards
+    // Only preload images if we're on a large screen (>= 900px)
+    if (window.innerWidth >= 900) {
+      const preloadCardImages = () => {
+        const suits = ['C', 'D', 'H', 'S'];
+        const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        suits.forEach(suit => {
+          ranks.forEach(rank => {
+            const img = new Image();
+            img.src = `/cards/${rank}${suit}.png`;
+          });
+        });
+      };
+      
+      preloadCardImages();
+    }
   }, []);
+
+  // Get card image filename from card data
+  const getCardImage = (card: Card): string => {
+    const rank = card.rank;
+    const suit = card.suit;
+    return `${rank}${suit}.png`;
+  };
 
   // Simple stateless card image component to prevent flickering
   const CardImage = ({ card, width, height, className, alt, faceDown = false }: {
@@ -2163,8 +2185,11 @@ export default function GameTable({
     alt?: string;
     faceDown?: boolean;
   }) => {
+    // Check if we're on a large screen (>= 900px)
+    const isLargeScreen = window.innerWidth >= 900;
+
     if (faceDown) {
-    return (
+      return (
         <div
           className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
           style={{ width, height }}
@@ -2174,7 +2199,19 @@ export default function GameTable({
       );
     }
 
-    // Get suit symbol and color
+    // Use PNG images for large screens, CSS for small screens
+    if (isLargeScreen) {
+      return (
+        <img
+          src={`/cards/${getCardImage(card)}`}
+          alt={alt || `${card.rank}${card.suit}`}
+          className={className}
+          style={{ width, height, objectFit: 'contain' }}
+        />
+      );
+    }
+
+    // CSS-based cards for small screens
     const getSuitSymbol = (suit: string) => {
       const suitMap: Record<string, string> = {
         '♠': '♠️', 'Spades': '♠️', 'S': '♠️',
@@ -2203,8 +2240,6 @@ export default function GameTable({
     
     // Check if we're on mobile (small screen)
     const isMobile = window.innerWidth < 900;
-    
-
     
     // Adjust sizing based on card type and screen size
     const cornerRankSize = isTableCard 
