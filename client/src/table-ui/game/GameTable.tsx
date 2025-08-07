@@ -8,8 +8,6 @@ import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
-import LoserModal from './LoserModal';
-import SoloWinnerModal from './SoloWinnerModal';
 
 
 import BiddingInterface from './BiddingInterface';
@@ -20,13 +18,13 @@ import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
-import { useAuth } from '@/context/AuthContext';
+
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
 
 // Coin debit animation component
-const CoinDebitAnimation = ({ playerIndex, amount, isVisible }: { playerIndex: number, amount: number, isVisible: boolean }) => {
+const CoinDebitAnimation = ({ amount, isVisible }: { amount: number, isVisible: boolean }) => {
   if (!isVisible) return null;
   
   return (
@@ -494,7 +492,7 @@ export default function GameTable({
   useEffect(() => {
     if (!socket) return;
     
-    const handleGameStarted = (data: any) => {
+    const handleGameStarted = () => {
       // Show coin debit animation for 4-human player games
       const humanPlayers = game.players.filter(p => p && !isBot(p));
       if (humanPlayers.length === 4 && game.buyIn) {
@@ -1374,7 +1372,6 @@ export default function GameTable({
         {/* Coin debit animation */}
         {showCoinDebit && player && player.type === 'human' && (
           <CoinDebitAnimation 
-            playerIndex={position} 
             amount={coinDebitAmount} 
             isVisible={showCoinDebit} 
           />
