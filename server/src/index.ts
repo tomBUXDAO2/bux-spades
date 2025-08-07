@@ -1127,6 +1127,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         trickNumber: game.play.trickNumber,
       });
       
+      console.log('[PLAY START] Emitted play_start event with currentPlayerIndex:', game.play.currentPlayerIndex, 'firstPlayer:', firstPlayer.username);
+      
       // Emit game update AFTER play_start to ensure correct current player
       io.to(game.id).emit('game_update', enrichGameForClient(game));
       
@@ -1138,6 +1140,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }, 1000);
       } else {
         // Start turn timeout for human players when play phase begins
+        console.log('[HUMAN TURN] First player is human, starting turn timeout for:', firstPlayer.username, 'at index:', (game.dealerIndex + 1) % 4);
         startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
       }
     } else {
@@ -1174,11 +1177,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
     }
     
-    // Emit game update to ensure frontend has latest state (only for bidding phase)
+    // Emit game update to ensure frontend has latest state
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    
+    // Also emit bidding_update for immediate UI feedback if still in bidding phase
     if (game.status === 'BIDDING') {
-      io.to(game.id).emit('game_update', enrichGameForClient(game));
-      
-      // Also emit bidding_update for immediate UI feedback
       io.to(game.id).emit('bidding_update', {
         currentBidderIndex: game.bidding.currentBidderIndex,
         bids: game.bidding.bids,
