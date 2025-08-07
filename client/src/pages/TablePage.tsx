@@ -352,9 +352,16 @@ export default function TablePage() {
     try {
       const audio = new Audio('/sounds/card.wav');
       audio.volume = 0.3;
-      audio.play().catch(err => console.log('Audio play failed:', err));
+      audio.preload = 'auto';
+      audio.play().catch(err => {
+        console.log('Card audio play failed:', err);
+        // Try again with user interaction
+        document.addEventListener('click', () => {
+          audio.play().catch(e => console.log('Card audio retry failed:', e));
+        }, { once: true });
+      });
     } catch (error) {
-      console.log('Audio not supported or failed to load:', error);
+      console.log('Card audio not supported or failed to load:', error);
     }
   };
 

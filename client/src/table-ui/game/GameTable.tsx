@@ -20,37 +20,62 @@ import { useSocket } from '../../context/SocketContext';
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
+import { useAuth } from '../../context/AuthContext';
 
 // Sound utility for dealing cards
-const playCardSound = () => {
+const playCardSound = (audioEnabled: boolean) => {
+  if (!audioEnabled) return;
   try {
-    const audio = new Audio('/sounds/card.wav'); // Use public/sounds/card.wav
+    const audio = new Audio('/sounds/card.wav');
     audio.volume = 0.3;
-    audio.play().catch(err => console.log('Audio play failed:', err));
+    audio.preload = 'auto';
+    audio.play().catch(err => {
+      console.log('Card audio play failed:', err);
+      // Try again with user interaction
+      document.addEventListener('click', () => {
+        audio.play().catch(e => console.log('Card audio retry failed:', e));
+      }, { once: true });
+    });
   } catch (error) {
-    console.log('Audio not supported or failed to load:', error);
+    console.log('Card audio not supported or failed to load:', error);
   }
 };
 
 // Sound utility for bid
-const playBidSound = () => {
+const playBidSound = (audioEnabled: boolean) => {
+  if (!audioEnabled) return;
   try {
     const audio = new Audio('/sounds/bid.mp3');
     audio.volume = 0.5;
-    audio.play().catch(err => console.log('Audio play failed:', err));
+    audio.preload = 'auto';
+    audio.play().catch(err => {
+      console.log('Bid audio play failed:', err);
+      // Try again with user interaction
+      document.addEventListener('click', () => {
+        audio.play().catch(e => console.log('Bid audio retry failed:', e));
+      }, { once: true });
+    });
   } catch (error) {
-    console.log('Audio not supported or failed to load:', error);
+    console.log('Bid audio not supported or failed to load:', error);
   }
 };
 
 // Sound utility for win
-const playWinSound = () => {
+const playWinSound = (audioEnabled: boolean) => {
+  if (!audioEnabled) return;
   try {
     const audio = new Audio('/sounds/win.mp3');
     audio.volume = 0.5;
-    audio.play().catch(err => console.log('Audio play failed:', err));
+    audio.preload = 'auto';
+    audio.play().catch(err => {
+      console.log('Win audio play failed:', err);
+      // Try again with user interaction
+      document.addEventListener('click', () => {
+        audio.play().catch(e => console.log('Win audio retry failed:', e));
+      }, { once: true });
+    });
   } catch (error) {
-    console.log('Audio not supported or failed to load:', error);
+    console.log('Win audio not supported or failed to load:', error);
   }
 };
 
@@ -373,6 +398,41 @@ export default function GameTable({
   botCount = 0,
   isSpectator = false
 }: GameTableProps) {
+  const { socket, isConnected, isAuthenticated, isReady } = useSocket();
+  const { user } = useAuth();
+  const [gameState, setGameState] = useState<GameState>(game);
+  const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
+  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
+  const [showSeatReplacement, setShowSeatReplacement] = useState(false);
+  const [seatReplacementData, setSeatReplacementData] = useState<{ gameId: string; seatIndex: number; expiresAt: number } | null>(null);
+  const [showLoserModal, setShowLoserModal] = useState(false);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [showSoloWinnerModal, setShowSoloWinnerModal] = useState(false);
+  const [showHandSummaryModal, setShowHandSummaryModal] = useState(false);
+  const [showBlindNilModal, setShowBlindNilModal] = useState(false);
+  const [blindNilData, setBlindNilData] = useState<{ playerId: string; playerName: string; bid: number } | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  // Enable audio on first user interaction
+  useEffect(() => {
+    const enableAudio = () => {
+      setAudioEnabled(true);
+      document.removeEventListener('click', enableAudio);
+      document.removeEventListener('touchstart', enableAudio);
+      document.removeEventListener('keydown', enableAudio);
+    };
+
+    document.addEventListener('click', enableAudio);
+    document.addEventListener('touchstart', enableAudio);
+    document.addEventListener('keydown', enableAudio);
+
+    return () => {
+      document.removeEventListener('click', enableAudio);
+      document.removeEventListener('touchstart', enableAudio);
+      document.removeEventListener('keydown', enableAudio);
+    };
+  }, []);
+
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
@@ -653,9 +713,7 @@ export default function GameTable({
     }
   };
 
-  // Restore user assignment
-  const user = propUser;
-  const { socket, isAuthenticated } = useSocket();
+  // Use propUser directly instead of creating duplicate user variable
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -682,11 +740,8 @@ export default function GameTable({
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
-  // Use gameState for all game data
-  const [gameState, setGameState] = useState(game);
-  
   // Add debug logs for hand mapping
-  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === propUser?.id);
   const myHand = Array.isArray((gameState as any).hands) && myPlayerIndex >= 0 ? (gameState as any).hands[myPlayerIndex] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
@@ -865,7 +920,7 @@ export default function GameTable({
       return;
     }
     
-    playBidSound();
+    playBidSound(audioEnabled);
     const payload = { gameId: gameState.id, userId: currentPlayerId, bid };
     socket?.emit("make_bid", payload);
     
@@ -894,10 +949,7 @@ export default function GameTable({
 
   // Add at the top of the GameTable component, after useState declarations
   const [invitingBotSeat, setInvitingBotSeat] = useState<number | null>(null);
-  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
   const prevBidsRef = useRef<(number|null)[] | null>(null);
-  const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
-  const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
 
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
