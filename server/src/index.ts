@@ -611,7 +611,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.emit('joined_game_room', { gameId });
       
       // Send game update to all players in the game room
-      const enrichedGame = enrichGameForClient(game);
+      const enrichedGame = enrichGameForClient(game, socket.userId);
       console.log('[SERVER DEBUG] Sending game_update to all players:', {
         gameId,
         userId: socket.userId,
