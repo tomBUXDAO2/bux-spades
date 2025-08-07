@@ -8,6 +8,9 @@ import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
+import LoserModal from './LoserModal';
+import SoloWinnerModal from './SoloWinnerModal';
+
 
 import BiddingInterface from './BiddingInterface';
 
@@ -17,9 +20,23 @@ import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
 import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
+
+// Coin debit animation component
+const CoinDebitAnimation = ({ playerIndex, amount, isVisible }: { playerIndex: number, amount: number, isVisible: boolean }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
+      <div className="bg-red-600 text-white font-bold text-lg px-3 py-1 rounded-lg animate-bounce">
+        -{(amount / 1000).toFixed(0)}k
+      </div>
+    </div>
+  );
+};
 
 // Preload audio files for better performance
 let cardAudio: HTMLAudioElement | null = null;
@@ -426,9 +443,15 @@ export default function GameTable({
   botCount = 0,
   isSpectator = false
 }: GameTableProps) {
+  const { socket } = useSocket();
+  
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
+  
+  // Coin debit animation state
+  const [showCoinDebit, setShowCoinDebit] = useState(false);
+  const [coinDebitAmount, setCoinDebitAmount] = useState(0);
   
   // Timer effect for turn countdown
   useEffect(() => {
@@ -466,6 +489,31 @@ export default function GameTable({
   useEffect(() => {
     initializeAudio();
   }, []);
+  
+  // Handle game started event to show coin debit animation
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleGameStarted = (data: any) => {
+      // Show coin debit animation for 4-human player games
+      const humanPlayers = game.players.filter(p => p && !isBot(p));
+      if (humanPlayers.length === 4 && game.buyIn) {
+        setCoinDebitAmount(game.buyIn);
+        setShowCoinDebit(true);
+        
+        // Hide animation after 3 seconds
+        setTimeout(() => {
+          setShowCoinDebit(false);
+        }, 3000);
+      }
+    };
+    
+    socket.on('game_started', handleGameStarted);
+    
+    return () => {
+      socket.off('game_started', handleGameStarted);
+    };
+  }, [game.players, game.buyIn]);
   
   const isMyTurn = game.currentPlayer === propUser?.id;
   const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
@@ -713,7 +761,7 @@ export default function GameTable({
 
   // Restore user assignment
   const user = propUser;
-  const { socket, isAuthenticated } = useSocket();
+  const { isAuthenticated } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -1322,6 +1370,15 @@ export default function GameTable({
             ) */}
           </div>
         </div>
+        
+        {/* Coin debit animation */}
+        {showCoinDebit && player && player.type === 'human' && (
+          <CoinDebitAnimation 
+            playerIndex={position} 
+            amount={coinDebitAmount} 
+            isVisible={showCoinDebit} 
+          />
+        )}
       </div>
     );
   };
@@ -3028,7 +3085,19 @@ export default function GameTable({
         onPlayAgain={handlePlayAgain}
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
-        coinsWon={gameState.buyIn ? gameState.buyIn * 2 : 0} // TODO: Calculate actual coins won
+        coinsWon={(() => {
+          if (!gameState.buyIn) return 0;
+          const buyIn = gameState.buyIn;
+          const prizePot = buyIn * 4 * 0.9; // 90% of total buy-ins
+          const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
+          if (isPartnersMode) {
+            return prizePot / 2; // Each winning team member gets half the pot
+          } else {
+            // Solo mode: 1st place gets the pot minus 2nd place's stake back
+            const secondPlacePrize = buyIn; // 2nd place gets their stake back
+            return prizePot - secondPlacePrize; // 1st place gets the remainder
+          }
+        })()}
         humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
         onTimerExpire={handleTimerExpire}
       />
@@ -3043,7 +3112,7 @@ export default function GameTable({
         onPlayAgain={handlePlayAgain}
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
-        coinsWon={0} // No coins won when losing
+        coinsWon={0} // Losers get 0 coins
         humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
         onTimerExpire={handleTimerExpire}
       />
