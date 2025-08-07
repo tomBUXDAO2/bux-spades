@@ -1538,13 +1538,36 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Partners mode game over check
         console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
         
-        if (
-          game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
-          game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
-        ) {
-          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
+        // Check if game should end (only when there's a clear winner)
+        let shouldEndGame = false;
+        let winningTeam = null;
+        
+        // If either team is below minPoints, they lose immediately
+        if (game.team1TotalScore <= minPoints) {
+          shouldEndGame = true;
+          winningTeam = 2;
+        } else if (game.team2TotalScore <= minPoints) {
+          shouldEndGame = true;
+          winningTeam = 1;
+        }
+        // If either team is above maxPoints, check if they have a clear lead
+        else if (game.team1TotalScore >= maxPoints) {
+          if (game.team1TotalScore > game.team2TotalScore) {
+            shouldEndGame = true;
+            winningTeam = 1;
+          }
+          // If tied at maxPoints, continue the game
+        } else if (game.team2TotalScore >= maxPoints) {
+          if (game.team2TotalScore > game.team1TotalScore) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          }
+          // If tied at maxPoints, continue the game
+        }
+        
+        if (shouldEndGame && winningTeam) {
+          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
           game.status = 'COMPLETED';
-          const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
           io.to(game.id).emit('game_over', {
             team1Score: game.team1TotalScore,
             team2Score: game.team2TotalScore,
@@ -1558,7 +1581,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           updateStatsAndCoins(game, winningTeam).catch(err => {
             console.error('Failed to update stats/coins:', err);
           });
-          }
         }
         return;
       }
@@ -1674,13 +1696,36 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
         
-        if (
-          game.team1TotalScore >= maxPoints || game.team2TotalScore >= maxPoints ||
-          game.team1TotalScore <= minPoints || game.team2TotalScore <= minPoints
-        ) {
-          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore);
+        // Check if game should end (only when there's a clear winner)
+        let shouldEndGame = false;
+        let winningTeam = null;
+        
+        // If either team is below minPoints, they lose immediately
+        if (game.team1TotalScore <= minPoints) {
+          shouldEndGame = true;
+          winningTeam = 2;
+        } else if (game.team2TotalScore <= minPoints) {
+          shouldEndGame = true;
+          winningTeam = 1;
+        }
+        // If either team is above maxPoints, check if they have a clear lead
+        else if (game.team1TotalScore >= maxPoints) {
+          if (game.team1TotalScore > game.team2TotalScore) {
+            shouldEndGame = true;
+            winningTeam = 1;
+          }
+          // If tied at maxPoints, continue the game
+        } else if (game.team2TotalScore >= maxPoints) {
+          if (game.team2TotalScore > game.team1TotalScore) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          }
+          // If tied at maxPoints, continue the game
+        }
+        
+        if (shouldEndGame && winningTeam) {
+          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
           game.status = 'COMPLETED';
-          const winningTeam = game.team1TotalScore > game.team2TotalScore ? 1 : 2;
           io.to(game.id).emit('game_over', {
             team1Score: game.team1TotalScore,
             team2Score: game.team2TotalScore,

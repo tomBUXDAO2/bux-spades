@@ -201,12 +201,18 @@ export function getWinningTeam(game: GameState): 'team1' | 'team2' | null {
   if (team1Score <= minPoints) return 'team2';
   if (team2Score <= minPoints) return 'team1';
   
-  // If either team is above maxPoints, they win
-  if (team1Score >= maxPoints) return 'team1';
-  if (team2Score >= maxPoints) return 'team2';
+  // If either team is above maxPoints, check if they have a clear lead
+  if (team1Score >= maxPoints) {
+    if (team1Score > team2Score) return 'team1';
+    // If tied at maxPoints, no clear winner yet
+  }
+  if (team2Score >= maxPoints) {
+    if (team2Score > team1Score) return 'team2';
+    // If tied at maxPoints, no clear winner yet
+  }
   
-  // Otherwise, highest score wins
-  return team1Score > team2Score ? 'team1' : 'team2';
+  // If we reach here, there's no clear winner (scores are tied)
+  return null;
 }
 
 /**

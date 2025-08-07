@@ -30,9 +30,20 @@ export const calculateHandScore = (players: Player[]) => {
 };
 
 export const isGameOver = (team1Score: number, team2Score: number, minPoints: number, maxPoints: number) => {
-  if (team1Score >= maxPoints) return { isOver: true, winner: 1 };
-  if (team2Score >= maxPoints) return { isOver: true, winner: 2 };
+  // If either team is below minPoints, they lose immediately
   if (team1Score <= minPoints) return { isOver: true, winner: 2 };
   if (team2Score <= minPoints) return { isOver: true, winner: 1 };
+  
+  // If either team is above maxPoints, check if they have a clear lead
+  if (team1Score >= maxPoints) {
+    if (team1Score > team2Score) return { isOver: true, winner: 1 };
+    // If tied at maxPoints, continue the game
+  }
+  if (team2Score >= maxPoints) {
+    if (team2Score > team1Score) return { isOver: true, winner: 2 };
+    // If tied at maxPoints, continue the game
+  }
+  
+  // Game continues if no winning condition is met (including tied scores)
   return { isOver: false, winner: null };
 }; 
