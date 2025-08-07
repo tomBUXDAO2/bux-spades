@@ -3078,7 +3078,7 @@ export default function GameTable({
         onClose={() => setShowWinner(false)}
         team1Score={gameState.team1TotalScore || 0}
         team2Score={gameState.team2TotalScore || 0}
-        winningTeam={gameState.team1TotalScore > gameState.team2TotalScore ? 1 : 2}
+        winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
         onPlayAgain={handlePlayAgain}
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
@@ -3105,7 +3105,7 @@ export default function GameTable({
         onClose={() => setShowLoser(false)}
         team1Score={gameState.team1TotalScore || 0}
         team2Score={gameState.team2TotalScore || 0}
-        winningTeam={gameState.team1TotalScore > gameState.team2TotalScore ? 1 : 2}
+        winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
         onPlayAgain={handlePlayAgain}
         userTeam={getUserTeam()}
         isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
