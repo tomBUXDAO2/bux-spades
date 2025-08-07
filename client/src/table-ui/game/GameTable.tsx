@@ -8,6 +8,7 @@ import Chat from '../Chat';
 import HandSummaryModal from './HandSummaryModal';
 import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
+import SoloWinnerModal from './SoloWinnerModal';
 
 
 import BiddingInterface from './BiddingInterface';
@@ -413,18 +414,7 @@ const formatCoins = (value: number) => {
   return `${value / 1000}k`;
 };
 
-// Helper functions for player info
-const getPlayerName = (index: number, gameState: any) => {
-  const player = gameState.players?.[index];
-  if (!player) return `Player ${index + 1}`;
-  return player.username || (player as any).name || `Player ${index + 1}`;
-};
 
-const getPlayerAvatar = (index: number, gameState: any) => {
-  const player = gameState.players?.[index];
-  if (!player) return '/default-pfp.jpg';
-  return player.avatar || (player as any).image || '/default-pfp.jpg';
-};
 
 export default function GameTable({ 
   game, 
@@ -2440,104 +2430,7 @@ export default function GameTable({
 
 
               {/* Winner/Loser Modals - positioned inside the actual game table (blue oval) */}
-              {(showWinner || showLoser) && (() => {
-                if (gameState.gameMode === 'SOLO') {
-                  // Solo mode - use SoloWinnerModal for both winner and loser
-                  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-                  const winningPlayer = gameState.winningPlayer || 0;
-                  const playerScores = gameState.playerScores || [0, 0, 0, 0];
-                  
-                  return (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-                      <div className="w-[480px] md:w-[440px] sm:w-[400px] max-sm:w-[360px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
-                        <div className="flex items-center justify-center gap-2 mb-3">
-                          <svg className="h-6 w-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                          </svg>
-                          <h2 className="text-lg font-bold text-white text-center">
-                            {(() => {
-                              const sortedPlayers = playerScores
-                                .map((score, index) => ({ score, index }))
-                                .sort((a, b) => b.score - a.score);
-                              const userPlacement = sortedPlayers.findIndex(player => player.index === myPlayerIndex) + 1;
-                              switch (userPlacement) {
-                                case 1: return '1st PLACE';
-                                case 2: return '2nd PLACE';
-                                case 3: return '3rd PLACE';
-                                case 4: return '4th PLACE';
-                                default: return `${userPlacement}th PLACE`;
-                              }
-                            })()}
-                          </h2>
-                        </div>
-                        <div className="space-y-3 mb-4">
-                          {(() => {
-                            const sortedPlayers = playerScores
-                              .map((score, index) => ({ score, index }))
-                              .sort((a, b) => b.score - a.score);
-                            return sortedPlayers.map((player, sortedIndex) => {
-                              const { score, index } = player;
-                              const playerColor = getPlayerColor(index);
-                              const isWinner = index === winningPlayer;
-                              const isUser = index === myPlayerIndex;
-                              const placement = sortedIndex + 1;
-                              
-                              return (
-                                <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <img 
-                                        src={getPlayerAvatar(index, gameState)} 
-                                        alt={getPlayerName(index, gameState)} 
-                                        className="w-5 h-5 rounded-full border border-white/20 mr-2"
-                                      />
-                                      <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2`}></div>
-                                      <span className={`text-sm font-medium ${isUser ? 'text-white' : 'text-gray-300'}`}>
-                                        {(() => {
-                                          switch (placement) {
-                                            case 1: return '1st PLACE';
-                                            case 2: return '2nd PLACE';
-                                            case 3: return '3rd PLACE';
-                                            case 4: return '4th PLACE';
-                                            default: return `${placement}th PLACE`;
-                                          }
-                                        })()} - {getPlayerName(index, gameState)} {isUser ? '(You)' : ''}
-                                      </span>
-                                      {isWinner && <svg className="h-4 w-4 text-yellow-500 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                                      </svg>}
-                                    </div>
-                                    <span className={`font-bold text-sm ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
-                                      {score}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={handlePlayAgain}
-                            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all"
-                          >
-                            Play Again
-                          </button>
-                          <button
-                            onClick={handleLeaveTable}
-                            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
-                          >
-                            Leave Table
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                } else {
-                  // Partners mode - WinnerModal will be rendered outside the table for both winners and losers
-                  return null;
-                }
-              })()}
+              {/* Note: Solo modals are now rendered outside the table, so this section is empty */}
               {/* Leave Table button - inside table in top left corner */}
               <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                 <button
@@ -3074,47 +2967,61 @@ export default function GameTable({
         onFillSeat={handleFillSeatWithBot}
       />
 
-      {/* Winner Modal - rendered outside the table */}
-      <WinnerModal
-        isOpen={showWinner}
-        onClose={() => setShowWinner(false)}
-        team1Score={gameState.team1TotalScore || 0}
-        team2Score={gameState.team2TotalScore || 0}
-        winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
-        onPlayAgain={handlePlayAgain}
-        userTeam={getUserTeam()}
-        isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
-        coinsWon={(() => {
-          if (!gameState.buyIn) return 0;
-          const buyIn = gameState.buyIn;
-          const prizePot = buyIn * 4 * 0.9; // 90% of total buy-ins
-          const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
-          if (isPartnersMode) {
-            return prizePot / 2; // Each winning team member gets half the pot
-          } else {
-            // Solo mode: 1st place gets the pot minus 2nd place's stake back
-            const secondPlacePrize = buyIn; // 2nd place gets their stake back
-            return prizePot - secondPlacePrize; // 1st place gets the remainder
-          }
-        })()}
-        humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
-        onTimerExpire={handleTimerExpire}
-      />
+      {/* Solo Winner Modal - rendered outside the table for solo games */}
+      {gameState.gameMode === 'SOLO' && (
+        <SoloWinnerModal
+          isOpen={showWinner || showLoser}
+          onClose={() => {
+            setShowWinner(false);
+            setShowLoser(false);
+          }}
+          playerScores={gameState.playerScores || [0, 0, 0, 0]}
+          winningPlayer={gameState.winningPlayer || 0}
+          onPlayAgain={handlePlayAgain}
+          userPlayerIndex={gameState.players.findIndex(p => p && p.id === user?.id)}
+          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          onTimerExpire={handleTimerExpire}
+        />
+      )}
 
-      {/* Loser Modal - rendered outside the table */}
-      <WinnerModal
-        isOpen={showLoser}
-        onClose={() => setShowLoser(false)}
-        team1Score={gameState.team1TotalScore || 0}
-        team2Score={gameState.team2TotalScore || 0}
-        winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
-        onPlayAgain={handlePlayAgain}
-        userTeam={getUserTeam()}
-        isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
-        coinsWon={0} // Losers get 0 coins
-        humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
-        onTimerExpire={handleTimerExpire}
-      />
+      {/* Winner Modal - rendered outside the table for partners games only */}
+      {gameState.gameMode !== 'SOLO' && (
+        <WinnerModal
+          isOpen={showWinner}
+          onClose={() => setShowWinner(false)}
+          team1Score={gameState.team1TotalScore || 0}
+          team2Score={gameState.team2TotalScore || 0}
+          winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
+          onPlayAgain={handlePlayAgain}
+          userTeam={getUserTeam()}
+          isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
+          coinsWon={(() => {
+            if (!gameState.buyIn) return 0;
+            const buyIn = gameState.buyIn;
+            const prizePot = buyIn * 4 * 0.9; // 90% of total buy-ins
+            return prizePot / 2; // Each winning team member gets half the pot
+          })()}
+          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          onTimerExpire={handleTimerExpire}
+        />
+      )}
+
+      {/* Loser Modal - rendered outside the table for partners games only */}
+      {gameState.gameMode !== 'SOLO' && (
+        <WinnerModal
+          isOpen={showLoser}
+          onClose={() => setShowLoser(false)}
+          team1Score={gameState.team1TotalScore || 0}
+          team2Score={gameState.team2TotalScore || 0}
+          winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
+          onPlayAgain={handlePlayAgain}
+          userTeam={getUserTeam()}
+          isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
+          coinsWon={0} // Losers get 0 coins
+          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          onTimerExpire={handleTimerExpire}
+        />
+      )}
     </>
   );
 }
