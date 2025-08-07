@@ -1127,6 +1127,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         trickNumber: game.play.trickNumber,
       });
       
+      // Emit game update AFTER play_start to ensure correct current player
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      
       // If first player is a bot, trigger their move
       if (firstPlayer.type === 'bot') {
         console.log('[BOT TURN] First player is bot, triggering bot play');
@@ -1171,14 +1174,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
     }
     
-    // Emit game update to ensure frontend has latest state
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    
-    // Also emit bidding_update for immediate UI feedback
-    io.to(game.id).emit('bidding_update', {
-      currentBidderIndex: game.bidding.currentBidderIndex,
-      bids: game.bidding.bids,
-    });
+    // Emit game update to ensure frontend has latest state (only for bidding phase)
+    if (game.status === 'BIDDING') {
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      
+      // Also emit bidding_update for immediate UI feedback
+      io.to(game.id).emit('bidding_update', {
+        currentBidderIndex: game.bidding.currentBidderIndex,
+        bids: game.bidding.bids,
+      });
+    }
     
     // Log the current game state for debugging
     console.log('[BIDDING DEBUG] Current game state after bid:', {
