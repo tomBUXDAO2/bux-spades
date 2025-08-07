@@ -5,7 +5,6 @@
 // export { default as BiddingInterface } from './BiddingInterface';
 // export { default as HandSummaryModal } from './HandSummaryModal';
 // export { default as WinnerModal } from './WinnerModal';
-// export { default as LoserModal } from './LoserModal';
 
 // Export types
 // export * from '../../types/game';

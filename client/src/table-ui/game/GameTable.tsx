@@ -29,7 +29,7 @@ const CoinDebitAnimation = ({ amount, isVisible }: { amount: number, isVisible: 
   
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-      <div className="bg-red-600 text-white font-bold text-lg px-3 py-1 rounded-lg animate-bounce">
+      <div className="text-red-500 font-bold text-lg px-3 py-1 rounded-lg animate-[floatUp_3s_ease-out_forwards]">
         -{(amount / 1000).toFixed(0)}k
       </div>
     </div>
@@ -1920,7 +1920,9 @@ export default function GameTable({
     const seatOrderedPlayers = [...gameState.players].sort((a, b) => (a && b ? a.position - b.position : 0));
     const myPlayerId = user?.id;
     const mySeatIndex = seatOrderedPlayers.findIndex(p => p && p.id === myPlayerId);
-    const orderedPlayers = [0,1,2,3].map(i => seatOrderedPlayers[(mySeatIndex + i) % 4]);
+    // For spectators, use seat 0 as the reference point
+    const referenceSeatIndex = mySeatIndex >= 0 ? mySeatIndex : 0;
+    const orderedPlayers = [0,1,2,3].map(i => seatOrderedPlayers[(referenceSeatIndex + i) % 4]);
 
     return displayTrick.map((card: Card, i: number) => {
       const seatIndex = (card as any).playerIndex;
@@ -2532,7 +2534,7 @@ export default function GameTable({
                     </div>
                   );
                 } else {
-                  // Partners mode - WinnerModal and LoserModal will be rendered outside the table
+                  // Partners mode - WinnerModal will be rendered outside the table for both winners and losers
                   return null;
                 }
               })()}

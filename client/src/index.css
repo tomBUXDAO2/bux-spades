@@ -100,4 +100,16 @@
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
+
+  /* Animation for coin debit float up */
+  @keyframes floatUp {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-50px);
+    }
+  }
 } 
