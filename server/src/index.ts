@@ -65,9 +65,9 @@ const io = new Server(httpServer, {
   path: '/socket.io',
   transports: ['polling', 'websocket'],
   allowEIO3: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  connectTimeout: 45000,
+  pingTimeout: 120000, // Increased from 60000 - 2 minutes for mobile stability
+  pingInterval: 30000, // Increased from 25000 - 30 seconds for better mobile handling
+  connectTimeout: 60000, // Increased from 45000 - 1 minute for slower connections
   allowUpgrades: true,
   cookie: process.env.NODE_ENV === 'production' ? {
     name: 'io',
@@ -76,10 +76,15 @@ const io = new Server(httpServer, {
     sameSite: 'none',
     secure: true
   } : false,
-  upgradeTimeout: 30000,
+  upgradeTimeout: 45000, // Increased from 30000 - 45 seconds for mobile
   maxHttpBufferSize: 1e8,
   perMessageDeflate: {
     threshold: 2048
+  },
+  // Add mobile-specific optimizations
+  allowRequest: (req, callback) => {
+    // Allow all connections for now, can be restricted later
+    callback(null, true);
   }
 });
 
@@ -2027,6 +2032,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.log('[TIMEOUT DEBUG] Starting timeout from bot bidding logic for:', player.username);
       startTurnTimeout(game, data.playerIndex, data.phase);
     }
+  });
+
+  // Handle heartbeat pings from mobile devices
+  socket.on('ping', () => {
+    console.log('[HEARTBEAT] Received ping from socket:', socket.id);
+    socket.emit('pong');
   });
 });
 

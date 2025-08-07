@@ -49,6 +49,8 @@ export class SocketManager {
   private stateChangeCallbacks: ((state: SocketState) => void)[] = [];
   private initialized = false;
   private onConnectCallbacks: (() => void)[] = [];
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private connectionQualityInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
     // Private constructor to enforce singleton
@@ -122,8 +124,14 @@ export class SocketManager {
       isProduction: window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1',
       wsUrl: wsUrl
     });
+    // Detect mobile device for optimized settings
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    
+    console.log('SocketManager: Device detection:', { isMobile, isSafari });
+    
     this.socket = io(wsUrl, {
-      transports: ['websocket', 'polling'],
+      transports: isMobile ? ['polling', 'websocket'] : ['websocket', 'polling'], // Prefer polling on mobile
       auth: {
         token,
         userId,
@@ -131,16 +139,20 @@ export class SocketManager {
         avatar
       },
       reconnection: true,
-      reconnectionAttempts: 15, // Increased from 10
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000, // Increased from 5000
-      timeout: 30000, // Increased from 20000
+      reconnectionAttempts: isMobile ? 20 : 15, // More attempts on mobile
+      reconnectionDelay: isMobile ? 2000 : 1000, // Slower reconnection on mobile
+      reconnectionDelayMax: isMobile ? 15000 : 10000, // Longer max delay on mobile
+      timeout: isMobile ? 45000 : 30000, // Longer timeout on mobile
       autoConnect: true,
       forceNew: true, // Force new connection
       upgrade: true, // Allow transport upgrade
       rememberUpgrade: true,
       // Add more robust settings for page refresh scenarios
-      closeOnBeforeunload: false // Don't close on page unload
+      closeOnBeforeunload: false, // Don't close on page unload
+      // Mobile-specific optimizations
+      extraHeaders: isMobile ? {
+        'User-Agent': navigator.userAgent
+      } : undefined
     });
 
     this.setupSocketListeners();
@@ -154,6 +166,15 @@ export class SocketManager {
     this.socket.on('connect', () => {
       console.log('SOCKET CONNECTED SUCCESSFULLY');
       this.state.isConnected = true;
+      
+      // Log connection details for debugging
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.log('Socket connection established:', {
+        isMobile,
+        userAgent: navigator.userAgent,
+        connectionState: this.socket?.connected,
+        transport: this.socket?.io?.engine?.transport?.name
+      });
       
       // If we have a session, authenticate immediately
       if (this.session) {
@@ -177,6 +198,15 @@ export class SocketManager {
       this.state.isAuthenticated = false;
       this.state.isReady = false;
       
+      // Log disconnect details for debugging
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.log('Socket disconnect details:', {
+        reason,
+        isMobile,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      });
+      
       // Let Socket.IO handle all reconnection automatically
       // No manual reconnection logic to interfere
       
@@ -193,6 +223,15 @@ export class SocketManager {
       console.log('Socket reconnected after', attemptNumber, 'attempts');
       this.state.isConnected = true;
       
+      // Log reconnection details for debugging
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.log('Socket reconnection details:', {
+        attemptNumber,
+        isMobile,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      });
+      
       // Re-authenticate after reconnection
       if (this.session) {
         console.log('SocketManager: Re-authenticating after reconnection');
@@ -201,6 +240,11 @@ export class SocketManager {
           userId: this.session.userId,
           username: this.session.username
         });
+      }
+      
+      // Restart heartbeat for mobile devices
+      if (isMobile) {
+        this.startHeartbeat();
       }
       
       this.notifyStateChange();
@@ -223,6 +267,13 @@ export class SocketManager {
       this.state.isAuthenticated = data.success;
       this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
       console.log('SOCKET STATE AFTER AUTH:', { isConnected: this.state.isConnected, isAuthenticated: this.state.isAuthenticated, isReady: this.state.isReady });
+      
+      // Start heartbeat and connection monitoring for mobile devices
+      if (this.state.isReady) {
+        this.startHeartbeat();
+        this.startConnectionQualityMonitor();
+      }
+      
       this.notifyStateChange();
     });
 
@@ -268,7 +319,70 @@ export class SocketManager {
     this.state.isAuthenticated = false;
     this.state.isReady = false;
     this.session = null;
+    this.stopHeartbeat();
+    this.stopConnectionQualityMonitor();
     this.notifyStateChange();
+  }
+
+  private startHeartbeat(): void {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (!isMobile) return; // Only use heartbeat on mobile devices
+    
+    console.log('SocketManager: Starting heartbeat for mobile device');
+    this.stopHeartbeat(); // Clear any existing heartbeat
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket && this.socket.connected) {
+        // Send a ping to keep connection alive
+        this.socket.emit('ping');
+        console.log('SocketManager: Heartbeat ping sent');
+      } else {
+        console.log('SocketManager: Heartbeat failed - socket not connected');
+        this.stopHeartbeat();
+      }
+    }, 25000); // Send heartbeat every 25 seconds
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log('SocketManager: Heartbeat stopped');
+    }
+  }
+
+  private startConnectionQualityMonitor(): void {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (!isMobile) return; // Only monitor on mobile devices
+    
+    console.log('SocketManager: Starting connection quality monitor for mobile device');
+    this.stopConnectionQualityMonitor(); // Clear any existing monitor
+    
+    this.connectionQualityInterval = setInterval(() => {
+      if (this.socket) {
+        const transport = this.socket.io?.engine?.transport?.name;
+        const connected = this.socket.connected;
+        
+        console.log('SocketManager: Connection quality check:', {
+          transport,
+          connected,
+          timestamp: new Date().toISOString()
+        });
+        
+        // If connection is poor, try to improve it
+        if (connected && transport === 'polling') {
+          console.log('SocketManager: Polling transport detected, connection quality:', { transport, connected });
+        }
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  private stopConnectionQualityMonitor(): void {
+    if (this.connectionQualityInterval) {
+      clearInterval(this.connectionQualityInterval);
+      this.connectionQualityInterval = null;
+      console.log('SocketManager: Connection quality monitor stopped');
+    }
   }
 
   public forceReconnect(): void {

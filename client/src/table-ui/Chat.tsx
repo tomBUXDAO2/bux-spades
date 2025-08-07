@@ -271,22 +271,38 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       isGameMessage: chatType === 'game'
     };
 
-    try {
-      console.log('Sending chat message:', { chatType, gameId, message, isSpectator });
-      console.log('Current socket state:', { 
-        socketId: socket.id, 
-        isConnected: socket.connected
-      });
-      
-      if (chatType === 'game') {
-        socket.emit('chat_message', { gameId, message });
-      } else {
-        socket.emit('lobby_chat_message', message);
+    const sendMessageWithRetry = (retryCount = 0) => {
+      try {
+        console.log('Sending chat message:', { chatType, gameId, message, isSpectator, retryCount });
+        console.log('Current socket state:', { 
+          socketId: socket.id, 
+          isConnected: socket.connected,
+          transport: socket.io?.engine?.transport?.name
+        });
+        
+        if (chatType === 'game') {
+          socket.emit('chat_message', { gameId, message });
+        } else {
+          socket.emit('lobby_chat_message', message);
+        }
+        setNewMessage('');
+      } catch (error) {
+        console.error('Failed to send chat message:', error);
+        
+        // Retry logic for mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile && retryCount < 3 && socket?.connected) {
+          console.log(`Retrying chat message (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => {
+            sendMessageWithRetry(retryCount + 1);
+          }, 1000 * (retryCount + 1)); // Exponential backoff
+        } else {
+          console.error('Chat message failed after retries');
+        }
       }
-      setNewMessage('');
-    } catch (error) {
-      console.error('Failed to send chat message:', error);
-    }
+    };
+
+    sendMessageWithRetry();
   };
 
   const formatTime = (timestamp: number): string => {
