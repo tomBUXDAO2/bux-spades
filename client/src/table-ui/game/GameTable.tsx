@@ -20,60 +20,88 @@ import { useSocket } from '../../context/SocketContext';
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
-import { useAuth } from '../../context/AuthContext';
+
+// Preload audio files for better performance
+let cardAudio: HTMLAudioElement | null = null;
+let bidAudio: HTMLAudioElement | null = null;
+let winAudio: HTMLAudioElement | null = null;
+
+// Initialize audio context and preload sounds
+const initializeAudio = () => {
+  try {
+    // Create audio context to unlock audio (needed for browser autoplay policies)
+    new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Preload audio files
+    cardAudio = new Audio('/sounds/card.wav');
+    cardAudio.volume = 0.3;
+    cardAudio.preload = 'auto';
+    
+    bidAudio = new Audio('/sounds/bid.mp3');
+    bidAudio.volume = 0.5;
+    bidAudio.preload = 'auto';
+    
+    winAudio = new Audio('/sounds/win.mp3');
+    winAudio.volume = 0.5;
+    winAudio.preload = 'auto';
+    
+    // Make audio available globally for other components
+    (window as any).cardAudio = cardAudio;
+    (window as any).bidAudio = bidAudio;
+    (window as any).winAudio = winAudio;
+    
+    console.log('Audio initialized successfully');
+  } catch (error) {
+    console.log('Audio initialization failed:', error);
+  }
+};
 
 // Sound utility for dealing cards
-const playCardSound = (audioEnabled: boolean) => {
-  if (!audioEnabled) return;
+const playCardSound = () => {
   try {
-    const audio = new Audio('/sounds/card.wav');
-    audio.volume = 0.3;
-    audio.preload = 'auto';
-    audio.play().catch(err => {
-      console.log('Card audio play failed:', err);
-      // Try again with user interaction
-      document.addEventListener('click', () => {
-        audio.play().catch(e => console.log('Card audio retry failed:', e));
-      }, { once: true });
-    });
+    if (cardAudio) {
+      cardAudio.currentTime = 0;
+      cardAudio.play().catch(err => console.log('Card audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/card.wav');
+      audio.volume = 0.3;
+      audio.play().catch(err => console.log('Card audio play failed:', err));
+    }
   } catch (error) {
     console.log('Card audio not supported or failed to load:', error);
   }
 };
 
 // Sound utility for bid
-const playBidSound = (audioEnabled: boolean) => {
-  if (!audioEnabled) return;
+const playBidSound = () => {
   try {
-    const audio = new Audio('/sounds/bid.mp3');
-    audio.volume = 0.5;
-    audio.preload = 'auto';
-    audio.play().catch(err => {
-      console.log('Bid audio play failed:', err);
-      // Try again with user interaction
-      document.addEventListener('click', () => {
-        audio.play().catch(e => console.log('Bid audio retry failed:', e));
-      }, { once: true });
-    });
+    if (bidAudio) {
+      bidAudio.currentTime = 0;
+      bidAudio.play().catch(err => console.log('Bid audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/bid.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Bid audio play failed:', err));
+    }
   } catch (error) {
     console.log('Bid audio not supported or failed to load:', error);
   }
 };
 
 // Sound utility for win
-const playWinSound = (audioEnabled: boolean) => {
-  if (!audioEnabled) return;
+const playWinSound = () => {
   try {
-    const audio = new Audio('/sounds/win.mp3');
-    audio.volume = 0.5;
-    audio.preload = 'auto';
-    audio.play().catch(err => {
-      console.log('Win audio play failed:', err);
-      // Try again with user interaction
-      document.addEventListener('click', () => {
-        audio.play().catch(e => console.log('Win audio retry failed:', e));
-      }, { once: true });
-    });
+    if (winAudio) {
+      winAudio.currentTime = 0;
+      winAudio.play().catch(err => console.log('Win audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/win.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Win audio play failed:', err));
+    }
   } catch (error) {
     console.log('Win audio not supported or failed to load:', error);
   }
@@ -398,41 +426,6 @@ export default function GameTable({
   botCount = 0,
   isSpectator = false
 }: GameTableProps) {
-  const { socket, isConnected, isAuthenticated, isReady } = useSocket();
-  const { user } = useAuth();
-  const [gameState, setGameState] = useState<GameState>(game);
-  const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
-  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
-  const [showSeatReplacement, setShowSeatReplacement] = useState(false);
-  const [seatReplacementData, setSeatReplacementData] = useState<{ gameId: string; seatIndex: number; expiresAt: number } | null>(null);
-  const [showLoserModal, setShowLoserModal] = useState(false);
-  const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [showSoloWinnerModal, setShowSoloWinnerModal] = useState(false);
-  const [showHandSummaryModal, setShowHandSummaryModal] = useState(false);
-  const [showBlindNilModal, setShowBlindNilModal] = useState(false);
-  const [blindNilData, setBlindNilData] = useState<{ playerId: string; playerName: string; bid: number } | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
-
-  // Enable audio on first user interaction
-  useEffect(() => {
-    const enableAudio = () => {
-      setAudioEnabled(true);
-      document.removeEventListener('click', enableAudio);
-      document.removeEventListener('touchstart', enableAudio);
-      document.removeEventListener('keydown', enableAudio);
-    };
-
-    document.addEventListener('click', enableAudio);
-    document.addEventListener('touchstart', enableAudio);
-    document.addEventListener('keydown', enableAudio);
-
-    return () => {
-      document.removeEventListener('click', enableAudio);
-      document.removeEventListener('touchstart', enableAudio);
-      document.removeEventListener('keydown', enableAudio);
-    };
-  }, []);
-
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
@@ -468,6 +461,11 @@ export default function GameTable({
       }
     };
   }, [game.status, game.currentPlayer, propUser?.id]);
+  
+  // Initialize audio when component mounts
+  useEffect(() => {
+    initializeAudio();
+  }, []);
   
   const isMyTurn = game.currentPlayer === propUser?.id;
   const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
@@ -713,7 +711,9 @@ export default function GameTable({
     }
   };
 
-  // Use propUser directly instead of creating duplicate user variable
+  // Restore user assignment
+  const user = propUser;
+  const { socket, isAuthenticated } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -740,8 +740,11 @@ export default function GameTable({
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
+  // Use gameState for all game data
+  const [gameState, setGameState] = useState(game);
+  
   // Add debug logs for hand mapping
-  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === propUser?.id);
+  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
   const myHand = Array.isArray((gameState as any).hands) && myPlayerIndex >= 0 ? (gameState as any).hands[myPlayerIndex] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
@@ -920,7 +923,7 @@ export default function GameTable({
       return;
     }
     
-    playBidSound(audioEnabled);
+    playBidSound();
     const payload = { gameId: gameState.id, userId: currentPlayerId, bid };
     socket?.emit("make_bid", payload);
     
@@ -949,7 +952,10 @@ export default function GameTable({
 
   // Add at the top of the GameTable component, after useState declarations
   const [invitingBotSeat, setInvitingBotSeat] = useState<number | null>(null);
+  const [pendingSystemMessage, setPendingSystemMessage] = useState<string | null>(null);
   const prevBidsRef = useRef<(number|null)[] | null>(null);
+  const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
+  const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
 
   const handleInviteBot = async (seatIndex: number) => {
     setInvitingBotSeat(seatIndex);
@@ -2241,7 +2247,7 @@ export default function GameTable({
     const isLargeScreen = window.innerWidth >= 900;
 
     if (faceDown) {
-      return (
+    return (
         <div
           className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
           style={{ width, height }}

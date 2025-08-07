@@ -440,17 +440,17 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
               <img src="/players.svg" alt="Players" className={`${isMobile ? 'w-4 h-4' : 'w-6 h-6'}`} style={{ filter: 'invert(1) brightness(2)' }} />
             </button>
           )}
-          {/* Toggle switch for chat type */}
-          {onToggleChatType && (
+        {/* Toggle switch for chat type */}
+        {onToggleChatType && (
             <div className="flex items-center gap-2 ml-2">
-              <span className="text-xs font-semibold text-indigo-400">{isLobby ? 'Lobby' : 'Game'}</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" checked={isLobby} onChange={onToggleChatType} className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-all"></div>
-                <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isLobby ? 'translate-x-5' : ''}`}></div>
-              </label>
-            </div>
-          )}
+            <span className="text-xs font-semibold text-indigo-400">{isLobby ? 'Lobby' : 'Game'}</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={isLobby} onChange={onToggleChatType} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-all"></div>
+              <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isLobby ? 'translate-x-5' : ''}`}></div>
+            </label>
+          </div>
+        )}
         </div>
       </div>
       {/* Tab Content */}

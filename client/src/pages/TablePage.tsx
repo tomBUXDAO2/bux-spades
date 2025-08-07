@@ -262,35 +262,35 @@ export default function TablePage() {
   useEffect(() => {
     if (!socket) return;
     
-    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
+      const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
       console.log('[BIDDING UPDATE] Received bidding update:', bidding);
       
-      setGame(prev => {
-        if (!prev) return prev;
-        
-        const nextPlayer = prev.players[bidding.currentBidderIndex];
-        
-        const updatedGame = {
-          ...prev,
-          bidding: {
-            ...prev.bidding,
-            currentBidderIndex: bidding.currentBidderIndex,
-            currentPlayer: nextPlayer?.id ?? '',
-            bids: bidding.bids,
-          },
-          // --- CRITICAL FIX: Update root-level currentPlayer! ---
+    setGame(prev => {
+      if (!prev) return prev;
+      
+      const nextPlayer = prev.players[bidding.currentBidderIndex];
+      
+      const updatedGame = {
+        ...prev,
+        bidding: {
+          ...prev.bidding,
+          currentBidderIndex: bidding.currentBidderIndex,
           currentPlayer: nextPlayer?.id ?? '',
-        };
+          bids: bidding.bids,
+        },
+        // --- CRITICAL FIX: Update root-level currentPlayer! ---
+        currentPlayer: nextPlayer?.id ?? '',
+      };
         
         console.log('[BIDDING UPDATE] Updated game state:', {
           currentBidderIndex: updatedGame.bidding.currentBidderIndex,
           currentPlayer: updatedGame.currentPlayer,
           bids: updatedGame.bidding.bids
         });
-        
-        return updatedGame;
-      });
-    };
+      
+      return updatedGame;
+    });
+  };
     
     // Handle bidding completion
       const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
@@ -350,16 +350,16 @@ export default function TablePage() {
 
   const playCardSound = () => {
     try {
-      const audio = new Audio('/sounds/card.wav');
-      audio.volume = 0.3;
-      audio.preload = 'auto';
-      audio.play().catch(err => {
-        console.log('Card audio play failed:', err);
-        // Try again with user interaction
-        document.addEventListener('click', () => {
-          audio.play().catch(e => console.log('Card audio retry failed:', e));
-        }, { once: true });
-      });
+      // Try to use preloaded audio first
+      if ((window as any).cardAudio) {
+        (window as any).cardAudio.currentTime = 0;
+        (window as any).cardAudio.play().catch((err: any) => console.log('Card audio play failed:', err));
+      } else {
+        // Fallback to creating new audio
+        const audio = new Audio('/sounds/card.wav');
+        audio.volume = 0.3;
+        audio.play().catch((err: any) => console.log('Card audio play failed:', err));
+      }
     } catch (error) {
       console.log('Card audio not supported or failed to load:', error);
     }
