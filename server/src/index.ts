@@ -1536,53 +1536,53 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           }
         } else {
           // Partners mode game over check
-        console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
-        
-        // Check if game should end (only when there's a clear winner)
-        let shouldEndGame = false;
-        let winningTeam = null;
-        
-        // If either team is below minPoints, they lose immediately
-        if (game.team1TotalScore <= minPoints) {
-          shouldEndGame = true;
-          winningTeam = 2;
-        } else if (game.team2TotalScore <= minPoints) {
-          shouldEndGame = true;
-          winningTeam = 1;
-        }
-        // If either team is above maxPoints, check if they have a clear lead
-        else if (game.team1TotalScore >= maxPoints) {
-          if (game.team1TotalScore > game.team2TotalScore) {
+          console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
+          
+          // Check if game should end (only when there's a clear winner)
+          let shouldEndGame = false;
+          let winningTeam = null;
+          
+          // If either team is below minPoints, they lose immediately
+          if (game.team1TotalScore <= minPoints) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          } else if (game.team2TotalScore <= minPoints) {
             shouldEndGame = true;
             winningTeam = 1;
           }
-          // If tied at maxPoints, continue the game
-        } else if (game.team2TotalScore >= maxPoints) {
-          if (game.team2TotalScore > game.team1TotalScore) {
-            shouldEndGame = true;
-            winningTeam = 2;
+          // If either team is above maxPoints, check if they have a clear lead
+          else if (game.team1TotalScore >= maxPoints) {
+            if (game.team1TotalScore > game.team2TotalScore) {
+              shouldEndGame = true;
+              winningTeam = 1;
+            }
+            // If tied at maxPoints, continue the game
+          } else if (game.team2TotalScore >= maxPoints) {
+            if (game.team2TotalScore > game.team1TotalScore) {
+              shouldEndGame = true;
+              winningTeam = 2;
+            }
+            // If tied at maxPoints, continue the game
           }
-          // If tied at maxPoints, continue the game
-        }
-        
-        if (shouldEndGame && winningTeam) {
-          console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-          game.status = 'COMPLETED';
-          io.to(game.id).emit('game_over', {
-            team1Score: game.team1TotalScore,
-            team2Score: game.team2TotalScore,
-            winningTeam,
-          });
           
-          // Start play again timer
-          startPlayAgainTimer(game);
-          
-          // Update stats and coins in DB
-          updateStatsAndCoins(game, winningTeam).catch(err => {
-            console.error('Failed to update stats/coins:', err);
-          });
+          if (shouldEndGame && winningTeam) {
+            console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
+            game.status = 'COMPLETED';
+            io.to(game.id).emit('game_over', {
+              team1Score: game.team1TotalScore,
+              team2Score: game.team2TotalScore,
+              winningTeam,
+            });
+            
+            // Start play again timer
+            startPlayAgainTimer(game);
+            
+            // Update stats and coins in DB
+            updateStatsAndCoins(game, winningTeam).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+          }
         }
-        return;
       }
       
       // Additional check: If all hands are empty and we have 13 tricks total, force hand completion
@@ -1759,42 +1759,42 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         console.log('[FAILSAFE DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
         
         if (game.players.every(p => Array.isArray(p.hand) && p.hand.length === 0) && game.play.trickNumber < 13) {
-        console.log('[FAILSAFE] All hands empty but only', game.play.trickNumber, 'tricks completed. Forcing hand completion.');
-        
-        // If there are any cards left in the current trick, score it as the final trick
-        if (game.play.currentTrick.length > 0) {
-          console.log('[FAILSAFE] Incomplete trick detected with', game.play.currentTrick.length, 'cards. Forcing trick completion.');
-          const finalWinnerIndex = determineTrickWinner(game.play.currentTrick);
-          game.play.tricks.push({
-            cards: game.play.currentTrick,
-            winnerIndex: finalWinnerIndex,
-          });
-          game.play.trickNumber += 1;
-          if (game.players[finalWinnerIndex]) {
-            game.players[finalWinnerIndex].tricks = (game.players[finalWinnerIndex].tricks || 0) + 1;
+          console.log('[FAILSAFE] All hands empty but only', game.play.trickNumber, 'tricks completed. Forcing hand completion.');
+          
+          // If there are any cards left in the current trick, score it as the final trick
+          if (game.play.currentTrick.length > 0) {
+            console.log('[FAILSAFE] Incomplete trick detected with', game.play.currentTrick.length, 'cards. Forcing trick completion.');
+            const finalWinnerIndex = determineTrickWinner(game.play.currentTrick);
+            game.play.tricks.push({
+              cards: game.play.currentTrick,
+              winnerIndex: finalWinnerIndex,
+            });
+            game.play.trickNumber += 1;
+            if (game.players[finalWinnerIndex]) {
+              game.players[finalWinnerIndex].tricks = (game.players[finalWinnerIndex].tricks || 0) + 1;
+            }
+            game.play.currentTrick = [];
+            console.log('[FAILSAFE] Forced final trick completion, new trickNumber:', game.play.trickNumber);
           }
-          game.play.currentTrick = [];
-          console.log('[FAILSAFE] Forced final trick completion, new trickNumber:', game.play.trickNumber);
-        }
-        
-        // Force hand completion regardless of trick number
-        console.log('[FAILSAFE] Forcing hand completion due to empty hands');
-        game.status = 'HAND_COMPLETED';
-        
-        // Calculate final scores
-        const finalScores = calculatePartnersHandScore(game);
-        console.log('[FAILSAFE] Final scores calculated:', finalScores);
-        
-        // Emit hand completed event
-        io.to(game.id).emit('hand_completed', finalScores);
-        console.log('[FAILSAFE] Hand completed event emitted');
-        
-        // Update stats for this hand
-        updateHandStats(game).catch(err => {
-          console.error('Failed to update hand stats:', err);
-        });
-        
-        return; // Exit early to prevent further processing
+          
+          // Force hand completion regardless of trick number
+          console.log('[FAILSAFE] Forcing hand completion due to empty hands');
+          game.status = 'HAND_COMPLETED';
+          
+          // Calculate final scores
+          const finalScores = calculatePartnersHandScore(game);
+          console.log('[FAILSAFE] Final scores calculated:', finalScores);
+          
+          // Emit hand completed event
+          io.to(game.id).emit('hand_completed', finalScores);
+          console.log('[FAILSAFE] Hand completed event emitted');
+          
+          // Update stats for this hand
+          updateHandStats(game).catch(err => {
+            console.error('Failed to update hand stats:', err);
+          });
+          
+          return; // Exit early to prevent further processing
         }
       }
     } else {
@@ -1906,13 +1906,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           currentPlayer: game.bidding.currentPlayer
         });
 
-      // If first bidder is a bot, trigger their bid
-      const firstBidder = game.players[game.bidding.currentBidderIndex];
-      if (firstBidder && firstBidder.type === 'bot') {
-        setTimeout(() => {
-          botMakeMove(game, game.bidding.currentBidderIndex);
+        // If first bidder is a bot, trigger their bid
+        const firstBidder = game.players[game.bidding.currentBidderIndex];
+        if (firstBidder && firstBidder.type === 'bot') {
+          setTimeout(() => {
+            botMakeMove(game, game.bidding.currentBidderIndex);
           }, 600); // Reduced delay for faster bot bidding
-      }
+        }
       }, 1200); // Reduced delay after dealing
 
     } catch (error) {
