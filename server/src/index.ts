@@ -458,11 +458,27 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         const isCurrentPlayer = game.currentPlayer === socket.userId;
         
         if (isCurrentPlayer) {
-          // User is the current player but not in a seat - restore them to their EXACT original seat
-          console.log(`[RECONNECT] Restoring current player ${socket.userId} to their EXACT original seat`);
+          // User is the current player but not in a seat - find their original seat
+          console.log(`[RECONNECT] Restoring current player ${socket.userId} to their original seat`);
           
-          // The current player should be in seat 0 (the first seat)
-          const originalSeatIndex = 0;
+          // Find which seat this player originally occupied by checking game state
+          let originalSeatIndex = -1;
+          for (let i = 0; i < game.players.length; i++) {
+            if (game.players[i] && game.players[i].id === socket.userId) {
+              originalSeatIndex = i;
+              break;
+            }
+          }
+          
+          // If we can't find their original seat, put them in the first available seat
+          if (originalSeatIndex === -1) {
+            originalSeatIndex = game.players.findIndex(p => p === null);
+            if (originalSeatIndex === -1) {
+              console.log(`[RECONNECT] No available seats for reconnecting player ${socket.userId}`);
+              socket.emit('error', { message: 'No available seats' });
+              return;
+            }
+          }
           
           const playerAvatar = socket.auth?.avatar || '/default-avatar.png';
           const playerUsername = socket.auth?.username || 'Unknown';
@@ -481,7 +497,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             position: originalSeatIndex
           };
           
-          console.log(`[RECONNECT] Player restored to their EXACT original seat ${originalSeatIndex}:`, game.players[originalSeatIndex]);
+          console.log(`[RECONNECT] Player restored to seat ${originalSeatIndex}:`, game.players[originalSeatIndex]);
           console.log(`[RECONNECT] Game players after restoration:`, game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`));
           
           // Clear any existing seat replacement for this seat
@@ -594,18 +610,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit confirmation to the client
       socket.emit('joined_game_room', { gameId });
       
-      // Send game update ONLY to this socket, with hand
-      const enrichedGame = enrichGameForClient(game, socket.userId);
-      console.log('[SERVER DEBUG] Sending game_update to client:', {
+      // Send game update to all players in the game room
+      const enrichedGame = enrichGameForClient(game);
+      console.log('[SERVER DEBUG] Sending game_update to all players:', {
         gameId,
         userId: socket.userId,
         currentPlayer: enrichedGame.currentPlayer,
         status: enrichedGame.status
       });
-      socket.emit('game_update', enrichedGame);
+      io.to(game.id).emit('game_update', enrichedGame);
       
-      // Emit to all other players in the game room (excluding this socket)
-      socket.to(game.id).emit('game_update', enrichGameForClient(game));
+      // Update lobby for all clients
       io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game:', error);
@@ -1384,15 +1399,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       const enrichedGame = enrichGameForClient(game);
       console.log('[TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
       io.to(game.id).emit('game_update', enrichedGame);
-      
-      // Emit trick complete with the stored trick data for animation
-      io.to(game.id).emit('trick_complete', {
-        trick: {
-          cards: completedTrick,
-          winnerIndex: winnerIndex,
-        },
-        trickNumber: game.play.trickNumber,
-      });
       
       // Emit clear trick event after animation delay
       setTimeout(() => {
