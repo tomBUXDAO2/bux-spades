@@ -1146,14 +1146,16 @@ export default function GameTable({
     // Determine player color based on game mode
     let playerGradient;
     if (isSoloGame) {
-      // Solo mode: 4 individual colors
+      // Solo mode: 4 individual colors - use original position for consistent colors across all players
       const soloColors = [
         "bg-gradient-to-r from-red-700 to-red-500",    // Position 0: Red
         "bg-gradient-to-r from-blue-700 to-blue-500",  // Position 1: Blue
         "bg-gradient-to-r from-orange-600 to-orange-400", // Position 2: Orange
         "bg-gradient-to-r from-purple-700 to-purple-500"  // Position 3: Purple
       ];
-      playerGradient = soloColors[position];
+      // Use original position for color assignment, not display position
+      const originalPosition = player.position ?? position;
+      playerGradient = soloColors[originalPosition];
     } else {
       // Partners mode: 2 team colors
       // Team 1 (positions 0,2) = Red Team
