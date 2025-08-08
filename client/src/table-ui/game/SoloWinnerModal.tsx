@@ -11,7 +11,6 @@ interface SoloWinnerModalProps {
   userPlayerIndex?: number; // The current user's player index
   humanPlayerCount?: number; // Number of human players in the game
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
-  playerPositions?: number[]; // Original player positions for correct color assignment
 }
 
 export default function SoloWinnerModal({ 
@@ -22,8 +21,7 @@ export default function SoloWinnerModal({
   onPlayAgain, 
   userPlayerIndex,
   humanPlayerCount = 1,
-  onTimerExpire,
-  playerPositions = [0, 1, 2, 3] // Default to original positions
+  onTimerExpire
 }: SoloWinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -96,9 +94,7 @@ export default function SoloWinnerModal({
         <div className="space-y-3 mb-4">
           {sortedPlayers.map((player, sortedIndex) => {
             const { score, index } = player;
-            // Use original position for color assignment to account for seat rotation
-            const originalPosition = playerPositions[index] ?? index;
-            const playerColor = getPlayerColor(originalPosition);
+            const playerColor = getPlayerColor(index);
             const isWinner = index === winningPlayer;
             const isUser = index === userPlayerIndex;
             const placement = sortedIndex + 1;

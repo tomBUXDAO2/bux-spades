@@ -2981,7 +2981,6 @@ export default function GameTable({
           userPlayerIndex={gameState.players.findIndex(p => p && p.id === user?.id)}
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
-          playerPositions={gameState.players.map(p => p?.position ?? 0)} // Pass original positions for correct color assignment
         />
       )}
 
