@@ -139,10 +139,10 @@ export class SocketManager {
         avatar
       },
       reconnection: true,
-      reconnectionAttempts: isMobile ? 20 : 15, // More attempts on mobile
-      reconnectionDelay: isMobile ? 2000 : 1000, // Slower reconnection on mobile
-      reconnectionDelayMax: isMobile ? 15000 : 10000, // Longer max delay on mobile
-      timeout: isMobile ? 45000 : 30000, // Longer timeout on mobile
+      reconnectionAttempts: isMobile ? 10 : 8, // Reduced attempts to prevent connection spam
+      reconnectionDelay: isMobile ? 3000 : 2000, // Slower initial reconnection
+      reconnectionDelayMax: isMobile ? 10000 : 8000, // Shorter max delay
+      timeout: isMobile ? 30000 : 20000, // Shorter timeout for faster failure detection
       autoConnect: true,
       forceNew: true, // Force new connection
       upgrade: true, // Allow transport upgrade
@@ -176,17 +176,8 @@ export class SocketManager {
         transport: this.socket?.io?.engine?.transport?.name
       });
       
-      // If we have a session, authenticate immediately
-      if (this.session) {
-        console.log('SENDING AUTHENTICATE EVENT');
-        this.socket?.emit('authenticate', {
-          token: this.session.token,
-          userId: this.session.userId,
-          username: this.session.username
-        });
-      } else {
-        console.log('NO SESSION FOR AUTHENTICATION');
-      }
+      // Don't send authenticate event - server already authenticates during connection
+      // The server will send 'authenticated' event after successful authentication
       
       this.notifyStateChange();
       this.notifyConnect();
@@ -232,15 +223,8 @@ export class SocketManager {
         timestamp: new Date().toISOString()
       });
       
-      // Re-authenticate after reconnection
-      if (this.session) {
-        console.log('SocketManager: Re-authenticating after reconnection');
-        this.socket?.emit('authenticate', {
-          token: this.session.token,
-          userId: this.session.userId,
-          username: this.session.username
-        });
-      }
+      // Don't re-authenticate - server will handle authentication on reconnection
+      // The server will send 'authenticated' event after successful re-authentication
       
       // Restart heartbeat for mobile devices
       if (isMobile) {
@@ -281,6 +265,10 @@ export class SocketManager {
       console.error('Socket error:', error);
       this.state.isReady = false;
       this.state.error = error.message;
+      
+      // Don't disconnect on error - let Socket.IO handle reconnection
+      console.log('Socket error occurred, letting Socket.IO handle reconnection');
+      
       this.notifyStateChange();
     });
 

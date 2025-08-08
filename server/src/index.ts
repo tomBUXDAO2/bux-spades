@@ -226,6 +226,20 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   if (socket.userId) {
+    // Check if there's an existing socket for this user and disconnect it
+    const existingSocket = authenticatedSockets.get(socket.userId);
+    if (existingSocket && existingSocket.id !== socket.id) {
+      console.log(`[CONNECTION] Disconnecting existing socket for user ${socket.userId}:`, {
+        oldSocketId: existingSocket.id,
+        newSocketId: socket.id
+      });
+      existingSocket.emit('session_invalidated', {
+        reason: 'new_connection',
+        message: 'You have connected from another location'
+      });
+      existingSocket.disconnect();
+    }
+    
     // Create new session for this user
     const sessionId = createUserSession(socket.userId);
     
@@ -235,6 +249,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     console.log('User connected:', {
       userId: socket.userId,
       sessionId,
+      socketId: socket.id,
       onlineUsers: Array.from(onlineUsers)
     });
     socket.emit('authenticated', { 
@@ -385,21 +400,34 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   // Handle disconnection
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     console.log('Client disconnected:', {
       socketId: socket.id,
-      userId: socket.userId
+      userId: socket.userId,
+      reason
     });
 
     if (socket.userId) {
-      authenticatedSockets.delete(socket.userId);
-      onlineUsers.delete(socket.userId);
+      // Only remove from authenticatedSockets if this is the current socket for this user
+      const currentSocket = authenticatedSockets.get(socket.userId);
+      if (currentSocket && currentSocket.id === socket.id) {
+        authenticatedSockets.delete(socket.userId);
+        onlineUsers.delete(socket.userId);
+        console.log('User disconnected (removed from tracking):', {
+          userId: socket.userId,
+          reason,
+          onlineUsers: Array.from(onlineUsers)
+        });
+      } else {
+        console.log('User disconnected (socket already replaced):', {
+          userId: socket.userId,
+          reason,
+          currentSocketId: currentSocket?.id
+        });
+      }
+      
       // Don't invalidate session on disconnect - let it persist for reconnection
       io.emit('online_users', Array.from(onlineUsers));
-      console.log('User disconnected:', {
-        userId: socket.userId,
-        onlineUsers: Array.from(onlineUsers)
-      });
     }
   });
 
