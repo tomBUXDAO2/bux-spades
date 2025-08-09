@@ -1215,29 +1215,57 @@ function selectCardToWin(playableCards: Card[], currentTrick: Card[], hand: Card
         );
       }
     } else {
-      // Void in lead suit
+      // Void in lead suit - smart spade usage based on table bid and void count
       const spades = playableCards.filter(c => c.suit === 'S');
       
       if (spades.length > 0) {
-        // Have spades - check if we should trump
+        // Check if we should avoid cutting due to multiple void players
+        if (shouldAvoidCutting(game, seatIndex, leadSuit)) {
+          // Multiple players void - consider playing another suit instead of cutting
+          const nonSpades = playableCards.filter(c => c.suit !== 'S');
+          if (nonSpades.length > 0) {
+            // Play highest non-spade to avoid wasting spades
+            return nonSpades.reduce((highest, card) => 
+              getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+            );
+          }
+        }
+        
+        // Have spades - smart cutting strategy based on table bid
         if (isHighBidGame) {
-          // In high-bid games, be more aggressive about trumping
-          if (isPartnerLikelyToWin(currentTrick, partnerHand)) {
-            // Partner can win - don't trump unnecessarily
-            return spades.reduce((lowest, card) => 
+          // High bid game (>10) - preserve high spades, use lowest that can win
+          const winningSpades = spades.filter(c => 
+            getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+          );
+          
+          if (winningSpades.length > 0) {
+            // Can win - use lowest spade that will win
+            return winningSpades.reduce((lowest, card) => 
               getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
             );
           } else {
-            // Partner can't win - trump with lowest spade
+            // Can't win - play lowest spade to preserve high ones
             return spades.reduce((lowest, card) => 
               getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
             );
           }
         } else {
-          // In low-bid games, be more conservative about trumping
-          return spades.reduce((lowest, card) => 
-            getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+          // Low bid game (≤10) - avoid bags, use highest spade to ensure we win
+          const winningSpades = spades.filter(c => 
+            getCardValue(c.rank) > getCardValue(highestOnTable.rank)
           );
+          
+          if (winningSpades.length > 0) {
+            // Can win - use highest spade to avoid bags
+            return winningSpades.reduce((highest, card) => 
+              getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+            );
+          } else {
+            // Can't win - still use highest spade to avoid bags
+            return spades.reduce((highest, card) => 
+              getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+            );
+          }
         }
       } else {
         // No spades - discard highest card
@@ -1299,8 +1327,47 @@ function selectCardForNil(playableCards: Card[], currentTrick: Card[], hand: Car
   }
 }
 
+// Helper function to determine if we should avoid cutting when multiple bots are void
+function shouldAvoidCutting(game: Game, seatIndex: number, leadSuit: string): boolean {
+  const totalTableBid = game.bidding?.bids.reduce((sum, bid) => sum + (bid || 0), 0) || 0;
+  const isHighBidGame = totalTableBid > 10;
+  
+  if (!isHighBidGame) return false; // In low bid games, always cut to avoid bags
+  
+  // Check how many players are void in the lead suit
+  let voidCount = 0;
+  for (let i = 0; i < 4; i++) {
+    const playerHand = game.hands?.[i];
+    if (playerHand && !playerHand.some(c => c.suit === leadSuit)) {
+      voidCount++;
+    }
+  }
+  
+  // If multiple players are void, be more conservative about cutting
+  return voidCount > 1;
+}
+
 // Card selection when partner is nil
 function selectCardToCoverPartner(playableCards: Card[], currentTrick: Card[], hand: Card[], partnerHand: Card[], game: Game, seatIndex: number): Card {
+  // Get table bid to determine spade strategy
+  const totalTableBid = game.bidding?.bids.reduce((sum, bid) => sum + (bid || 0), 0) || 0;
+  const isHighBidGame = totalTableBid > 10;
+  
+  // Determine play order to see if we're playing before or after nil partner
+  const nilPartnerIndex = (seatIndex + 2) % 4;
+  const playOrder = [game.play?.currentPlayerIndex || 0];
+  let currentPlayer = (game.play?.currentPlayerIndex || 0 + 1) % 4;
+  while (currentPlayer !== game.play?.currentPlayerIndex) {
+    playOrder.push(currentPlayer);
+    currentPlayer = (currentPlayer + 1) % 4;
+  }
+  
+  const ourPosition = playOrder.indexOf(seatIndex);
+  const nilPartnerPosition = playOrder.indexOf(nilPartnerIndex);
+  const playingAfterNilPartner = ourPosition > nilPartnerPosition;
+  
+  console.log(`[NIL COVER DEBUG] Bot ${seatIndex} covering nil partner ${nilPartnerIndex}, table bid: ${totalTableBid}, playing after nil: ${playingAfterNilPartner}`);
+  
   if (currentTrick.length === 0) {
     // Leading - lead highest cards first, especially in suits partner is void
     const partnerVoidSuits = getPartnerVoidSuits(partnerHand);
@@ -1331,9 +1398,9 @@ function selectCardToCoverPartner(playableCards: Card[], currentTrick: Card[], h
   const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
   if (cardsOfLeadSuit.length > 0) {
     // Can beat the highest on table
-    const winningCards = cardsOfLeadSuit.filter(c => 
-      getCardValue(c.rank) > getCardValue(highestOnTable.rank)
-    );
+            const winningCards = cardsOfLeadSuit.filter(c => 
+          getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+        );
     
     if (winningCards.length > 0) {
       // Play lowest winning card
@@ -1346,20 +1413,69 @@ function selectCardToCoverPartner(playableCards: Card[], currentTrick: Card[], h
         getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
       );
     }
-  } else {
-    // Void in lead suit - play highest spade if possible
-    const spades = playableCards.filter(c => c.suit === 'S');
-    if (spades.length > 0) {
-      return spades.reduce((highest, card) => 
-        getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
-      );
-    } else {
-      // No spades - play highest card
-      return playableCards.reduce((highest, card) => 
-        getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
-      );
+      } else {
+      // Void in lead suit - smart spade usage based on table bid, play order, and void count
+      const spades = playableCards.filter(c => c.suit === 'S');
+      if (spades.length > 0) {
+        // Check if we should avoid cutting due to multiple void players
+        if (shouldAvoidCutting(game, seatIndex, leadSuit)) {
+          // Multiple players void - consider playing another suit instead of cutting
+          const nonSpades = playableCards.filter(c => c.suit !== 'S');
+          if (nonSpades.length > 0) {
+            // Play highest non-spade to avoid wasting spades
+            return nonSpades.reduce((highest, card) => 
+              getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+            );
+          }
+        }
+        
+        if (isHighBidGame && playingAfterNilPartner) {
+          // High bid game and playing after nil partner - save high spades, use lowest that can win
+          const winningSpades = spades.filter(c => 
+            getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+          );
+          
+          if (winningSpades.length > 0) {
+            // Use lowest spade that can win
+            return winningSpades.reduce((lowest, card) => 
+              getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+            );
+          } else {
+            // Can't win with spades - play lowest spade to avoid wasting high ones
+            return spades.reduce((lowest, card) => 
+              getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+            );
+          }
+        } else if (isHighBidGame && !playingAfterNilPartner) {
+          // High bid game and playing before nil partner - can use higher spades strategically
+          const winningSpades = spades.filter(c => 
+            getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+          );
+          
+          if (winningSpades.length > 0) {
+            // Use lowest spade that can win
+            return winningSpades.reduce((lowest, card) => 
+              getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+            );
+          } else {
+            // Can't win - play lowest spade to preserve high ones
+            return spades.reduce((lowest, card) => 
+              getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+            );
+          }
+        } else {
+          // Low bid game - avoid bags, use highest spade to ensure we win
+          return spades.reduce((highest, card) => 
+            getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+          );
+        }
+      } else {
+        // No spades - play highest card
+        return playableCards.reduce((highest, card) => 
+          getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+        );
+      }
     }
-  }
 }
 
 // Special rules filtering function
