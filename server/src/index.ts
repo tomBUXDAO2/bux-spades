@@ -18,6 +18,7 @@ import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
 import { enrichGameForClient } from './routes/games.routes';
+import { logGameStart } from './routes/games.routes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -1171,6 +1172,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         trickNumber: 0,
         spadesBroken: false
       };
+      
+      // NEW: Log game start to database when transitioning to PLAYING
+      if (!game.dbGameId) {
+        logGameStart(game).catch((err: Error) => {
+          console.error('Failed to log game start:', err);
+        });
+      }
       
       console.log('[BIDDING COMPLETE] Moving to play phase, first player:', firstPlayer.username, 'at index:', (game.dealerIndex + 1) % 4);
       

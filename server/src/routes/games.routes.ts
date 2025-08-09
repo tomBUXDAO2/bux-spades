@@ -20,7 +20,7 @@ function isNonNull<T>(value: T | null | undefined): value is T {
 // Games store is now imported from index.ts to avoid circular dependency
 
 // Create a new game
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const settings = req.body;
     const creatorPlayer = {
@@ -65,6 +65,7 @@ router.post('/', (req, res) => {
       status: 'WAITING' as Game['status'],
       completedTricks: [],
       lastActivity: Date.now(), // Initialize with current timestamp
+      createdAt: Date.now(), // Add creation timestamp for logging
       rules: {
         // For gimmick games (SUICIDE, 4 OR NIL, BID 3, BID HEARTS), set gameType to 'REG'
         // and use forcedBid to distinguish between them
@@ -80,6 +81,10 @@ router.post('/', (req, res) => {
       isBotGame: false,
     };
     games.push(newGame);
+    
+    // NEW: Log the game start to database
+    await logGameStart(newGame);
+    
     io.emit('games_updated', games);
     res.status(201).json(newGame);
   } catch (err) {
@@ -2450,29 +2455,70 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
       return;
     }
     
-    // Create game record in database
+    // Calculate final scores and determine winner
+    let finalScore = 0;
+    let winner = 0;
+    let team1Score = null;
+    let team2Score = null;
+    
+    if (gameMode === 'SOLO') {
+      // Solo mode: find highest scoring player
+      const playerScores = game.playerScores || [0, 0, 0, 0];
+      winner = winningTeamOrPlayer; // This is already the player index
+      finalScore = playerScores[winner];
+    } else {
+      // Partners mode: determine team scores
+      winner = winningTeamOrPlayer; // This is already the team number (1 or 2)
+      if (winner === 1) {
+        team1Score = game.team1TotalScore || 0;
+        team2Score = game.team2TotalScore || 0;
+        finalScore = team1Score;
+      } else {
+        team1Score = game.team1TotalScore || 0;
+        team2Score = game.team2TotalScore || 0;
+        finalScore = team2Score;
+      }
+    }
+    
+    // Create game record in database with new fields
     const dbGame = await prisma.game.create({
       data: {
-        creatorId,
+        creatorId: game.players[0]?.id || 'unknown', // Use first player as creator
         status: 'FINISHED',
-        gameMode: gameMode as any, // Cast to enum
-        bidType: bidType as any, // Cast to enum
-        specialRules: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[],
-        minPoints: game.rules?.minPoints || 0,
-        maxPoints: game.rules?.maxPoints || 0,
-        buyIn: game.buyIn || 0,
-        solo,
-        whiz,
-        mirror,
-        gimmick,
-        screamer,
-        assassin
+        gameMode: game.gameMode,
+                  bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK',
+        specialRules: Object.keys(game.specialRules || {}).filter(key => game.specialRules?.[key as keyof typeof game.specialRules]).map(key => {
+          if (key === 'screamer') return 'SCREAMER';
+          if (key === 'assassin') return 'ASSASSIN';
+          return 'SCREAMER'; // Default fallback
+        }) as any[],
+        minPoints: game.minPoints,
+        maxPoints: game.maxPoints,
+        buyIn: game.buyIn,
+        solo: game.gameMode === 'SOLO',
+        whiz: bidType === 'WHIZ',
+        mirror: bidType === 'MIRROR',
+        gimmick: bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES',
+        screamer: specialRules.screamer || false,
+        assassin: specialRules.assassin || false,
+        // NEW: Game completion tracking
+        rated: true, // This is an all-human game
+        completed: true,
+        cancelled: false,
+        finalScore,
+        winner,
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
+        specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true).map(key => {
+          if (key === 'screamer') return 'SCREAMER';
+          if (key === 'assassin') return 'ASSASSIN';
+          return 'SCREAMER'; // Default fallback
+        }) as any[]
       }
     });
     
-    console.log(`Logged game ${dbGame.id} with settings: solo=${solo}, whiz=${whiz}, mirror=${mirror}, gimmick=${gimmick}, screamer=${screamer}, assassin=${assassin}`);
+    console.log(`Logged game ${dbGame.id} with settings: solo=${solo}, whiz=${whiz}, mirror=${mirror}, gimmick=${gimmick}, screamer=${screamer}, assassin=${assassin}, rated=true, winner=${winner}, finalScore=${finalScore}`);
     
-    // Create game player records
+    // Create game player records with final results
     for (let i = 0; i < 4; i++) {
       const player = game.players[i];
       if (!player || player.type !== 'human') continue;
@@ -2490,7 +2536,15 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
       const finalBid = player.bid || 0;
       const finalTricks = player.tricks || 0;
       const finalBags = Math.max(0, finalTricks - finalBid); // Calculate bags from tricks and bid
-      const finalPoints = 0; // Points are calculated per hand, not stored per player
+      const finalPoints = gameMode === 'SOLO' ? (game.playerScores?.[i] || 0) : 0;
+      
+      // Determine if this player won
+      let won = false;
+      if (gameMode === 'SOLO') {
+        won = i === winner;
+      } else {
+        won = team === winner;
+      }
       
       await prisma.gamePlayer.create({
         data: {
@@ -2500,12 +2554,57 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           team,
           bid: finalBid,
           bags: finalBags,
-          points: finalPoints
+          points: finalPoints,
+          // NEW: Final game results
+          finalScore: finalPoints,
+          finalBags: finalBags,
+          finalPoints: finalPoints,
+          won
         }
       });
     }
     
-    console.log(`Created game player records for game ${dbGame.id}`);
+    // Create GameResult record for comprehensive tracking
+    const playerResults = {
+      players: game.players.map((p, i) => ({
+        position: i,
+        userId: p?.id,
+        username: p?.username,
+        team: gameMode === 'PARTNERS' ? ((i === 0 || i === 2) ? 1 : 2) : null,
+        finalBid: p?.bid || 0,
+        finalTricks: p?.tricks || 0,
+        finalBags: p ? Math.max(0, (p.tricks || 0) - (p.bid || 0)) : 0,
+        finalScore: gameMode === 'SOLO' ? (game.playerScores?.[i] || 0) : 0,
+        won: gameMode === 'SOLO' ? (i === winner) : ((i === 0 || i === 2) ? winner === 1 : winner === 2)
+      }))
+    };
+    
+    // Count total rounds and tricks
+    const totalRounds = game.rounds?.length || 0;
+    const totalTricks = game.play?.tricks?.length || 0;
+    
+    // Track special events (nils, blind nils, etc.)
+    const specialEvents = {
+      nils: game.bidding?.nilBids || {},
+      totalHands: game.hands?.length || 0
+    };
+    
+    await prisma.gameResult.create({
+      data: {
+        gameId: dbGame.id,
+        winner,
+        finalScore,
+        gameDuration: Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000), // Duration in seconds
+        team1Score,
+        team2Score,
+        playerResults,
+        totalRounds,
+        totalTricks,
+        specialEvents
+      }
+    });
+    
+    console.log(`Created comprehensive game result record for game ${dbGame.id}`);
     
   } catch (err) {
     console.error('Failed to log completed game:', err);
@@ -2514,16 +2613,16 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
 
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
-  // Check if this is an all-human game (no bots)
+  // Check if this is a rated game (4 human players)
   const humanPlayers = game.players.filter(p => p && p.type === 'human');
-  const isAllHumanGame = humanPlayers.length === 4;
+  const isRatedGame = humanPlayers.length === 4;
   
-  if (!isAllHumanGame) {
-    console.log('Skipping stats/coins update - not an all-human game');
+  if (!isRatedGame) {
+    console.log('Skipping stats/coins update - not a rated game (has bots)');
     return;
   }
   
-  console.log('Updating stats and coins for all-human game');
+  console.log('Updating stats and coins for rated game');
   
   // Log the completed game to database
   await logCompletedGame(game, winningTeamOrPlayer);
@@ -2541,22 +2640,22 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
       isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
     }
     
-          // Calculate bags for this player
-      const playerBid = player.bid || 0;
-      const playerTricks = player.tricks || 0;
-      
-      // For nil and blind nil, all tricks count as bags if failed
-      let bags = 0;
-      if (playerBid === 0 || playerBid === -1) {
-        // Nil or blind nil: all tricks count as bags if failed
-        bags = playerTricks;
-      } else {
-        // Regular bid: only excess tricks count as bags
-        bags = Math.max(0, playerTricks - playerBid);
+    // Calculate bags for this player
+    const playerBid = player.bid || 0;
+    const playerTricks = player.tricks || 0;
+    
+    // For nil and blind nil, all tricks count as bags if failed
+    let bags = 0;
+    if (playerBid === 0 || playerBid === -1) {
+      // Nil or blind nil: all tricks count as bags if failed
+      bags = playerTricks;
+    } else {
+      // Regular bid: only excess tricks count as bags
+      bags = Math.max(0, playerTricks - playerBid);
     }
     
     try {
-      // Handle coin buy-in and prizes
+      // Handle coin buy-in and prizes (only for rated games)
       const buyIn = game.buyIn || 0;
       if (buyIn > 0) {
         // Deduct buy-in from all players
@@ -2590,16 +2689,74 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
         }
       }
       
-      // Update stats (nil tracking is now done per hand)
-      const stats = await prisma.userStats.update({
-        where: { userId },
-        data: {
-          gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 }
-        }
-      });
+      // Update stats with separate tracking for partners vs solo games
+      const isSoloGame = game.gameMode === 'SOLO';
       
-      console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
+      if (isSoloGame) {
+        // Solo game stats
+        await prisma.userStats.update({
+          where: { userId },
+          data: {
+            gamesPlayed: { increment: 1 },
+            gamesWon: { increment: isWinner ? 1 : 0 },
+            soloGamesPlayed: { increment: 1 },
+            soloGamesWon: { increment: isWinner ? 1 : 0 },
+            soloTotalBags: { increment: bags },
+            soloBagsPerGame: { set: 0 }, // Will be calculated below
+            totalCoinsWon: { increment: isWinner ? (game.buyIn || 0) * 2.6 : 0 }, // 1st place gets 2.6x buy-in
+            totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
+            netCoins: { increment: isWinner ? (game.buyIn || 0) * 1.6 : -(game.buyIn || 0) } // 1st: +1.6x, others: -1x
+          }
+        });
+        
+        // Calculate solo bags per game
+        const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+        if (currentStats?.soloGamesPlayed && currentStats.soloTotalBags) {
+          const newBagsPerGame = currentStats.soloTotalBags / currentStats.soloGamesPlayed;
+          await prisma.userStats.update({
+            where: { userId },
+            data: { soloBagsPerGame: newBagsPerGame }
+          });
+        }
+      } else {
+        // Partners game stats
+        await prisma.userStats.update({
+          where: { userId },
+          data: {
+            gamesPlayed: { increment: 1 },
+            gamesWon: { increment: isWinner ? 1 : 0 },
+            partnersGamesPlayed: { increment: 1 },
+            partnersGamesWon: { increment: isWinner ? 1 : 0 },
+            partnersTotalBags: { increment: bags },
+            partnersBagsPerGame: { set: 0 }, // Will be calculated below
+            totalCoinsWon: { increment: isWinner ? Math.floor((game.buyIn || 0) * 1.8) : 0 }, // Winners split 90% of pot
+            totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
+            netCoins: { increment: isWinner ? Math.floor((game.buyIn || 0) * 0.8) : -(game.buyIn || 0) } // Winners: +0.8x, losers: -1x
+          }
+        });
+        
+        // Calculate partners bags per game
+        const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+        if (currentStats?.partnersGamesPlayed && currentStats.partnersTotalBags) {
+          const newBagsPerGame = currentStats.partnersTotalBags / currentStats.partnersGamesPlayed;
+          await prisma.userStats.update({
+            where: { userId },
+            data: { partnersBagsPerGame: newBagsPerGame }
+          });
+        }
+      }
+      
+      // Update overall bags per game
+      const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+      if (currentStats?.gamesPlayed && currentStats.totalBags) {
+        const newBagsPerGame = currentStats.totalBags / currentStats.gamesPlayed;
+        await prisma.userStats.update({
+          where: { userId },
+          data: { bagsPerGame: newBagsPerGame }
+        });
+      }
+      
+      console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}, gameType=${isSoloGame ? 'SOLO' : 'PARTNERS'}`);
     } catch (err) {
       console.error('Failed to update stats/coins for user', userId, err);
     }
@@ -2870,6 +3027,108 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       }
     }
   }, 300);
+}
+
+// NEW: Log game when it starts (not just when completed)
+export async function logGameStart(game: Game) {
+  console.log('Logging game start to database');
+  
+  try {
+    // Determine if this is a rated game (4 human players)
+    const humanPlayers = game.players.filter(p => p && p.type === 'human');
+    const isRatedGame = humanPlayers.length === 4;
+    
+    // Determine game settings based on game rules
+    const gameMode = game.gameMode;
+    const bidType = game.rules?.bidType || 'REG';
+    const specialRules = game.specialRules || {};
+    
+    // Determine boolean flags
+    const solo = gameMode === 'SOLO';
+    const whiz = bidType === 'WHIZ';
+    const mirror = bidType === 'MIRROR';
+    const gimmick = bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES';
+    const screamer = specialRules.screamer === true;
+    const assassin = specialRules.assassin === true;
+    
+    // Get creator ID from the first human player
+    const creatorPlayer = humanPlayers[0];
+    const creatorId = creatorPlayer?.id;
+    
+    if (!creatorId) {
+      console.error('No creator ID found for game logging');
+      return;
+    }
+    
+    // Create initial game record in database
+    const dbGame = await prisma.game.create({
+      data: {
+        creatorId,
+        status: 'PLAYING', // Game is now in progress
+        gameMode: gameMode as any, // Cast to enum
+        bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK' as any, // Map to schema enum
+        specialRules: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[],
+        minPoints: game.rules?.minPoints || 0,
+        maxPoints: game.rules?.maxPoints || 0,
+        buyIn: game.buyIn || 0,
+        solo,
+        whiz,
+        mirror,
+        gimmick,
+        screamer,
+        assassin,
+        // NEW: Game tracking fields
+        rated: isRatedGame, // Only rated if 4 human players
+        completed: false, // Game just started
+        cancelled: false,
+        finalScore: 0, // Will be updated when game completes
+        winner: 0, // Will be updated when game completes
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK',
+        specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[]
+      }
+    });
+    
+    // Store the database game ID in the game object for later updates
+    game.dbGameId = dbGame.id;
+    
+    console.log(`Logged game start ${dbGame.id} with settings: solo=${solo}, whiz=${whiz}, mirror=${mirror}, gimmick=${gimmick}, rated=${isRatedGame}`);
+    
+    // Create initial game player records
+    for (let i = 0; i < 4; i++) {
+      const player = game.players[i];
+      if (!player) continue; // Skip empty seats
+      
+      const userId = player.type === 'human' ? player.id : 'bot';
+      
+      // Determine team for partners games
+      let team = null;
+      if (gameMode === 'PARTNERS') {
+        team = (i === 0 || i === 2) ? 1 : 2;
+      }
+      
+      await prisma.gamePlayer.create({
+        data: {
+          gameId: dbGame.id,
+          userId, // Use 'bot' as placeholder for bot players
+          position: i,
+          team,
+          bid: 0, // Will be updated during bidding
+          bags: 0, // Will be updated during play
+          points: 0, // Will be updated during play
+          // NEW: Final game results (will be updated when game completes)
+          finalScore: 0,
+          finalBags: 0,
+          finalPoints: 0,
+          won: false
+        }
+      });
+    }
+    
+    console.log(`Created initial game player records for game ${dbGame.id}`);
+    
+  } catch (err) {
+    console.error('Failed to log game start:', err);
+  }
 }
 
 export default router; 
