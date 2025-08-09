@@ -1829,18 +1829,31 @@ export default function GameTable({
     }
   }, [gameState.cardPlayers]);
 
-  // Effect to handle game completion
+  // Effect to handle game completion - consolidated to prevent duplicate modals
   useEffect(() => {
     if (!socket) return;
 
     const handleGameOver = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
-      console.log('Game over event received:', data);
+      console.log('[GAME OVER] Socket event received:', data);
+      console.log('[GAME OVER] Current game status:', gameState.status);
+      console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
+      
       setShowHandSummary(false);
       setHandSummaryData(null);
-      if (data.winningTeam === 1) {
-        setShowWinner(true);
+      
+      // Only set modal state if not already showing a modal
+      if (!showWinner && !showLoser) {
+        if (data.winningTeam === 1) {
+          console.log('[GAME OVER] Setting showWinner to true');
+          setShowWinner(true);
+          setShowLoser(false);
+        } else {
+          console.log('[GAME OVER] Setting showLoser to true');
+          setShowLoser(true);
+          setShowWinner(false);
+        }
       } else {
-        setShowLoser(true);
+        console.log('[GAME OVER] Modal already showing, ignoring socket event');
       }
     };
 
@@ -1849,27 +1862,41 @@ export default function GameTable({
     return () => {
       socket.off('game_over', handleGameOver);
     };
-  }, [socket]);
+  }, [socket, showWinner, showLoser]);
 
   // Effect to handle game status changes
   useEffect(() => {
     if (gameState.status === "COMPLETED") {
       const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
+      console.log('[GAME STATUS] Game completed, winning team:', winningTeam);
+      console.log('[GAME STATUS] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
+      
       setShowHandSummary(false);
       setHandSummaryData(null);
-      if (winningTeam === 1) {
-        setShowWinner(true);
+      
+      // Only set modal state if not already showing a modal
+      if (!showWinner && !showLoser) {
+        if (winningTeam === 1) {
+          console.log('[GAME STATUS] Setting showWinner to true');
+          setShowWinner(true);
+          setShowLoser(false);
+        } else {
+          console.log('[GAME STATUS] Setting showLoser to true');
+          setShowLoser(true);
+          setShowWinner(false);
+        }
       } else {
-        setShowLoser(true);
+        console.log('[GAME STATUS] Modal already showing, ignoring status change');
       }
     } else if (gameState.status === "WAITING") {
       // Close winner/loser modals when game resets to WAITING status
+      console.log('[GAME STATUS] Game reset to WAITING, closing all modals');
       setShowWinner(false);
       setShowLoser(false);
       setShowHandSummary(false);
       setHandSummaryData(null);
     }
-  }, [gameState.status, gameState.winningTeam]);
+  }, [gameState.status, gameState.winningTeam, showWinner, showLoser]);
 
   const [showGameInfo, setShowGameInfo] = useState(false);
   const infoRef = useRef<HTMLDivElement>(null);
