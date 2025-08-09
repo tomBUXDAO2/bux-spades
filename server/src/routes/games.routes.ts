@@ -2257,7 +2257,7 @@ function calculatePartnersHandScore(game: Game) {
 }
 
 // Helper to calculate solo hand score
-function calculateSoloHandScore(game: Game) {
+export function calculateSoloHandScore(game: Game) {
   if (!game.bidding || !game.play) {
     throw new Error('Invalid game state for scoring');
   }

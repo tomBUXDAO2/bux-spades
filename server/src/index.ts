@@ -13,7 +13,7 @@ import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gam
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner } from './routes/games.routes';
+import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
@@ -1814,9 +1814,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           console.log('[FAILSAFE] Forcing hand completion due to empty hands');
           game.status = 'HAND_COMPLETED';
           
-          // Calculate final scores
-          const finalScores = calculatePartnersHandScore(game);
-          console.log('[FAILSAFE] Final scores calculated:', finalScores);
+          // Calculate final scores based on game mode
+          let finalScores;
+          if (game.gameMode === 'SOLO') {
+            finalScores = calculateSoloHandScore(game);
+            console.log('[FAILSAFE] Solo final scores calculated:', finalScores);
+          } else {
+            finalScores = calculatePartnersHandScore(game);
+            console.log('[FAILSAFE] Partners final scores calculated:', finalScores);
+          }
           
           // Emit hand completed event
           io.to(game.id).emit('hand_completed', finalScores);
@@ -2491,76 +2497,6 @@ io.engine.on('upgradeError', (err) => {
 // --- Helper functions copied from games.routes.ts ---
 
 // Helper to calculate partners hand score
-function calculateSoloHandScore(game: Game) {
-  if (!game.bidding || !game.play) {
-    throw new Error('Invalid game state for scoring');
-  }
-  
-  // Use the already updated player trick counts instead of recalculating
-  const tricksPerPlayer = game.players.map(p => p?.tricks || 0);
-  
-  console.log('[SOLO SCORING DEBUG] Tricks per player:', tricksPerPlayer);
-  console.log('[SOLO SCORING DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
-  
-  const playerScores = [0, 0, 0, 0];
-  const playerBags = [0, 0, 0, 0];
-  
-  // Calculate individual player scores
-  for (let i = 0; i < 4; i++) {
-    const bid = game.bidding.bids[i] ?? 0;
-    const tricks = tricksPerPlayer[i];
-    
-    console.log(`[SOLO SCORING DEBUG] Player ${i}: bid=${bid}, tricks=${tricks}`);
-    
-    if (tricks >= bid) {
-      playerScores[i] += bid * 10;
-      playerBags[i] = tricks - bid;
-      playerScores[i] += playerBags[i];
-    } else {
-      playerScores[i] -= bid * 10;
-      playerBags[i] = 0;
-    }
-    
-    // Nil and Blind Nil
-    if (bid === 0) { // Nil
-      if (tricks === 0) {
-        playerScores[i] += 100;
-      } else {
-        playerScores[i] -= 100;
-        playerBags[i] += tricks;
-      }
-    } else if (bid === -1) { // Blind Nil
-      if (tricks === 0) {
-        playerScores[i] += 200;
-      } else {
-        playerScores[i] -= 200;
-        playerBags[i] += tricks;
-      }
-    }
-    
-    // Bag penalty
-    if (playerBags[i] >= 10) {
-      playerScores[i] -= 100;
-      playerBags[i] -= 10;
-    }
-  }
-  
-  // Validate total tricks equals 13
-  const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
-  if (totalTricks !== 13) {
-    console.error(`[SOLO SCORING ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total.`);
-    console.error('[SOLO SCORING ERROR] Tricks per player:', tricksPerPlayer);
-  }
-  
-  console.log('[SOLO SCORING DEBUG] Final player scores:', playerScores);
-  console.log('[SOLO SCORING DEBUG] Final player bags:', playerBags);
-  
-  return {
-    playerScores,
-    playerBags,
-    tricksPerPlayer
-  };
-}
 
 function calculatePartnersHandScore(game: Game) {
   if (!game.bidding || !game.play) {
