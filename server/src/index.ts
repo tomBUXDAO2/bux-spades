@@ -530,6 +530,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             position: originalSeatIndex
           };
           
+          // Remove player from spectators if they were added there during disconnect
+          const spectatorIndex = game.spectators?.findIndex(s => s.id === socket.userId);
+          if (spectatorIndex !== -1) {
+            console.log(`[RECONNECT] Removing ${socket.userId} from spectators as they reconnected to their seat`);
+            game.spectators.splice(spectatorIndex, 1);
+          }
+          
           console.log(`[RECONNECT] Player restored to seat ${originalSeatIndex}:`, game.players[originalSeatIndex]);
           console.log(`[RECONNECT] Game players after restoration:`, game.players.map((p: GamePlayer | null, i: number) => `${i}: ${p ? p.id : 'null'}`));
           

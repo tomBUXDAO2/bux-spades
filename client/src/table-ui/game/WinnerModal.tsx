@@ -13,6 +13,7 @@ interface WinnerModalProps {
   coinsWon?: number; // Number of coins won
   humanPlayerCount?: number; // Number of human players in the game
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
+  onLeaveTable?: () => void; // Function to call when leaving table
 }
 
 export default function WinnerModal({ 
@@ -26,7 +27,8 @@ export default function WinnerModal({
   isCoinGame = false,
   coinsWon = 0,
   humanPlayerCount = 1,
-  onTimerExpire
+  onTimerExpire,
+  onLeaveTable
 }: WinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -38,7 +40,12 @@ export default function WinnerModal({
 
   const handleLeave = () => {
     setShowPlayAgainPrompt(false);
-    onClose();
+    // Call the leave table function if provided, otherwise just close the modal
+    if (onLeaveTable) {
+      onLeaveTable();
+    } else {
+      onClose();
+    }
   };
 
   // Timer effect for auto-leaving after 30 seconds

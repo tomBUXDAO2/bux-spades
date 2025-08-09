@@ -11,6 +11,8 @@ interface SoloWinnerModalProps {
   userPlayerIndex?: number; // The current user's player index
   humanPlayerCount?: number; // Number of human players in the game
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
+  buyIn?: number; // Buy-in amount for coin calculation
+  onLeaveTable?: () => void; // Function to call when leaving table
 }
 
 export default function SoloWinnerModal({ 
@@ -21,7 +23,9 @@ export default function SoloWinnerModal({
   onPlayAgain, 
   userPlayerIndex,
   humanPlayerCount = 1,
-  onTimerExpire
+  onTimerExpire,
+  buyIn = 0,
+  onLeaveTable
 }: SoloWinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -33,7 +37,12 @@ export default function SoloWinnerModal({
 
   const handleLeave = () => {
     setShowPlayAgainPrompt(false);
-    onClose();
+    // Call the leave table function if provided, otherwise just close the modal
+    if (onLeaveTable) {
+      onLeaveTable();
+    } else {
+      onClose();
+    }
   };
 
   // Timer effect for auto-leaving after 30 seconds
@@ -80,6 +89,33 @@ export default function SoloWinnerModal({
       default: return `${placement}th PLACE`;
     }
   };
+  
+  // Calculate coin prizes for solo mode
+  const calculateCoinPrizes = () => {
+    if (!buyIn || buyIn <= 0) return { firstPlace: 0, secondPlace: 0 };
+    
+    const totalPot = buyIn * 4;
+    const rake = Math.floor(totalPot * 0.1); // 10% rake
+    const prizePool = totalPot - rake;
+    
+    // Solo mode: 2nd place gets buy-in back, 1st place gets remainder
+    const secondPlacePrize = buyIn; // Exactly their stake back
+    const firstPlacePrize = prizePool - secondPlacePrize; // Remainder after 2nd place gets their stake
+    
+    return { firstPlace: firstPlacePrize, secondPlace: secondPlacePrize };
+  };
+  
+  const coinPrizes = calculateCoinPrizes();
+  
+  // Format coins helper
+  const formatCoins = (value: number) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}k`;
+    }
+    return value.toString();
+  };
 
   if (!isOpen) return null;
 
@@ -109,9 +145,18 @@ export default function SoloWinnerModal({
                     </span>
                     {isWinner && <FaTrophy className="h-4 w-4 text-yellow-500 ml-2" />}
                   </div>
-                  <span className={`font-bold text-sm ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
-                    {score}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className={`font-bold text-sm ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
+                      {score}
+                    </span>
+                    {buyIn > 0 && (
+                      <span className={`text-xs ${placement === 1 ? 'text-yellow-400' : placement === 2 ? 'text-green-400' : 'text-gray-400'}`}>
+                        {placement === 1 ? `+${formatCoins(coinPrizes.firstPlace)}` : 
+                         placement === 2 ? `+${formatCoins(coinPrizes.secondPlace)}` : 
+                         '0k'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );

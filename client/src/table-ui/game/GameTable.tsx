@@ -3010,6 +3010,8 @@ export default function GameTable({
           userPlayerIndex={gameState.players.findIndex(p => p && p.id === user?.id)}
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
+          buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}
+          onLeaveTable={handleLeaveTable}
         />
       )}
 
@@ -3032,6 +3034,7 @@ export default function GameTable({
           })()}
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
+          onLeaveTable={handleLeaveTable}
         />
       )}
 
