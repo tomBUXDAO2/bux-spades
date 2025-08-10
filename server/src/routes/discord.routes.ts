@@ -109,34 +109,27 @@ router.get(
       // Check for Facebook connection
       const hasFacebook = connections.some((conn: any) => conn.type === 'facebook');
       
-      if (hasFacebook) {
-        // Get user info to get Discord ID
-        const userResponse = await fetch('https://discord.com/api/users/@me', {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-          },
-        });
-        
-        const userData = await userResponse.json() as any;
-        
-        // Verify Facebook connection for this user
-        if (verifyFacebookConnection) {
-          await verifyFacebookConnection(userData.id);
-        }
-        
-        res.json({ 
-          success: true, 
-          message: 'Facebook connection verified! LEAGUE role awarded.',
-          hasFacebook: true,
-          discordId: userData.id
-        });
-      } else {
-        res.json({ 
-          success: false, 
-          message: 'No Facebook connection found.',
-          hasFacebook: false
-        });
-      }
+                     if (hasFacebook) {
+                 // Get user info to get Discord ID
+                 const userResponse = await fetch('https://discord.com/api/users/@me', {
+                   headers: {
+                     Authorization: `Bearer ${tokenData.access_token}`,
+                   },
+                 });
+                 
+                 const userData = await userResponse.json() as any;
+                 
+                 // Verify Facebook connection for this user
+                 if (verifyFacebookConnection) {
+                   await verifyFacebookConnection(userData.id);
+                 }
+                 
+                 // Redirect to success page
+                 res.redirect(`${process.env.CLIENT_URL}/facebook-verification?status=success&message=${encodeURIComponent('Facebook connection verified! LEAGUE role awarded.')}`);
+               } else {
+                 // Redirect to error page
+                 res.redirect(`${process.env.CLIENT_URL}/facebook-verification?status=error&message=${encodeURIComponent('No Facebook connection found. Please connect your Facebook to your Discord profile first.')}`);
+               }
       
     } catch (error) {
       console.error('Error in connections callback:', error);

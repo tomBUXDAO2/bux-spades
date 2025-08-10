@@ -10,6 +10,7 @@ import Register from '@/components/auth/Register';
 import AuthCallback from '@/components/auth/AuthCallback';
 import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
+import FacebookVerification from './pages/FacebookVerification';
 import { SocketProvider } from './context/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
@@ -60,6 +61,10 @@ const router = createBrowserRouter(
         {
           path: "auth/callback",
           element: <AuthCallback />
+        },
+        {
+          path: "facebook-verification",
+          element: <FacebookVerification />
         },
         {
           path: "",

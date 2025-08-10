@@ -235,18 +235,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       try {
         const userId = interaction.user.id;
-        const hasFacebook = await hasFacebookConnected(userId);
         
-        if (hasFacebook) {
-          const member = interaction.member as GuildMember;
-          await awardLeagueRole(member);
-          await interaction.editReply('✅ Facebook connection verified! LEAGUE role has been assigned to you.');
-        } else {
-          await interaction.editReply('❌ No Facebook connection found. Please connect your Facebook to your Discord profile first, then try again.');
-        }
+        // Redirect user to OAuth2 flow to check their Facebook connection
+        const authUrl = `https://bux-spades-server.fly.dev/api/auth/discord/connections`;
+        
+        await interaction.editReply(`🔗 **Facebook Connection Check Required**\n\nTo verify your Facebook connection, please visit this link:\n${authUrl}\n\nThis will check if you have Facebook connected to your Discord profile and award the LEAGUE role if verified.`);
       } catch (error) {
         console.error('Error handling verify button:', error);
-        await interaction.editReply('❌ Error verifying Facebook connection. Please try again later.');
+        await interaction.editReply('❌ Error processing verification request. Please try again later.');
       }
       return;
     }
