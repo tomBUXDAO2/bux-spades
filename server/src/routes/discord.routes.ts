@@ -140,19 +140,32 @@ router.get(
       console.log('User response status:', userResponse.status);
       console.log('User response headers:', Object.fromEntries(userResponse.headers.entries()));
       
-      const userData = await userResponse.json() as any;
+      let userData = await userResponse.json() as any;
       console.log('User data response:', userData);
       
       if (!userData.id) {
         console.error('Failed to get user ID from Discord API:', userData);
         
-        // If we have Facebook connection but can't get user ID, still assign role
-        if (hasFacebook) {
-          console.log('Facebook connection found but user ID failed - using fallback');
-          // We'll use the bulletproof fallback to assign role anyway
-        } else {
-          return res.status(400).json({ error: 'Failed to get user information from Discord' });
+              // If we have Facebook connection but can't get user ID, still assign role
+      if (hasFacebook) {
+        console.log('Facebook connection found but user ID failed - using fallback');
+        // We'll use the bulletproof fallback to assign role anyway
+        // But we need to get the user ID from the token data instead
+        const tokenParts = tokenData.access_token.split('.');
+        if (tokenParts.length >= 2) {
+          try {
+            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+            if (payload.user_id) {
+              userData = { id: payload.user_id };
+              console.log('Extracted user ID from token:', payload.user_id);
+            }
+          } catch (e) {
+            console.log('Could not extract user ID from token');
+          }
         }
+      } else {
+        return res.status(400).json({ error: 'Failed to get user information from Discord' });
+      }
       }
       
       console.log('BULLETPROOF Facebook check:', {
