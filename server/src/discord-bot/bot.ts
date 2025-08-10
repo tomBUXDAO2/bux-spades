@@ -19,6 +19,28 @@ const VERIFICATION_CHANNEL_ID = '1403960351107715073';
 // Store verified Facebook connections (in production, this should be in database)
 const verifiedFacebookUsers = new Set<string>();
 
+// Store active game lines
+interface GameLine {
+  messageId: string;
+  hostId: string;
+  hostName: string;
+  coins: number;
+  gameMode: string;
+  maxPoints: number;
+  minPoints: number;
+  gameType: string;
+  screamer: string | null;
+  assassin: string | null;
+  players: {
+    userId: string;
+    username: string;
+    seat: number;
+  }[];
+  createdAt: number;
+}
+
+const activeGameLines = new Map<string, GameLine>();
+
 // Function to check if user has Facebook connected via OAuth2
 async function hasFacebookConnected(userId: string): Promise<boolean> {
   try {
@@ -254,12 +276,85 @@ client.on(Events.InteractionCreate, async (interaction) => {
       try {
         const userId = interaction.user.id;
         const username = interaction.user.username;
+        const messageId = interaction.message.id;
+        const gameLine = activeGameLines.get(messageId);
+        
+        if (!gameLine) {
+          await interaction.editReply('❌ Game line not found or expired.');
+          return;
+        }
         
         if (interaction.customId === 'join_game') {
-          await interaction.editReply('✅ You have joined the game!');
+          // Check if user is already in the game
+          const existingPlayer = gameLine.players.find(p => p.userId === userId);
+          if (existingPlayer) {
+            await interaction.editReply('❌ You are already in this game!');
+            return;
+          }
+          
+          // Check if game is full
+          if (gameLine.players.length >= 4) {
+            await interaction.editReply('❌ This game is full!');
+            return;
+          }
+          
+          // Assign seat based on join order
+          let seat: number;
+          if (gameLine.players.length === 1) {
+            seat = 2; // Partner (seat 2)
+          } else if (gameLine.players.length === 2) {
+            seat = 1; // Player 3 (seat 1)
+          } else {
+            seat = 3; // Player 4 (seat 3)
+          }
+          
+          // Add player to game
+          gameLine.players.push({
+            userId,
+            username,
+            seat
+          });
+          
+          // Update embed
+          await updateGameLineEmbed(interaction.message, gameLine);
+          
+          await interaction.editReply(`✅ You have joined the game! You are seat ${seat}.`);
+          
+          // Check if game is full and create it
+          if (gameLine.players.length === 4) {
+            await createGameAndNotifyPlayers(interaction.message, gameLine);
+          }
+          
         } else if (interaction.customId === 'leave_game') {
+          // Check if user is in the game
+          const playerIndex = gameLine.players.findIndex(p => p.userId === userId);
+          if (playerIndex === -1) {
+            await interaction.editReply('❌ You are not in this game!');
+            return;
+          }
+          
+          // Remove player from game
+          gameLine.players.splice(playerIndex, 1);
+          
+          // Update embed
+          await updateGameLineEmbed(interaction.message, gameLine);
+          
           await interaction.editReply('❌ You have left the game.');
+          
         } else if (interaction.customId === 'start_game') {
+          // Only host can start the game
+          if (userId !== gameLine.hostId) {
+            await interaction.editReply('❌ Only the host can start the game!');
+            return;
+          }
+          
+          // Check if game is full
+          if (gameLine.players.length < 4) {
+            await interaction.editReply('❌ Need 4 players to start the game!');
+            return;
+          }
+          
+          await createGameAndNotifyPlayers(interaction.message, gameLine);
           await interaction.editReply('🚀 Starting the game...');
         }
       } catch (error) {
@@ -319,7 +414,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(`**${gameLineTitle}**${specialRulesText}`)
         .addFields(
           { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
-          { name: '👥 Players', value: '0/4', inline: true },
+          { name: '👥 Players', value: '1/4', inline: true },
           { name: '⏰ Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
         )
         .setFooter({ text: 'Click the buttons below to join or leave the game' })
@@ -346,7 +441,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setDisabled(true) // Disabled until 4 players join
         );
       
-      await interaction.editReply({ embeds: [embed], components: [row] });
+      const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+      
+      // Store the game line data
+      const gameLine: GameLine = {
+        messageId: reply.id,
+        hostId: interaction.user.id,
+        hostName: interaction.user.username,
+        coins,
+        gameMode,
+        maxPoints,
+        minPoints,
+        gameType,
+        screamer,
+        assassin,
+        players: [
+          {
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            seat: 0 // Host is seat 0
+          }
+        ],
+        createdAt: Date.now()
+      };
+      
+      activeGameLines.set(reply.id, gameLine);
     } catch (error) {
       console.error('Error in game command:', error);
       await interaction.editReply('❌ Error creating game line');
@@ -398,6 +517,162 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 });
+
+// Helper function to update game line embed
+async function updateGameLineEmbed(message: any, gameLine: GameLine) {
+  try {
+    // Format coins for display
+    const formatCoins = (amount: number) => {
+      if (amount >= 1000000) {
+        return `${amount / 1000000}M`;
+      } else {
+        return `${amount / 1000}k`;
+      }
+    };
+    
+    // Format the game line title
+    const gameLineTitle = `${formatCoins(gameLine.coins)} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
+    
+    // Build special rules text
+    let specialRulesText = '';
+    const rules = [];
+    if (gameLine.screamer === 'yes') rules.push('SCREAMER');
+    if (gameLine.assassin === 'yes') rules.push('ASSASSIN');
+    if (rules.length > 0) {
+      specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
+    }
+    
+    // Create the embed
+    const embed = new EmbedBuilder()
+      .setColor(0x00ff00) // Green color
+      .setTitle('🎮 GAME LINE')
+      .setDescription(`**${gameLineTitle}**${specialRulesText}`)
+      .addFields(
+        { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
+        { name: '👥 Players', value: `${gameLine.players.length}/4`, inline: true },
+        { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true }
+      )
+      .setFooter({ text: 'Click the buttons below to join or leave the game' })
+      .setTimestamp();
+    
+    // Create join/leave buttons
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('join_game')
+          .setLabel('Join Game')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✅')
+          .setDisabled(gameLine.players.length >= 4),
+        new ButtonBuilder()
+          .setCustomId('leave_game')
+          .setLabel('Leave Game')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('❌'),
+        new ButtonBuilder()
+          .setCustomId('start_game')
+          .setLabel('Start Game')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🚀')
+          .setDisabled(gameLine.players.length < 4)
+      );
+    
+    await message.edit({ embeds: [embed], components: [row] });
+  } catch (error) {
+    console.error('Error updating game line embed:', error);
+  }
+}
+
+// Helper function to create game and notify players
+async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
+  try {
+    // Create game on the server
+    const gameData = {
+      creatorId: gameLine.hostId,
+      buyIn: gameLine.coins,
+      gameMode: gameLine.gameMode,
+      maxPoints: gameLine.maxPoints,
+      minPoints: gameLine.minPoints,
+      gameType: gameLine.gameType,
+      specialRules: {
+        screamer: gameLine.screamer === 'yes',
+        assassin: gameLine.assassin === 'yes'
+      },
+      players: gameLine.players.map(p => ({
+        userId: p.userId,
+        username: p.username,
+        seat: p.seat
+      }))
+    };
+    
+    // Make API call to create game
+    const response = await fetch('https://bux-spades-server.fly.dev/api/games', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(gameData)
+    });
+    
+    if (response.ok) {
+      const game = await response.json() as any;
+      const gameUrl = `https://bux-spades.pro/table/${game.id}`;
+      
+      // Ping all players
+      const playerMentions = gameLine.players.map(p => `<@${p.userId}>`).join(' ');
+      
+      // Create game ready embed
+      const gameReadyEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('🎮 Game Ready!')
+        .setDescription(`${playerMentions}\n\nYour game is ready! Click the link below to join:`)
+        .addFields(
+          { name: '🔗 Game Link', value: gameUrl, inline: false },
+          { name: '💰 Buy-in', value: gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`, inline: true },
+          { name: '🎯 Game Mode', value: gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1), inline: true },
+          { name: '📊 Points', value: `${gameLine.maxPoints}/${gameLine.minPoints}`, inline: true }
+        )
+        .setTimestamp();
+      
+      await message.reply({ embeds: [gameReadyEmbed] });
+      
+      // Remove game line from active list
+      activeGameLines.delete(message.id);
+      
+      // Build special rules text for final embed
+      let finalSpecialRulesText = '';
+      const finalRules = [];
+      if (gameLine.screamer === 'yes') finalRules.push('SCREAMER');
+      if (gameLine.assassin === 'yes') finalRules.push('ASSASSIN');
+      if (finalRules.length > 0) {
+        finalSpecialRulesText = `\n**Special Rules:** ${finalRules.join(' + ')}`;
+      }
+      
+      // Update original embed to show game is full
+      const finalEmbed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('🎮 GAME LINE - FULL')
+        .setDescription(`**${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}**${finalSpecialRulesText}`)
+        .addFields(
+          { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
+          { name: '👥 Players', value: '4/4', inline: true },
+          { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true },
+          { name: '🔗 Game Link', value: gameUrl, inline: false }
+        )
+        .setFooter({ text: 'Game created! Check the reply above for details.' })
+        .setTimestamp();
+      
+      await message.edit({ embeds: [finalEmbed], components: [] });
+      
+    } else {
+      console.error('Failed to create game:', await response.text());
+      await message.reply('❌ Failed to create game. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error creating game:', error);
+    await message.reply('❌ Error creating game. Please try again.');
+  }
+}
 
 // Export functions for external use
 export { 
