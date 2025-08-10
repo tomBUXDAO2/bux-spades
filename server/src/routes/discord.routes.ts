@@ -106,10 +106,16 @@ router.get(
 
       const connections = await connectionsResponse.json() as any[];
       
+      console.log('Facebook verification debug:', {
+        connectionsCount: connections.length,
+        connections: connections.map((conn: any) => ({ type: conn.type, name: conn.name, verified: conn.verified })),
+        hasFacebook: connections.some((conn: any) => conn.type === 'facebook')
+      });
+      
       // Check for Facebook connection
       const hasFacebook = connections.some((conn: any) => conn.type === 'facebook');
       
-                     if (hasFacebook) {
+      if (hasFacebook) {
                  // Get user info to get Discord ID
                  const userResponse = await fetch('https://discord.com/api/users/@me', {
                    headers: {

@@ -70,11 +70,14 @@ async function hasFacebookConnected(userId: string): Promise<boolean> {
 // Function to verify a user's Facebook connection
 async function verifyFacebookConnection(userId: string): Promise<void> {
   try {
+    console.log(`Starting Facebook verification for user ${userId}`);
     verifiedFacebookUsers.add(userId);
-    console.log(`Verified Facebook connection for user ${userId}`);
+    console.log(`Added user ${userId} to verifiedFacebookUsers set`);
     
     // Update their Discord role
+    console.log(`Calling checkAndUpdateUserRole for user ${userId}`);
     await checkAndUpdateUserRole(userId);
+    console.log(`Successfully completed Facebook verification for user ${userId}`);
   } catch (error) {
     console.error(`Error verifying Facebook connection for user ${userId}:`, error);
   }
@@ -133,20 +136,30 @@ async function removeLeagueRole(member: GuildMember): Promise<void> {
 // Check and update role for a specific user
 async function checkAndUpdateUserRole(userId: string): Promise<void> {
   try {
+    console.log(`Starting checkAndUpdateUserRole for user ${userId}`);
+    
     const guild = client.guilds.cache.get(GUILD_ID);
     if (!guild) {
       console.error('Guild not found');
       return;
     }
+    console.log(`Found guild: ${guild.name}`);
     
     const member = await guild.members.fetch(userId);
+    console.log(`Found member: ${member.user.username} (${member.id})`);
+    
     const hasFacebook = await hasFacebookConnected(userId);
+    console.log(`User ${userId} Facebook connection check result: ${hasFacebook}`);
     
     if (hasFacebook) {
+      console.log(`Awarding LEAGUE role to ${member.user.username}`);
       await awardLeagueRole(member);
     } else {
+      console.log(`Removing LEAGUE role from ${member.user.username}`);
       await removeLeagueRole(member);
     }
+    
+    console.log(`Completed checkAndUpdateUserRole for user ${userId}`);
   } catch (error) {
     console.error(`Error checking/updating role for user ${userId}:`, error);
   }
