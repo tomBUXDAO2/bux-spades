@@ -2858,7 +2858,13 @@ function isNonNull<T>(value: T | null | undefined): value is T {
 
 // Helper to get active games (no null players)
 function getActiveGames() {
-  return games.filter(game => game.players.every(player => player !== null));
+  return games.filter(game => {
+    // Filter out league games that are in waiting status
+    if ((game as any).league && game.status === 'WAITING') {
+      return false;
+    }
+    return game.players.every(player => player !== null);
+  });
 }
 
 // Helper to emit game update to all players with their own hands
