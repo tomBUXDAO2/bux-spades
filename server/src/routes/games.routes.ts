@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
     const settings = req.body;
     const creatorPlayer = {
       id: settings.creatorId,
-      username: settings.creatorName,
+      username: settings.creatorName || 'Unknown',
       avatar: settings.creatorImage || null,
       type: 'human' as const,
     };
@@ -52,6 +52,25 @@ router.post('/', async (req, res) => {
       finalGameType: (settings.biddingOption === 'SUICIDE' || settings.biddingOption === '4 OR NIL' || settings.biddingOption === 'BID 3' || settings.biddingOption === 'BID HEARTS' || settings.biddingOption === 'CRAZY ACES') ? 'REG' : (settings.biddingOption || 'REG')
     });
     
+    // Handle pre-assigned players for league games
+    let players: (GamePlayer | null)[] = [null, null, null, null];
+    
+    if (settings.league && settings.players && settings.players.length === 4) {
+      // League game with pre-assigned players
+      for (const playerData of settings.players) {
+        const player: GamePlayer = {
+          id: playerData.userId,
+          username: playerData.username,
+          avatar: null, // Will be fetched when player joins
+          type: 'human' as const,
+        };
+        players[playerData.seat] = player;
+      }
+    } else {
+      // Regular game - only creator in first seat
+      players[0] = creatorPlayer;
+    }
+    
     const newGame: Game = {
       id: uuidv4(),
       gameMode: settings.gameMode,
@@ -60,7 +79,7 @@ router.post('/', async (req, res) => {
       buyIn: settings.buyIn,
       forcedBid,
       specialRules: settings.specialRules || {},
-      players: [creatorPlayer, null, null, null],
+      players,
       spectators: [],
       status: 'WAITING' as Game['status'],
       completedTricks: [],
@@ -150,24 +169,44 @@ router.get('/:id', (req, res) => {
   // Find seat for player
   let seatIndex = -1;
   
-  if (requestedSeat !== null && requestedSeat >= 0 && requestedSeat < 4) {
-    // Use requested seat if available
-    if (game.players[requestedSeat] === null) {
-      seatIndex = requestedSeat;
+  // For league games, check if player is pre-assigned to a specific seat
+  if ((game as any).league) {
+    const preAssignedSeat = game.players.findIndex(p => p && p.id === playerId);
+    if (preAssignedSeat !== -1) {
+      // Player is pre-assigned to this seat
+      seatIndex = preAssignedSeat;
+      console.log(`[LEAGUE JOIN] Player ${playerId} joining pre-assigned seat ${seatIndex}`);
     } else {
-      return res.status(400).json({ error: 'Seat is already taken' });
+      return res.status(400).json({ error: 'You are not assigned to this league game' });
     }
   } else {
-    // Find first empty seat
-    seatIndex = game.players.findIndex(p => p === null);
-    if (seatIndex === -1) {
-      return res.status(400).json({ error: 'Game is full' });
+    // Regular game logic
+    if (requestedSeat !== null && requestedSeat >= 0 && requestedSeat < 4) {
+      // Use requested seat if available
+      if (game.players[requestedSeat] === null) {
+        seatIndex = requestedSeat;
+      } else {
+        return res.status(400).json({ error: 'Seat is already taken' });
+      }
+    } else {
+      // Find first empty seat
+      seatIndex = game.players.findIndex(p => p === null);
+      if (seatIndex === -1) {
+        return res.status(400).json({ error: 'Game is full' });
+      }
     }
   }
   
   // Assign player to seat
   player.position = seatIndex;
-  game.players[seatIndex] = player;
+  
+  // For league games, update the existing player data with avatar/username
+  if ((game as any).league && game.players[seatIndex]) {
+    game.players[seatIndex]!.avatar = player.avatar;
+    game.players[seatIndex]!.username = player.username;
+  } else {
+    game.players[seatIndex] = player;
+  }
   
   console.log('[HTTP JOIN DEBUG] Player added to game:', { 
     playerId: player.id, 

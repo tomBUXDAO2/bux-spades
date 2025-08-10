@@ -644,6 +644,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
     // Create game on the server
     const gameData = {
       creatorId: gameLine.hostId,
+      creatorName: gameLine.hostName,
       buyIn: gameLine.coins,
       gameMode: gameLine.gameMode,
       maxPoints: gameLine.maxPoints,
