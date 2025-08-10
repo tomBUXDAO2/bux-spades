@@ -110,12 +110,27 @@ router.get(
       
       console.log('Facebook verification debug:', {
         connectionsCount: connections.length,
-        connections: connections.map((conn: any) => ({ type: conn.type, name: conn.name, verified: conn.verified })),
-        hasFacebook: connections.some((conn: any) => conn.type === 'facebook')
+        connections: connections.map((conn: any) => ({ type: conn.type, name: conn.name, verified: conn.verified, id: conn.id })),
+        hasFacebook: connections.some((conn: any) => conn.type === 'facebook'),
+        allConnectionTypes: connections.map((conn: any) => conn.type),
+        rawConnections: connections
       });
       
-      // Check for Facebook connection
-      const hasFacebook = connections.some((conn: any) => conn.type === 'facebook');
+      // Check for Facebook connection (try multiple possible identifiers)
+      const hasFacebook = connections.some((conn: any) => 
+        conn.type === 'facebook' || 
+        conn.type === 'Facebook' || 
+        conn.type === 'FACEBOOK' ||
+        conn.name?.toLowerCase().includes('facebook') ||
+        conn.id?.toLowerCase().includes('facebook')
+      );
+      
+      console.log('Facebook connection check result:', {
+        hasFacebook,
+        connectionTypes: connections.map((conn: any) => conn.type),
+        connectionNames: connections.map((conn: any) => conn.name),
+        connectionIds: connections.map((conn: any) => conn.id)
+      });
       
       if (hasFacebook) {
                  // Get user info to get Discord ID
