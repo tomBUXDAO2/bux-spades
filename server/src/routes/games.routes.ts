@@ -2508,6 +2508,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         finalScore,
         winner,
         gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
+        league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true).map(key => {
           if (key === 'screamer') return 'SCREAMER';
           if (key === 'assassin') return 'ASSASSIN';
@@ -2605,6 +2606,32 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     });
     
     console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+    
+    // Send Discord results for league games
+    if ((game as any).league) {
+      try {
+        const { sendLeagueGameResults } = await import('../discord-bot/bot');
+        
+        // Create game line string
+        const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
+        const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${game.rules.gameType.toUpperCase()}`;
+        
+        // Prepare game data for Discord
+        const gameData = {
+          buyIn: game.buyIn,
+          players: game.players.map((p, i) => ({
+            userId: p?.id || '',
+            won: game.gameMode === 'SOLO' 
+              ? i === winningTeamOrPlayer 
+              : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+          }))
+        };
+        
+        await sendLeagueGameResults(gameData, gameLine);
+      } catch (error) {
+        console.error('Failed to send Discord results:', error);
+      }
+    }
     
   } catch (err) {
     console.error('Failed to log completed game:', err);
@@ -3084,6 +3111,7 @@ export async function logGameStart(game: Game) {
         finalScore: 0, // Will be updated when game completes
         winner: 0, // Will be updated when game completes
         gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK',
+        league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[]
       }
     });

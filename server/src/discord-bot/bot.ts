@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, TextChannel } from 'discord.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -15,6 +15,7 @@ const client = new Client({
 const LEAGUE_ROLE_ID = '1403953667501195284';
 const GUILD_ID = '1403837418494492763';
 const VERIFICATION_CHANNEL_ID = '1403960351107715073';
+const RESULTS_CHANNEL_ID = '1404128066296610878';
 
 
 
@@ -648,6 +649,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       maxPoints: gameLine.maxPoints,
       minPoints: gameLine.minPoints,
       gameType: gameLine.gameType,
+      league: true, // Mark as league game
       specialRules: {
         screamer: gameLine.screamer === 'yes',
         assassin: gameLine.assassin === 'yes'
@@ -678,10 +680,9 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Create game ready embed
       const gameReadyEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle('🎮 Game Ready!')
-        .setDescription(`${playerMentions}\n\nYour game is ready! Click the link below to join:`)
+        .setTitle('🎮 Table Up!')
+        .setDescription(`${playerMentions}\n\n**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**\n\n**GOOD LUCK! 🍀**`)
         .addFields(
-          { name: '🔗 Game Link', value: gameUrl, inline: false },
           { name: '💰 Buy-in', value: gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`, inline: true },
           { name: '🎯 Game Mode', value: gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1), inline: true },
           { name: '📊 Points', value: `${gameLine.maxPoints}/${gameLine.minPoints}`, inline: true }
@@ -710,8 +711,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         .addFields(
           { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
           { name: '👥 Players', value: '4/4', inline: true },
-          { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true },
-          { name: '🔗 Game Link', value: gameUrl, inline: false }
+          { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true }
         )
         .setFooter({ text: 'Game created! Check the reply above for details.' })
         .setTimestamp();
@@ -728,6 +728,42 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
   }
 }
 
+// Function to send league game results to Discord
+async function sendLeagueGameResults(gameData: any, gameLine: string) {
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    const channel = await guild.channels.fetch(RESULTS_CHANNEL_ID) as TextChannel;
+    
+    if (!channel) {
+      console.error('Results channel not found');
+      return;
+    }
+    
+    // Determine winners and losers
+    const winners = gameData.players.filter((p: any) => p.won).map((p: any) => `<@${p.userId}>`);
+    const losers = gameData.players.filter((p: any) => !p.won).map((p: any) => `<@${p.userId}>`);
+    
+    // Calculate coins won
+    const coinsWon = gameData.buyIn * 2; // Winners split the pot
+    
+    const resultsEmbed = new EmbedBuilder()
+      .setTitle('🏆 League Game Results')
+      .setDescription(`**${gameLine}**`)
+      .addFields(
+        { name: '🥇 Winners', value: winners.join(', '), inline: true },
+        { name: '💰 Coins Won', value: `${coinsWon >= 1000000 ? `${coinsWon / 1000000}M` : `${coinsWon / 1000}k`}`, inline: true },
+        { name: '🥈 Losers', value: losers.join(', '), inline: true }
+      )
+      .setColor(0x00ff00)
+      .setTimestamp();
+    
+    await channel.send({ embeds: [resultsEmbed] });
+    console.log('Sent league game results to Discord');
+  } catch (error) {
+    console.error('Error sending league game results:', error);
+  }
+}
+
 // Export functions for external use
 export { 
   checkAndUpdateUserRole, 
@@ -735,7 +771,8 @@ export {
   removeLeagueRole,
   verifyFacebookConnection,
   revokeFacebookVerification,
-  markOAuth2Verified
+  markOAuth2Verified,
+  sendLeagueGameResults
 };
 
 // Start the bot when this module is loaded
