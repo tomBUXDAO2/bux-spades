@@ -577,7 +577,28 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     let playerList = '';
     if (gameLine.players.length === 0) {
       playerList = 'No players joined yet';
+    } else if (gameLine.gameMode === 'Partners') {
+      // Partners format: Red team vs Blue team
+      const host = gameLine.players.find(p => p.seat === 0);
+      const partner = gameLine.players.find(p => p.seat === 2);
+      const player3 = gameLine.players.find(p => p.seat === 1);
+      const player4 = gameLine.players.find(p => p.seat === 3);
+      
+      if (host && partner) {
+        playerList += `<@${host.userId}> (Red)\n<@${partner.userId}> (Red)\n\n`;
+      } else if (host) {
+        playerList += `<@${host.userId}> (Red)\n\n`;
+      }
+      
+      if (player3 && player4) {
+        playerList += `Vs.\n\n<@${player3.userId}> (Blue)\n<@${player4.userId}> (Blue)`;
+      } else if (player3) {
+        playerList += `Vs.\n\n<@${player3.userId}> (Blue)`;
+      } else {
+        playerList += 'Vs.\n\n(Blue team empty)';
+      }
     } else {
+      // Solo format: keep original seat-based format
       playerList = gameLine.players.map(p => `<@${p.userId}> (Seat ${p.seat})`).join('\n');
     }
     
