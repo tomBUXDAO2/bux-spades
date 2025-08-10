@@ -95,6 +95,8 @@ router.get(
 
       const tokenData = await tokenResponse.json() as any;
       
+      console.log('Full token data received:', tokenData);
+      
       if (!tokenData.access_token) {
         return res.status(400).json({ error: 'Failed to get access token' });
       }
