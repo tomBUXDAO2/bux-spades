@@ -573,6 +573,18 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
       specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
     }
     
+    // Build player list
+    let playerList = '';
+    if (gameLine.players.length === 0) {
+      playerList = 'No players joined yet';
+    } else {
+      playerList = gameLine.players.map(p => `<@${p.userId}> (Seat ${p.seat})`).join('\n');
+    }
+    
+    // Add info about remaining slots
+    const remainingSlots = 4 - gameLine.players.length;
+    const slotsInfo = remainingSlots > 0 ? `\n\n**${remainingSlots} more player${remainingSlots === 1 ? '' : 's'} needed**` : '\n\n**Game is full!**';
+    
     // Create the embed
     const embed = new EmbedBuilder()
       .setColor(0x00ff00) // Green color
@@ -581,7 +593,8 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
       .addFields(
         { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
         { name: '👥 Players', value: `${gameLine.players.length}/4`, inline: true },
-        { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true }
+        { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt / 1000)}:R>`, inline: true },
+        { name: '🎯 Current Players', value: playerList + slotsInfo, inline: false }
       )
       .setFooter({ text: 'Click the buttons below to join or leave the game' })
       .setTimestamp();
