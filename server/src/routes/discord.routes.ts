@@ -145,7 +145,14 @@ router.get(
       
       if (!userData.id) {
         console.error('Failed to get user ID from Discord API:', userData);
-        return res.status(400).json({ error: 'Failed to get user information from Discord' });
+        
+        // If we have Facebook connection but can't get user ID, still assign role
+        if (hasFacebook) {
+          console.log('Facebook connection found but user ID failed - using fallback');
+          // We'll use the bulletproof fallback to assign role anyway
+        } else {
+          return res.status(400).json({ error: 'Failed to get user information from Discord' });
+        }
       }
       
       console.log('BULLETPROOF Facebook check:', {
