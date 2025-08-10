@@ -319,10 +319,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setDescription(`**${gameLineTitle}**${specialRulesText}`)
         .addFields(
           { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
-          { name: '🎯 Game Mode', value: gameMode.charAt(0).toUpperCase() + gameMode.slice(1), inline: true },
-          { name: '🎲 Game Type', value: gameType.charAt(0).toUpperCase() + gameType.slice(1), inline: true },
-          { name: '💰 Coins', value: formatCoins(coins), inline: true },
-          { name: '📊 Points', value: `${maxPoints}/${minPoints}`, inline: true },
           { name: '👥 Players', value: '0/4', inline: true },
           { name: '⏰ Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
         )
