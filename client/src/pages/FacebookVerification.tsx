@@ -69,7 +69,18 @@ const FacebookVerification: React.FC = () => {
             )}
             
             <button
-              onClick={() => window.close()}
+              onClick={() => {
+                // Try to close the window, fallback to going back if it fails
+                try {
+                  window.close();
+                  // If window.close() doesn't work (due to browser security), go back
+                  setTimeout(() => {
+                    window.history.back();
+                  }, 100);
+                } catch (error) {
+                  window.history.back();
+                }
+              }}
               className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-3 px-4 rounded-md transition-colors duration-200"
             >
               Close Window
