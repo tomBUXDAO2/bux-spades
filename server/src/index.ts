@@ -20,6 +20,25 @@ import './config/passport';
 import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
 
+// Import Discord bot (only if bot token is provided and valid)
+let discordBot: any = null;
+if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN.trim() !== '') {
+  try {
+    // Validate token format before loading bot
+    const token = process.env.DISCORD_BOT_TOKEN.trim();
+    if (token && token.length > 0) {
+      discordBot = require('./discord-bot/bot').default;
+      console.log('Discord bot loaded successfully');
+    } else {
+      console.warn('Discord bot token is empty, skipping bot initialization');
+    }
+  } catch (error) {
+    console.warn('Discord bot not loaded:', error);
+  }
+} else {
+  console.log('Discord bot token not provided, skipping bot initialization');
+}
+
 const app = express();
 const httpServer = createServer(app);
 const prisma = new PrismaClient();
