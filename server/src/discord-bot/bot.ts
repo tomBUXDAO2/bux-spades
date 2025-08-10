@@ -16,8 +16,7 @@ const LEAGUE_ROLE_ID = '1403953667501195284';
 const GUILD_ID = '1403837418494492763';
 const VERIFICATION_CHANNEL_ID = '1403960351107715073';
 
-// Store verified Facebook connections (in production, this should be in database)
-const verifiedFacebookUsers = new Set<string>();
+
 
 // Store active game lines
 interface GameLine {
@@ -44,22 +43,13 @@ const activeGameLines = new Map<string, GameLine>();
 // Function to check if user has Facebook connected via OAuth2
 async function hasFacebookConnected(userId: string): Promise<boolean> {
   try {
-    // First check if user has been manually verified
-    if (verifiedFacebookUsers.has(userId)) {
-      console.log(`User ${userId} Facebook connection check (manual): true`);
+    // Check OAuth2 verified users set
+    if (oauth2VerifiedUsers.has(userId)) {
+      console.log(`User ${userId} Facebook connection check (OAuth2): true`);
       return true;
     }
-
-    // Try to check via OAuth2 connections (this would require user to authorize)
-    // For now, we'll use a different approach - check if user has connected accounts
-    // This requires the user to have authorized our app with 'connections' scope
     
-    console.log(`User ${userId} Facebook connection check: attempting OAuth2 check`);
-    
-    // Note: This would require the user to have authorized our app with 'connections' scope
-    // and we would need to store their OAuth2 access token
-    // For now, return false and rely on manual verification
-    
+    console.log(`User ${userId} Facebook connection check: false`);
     return false;
   } catch (error) {
     console.error(`Error checking Facebook connection for user ${userId}:`, error);
@@ -71,8 +61,8 @@ async function hasFacebookConnected(userId: string): Promise<boolean> {
 async function verifyFacebookConnection(userId: string): Promise<void> {
   try {
     console.log(`Starting Facebook verification for user ${userId}`);
-    verifiedFacebookUsers.add(userId);
-    console.log(`Added user ${userId} to verifiedFacebookUsers set`);
+    oauth2VerifiedUsers.add(userId);
+    console.log(`Added user ${userId} to oauth2VerifiedUsers set`);
     
     // Update their Discord role
     console.log(`Calling checkAndUpdateUserRole for user ${userId}`);
@@ -91,7 +81,6 @@ async function markOAuth2Verified(userId: string): Promise<void> {
   try {
     console.log(`Marking user ${userId} as OAuth2 verified`);
     oauth2VerifiedUsers.add(userId);
-    verifiedFacebookUsers.add(userId);
     
     // Update their Discord role
     await checkAndUpdateUserRole(userId);
@@ -104,7 +93,7 @@ async function markOAuth2Verified(userId: string): Promise<void> {
 // Function to revoke Facebook verification
 async function revokeFacebookVerification(userId: string): Promise<void> {
   try {
-    verifiedFacebookUsers.delete(userId);
+    oauth2VerifiedUsers.delete(userId);
     console.log(`Revoked Facebook verification for user ${userId}`);
     
     // Update their Discord role
