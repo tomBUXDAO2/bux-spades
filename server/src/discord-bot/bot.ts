@@ -283,26 +283,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       
+      const coins = interaction.options.getInteger('coins', true);
+      const gameMode = interaction.options.getString('gamemode', true);
       const maxPoints = interaction.options.getInteger('maxpoints', true);
       const minPoints = interaction.options.getInteger('minpoints', true);
-      const gameMode = interaction.options.getString('gamemode', true);
       const gameType = interaction.options.getString('gametype', true);
-      const specialRules = interaction.options.getBoolean('specialrules', true);
-      const specialRule1 = interaction.options.getString('specialrule1');
-      const specialRule2 = interaction.options.getString('specialrule2');
+      const screamer = interaction.options.getString('screamer');
+      const assassin = interaction.options.getString('assassin');
+      
+      // Format coins for display
+      const formatCoins = (amount: number) => {
+        if (amount >= 1000000) {
+          return `${amount / 1000000}M`;
+        } else {
+          return `${amount / 1000}k`;
+        }
+      };
       
       // Format the game line title
-      const gameLineTitle = `${maxPoints}k ${gameMode.toUpperCase()} ${maxPoints}/${minPoints} ${gameType.toUpperCase()}`;
+      const gameLineTitle = `${formatCoins(coins)} ${gameMode.toUpperCase()} ${maxPoints}/${minPoints} ${gameType.toUpperCase()}`;
       
       // Build special rules text
       let specialRulesText = '';
-      if (specialRules) {
-        const rules = [];
-        if (specialRule1) rules.push(specialRule1.toUpperCase());
-        if (specialRule2) rules.push(specialRule2.toUpperCase());
-        if (rules.length > 0) {
-          specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
-        }
+      const rules = [];
+      if (screamer === 'yes') rules.push('SCREAMER');
+      if (assassin === 'yes') rules.push('ASSASSIN');
+      if (rules.length > 0) {
+        specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
       }
       
       // Create the embed
@@ -314,7 +321,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
           { name: '🎯 Game Mode', value: gameMode.charAt(0).toUpperCase() + gameMode.slice(1), inline: true },
           { name: '🎲 Game Type', value: gameType.charAt(0).toUpperCase() + gameType.slice(1), inline: true },
-          { name: '💰 Points', value: `${maxPoints}/${minPoints}`, inline: true },
+          { name: '💰 Coins', value: formatCoins(coins), inline: true },
+          { name: '📊 Points', value: `${maxPoints}/${minPoints}`, inline: true },
           { name: '👥 Players', value: '0/4', inline: true },
           { name: '⏰ Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
         )
