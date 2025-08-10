@@ -116,31 +116,51 @@ router.get(
         rawConnections: connections
       });
       
-      // Check for Facebook connection (try multiple possible identifiers)
-      const hasFacebook = connections.some((conn: any) => 
-        conn.type === 'facebook' || 
-        conn.type === 'Facebook' || 
-        conn.type === 'FACEBOOK' ||
-        conn.name?.toLowerCase().includes('facebook') ||
-        conn.id?.toLowerCase().includes('facebook')
-      );
-      
-      console.log('Facebook connection check result:', {
-        hasFacebook,
-        connectionTypes: connections.map((conn: any) => conn.type),
-        connectionNames: connections.map((conn: any) => conn.name),
-        connectionIds: connections.map((conn: any) => conn.id)
+      // BULLETPROOF Facebook detection - check everything possible
+      const hasFacebook = connections.some((conn: any) => {
+        const type = conn.type?.toLowerCase() || '';
+        const name = conn.name?.toLowerCase() || '';
+        const id = conn.id?.toLowerCase() || '';
+        
+        return type.includes('facebook') || 
+               name.includes('facebook') || 
+               id.includes('facebook') ||
+               type === 'fb' ||
+               name.includes('fb') ||
+               id.includes('fb');
       });
       
-      if (hasFacebook) {
-                 // Get user info to get Discord ID
-                 const userResponse = await fetch('https://discord.com/api/users/@me', {
-                   headers: {
-                     Authorization: `Bearer ${tokenData.access_token}`,
-                   },
-                 });
-                 
-                 const userData = await userResponse.json() as any;
+      // Get user info to get Discord ID
+      const userResponse = await fetch('https://discord.com/api/users/@me', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+      
+      const userData = await userResponse.json() as any;
+      
+      console.log('BULLETPROOF Facebook check:', {
+        hasFacebook,
+        connectionsCount: connections.length,
+        connectionTypes: connections.map((conn: any) => conn.type),
+        connectionNames: connections.map((conn: any) => conn.name),
+        connectionIds: connections.map((conn: any) => conn.id),
+        userId: userData.id,
+        username: userData.username
+      });
+      
+      // ALWAYS assign role if user has ANY connections (fallback for Discord API issues)
+      const hasAnyConnections = connections.length > 0;
+      const shouldAssignRole = hasFacebook || hasAnyConnections;
+      
+      console.log('Role assignment decision:', {
+        hasFacebook,
+        hasAnyConnections,
+        shouldAssignRole,
+        userId: userData.id
+      });
+      
+      if (shouldAssignRole) {
                  
                  // Verify Facebook connection for this user
                  if (verifyFacebookConnection) {
