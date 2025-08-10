@@ -56,7 +56,7 @@ const FacebookVerification: React.FC = () => {
             {message || 'An error occurred during verification.'}
           </p>
 
-          {/* Action Button */}
+          {/* Instructions */}
           <div className="space-y-3">
             {isSuccess ? (
               <div className="text-green-200 text-sm">
@@ -67,24 +67,6 @@ const FacebookVerification: React.FC = () => {
                 Please connect your Facebook to your Discord profile and try again.
               </div>
             )}
-            
-            <button
-              onClick={() => {
-                // Try to close the window, fallback to going back if it fails
-                try {
-                  window.close();
-                  // If window.close() doesn't work (due to browser security), go back
-                  setTimeout(() => {
-                    window.history.back();
-                  }, 100);
-                } catch (error) {
-                  window.history.back();
-                }
-              }}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-3 px-4 rounded-md transition-colors duration-200"
-            >
-              Close Window
-            </button>
           </div>
 
           {/* BUX Spades Logo */}
