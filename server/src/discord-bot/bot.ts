@@ -246,10 +246,103 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
+    
+    // Handle game line buttons
+    if (interaction.customId === 'join_game' || interaction.customId === 'leave_game' || interaction.customId === 'start_game') {
+      await interaction.deferReply({ ephemeral: true });
+      
+      try {
+        const userId = interaction.user.id;
+        const username = interaction.user.username;
+        
+        if (interaction.customId === 'join_game') {
+          await interaction.editReply('✅ You have joined the game!');
+        } else if (interaction.customId === 'leave_game') {
+          await interaction.editReply('❌ You have left the game.');
+        } else if (interaction.customId === 'start_game') {
+          await interaction.editReply('🚀 Starting the game...');
+        }
+      } catch (error) {
+        console.error('Error handling game button:', error);
+        await interaction.editReply('❌ Error processing game action. Please try again later.');
+      }
+      return;
+    }
   }
   
   // Handle slash commands
   if (!interaction.isCommand()) return;
+  
+  if (interaction.commandName === 'game') {
+    await interaction.deferReply();
+    
+    try {
+      const maxPoints = interaction.options.getInteger('maxpoints', true);
+      const minPoints = interaction.options.getInteger('minpoints', true);
+      const gameMode = interaction.options.getString('gamemode', true);
+      const gameType = interaction.options.getString('gametype', true);
+      const specialRules = interaction.options.getBoolean('specialrules', true);
+      const specialRule1 = interaction.options.getString('specialrule1');
+      const specialRule2 = interaction.options.getString('specialrule2');
+      
+      // Format the game line title
+      const gameLineTitle = `${maxPoints}k ${gameMode.toUpperCase()} ${maxPoints}/${minPoints} ${gameType.toUpperCase()}`;
+      
+      // Build special rules text
+      let specialRulesText = '';
+      if (specialRules) {
+        const rules = [];
+        if (specialRule1) rules.push(specialRule1.toUpperCase());
+        if (specialRule2) rules.push(specialRule2.toUpperCase());
+        if (rules.length > 0) {
+          specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
+        }
+      }
+      
+      // Create the embed
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00) // Green color
+        .setTitle('🎮 GAME LINE')
+        .setDescription(`**${gameLineTitle}**${specialRulesText}`)
+        .addFields(
+          { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '🎯 Game Mode', value: gameMode.charAt(0).toUpperCase() + gameMode.slice(1), inline: true },
+          { name: '🎲 Game Type', value: gameType.charAt(0).toUpperCase() + gameType.slice(1), inline: true },
+          { name: '💰 Points', value: `${maxPoints}/${minPoints}`, inline: true },
+          { name: '👥 Players', value: '0/4', inline: true },
+          { name: '⏰ Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+        )
+        .setFooter({ text: 'Click the buttons below to join or leave the game' })
+        .setTimestamp();
+      
+      // Create join/leave buttons
+      const row = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('join_game')
+            .setLabel('Join Game')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅'),
+          new ButtonBuilder()
+            .setCustomId('leave_game')
+            .setLabel('Leave Game')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌'),
+          new ButtonBuilder()
+            .setCustomId('start_game')
+            .setLabel('Start Game')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🚀')
+            .setDisabled(true) // Disabled until 4 players join
+        );
+      
+      await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch (error) {
+      console.error('Error in game command:', error);
+      await interaction.editReply('❌ Error creating game line');
+    }
+    return;
+  }
   
   if (interaction.commandName === 'checkfacebook') {
     await interaction.deferReply();
