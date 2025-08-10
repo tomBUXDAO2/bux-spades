@@ -83,6 +83,24 @@ async function verifyFacebookConnection(userId: string): Promise<void> {
   }
 }
 
+// Store users who have been verified through OAuth2
+const oauth2VerifiedUsers = new Set<string>();
+
+// Function to mark user as verified through OAuth2
+async function markOAuth2Verified(userId: string): Promise<void> {
+  try {
+    console.log(`Marking user ${userId} as OAuth2 verified`);
+    oauth2VerifiedUsers.add(userId);
+    verifiedFacebookUsers.add(userId);
+    
+    // Update their Discord role
+    await checkAndUpdateUserRole(userId);
+    console.log(`Successfully marked user ${userId} as OAuth2 verified`);
+  } catch (error) {
+    console.error(`Error marking user ${userId} as OAuth2 verified:`, error);
+  }
+}
+
 // Function to revoke Facebook verification
 async function revokeFacebookVerification(userId: string): Promise<void> {
   try {
@@ -693,7 +711,8 @@ export {
   awardLeagueRole, 
   removeLeagueRole,
   verifyFacebookConnection,
-  revokeFacebookVerification
+  revokeFacebookVerification,
+  markOAuth2Verified
 };
 
 // Start the bot when this module is loaded

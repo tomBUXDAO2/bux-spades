@@ -6,12 +6,14 @@ import jwt from 'jsonwebtoken';
 let checkAndUpdateUserRole: any = null;
 let verifyFacebookConnection: any = null;
 let revokeFacebookVerification: any = null;
+let markOAuth2Verified: any = null;
 
 try {
   const botModule = require('../discord-bot/bot');
   checkAndUpdateUserRole = botModule.checkAndUpdateUserRole;
   verifyFacebookConnection = botModule.verifyFacebookConnection;
   revokeFacebookVerification = botModule.revokeFacebookVerification;
+  markOAuth2Verified = botModule.markOAuth2Verified;
 } catch (error) {
   console.warn('Discord bot functions not available:', error);
 }
@@ -128,6 +130,11 @@ router.get(
                  // Verify Facebook connection for this user
                  if (verifyFacebookConnection) {
                    await verifyFacebookConnection(userData.id);
+                 }
+                 
+                 // Also mark as OAuth2 verified if the bot function is available
+                 if (markOAuth2Verified) {
+                   await markOAuth2Verified(userData.id);
                  }
                  
                  // Redirect to success page
