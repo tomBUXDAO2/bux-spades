@@ -148,20 +148,24 @@ router.get(
         
               // If we have Facebook connection but can't get user ID, still assign role
       if (hasFacebook) {
-        console.log('Facebook connection found but user ID failed - using fallback');
-        // We'll use the bulletproof fallback to assign role anyway
-        // But we need to get the user ID from the token data instead
-        const tokenParts = tokenData.access_token.split('.');
-        if (tokenParts.length >= 2) {
-          try {
-            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-            if (payload.user_id) {
-              userData = { id: payload.user_id };
-              console.log('Extracted user ID from token:', payload.user_id);
+        console.log('Facebook connection found but user ID failed - trying token-based user lookup');
+        try {
+          // Use the token to get user info directly
+          const tokenUserResponse = await fetch('https://discord.com/api/v10/users/@me', {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`
             }
-          } catch (e) {
-            console.log('Could not extract user ID from token');
+          });
+          
+          if (tokenUserResponse.ok) {
+            const tokenUserData = await tokenUserResponse.json() as any;
+            userData = { id: tokenUserData.id };
+            console.log('Successfully got user ID from token:', tokenUserData.id);
+          } else {
+            console.log('Token-based user lookup also failed:', tokenUserResponse.status);
           }
+        } catch (e) {
+          console.log('Error in token-based user lookup:', e);
         }
       } else {
         return res.status(400).json({ error: 'Failed to get user information from Discord' });
