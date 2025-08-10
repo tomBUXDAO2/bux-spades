@@ -277,6 +277,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.deferReply();
     
     try {
+      // Check if this is a chat input command interaction
+      if (!interaction.isChatInputCommand()) {
+        await interaction.editReply('❌ This command can only be used as a slash command.');
+        return;
+      }
+      
       const maxPoints = interaction.options.getInteger('maxpoints', true);
       const minPoints = interaction.options.getInteger('minpoints', true);
       const gameMode = interaction.options.getString('gamemode', true);
