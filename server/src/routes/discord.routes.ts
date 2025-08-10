@@ -137,7 +137,16 @@ router.get(
         },
       });
       
+      console.log('User response status:', userResponse.status);
+      console.log('User response headers:', Object.fromEntries(userResponse.headers.entries()));
+      
       const userData = await userResponse.json() as any;
+      console.log('User data response:', userData);
+      
+      if (!userData.id) {
+        console.error('Failed to get user ID from Discord API:', userData);
+        return res.status(400).json({ error: 'Failed to get user information from Discord' });
+      }
       
       console.log('BULLETPROOF Facebook check:', {
         hasFacebook,
