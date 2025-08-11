@@ -237,8 +237,8 @@ client.once(Events.ClientReady, () => {
   console.log(`Discord bot logged in as ${client.user?.tag}`);
   console.log(`Monitoring guild: ${GUILD_ID}`);
   
-  // Post the verification embed when bot starts
-  postVerificationEmbed();
+  // Verification embed is now posted manually when needed
+  // postVerificationEmbed();
 });
 
 // Event: New member joins
