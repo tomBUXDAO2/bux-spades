@@ -6,6 +6,7 @@ import { games } from '../gamesStore';
 import { startSeatReplacement } from "../index";
 import { PrismaClient } from '@prisma/client';
 import type { AuthenticatedSocket } from '../index';
+import { trickLogger } from '../lib/trickLogger';
 
 
 
@@ -128,8 +129,41 @@ router.post('/', async (req, res) => {
     };
     games.push(newGame);
     
-    // NEW: Log the game start to database
-    await logGameStart(newGame);
+    // FORCE GAME LOGGING - Create game in database immediately
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const dbGame = await prisma.game.create({
+        data: {
+          creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
+          gameMode: newGame.gameMode,
+          bidType: 'REGULAR',
+          specialRules: [],
+          minPoints: newGame.minPoints,
+          maxPoints: newGame.maxPoints,
+          buyIn: newGame.buyIn,
+          rated: newGame.players.filter(p => p && p.type === 'human').length === 4,
+          status: 'WAITING',
+        }
+      });
+      
+      newGame.dbGameId = dbGame.id;
+      console.log('[FORCE GAME LOGGED] Game forced to database with ID:', newGame.dbGameId);
+      
+      // Start round logging immediately when game is created
+      try {
+        const { trickLogger } = await import('../lib/trickLogger');
+        await trickLogger.startRound(newGame.dbGameId, 1);
+        console.log('[ROUND STARTED] Round 1 started for game:', newGame.dbGameId);
+      } catch (err) {
+        console.error('Failed to start round logging:', err);
+      }
+      
+      await prisma.$disconnect();
+    } catch (err) {
+      console.error('Failed to force log game start:', err);
+    }
     
     // Filter out league games in waiting status for lobby
     const lobbyGames = games.filter(game => {
@@ -1767,6 +1801,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
       });
       game.play.trickNumber += 1;
       console.log('[TRICK DEBUG] Trick completed, new trickNumber:', game.play.trickNumber);
+      
+      // NEW: Log the completed trick to database
+      trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
+        console.error('Failed to log trick to database:', err);
+      });
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
       console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
@@ -1838,6 +1877,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
           // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
           
+          // NEW: Log completed hand to database
+          trickLogger.logCompletedHand(game).catch((err: Error) => {
+            console.error('Failed to log completed hand to database:', err);
+          });
+          
           console.log('[HAND COMPLETED] Solo mode - Emitting hand_completed event with data:', {
             // Current hand scores (for hand summary display)
             team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
@@ -1907,9 +1951,14 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10;
         }
         
-        // Set game status to indicate hand is completed
-        game.status = 'HAND_COMPLETED';
-        
+                  // Set game status to indicate hand is completed
+          game.status = 'HAND_COMPLETED';
+          
+          // NEW: Log completed hand to database
+          trickLogger.logCompletedHand(game).catch((err: Error) => {
+            console.error('Failed to log completed hand to database:', err);
+          });
+          
           console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with data:', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
@@ -2048,10 +2097,15 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10;
         }
         
-        // Set game status to indicate hand is completed
-        game.status = 'HAND_COMPLETED';
-        
-        console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
+                  // Set game status to indicate hand is completed
+          game.status = 'HAND_COMPLETED';
+          
+          // NEW: Log completed hand to database
+          trickLogger.logCompletedHand(game).catch((err: Error) => {
+            console.error('Failed to log completed hand to database:', err);
+          });
+          
+          console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
           team2TotalScore: game.team2TotalScore,
@@ -2159,6 +2213,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Force hand completion regardless of trick number
         console.log('[FAILSAFE] Forcing hand completion due to empty hands');
         game.status = 'HAND_COMPLETED';
+        
+        // NEW: Log completed hand to database
+        trickLogger.logCompletedHand(game).catch((err: Error) => {
+          console.error('Failed to log completed hand to database:', err);
+        });
         
         // Calculate final scores
         const finalScores = calculatePartnersHandScore(game);
@@ -3057,6 +3116,11 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       });
       game.play.trickNumber += 1;
       console.log('[HUMAN TIMEOUT TRICK DEBUG] Trick completed, new trickNumber:', game.play.trickNumber);
+      
+      // NEW: Log the completed trick to database
+      trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
+        console.error('Failed to log trick to database:', err);
+      });
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
       console.log('[HUMAN TIMEOUT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);

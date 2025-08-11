@@ -19,6 +19,7 @@ import socialRoutes from './routes/social.routes';
 import './config/passport';
 import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
+import { trickLogger } from './lib/trickLogger';
 
 // Import Discord bot (only if bot token is provided and valid)
 let discordBot: any = null;
@@ -1103,7 +1104,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   // Make bid event
-  socket.on('make_bid', ({ gameId, userId, bid }) => {
+  socket.on('make_bid', async ({ gameId, userId, bid }) => {
     console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, socketId: socket.id });
     console.log('[BID DEBUG] Socket auth status:', { isAuthenticated: socket.isAuthenticated, userId: socket.userId });
     
@@ -1192,12 +1193,69 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         spadesBroken: false
       };
       
-      // NEW: Log game start to database when transitioning to PLAYING
+              // FORCE GAME LOGGING - Create game in database immediately
       if (!game.dbGameId) {
-        logGameStart(game).catch((err: Error) => {
-          console.error('Failed to log game start:', err);
-        });
+        try {
+          const { PrismaClient } = await import('@prisma/client');
+          const prisma = new PrismaClient();
+          
+          const dbGame = await prisma.game.create({
+            data: {
+              creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
+              gameMode: game.gameMode,
+              bidType: 'REGULAR',
+              specialRules: [],
+              minPoints: game.minPoints,
+              maxPoints: game.maxPoints,
+              buyIn: game.buyIn,
+              rated: game.players.filter(p => p && p.type === 'human').length === 4,
+              status: 'PLAYING',
+            }
+          });
+          
+          game.dbGameId = dbGame.id;
+          console.log('[FORCE GAME LOGGED] Game forced to database with ID:', game.dbGameId);
+          await prisma.$disconnect();
+        } catch (err) {
+          console.error('Failed to force log game start:', err);
+          game.dbGameId = game.id; // Fallback to in-memory ID
+        }
+      } else {
+        console.log('[GAME ALREADY LOGGED] Game already has dbGameId:', game.dbGameId);
+        // Verify the game actually exists in the database
+        try {
+          const { PrismaClient } = await import('@prisma/client');
+          const prisma = new PrismaClient();
+          const dbGame = await prisma.game.findUnique({
+            where: { id: game.dbGameId }
+          });
+          if (!dbGame) {
+            console.log('[GAME NOT IN DB] Game with dbGameId not found in database, recreating...');
+            const newDbGame = await prisma.game.create({
+              data: {
+                creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
+                gameMode: game.gameMode,
+                bidType: 'REGULAR',
+                specialRules: [],
+                minPoints: game.minPoints,
+                maxPoints: game.maxPoints,
+                buyIn: game.buyIn,
+                rated: game.players.filter(p => p && p.type === 'human').length === 4,
+                status: 'PLAYING',
+              }
+            });
+            game.dbGameId = newDbGame.id;
+            console.log('[GAME RECREATED] Game recreated in database with ID:', game.dbGameId);
+          } else {
+            console.log('[GAME VERIFIED] Game found in database:', game.dbGameId);
+          }
+          await prisma.$disconnect();
+        } catch (err) {
+          console.error('Failed to verify game in database:', err);
+        }
       }
+  
+  // Round logging is now started when game is created
       
       console.log('[BIDDING COMPLETE] Moving to play phase, first player:', firstPlayer.username, 'at index:', (game.dealerIndex + 1) % 4);
       
@@ -1429,6 +1487,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         winnerIndex,
       });
       game.play.trickNumber += 1;
+      
+      // NEW: Log the completed trick to database
+      trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
+        console.error('Failed to log trick to database:', err);
+      });
       // Set current player to the winner of the trick
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
@@ -1497,6 +1560,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
           
+          // NEW: Log completed hand to database
+          trickLogger.logCompletedHand(game).catch((err: Error) => {
+            console.error('Failed to log completed hand to database:', err);
+          });
+          
                   io.to(game.id).emit('hand_completed', {
           // Current hand scores (for hand summary display)
           team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
@@ -1541,6 +1609,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         // Set game status to indicate hand is completed
         game.status = 'HAND_COMPLETED';
+        
+        // NEW: Log completed hand to database
+        trickLogger.logCompletedHand(game).catch((err: Error) => {
+          console.error('Failed to log completed hand to database:', err);
+        });
         
         io.to(game.id).emit('hand_completed', {
           ...handSummary,
@@ -1837,6 +1910,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               winnerIndex: finalWinnerIndex,
             });
             game.play.trickNumber += 1;
+            
+            // NEW: Log the completed trick to database
+            trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
+              console.error('Failed to log trick to database:', err);
+            });
+            
             if (game.players[finalWinnerIndex]) {
               game.players[finalWinnerIndex].tricks = (game.players[finalWinnerIndex].tricks || 0) + 1;
             }
@@ -1847,6 +1926,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Force hand completion regardless of trick number
           console.log('[FAILSAFE] Forcing hand completion due to empty hands');
           game.status = 'HAND_COMPLETED';
+          
+          // NEW: Log completed hand to database
+          trickLogger.logCompletedHand(game).catch((err: Error) => {
+            console.error('Failed to log completed hand to database:', err);
+          });
           
           // Calculate final scores based on game mode
           let finalScores;
@@ -2139,7 +2223,9 @@ export function startSeatReplacement(game: Game, seatIndex: number) {
   const expiresAt = Date.now() + 120000; // 2 minutes
   const timer = setTimeout(() => {
     console.log(`[SEAT REPLACEMENT] Timer expired for seat ${seatIndex} in game ${game.id}`);
-    fillSeatWithBot(game, seatIndex);
+            fillSeatWithBot(game, seatIndex).catch(err => {
+          console.error('[SEAT REPLACEMENT] Error filling seat with bot:', err);
+        });
   }, 120000);
   
   seatReplacements.set(replacementId, { gameId: game.id, seatIndex, timer, expiresAt });
@@ -2218,7 +2304,7 @@ function addBotToSeat(game: Game, seatIndex: number) {
   }
 }
 
-function fillSeatWithBot(game: Game, seatIndex: number) {
+async function fillSeatWithBot(game: Game, seatIndex: number) {
   const replacementId = `${game.id}-${seatIndex}`;
   const replacement = seatReplacements.get(replacementId);
   
@@ -2265,6 +2351,34 @@ function fillSeatWithBot(game: Game, seatIndex: number) {
   io.to(game.id).emit('game_update', enrichedGame);
   
   console.log(`[SEAT REPLACEMENT] Bot added to seat ${seatIndex} in game ${game.id}`);
+  
+  // FORCE GAME LOGGING - Create game in database immediately
+  if (!game.dbGameId) {
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const dbGame = await prisma.game.create({
+        data: {
+          creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
+          gameMode: game.gameMode,
+          bidType: 'REGULAR',
+          specialRules: [],
+          minPoints: game.minPoints,
+          maxPoints: game.maxPoints,
+          buyIn: game.buyIn,
+          rated: game.players.filter(p => p && p.type === 'human').length === 4,
+          status: 'PLAYING',
+        }
+      });
+      
+      game.dbGameId = dbGame.id;
+      console.log(`[SEAT REPLACEMENT] Game forced to database with ID: ${game.dbGameId}`);
+      await prisma.$disconnect();
+    } catch (err) {
+      console.error('[SEAT REPLACEMENT] Failed to force log game to database:', err);
+    }
+  }
   
   // Check if it's the bot's turn to play
   if (game.play && game.play.currentPlayerIndex === seatIndex) {
