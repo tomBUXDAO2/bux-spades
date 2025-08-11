@@ -211,8 +211,8 @@ router.get('/:id', (req, res) => {
     position: requestedSeat
   };
 
-  // Prevent duplicate join
-  if (game.players.some(p => p && p.id === player.id)) {
+  // Prevent duplicate join - but allow league game players to "rejoin" their assigned seat
+  if (game.players.some(p => p && p.id === player.id) && !(game as any).league) {
     return res.status(400).json({ error: 'Player already joined' });
   }
 
@@ -232,21 +232,37 @@ router.get('/:id', (req, res) => {
   
   // For league games, check if player is pre-assigned to a specific seat
   if ((game as any).league) {
-    // Find user by Discord ID
-    const user = await prisma.user.findFirst({
-      where: { discordId: playerId }
+    console.log('[LEAGUE JOIN DEBUG] Processing league game join:', {
+      playerId,
+      gamePlayers: game.players.map(p => p ? { id: p.id, username: p.username } : null)
+    });
+    
+    // Find user by database ID (playerId is already the database user ID)
+    const user = await prisma.user.findUnique({
+      where: { id: playerId }
     });
     
     if (!user) {
+      console.log('[LEAGUE JOIN DEBUG] User not found in database:', playerId);
       return res.status(400).json({ error: 'User not found. Please login with Discord first.' });
     }
     
     const preAssignedSeat = game.players.findIndex(p => p && p.id === user.id);
+    console.log('[LEAGUE JOIN DEBUG] Pre-assigned seat search:', {
+      userId: user.id,
+      preAssignedSeat,
+      gamePlayers: game.players.map(p => p ? { id: p.id, username: p.username } : null)
+    });
+    
     if (preAssignedSeat !== -1) {
       // Player is pre-assigned to this seat
       seatIndex = preAssignedSeat;
-      console.log(`[LEAGUE JOIN] Player ${playerId} (${user.id}) joining pre-assigned seat ${seatIndex}`);
+      console.log(`[LEAGUE JOIN] Player ${playerId} joining pre-assigned seat ${seatIndex}`);
     } else {
+      console.log('[LEAGUE JOIN DEBUG] Player not assigned to this league game:', {
+        userId: user.id,
+        username: user.username
+      });
       return res.status(400).json({ error: 'You are not assigned to this league game' });
     }
   } else {
@@ -273,8 +289,8 @@ router.get('/:id', (req, res) => {
   // For league games, update the existing player data with avatar/username
   if ((game as any).league && game.players[seatIndex]) {
     // Find the user to get the correct ID
-    const user = await prisma.user.findFirst({
-      where: { discordId: playerId }
+    const user = await prisma.user.findUnique({
+      where: { id: playerId }
     });
     
     if (user) {

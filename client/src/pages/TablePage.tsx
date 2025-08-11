@@ -160,6 +160,38 @@ export default function TablePage() {
         // Update modal state for initial game load
         updateModalState(data);
         
+        // Check if user is already assigned to a seat in this game (for league games)
+        const isUserInGame = data.players.some((player: any) => player && player.id === user.id);
+        console.log('[LEAGUE GAME DEBUG] Checking if user is in game:', {
+          userId: user.id,
+          isUserInGame,
+          isSpectator,
+          gamePlayers: data.players.map((p: any) => p ? { id: p.id, username: p.username } : null)
+        });
+        
+        if (isUserInGame && !isSpectator) {
+          console.log('[LEAGUE GAME] User is already assigned to this game, auto-joining...');
+          // Auto-join the user to the game
+          try {
+            const joinResponse = await api.post(`/api/games/${gameId}/join`, {
+              id: user.id,
+              username: user.username,
+              avatar: user.avatar
+            });
+            if (joinResponse.ok) {
+              const updatedGame = await joinResponse.json();
+              setGame(updatedGame);
+              updateModalState(updatedGame);
+              console.log('[LEAGUE GAME] Successfully auto-joined user to game');
+            } else {
+              const errorData = await joinResponse.json();
+              console.error('[LEAGUE GAME] Failed to auto-join user to game:', errorData);
+            }
+          } catch (error) {
+            console.error('[LEAGUE GAME] Error auto-joining user to game:', error);
+          }
+        }
+        
         // Request full-screen on mobile/tablet after game loads
         if (isMobileOrTablet()) {
           setTimeout(() => {
