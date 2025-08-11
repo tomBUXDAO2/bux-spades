@@ -658,6 +658,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       players: gameLine.players.map(p => ({
         userId: p.userId,
         username: p.username,
+        discordId: p.userId, // Use Discord ID for matching
         seat: p.seat
       }))
     };
