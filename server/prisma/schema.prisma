@@ -94,11 +94,11 @@ model Round {
 model Trick {
   id              String   @id @default(cuid())
   roundId         String
-  trickNumber     Int      // Trick number within the round (1-13)
   leadPlayerId    String
   winningPlayerId String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  trickNumber     Int
   cards           Card[]
   round           Round    @relation(fields: [roundId], references: [id])
 
@@ -111,9 +111,9 @@ model Card {
   playerId  String
   suit      Suit
   value     Int
-  position  Int      // Position in the trick (0-3)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  position  Int
   trick     Trick    @relation(fields: [trickId], references: [id])
 }
 
