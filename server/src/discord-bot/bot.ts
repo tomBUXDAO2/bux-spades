@@ -41,6 +41,35 @@ interface GameLine {
 
 const activeGameLines = new Map<string, GameLine>();
 
+
+
+// Load verified users from database on startup
+async function loadVerifiedUsersFromDatabase() {
+  try {
+    // Get all users with discordId (these are Discord users)
+    const users = await prisma.user.findMany({
+      where: {
+        discordId: { not: null }
+      },
+      select: {
+        discordId: true
+      }
+    });
+    
+    // Add all Discord users to the verified set (they've been verified through OAuth2)
+    users.forEach(user => {
+      if (user.discordId) {
+        oauth2VerifiedUsers.add(user.discordId);
+        console.log(`Loaded verified user from database: ${user.discordId}`);
+      }
+    });
+    
+    console.log(`Loaded ${oauth2VerifiedUsers.size} verified users from database`);
+  } catch (error) {
+    console.error('Error loading verified users from database:', error);
+  }
+}
+
 // Function to check if user has Facebook connected via OAuth2
 async function hasFacebookConnected(userId: string): Promise<boolean> {
   try {
@@ -163,8 +192,18 @@ async function checkAndUpdateUserRole(userId: string): Promise<void> {
       console.log(`Awarding LEAGUE role to ${member.user.username}`);
       await awardLeagueRole(member);
     } else {
-      console.log(`Removing LEAGUE role from ${member.user.username}`);
-      await removeLeagueRole(member);
+      // Only remove role if user is definitely not verified (not just temporarily unavailable)
+      // Check if user exists in database as a Discord user (which means they were verified)
+      const userInDatabase = await prisma.user.findFirst({
+        where: { discordId: userId }
+      });
+      
+      if (!userInDatabase) {
+        console.log(`Removing LEAGUE role from ${member.user.username} - user not in database`);
+        await removeLeagueRole(member);
+      } else {
+        console.log(`Keeping LEAGUE role for ${member.user.username} - user exists in database (was verified)`);
+      }
     }
     
     console.log(`Completed checkAndUpdateUserRole for user ${userId}`);
@@ -264,7 +303,16 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     if (newHasFacebook) {
       await awardLeagueRole(newMember);
     } else {
-      await removeLeagueRole(newMember);
+      // Only remove role if user is definitely not verified (not just temporarily unavailable)
+      const userInDatabase = await prisma.user.findFirst({
+        where: { discordId: newMember.id }
+      });
+      
+      if (!userInDatabase) {
+        await removeLeagueRole(newMember);
+      } else {
+        console.log(`Keeping LEAGUE role for ${newMember.user.username} - user exists in database (was verified)`);
+      }
     }
   }
 });
@@ -517,8 +565,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await awardLeagueRole(member);
           awardedCount++;
         } else if (!hasFacebook && hasLeagueRole) {
-          await removeLeagueRole(member);
-          removedCount++;
+          // Only remove role if user is definitely not verified (not just temporarily unavailable)
+          const userInDatabase = await prisma.user.findFirst({
+            where: { discordId: member.id }
+          });
+          
+          if (!userInDatabase) {
+            await removeLeagueRole(member);
+            removedCount++;
+          } else {
+            console.log(`Keeping LEAGUE role for ${member.user.username} - user exists in database (was verified)`);
+          }
         }
         
         checkedCount++;
@@ -788,8 +845,10 @@ console.log('- Role ID:', LEAGUE_ROLE_ID);
 
 if (token && token.trim() !== '') {
   console.log('Attempting to start Discord bot...');
-  client.login(token).then(() => {
+  client.login(token).then(async () => {
     console.log('Discord bot login successful!');
+    // Load verified users from database after successful login
+    await loadVerifiedUsersFromDatabase();
   }).catch((error) => {
     console.error('Failed to start Discord bot:', error);
     console.log('Discord bot will not be available');
