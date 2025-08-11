@@ -144,11 +144,13 @@ export const login = async (req: Request, res: Response) => {
       const isPlayer = game.players.some((player: any) => 
         player && player.id === user.id && player.type === 'human'
       );
+      const isLeagueGame = (game as any).league;
       const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
+      const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
       
-      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isActiveGame=${isActiveGame}`);
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
       
-      return isPlayer && isActiveGame;
+      return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });
     
     console.log('[ACTIVE GAME DEBUG] Found active game:', activeGame ? { id: activeGame.id, status: activeGame.status } : null);
@@ -211,11 +213,13 @@ export const getProfile = async (req: Request, res: Response) => {
       const isPlayer = game.players.some((player: any) => 
         player && player.id === userId && player.type === 'human'
       );
+      const isLeagueGame = (game as any).league;
       const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
+      const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
       
-      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isActiveGame=${isActiveGame}`);
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
       
-      return isPlayer && isActiveGame;
+      return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });
     
     console.log('[ACTIVE GAME DEBUG] Found active game in getProfile:', activeGame ? { id: activeGame.id, status: activeGame.status } : null);

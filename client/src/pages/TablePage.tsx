@@ -160,17 +160,24 @@ export default function TablePage() {
         // Update modal state for initial game load
         updateModalState(data);
         
-        // Check if user is already assigned to a seat in this game (for league games)
+        // Check if this is a league game and if user is assigned to it
+        const isLeagueGame = (data as any).league;
         const isUserInGame = data.players.some((player: any) => player && player.id === user.id);
-        console.log('[LEAGUE GAME DEBUG] Checking if user is in game:', {
+        const isUserAssignedToLeagueGame = isLeagueGame && isUserInGame;
+        
+        console.log('[LEAGUE GAME DEBUG] Checking game and user status:', {
           userId: user.id,
+          isLeagueGame,
           isUserInGame,
+          isUserAssignedToLeagueGame,
           isSpectator,
+          gameStatus: data.status,
           gamePlayers: data.players.map((p: any) => p ? { id: p.id, username: p.username } : null)
         });
         
-        if (isUserInGame && !isSpectator) {
-          console.log('[LEAGUE GAME] User is already assigned to this game, auto-joining...');
+        // For league games, if user is assigned and not spectating, auto-join them
+        if (isUserAssignedToLeagueGame && !isSpectator) {
+          console.log('[LEAGUE GAME] User is assigned to this league game, auto-joining...');
           // Auto-join the user to the game
           try {
             const joinResponse = await api.post(`/api/games/${gameId}/join`, {
@@ -190,6 +197,10 @@ export default function TablePage() {
           } catch (error) {
             console.error('[LEAGUE GAME] Error auto-joining user to game:', error);
           }
+        } else if (isUserAssignedToLeagueGame && isSpectator) {
+          // If user is assigned to league game but accessing as spectator, redirect them to player view
+          console.log('[LEAGUE GAME] User is assigned to league game but accessing as spectator, redirecting to player view');
+          navigate(`/table/${gameId}`, { replace: true });
         }
         
         // Request full-screen on mobile/tablet after game loads
