@@ -390,37 +390,50 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
   // Get a player's avatar - updated to match GameTable.tsx logic
   const getPlayerAvatar = (playerId: string): string => {
+    console.log('[AVATAR DEBUG] getPlayerAvatar called with playerId:', playerId);
+    console.log('[AVATAR DEBUG] Available players:', players.map(p => ({ id: p.id, username: p.username, avatar: p.avatar })));
+    console.log('[AVATAR DEBUG] Available spectators:', spectators?.map(s => ({ id: s.id, username: s.username, avatar: s.avatar })));
+    
     // Find the player in the players array
     const player = players.find(p => p.id === playerId);
+    console.log('[AVATAR DEBUG] Found player:', player);
     
     // Check for avatar property first (most common)
     if (player && player.avatar) {
+      console.log('[AVATAR DEBUG] Using player avatar:', player.avatar);
       return player.avatar;
     }
     
     // Check for image property as fallback
     if (player && 'image' in player && player.image) {
+      console.log('[AVATAR DEBUG] Using player image:', player.image);
       return player.image as string;
     }
     
     // Check if it's a spectator
     const spectator = spectators?.find(s => s.id === playerId);
+    console.log('[AVATAR DEBUG] Found spectator:', spectator);
     if (spectator && spectator.avatar) {
+      console.log('[AVATAR DEBUG] Using spectator avatar:', spectator.avatar);
       return spectator.avatar;
     }
     
     // Discord user ID (numeric string)
     if (playerId && /^\d+$/.test(playerId)) {
       // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
-      return `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
+      const discordAvatar = `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
+      console.log('[AVATAR DEBUG] Using Discord avatar:', discordAvatar);
+      return discordAvatar;
     }
     
     // Guest user, use default avatar
     if (playerId && playerId.startsWith('guest_')) {
+      console.log('[AVATAR DEBUG] Using guest avatar:', GUEST_AVATAR);
       return GUEST_AVATAR;
     }
     
     // Fallback to bot avatar
+    console.log('[AVATAR DEBUG] Using bot avatar fallback:', BOT_AVATAR);
     return BOT_AVATAR;
   };
 
