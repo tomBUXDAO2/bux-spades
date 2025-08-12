@@ -31,6 +31,8 @@ interface GameLine {
   gameType: string;
   screamer: string | null;
   assassin: string | null;
+  nil: string | null;
+  blindNil: string | null;
   players: {
     userId: string;
     username: string;
@@ -454,6 +456,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const gameType = interaction.options.getString('gametype', true);
       const screamer = interaction.options.getString('screamer');
       const assassin = interaction.options.getString('assassin');
+      const nil = interaction.options.getString('nil');
+      const blindNil = interaction.options.getString('blindnil');
       
       // Format coins for display
       const formatCoins = (amount: number) => {
@@ -472,6 +476,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const rules = [];
       if (screamer === 'yes') rules.push('SCREAMER');
       if (assassin === 'yes') rules.push('ASSASSIN');
+      
+      // Add nil/blind nil settings only for regular games
+      if (gameType === 'regular') {
+        if (nil === 'no') rules.push('NO NIL');
+        if (blindNil === 'yes') rules.push('BLIND NIL');
+      }
+      
       if (rules.length > 0) {
         specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
       }
@@ -524,6 +535,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         gameType,
         screamer,
         assassin,
+        nil,
+        blindNil,
         players: [
           {
             userId: interaction.user.id,
@@ -710,7 +723,10 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       league: true, // Mark as league game
       specialRules: {
         screamer: gameLine.screamer === 'yes',
-        assassin: gameLine.assassin === 'yes'
+        assassin: gameLine.assassin === 'yes',
+        // Only apply nil/blind nil settings for regular games
+        allowNil: gameLine.gameType === 'regular' ? (gameLine.nil === 'yes') : true,
+        allowBlindNil: gameLine.gameType === 'regular' ? (gameLine.blindNil === 'yes') : false
       },
       players: gameLine.players.map(p => ({
         userId: p.userId,
@@ -758,6 +774,13 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       const finalRules = [];
       if (gameLine.screamer === 'yes') finalRules.push('SCREAMER');
       if (gameLine.assassin === 'yes') finalRules.push('ASSASSIN');
+      
+      // Add nil/blind nil settings only for regular games
+      if (gameLine.gameType === 'regular') {
+        if (gameLine.nil === 'no') finalRules.push('NO NIL');
+        if (gameLine.blindNil === 'yes') finalRules.push('BLIND NIL');
+      }
+      
       if (finalRules.length > 0) {
         finalSpecialRulesText = `\n**Special Rules:** ${finalRules.join(' + ')}`;
       }

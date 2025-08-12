@@ -101,6 +101,22 @@ const commands = [
         .addChoices(
           { name: 'Yes', value: 'yes' },
           { name: 'No', value: 'no' }
+        ))
+    .addStringOption(option =>
+      option.setName('nil')
+        .setDescription('Allow Nil bids? (Regular games only)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Yes', value: 'yes' },
+          { name: 'No', value: 'no' }
+        ))
+    .addStringOption(option =>
+      option.setName('blindnil')
+        .setDescription('Allow Blind Nil bids? (Regular games only)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Yes', value: 'yes' },
+          { name: 'No', value: 'no' }
         )),
 ];
 
