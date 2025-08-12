@@ -394,9 +394,23 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     console.log('[AVATAR DEBUG] Available players:', players.map(p => ({ id: p.id, username: p.username, avatar: p.avatar })));
     console.log('[AVATAR DEBUG] Available spectators:', spectators?.map(s => ({ id: s.id, username: s.username, avatar: s.avatar })));
     
-    // Find the player in the players array
-    const player = players.find(p => p.id === playerId);
-    console.log('[AVATAR DEBUG] Found player:', player);
+    // Find the player in the players array by exact ID match
+    let player = players.find(p => p.id === playerId);
+    console.log('[AVATAR DEBUG] Found player by exact ID:', player);
+    
+    // If no exact match, try to find by username (for system messages or other cases)
+    if (!player && playerId !== 'system') {
+      // Try to extract username from playerId if it looks like a Discord-style ID
+      const possibleUsername = playerId.split('_')[0]; // Try to get username part
+      player = players.find(p => p.username && p.username.toLowerCase().includes(possibleUsername.toLowerCase()));
+      console.log('[AVATAR DEBUG] Found player by username match:', player);
+      
+      // If still no match, try to find by partial ID match (for cases where IDs are similar but not exact)
+      if (!player) {
+        player = players.find(p => p.id && p.id.includes(playerId.substring(0, 8)));
+        console.log('[AVATAR DEBUG] Found player by partial ID match:', player);
+      }
+    }
     
     // Check for avatar property first (most common)
     if (player && player.avatar) {
@@ -418,6 +432,12 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       return spectator.avatar;
     }
     
+    // For system messages, use a special system avatar
+    if (playerId === 'system') {
+      console.log('[AVATAR DEBUG] Using system avatar');
+      return '/system-avatar.png'; // You can create this or use a default
+    }
+    
     // Discord user ID (numeric string)
     if (playerId && /^\d+$/.test(playerId)) {
       // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
@@ -432,7 +452,14 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       return GUEST_AVATAR;
     }
     
-    // Fallback to bot avatar
+    // Try to find any player with a valid avatar as fallback
+    const anyPlayerWithAvatar = players.find(p => p.avatar);
+    if (anyPlayerWithAvatar && anyPlayerWithAvatar.avatar) {
+      console.log('[AVATAR DEBUG] Using fallback player avatar:', anyPlayerWithAvatar.avatar);
+      return anyPlayerWithAvatar.avatar;
+    }
+    
+    // Final fallback to bot avatar
     console.log('[AVATAR DEBUG] Using bot avatar fallback:', BOT_AVATAR);
     return BOT_AVATAR;
   };
