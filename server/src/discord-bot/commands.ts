@@ -11,197 +11,337 @@ const commands = [
     .setDefaultMemberPermissions(0x8), // Administrator permission
   new SlashCommandBuilder()
     .setName('game')
-    .setDescription('Create a game line for league members to join')
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('regular')
-        .setDescription('Create a regular bidding game')
-        .addIntegerOption(option =>
-          option.setName('coins')
-            .setDescription('Coins (buy-in amount)')
-            .setRequired(true)
-            .addChoices(
-              { name: '100k', value: 100000 },
-              { name: '200k', value: 200000 },
-              { name: '300k', value: 300000 },
-              { name: '400k', value: 400000 },
-              { name: '500k', value: 500000 },
-              { name: '600k', value: 600000 },
-              { name: '700k', value: 700000 },
-              { name: '800k', value: 800000 },
-              { name: '900k', value: 900000 },
-              { name: '1M', value: 1000000 },
-              { name: '2M', value: 2000000 },
-              { name: '3M', value: 3000000 },
-              { name: '4M', value: 4000000 },
-              { name: '5M', value: 5000000 },
-              { name: '6M', value: 6000000 },
-              { name: '7M', value: 7000000 },
-              { name: '8M', value: 8000000 },
-              { name: '9M', value: 9000000 },
-              { name: '10M', value: 10000000 }
-            ))
-        .addStringOption(option =>
-          option.setName('gamemode')
-            .setDescription('Partners or Solo game')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Partners', value: 'partners' },
-              { name: 'Solo', value: 'solo' }
-            ))
-        .addIntegerOption(option =>
-          option.setName('maxpoints')
-            .setDescription('Maximum points to win')
-            .setRequired(true)
-            .addChoices(
-              { name: '100', value: 100 },
-              { name: '150', value: 150 },
-              { name: '200', value: 200 },
-              { name: '250', value: 250 },
-              { name: '300', value: 300 },
-              { name: '350', value: 350 },
-              { name: '400', value: 400 },
-              { name: '450', value: 450 },
-              { name: '500', value: 500 },
-              { name: '550', value: 550 },
-              { name: '600', value: 600 },
-              { name: '650', value: 650 }
-            ))
-        .addIntegerOption(option =>
-          option.setName('minpoints')
-            .setDescription('Minimum points to lose')
-            .setRequired(true)
-            .addChoices(
-              { name: '-100', value: -100 },
-              { name: '-150', value: -150 },
-              { name: '-200', value: -200 },
-              { name: '-250', value: -250 }
-            ))
-        .addStringOption(option =>
-          option.setName('screamer')
-            .setDescription('Enable Screamer rule?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            ))
-        .addStringOption(option =>
-          option.setName('assassin')
-            .setDescription('Enable Assassin rule?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            ))
-        .addStringOption(option =>
-          option.setName('nil')
-            .setDescription('Allow Nil bids?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            ))
-        .addStringOption(option =>
-          option.setName('blindnil')
-            .setDescription('Allow Blind Nil bids?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            )))
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('special')
-        .setDescription('Create a special game type (Whiz, Mirror, etc.)')
-        .addIntegerOption(option =>
-          option.setName('coins')
-            .setDescription('Coins (buy-in amount)')
-            .setRequired(true)
-            .addChoices(
-              { name: '100k', value: 100000 },
-              { name: '200k', value: 200000 },
-              { name: '300k', value: 300000 },
-              { name: '400k', value: 400000 },
-              { name: '500k', value: 500000 },
-              { name: '600k', value: 600000 },
-              { name: '700k', value: 700000 },
-              { name: '800k', value: 800000 },
-              { name: '900k', value: 900000 },
-              { name: '1M', value: 1000000 },
-              { name: '2M', value: 2000000 },
-              { name: '3M', value: 3000000 },
-              { name: '4M', value: 4000000 },
-              { name: '5M', value: 5000000 },
-              { name: '6M', value: 6000000 },
-              { name: '7M', value: 7000000 },
-              { name: '8M', value: 8000000 },
-              { name: '9M', value: 9000000 },
-              { name: '10M', value: 10000000 }
-            ))
-        .addStringOption(option =>
-          option.setName('gamemode')
-            .setDescription('Partners or Solo game')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Partners', value: 'partners' },
-              { name: 'Solo', value: 'solo' }
-            ))
-        .addIntegerOption(option =>
-          option.setName('maxpoints')
-            .setDescription('Maximum points to win')
-            .setRequired(true)
-            .addChoices(
-              { name: '100', value: 100 },
-              { name: '150', value: 150 },
-              { name: '200', value: 200 },
-              { name: '250', value: 250 },
-              { name: '300', value: 300 },
-              { name: '350', value: 350 },
-              { name: '400', value: 400 },
-              { name: '450', value: 450 },
-              { name: '500', value: 500 },
-              { name: '550', value: 550 },
-              { name: '600', value: 600 },
-              { name: '650', value: 650 }
-            ))
-        .addIntegerOption(option =>
-          option.setName('minpoints')
-            .setDescription('Minimum points to lose')
-            .setRequired(true)
-            .addChoices(
-              { name: '-100', value: -100 },
-              { name: '-150', value: -150 },
-              { name: '-200', value: -200 },
-              { name: '-250', value: -250 }
-            ))
-        .addStringOption(option =>
-          option.setName('gametype')
-            .setDescription('Type of special game')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Whiz', value: 'whiz' },
-              { name: 'Mirror', value: 'mirror' },
-              { name: 'Suicide', value: 'suicide' },
-              { name: 'Bid 3/4', value: 'bid34' },
-              { name: 'Nil/Bid Hearts', value: 'nilhearts' },
-              { name: 'Crazy Aces', value: 'crazyaces' }
-            ))
-        .addStringOption(option =>
-          option.setName('screamer')
-            .setDescription('Enable Screamer rule?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            ))
-        .addStringOption(option =>
-          option.setName('assassin')
-            .setDescription('Enable Assassin rule?')
-            .setRequired(false)
-            .addChoices(
-              { name: 'Yes', value: 'yes' },
-              { name: 'No', value: 'no' }
-            ))),
+    .setDescription('Create a regular bidding game line')
+    .addIntegerOption(option =>
+      option.setName('coins')
+        .setDescription('Coins (buy-in amount)')
+        .setRequired(true)
+        .addChoices(
+          { name: '100k', value: 100000 },
+          { name: '200k', value: 200000 },
+          { name: '300k', value: 300000 },
+          { name: '400k', value: 400000 },
+          { name: '500k', value: 500000 },
+          { name: '600k', value: 600000 },
+          { name: '700k', value: 700000 },
+          { name: '800k', value: 800000 },
+          { name: '900k', value: 900000 },
+          { name: '1M', value: 1000000 },
+          { name: '2M', value: 2000000 },
+          { name: '3M', value: 3000000 },
+          { name: '4M', value: 4000000 },
+          { name: '5M', value: 5000000 },
+          { name: '6M', value: 6000000 },
+          { name: '7M', value: 7000000 },
+          { name: '8M', value: 8000000 },
+          { name: '9M', value: 9000000 },
+          { name: '10M', value: 10000000 }
+        ))
+    .addStringOption(option =>
+      option.setName('gamemode')
+        .setDescription('Partners or Solo game')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Partners', value: 'partners' },
+          { name: 'Solo', value: 'solo' }
+        ))
+    .addIntegerOption(option =>
+      option.setName('maxpoints')
+        .setDescription('Maximum points to win')
+        .setRequired(true)
+        .addChoices(
+          { name: '100', value: 100 },
+          { name: '150', value: 150 },
+          { name: '200', value: 200 },
+          { name: '250', value: 250 },
+          { name: '300', value: 300 },
+          { name: '350', value: 350 },
+          { name: '400', value: 400 },
+          { name: '450', value: 450 },
+          { name: '500', value: 500 },
+          { name: '550', value: 550 },
+          { name: '600', value: 600 },
+          { name: '650', value: 650 }
+        ))
+    .addIntegerOption(option =>
+      option.setName('minpoints')
+        .setDescription('Minimum points to lose')
+        .setRequired(true)
+        .addChoices(
+          { name: '-100', value: -100 },
+          { name: '-150', value: -150 },
+          { name: '-200', value: -200 },
+          { name: '-250', value: -250 }
+        ))
+    .addStringOption(option =>
+      option.setName('nil')
+      .setDescription('Allow Nil bids?')
+      .setRequired(false)
+      .addChoices(
+        { name: 'On', value: 'yes' },
+        { name: 'Off', value: 'no' }
+      ))
+    .addStringOption(option =>
+      option.setName('blindnil')
+      .setDescription('Allow Blind Nil bids?')
+      .setRequired(false)
+      .addChoices(
+        { name: 'On', value: 'yes' },
+        { name: 'Off', value: 'no' }
+      ))
+    .addStringOption(option =>
+      option.setName('specialrules')
+      .setDescription('Special rules (none by default)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'None', value: 'none' },
+        { name: 'Screamer', value: 'screamer' },
+        { name: 'Assassin', value: 'assassin' },
+        { name: 'Screamer + Assassin', value: 'both' }
+      )),
+  new SlashCommandBuilder()
+    .setName('whiz')
+    .setDescription('Create a Whiz game line')
+    .addIntegerOption(option =>
+      option.setName('coins')
+        .setDescription('Coins (buy-in amount)')
+        .setRequired(true)
+        .addChoices(
+          { name: '100k', value: 100000 },
+          { name: '200k', value: 200000 },
+          { name: '300k', value: 300000 },
+          { name: '400k', value: 400000 },
+          { name: '500k', value: 500000 },
+          { name: '600k', value: 600000 },
+          { name: '700k', value: 700000 },
+          { name: '800k', value: 800000 },
+          { name: '900k', value: 900000 },
+          { name: '1M', value: 1000000 },
+          { name: '2M', value: 2000000 },
+          { name: '3M', value: 3000000 },
+          { name: '4M', value: 4000000 },
+          { name: '5M', value: 5000000 },
+          { name: '6M', value: 6000000 },
+          { name: '7M', value: 7000000 },
+          { name: '8M', value: 8000000 },
+          { name: '9M', value: 9000000 },
+          { name: '10M', value: 10000000 }
+        ))
+    .addStringOption(option =>
+      option.setName('gamemode')
+        .setDescription('Partners or Solo game')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Partners', value: 'partners' },
+          { name: 'Solo', value: 'solo' }
+        ))
+    .addIntegerOption(option =>
+      option.setName('maxpoints')
+        .setDescription('Maximum points to win')
+        .setRequired(true)
+        .addChoices(
+          { name: '100', value: 100 },
+          { name: '150', value: 150 },
+          { name: '200', value: 200 },
+          { name: '250', value: 250 },
+          { name: '300', value: 300 },
+          { name: '350', value: 350 },
+          { name: '400', value: 400 },
+          { name: '450', value: 450 },
+          { name: '500', value: 500 },
+          { name: '550', value: 550 },
+          { name: '600', value: 600 },
+          { name: '650', value: 650 }
+        ))
+    .addIntegerOption(option =>
+      option.setName('minpoints')
+        .setDescription('Minimum points to lose')
+        .setRequired(true)
+        .addChoices(
+          { name: '-100', value: -100 },
+          { name: '-150', value: -150 },
+          { name: '-200', value: -200 },
+          { name: '-250', value: -250 }
+        ))
+    .addStringOption(option =>
+      option.setName('specialrules')
+      .setDescription('Special rules (none by default)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'None', value: 'none' },
+        { name: 'Screamer', value: 'screamer' },
+        { name: 'Assassin', value: 'assassin' },
+        { name: 'Screamer + Assassin', value: 'both' }
+      )),
+  new SlashCommandBuilder()
+    .setName('mirror')
+    .setDescription('Create a Mirror game line')
+    .addIntegerOption(option =>
+      option.setName('coins')
+        .setDescription('Coins (buy-in amount)')
+        .setRequired(true)
+        .addChoices(
+          { name: '100k', value: 100000 },
+          { name: '200k', value: 200000 },
+          { name: '300k', value: 300000 },
+          { name: '400k', value: 400000 },
+          { name: '500k', value: 500000 },
+          { name: '600k', value: 600000 },
+          { name: '700k', value: 700000 },
+          { name: '800k', value: 800000 },
+          { name: '900k', value: 900000 },
+          { name: '1M', value: 1000000 },
+          { name: '2M', value: 2000000 },
+          { name: '3M', value: 3000000 },
+          { name: '4M', value: 4000000 },
+          { name: '5M', value: 5000000 },
+          { name: '6M', value: 6000000 },
+          { name: '7M', value: 7000000 },
+          { name: '8M', value: 8000000 },
+          { name: '9M', value: 9000000 },
+          { name: '10M', value: 10000000 }
+        ))
+    .addStringOption(option =>
+      option.setName('gamemode')
+        .setDescription('Partners or Solo game')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Partners', value: 'partners' },
+          { name: 'Solo', value: 'solo' }
+        ))
+    .addIntegerOption(option =>
+      option.setName('maxpoints')
+        .setDescription('Maximum points to win')
+        .setRequired(true)
+        .addChoices(
+          { name: '100', value: 100 },
+          { name: '150', value: 150 },
+          { name: '200', value: 200 },
+          { name: '250', value: 250 },
+          { name: '300', value: 300 },
+          { name: '350', value: 350 },
+          { name: '400', value: 400 },
+          { name: '450', value: 450 },
+          { name: '500', value: 500 },
+          { name: '550', value: 550 },
+          { name: '600', value: 600 },
+          { name: '650', value: 650 }
+        ))
+    .addIntegerOption(option =>
+      option.setName('minpoints')
+        .setDescription('Minimum points to lose')
+        .setRequired(true)
+        .addChoices(
+          { name: '-100', value: -100 },
+          { name: '-150', value: -150 },
+          { name: '-200', value: -200 },
+          { name: '-250', value: -250 }
+        ))
+    .addStringOption(option =>
+      option.setName('specialrules')
+      .setDescription('Special rules (none by default)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'None', value: 'none' },
+        { name: 'Screamer', value: 'screamer' },
+        { name: 'Assassin', value: 'assassin' },
+        { name: 'Screamer + Assassin', value: 'both' }
+      )),
+  new SlashCommandBuilder()
+    .setName('gimmick')
+    .setDescription('Create a Gimmick game line')
+    .addIntegerOption(option =>
+      option.setName('coins')
+        .setDescription('Coins (buy-in amount)')
+        .setRequired(true)
+        .addChoices(
+          { name: '100k', value: 100000 },
+          { name: '200k', value: 200000 },
+          { name: '300k', value: 300000 },
+          { name: '400k', value: 400000 },
+          { name: '500k', value: 500000 },
+          { name: '600k', value: 600000 },
+          { name: '700k', value: 700000 },
+          { name: '800k', value: 800000 },
+          { name: '900k', value: 900000 },
+          { name: '1M', value: 1000000 },
+          { name: '2M', value: 2000000 },
+          { name: '3M', value: 3000000 },
+          { name: '4M', value: 4000000 },
+          { name: '5M', value: 5000000 },
+          { name: '6M', value: 6000000 },
+          { name: '7M', value: 7000000 },
+          { name: '8M', value: 8000000 },
+          { name: '9M', value: 9000000 },
+          { name: '10M', value: 10000000 }
+        ))
+    .addStringOption(option =>
+      option.setName('gamemode')
+        .setDescription('Partners or Solo game')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Partners', value: 'partners' },
+          { name: 'Solo', value: 'solo' }
+        ))
+    .addStringOption(option =>
+      option.setName('gimmicktype')
+      .setDescription('Type of gimmick game')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Suicide', value: 'suicide' },
+        { name: '4 or Nil', value: 'bid34' },
+        { name: 'Bid 3', value: 'bid3' },
+        { name: 'Bid Hearts', value: 'nilhearts' },
+        { name: 'Crazy Aces', value: 'crazyaces' }
+      ))
+    .addIntegerOption(option =>
+      option.setName('maxpoints')
+        .setDescription('Maximum points to win')
+        .setRequired(true)
+        .addChoices(
+          { name: '100', value: 100 },
+          { name: '150', value: 150 },
+          { name: '200', value: 200 },
+          { name: '250', value: 250 },
+          { name: '300', value: 300 },
+          { name: '350', value: 350 },
+          { name: '400', value: 400 },
+          { name: '450', value: 450 },
+          { name: '500', value: 500 },
+          { name: '550', value: 550 },
+          { name: '600', value: 600 },
+          { name: '650', value: 650 }
+        ))
+    .addIntegerOption(option =>
+      option.setName('minpoints')
+        .setDescription('Minimum points to lose')
+        .setRequired(true)
+        .addChoices(
+          { name: '-100', value: -100 },
+          { name: '-150', value: -150 },
+          { name: '-200', value: -200 },
+          { name: '-250', value: -250 }
+        ))
+    .addStringOption(option =>
+      option.setName('specialrules')
+      .setDescription('Special rules (none by default)')
+      .setRequired(false)
+      .addChoices(
+        { name: 'None', value: 'none' },
+        { name: 'Screamer', value: 'screamer' },
+        { name: 'Assassin', value: 'assassin' },
+        { name: 'Screamer + Assassin', value: 'both' }
+      )),
+  new SlashCommandBuilder()
+    .setName('stats')
+    .setDescription('Show user game statistics')
+    .addUserOption(option =>
+      option.setName('user')
+        .setDescription('User to check stats for (defaults to yourself)')
+        .setRequired(false)),
+  new SlashCommandBuilder()
+    .setName('help')
+    .setDescription('Show all available commands and how to use them'),
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN!);

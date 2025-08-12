@@ -1652,7 +1652,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-            game.status = 'COMPLETED';
+            game.status = 'FINISHED';
             
             // Find winning player (highest score)
             let winningPlayer = 0;
@@ -1707,7 +1707,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (shouldEndGame && winningTeam) {
             console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-            game.status = 'COMPLETED';
+            game.status = 'FINISHED';
             io.to(game.id).emit('game_over', {
               team1Score: game.team1TotalScore,
               team2Score: game.team2TotalScore,
@@ -1865,7 +1865,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         if (shouldEndGame && winningTeam) {
           console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-          game.status = 'COMPLETED';
+          game.status = 'FINISHED';
           io.to(game.id).emit('game_over', {
             team1Score: game.team1TotalScore,
             team2Score: game.team2TotalScore,

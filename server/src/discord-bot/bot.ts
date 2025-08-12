@@ -445,7 +445,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // Handle slash commands
   if (!interaction.isCommand()) return;
   
-  if (interaction.commandName === 'game') {
+  if (['game', 'whiz', 'mirror', 'gimmick'].includes(interaction.commandName)) {
     await interaction.deferReply();
     
     try {
@@ -455,27 +455,39 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       
-      const subcommand = interaction.options.getSubcommand();
       const coins = interaction.options.getInteger('coins', true);
       const gameMode = interaction.options.getString('gamemode', true);
       const maxPoints = interaction.options.getInteger('maxpoints', true);
       const minPoints = interaction.options.getInteger('minpoints', true);
-      const screamer = interaction.options.getString('screamer');
-      const assassin = interaction.options.getString('assassin');
+      const specialRules = interaction.options.getString('specialrules');
+      
+      // Parse special rules
+      let screamer: string | null = null;
+      let assassin: string | null = null;
+      
+      if (specialRules === 'screamer') {
+        screamer = 'yes';
+      } else if (specialRules === 'assassin') {
+        assassin = 'yes';
+      } else if (specialRules === 'both') {
+        screamer = 'yes';
+        assassin = 'yes';
+      }
       
       let gameType: string;
       let nil: string | null = null;
       let blindNil: string | null = null;
       
-      if (subcommand === 'regular') {
+      if (interaction.commandName === 'game') {
         gameType = 'regular';
         nil = interaction.options.getString('nil');
         blindNil = interaction.options.getString('blindnil');
-      } else if (subcommand === 'special') {
-        gameType = interaction.options.getString('gametype', true);
-      } else {
-        await interaction.editReply('❌ Invalid subcommand. Use /game regular or /game special.');
-        return;
+      } else if (interaction.commandName === 'whiz') {
+        gameType = 'whiz';
+      } else if (interaction.commandName === 'mirror') {
+        gameType = 'mirror';
+      } else if (interaction.commandName === 'gimmick') {
+        gameType = interaction.options.getString('gimmicktype', true);
       }
       
       // Format coins for display
@@ -571,6 +583,115 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (error) {
       console.error('Error in game command:', error);
       await interaction.editReply('❌ Error creating game line');
+    }
+    return;
+  }
+  
+  // Handle stats command
+  if (interaction.commandName === 'stats') {
+    await interaction.deferReply();
+    
+    try {
+      if (!interaction.isChatInputCommand()) {
+        await interaction.editReply('❌ This command can only be used as a slash command.');
+        return;
+      }
+      
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      
+      // Get user stats from database
+      const user = await prisma.user.findFirst({
+        where: { discordId: targetUser.id },
+        include: { stats: true }
+      });
+      
+      if (!user || !user.stats) {
+        await interaction.editReply(`❌ No stats found for ${targetUser.username}`);
+        return;
+      }
+      
+      const stats = user.stats;
+      
+      // Calculate win percentage
+      const totalWinPercentage = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(1) : '0.0';
+      
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle(`📊 Stats for ${targetUser.username}`)
+        .addFields(
+          { name: '🎮 Total Games', value: stats.gamesPlayed.toString(), inline: true },
+          { name: '🏆 Total Wins', value: stats.gamesWon.toString(), inline: true },
+          { name: '📈 Win Rate', value: `${totalWinPercentage}%`, inline: true },
+          { name: '💰 Total Coins Won', value: stats.totalCoinsWon.toLocaleString(), inline: true },
+          { name: '💸 Total Coins Lost', value: stats.totalCoinsLost.toLocaleString(), inline: true },
+          { name: '💵 Net Coins', value: stats.netCoins.toLocaleString(), inline: true }
+        )
+        .setTimestamp();
+      
+      await interaction.editReply({ embeds: [embed] });
+      
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      await interaction.editReply('❌ Error fetching stats. Please try again.');
+    }
+    return;
+  }
+  
+  // Handle help command
+  if (interaction.commandName === 'help') {
+    await interaction.deferReply();
+    
+    try {
+      if (!interaction.isChatInputCommand()) {
+        await interaction.editReply('❌ This command can only be used as a slash command.');
+        return;
+      }
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('🎮 BUX Spades Discord Commands')
+        .setDescription('Here are all available commands and how to use them:')
+        .addFields(
+          { 
+            name: '🎯 Game Creation Commands', 
+            value: `**/game** - Create a regular bidding game
+**/whiz** - Create a Whiz game
+**/mirror** - Create a Mirror game  
+**/gimmick** - Create a Gimmick game (Suicide, 4 or Nil, etc.)`,
+            inline: false 
+          },
+          { 
+            name: '📊 Stats Commands', 
+            value: `**/stats** - Show your game statistics
+**/stats @user** - Show another user's statistics`,
+            inline: false 
+          },
+          { 
+            name: '🎮 How to Play', 
+            value: `1. Use any game creation command to start a game line
+2. Click "Join Game" to join the line
+3. When 4 players join, click "Start Game"
+4. Open your BUX Spades app and login with Discord
+5. You'll be automatically directed to your table!`,
+            inline: false 
+          },
+          { 
+            name: '📋 Game Options', 
+            value: `• **Coins**: 100k to 10M buy-in
+• **Game Mode**: Partners or Solo
+• **Points**: 100-650 max, -250 to -100 min
+• **Special Rules**: Screamer, Assassin, or both
+• **Nil Options**: On/Off for regular games`,
+            inline: false 
+          }
+        )
+        .setFooter({ text: 'Need help? Ask in the general chat!' })
+        .setTimestamp();
+      
+      await interaction.editReply({ embeds: [embed] });
+      
+    } catch (error) {
+      console.error('Error showing help:', error);
+      await interaction.editReply('❌ Error showing help. Please try again.');
     }
     return;
   }
