@@ -37,6 +37,7 @@ interface GameLine {
     userId: string;
     username: string;
     seat: number;
+    avatar?: string; // Optional avatar URL
   }[];
   createdAt: number;
 }
@@ -380,10 +381,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
           }
           
           // Add player to game
+          // Get the user's avatar
+          const user = await client.users.fetch(userId);
+          const avatar = user.displayAvatarURL({ extension: 'png', size: 128 });
+          
           gameLine.players.push({
             userId,
             username,
-            seat
+            seat,
+            avatar
           });
           
           // Update embed
@@ -541,7 +547,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           {
             userId: interaction.user.id,
             username: interaction.user.username,
-            seat: 0 // Host is seat 0
+            seat: 0, // Host is seat 0
+            avatar: interaction.user.displayAvatarURL({ extension: 'png', size: 128 })
           }
         ],
         createdAt: Date.now()
@@ -732,7 +739,8 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         userId: p.userId,
         username: p.username,
         discordId: p.userId, // Use Discord ID for matching
-        seat: p.seat
+        seat: p.seat,
+        avatar: p.avatar // Include avatar if available
       }))
     };
     

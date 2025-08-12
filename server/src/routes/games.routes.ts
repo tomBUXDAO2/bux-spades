@@ -72,7 +72,7 @@ router.post('/', async (req, res) => {
               email: `${playerData.username}@discord.local`, // Temporary email
               discordId: playerData.discordId || playerData.userId,
               coins: 5000000, // Default coins
-              avatar: null
+              avatar: playerData.avatar || null // Use provided avatar or null
             }
           });
           
