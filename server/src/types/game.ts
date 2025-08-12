@@ -89,4 +89,6 @@ export interface Game {
   dbGameId?: string; // Database game ID for updates
   createdAt?: number; // Game creation timestamp
   rounds?: any[]; // Game rounds for logging
+  // League game property
+  league?: boolean; // Whether this is a league game created via Discord
 } 

@@ -126,6 +126,7 @@ router.post('/', async (req, res) => {
         gimmickType: 'REG' as GamePlayOption
       },
       isBotGame: false,
+      league: settings.league || false, // Add league property
     };
     games.push(newGame);
     
