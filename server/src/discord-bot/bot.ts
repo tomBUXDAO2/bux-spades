@@ -455,15 +455,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       
+      const subcommand = interaction.options.getSubcommand();
       const coins = interaction.options.getInteger('coins', true);
       const gameMode = interaction.options.getString('gamemode', true);
       const maxPoints = interaction.options.getInteger('maxpoints', true);
       const minPoints = interaction.options.getInteger('minpoints', true);
-      const gameType = interaction.options.getString('gametype', true);
       const screamer = interaction.options.getString('screamer');
       const assassin = interaction.options.getString('assassin');
-      const nil = interaction.options.getString('nil');
-      const blindNil = interaction.options.getString('blindnil');
+      
+      let gameType: string;
+      let nil: string | null = null;
+      let blindNil: string | null = null;
+      
+      if (subcommand === 'regular') {
+        gameType = 'regular';
+        nil = interaction.options.getString('nil');
+        blindNil = interaction.options.getString('blindnil');
+      } else if (subcommand === 'special') {
+        gameType = interaction.options.getString('gametype', true);
+      } else {
+        await interaction.editReply('❌ Invalid subcommand. Use /game regular or /game special.');
+        return;
+      }
       
       // Format coins for display
       const formatCoins = (amount: number) => {
