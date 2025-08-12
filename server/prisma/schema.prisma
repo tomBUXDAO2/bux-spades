@@ -52,6 +52,8 @@ model Game {
   gameType            String?       @default("REGULAR")
   specialRulesApplied SpecialRule[]
   league              Boolean?      @default(false)
+  allowNil            Boolean?      @default(true)
+  allowBlindNil       Boolean?      @default(false)
   creator             User          @relation("GameCreator", fields: [creatorId], references: [id])
   players             GamePlayer[]
   gameResult          GameResult?

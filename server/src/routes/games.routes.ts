@@ -146,6 +146,8 @@ router.post('/', async (req, res) => {
           buyIn: newGame.buyIn,
           rated: newGame.players.filter(p => p && p.type === 'human').length === 4,
           status: 'WAITING',
+          allowNil: newGame.rules.allowNil,
+          allowBlindNil: newGame.rules.allowBlindNil,
         }
       });
       
