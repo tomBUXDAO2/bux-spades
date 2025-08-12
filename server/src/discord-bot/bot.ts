@@ -484,27 +484,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       } else if (interaction.commandName === 'mirror') {
         gameType = 'MIRROR';
       } else if (interaction.commandName === 'gimmick') {
-        const gimmickType = interaction.options.getString('gimmicktype', true);
-        // Map gimmick types to correct uppercase values
-        switch (gimmickType) {
-          case 'suicide':
-            gameType = 'SUICIDE';
-            break;
-          case 'bid34':
-            gameType = '4 OR NIL';
-            break;
-          case 'bid3':
-            gameType = 'BID 3';
-            break;
-          case 'nilhearts':
-            gameType = 'BID HEARTS';
-            break;
-          case 'crazyaces':
-            gameType = 'CRAZY ACES';
-            break;
-          default:
-            gameType = gimmickType.toUpperCase();
-        }
+        gameType = interaction.options.getString('gimmicktype', true);
       }
       
       // Format coins for display
