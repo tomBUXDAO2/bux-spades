@@ -134,10 +134,16 @@ export const login = async (req: Request, res: Response) => {
 
     // Check if user is in an active game
     console.log('[ACTIVE GAME DEBUG] Checking for active games for user:', user.id);
+    console.log('[ACTIVE GAME DEBUG] User details:', {
+      id: user.id,
+      username: user.username,
+      discordId: user.discordId
+    });
     console.log('[ACTIVE GAME DEBUG] Available games:', games.map(g => ({ 
       id: g.id, 
       status: g.status, 
-      players: g.players.map(p => p ? { id: p.id, type: p.type } : null)
+      league: (g as any).league,
+      players: g.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null)
     })));
     
     const activeGame = games.find((game: Game) => {
@@ -149,6 +155,7 @@ export const login = async (req: Request, res: Response) => {
       const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
       
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id} players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
       
       return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });
@@ -203,10 +210,16 @@ export const getProfile = async (req: Request, res: Response) => {
 
     // Check if user is in an active game
     console.log('[ACTIVE GAME DEBUG] Checking for active games for user in getProfile:', userId);
+    console.log('[ACTIVE GAME DEBUG] User details:', {
+      id: user.id,
+      username: user.username,
+      discordId: user.discordId
+    });
     console.log('[ACTIVE GAME DEBUG] Available games:', games.map(g => ({ 
       id: g.id, 
       status: g.status, 
-      players: g.players.map(p => p ? { id: p.id, type: p.type } : null)
+      league: (g as any).league,
+      players: g.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null)
     })));
     
     const activeGame = games.find((game: Game) => {
@@ -218,6 +231,7 @@ export const getProfile = async (req: Request, res: Response) => {
       const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
       
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
+      console.log(`[ACTIVE GAME DEBUG] Game ${game.id} players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
       
       return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });

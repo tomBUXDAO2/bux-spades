@@ -84,6 +84,51 @@ const HomePage: React.FC = () => {
     }
   }, [user]);
 
+  // Check for league games when homepage loads
+  useEffect(() => {
+    if (!user) return;
+
+    const checkForLeagueGames = async () => {
+      try {
+        console.log('[LEAGUE GAME CHECK] Checking for league games for user:', user.id);
+        
+        // Get all games from the server
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const allGames = await response.json();
+          console.log('[LEAGUE GAME CHECK] All games:', allGames.map((g: any) => ({ 
+            id: g.id, 
+            status: g.status, 
+            league: g.league,
+            players: g.players?.map((p: any) => p ? { id: p.id, username: p.username } : null) || []
+          })));
+          
+          // Find league games where user is assigned
+          const userLeagueGame = allGames.find((game: any) => {
+            const isLeagueGame = game.league;
+            const isUserInGame = game.players?.some((player: any) => player && player.id === user.id);
+            const isWaiting = game.status === 'WAITING';
+            
+            console.log(`[LEAGUE GAME CHECK] Game ${game.id}: isLeagueGame=${isLeagueGame}, isUserInGame=${isUserInGame}, isWaiting=${isWaiting}`);
+            
+            return isLeagueGame && isUserInGame && isWaiting;
+          });
+          
+          if (userLeagueGame) {
+            console.log('[LEAGUE GAME CHECK] Found league game for user, redirecting to table:', userLeagueGame.id);
+            navigate(`/table/${userLeagueGame.id}`, { replace: true });
+          } else {
+            console.log('[LEAGUE GAME CHECK] No league game found for user');
+          }
+        }
+      } catch (error) {
+        console.error('[LEAGUE GAME CHECK] Error checking for league games:', error);
+      }
+    };
+
+    checkForLeagueGames();
+  }, [user, navigate]);
+
   // Socket event handlers
   useEffect(() => {
     if (!socket || !isAuthenticated) {
