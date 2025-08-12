@@ -646,42 +646,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('🎮 BUX Spades Discord Commands')
-        .setDescription('Here are all available commands and how to use them:')
+        .setDescription('Here are all available commands and how to use them:\n')
         .addFields(
           { 
             name: '🎯 Game Creation Commands', 
-            value: `**/game** - Create a regular bidding game
-**/whiz** - Create a Whiz game
-**/mirror** - Create a Mirror game  
-**/gimmick** - Create a Gimmick game (Suicide, 4 or Nil, etc.)`,
+            value: '\n**/game** - Create a regular bidding game\n**/whiz** - Create a Whiz game\n**/mirror** - Create a Mirror game\n**/gimmick** - Create a Gimmick game (Suicide, 4 or Nil, etc.)\n',
             inline: false 
           },
           { 
             name: '📊 Stats Commands', 
-            value: `**/stats** - Show your game statistics
-**/stats @user** - Show another user's statistics`,
-            inline: false 
-          },
-          { 
-            name: '🎮 How to Play', 
-            value: `1. Use any game creation command to start a game line
-2. Click "Join Game" to join the line
-3. When 4 players join, click "Start Game"
-4. Open your BUX Spades app and login with Discord
-5. You'll be automatically directed to your table!`,
+            value: '\n**/stats** - Show your game statistics\n**/stats @user** - Show another user\'s statistics\n',
             inline: false 
           },
           { 
             name: '📋 Game Options', 
-            value: `• **Coins**: 100k to 10M buy-in
-• **Game Mode**: Partners or Solo
-• **Points**: 100-650 max, -250 to -100 min
-• **Special Rules**: Screamer, Assassin, or both
-• **Nil Options**: On/Off for regular games`,
+            value: '\n• **Coins**: 100k to 10M buy-in\n• **Game Mode**: Partners or Solo\n• **Points**: 100-650 max, -250 to -100 min\n• **Special Rules**: None, Screamer, Assassin\n• **Nil Options**: On/Off for regular games\n• **Blind Nil Options**: On/Off for regular games',
             inline: false 
           }
         )
-        .setFooter({ text: 'Need help? Ask in the general chat!' })
+        .setFooter({ text: 'Need help? Ask in chat!' })
         .setTimestamp();
       
       await interaction.editReply({ embeds: [embed] });
