@@ -452,12 +452,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       return GUEST_AVATAR;
     }
     
-    // Try to find any player with a valid avatar as fallback
-    const anyPlayerWithAvatar = players.find(p => p.avatar);
-    if (anyPlayerWithAvatar && anyPlayerWithAvatar.avatar) {
-      console.log('[AVATAR DEBUG] Using fallback player avatar:', anyPlayerWithAvatar.avatar);
-      return anyPlayerWithAvatar.avatar;
-    }
+    // Don't use other players' avatars as fallback - use proper defaults
     
     // Final fallback to bot avatar
     console.log('[AVATAR DEBUG] Using bot avatar fallback:', BOT_AVATAR);
