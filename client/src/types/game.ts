@@ -41,7 +41,7 @@ export interface Bot {
 
 export interface GameState {
   id: string;
-  status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'HAND_COMPLETED' | 'COMPLETED';
+  status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'HAND_COMPLETED' | 'COMPLETED' | 'FINISHED';
   players: (Player | Bot | null)[];
   currentPlayer: string;
   currentTrick: Card[];
