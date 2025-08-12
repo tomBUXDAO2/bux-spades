@@ -469,9 +469,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         screamer = 'yes';
       } else if (specialRules === 'assassin') {
         assassin = 'yes';
-      } else if (specialRules === 'both') {
-        screamer = 'yes';
-        assassin = 'yes';
       }
       
       let gameType: string;
@@ -778,29 +775,32 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     let playerList = '';
     if (gameLine.players.length === 0) {
       playerList = 'No players joined yet';
-    } else if (gameLine.gameMode === 'Partners') {
-      // Partners format: Red team vs Blue team
-      const host = gameLine.players.find(p => p.seat === 0);
-      const partner = gameLine.players.find(p => p.seat === 2);
-      const player3 = gameLine.players.find(p => p.seat === 1);
-      const player4 = gameLine.players.find(p => p.seat === 3);
-      
-      if (host && partner) {
-        playerList += `<@${host.userId}> (Red)\n<@${partner.userId}> (Red)\n\n`;
-      } else if (host) {
-        playerList += `<@${host.userId}> (Red)\n\n`;
-      }
-      
-      if (player3 && player4) {
-        playerList += `Vs.\n\n<@${player3.userId}> (Blue)\n<@${player4.userId}> (Blue)`;
-      } else if (player3) {
-        playerList += `Vs.\n\n<@${player3.userId}> (Blue)`;
-      } else {
-        playerList += 'Vs.\n\n(Blue team empty)';
-      }
     } else {
-      // Solo format: keep original seat-based format
-      playerList = gameLine.players.map(p => `<@${p.userId}> (Seat ${p.seat})`).join('\n');
+      // Show players in colored containers: first 2 in red, next 2 in blue
+      const redTeam = gameLine.players.slice(0, 2);
+      const blueTeam = gameLine.players.slice(2, 4);
+      
+      // Red team (first 2 players)
+      if (redTeam.length > 0) {
+        playerList += `🔴 **Red Team:**\n`;
+        redTeam.forEach(player => {
+          playerList += `• <@${player.userId}>\n`;
+        });
+        playerList += '\n';
+      }
+      
+      // Blue team (next 2 players)
+      if (blueTeam.length > 0) {
+        playerList += `🔵 **Blue Team:**\n`;
+        blueTeam.forEach(player => {
+          playerList += `• <@${player.userId}>\n`;
+        });
+      }
+      
+      // If no blue team players yet, show empty slots
+      if (blueTeam.length === 0 && redTeam.length < 4) {
+        playerList += `🔵 **Blue Team:**\n• *Empty*\n`;
+      }
     }
     
     // Add info about remaining slots

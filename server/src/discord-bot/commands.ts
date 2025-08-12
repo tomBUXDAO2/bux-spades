@@ -97,7 +97,6 @@ const commands = [
         { name: 'None', value: 'none' },
         { name: 'Screamer', value: 'screamer' },
         { name: 'Assassin', value: 'assassin' },
-        { name: 'Screamer + Assassin', value: 'both' }
       )),
   new SlashCommandBuilder()
     .setName('whiz')
@@ -171,7 +170,6 @@ const commands = [
         { name: 'None', value: 'none' },
         { name: 'Screamer', value: 'screamer' },
         { name: 'Assassin', value: 'assassin' },
-        { name: 'Screamer + Assassin', value: 'both' }
       )),
   new SlashCommandBuilder()
     .setName('mirror')
@@ -245,7 +243,6 @@ const commands = [
         { name: 'None', value: 'none' },
         { name: 'Screamer', value: 'screamer' },
         { name: 'Assassin', value: 'assassin' },
-        { name: 'Screamer + Assassin', value: 'both' }
       )),
   new SlashCommandBuilder()
     .setName('gimmick')
@@ -330,7 +327,6 @@ const commands = [
         { name: 'None', value: 'none' },
         { name: 'Screamer', value: 'screamer' },
         { name: 'Assassin', value: 'assassin' },
-        { name: 'Screamer + Assassin', value: 'both' }
       )),
   new SlashCommandBuilder()
     .setName('stats')
