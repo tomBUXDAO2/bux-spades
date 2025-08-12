@@ -157,6 +157,22 @@ export const login = async (req: Request, res: Response) => {
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id} players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
       
+      // GAIL DEBUG: Special logging for league games to help identify user mismatches
+      if (isLeagueGame && game.status === 'WAITING') {
+        console.log(`[GAIL DEBUG] League game ${game.id} - Checking user matching:`);
+        console.log(`[GAIL DEBUG] Current user:`, { id: user.id, username: user.username, discordId: user.discordId });
+        console.log(`[GAIL DEBUG] Game players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
+        
+        // Check if any player has a similar username (case-insensitive)
+        const similarUsername = game.players.find(p => p && p.username.toLowerCase() === user.username.toLowerCase());
+        if (similarUsername) {
+          console.log(`[GAIL DEBUG] Found similar username but different ID:`, {
+            gamePlayer: { id: similarUsername.id, username: similarUsername.username },
+            currentUser: { id: user.id, username: user.username }
+          });
+        }
+      }
+      
       return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });
     
@@ -232,6 +248,22 @@ export const getProfile = async (req: Request, res: Response) => {
       
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
       console.log(`[ACTIVE GAME DEBUG] Game ${game.id} players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
+      
+      // GAIL DEBUG: Special logging for league games to help identify user mismatches
+      if (isLeagueGame && game.status === 'WAITING') {
+        console.log(`[GAIL DEBUG] League game ${game.id} - Checking user matching in getProfile:`);
+        console.log(`[GAIL DEBUG] Current user:`, { id: user.id, username: user.username, discordId: user.discordId });
+        console.log(`[GAIL DEBUG] Game players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
+        
+        // Check if any player has a similar username (case-insensitive)
+        const similarUsername = game.players.find(p => p && p.username.toLowerCase() === user.username.toLowerCase());
+        if (similarUsername) {
+          console.log(`[GAIL DEBUG] Found similar username but different ID:`, {
+            gamePlayer: { id: similarUsername.id, username: similarUsername.username },
+            currentUser: { id: user.id, username: user.username }
+          });
+        }
+      }
       
       return isPlayer && (isActiveGame || isLeagueGameWaiting);
     });
