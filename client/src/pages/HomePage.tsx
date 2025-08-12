@@ -28,7 +28,7 @@ const ConfirmActionModal = ({ open, player, action, onConfirm, onCancel }: any) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
       <div className="bg-slate-800 rounded-lg p-6 flex flex-col items-center">
-        <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full mb-2" />
+        <img src={player.avatar || '/default-pfp.jpg'} alt={player.username} className="w-16 h-16 rounded-full mb-2" />
         <div className="text-lg text-slate-200 font-bold mb-2">{player.username}</div>
         <div className="text-slate-300 mb-4">Are you sure you want to {actionText.toLowerCase()}?</div>
         <div className="flex gap-4">
@@ -858,7 +858,7 @@ const HomePage: React.FC = () => {
                     })
                     .map(player => (
                       <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
-                        <img src={isPlayer(player) ? player.avatar : isBot(player) ? player.avatar : '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+                        <img src={isPlayer(player) ? (player.avatar || '/default-pfp.jpg') : isBot(player) ? (player.avatar || '/bot-avatar.jpg') : '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
                         <span
                           className={`text-sm font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                           onClick={() => handleOpenPlayerStats(player)}
