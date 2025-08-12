@@ -775,8 +775,8 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     let playerList = '';
     if (gameLine.players.length === 0) {
       playerList = 'No players joined yet';
-    } else {
-      // Show players in colored containers: first 2 in red, next 2 in blue
+    } else if (gameLine.gameMode === 'partners') {
+      // Partners mode: Red team vs Blue team
       const redTeam = gameLine.players.slice(0, 2);
       const blueTeam = gameLine.players.slice(2, 4);
       
@@ -800,6 +800,23 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
       // If no blue team players yet, show empty slots
       if (blueTeam.length === 0 && redTeam.length < 4) {
         playerList += `🔵 **Blue Team:**\n• *Empty*\n`;
+      }
+    } else {
+      // Solo mode: Individual player colors
+      const soloColors = ['🔴', '🔵', '🟠', '🟢']; // Red, Blue, Orange, Green
+      const colorNames = ['Red', 'Blue', 'Orange', 'Green'];
+      
+      gameLine.players.forEach((player, index) => {
+        const color = soloColors[index];
+        const colorName = colorNames[index];
+        playerList += `${color} **${colorName} Player:**\n• <@${player.userId}>\n\n`;
+      });
+      
+      // Show empty slots for remaining positions
+      for (let i = gameLine.players.length; i < 4; i++) {
+        const color = soloColors[i];
+        const colorName = colorNames[i];
+        playerList += `${color} **${colorName} Player:**\n• *Empty*\n\n`;
       }
     }
     

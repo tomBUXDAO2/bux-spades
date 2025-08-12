@@ -1151,7 +1151,7 @@ export default function GameTable({
         "bg-gradient-to-r from-red-700 to-red-500",    // Position 0: Red
         "bg-gradient-to-r from-blue-700 to-blue-500",  // Position 1: Blue
         "bg-gradient-to-r from-orange-600 to-orange-400", // Position 2: Orange
-        "bg-gradient-to-r from-purple-700 to-purple-500"  // Position 3: Purple
+        "bg-gradient-to-r from-green-700 to-green-500"  // Position 3: Green
       ];
       // Use original position for color assignment, not display position
       const originalPosition = player.position ?? position;
