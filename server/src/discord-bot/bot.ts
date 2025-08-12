@@ -615,6 +615,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle(`📊 Stats for ${targetUser.username}`)
+        .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .addFields(
           { name: '🎮 Total Games', value: stats.gamesPlayed.toString(), inline: true },
           { name: '🏆 Total Wins', value: stats.gamesWon.toString(), inline: true },
@@ -647,6 +648,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setColor(0x00ff00)
         .setTitle('🎮 BUX Spades Discord Commands')
         .setDescription('Here are all available commands and how to use them:\n')
+        .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .addFields(
           { 
             name: '🎯 Game Creation Commands', 
@@ -654,8 +656,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             inline: false 
           },
           { 
+            name: '\u200b', 
+            value: '\u200b',
+            inline: false 
+          },
+          { 
             name: '📊 Stats Commands', 
             value: '\n**/stats** - Show your game statistics\n**/stats @user** - Show another user\'s statistics\n',
+            inline: false 
+          },
+          { 
+            name: '\u200b', 
+            value: '\u200b',
             inline: false 
           },
           { 
@@ -812,6 +824,7 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
       .setColor(0x00ff00) // Green color
       .setTitle('🎮 GAME LINE')
       .setDescription(`**${gameLineTitle}**${specialRulesText}`)
+      .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
         { name: '👥 Players', value: `${gameLine.players.length}/4`, inline: true },
@@ -932,6 +945,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         .setColor(0x00ff00)
         .setTitle('🎮 GAME LINE - FULL')
         .setDescription(`**${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}**${finalSpecialRulesText}`)
+        .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .addFields(
           { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
           { name: '👥 Players', value: '4/4', inline: true },
@@ -973,6 +987,7 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
     const resultsEmbed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(`**${gameLine}**`)
+      .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '🥇 Winners', value: winners.join(', '), inline: true },
         { name: '💰 Coins Won', value: `${coinsWon >= 1000000 ? `${coinsWon / 1000000}M` : `${coinsWon / 1000}k`}`, inline: true },
