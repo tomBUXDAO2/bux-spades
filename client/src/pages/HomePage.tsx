@@ -131,6 +131,51 @@ const HomePage: React.FC = () => {
     checkForLeagueGames();
   }, [user, navigate]);
 
+  // Periodic check for league games (fallback for missed real-time events)
+  useEffect(() => {
+    if (!user) return;
+    
+    console.log('[PERIODIC LEAGUE CHECK] Setting up periodic check for user:', user.id);
+    
+    const checkForLeagueGames = async () => {
+      try {
+        console.log('[PERIODIC LEAGUE CHECK] Running periodic check...');
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const allGames = await response.json();
+          
+          const userLeagueGame = allGames.find((game: any) => {
+            const isLeagueGame = game.league;
+            const isUserInGame = game.players?.some((player: any) => player && player.id === user.id);
+            const isWaiting = game.status === 'WAITING';
+            
+            console.log(`[PERIODIC LEAGUE CHECK] Game ${game.id}: isLeagueGame=${isLeagueGame}, isUserInGame=${isUserInGame}, isWaiting=${isWaiting}`);
+            
+            return isLeagueGame && isUserInGame && isWaiting;
+          });
+          
+          if (userLeagueGame) {
+            console.log('[PERIODIC LEAGUE CHECK] Found league game for user, redirecting to table:', userLeagueGame.id);
+            navigate(`/table/${userLeagueGame.id}`, { replace: true });
+          }
+        }
+      } catch (error) {
+        console.error('[PERIODIC LEAGUE CHECK] Error checking for league games:', error);
+      }
+    };
+    
+    // Check immediately
+    checkForLeagueGames();
+    
+    // Then check every 15 seconds as a fallback
+    const interval = setInterval(checkForLeagueGames, 15000);
+    
+    return () => {
+      console.log('[PERIODIC LEAGUE CHECK] Cleaning up periodic check');
+      clearInterval(interval);
+    };
+  }, [user, navigate]);
+
   // Socket event handlers
   useEffect(() => {
     if (!socket || !isAuthenticated) {

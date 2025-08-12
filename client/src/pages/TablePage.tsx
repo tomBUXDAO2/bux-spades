@@ -129,8 +129,10 @@ export default function TablePage() {
     
     // Socket is now managed by SocketContext
 
-    const fetchGame = async () => {
+    const fetchGame = async (retryCount = 0) => {
       try {
+        console.log(`[GAME FETCH] Attempting to fetch game ${gameId} (attempt ${retryCount + 1})`);
+        
         // If spectating, call spectate endpoint
         if (isSpectator) {
           await api.post(`/api/games/${gameId}/spectate`, {
@@ -145,7 +147,7 @@ export default function TablePage() {
           return;
         }
         if (!response.ok) {
-          throw new Error('Failed to fetch game');
+          throw new Error(`Failed to fetch game: ${response.status}`);
         }
         const data = await response.json();
         
@@ -225,6 +227,35 @@ export default function TablePage() {
             console.error('[AUTO-JOIN FALLBACK] Error auto-joining user to game:', error);
           }
         }
+
+        // ROBUSTNESS CHECK: If user is not in game but should be (based on server state), try to add them
+        if (!isUserInGame && !isSpectator && data.status === 'WAITING') {
+          console.log('[ROBUSTNESS CHECK] User not found in game but game is WAITING, checking if they should be added...');
+          
+          // Check if there are empty seats and user should be in this game
+          const emptySeats = data.players.filter((player: any) => !player);
+          if (emptySeats.length > 0) {
+            console.log('[ROBUSTNESS CHECK] Found empty seats, attempting to add user to game...');
+            try {
+              const joinResponse = await api.post(`/api/games/${gameId}/join`, {
+                id: user.id,
+                username: user.username,
+                avatar: user.avatar
+              });
+              if (joinResponse.ok) {
+                const updatedGame = await joinResponse.json();
+                setGame(updatedGame);
+                updateModalState(updatedGame);
+                console.log('[ROBUSTNESS CHECK] Successfully added user to game');
+              } else {
+                const errorData = await joinResponse.json();
+                console.error('[ROBUSTNESS CHECK] Failed to add user to game:', errorData);
+              }
+            } catch (error) {
+              console.error('[ROBUSTNESS CHECK] Error adding user to game:', error);
+            }
+          }
+        }
         
         // Request full-screen on mobile/tablet after game loads
         if (isMobileOrTablet()) {
@@ -246,9 +277,21 @@ export default function TablePage() {
           }, 500);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load game');
+        console.error(`[GAME FETCH] Error fetching game (attempt ${retryCount + 1}):`, err);
+        
+        // Retry up to 3 times with exponential backoff
+        if (retryCount < 3) {
+          const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+          console.log(`[GAME FETCH] Retrying in ${delay}ms...`);
+          setTimeout(() => fetchGame(retryCount + 1), delay);
+          return;
+        }
+        
+        setError(err instanceof Error ? err.message : 'Failed to load game after multiple attempts');
       } finally {
-        setIsLoading(false);
+        if (retryCount === 0) {
+          setIsLoading(false);
+        }
       }
     };
 
