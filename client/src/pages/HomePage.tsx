@@ -146,6 +146,29 @@ const HomePage: React.FC = () => {
       setIsLoading(false);
     };
 
+    const handleAllGamesUpdated = (allGames: GameState[]) => {
+      console.log('All games updated (including league games):', allGames);
+      
+      // Check if any of the updated games is a league game for this user
+      if (user) {
+        console.log('[REAL-TIME LEAGUE CHECK] Checking all games for user:', user.id);
+        const userLeagueGame = allGames.find((game: any) => {
+          const isLeagueGame = game.league;
+          const isUserInGame = game.players?.some((player: any) => player && player.id === user.id);
+          const isWaiting = game.status === 'WAITING';
+          
+          console.log(`[REAL-TIME LEAGUE CHECK] Game ${game.id}: isLeagueGame=${isLeagueGame}, isUserInGame=${isUserInGame}, isWaiting=${isWaiting}`);
+          
+          return isLeagueGame && isUserInGame && isWaiting;
+        });
+        
+        if (userLeagueGame) {
+          console.log('[REAL-TIME LEAGUE CHECK] Found new league game for user, redirecting to table:', userLeagueGame.id);
+          navigate(`/table/${userLeagueGame.id}`, { replace: true });
+        }
+      }
+    };
+
     const handleLobbyChatMessage = (msg: ChatMessage) => {
       console.log('Lobby chat message received:', msg);
       setChatMessages(prev => [...prev, msg]);
@@ -169,6 +192,7 @@ const HomePage: React.FC = () => {
 
     // Add event listeners
     socket.on('games_updated', handleGamesUpdated);
+    socket.on('all_games_updated', handleAllGamesUpdated);
     socket.on('lobby_chat_message', handleLobbyChatMessage);
     socket.on('online_users', handleOnlineUsers);
     socket.on('friendAdded', handleFriendAdded);
@@ -187,12 +211,13 @@ const HomePage: React.FC = () => {
     return () => {
       console.log('Cleaning up socket event handlers');
       socket.off('games_updated', handleGamesUpdated);
+      socket.off('all_games_updated', handleAllGamesUpdated);
       socket.off('lobby_chat_message', handleLobbyChatMessage);
       socket.off('online_users', handleOnlineUsers);
       socket.off('friendAdded', handleFriendAdded);
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
     };
-  }, [socket, isAuthenticated, user.id]);
+  }, [socket, isAuthenticated, user, navigate]);
 
   useEffect(() => {
     if (chatContainerRef.current) {

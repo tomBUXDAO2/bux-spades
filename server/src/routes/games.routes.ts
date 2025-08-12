@@ -174,6 +174,9 @@ router.post('/', async (req, res) => {
       return true;
     });
     io.emit('games_updated', lobbyGames);
+    
+    // Also emit all games (including league games) for real-time league game detection
+    io.emit('all_games_updated', games);
     res.status(201).json(newGame);
   } catch (err) {
     console.error('Error creating game:', err);
