@@ -116,9 +116,11 @@ const HomePage: React.FC = () => {
           
           if (userLeagueGame) {
             console.log('[LEAGUE GAME CHECK] Found league game for user, redirecting to table:', userLeagueGame.id);
+            console.log('[LEAGUE GAME CHECK] Redirecting now...');
             navigate(`/table/${userLeagueGame.id}`, { replace: true });
           } else {
             console.log('[LEAGUE GAME CHECK] No league game found for user');
+            console.log('[LEAGUE GAME CHECK] User will stay in lobby');
           }
         }
       } catch (error) {

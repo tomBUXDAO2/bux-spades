@@ -203,6 +203,29 @@ export default function TablePage() {
           navigate(`/table/${gameId}`, { replace: true });
         }
         
+        // ADDITIONAL: Auto-join any user who is assigned to a seat in a WAITING game (fallback for non-league games)
+        if (isUserInGame && !isSpectator && data.status === 'WAITING') {
+          console.log('[AUTO-JOIN FALLBACK] User is assigned to seat in WAITING game, auto-joining...');
+          try {
+            const joinResponse = await api.post(`/api/games/${gameId}/join`, {
+              id: user.id,
+              username: user.username,
+              avatar: user.avatar
+            });
+            if (joinResponse.ok) {
+              const updatedGame = await joinResponse.json();
+              setGame(updatedGame);
+              updateModalState(updatedGame);
+              console.log('[AUTO-JOIN FALLBACK] Successfully auto-joined user to game');
+            } else {
+              const errorData = await joinResponse.json();
+              console.error('[AUTO-JOIN FALLBACK] Failed to auto-join user to game:', errorData);
+            }
+          } catch (error) {
+            console.error('[AUTO-JOIN FALLBACK] Error auto-joining user to game:', error);
+          }
+        }
+        
         // Request full-screen on mobile/tablet after game loads
         if (isMobileOrTablet()) {
           setTimeout(() => {
