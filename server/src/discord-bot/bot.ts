@@ -440,7 +440,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isCommand()) return;
   
   if (['game', 'whiz', 'mirror', 'gimmick'].includes(interaction.commandName)) {
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring reply:', error);
+      return;
+    }
     
     try {
       // Check if this is a chat input command interaction
@@ -580,7 +585,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   
   // Handle stats command
   if (interaction.commandName === 'stats') {
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring stats reply:', error);
+      return;
+    }
     
     try {
       if (!interaction.isChatInputCommand()) {
@@ -631,7 +641,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   
   // Handle help command
   if (interaction.commandName === 'help') {
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring help reply:', error);
+      return;
+    }
     
     try {
       if (!interaction.isChatInputCommand()) {
@@ -683,7 +698,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
   
   if (interaction.commandName === 'checkfacebook') {
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring checkfacebook reply:', error);
+      return;
+    }
     
     try {
       const guild = interaction.guild;
