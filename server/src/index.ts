@@ -3062,7 +3062,10 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
       console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
       if (phase === 'bidding') {
         console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
+        // Mark this as a bot action to prevent timeout clearing
+        (game as any).botActionInProgress = true;
         botMakeMove(game, playerIndex);
+        (game as any).botActionInProgress = false;
       } else if (phase === 'playing') {
         console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
         // Use the dedicated human timeout handler
@@ -3093,9 +3096,16 @@ export function clearTurnTimeout(game: Game, playerId: string) {
   if (existingTimeout) {
     console.log(`[TURN TIMEOUT DEBUG] Clearing timeout for player ${playerId}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
     clearTimeout(existingTimeout.timer);
-    // Reset consecutive timeouts when player acts
-    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: playerId, timer: null, consecutiveTimeouts: 0 });
-    console.log(`[TURN TIMEOUT DEBUG] Reset consecutive timeouts to 0 for player ${playerId}`);
+    
+    // Don't reset consecutive timeouts if this is a bot action
+    if ((game as any).botActionInProgress) {
+      console.log(`[TURN TIMEOUT DEBUG] Bot action in progress, keeping consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
+      turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: playerId, timer: null, consecutiveTimeouts: existingTimeout.consecutiveTimeouts });
+    } else {
+      // Reset consecutive timeouts when player acts
+      turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: playerId, timer: null, consecutiveTimeouts: 0 });
+      console.log(`[TURN TIMEOUT DEBUG] Reset consecutive timeouts to 0 for player ${playerId}`);
+    }
   }
 }
 

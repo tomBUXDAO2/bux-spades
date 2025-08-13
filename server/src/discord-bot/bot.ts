@@ -932,8 +932,9 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Build team information
       let teamInfo = '';
       if (gameLine.gameMode === 'partners') {
-        const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).map(p => `<@${p.userId}>`);
-        const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).map(p => `<@${p.userId}>`);
+        // First 2 players to join = Red Team, next 2 players = Blue Team (matching game line embed)
+        const redTeam = gameLine.players.slice(0, 2).map(p => `<@${p.userId}>`);
+        const blueTeam = gameLine.players.slice(2, 4).map(p => `<@${p.userId}>`);
         teamInfo = `🔴 **Red Team:** ${redTeam.join(', ')}\n🔵 **Blue Team:** ${blueTeam.join(', ')}`;
       } else {
         // Solo mode
