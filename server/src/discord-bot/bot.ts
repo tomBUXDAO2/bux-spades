@@ -370,15 +370,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             return;
           }
           
-          // Assign seat based on join order
-          let seat: number;
-          if (gameLine.players.length === 1) {
-            seat = 2; // Partner (seat 2)
-          } else if (gameLine.players.length === 2) {
-            seat = 1; // Player 3 (seat 1)
-          } else {
-            seat = 3; // Player 4 (seat 3)
-          }
+          // Assign seat based on join order - use sequential seats 0, 1, 2, 3
+          const seat = gameLine.players.length;
           
           // Add player to game
           // Get the user's avatar
@@ -907,16 +900,35 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Ping all players
       const playerMentions = gameLine.players.map(p => `<@${p.userId}>`).join(' ');
       
+      // Build game line format: "100k Partners 100/-100 Regular nil tick bn cross"
+      let gameLineFormat = `${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1)} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.charAt(0).toUpperCase() + gameLine.gameType.slice(1)}`;
+      
+      // Add nil and blind nil indicators
+      if (gameLine.gameType === 'regular') {
+        gameLineFormat += ` nil ${gameLine.nil === 'yes' ? '☑️' : '❌'} bn ${gameLine.blindNil === 'yes' ? '☑️' : '❌'}`;
+      }
+      
+      // Build team information
+      let teamInfo = '';
+      if (gameLine.gameMode === 'partners') {
+        const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).map(p => `<@${p.userId}>`);
+        const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).map(p => `<@${p.userId}>`);
+        teamInfo = `🔴 **Red Team:** ${redTeam.join(', ')}\n🔵 **Blue Team:** ${blueTeam.join(', ')}`;
+      } else {
+        // Solo mode
+        const soloColors = ['🔴', '🔵', '🟠', '🟢'];
+        const colorNames = ['Red', 'Blue', 'Orange', 'Green'];
+        teamInfo = gameLine.players.map((p, index) => 
+          `${soloColors[index]} **${colorNames[index]} Player:** <@${p.userId}>`
+        ).join('\n');
+      }
+      
       // Create game ready embed
       const gameReadyEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('🎮 Table Up!')
-        .setDescription(`${playerMentions}\n\n**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**\n\n**GOOD LUCK! 🍀**`)
-        .addFields(
-          { name: '💰 Buy-in', value: gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`, inline: true },
-          { name: '🎯 Game Mode', value: gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1), inline: true },
-          { name: '📊 Points', value: `${gameLine.maxPoints}/${gameLine.minPoints}`, inline: true }
-        )
+        .setDescription(`**${gameLineFormat}**\n\n${teamInfo}\n\n**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**\n\n**GOOD LUCK! 🍀**`)
+        .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .setTimestamp();
       
       await message.reply({ embeds: [gameReadyEmbed] });

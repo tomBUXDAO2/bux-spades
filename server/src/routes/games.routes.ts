@@ -91,6 +91,7 @@ router.post('/', async (req, res) => {
           username: playerData.username,
           avatar: user.avatar,
           type: 'human' as const,
+          position: playerData.seat, // Set position to match seat
         };
         players[playerData.seat] = player;
       }
