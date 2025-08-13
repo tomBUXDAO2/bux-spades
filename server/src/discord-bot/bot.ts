@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, TextChannel } from 'discord.js';
 import { PrismaClient } from '@prisma/client';
+import { registerCommands } from './commands';
 
 const prisma = new PrismaClient();
 
@@ -1039,6 +1040,8 @@ if (token && token.trim() !== '') {
   console.log('Attempting to start Discord bot...');
   client.login(token).then(async () => {
     console.log('Discord bot login successful!');
+    // Register slash commands
+    await registerCommands();
     // Load verified users from database after successful login
     await loadVerifiedUsersFromDatabase();
   }).catch((error) => {
