@@ -430,6 +430,7 @@ const HomePage: React.FC = () => {
         {/* Footer */}
         <div className="flex justify-between items-center">
           <span className="text-xs text-slate-400">
+            {(game as any).league && '⭐ '}
             {game.status === 'WAITING' ? 'WAITING' : 'IN PROGRESS'}
           </span>
           <button className="px-3 py-1 bg-slate-700 text-slate-300 text-xs rounded-full hover:bg-slate-600 transition" onClick={() => handleWatchGame(game.id)}>

@@ -2983,8 +2983,20 @@ export default function GameTable({
                 })()}
               </span>
             </div>
+            {/* League indicator */}
+            {(gameState as any).league && (
+              <div className="text-sm mt-1">
+                <span className="text-yellow-400">⭐ LEAGUE GAME</span>
+              </div>
+            )}
+                      </div>
+            {/* League indicator */}
+            {(gameState as any).league && (
+              <div className="text-sm mt-1">
+                <span className="text-yellow-400">⭐ LEAGUE GAME</span>
+              </div>
+            )}
           </div>
-        </div>
       )}
 
       {/* Seat Replacement Modal */}
