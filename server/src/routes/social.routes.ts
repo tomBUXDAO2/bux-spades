@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import { io } from '../index';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { requireAuth } from '../middleware/auth.middleware';
 const router = Router();
-const prisma = new PrismaClient();
 
 // Add Friend
-router.post('/friends/add', authenticateToken, async (req, res) => {
-  const currentUserId = (req as any).user.userId;
+router.post('/friends/add', requireAuth, async (req, res) => {
+  const currentUserId = (req as any).user.id;
   const { friendId } = req.body;
   if (currentUserId === friendId) return res.status(400).json({ error: "Cannot add yourself as a friend." });
   try {
@@ -33,8 +32,8 @@ router.post('/friends/add', authenticateToken, async (req, res) => {
 });
 
 // Remove Friend
-router.post('/friends/remove', authenticateToken, async (req, res) => {
-  const currentUserId = (req as any).user.userId;
+router.post('/friends/remove', requireAuth, async (req, res) => {
+  const currentUserId = (req as any).user.id;
   const { friendId } = req.body;
   try {
     await prisma.friend.delete({
@@ -53,8 +52,8 @@ router.post('/friends/remove', authenticateToken, async (req, res) => {
 });
 
 // Block User
-router.post('/block', authenticateToken, async (req, res) => {
-  const currentUserId = (req as any).user.userId;
+router.post('/block', requireAuth, async (req, res) => {
+  const currentUserId = (req as any).user.id;
   const { blockId } = req.body;
   if (currentUserId === blockId) return res.status(400).json({ error: "Cannot block yourself." });
   // Remove from friends if currently a friend
@@ -70,8 +69,8 @@ router.post('/block', authenticateToken, async (req, res) => {
 });
 
 // Unblock User
-router.post('/unblock', authenticateToken, async (req, res) => {
-  const currentUserId = (req as any).user.userId;
+router.post('/unblock', requireAuth, async (req, res) => {
+  const currentUserId = (req as any).user.id;
   const { blockId } = req.body;
   await prisma.blockedUser.deleteMany({
     where: { userId: currentUserId, blockedId: blockId }

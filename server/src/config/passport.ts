@@ -1,8 +1,6 @@
 import { Strategy as DiscordStrategy } from 'passport-discord';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import passport from 'passport';
-
-const prisma = new PrismaClient();
 
 passport.use(
   new DiscordStrategy(

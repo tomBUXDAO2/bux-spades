@@ -1,14 +1,13 @@
 // @ts-nocheck
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import { onlineUsers } from '../index';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { requireAuth } from '../middleware/auth.middleware';
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/users - return all users with online status and friend/block status
-router.get('/', authenticateToken, async (req, res) => {
-  const currentUserId = (req as any).user.userId;
+router.get('/', requireAuth, async (req, res) => {
+  const currentUserId = (req as any).user.id;
   const users = await prisma.user.findMany({
     select: { id: true, username: true, avatar: true, coins: true }
   }) as any[];
@@ -34,7 +33,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // GET /api/users/:id/stats - return UserStats for a user
-router.get('/:id/stats', authenticateToken, async (req, res) => {
+router.get('/:id/stats', requireAuth, async (req, res) => {
   try {
     const userId = req.params.id;
     const stats = await prisma.userStats.findUnique({

@@ -8,7 +8,7 @@ import { Server, Socket } from 'socket.io';
 import passport from 'passport';
 import session from 'express-session';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
@@ -42,26 +42,31 @@ if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN.trim() !== ''
 
 const app = express();
 const httpServer = createServer(app);
-const prisma = new PrismaClient();
+
 
 // Body parsing middleware MUST come first
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Universal CORS handler
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Expose-Headers', 'Set-Cookie');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
+// Strict CORS handler
+const httpAllowedOrigins = [
+  'http://localhost:5173',
+  'https://bux-spades.pro',
+  'https://www.bux-spades.pro',
+  'https://bux-spades.vercel.app'
+];
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || httpAllowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie']
+}));
 
-const allowedOrigins = [
+const socketAllowedOrigins = [
   'http://localhost:5173',
   'https://bux-spades.pro',
   'https://www.bux-spades.pro',
@@ -72,7 +77,7 @@ const allowedOrigins = [
 const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || socketAllowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -98,7 +103,7 @@ const io = new Server(httpServer, {
     secure: true
   } : false,
   upgradeTimeout: 45000, // Increased from 30000 - 45 seconds for mobile
-  maxHttpBufferSize: 1e8,
+  maxHttpBufferSize: 1e6,
   perMessageDeflate: {
     threshold: 2048
   },
@@ -154,10 +159,12 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Debug middleware to log requests
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`, req.body);
-  next();
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`, req.body);
+    next();
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -285,14 +292,33 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   socket.on('chat_message', async ({ gameId, message }) => {
     console.log('=== CHAT MESSAGE EVENT RECEIVED ===');
     console.log('Chat message received:', { gameId, message, socketId: socket.id, userId: socket.userId });
-    
+
+    // Basic size/rate checks
+    if (!socket.data) socket.data = {} as any;
+    const now = Date.now();
+    // Simple in-memory token bucket per socket
+    const bucket = (socket.data as any).chatBucket || { tokens: 5, lastRefill: now };
+    const elapsed = now - bucket.lastRefill;
+    const refill = Math.floor(elapsed / 1000) * 2; // 2 tokens/sec
+    bucket.tokens = Math.min(20, bucket.tokens + refill);
+    bucket.lastRefill = now;
+    if (bucket.tokens <= 0) {
+      return; // drop silently
+    }
+    bucket.tokens -= 1;
+    (socket.data as any).chatBucket = bucket;
+
+    if (typeof message?.message !== 'string' || message.message.length === 0 || message.message.length > 500) {
+      return;
+    }
+
     // Update game activity
     const game = games.find((g: Game) => g.id === gameId);
     if (game) {
       game.lastActivity = Date.now();
       updateGameActivity(gameId);
     }
-    
+
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized chat message attempt:', { 
         socketId: socket.id, 
@@ -307,6 +333,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.log('Invalid chat message format:', { gameId, message });
       return;
     }
+
+    // Force userId from socket, never trust client-provided
+    message.userId = socket.userId;
 
     // Validate message format
     if (!message.userId || !message.message) {
@@ -1196,9 +1225,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               // FORCE GAME LOGGING - Create game in database immediately
       if (!game.dbGameId) {
         try {
-          const { PrismaClient } = await import('@prisma/client');
-          const prisma = new PrismaClient();
-          
           const dbGame = await prisma.game.create({
             data: {
               creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
@@ -1215,7 +1241,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           game.dbGameId = dbGame.id;
           console.log('[FORCE GAME LOGGED] Game forced to database with ID:', game.dbGameId);
-          await prisma.$disconnect();
         } catch (err) {
           console.error('Failed to force log game start:', err);
           game.dbGameId = game.id; // Fallback to in-memory ID
@@ -1224,8 +1249,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         console.log('[GAME ALREADY LOGGED] Game already has dbGameId:', game.dbGameId);
         // Verify the game actually exists in the database
         try {
-          const { PrismaClient } = await import('@prisma/client');
-          const prisma = new PrismaClient();
           const dbGame = await prisma.game.findUnique({
             where: { id: game.dbGameId }
           });
@@ -2355,9 +2378,6 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
   // FORCE GAME LOGGING - Create game in database immediately
   if (!game.dbGameId) {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      
       const dbGame = await prisma.game.create({
         data: {
           creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
@@ -3128,7 +3148,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     port: PORT,
     env: process.env.NODE_ENV,
     cors: {
-      allowedOrigins,
+      allowedOrigins: httpAllowedOrigins,
       credentials: true
     },
     socket: {

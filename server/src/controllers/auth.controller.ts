@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { games } from '../gamesStore';
 import type { Game } from '../types/game';
 
-const prisma = new PrismaClient();
 
 // Validation schemas
 const registerSchema = z.object({
@@ -22,9 +21,9 @@ const loginSchema = z.object({
 
 // JWT token generation
 const generateToken = (userId: string): string => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
+  return jwt.sign({ userId }, process.env.JWT_SECRET || '', {
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  } as any);
 };
 
 export const register = async (req: Request, res: Response) => {
@@ -69,10 +68,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    // @ts-ignore
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET as any, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    });
+    const token = generateToken(user.id);
 
     res.status(201).json({
       token,
@@ -128,9 +124,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Generate token
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || '', {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    } as any);
+    const token = generateToken(user.id);
 
     // Check if user is in an active game
     console.log('[ACTIVE GAME DEBUG] Checking for active games for user:', user.id);

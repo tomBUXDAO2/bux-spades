@@ -1,8 +1,6 @@
 import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, TextChannel } from 'discord.js';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import { registerCommands } from './commands';
-
-const prisma = new PrismaClient();
 
 // Create a new client instance
 const client = new Client({

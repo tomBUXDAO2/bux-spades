@@ -1,27 +1,28 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
-export const authenticateToken = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+export interface AuthenticatedRequest extends Request {
+	user?: { id: string };
+}
 
-  if (!token) {
-    return res.status(401).json({
-      message: 'Authentication token is required',
-    });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-    (req as any).user = decoded;
-    next();
-  } catch (error) {
-    return res.status(403).json({
-      message: 'Invalid or expired token',
-    });
-  }
+export const requireAuth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const authHeader = req.headers.authorization;
+		if (!authHeader || !authHeader.startsWith('Bearer ')) {
+			return res.status(401).json({ error: 'Authentication required' });
+		}
+		const token = authHeader.split(' ')[1];
+		const secret = process.env.JWT_SECRET;
+		if (!secret) {
+			return res.status(500).json({ error: 'Server configuration error' });
+		}
+		const decoded = jwt.verify(token, secret) as { userId: string };
+		if (!decoded?.userId) {
+			return res.status(401).json({ error: 'Invalid token' });
+		}
+		(req as AuthenticatedRequest).user = { id: decoded.userId };
+		return next();
+	} catch (err) {
+		return res.status(401).json({ error: 'Invalid token' });
+	}
 }; 

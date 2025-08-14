@@ -4,14 +4,16 @@ import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption 
 import { io } from '../index';
 import { games } from '../gamesStore';
 import { startSeatReplacement } from "../index";
-import { PrismaClient } from '@prisma/client';
 import type { AuthenticatedSocket } from '../index';
 import { trickLogger } from '../lib/trickLogger';
-
+import prisma from '../lib/prisma';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { z } from 'zod';
+import { rateLimit } from '../middleware/rateLimit.middleware';
 
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Helper function to filter out null values
 function isNonNull<T>(value: T | null | undefined): value is T {
@@ -21,11 +23,28 @@ function isNonNull<T>(value: T | null | undefined): value is T {
 // Games store is now imported from index.ts to avoid circular dependency
 
 // Create a new game
-router.post('/', async (req, res) => {
+const createGameSchema = z.object({
+	gameMode: z.enum(['SOLO', 'PARTNERS']),
+	maxPoints: z.number().int().min(-1000).max(10000),
+	minPoints: z.number().int().min(-10000).max(1000),
+	buyIn: z.number().int().min(0).max(100000000),
+	biddingOption: z.string().optional(),
+	specialRules: z.any().optional(),
+	league: z.boolean().optional(),
+	players: z.array(z.object({
+		userId: z.string().optional(),
+		discordId: z.string().optional(),
+		username: z.string(),
+		avatar: z.string().nullable().optional(),
+		seat: z.number().int().min(0).max(3)
+	})).optional()
+});
+
+router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), requireAuth, validate(createGameSchema), async (req, res) => {
   try {
     const settings = req.body;
     const creatorPlayer = {
-      id: settings.creatorId,
+      id: (req as AuthenticatedRequest).user!.id,
       username: settings.creatorName || 'Unknown',
       avatar: settings.creatorImage || null,
       type: 'human' as const,
@@ -133,9 +152,6 @@ router.post('/', async (req, res) => {
     
     // FORCE GAME LOGGING - Create game in database immediately
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      
       const dbGame = await prisma.game.create({
         data: {
           creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
@@ -164,7 +180,7 @@ router.post('/', async (req, res) => {
         console.error('Failed to start round logging:', err);
       }
       
-      await prisma.$disconnect();
+
     } catch (err) {
       console.error('Failed to force log game start:', err);
     }
@@ -188,19 +204,25 @@ router.post('/', async (req, res) => {
 });
 
 // List all games
-router.get('/', (_req, res) => {
+router.get('/', requireAuth, (_req, res) => {
   res.json(games);
 });
 
 // Get game details
-router.get('/:id', (req, res) => {
+router.get('/:id', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   res.json(enrichGameForClient(game));
 });
 
   // Join a game
-  router.post('/:id/join', async (req, res) => {
+  const joinGameSchema = z.object({
+	seat: z.number().int().min(0).max(3).optional(),
+	username: z.string().min(1),
+	avatar: z.string().optional()
+});
+
+router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10 }), requireAuth, validate(joinGameSchema), async (req, res) => {
     console.log('[HTTP JOIN DEBUG] Join request:', { gameId: req.params.id, body: req.body });
     console.log('[HTTP JOIN DEBUG] Available games:', games.map(g => ({ id: g.id, status: g.status, players: g.players.map(p => p ? p.id : 'null') })));
     
@@ -209,7 +231,7 @@ router.get('/:id', (req, res) => {
 
   // Use requested seat if provided and available, otherwise find first empty seat
   const requestedSeat = typeof req.body.seat === 'number' ? req.body.seat : null;
-  const playerId = req.body.id;
+  const playerId = (req as AuthenticatedRequest).user!.id;
   const player = {
     id: playerId,
     username: req.body.username || 'Unknown',
@@ -327,11 +349,12 @@ router.get('/:id', (req, res) => {
 });
 
 // Invite a bot to an empty seat (host only, pre-game)
-router.post('/:id/invite-bot', (req, res) => {
+router.post('/:id/invite-bot', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status !== 'WAITING') return res.status(400).json({ error: 'Game already started' });
-  const { seatIndex, requesterId } = req.body;
+  const { seatIndex } = req.body;
+  const requesterId = (req as AuthenticatedRequest).user!.id;
   // Debug logging
   console.log('[INVITE BOT] seatIndex:', seatIndex, 'requesterId:', requesterId);
   console.log('[INVITE BOT] game.players BEFORE:', JSON.stringify(game.players));
@@ -357,11 +380,12 @@ router.post('/:id/invite-bot', (req, res) => {
 });
 
 // Invite a bot to fill an empty seat mid-game (partner only)
-router.post('/:id/invite-bot-midgame', (req, res) => {
+router.post('/:id/invite-bot-midgame', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status === 'WAITING') return res.status(400).json({ error: 'Game has not started' });
-  const { seatIndex, requesterId } = req.body;
+  const { seatIndex } = req.body;
+  const requesterId = (req as AuthenticatedRequest).user!.id;
   if (seatIndex < 0 || seatIndex > 3 || game.players[seatIndex]) return res.status(400).json({ error: 'Seat is not empty' });
   // Find the partner seat (for 4-player games: 0<->2, 1<->3)
   const partnerSeat = (seatIndex + 2) % 4;
@@ -383,12 +407,11 @@ router.post('/:id/invite-bot-midgame', (req, res) => {
 });
 
 // Add a spectator to a game
-router.post('/:id/spectate', async (req, res) => {
+router.post('/:id/spectate', requireAuth, async (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
-  const userId = req.body.id;
+  const userId = (req as AuthenticatedRequest).user!.id;
   let hostReplaced = false;
-  if (!userId) return res.status(400).json({ error: 'Missing user id' });
   // Prevent duplicate spectate
   if (game.spectators.some(s => s.id === userId)) {
     return res.status(400).json({ error: 'Already spectating' });
@@ -410,10 +433,10 @@ router.post('/:id/spectate', async (req, res) => {
 });
 
 // Remove a player or spectator from a game
-router.post('/:id/leave', (req, res) => {
+router.post('/:id/leave', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
-  const userId = req.body.id;
+  const userId = (req as AuthenticatedRequest).user!.id;
   let hostReplaced = false;
   
   // Remove from players
@@ -527,7 +550,7 @@ export function dealCards(players: (GamePlayer | null)[], dealerIndex: number): 
 }
 
 // Start the game
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 5 }), requireAuth, async (req, res) => {
   console.log('[DEBUG] /start route CALLED for game', req.params.id);
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
@@ -539,14 +562,23 @@ router.post('/:id/start', async (req, res) => {
   if (!game.isBotGame) {
     // Debit buy-in from each human player's coin balance
     try {
-      for (const player of game.players) {
-        if (player && player.type === 'human') {
-          await prisma.user.update({
-            where: { id: player.id },
-            data: { coins: { decrement: game.buyIn } }
-          });
+      await prisma.$transaction(async (tx) => {
+        // Validate all players have enough coins first
+        const humanPlayers = game.players.filter(p => p && p.type === 'human') as GamePlayer[];
+        const userIds = humanPlayers.map(p => p.id);
+        const users = await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, coins: true } });
+        const userCoins = new Map(users.map(u => [u.id, u.coins]));
+        for (const p of humanPlayers) {
+          const coins = userCoins.get(p.id);
+          if (coins === undefined || coins < game.buyIn) {
+            throw new Error('Not enough coins for all players');
+          }
         }
-      }
+        // Debit all
+        for (const p of humanPlayers) {
+          await tx.user.update({ where: { id: p.id }, data: { coins: { decrement: game.buyIn } } });
+        }
+      });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to debit coins from players' });
     }
@@ -593,11 +625,12 @@ router.post('/:id/start', async (req, res) => {
 });
 
 // Remove a bot from a seat (host only, pre-game)
-router.post('/:id/remove-bot', (req, res) => {
+router.post('/:id/remove-bot', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status !== 'WAITING') return res.status(400).json({ error: 'Game already started' });
-  const { seatIndex, requesterId } = req.body;
+  const { seatIndex } = req.body;
+  const requesterId = (req as AuthenticatedRequest).user!.id;
   // Only host can remove bots
   if (game.players[0]?.id !== requesterId) return res.status(403).json({ error: 'Only host can remove bots' });
   if (seatIndex < 0 || seatIndex > 3 || !game.players[seatIndex] || game.players[seatIndex].type !== 'bot') return res.status(400).json({ error: 'Invalid seat or not a bot' });
@@ -608,11 +641,12 @@ router.post('/:id/remove-bot', (req, res) => {
 });
 
 // Remove a bot from a seat mid-game (partner only)
-router.post('/:id/remove-bot-midgame', (req, res) => {
+router.post('/:id/remove-bot-midgame', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status === 'WAITING') return res.status(400).json({ error: 'Game has not started' });
-  const { seatIndex, requesterId } = req.body;
+  const { seatIndex } = req.body;
+  const requesterId = (req as AuthenticatedRequest).user!.id;
   if (seatIndex < 0 || seatIndex > 3 || !game.players[seatIndex] || game.players[seatIndex].type !== 'bot') return res.status(400).json({ error: 'Invalid seat or not a bot' });
   // Find the partner seat (for 4-player games: 0<->2, 1<->3)
   const partnerSeat = (seatIndex + 2) % 4;

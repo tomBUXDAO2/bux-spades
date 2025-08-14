@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from './prisma';
 import { Game, Card } from '../types/game';
 import { games } from '../gamesStore';
-
-const prisma = new PrismaClient();
 
 export interface TrickLogData {
   roundId: string;
