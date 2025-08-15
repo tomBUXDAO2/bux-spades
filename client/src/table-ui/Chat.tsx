@@ -63,6 +63,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   const [isMobile, setIsMobile] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [statsPlayer, setStatsPlayer] = useState<any | null>(null);
+  const [playerStatuses, setPlayerStatuses] = useState<Record<string, 'friend' | 'blocked' | 'not_friend'>>({});
 
   // Debug emoji data
   useEffect(() => {
@@ -479,6 +480,26 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     };
   }, [socket, isAuthenticated]);
 
+  // Fetch user statuses to mirror lobby player list (friend/blocked)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const loadStatuses = async () => {
+      try {
+        const res = await api.get('/api/users');
+        const list = await res.json();
+        const ids = new Set([...(players || []).map(p => p.id), ...((spectators || []).map(s => s.id))]);
+        const map: Record<string, 'friend' | 'blocked' | 'not_friend'> = {};
+        (list || []).forEach((u: any) => {
+          if (ids.has(u.id)) map[u.id] = (u.status as any) || 'not_friend';
+        });
+        setPlayerStatuses(map);
+      } catch (e) {
+        console.error('Failed to load user statuses', e);
+      }
+    };
+    loadStatuses();
+  }, [isAuthenticated, players, spectators]);
+
   return (
     <>
       <div className="flex flex-col h-full bg-gray-800 border-l border-gray-600">
@@ -683,72 +704,92 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           {players.map(player => (
             <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
               <img src={player.avatar || player.image || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
-              <button
-                className="text-sm font-medium text-slate-200 flex items-center hover:underline"
+              <span
+                className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(player.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
                   setStatsPlayer({
                     username: player.username || player.name,
                     avatar: player.avatar || player.image || '/bot-avatar.jpg',
                     stats: (player as any)?.stats || {},
-                    status: 'not_friend'
+                    status: playerStatuses[player.id] || 'not_friend'
                   });
                   setIsStatsOpen(true);
                 }}
               >
                 {player.username || player.name}
-              </button>
-              {/* Online status dot */}
-              {isAuthenticated && (
-                <span className={`ml-auto inline-block w-2 h-2 rounded-full ${player && (window as any).onlineUsers?.includes?.(player.id) ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-              )}
-              {/* Friend/Block buttons */}
-              {user && player.id !== user.id && (
-                <div className="flex items-center gap-2 ml-2">
-                  <button
-                    className="w-7 h-7 flex items-center justify-center rounded bg-green-600 hover:bg-green-700"
-                    title="Add Friend"
-                    onClick={async () => {
-                      try {
-                        await api.post('/api/social/friends/add', { friendId: player.id });
-                      } catch (e) { console.error(e); }
-                    }}
-                  >
-                    <img src="/add-friend.svg" alt="Add Friend" className="w-4 h-4" style={{ filter: 'invert(1) brightness(2)' }} />
-                  </button>
-                  <button
-                    className="w-7 h-7 flex items-center justify-center rounded bg-slate-600 hover:bg-slate-500"
-                    title="Block"
-                    onClick={async () => {
-                      try {
-                        await api.post('/api/social/block', { blockId: player.id });
-                      } catch (e) { console.error(e); }
-                    }}
-                  >
-                    <img src="/remove-friend.svg" alt="Block" className="w-4 h-4" style={{ filter: 'invert(1) brightness(2)' }} />
-                  </button>
-                </div>
-              )}
+                {(window as any).onlineUsers?.includes?.(player.id) && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
+                {playerStatuses[player.id] === 'friend' && (
+                  <img src="/friend.svg" alt="Friend" className="ml-2 w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+                )}
+              </span>
+              <div className="flex gap-2 ml-auto items-center">
+                {user && player.id !== user.id && (
+                  playerStatuses[player.id] === 'blocked' ? (
+                    <>
+                      <span className="text-slate-400 text-xs mr-2 flex items-center h-8">unblock?</span>
+                      <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Unblock"
+                        onClick={async () => { try { await api.post('/api/social/unblock', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error(e); } }}>
+                        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                          <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
+                          <path d="M6 18L18 6" stroke="white" strokeWidth="2.5" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    playerStatuses[player.id] === 'friend' ? (
+                      <>
+                        <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
+                          onClick={async () => { try { await api.post('/api/social/friends/remove', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error(e); } }}>
+                          <img src="/remove-friend.svg" alt="Remove Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
+                        </button>
+                        <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error(e); } }}>
+                          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                            <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
+                            <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
+                          onClick={async () => { try { await api.post('/api/social/friends/add', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'friend' })); } catch (e) { console.error(e); } }}>
+                          <img src="/add-friend.svg" alt="Add Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
+                        </button>
+                        <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error(e); } }}>
+                          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                            <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
+                            <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
+                          </svg>
+                        </button>
+                      </>
+                    )
+                  )
+                )}
+              </div>
             </div>
           ))}
           {/* Spectators */}
           {spectators && spectators.map(spectator => (
             <div key={spectator.id} className="flex items-center gap-3 p-2 rounded bg-slate-700 opacity-80">
               <img src={spectator.avatar || spectator.image || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
-              <button
-                className="text-sm font-medium text-slate-200 flex items-center hover:underline"
+              <span
+                className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(spectator.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
                   setStatsPlayer({
                     username: spectator.username || spectator.name,
                     avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
                     stats: (spectator as any)?.stats || {},
-                    status: 'not_friend'
+                    status: playerStatuses[spectator.id] || 'not_friend'
                   });
                   setIsStatsOpen(true);
                 }}
               >
                 {spectator.username || spectator.name}
+                {(window as any).onlineUsers?.includes?.(spectator.id) && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
                 <EyeIcon />
-              </button>
+              </span>
             </div>
           ))}
         </div>
