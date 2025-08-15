@@ -478,8 +478,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       if (interaction.commandName === 'game') {
         gameType = 'regular';
-        nil = interaction.options.getString('nil');
-        blindNil = interaction.options.getString('blindnil');
+        // Default nil ON unless explicitly provided as 'no'
+        const providedNil = interaction.options.getString('nil');
+        nil = providedNil === 'no' ? 'no' : 'yes';
+        blindNil = interaction.options.getString('blindnil') || 'no';
       } else if (interaction.commandName === 'whiz') {
         gameType = 'WHIZ';
       } else if (interaction.commandName === 'mirror') {
@@ -500,25 +502,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Format the game line title
       const gameLineTitle = `${formatCoins(coins)} ${gameMode.toUpperCase()} ${maxPoints}/${minPoints} ${gameType.toUpperCase()}`;
       
-      // Build special rules text
-      let specialRulesText = '';
-      const rules = [];
-      if (screamer === 'yes') rules.push('SCREAMER');
-      if (assassin === 'yes') rules.push('ASSASSIN');
-      
-      // Add nil/blind nil settings only for regular games
+      // Build special rules line including nil/bn when regular
+      const rules: string[] = [];
       if (gameType === 'regular') {
-        if (nil === 'no') rules.push('NO NIL');
-        if (blindNil === 'yes') rules.push('BLIND NIL');
+        rules.push(`nil ${nil === 'yes' ? '☑️' : '❌'}`);
+        rules.push(`bn ${blindNil === 'yes' ? '☑️' : '❌'}`);
       }
+      if (specialRules === 'screamer') rules.push('SCREAMER');
+      if (specialRules === 'assassin') rules.push('ASSASSIN');
+      const specialRulesText = rules.length > 0 ? `\n${rules.join(' ')}` : '';
       
-      if (rules.length > 0) {
-        specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
-      }
-      
-      // Create the embed
       const embed = new EmbedBuilder()
-        .setColor(0x00ff00) // Green color
+        .setColor(0x0099ff)
         .setTitle('🎮 GAME LINE')
         .setDescription(`**${gameLineTitle}**${specialRulesText}`)
         .addFields(
@@ -886,7 +881,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       creatorId: gameLine.hostId,
       creatorName: gameLine.hostName,
       buyIn: gameLine.coins,
-      gameMode: gameLine.gameMode,
+      gameMode: gameLine.gameMode.toUpperCase(),
       maxPoints: gameLine.maxPoints,
       minPoints: gameLine.minPoints,
       gameType: gameLine.gameType,
@@ -938,9 +933,9 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Build team information
       let teamInfo = '';
       if (gameLine.gameMode === 'partners') {
-        // First 2 players to join = Red Team, next 2 players = Blue Team (matching game line embed)
-        const redTeam = gameLine.players.slice(0, 2).map(p => `<@${p.userId}>`);
-        const blueTeam = gameLine.players.slice(2, 4).map(p => `<@${p.userId}>`);
+        // Preserve fixed seat mapping: 0,2 (Red) and 1,3 (Blue)
+        const redTeam = [0,2].map(i => `<@${gameLine.players[i].userId}>`);
+        const blueTeam = [1,3].map(i => `<@${gameLine.players[i].userId}>`);
         teamInfo = `🔴 **Red Team:** ${redTeam.join(', ')}\n🔵 **Blue Team:** ${blueTeam.join(', ')}`;
       } else {
         // Solo mode
