@@ -1994,7 +1994,7 @@ export default function GameTable({
   }, [socket]);
 
   // Loosen the chatReady guard so Chat UI renders for both players and spectators
-  const chatReady = gameState?.id && (currentPlayerId || myPlayerIndex === -1);
+  const chatReady = Boolean(gameState?.id);
 
   // Add a new effect to handle socket reconnection and message sending
   useEffect(() => {

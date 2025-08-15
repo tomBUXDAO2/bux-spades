@@ -120,8 +120,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
       chatType
     });
 
-    if (!socket || !isReady) {
-      console.log('No active socket available for chat or not authenticated');
+    if (!socket) {
+      console.log('No active socket available for chat');
       return;
     }
 
@@ -264,8 +264,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket || (!isReady && chatType === 'game')) {
-      console.log('Cannot send message - socket not ready:', { isConnected, isAuthenticated, isReady, chatType });
+    if (!newMessage.trim() || !socket || (chatType === 'game' && !socket.connected)) {
+      console.log('Cannot send message - socket not ready:', { isConnected: socket?.connected, isAuthenticated, isReady, chatType });
       return;
     }
 
