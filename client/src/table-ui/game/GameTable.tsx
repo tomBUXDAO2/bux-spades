@@ -3100,7 +3100,7 @@ export default function GameTable({
 
       {/* League ready controls */}
       {isLeague && gameState.status === 'WAITING' && (
-        <div className="absolute z-[100000] flex flex-col items-center gap-2 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="fixed z-[100000] flex flex-col items-center gap-2 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
            {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
              <button
                onClick={() => toggleReady(!leagueReady[myIndex])}
