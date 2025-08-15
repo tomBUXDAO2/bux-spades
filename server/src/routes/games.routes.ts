@@ -2639,12 +2639,13 @@ async function updateHandStats(game: Game) {
 
 // --- Game logging helper ---
 async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
-  // Check if this is an all-human game (no bots)
+  // Check player composition but always log league games
   const humanPlayers = game.players.filter(p => p && p.type === 'human');
   const isAllHumanGame = humanPlayers.length === 4;
+  const isLeagueGame = (game as any).league === true;
   
-  if (!isAllHumanGame) {
-    console.log('Skipping game logging - not an all-human game');
+  if (!isAllHumanGame && !isLeagueGame) {
+    console.log('Skipping game logging - not an all-human game and not a league game');
     return;
   }
   
@@ -2653,7 +2654,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
   try {
     // Determine game settings based on game rules
     const gameMode = game.gameMode;
-    const bidType = game.rules?.bidType || 'REG';
+    const bidType = game.rules?.bidType || 'REGULAR';
     const specialRules = game.specialRules || {};
     
     // Determine boolean flags
@@ -2832,7 +2833,9 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         
         // Create game line string
         const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
-        const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${game.rules.gameType.toUpperCase()}`;
+        // Prefer bidType (e.g., WHIZ, MIRROR(S)), fallback to gameType from rules
+        const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
+        const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
         
         // Prepare game data for Discord
         const gameData = {
