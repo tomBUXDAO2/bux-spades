@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, TextChannel } from 'discord.js';
 import prisma from '../lib/prisma';
 import { registerCommands } from './commands';
+import jwt from 'jsonwebtoken';
 
 // Create a new client instance
 const client = new Client({
@@ -902,12 +903,16 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         avatar: p.avatar // Include avatar if available
       }))
     };
+
+    // Sign a short-lived JWT so the API accepts this request
+    const token = jwt.sign({ userId: gameLine.hostId }, process.env.JWT_SECRET || '', { expiresIn: '5m' } as any);
     
     // Make API call to create game
     const response = await fetch('https://bux-spades-server.fly.dev/api/games', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(gameData)
     });
