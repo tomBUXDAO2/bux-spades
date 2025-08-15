@@ -56,7 +56,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     socketManager.initialize(user.id, user.username, user.avatar || undefined);
 
     // Ensure we auto-join any active game room after authentication
-    const off = socketManager.onStateChange((s) => {
+    socketManager.onStateChange((s) => {
       if (s.isReady) {
         try {
           const stored = localStorage.getItem('activeGameId');
