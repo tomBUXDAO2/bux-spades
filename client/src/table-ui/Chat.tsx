@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/lib/api';
+import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { Player } from '../types/game';
@@ -48,6 +51,7 @@ const EyeIcon = () => (
 
 export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages, isSpectator = false }: ChatProps) {
   const { socket, isAuthenticated, isConnected, isReady } = useSocket();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -57,6 +61,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   const lobbyEmojiPickerRef = useRef<HTMLDivElement>(null);
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [statsPlayer, setStatsPlayer] = useState<any | null>(null);
 
   // Debug emoji data
   useEffect(() => {
@@ -463,6 +469,9 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     if (!socket || !isAuthenticated) return;
     const logAll = (event: string, ...args: unknown[]) => {
       console.log('SOCKET EVENT:', event, ...args);
+      if (event === 'online_users' && Array.isArray(args[0])) {
+        (window as any).onlineUsers = args[0] as string[];
+      }
     };
     socket.onAny(logAll);
     return () => {
@@ -471,7 +480,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   }, [socket, isAuthenticated]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 border-l border-gray-600">
+    <>
+      <div className="flex flex-col h-full bg-gray-800 border-l border-gray-600">
       {/* Chat/Players Header */}
       <div className="flex items-center justify-between bg-gray-900 p-2 border-b border-gray-600">
         <div className="flex items-center gap-2">
@@ -673,23 +683,79 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           {players.map(player => (
             <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
               <img src={player.avatar || player.image || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
-              <span className="text-sm font-medium text-slate-200 flex items-center">
+              <button
+                className="text-sm font-medium text-slate-200 flex items-center hover:underline"
+                onClick={() => {
+                  setStatsPlayer({
+                    username: player.username || player.name,
+                    avatar: player.avatar || player.image || '/bot-avatar.jpg',
+                    stats: (player as any)?.stats || {},
+                    status: 'not_friend'
+                  });
+                  setIsStatsOpen(true);
+                }}
+              >
                 {player.username || player.name}
-              </span>
+              </button>
+              {/* Online status dot */}
+              {isAuthenticated && (
+                <span className={`ml-auto inline-block w-2 h-2 rounded-full ${player && (window as any).onlineUsers?.includes?.(player.id) ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+              )}
+              {/* Friend/Block buttons */}
+              {user && player.id !== user.id && (
+                <div className="flex items-center gap-2 ml-2">
+                  <button
+                    className="w-7 h-7 flex items-center justify-center rounded bg-green-600 hover:bg-green-700"
+                    title="Add Friend"
+                    onClick={async () => {
+                      try {
+                        await api.post('/api/social/friends/add', { friendId: player.id });
+                      } catch (e) { console.error(e); }
+                    }}
+                  >
+                    <img src="/add-friend.svg" alt="Add Friend" className="w-4 h-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                  </button>
+                  <button
+                    className="w-7 h-7 flex items-center justify-center rounded bg-slate-600 hover:bg-slate-500"
+                    title="Block"
+                    onClick={async () => {
+                      try {
+                        await api.post('/api/social/block', { blockId: player.id });
+                      } catch (e) { console.error(e); }
+                    }}
+                  >
+                    <img src="/remove-friend.svg" alt="Block" className="w-4 h-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {/* Spectators */}
           {spectators && spectators.map(spectator => (
             <div key={spectator.id} className="flex items-center gap-3 p-2 rounded bg-slate-700 opacity-80">
               <img src={spectator.avatar || spectator.image || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
-              <span className="text-sm font-medium text-slate-200 flex items-center">
+              <button
+                className="text-sm font-medium text-slate-200 flex items-center hover:underline"
+                onClick={() => {
+                  setStatsPlayer({
+                    username: spectator.username || spectator.name,
+                    avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
+                    stats: (spectator as any)?.stats || {},
+                    status: 'not_friend'
+                  });
+                  setIsStatsOpen(true);
+                }}
+              >
                 {spectator.username || spectator.name}
                 <EyeIcon />
-              </span>
+              </button>
             </div>
           ))}
         </div>
       )}
-    </div>
+      </div>
+      <PlayerStatsModal isOpen={isStatsOpen} onClose={() => setIsStatsOpen(false)} player={statsPlayer} />
+    </>
   );
-} 
+}
+ 
