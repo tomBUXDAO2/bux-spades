@@ -2869,13 +2869,14 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
 		await logCompletedGame(game, winningTeamOrPlayer);
 	}
 	
-	// Only proceed with stats/coins updates for rated (all-human) games
-	if (!isAllHumanGame) {
-		console.log('Skipping stats/coins update - not a rated game (has bots)');
+	// Only proceed with stats/coins updates for rated games (started with 4 humans)
+	const ratedGame = (game as any).isBotGame === false;
+	if (!ratedGame) {
+		console.log('Skipping stats/coins update - not a rated game (did not start with 4 humans)');
 		return;
 	}
 	
-	console.log('Updating stats and coins for rated game');
+	console.log('Updating stats and coins for rated game (started with 4 humans)');
 	
 	for (let i = 0; i < 4; i++) {
 		const player = game.players[i];
