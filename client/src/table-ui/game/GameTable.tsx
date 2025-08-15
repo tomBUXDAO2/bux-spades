@@ -3100,41 +3100,41 @@ export default function GameTable({
 
       {/* League ready controls */}
       {isLeague && gameState.status === 'WAITING' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-40 pointer-events-none gap-2">
-          {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
-            <button
-              onClick={() => toggleReady(!leagueReady[myIndex])}
-              className={`pointer-events-auto px-5 py-2 rounded-lg text-base font-semibold ${leagueReady[myIndex] ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white shadow`}
-            >
-              {leagueReady[myIndex] ? 'Ready ✓' : 'Ready'}
-            </button>
-          )}
-          {isHost && (
-            <button
-              onClick={requestStart}
-              disabled={!allHumansReady}
-              className={`pointer-events-auto px-5 py-2 rounded-lg text-base font-semibold shadow ${allHumansReady ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-            >
-              Start Game
-            </button>
-          )}
-          {/* Ready status list for seats 1,2,3 */}
-          <div className="pointer-events-none mt-1 text-xs text-slate-300 bg-slate-800/70 rounded px-2 py-1">
-            {[1,2,3].map((idx) => {
-              const p = gameState.players[idx];
-              if (!p) return null;
-              const name = (p as any).username || (p as any).name || 'Player';
-              const ok = !!leagueReady[idx];
-              return (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-green-500' : 'bg-slate-500'}`}></span>
-                  <span>{name}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        <div className="absolute z-[100000] flex flex-col items-center gap-2 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+           {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
+             <button
+               onClick={() => toggleReady(!leagueReady[myIndex])}
+               className={`pointer-events-auto px-5 py-2 rounded-lg text-base font-semibold ${leagueReady[myIndex] ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white shadow`}
+             >
+               {leagueReady[myIndex] ? 'Ready ✓' : 'Ready'}
+             </button>
+           )}
+           {isHost && (
+             <button
+               onClick={requestStart}
+               disabled={!allHumansReady}
+               className={`pointer-events-auto px-6 py-2 rounded-lg text-lg font-bold shadow ${allHumansReady ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+             >
+               Start Game
+             </button>
+           )}
+           {/* Ready status list for seats 1,2,3 */}
+           <div className="pointer-events-none mt-1 text-xs text-slate-300 bg-slate-800/80 rounded px-2 py-1 w-full">
+             {[1,2,3].map((idx) => {
+               const p = gameState.players[idx];
+               if (!p) return null;
+               const name = (p as any).username || (p as any).name || 'Player';
+               const ok = !!leagueReady[idx];
+               return (
+                 <div key={idx} className="flex items-center gap-2 justify-center">
+                   <span className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-green-500' : 'bg-slate-500'}`}></span>
+                   <span>{name}</span>
+                 </div>
+               );
+             })}
+           </div>
+         </div>
+       )}
 
     </>
   );
