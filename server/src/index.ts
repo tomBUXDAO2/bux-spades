@@ -286,6 +286,20 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       sessionId,
       games: Array.from(socket.rooms).filter(room => room !== socket.id)
     });
+
+    // Auto-join any rooms for games this user is already part of (players or spectators)
+    try {
+      const userGameIds = games
+        .filter((g: any) => (g.players || []).some((p: any) => p && p.id === socket.userId) || (g.spectators || []).some((s: any) => s && s.id === socket.userId))
+        .map((g: any) => g.id);
+      if (userGameIds.length > 0) {
+        userGameIds.forEach((id: string) => socket.join(id));
+        console.log('[AUTO JOIN ROOMS] userId:', socket.userId, 'rooms:', userGameIds);
+        userGameIds.forEach((id: string) => socket.emit('joined_game_room', { gameId: id }));
+      }
+    } catch (e) {
+      console.log('[AUTO JOIN ROOMS] error', e);
+    }
   }
 
   // Handle chat messages
