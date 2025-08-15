@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FaTrophy } from 'react-icons/fa';
+import type { Player, Bot } from '@/types/game';
 
 interface WinnerModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface WinnerModalProps {
   humanPlayerCount?: number; // Number of human players in the game
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
   onLeaveTable?: () => void; // Function to call when leaving table
+  players?: (Player | Bot | null)[]; // Players to display names/avatars
 }
 
 export default function WinnerModal({ 
@@ -28,7 +30,8 @@ export default function WinnerModal({
   coinsWon = 0,
   humanPlayerCount = 1,
   onTimerExpire,
-  onLeaveTable
+  onLeaveTable,
+  players = []
 }: WinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -78,6 +81,13 @@ export default function WinnerModal({
   // Determine if user won
   const userWon = userTeam === winningTeam;
 
+  const getDisplay = (idx: number) => {
+    const p = players[idx] as (Player | Bot | null);
+    const displayName = (p && ('username' in p) && p.username) ? p.username : 'Unknown';
+    const avatarUrl = (p && ('avatar' in p) && p.avatar) ? p.avatar! : '/default-pfp.jpg';
+    return { displayName, avatarUrl };
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -107,6 +117,16 @@ export default function WinnerModal({
                 <span className="text-gray-400">Final Score</span>
                 <span className="font-medium text-white">{team1Score}</span>
               </div>
+              {[0, 2].map((idx) => {
+                const { displayName, avatarUrl } = getDisplay(idx);
+                return (
+                  <div key={`team1-${idx}`} className="flex items-center text-xs text-white/90">
+                    <div className="bg-red-500 rounded-full w-1.5 h-1.5 mr-2"></div>
+                    <img src={avatarUrl} alt={displayName} className="w-5 h-5 rounded-full mr-2 object-cover" />
+                    <span className="truncate">{displayName}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -121,6 +141,16 @@ export default function WinnerModal({
                 <span className="text-gray-400">Final Score</span>
                 <span className="font-medium text-white">{team2Score}</span>
               </div>
+              {[1, 3].map((idx) => {
+                const { displayName, avatarUrl } = getDisplay(idx);
+                return (
+                  <div key={`team2-${idx}`} className="flex items-center text-xs text-white/90">
+                    <div className="bg-blue-500 rounded-full w-1.5 h-1.5 mr-2"></div>
+                    <img src={avatarUrl} alt={displayName} className="w-5 h-5 rounded-full mr-2 object-cover" />
+                    <span className="truncate">{displayName}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -3049,6 +3049,7 @@ export default function GameTable({
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           onLeaveTable={handleLeaveTable}
+          players={gameState.players}
         />
       )}
 
@@ -3066,6 +3067,8 @@ export default function GameTable({
           coinsWon={0} // Losers get 0 coins
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
+          onLeaveTable={handleLeaveTable}
+          players={gameState.players}
         />
       )}
     </>
