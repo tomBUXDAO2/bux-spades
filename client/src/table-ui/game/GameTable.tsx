@@ -436,7 +436,6 @@ export default function GameTable({
   // Using propUser elsewhere; no need to pull from AuthContext here
 // const { user } = useAuth();
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
-  const [showStartModal, setShowStartModal] = useState(false);
   
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
