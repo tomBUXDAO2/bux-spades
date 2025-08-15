@@ -264,17 +264,14 @@ export default function TablePage() {
           }, 1000); // Small delay to ensure game is loaded
         }
 
-        // After fetching game, ensure we join the socket room if socket is ready
+        // After fetching game, store activeGameId and ensure we join the socket room if socket is ready
+        try { localStorage.setItem('activeGameId', String(gameId)); } catch {}
         if (socket && socket.connected && !isSpectator) {
           setTimeout(() => {
             if (socket && socket.connected) {
-              socket.emit('join_game', {
-                gameId,
-                userId: user.id,
-                timestamp: new Date().toISOString()
-              });
+              socket.emit('join_game', { gameId });
             }
-          }, 500);
+          }, 300);
         }
       } catch (err) {
         console.error(`[GAME FETCH] Error fetching game (attempt ${retryCount + 1}):`, err);
@@ -301,15 +298,12 @@ export default function TablePage() {
     const fallbackJoinGame = () => {
       if (socket && socket.connected && !isSpectator) {
         console.log('SENDING JOIN_GAME EVENT');
-        socket.emit('join_game', {
-          gameId,
-          userId: user.id,
-          timestamp: new Date().toISOString()
-        });
+        socket.emit('join_game', { gameId });
       } else {
         console.log('SOCKET NOT READY FOR JOIN_GAME');
       }
     };
+
 
     // Try to join game after a delay as fallback
     setTimeout(fallbackJoinGame, 2000);

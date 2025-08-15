@@ -920,14 +920,19 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Game already started' });
         return;
       }
-      // League gating: require all humans ready before starting
+      // League gating: require the three non-host humans to be ready before starting
       if ((game as any).league) {
         if (!Array.isArray((game as any).leagueReady) || (game as any).leagueReady.length !== 4) {
           (game as any).leagueReady = [false, false, false, false];
         }
-        const allHumansReady = game.players.every((p: any, i: number) => p && p.type === 'human' ? (game as any).leagueReady[i] : true);
-        if (!allHumansReady) {
-          socket.emit('error', { message: 'All players must be ready to start' });
+        const hostId = game.players[0]?.id;
+        const othersReady = game.players.every((p: any, i: number) => {
+          if (!p || p.type !== 'human') return true; // bots/empty seats don't gate
+          if (p.id === hostId) return true; // host doesn't need to press Ready
+          return (game as any).leagueReady[i] === true;
+        });
+        if (!othersReady) {
+          socket.emit('error', { message: 'All non-host players must be ready to start' });
           return;
         }
       }
@@ -2236,8 +2241,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       ensureLeagueReady(game);
       const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
       if (idx === -1) return;
-      // Latch to true: once ready, stays ready until disconnect/reset
-      game.leagueReady[idx] = Boolean(game.leagueReady[idx] || ready);
+      // Latch to true: once ready, stays ready (never resets to false via this path)
+      game.leagueReady[idx] = game.leagueReady[idx] || !!ready;
       io.to(gameId).emit('league_ready_update', { gameId, leagueReady: game.leagueReady });
     } catch (e) {
       console.log('league_ready error', e);
