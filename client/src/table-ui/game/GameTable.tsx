@@ -1868,11 +1868,11 @@ export default function GameTable({
     };
   }, [socket, showWinner, showLoser]);
 
-  // Effect to handle game status changes
+  // Effect to handle game status changes (handle both COMPLETED and FINISHED)
   useEffect(() => {
-    if (gameState.status === "COMPLETED") {
+    if (gameState.status === "COMPLETED" || gameState.status === "FINISHED") {
       const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
-      console.log('[GAME STATUS] Game completed, winning team:', winningTeam);
+      console.log('[GAME STATUS] Game finished/completed, winning team:', winningTeam);
       console.log('[GAME STATUS] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
       setShowHandSummary(false);
