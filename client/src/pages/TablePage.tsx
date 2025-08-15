@@ -127,6 +127,9 @@ export default function TablePage() {
 
     console.log('[INIT] Starting initialization sequence for game:', gameId);
     
+    // Persist active game id immediately for reconnect logic
+    try { localStorage.setItem('activeGameId', String(gameId)); } catch {}
+    
     // Socket is now managed by SocketContext
 
     const fetchGame = async (retryCount = 0) => {
@@ -316,6 +319,22 @@ export default function TablePage() {
       }
     };
   }, [gameId, user, navigate, isSpectator]);
+
+  // Re-emit join_game on socket reconnect
+  useEffect(() => {
+    if (!socket) return;
+    const onReconnect = () => {
+      try {
+        const activeGameId = localStorage.getItem('activeGameId');
+        if (activeGameId && !isSpectator) {
+          console.log('[TABLE PAGE] Reconnect detected; rejoining game', activeGameId);
+          socket.emit('join_game', { gameId: activeGameId });
+        }
+      } catch {}
+    };
+    socket.on('reconnect', onReconnect);
+    return () => { socket.off('reconnect', onReconnect); };
+  }, [socket, isSpectator]);
 
   // Listen for game_update events and update local game state
   useEffect(() => {

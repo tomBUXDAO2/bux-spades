@@ -179,6 +179,19 @@ export class SocketManager {
       // Don't send authenticate event - server already authenticates during connection
       // The server will send 'authenticated' event after successful authentication
       
+      // Best-effort: if we already have an active game id, attempt a room join after a short delay
+      try {
+        const activeGameId = localStorage.getItem('activeGameId');
+        if (activeGameId && this.socket && this.socket.connected) {
+          setTimeout(() => {
+            if (this.socket && this.socket.connected) {
+              console.log('[SOCKET MANAGER] Auto-join on connect for game:', activeGameId);
+              this.socket.emit('join_game', { gameId: activeGameId });
+            }
+          }, 200);
+        }
+      } catch {}
+      
       this.notifyStateChange();
       this.notifyConnect();
     });
@@ -256,6 +269,14 @@ export class SocketManager {
       if (this.state.isReady) {
         this.startHeartbeat();
         this.startConnectionQualityMonitor();
+        // Ensure we are in the current game room post-auth
+        try {
+          const activeGameId = localStorage.getItem('activeGameId');
+          if (activeGameId && this.socket && this.socket.connected) {
+            console.log('[SOCKET MANAGER] Auto-join on authenticated for game:', activeGameId);
+            this.socket.emit('join_game', { gameId: activeGameId });
+          }
+        } catch {}
       }
       
       this.notifyStateChange();
