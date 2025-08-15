@@ -3,6 +3,9 @@ import prisma from '../lib/prisma';
 import { registerCommands } from './commands';
 import jwt from 'jsonwebtoken';
 
+// Prefer internal URL when running inside the server process
+const INTERNAL_API_URL = process.env.INTERNAL_API_URL || 'http://127.0.0.1:3000';
+
 // Create a new client instance
 const client = new Client({
   intents: [
@@ -908,7 +911,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
     const token = jwt.sign({ userId: gameLine.hostId }, process.env.JWT_SECRET || '', { expiresIn: '5m' } as any);
     
     // Make API call to create game
-    const response = await fetch('https://bux-spades-server.fly.dev/api/games', {
+    const response = await fetch(`${INTERNAL_API_URL}/api/games`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
