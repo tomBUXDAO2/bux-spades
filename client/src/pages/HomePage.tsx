@@ -12,10 +12,12 @@ import { useSocket } from '../context/SocketContext';
 import { api } from '@/lib/api';
 
 interface ChatMessage {
-  id: string;
-  username: string;
+  id?: string;
+  userId: string;
+  userName: string;
   message: string;
-  timestamp: Date;
+  timestamp: number;
+  isGameMessage?: boolean;
 }
 
 // Confirmation modal component
@@ -71,6 +73,7 @@ const HomePage: React.FC = () => {
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const navigate = useNavigate();
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
+  const onlineIdsRef = useRef<string[]>([]);
 
   // Check if user is new (has 5M coins and 0 games played)
   useEffect(() => {
@@ -221,6 +224,26 @@ const HomePage: React.FC = () => {
 
     const handleOnlineUsers = (onlineUserIds: string[]) => {
       console.log('Online users updated:', onlineUserIds);
+      // System join messages for newly online users
+      const prevIds = onlineIdsRef.current;
+      const newlyOnline = onlineUserIds.filter(id => !prevIds.includes(id));
+      if (newlyOnline.length > 0) {
+        setChatMessages(prev => [
+          ...prev,
+          ...newlyOnline.map(id => {
+            const player = onlinePlayers.find(p => p.id === id);
+            const name = player?.username || player?.name || 'Someone';
+            return {
+              id: `system-${Date.now()}-${id}`,
+              userId: 'system',
+              userName: 'System',
+              message: `${name} joined the lobby`,
+              timestamp: Date.now()
+            } as ChatMessage;
+          })
+        ]);
+      }
+      onlineIdsRef.current = onlineUserIds;
       setOnlinePlayers(prev => prev.map(player => ({
         ...player,
         online: onlineUserIds.includes(player.id)
@@ -274,12 +297,12 @@ const HomePage: React.FC = () => {
     e.preventDefault();
     if (!newMessage.trim()) return;
     const message: ChatMessage = {
-      id: Date.now().toString(),
-      username: user?.username || 'Anonymous',
+      id: `${user.id}-${Date.now()}`,
+      userId: user.id,
+      userName: user.username,
       message: newMessage.trim(),
-      timestamp: new Date(),
+      timestamp: Date.now()
     };
-    setChatMessages([...chatMessages, message]);
     setNewMessage('');
     if (socket) {
       socket.emit('lobby_chat_message', message);
@@ -592,6 +615,15 @@ const HomePage: React.FC = () => {
     localStorage.setItem('welcomeModalDismissed', 'true');
   };
 
+  const formatTime = (timestamp: number): string => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getUserAvatar = (userId: string): string => {
+    const player = onlinePlayers.find(p => p.id === userId);
+    return player?.avatar || '/default-pfp.jpg';
+  };
+
   return (
     <div className="min-h-screen bg-slate-900">
       <Header onOpenMyStats={handleOpenMyStats} />
@@ -728,16 +760,54 @@ const HomePage: React.FC = () => {
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto flex flex-col gap-y-4"
                 >
-                  {chatMessages.map(msg => (
-                    <div key={msg.id} className="bg-slate-700 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-indigo-400">{msg.username}</span>
-                        <span className="text-xs text-slate-400">
-                          {new Date(msg.timestamp).toLocaleTimeString()}
+                  {chatMessages.map((msg, index) => (
+                    msg.userId === 'system' ? (
+                      <div
+                        key={msg.id || index}
+                        className="w-full text-center my-2"
+                      >
+                        <span className="text-orange-400 italic flex items-center justify-center gap-1">
+                          {msg.message}
                         </span>
                       </div>
-                      <p className="text-slate-200 mt-1">{msg.message}</p>
-                    </div>
+                    ) : (
+                      <div
+                        key={msg.id || index}
+                        className={`mb-2 flex items-start ${msg.userId === user.id ? 'justify-end' : ''}`}
+                      >
+                        {msg.userId !== user.id && (
+                          <div className={`w-8 h-8 mr-2 rounded-full overflow-hidden flex-shrink-0`}>
+                            <img 
+                              src={getUserAvatar(msg.userId)} 
+                              alt={msg.userName || ''} 
+                              width={32}
+                              height={32}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className={`max-w-[80%] ${msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
+                          <div className="flex justify-between items-center mb-1">
+                            {msg.userId !== user.id && (
+                              <span className="font-medium text-xs opacity-80">{msg.userName}</span>
+                            )}
+                            <span className="text-xs opacity-75 ml-auto"> {formatTime(msg.timestamp)}</span>
+                          </div>
+                          <p>{msg.message}</p>
+                        </div>
+                        {msg.userId === user.id && (
+                          <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
+                            <img 
+                              src={user.avatar || getUserAvatar(msg.userId)} 
+                              alt={msg.userName || ''} 
+                              width={32}
+                              height={32}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
                   ))}
                   {chatMessages.length === 0 && (
                     <div className="text-center text-slate-400 py-4">
