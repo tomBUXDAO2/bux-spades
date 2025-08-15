@@ -373,8 +373,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             return;
           }
           
-          // Assign seat based on join order - use sequential seats 0, 1, 2, 3
-          const seat = gameLine.players.length;
+          // Assign seat based on required mapping: 0 (host), then 2, 1, 3
+          const seatOrder = [0, 2, 1, 3] as const;
+          const seat = seatOrder[gameLine.players.length] ?? gameLine.players.length;
           
           // Add player to game
           // Get the user's avatar
@@ -783,11 +784,11 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     if (gameLine.players.length === 0) {
       playerList = 'No players joined yet';
     } else if (gameLine.gameMode === 'partners') {
-      // Partners mode: Red team vs Blue team
-      const redTeam = gameLine.players.slice(0, 2);
-      const blueTeam = gameLine.players.slice(2, 4);
+      // Partners mode: Red team seats 0 & 2; Blue team seats 1 & 3
+      const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).sort((a,b)=>a.seat-b.seat);
+      const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).sort((a,b)=>a.seat-b.seat);
       
-      // Red team (first 2 players)
+      // Red team seats
       if (redTeam.length > 0) {
         playerList += `🔴 **Red Team:**\n`;
         redTeam.forEach(player => {
@@ -796,7 +797,7 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
         playerList += '\n';
       }
       
-      // Blue team (next 2 players)
+      // Blue team seats
       if (blueTeam.length > 0) {
         playerList += `🔵 **Blue Team:**\n`;
         blueTeam.forEach(player => {
@@ -805,7 +806,7 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
       }
       
       // If no blue team players yet, show empty slots
-      if (blueTeam.length === 0 && redTeam.length < 4) {
+      if (blueTeam.length === 0 && redTeam.length < 2) {
         playerList += `🔵 **Blue Team:**\n• *Empty*\n`;
       }
     } else {
@@ -934,9 +935,9 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Build team information
       let teamInfo = '';
       if (gameLine.gameMode === 'partners') {
-        // Preserve fixed seat mapping: 0,2 (Red) and 1,3 (Blue)
-        const redTeam = [0,2].map(i => `<@${gameLine.players[i].userId}>`);
-        const blueTeam = [1,3].map(i => `<@${gameLine.players[i].userId}>`);
+        // Preserve fixed seat mapping using seat property
+        const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).sort((a,b)=>a.seat-b.seat).map(p => `<@${p.userId}>`);
+        const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).sort((a,b)=>a.seat-b.seat).map(p => `<@${p.userId}>`);
         teamInfo = `🔴 **Red Team:** ${redTeam.join(', ')}\n🔵 **Blue Team:** ${blueTeam.join(', ')}`;
       } else {
         // Solo mode
