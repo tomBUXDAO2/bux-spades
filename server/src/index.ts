@@ -1729,6 +1729,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             updateStatsAndCoins(game, winningPlayer).catch(err => {
               console.error('Failed to update stats/coins:', err);
             });
+            // Fallback: ensure completed game is logged to DB and Discord for league games
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
+              .catch((e) => console.error('Failed to log completed game (fallback):', e));
           }
         } else {
           // Partners mode game over check
@@ -1777,6 +1781,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             updateStatsAndCoins(game, winningTeam).catch(err => {
               console.error('Failed to update stats/coins:', err);
             });
+            // Fallback: ensure completed game is logged to DB and Discord for league games
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
+              .catch((e) => console.error('Failed to log completed game (fallback):', e));
           }
         }
       }
@@ -1931,6 +1939,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           updateStatsAndCoins(game, winningTeam).catch(err => {
             console.error('Failed to update stats/coins:', err);
           });
+          // Fallback: ensure completed game is logged to DB and Discord for league games
+          void import('./lib/gameLogger')
+            .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
+            .catch((e) => console.error('Failed to log completed game (fallback):', e));
         }
         return;
       }
