@@ -2845,6 +2845,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           }))
         };
         
+        console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
         await sendLeagueGameResults(gameData, gameLine);
       } catch (error) {
         console.error('Failed to send Discord results:', error);
