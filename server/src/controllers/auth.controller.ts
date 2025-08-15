@@ -203,7 +203,7 @@ export const login = async (req: Request, res: Response) => {
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     let user = await prisma.user.findUnique({
       where: { id: userId },
@@ -267,7 +267,7 @@ export const getProfile = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const { username, avatar } = req.body;
 
     console.log('[SERVER DEBUG] Profile update request:', { userId, username, avatarLength: avatar ? avatar.length : 0, hasAvatar: !!avatar });

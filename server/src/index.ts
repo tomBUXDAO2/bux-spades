@@ -334,8 +334,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
 
-    // Force userId from socket, never trust client-provided
-    message.userId = socket.userId;
+    // Preserve system messages; otherwise force userId from socket
+    if (message.userId !== 'system') {
+      message.userId = socket.userId;
+    }
 
     // Validate message format
     if (!message.userId || !message.message) {
