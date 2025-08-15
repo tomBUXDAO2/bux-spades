@@ -429,10 +429,14 @@ const HomePage: React.FC = () => {
         </div>
         {/* Footer */}
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-400">
-            {(game as any).league && '⭐ '}
-            {game.status === 'WAITING' ? 'WAITING' : 'IN PROGRESS'}
-          </span>
+          <div className="flex flex-col">
+            {(game as any).league && (
+              <span className="text-[10px] text-yellow-400 font-bold leading-tight">⭐ LEAGUE</span>
+            )}
+            <span className="text-xs text-slate-400">
+              {game.status === 'WAITING' ? 'WAITING' : 'IN PROGRESS'}
+            </span>
+          </div>
           <button className="px-3 py-1 bg-slate-700 text-slate-300 text-xs rounded-full hover:bg-slate-600 transition" onClick={() => handleWatchGame(game.id)}>
             Watch
           </button>
