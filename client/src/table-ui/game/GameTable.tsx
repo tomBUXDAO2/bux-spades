@@ -3108,64 +3108,27 @@ export default function GameTable({
 
       {/* League ready controls */}
       {isLeague && gameState.status === 'WAITING' && (
-        <div className="absolute left-2 top-2 z-40">
+        <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
           {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleReady(!leagueReady[myIndex])}
-                className={`px-3 py-1 rounded text-sm font-semibold ${leagueReady[myIndex] ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white`}
-              >
-                {leagueReady[myIndex] ? 'Ready ✓' : 'Ready'}
-              </button>
-            </div>
+            <button
+              onClick={() => toggleReady(!leagueReady[myIndex])}
+              className={`pointer-events-auto px-5 py-2 rounded-lg text-base font-semibold ${leagueReady[myIndex] ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white shadow`}
+            >
+              {leagueReady[myIndex] ? 'Ready ✓' : 'Ready'}
+            </button>
           )}
           {isHost && (
             <button
-              onClick={() => setShowStartModal(true)}
-              className="px-3 py-1 rounded text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={requestStart}
+              disabled={!allHumansReady}
+              className={`pointer-events-auto px-5 py-2 rounded-lg text-base font-semibold shadow ${allHumansReady ? 'bg-yellow-500 hover:bg-yellow-600 text-black' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
             >
-              Start
+              Start Game
             </button>
           )}
         </div>
       )}
 
-      {/* Host Start Modal */}
-      {isLeague && isHost && showStartModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-slate-900 border border-white/20 rounded-lg p-4 w-[320px]">
-            <h3 className="text-white font-bold text-lg mb-2">Start League Game</h3>
-            <div className="space-y-2 mb-3">
-              {[1,2,3].map(seat => {
-                const idx = seat % 4; // 1,2,3
-                const p = gameState.players[idx];
-                if (!p) return null;
-                return (
-                  <div key={idx} className="flex items-center justify-between bg-slate-800 rounded px-2 py-1">
-                    <div className="flex items-center gap-2">
-                      <img src={(p as any).avatar || '/default-pfp.jpg'} className="w-6 h-6 rounded-full" />
-                      <span className="text-slate-200 text-sm">{(p as any).username}</span>
-                    </div>
-                    <span className={`text-xs ${leagueReady[idx] ? 'text-green-400' : 'text-slate-400'}`}>
-                      {leagueReady[idx] ? 'Ready' : 'Waiting'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowStartModal(false)} className="px-3 py-1 rounded bg-slate-600 text-white text-sm">Close</button>
-              <button
-                onClick={requestStart}
-                disabled={!allHumansReady}
-                className={`px-3 py-1 rounded text-sm ${allHumansReady ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
-              >
-                Start Game
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -768,14 +768,15 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     // Format the game line title
     const gameLineTitle = `${formatCoins(gameLine.coins)} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
     
-    // Build special rules text
-    let specialRulesText = '';
-    const rules = [];
-    if (gameLine.screamer === 'yes') rules.push('SCREAMER');
-    if (gameLine.assassin === 'yes') rules.push('ASSASSIN');
-    if (rules.length > 0) {
-      specialRulesText = `\n**Special Rules:** ${rules.join(' + ')}`;
+    // Build line suffix including nil/bn when regular
+    const parts: string[] = [];
+    if (gameLine.gameType === 'regular') {
+      parts.push(`nil ${gameLine.nil === 'yes' ? '☑️' : '❌'}`);
+      parts.push(`bn ${gameLine.blindNil === 'yes' ? '☑️' : '❌'}`);
     }
+    if (gameLine.screamer === 'yes') parts.push('SCREAMER');
+    if (gameLine.assassin === 'yes') parts.push('ASSASSIN');
+    const specialRulesText = parts.length > 0 ? `\n${parts.join(' ')}` : '';
     
     // Build player list
     let playerList = '';
