@@ -2577,7 +2577,7 @@ export default function GameTable({
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                {gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
+                {!isLeague && gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[99999]"
@@ -2585,13 +2585,13 @@ export default function GameTable({
                   >
                     Start Game
                   </button>
-                ) : gameState.status === "WAITING" && sanitizedPlayers.length < 4 ? (
+                ) : !isLeague && gameState.status === "WAITING" && sanitizedPlayers.length < 4 ? (
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Players</div>
                     <div className="text-sm mt-1">{sanitizedPlayers.length}/4 joined</div>
                   </div>
-                ) : gameState.status === "WAITING" && sanitizedPlayers[0]?.id !== currentPlayerId ? (
+                ) : !isLeague && gameState.status === "WAITING" && sanitizedPlayers[0]?.id !== currentPlayerId ? (
                   <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     <div className="font-bold">Waiting for Host</div>
@@ -2607,7 +2607,6 @@ export default function GameTable({
                     isBiddingPhase: gameState.status === "BIDDING",
                     isMyTurn: gameState.currentPlayer === currentPlayerId,
                     isSpectator: isSpectator,
-                    shouldShowBiddingInterface: gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1
                   });
                   return null;
                 })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1 ? (
@@ -3101,7 +3100,7 @@ export default function GameTable({
 
       {/* League ready controls */}
       {isLeague && gameState.status === 'WAITING' && (
-        <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-40 pointer-events-none gap-2">
           {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
             <button
               onClick={() => toggleReady(!leagueReady[myIndex])}
@@ -3119,6 +3118,21 @@ export default function GameTable({
               Start Game
             </button>
           )}
+          {/* Ready status list for seats 1,2,3 */}
+          <div className="pointer-events-none mt-1 text-xs text-slate-300 bg-slate-800/70 rounded px-2 py-1">
+            {[1,2,3].map((idx) => {
+              const p = gameState.players[idx];
+              if (!p) return null;
+              const name = (p as any).username || (p as any).name || 'Player';
+              const ok = !!leagueReady[idx];
+              return (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-green-500' : 'bg-slate-500'}`}></span>
+                  <span>{name}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
