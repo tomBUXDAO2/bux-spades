@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaTrophy } from 'react-icons/fa';
 import { getPlayerColor } from '../lib/gameRules';
+import type { Player, Bot } from '@/types/game';
 
 interface SoloWinnerModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface SoloWinnerModalProps {
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
   buyIn?: number; // Buy-in amount for coin calculation
   onLeaveTable?: () => void; // Function to call when leaving table
+  players?: (Player | Bot | null)[]; // Players to display names/avatars
+  isRated?: boolean; // Whether this was a rated game (all 4 humans)
 }
 
 export default function SoloWinnerModal({ 
@@ -25,7 +28,9 @@ export default function SoloWinnerModal({
   humanPlayerCount = 1,
   onTimerExpire,
   buyIn = 0,
-  onLeaveTable
+  onLeaveTable,
+  players = [],
+  isRated = false
 }: SoloWinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -90,9 +95,9 @@ export default function SoloWinnerModal({
     }
   };
   
-  // Calculate coin prizes for solo mode
+  // Calculate coin prizes for solo mode (only if rated)
   const calculateCoinPrizes = () => {
-    if (!buyIn || buyIn <= 0) return { firstPlace: 0, secondPlace: 0 };
+    if (!isRated || !buyIn || buyIn <= 0) return { firstPlace: 0, secondPlace: 0 };
     
     const totalPot = buyIn * 4;
     const rake = Math.floor(totalPot * 0.1); // 10% rake
@@ -132,24 +137,26 @@ export default function SoloWinnerModal({
             const { score, index } = player;
             const playerColor = getPlayerColor(index);
             const isWinner = index === winningPlayer;
-            const isUser = index === userPlayerIndex;
             const placement = sortedIndex + 1;
+
+            const p = players[index] as (Player | Bot | null);
+            const displayName = (p && ('username' in p) && p.username) ? p.username : 'Unknown';
+            const avatarUrl = (p && ('avatar' in p) && p.avatar) ? p.avatar! : '/default-pfp.jpg';
             
             return (
               <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2`}></div>
-                    <span className={`text-sm font-medium ${isUser ? 'text-white' : 'text-gray-300'}`}>
-                      {getPlacementText(placement)} - {playerColor.name} Player {isUser ? '(You)' : ''}
-                    </span>
+                    <img src={avatarUrl} alt={displayName} className="w-6 h-6 rounded-full mr-2 object-cover" />
+                    <span className="text-sm font-medium text-white">{getPlacementText(placement)} - {displayName}</span>
                     {isWinner && <FaTrophy className="h-4 w-4 text-yellow-500 ml-2" />}
                   </div>
                   <div className="flex flex-col items-end">
                     <span className={`font-bold text-sm ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
                       {score}
                     </span>
-                    {buyIn > 0 && (
+                    {isRated && buyIn > 0 && (
                       <span className={`text-xs ${placement === 1 ? 'text-yellow-400' : placement === 2 ? 'text-green-400' : 'text-gray-400'}`}>
                         {placement === 1 ? `+${formatCoins(coinPrizes.firstPlace)}` : 
                          placement === 2 ? `+${formatCoins(coinPrizes.secondPlace)}` : 

@@ -3024,6 +3024,8 @@ export default function GameTable({
           onTimerExpire={handleTimerExpire}
           buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}
           onLeaveTable={handleLeaveTable}
+          players={gameState.players}
+          isRated={gameState.players.filter(p => p && !isBot(p)).length === 4}
         />
       )}
 

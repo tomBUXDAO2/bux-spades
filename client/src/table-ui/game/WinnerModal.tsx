@@ -86,8 +86,8 @@ export default function WinnerModal({
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
           <h2 className="text-lg font-bold text-white text-center">
-            {userWon ? 'YOU WIN!' : 'YOU LOSE!'}
-            {isCoinGame && userWon && (
+            {userWon ? 'Winners' : 'Final Result'}
+            {isCoinGame && userWon && coinsWon > 0 && (
               <span className="block text-sm text-yellow-400 mt-1">
                 +{coinsWon.toLocaleString()} coins
               </span>
@@ -97,7 +97,7 @@ export default function WinnerModal({
 
         <div className="grid grid-cols-2 gap-3">
           {/* Team 1 (Red) */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+          <div className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${winningTeam === 1 ? 'border-yellow-500' : 'border-white/5'}`}>
             <div className="flex items-center mb-1">
               <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
               <h3 className="text-base font-semibold text-white">Red Team</h3>
@@ -111,7 +111,7 @@ export default function WinnerModal({
           </div>
 
           {/* Team 2 (Blue) */}
-          <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+          <div className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${winningTeam === 2 ? 'border-yellow-500' : 'border-white/5'}`}>
             <div className="flex items-center mb-1">
               <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
               <h3 className="text-base font-semibold text-white">Blue Team</h3>
