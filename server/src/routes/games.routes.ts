@@ -152,11 +152,18 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
     
     // FORCE GAME LOGGING - Create game in database immediately
     try {
+      const dbBidType = ((): any => {
+        const opt = newGame.rules.bidType;
+        if (opt === 'WHIZ') return 'WHIZ';
+        if (opt === 'MIRROR') return 'MIRRORS';
+        if (opt === 'SUICIDE' || opt === '4 OR NIL' || opt === 'BID 3' || opt === 'BID HEARTS' || opt === 'CRAZY ACES') return 'GIMMICK';
+        return 'REGULAR';
+      })();
       const dbGame = await prisma.game.create({
         data: {
           creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
           gameMode: newGame.gameMode,
-          bidType: 'REGULAR',
+          bidType: dbBidType,
           specialRules: [],
           minPoints: newGame.minPoints,
           maxPoints: newGame.maxPoints,
