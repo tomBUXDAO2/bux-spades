@@ -920,6 +920,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         socket.emit('error', { message: 'Game already started' });
         return;
       }
+      // League gating: require all humans ready before starting
+      if ((game as any).league) {
+        if (!Array.isArray((game as any).leagueReady) || (game as any).leagueReady.length !== 4) {
+          (game as any).leagueReady = [false, false, false, false];
+        }
+        const allHumansReady = game.players.every((p: any, i: number) => p && p.type === 'human' ? (game as any).leagueReady[i] : true);
+        if (!allHumansReady) {
+          socket.emit('error', { message: 'All players must be ready to start' });
+          return;
+        }
+      }
       // Only deduct coins if all 4 players are human
       const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
       if (allHuman) {
@@ -2216,6 +2227,59 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     console.log('[HEARTBEAT] Received ping from socket:', socket.id);
     socket.emit('pong');
   });
+
+  // Player toggles ready in league game
+  socket.on('league_ready', ({ gameId, ready }: { gameId: string; ready: boolean }) => {
+    try {
+      const game = games.find((g: any) => g.id === gameId);
+      if (!game || !game.league) return;
+      ensureLeagueReady(game);
+      const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
+      if (idx === -1) return;
+      game.leagueReady[idx] = !!ready;
+      io.to(gameId).emit('league_ready_update', { gameId, leagueReady: game.leagueReady });
+    } catch (e) {
+      console.log('league_ready error', e);
+    }
+  });
+
+  // Host attempts to start a league game
+  socket.on('league_start', ({ gameId }: { gameId: string }) => {
+    try {
+      const game = games.find((g: any) => g.id === gameId);
+      if (!game || !game.league) return;
+      ensureLeagueReady(game);
+      // Host is seat 0 by convention (creator)
+      const isHost = game.players[0]?.id === socket.userId;
+      if (!isHost) return;
+      const allHumansReady = game.players.every((p: any, i: number) => p && p.type === 'human' ? game.leagueReady[i] : true);
+      if (!allHumansReady) {
+        io.to(socket.id).emit('league_start_denied', { reason: 'not_all_ready', leagueReady: game.leagueReady });
+        return;
+      }
+      // Reuse existing start logic by emitting existing event
+      io.to(gameId).emit('league_starting');
+      // Optionally call existing handler if any (left as is to avoid big refactor)
+    } catch (e) {
+      console.log('league_start error', e);
+    }
+  });
+
+  // When a player disconnects, clear ready
+  socket.on('disconnect', () => {
+    try {
+      games.forEach((game: any) => {
+        if (game.league && Array.isArray(game.players)) {
+          const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
+          if (idx !== -1) {
+            ensureLeagueReady(game);
+            game.leagueReady[idx] = false;
+            io.to(game.id).emit('league_ready_update', { gameId: game.id, leagueReady: game.leagueReady });
+          }
+        }
+      });
+    } catch {}
+  });
 });
 
 // Seat replacement management - already declared above
@@ -3159,3 +3223,10 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     }
   });
 });
+
+// Add helper to ensure leagueReady array exists
+function ensureLeagueReady(game: any) {
+	if (!Array.isArray(game.leagueReady) || game.leagueReady.length !== 4) {
+		game.leagueReady = [false, false, false, false];
+	}
+}

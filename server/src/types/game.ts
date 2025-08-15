@@ -5,90 +5,92 @@ export type Suit = 'S' | 'H' | 'D' | 'C';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
 export interface Card {
-  suit: Suit;
-  rank: Rank;
-  playedBy?: string;
-  playerIndex?: number;
+	suit: Suit;
+	rank: Rank;
+	playedBy?: string;
+	playerIndex?: number;
 }
 
 export interface GamePlayer {
-  id: string; // Ensure id is always a string and never null
-  username: string;
-  avatar: string | null;
-  type: 'human' | 'bot';
-  position?: number;
-  hand?: Card[];
-  bid?: number;
-  tricks?: number;
-  team?: number;
-  isDealer?: boolean;
+	id: string; // Ensure id is always a string and never null
+	username: string;
+	avatar: string | null;
+	type: 'human' | 'bot';
+	position?: number;
+	hand?: Card[];
+	bid?: number;
+	tricks?: number;
+	team?: number;
+	isDealer?: boolean;
 }
 
 export interface Game {
-  id: string;
-  gameMode: GameMode;
-  maxPoints: number;
-  minPoints: number;
-  buyIn: number;
-  forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES' | 'NONE';
-  specialRules: {
-    screamer?: boolean;
-    assassin?: boolean;
-  };
-  players: (GamePlayer | null)[];
-  spectators: GamePlayer[];
-  status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'HAND_COMPLETED' | 'COMPLETED' | 'FINISHED';
-  completedTricks: Card[][];
-  rules: {
-    gameType: GameMode;
-    allowNil: boolean;
-    allowBlindNil: boolean;
-    coinAmount: number;
-    maxPoints: number;
-    minPoints: number;
-    bidType: BiddingOption;
-    specialRules?: {
-      screamer: boolean;
-      assassin: boolean;
-    };
-    gimmickType: GamePlayOption;
-  };
-  isBotGame: boolean;
-  dealerIndex?: number;
-  hands?: Card[][];
-  bidding?: {
-    currentPlayer: string;
-    currentBidderIndex: number;
-    bids: (number | null)[];
-    nilBids: Record<string, boolean>;
-  };
-  play?: {
-    currentPlayer: string;
-    currentPlayerIndex: number;
-    currentTrick: Card[];
-    leadSuit?: Suit;
-    tricks: {
-      cards: Card[];
-      winnerIndex: number;
-    }[];
-    trickNumber: number;
-    spadesBroken?: boolean;
-  };
-  team1TotalScore?: number;
-  team2TotalScore?: number;
-  team1Bags?: number;
-  team2Bags?: number;
-  // Solo mode properties
-  playerScores?: number[];
-  playerBags?: number[];
-  winningPlayer?: number;
-  winningTeam?: 'team1' | 'team2';
-  currentPlayer?: string;
-  lastActivity?: number; // Timestamp of last activity
-  // NEW: Database tracking fields
-  dbGameId?: string; // Database game ID for updates
-  createdAt?: number; // Game creation timestamp
-  rounds?: any[]; // Game rounds for logging
-  // League game property
-  league?: boolean; // Whether this is a league game created via Discord
+	id: string;
+	gameMode: GameMode;
+	maxPoints: number;
+	minPoints: number;
+	buyIn: number;
+	forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES' | 'NONE';
+	specialRules: {
+		screamer?: boolean;
+		assassin?: boolean;
+	};
+	players: (GamePlayer | null)[];
+	spectators: GamePlayer[];
+	status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'HAND_COMPLETED' | 'COMPLETED' | 'FINISHED';
+	completedTricks: Card[][];
+	rules: {
+		gameType: GameMode;
+		allowNil: boolean;
+		allowBlindNil: boolean;
+		coinAmount: number;
+		maxPoints: number;
+		minPoints: number;
+		bidType: BiddingOption;
+		specialRules?: {
+			screamer: boolean;
+			assassin: boolean;
+		};
+		gimmickType: GamePlayOption;
+	};
+	isBotGame: boolean;
+	dealerIndex?: number;
+	hands?: Card[][];
+	bidding?: {
+		currentPlayer: string;
+		currentBidderIndex: number;
+		bids: (number | null)[];
+		nilBids: Record<string, boolean>;
+	};
+	play?: {
+		currentPlayer: string;
+		currentPlayerIndex: number;
+		currentTrick: Card[];
+		leadSuit?: Suit;
+		tricks: {
+			cards: Card[];
+			winnerIndex: number;
+		}[];
+		trickNumber: number;
+		spadesBroken?: boolean;
+	};
+	team1TotalScore?: number;
+	team2TotalScore?: number;
+	team1Bags?: number;
+	team2Bags?: number;
+	// Solo mode properties
+	playerScores?: number[];
+	playerBags?: number[];
+	winningPlayer?: number;
+	winningTeam?: 'team1' | 'team2';
+	currentPlayer?: string;
+	lastActivity?: number; // Timestamp of last activity
+	// NEW: Database tracking fields
+	dbGameId?: string; // Database game ID for updates
+	createdAt?: number; // Game creation timestamp
+	rounds?: any[]; // Game rounds for logging
+	// League game property
+	league?: boolean; // Whether this is a league game created via Discord
+	// League ready states (index 0..3 corresponds to seat)
+	leagueReady?: boolean[];
 } 

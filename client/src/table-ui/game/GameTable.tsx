@@ -23,6 +23,7 @@ import { useSocket } from '../../context/SocketContext';
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
+// import { useAuth } from '@/context/AuthContext';
 
 // Coin debit animation component
 const CoinDebitAnimation = ({ amount, isVisible }: { amount: number, isVisible: boolean }) => {
@@ -431,7 +432,11 @@ export default function GameTable({
   botCount = 0,
   isSpectator = false
 }: GameTableProps) {
-  const { socket } = useSocket();
+  const { socket, isAuthenticated } = useSocket();
+  // Using propUser elsewhere; no need to pull from AuthContext here
+// const { user } = useAuth();
+  const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
+  const [showStartModal, setShowStartModal] = useState(false);
   
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
@@ -445,7 +450,7 @@ export default function GameTable({
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (game.status === 'BIDDING' || game.status === 'PLAYING') {
+    if (gameState.status === 'BIDDING' || gameState.status === 'PLAYING') {
       const isCurrentPlayer = game.currentPlayer === propUser?.id;
       
       if (isCurrentPlayer) {
@@ -749,7 +754,6 @@ export default function GameTable({
 
   // Restore user assignment
   const user = propUser;
-  const { isAuthenticated } = useSocket();
   const [isMobile, setIsMobile] = useState(false);
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -1275,7 +1279,7 @@ export default function GameTable({
     })();
     // After rendering the player avatar/info, render the played card if any
     // const playedCard = player ? getPlayedCardForPlayer(player.id) : null;
-    const isHuman = player?.type === 'human';
+    const isHuman = isPlayer(player);
     const displayName = isHuman ? player.username : 'Bot';
     const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
     return (
@@ -1362,7 +1366,7 @@ export default function GameTable({
         </div>
         
         {/* Coin debit animation */}
-        {showCoinDebit && player && player.type === 'human' && (
+        {showCoinDebit && isPlayer(player) && (
           <CoinDebitAnimation 
             amount={coinDebitAmount} 
             isVisible={showCoinDebit} 
@@ -2434,6 +2438,36 @@ export default function GameTable({
     };
   }, [socket]);
 
+  useEffect(() => {
+    if (!socket) return;
+    const onReadyUpdate = (payload: { gameId: string; leagueReady: boolean[] }) => {
+      if (payload.gameId === gameState.id) setLeagueReady(payload.leagueReady);
+    };
+    const onStartDenied = (p: any) => {
+      console.log('Start denied', p);
+    };
+    socket.on('league_ready_update', onReadyUpdate);
+    socket.on('league_start_denied', onStartDenied);
+    return () => {
+      socket.off('league_ready_update', onReadyUpdate);
+      socket.off('league_start_denied', onStartDenied);
+    };
+  }, [socket, gameState.id]);
+
+  const isLeague = (gameState as any).league;
+  const isHost = isLeague && gameState.players[0]?.id === user?.id;
+  const myIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+  const allHumansReady = gameState.players.every((p, i) => isPlayer(p) ? leagueReady[i] : true);
+
+  const toggleReady = (ready: boolean) => {
+    if (!socket) return;
+    socket.emit('league_ready', { gameId: gameState.id, ready });
+  };
+  const requestStart = () => {
+    if (!socket) return;
+    socket.emit('league_start', { gameId: gameState.id });
+  };
+
   return (
     <>
       <LandscapePrompt />
@@ -3070,6 +3104,67 @@ export default function GameTable({
           onLeaveTable={handleLeaveTable}
           players={gameState.players}
         />
+      )}
+
+      {/* League ready controls */}
+      {isLeague && gameState.status === 'WAITING' && (
+        <div className="absolute left-2 top-2 z-40">
+          {!isHost && myIndex !== -1 && isPlayer(gameState.players[myIndex]) && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleReady(!leagueReady[myIndex])}
+                className={`px-3 py-1 rounded text-sm font-semibold ${leagueReady[myIndex] ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white`}
+              >
+                {leagueReady[myIndex] ? 'Ready ✓' : 'Ready'}
+              </button>
+            </div>
+          )}
+          {isHost && (
+            <button
+              onClick={() => setShowStartModal(true)}
+              className="px-3 py-1 rounded text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              Start
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Host Start Modal */}
+      {isLeague && isHost && showStartModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-slate-900 border border-white/20 rounded-lg p-4 w-[320px]">
+            <h3 className="text-white font-bold text-lg mb-2">Start League Game</h3>
+            <div className="space-y-2 mb-3">
+              {[1,2,3].map(seat => {
+                const idx = seat % 4; // 1,2,3
+                const p = gameState.players[idx];
+                if (!p) return null;
+                return (
+                  <div key={idx} className="flex items-center justify-between bg-slate-800 rounded px-2 py-1">
+                    <div className="flex items-center gap-2">
+                      <img src={(p as any).avatar || '/default-pfp.jpg'} className="w-6 h-6 rounded-full" />
+                      <span className="text-slate-200 text-sm">{(p as any).username}</span>
+                    </div>
+                    <span className={`text-xs ${leagueReady[idx] ? 'text-green-400' : 'text-slate-400'}`}>
+                      {leagueReady[idx] ? 'Ready' : 'Waiting'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setShowStartModal(false)} className="px-3 py-1 rounded bg-slate-600 text-white text-sm">Close</button>
+              <button
+                onClick={requestStart}
+                disabled={!allHumansReady}
+                className={`px-3 py-1 rounded text-sm ${allHumansReady ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+              >
+                Start Game
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
