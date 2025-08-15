@@ -1022,11 +1022,30 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
     }
     
     // Determine winners and losers
-    const winners = gameData.players.filter((p: any) => p.won).map((p: any) => `<@${p.userId}>`);
-    const losers = gameData.players.filter((p: any) => !p.won).map((p: any) => `<@${p.userId}>`);
+    const winnersRaw = gameData.players.filter((p: any) => p.won);
+    const losersRaw = gameData.players.filter((p: any) => !p.won);
+    const winners = winnersRaw.map((p: any) => `<@${p.userId}>`);
+    const losers = losersRaw.map((p: any) => `<@${p.userId}>`);
     
-    // Calculate coins won
-    const coinsWon = gameData.buyIn * 2; // Winners split the pot
+    // Calculate coins won with 10% rake
+    // Partners: each winner gets 1.8x buy-in
+    // Solo: 1st gets 2.6x buy-in, 2nd gets 1x buy-in
+    const buyIn = gameData.buyIn || 0;
+    let coinsField = '';
+    if (winnersRaw.length === 2) {
+      const perWinner = Math.round(buyIn * 1.8);
+      coinsField = `${formatCoins(perWinner)} each`;
+    } else if (winnersRaw.length === 1) {
+      const first = Math.round(buyIn * 2.6);
+      const second = Math.round(buyIn * 1.0);
+      coinsField = `1st: ${formatCoins(first)} | 2nd: ${formatCoins(second)}`;
+    } else {
+      // Fallback
+      const totalPot = buyIn * gameData.players.length;
+      const rake = Math.floor(totalPot * 0.1);
+      const prizePool = totalPot - rake;
+      coinsField = `${formatCoins(prizePool)}`;
+    }
     
     const resultsEmbed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
@@ -1034,7 +1053,7 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '🥇 Winners', value: winners.join(', '), inline: true },
-        { name: '💰 Coins Won', value: `${coinsWon >= 1000000 ? `${coinsWon / 1000000}M` : `${coinsWon / 1000}k`}`, inline: true },
+        { name: '�� Coins Won', value: coinsField, inline: true },
         { name: '🥈 Losers', value: losers.join(', '), inline: true }
       )
       .setColor(0x00ff00)
@@ -1045,6 +1064,11 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
   } catch (error) {
     console.error('Error sending league game results:', error);
   }
+}
+
+// Helper to format coin values
+function formatCoins(amount: number): string {
+  return amount >= 1_000_000 ? `${amount / 1_000_000}M` : `${Math.round(amount / 1000)}k`;
 }
 
 // Export functions for external use
