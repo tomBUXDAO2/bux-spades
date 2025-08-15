@@ -931,6 +931,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           if (p.id === hostId) return true; // host doesn't need to press Ready
           return (game as any).leagueReady[i] === true;
         });
+        console.log('[LEAGUE START CHECK] gameId:', gameId, 'hostId:', hostId, 'leagueReady:', (game as any).leagueReady, 'othersReady:', othersReady);
         if (!othersReady) {
           socket.emit('error', { message: 'All non-host players must be ready to start' });
           return;
@@ -2242,7 +2243,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
       if (idx === -1) return;
       // Latch to true: once ready, stays ready (never resets to false via this path)
+      const before = [...game.leagueReady];
       game.leagueReady[idx] = game.leagueReady[idx] || !!ready;
+      console.log('[LEAGUE READY] gameId:', gameId, 'userId:', socket.userId, 'seat:', idx, 'before:', before, 'after:', game.leagueReady);
       io.to(gameId).emit('league_ready_update', { gameId, leagueReady: game.leagueReady });
     } catch (e) {
       console.log('league_ready error', e);
