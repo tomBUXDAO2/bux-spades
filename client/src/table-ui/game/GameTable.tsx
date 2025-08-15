@@ -2457,7 +2457,12 @@ export default function GameTable({
   const isLeague = (gameState as any).league;
   const isHost = isLeague && gameState.players[0]?.id === user?.id;
   const myIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-  const allHumansReady = gameState.players.every((p, i) => isPlayer(p) ? leagueReady[i] : true);
+  const allHumansReady = gameState.players.every((p, i) => {
+    if (!isPlayer(p)) return true;
+    // Host does not need to ready; require other humans only
+    if (i === myIndex) return true;
+    return !!leagueReady[i];
+  });
 
   const toggleReady = (ready: boolean) => {
     if (!socket) return;
