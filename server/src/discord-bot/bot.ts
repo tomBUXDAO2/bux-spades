@@ -887,6 +887,13 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       maxPoints: gameLine.maxPoints,
       minPoints: gameLine.minPoints,
       gameType: gameLine.gameType,
+      // Map gameType to server biddingOption
+      biddingOption: ((): string => {
+        const t = (gameLine.gameType || 'regular').toLowerCase();
+        if (t === 'whiz') return 'WHIZ';
+        if (t === 'mirror' || t === 'mirrors') return 'MIRROR';
+        return 'REG';
+      })(),
       league: true, // Mark as league game
       specialRules: {
         screamer: gameLine.screamer === 'yes',
