@@ -2858,154 +2858,159 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
 
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
-  // Check if this is a rated game (4 human players)
-  const humanPlayers = game.players.filter(p => p && p.type === 'human');
-  const isRatedGame = humanPlayers.length === 4;
-  
-  if (!isRatedGame) {
-    console.log('Skipping stats/coins update - not a rated game (has bots)');
-    return;
-  }
-  
-  console.log('Updating stats and coins for rated game');
-  
-  // Log the completed game to database
-  await logCompletedGame(game, winningTeamOrPlayer);
-  
-  for (let i = 0; i < 4; i++) {
-    const player = game.players[i];
-    if (!player || player.type !== 'human') continue;
-    const userId = player.id;
-    if (!userId) continue; // Skip if no user ID
-    
-    let isWinner = false;
-    if (game.gameMode === 'SOLO') {
-      isWinner = i === winningTeamOrPlayer;
-    } else {
-      isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
-    }
-    
-    // Calculate bags for this player
-    const playerBid = player.bid || 0;
-    const playerTricks = player.tricks || 0;
-    
-    // For nil and blind nil, all tricks count as bags if failed
-    let bags = 0;
-    if (playerBid === 0 || playerBid === -1) {
-      // Nil or blind nil: all tricks count as bags if failed
-      bags = playerTricks;
-    } else {
-      // Regular bid: only excess tricks count as bags
-      bags = Math.max(0, playerTricks - playerBid);
-    }
-    
-    try {
-      // Handle coin buy-in and prizes (only for rated games)
-      const buyIn = game.buyIn || 0;
-      if (buyIn > 0) {
-        // Deduct buy-in from all players
-        await prisma.user.update({
-          where: { id: userId },
-          data: { coins: { decrement: buyIn } }
-        });
-        
-        // Award prizes to winners
-        if (isWinner) {
-          let prizeAmount = 0;
-          const totalPot = buyIn * 4;
-          const rake = Math.floor(totalPot * 0.1); // 10% rake
-          const prizePool = totalPot - rake;
-          
-          if (game.gameMode === 'SOLO') {
-            // Solo mode: 2nd place gets buy-in back, 1st place gets remainder
-            const secondPlacePrize = buyIn;
-            prizeAmount = prizePool - secondPlacePrize; // 1st place gets remainder
-          } else {
-            // Partners mode: winning team splits 90% of pot (2 winners)
-            prizeAmount = Math.floor(prizePool / 2); // Each winner gets half of 90%
-          }
-          
-          await prisma.user.update({
-            where: { id: userId },
-            data: { coins: { increment: prizeAmount } }
-          });
-          
-          console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool})`);
-        }
-      }
-      
-      // Update stats with separate tracking for partners vs solo games
-      const isSoloGame = game.gameMode === 'SOLO';
-      
-      if (isSoloGame) {
-        // Solo game stats
-        await prisma.userStats.update({
-          where: { userId },
-          data: {
-            gamesPlayed: { increment: 1 },
-            gamesWon: { increment: isWinner ? 1 : 0 },
-            soloGamesPlayed: { increment: 1 },
-            soloGamesWon: { increment: isWinner ? 1 : 0 },
-            soloTotalBags: { increment: bags },
-            soloBagsPerGame: { set: 0 }, // Will be calculated below
-            totalCoinsWon: { increment: isWinner ? (game.buyIn || 0) * 2.6 : 0 }, // 1st place gets 2.6x buy-in
-            totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
-            netCoins: { increment: isWinner ? (game.buyIn || 0) * 1.6 : -(game.buyIn || 0) } // 1st: +1.6x, others: -1x
-          }
-        });
-        
-        // Calculate solo bags per game
-        const currentStats = await prisma.userStats.findUnique({ where: { userId } });
-        if (currentStats?.soloGamesPlayed && currentStats.soloTotalBags) {
-          const newBagsPerGame = currentStats.soloTotalBags / currentStats.soloGamesPlayed;
-          await prisma.userStats.update({
-            where: { userId },
-            data: { soloBagsPerGame: newBagsPerGame }
-          });
-        }
-      } else {
-        // Partners game stats
-        await prisma.userStats.update({
-          where: { userId },
-          data: {
-            gamesPlayed: { increment: 1 },
-            gamesWon: { increment: isWinner ? 1 : 0 },
-            partnersGamesPlayed: { increment: 1 },
-            partnersGamesWon: { increment: isWinner ? 1 : 0 },
-            partnersTotalBags: { increment: bags },
-            partnersBagsPerGame: { set: 0 }, // Will be calculated below
-            totalCoinsWon: { increment: isWinner ? Math.floor((game.buyIn || 0) * 1.8) : 0 }, // Winners split 90% of pot
-            totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
-            netCoins: { increment: isWinner ? Math.floor((game.buyIn || 0) * 0.8) : -(game.buyIn || 0) } // Winners: +0.8x, losers: -1x
-          }
-        });
-        
-        // Calculate partners bags per game
-        const currentStats = await prisma.userStats.findUnique({ where: { userId } });
-        if (currentStats?.partnersGamesPlayed && currentStats.partnersTotalBags) {
-          const newBagsPerGame = currentStats.partnersTotalBags / currentStats.partnersGamesPlayed;
-          await prisma.userStats.update({
-            where: { userId },
-            data: { partnersBagsPerGame: newBagsPerGame }
-          });
-        }
-      }
-      
-      // Update overall bags per game
-      const currentStats = await prisma.userStats.findUnique({ where: { userId } });
-      if (currentStats?.gamesPlayed && currentStats.totalBags) {
-        const newBagsPerGame = currentStats.totalBags / currentStats.gamesPlayed;
-        await prisma.userStats.update({
-          where: { userId },
-          data: { bagsPerGame: newBagsPerGame }
-        });
-      }
-      
-      console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}, gameType=${isSoloGame ? 'SOLO' : 'PARTNERS'}`);
-    } catch (err) {
-      console.error('Failed to update stats/coins for user', userId, err);
-    }
-  }
+	// Determine player composition
+	const humanPlayers = game.players.filter(p => p && p.type === 'human');
+	const isAllHumanGame = humanPlayers.length === 4;
+	const isLeagueGame = (game as any).league === true;
+	
+	// Always log completed league games (for results embed), even if bots replaced seats
+	// For non-league games, only log when all-human (legacy behavior)
+	if (isLeagueGame || isAllHumanGame) {
+		await logCompletedGame(game, winningTeamOrPlayer);
+	}
+	
+	// Only proceed with stats/coins updates for rated (all-human) games
+	if (!isAllHumanGame) {
+		console.log('Skipping stats/coins update - not a rated game (has bots)');
+		return;
+	}
+	
+	console.log('Updating stats and coins for rated game');
+	
+	for (let i = 0; i < 4; i++) {
+		const player = game.players[i];
+		if (!player || player.type !== 'human') continue;
+		const userId = player.id;
+		if (!userId) continue; // Skip if no user ID
+		
+		let isWinner = false;
+		if (game.gameMode === 'SOLO') {
+			isWinner = i === winningTeamOrPlayer;
+		} else {
+			isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
+		}
+		
+		// Calculate bags for this player
+		const playerBid = player.bid || 0;
+		const playerTricks = player.tricks || 0;
+		
+		// For nil and blind nil, all tricks count as bags if failed
+		let bags = 0;
+		if (playerBid === 0 || playerBid === -1) {
+			// Nil or blind nil: all tricks count as bags if failed
+			bags = playerTricks;
+		} else {
+			// Regular bid: only excess tricks count as bags
+			bags = Math.max(0, playerTricks - playerBid);
+		}
+		
+		try {
+			// Handle coin buy-in and prizes (only for rated games)
+			const buyIn = game.buyIn || 0;
+			if (buyIn > 0) {
+				// Deduct buy-in from all players
+				await prisma.user.update({
+					where: { id: userId },
+					data: { coins: { decrement: buyIn } }
+				});
+				
+				// Award prizes to winners
+				if (isWinner) {
+					let prizeAmount = 0;
+					const totalPot = buyIn * 4;
+					const rake = Math.floor(totalPot * 0.1); // 10% rake
+					const prizePool = totalPot - rake;
+					
+					if (game.gameMode === 'SOLO') {
+						// Solo mode: 2nd place gets buy-in back, 1st place gets remainder
+						const secondPlacePrize = buyIn;
+						prizeAmount = prizePool - secondPlacePrize; // 1st place gets remainder
+					} else {
+						// Partners mode: winning team splits 90% of pot (2 winners)
+						prizeAmount = Math.floor(prizePool / 2); // Each winner gets half of 90%
+					}
+					
+					await prisma.user.update({
+						where: { id: userId },
+						data: { coins: { increment: prizeAmount } }
+					});
+					
+					console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool})`);
+				}
+			}
+			
+			// Update stats with separate tracking for partners vs solo games
+			const isSoloGame = game.gameMode === 'SOLO';
+			
+			if (isSoloGame) {
+				// Solo game stats
+				await prisma.userStats.update({
+					where: { userId },
+					data: {
+						gamesPlayed: { increment: 1 },
+						gamesWon: { increment: isWinner ? 1 : 0 },
+						soloGamesPlayed: { increment: 1 },
+						soloGamesWon: { increment: isWinner ? 1 : 0 },
+						soloTotalBags: { increment: bags },
+						soloBagsPerGame: { set: 0 }, // Will be calculated below
+						totalCoinsWon: { increment: isWinner ? (game.buyIn || 0) * 2.6 : 0 }, // 1st place gets 2.6x buy-in
+						totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
+						netCoins: { increment: isWinner ? (game.buyIn || 0) * 1.6 : -(game.buyIn || 0) } // 1st: +1.6x, others: -1x
+					}
+				});
+				
+				// Calculate solo bags per game
+				const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+				if (currentStats?.soloGamesPlayed && currentStats.soloTotalBags) {
+					const newBagsPerGame = currentStats.soloTotalBags / currentStats.soloGamesPlayed;
+					await prisma.userStats.update({
+						where: { userId },
+						data: { soloBagsPerGame: newBagsPerGame }
+					});
+				}
+			} else {
+				// Partners game stats
+				await prisma.userStats.update({
+					where: { userId },
+					data: {
+						gamesPlayed: { increment: 1 },
+						gamesWon: { increment: isWinner ? 1 : 0 },
+						partnersGamesPlayed: { increment: 1 },
+						partnersGamesWon: { increment: isWinner ? 1 : 0 },
+						partnersTotalBags: { increment: bags },
+						partnersBagsPerGame: { set: 0 }, // Will be calculated below
+						totalCoinsWon: { increment: isWinner ? Math.floor((game.buyIn || 0) * 1.8) : 0 }, // Winners split 90% of pot
+						totalCoinsLost: { increment: game.buyIn || 0 }, // All players lose buy-in
+						netCoins: { increment: isWinner ? Math.floor((game.buyIn || 0) * 0.8) : -(game.buyIn || 0) } // Winners: +0.8x, losers: -1x
+					}
+				});
+				
+				// Calculate partners bags per game
+				const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+				if (currentStats?.partnersGamesPlayed && currentStats.partnersTotalBags) {
+					const newBagsPerGame = currentStats.partnersTotalBags / currentStats.partnersGamesPlayed;
+					await prisma.userStats.update({
+						where: { userId },
+						data: { partnersBagsPerGame: newBagsPerGame }
+					});
+				}
+			}
+			
+			// Update overall bags per game
+			const currentStats = await prisma.userStats.findUnique({ where: { userId } });
+			if (currentStats?.gamesPlayed && currentStats.totalBags) {
+				const newBagsPerGame = currentStats.totalBags / currentStats.gamesPlayed;
+				await prisma.userStats.update({
+					where: { userId },
+					data: { bagsPerGame: newBagsPerGame }
+				});
+			}
+			
+			console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}, gameType=${isSoloGame ? 'SOLO' : 'PARTNERS'}`);
+		} catch (err) {
+			console.error('Failed to update stats/coins for user', userId, err);
+		}
+	}
 }
 
 // Helper to enrich game object for client
