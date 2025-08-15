@@ -2236,7 +2236,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       ensureLeagueReady(game);
       const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
       if (idx === -1) return;
-      game.leagueReady[idx] = !!ready;
+      // Latch to true: once ready, stays ready until disconnect/reset
+      game.leagueReady[idx] = Boolean(game.leagueReady[idx] || ready);
       io.to(gameId).emit('league_ready_update', { gameId, leagueReady: game.leagueReady });
     } catch (e) {
       console.log('league_ready error', e);
@@ -2265,17 +2266,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
   });
 
-  // When a player disconnects, clear ready
+  // When a player disconnects, preserve ready state as requested (no auto-clear)
   socket.on('disconnect', () => {
     try {
       games.forEach((game: any) => {
         if (game.league && Array.isArray(game.players)) {
-          const idx = game.players.findIndex((p: any) => p && p.id === socket.userId);
-          if (idx !== -1) {
-            ensureLeagueReady(game);
-            game.leagueReady[idx] = false;
-            io.to(game.id).emit('league_ready_update', { gameId: game.id, leagueReady: game.leagueReady });
-          }
+          // No changes to leagueReady on disconnect
         }
       });
     } catch {}
