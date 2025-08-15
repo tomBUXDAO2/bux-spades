@@ -2470,7 +2470,7 @@ export default function GameTable({
   };
   const requestStart = () => {
     if (!socket) return;
-    socket.emit('league_start', { gameId: gameState.id });
+    socket.emit('start_game', { gameId: gameState.id });
   };
 
   const renderLeagueOverlay = () => {
