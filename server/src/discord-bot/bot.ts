@@ -325,6 +325,27 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 // Command to manually check all members
 client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    // Restrict coin options based on channel
+    const lowRoomId = '1404937454938619927';
+    const highRoomId = '1403844895445221445';
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'game') {
+      const channelId = interaction.channelId;
+      const coins = interaction.options.getInteger('coins', true);
+
+      if (channelId === lowRoomId && (coins < 100000 || coins > 900000)) {
+        await interaction.reply({ content: '❌ In low-room, buy-in must be between 100k and 900k.', ephemeral: true });
+        return;
+      }
+      if (channelId === highRoomId && coins < 1000000) {
+        await interaction.reply({ content: '❌ In high-room, buy-in must be 1M or higher.', ephemeral: true });
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('Channel restriction check failed:', e);
+  }
   // Handle button interactions
   if (interaction.isButton()) {
     if (interaction.customId === 'verify_facebook') {
@@ -1053,7 +1074,7 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '🥇 Winners', value: winners.join(', '), inline: true },
-        { name: '�� Coins Won', value: coinsField, inline: true },
+        { name: '💰 Coins Won', value: coinsField, inline: true },
         { name: '🥈 Losers', value: losers.join(', '), inline: true }
       )
       .setColor(0x00ff00)

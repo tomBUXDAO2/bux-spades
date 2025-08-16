@@ -94,7 +94,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		const playerResults = {
 			players: game.players.map((p: any, i: number) => ({
 				position: i,
-				userId: p?.id,
+				userId: p?.discordId || p?.id,
 				username: p?.username,
 				team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
 				finalBid: p?.bid || 0,
@@ -130,7 +130,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				const data = {
 					buyIn: game.buyIn,
 					players: game.players.map((p: any, i: number) => ({
-						userId: p?.id || '',
+						userId: p?.discordId || p?.id || '',
 						won: game.gameMode === 'SOLO' ? i === winningTeamOrPlayer : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
 					}))
 				};

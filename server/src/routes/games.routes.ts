@@ -2841,7 +2841,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         const gameData = {
           buyIn: game.buyIn,
           players: game.players.map((p, i) => ({
-            userId: p?.id || '',
+            userId: (p as any)?.discordId || p?.id || '',
             won: game.gameMode === 'SOLO' 
               ? i === winningTeamOrPlayer 
               : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
