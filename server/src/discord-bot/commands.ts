@@ -16,27 +16,7 @@ const commands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .addChoices(
-          { name: '100k', value: 100000 },
-          { name: '200k', value: 200000 },
-          { name: '300k', value: 300000 },
-          { name: '400k', value: 400000 },
-          { name: '500k', value: 500000 },
-          { name: '600k', value: 600000 },
-          { name: '700k', value: 700000 },
-          { name: '800k', value: 800000 },
-          { name: '900k', value: 900000 },
-          { name: '1M', value: 1000000 },
-          { name: '2M', value: 2000000 },
-          { name: '3M', value: 3000000 },
-          { name: '4M', value: 4000000 },
-          { name: '5M', value: 5000000 },
-          { name: '6M', value: 6000000 },
-          { name: '7M', value: 7000000 },
-          { name: '8M', value: 8000000 },
-          { name: '9M', value: 9000000 },
-          { name: '10M', value: 10000000 }
-        ))
+        .setAutocomplete(true))
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -105,27 +85,7 @@ const commands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .addChoices(
-          { name: '100k', value: 100000 },
-          { name: '200k', value: 200000 },
-          { name: '300k', value: 300000 },
-          { name: '400k', value: 400000 },
-          { name: '500k', value: 500000 },
-          { name: '600k', value: 600000 },
-          { name: '700k', value: 700000 },
-          { name: '800k', value: 800000 },
-          { name: '900k', value: 900000 },
-          { name: '1M', value: 1000000 },
-          { name: '2M', value: 2000000 },
-          { name: '3M', value: 3000000 },
-          { name: '4M', value: 4000000 },
-          { name: '5M', value: 5000000 },
-          { name: '6M', value: 6000000 },
-          { name: '7M', value: 7000000 },
-          { name: '8M', value: 8000000 },
-          { name: '9M', value: 9000000 },
-          { name: '10M', value: 10000000 }
-        ))
+        .setAutocomplete(true))
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -178,27 +138,7 @@ const commands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .addChoices(
-          { name: '100k', value: 100000 },
-          { name: '200k', value: 200000 },
-          { name: '300k', value: 300000 },
-          { name: '400k', value: 400000 },
-          { name: '500k', value: 500000 },
-          { name: '600k', value: 600000 },
-          { name: '700k', value: 700000 },
-          { name: '800k', value: 800000 },
-          { name: '900k', value: 900000 },
-          { name: '1M', value: 1000000 },
-          { name: '2M', value: 2000000 },
-          { name: '3M', value: 3000000 },
-          { name: '4M', value: 4000000 },
-          { name: '5M', value: 5000000 },
-          { name: '6M', value: 6000000 },
-          { name: '7M', value: 7000000 },
-          { name: '8M', value: 8000000 },
-          { name: '9M', value: 9000000 },
-          { name: '10M', value: 10000000 }
-        ))
+        .setAutocomplete(true))
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -251,27 +191,7 @@ const commands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .addChoices(
-          { name: '100k', value: 100000 },
-          { name: '200k', value: 200000 },
-          { name: '300k', value: 300000 },
-          { name: '400k', value: 400000 },
-          { name: '500k', value: 500000 },
-          { name: '600k', value: 600000 },
-          { name: '700k', value: 700000 },
-          { name: '800k', value: 800000 },
-          { name: '900k', value: 900000 },
-          { name: '1M', value: 1000000 },
-          { name: '2M', value: 2000000 },
-          { name: '3M', value: 3000000 },
-          { name: '4M', value: 4000000 },
-          { name: '5M', value: 5000000 },
-          { name: '6M', value: 6000000 },
-          { name: '7M', value: 7000000 },
-          { name: '8M', value: 8000000 },
-          { name: '9M', value: 9000000 },
-          { name: '10M', value: 10000000 }
-        ))
+        .setAutocomplete(true))
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')

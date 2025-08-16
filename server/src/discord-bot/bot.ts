@@ -325,12 +325,33 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 // Command to manually check all members
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Autocomplete for coins based on channel
+  if (interaction.isAutocomplete()) {
+    try {
+      const focused = interaction.options.getFocused(true);
+      if (focused.name === 'coins') {
+        const channelId = interaction.channelId;
+        const lowRoomId = '1404937454938619927';
+        const highRoomId = '1403844895445221445';
+        const lowChoices = [100000,200000,300000,400000,500000,600000,700000,800000,900000];
+        const highChoices = [1000000,2000000,3000000,4000000,5000000,6000000,7000000,8000000,9000000,10000000];
+        const list = channelId === highRoomId ? highChoices : lowChoices;
+        const query = String(focused.value || '').toLowerCase();
+        const filtered = list.filter(v => (v>=1000000?`${v/1000000}m`:`${v/1000}k`).includes(query));
+        await interaction.respond(filtered.slice(0,25).map(v => ({ name: v>=1000000?`${v/1000000}M`:`${v/1000}k`, value: v })));
+        return;
+      }
+    } catch (e) {
+      console.error('Autocomplete error:', e);
+    }
+  }
+
   try {
     // Restrict coin options based on channel
     const lowRoomId = '1404937454938619927';
     const highRoomId = '1403844895445221445';
 
-    if (interaction.isChatInputCommand() && interaction.commandName === 'game') {
+    if (interaction.isChatInputCommand() && ['game','whiz','mirror','gimmick'].includes(interaction.commandName)) {
       const channelId = interaction.channelId;
       const coins = interaction.options.getInteger('coins', true);
 
@@ -630,22 +651,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       
-      const stats = user.stats;
+      const stats = user.stats as any;
       
-      // Calculate win percentage
+      // Calculate win percentages
       const totalWinPercentage = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(1) : '0.0';
+      const leagueGames = (stats.partnersGamesPlayed ?? 0) + (stats.soloGamesPlayed ?? 0);
+      const leagueWins = (stats.partnersGamesWon ?? 0) + (stats.soloGamesWon ?? 0);
+      const leagueWinPct = leagueGames > 0 ? ((leagueWins / leagueGames) * 100).toFixed(1) : '0.0';
       
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle(`📊 Stats for ${targetUser.username}`)
-        .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
+        .setThumbnail(targetUser.displayAvatarURL({ extension: 'png', size: 128 }))
         .addFields(
-          { name: '🎮 Total Games', value: stats.gamesPlayed.toString(), inline: true },
-          { name: '🏆 Total Wins', value: stats.gamesWon.toString(), inline: true },
+          { name: 'TOTAL GAMES:', value: '\u200b', inline: false },
+          { name: '🎮 Games', value: stats.gamesPlayed.toString(), inline: true },
+          { name: '🏆 Wins', value: stats.gamesWon.toString(), inline: true },
           { name: '📈 Win Rate', value: `${totalWinPercentage}%`, inline: true },
-          { name: '💰 Total Coins Won', value: stats.totalCoinsWon.toLocaleString(), inline: true },
-          { name: '💸 Total Coins Lost', value: stats.totalCoinsLost.toLocaleString(), inline: true },
-          { name: '💵 Net Coins', value: stats.netCoins.toLocaleString(), inline: true }
+          { name: '\u200b', value: '\u200b', inline: false },
+          { name: 'LEAGUE GAMES:', value: '\u200b', inline: false },
+          { name: '🎮 Games', value: leagueGames.toString(), inline: true },
+          { name: '🏆 Wins', value: leagueWins.toString(), inline: true },
+          { name: '📈 Win Rate', value: `${leagueWinPct}%`, inline: true },
+          { name: '\u200b', value: '\u200b', inline: false },
+          { name: 'COINS:', value: '\u200b', inline: false },
+          { name: '💰', value: user.coins.toLocaleString(), inline: true }
         )
         .setTimestamp();
       
