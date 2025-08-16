@@ -88,7 +88,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           user = await prisma.user.create({
             data: {
               username: playerData.username,
-              email: `${playerData.username}@discord.local`, // Temporary email
+              // Don't set a placeholder email; will be filled on first OAuth login
               discordId: playerData.discordId || playerData.userId,
               coins: 5000000, // Default coins
               avatar: playerData.avatar || null // Use provided avatar or null
