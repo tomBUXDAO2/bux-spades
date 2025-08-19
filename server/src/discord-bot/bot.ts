@@ -348,6 +348,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const gm = (interaction.options as any).data?.find?.((d: any) => d?.name === 'gamemode');
           if (gm && typeof gm.value === 'string') gameModeOpt = gm.value;
         }
+        if (typeof gameModeOpt === 'string') {
+          gameModeOpt = gameModeOpt.toLowerCase();
+        }
         const all = [
           { name: '4 or Nil', value: '4 OR NIL' },
           { name: 'Bid 3', value: 'BID 3' },
