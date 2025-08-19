@@ -396,7 +396,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     
     // Handle game line buttons
     if (interaction.customId === 'join_game' || interaction.customId === 'leave_game' || interaction.customId === 'cancel_game') {
-      await interaction.deferReply({ ephemeral: true });
+      if (interaction.customId === 'cancel_game') {
+        // For cancel, defer the update without sending an ephemeral reply
+        await interaction.deferUpdate();
+      } else {
+        // For join/leave, keep responses ephemeral
+        await interaction.deferReply({ ephemeral: true });
+      }
       
       try {
         const userId = interaction.user.id;
@@ -405,7 +411,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const gameLine = activeGameLines.get(messageId);
         
         if (!gameLine) {
-          await interaction.editReply('❌ Game line not found or expired.');
+          if (interaction.customId === 'cancel_game') {
+            await interaction.followUp({ content: '❌ Game line not found or expired.', ephemeral: true });
+          } else {
+            await interaction.editReply('❌ Game line not found or expired.');
+          }
           return;
         }
         
@@ -471,7 +481,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const roles = (interaction.member?.roles as any);
           const isAdmin = !!(roles && (roles.cache ? roles.cache.has('1403850350091436123') : Array.isArray(roles) ? roles.includes('1403850350091436123') : false));
           if (!isHost && !isAdmin) {
-            await interaction.editReply('❌ Only the host or an admin can cancel this game.');
+            await interaction.followUp({ content: '❌ Only the host or an admin can cancel this game.', ephemeral: true });
             return;
           }
           activeGameLines.delete(messageId);
@@ -485,11 +495,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
               new ButtonBuilder().setCustomId('cancel_game').setLabel('Cancel Game').setStyle(ButtonStyle.Secondary).setEmoji('🛑').setDisabled(true)
             );
           await interaction.message.edit({ components: [disabledRow] });
-          await interaction.editReply('🛑 Game line cancelled.');
+          // Announce cancellation publicly to the channel
+          if (interaction.channel && 'send' in interaction.channel) {
+            await (interaction.channel as any).send('🛑 Game line cancelled.');
+          }
         }
       } catch (error) {
         console.error('Error handling game button:', error);
-        await interaction.editReply('❌ Error processing game action. Please try again later.');
+        if (interaction.customId === 'cancel_game') {
+          await interaction.followUp({ content: '❌ Error processing game action. Please try again later.', ephemeral: true });
+        } else {
+          await interaction.editReply('❌ Error processing game action. Please try again later.');
+        }
       }
       return;
     }
