@@ -204,13 +204,7 @@ const commands = [
       option.setName('gimmicktype')
       .setDescription('Type of gimmick game')
       .setRequired(true)
-              .addChoices(
-          { name: 'Suicide', value: 'SUICIDE' },
-          { name: '4 or Nil', value: '4 OR NIL' },
-          { name: 'Bid 3', value: 'BID 3' },
-          { name: 'Bid Hearts', value: 'BID HEARTS' },
-          { name: 'Crazy Aces', value: 'CRAZY ACES' }
-        ))
+      .setAutocomplete(true))
     .addIntegerOption(option =>
       option.setName('maxpoints')
         .setDescription('Maximum points to win')

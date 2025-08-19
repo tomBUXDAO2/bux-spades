@@ -341,6 +341,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.respond(filtered.slice(0,25).map(v => ({ name: v>=1000000?`${v/1000000}M`:`${v/1000}k`, value: v })));
         return;
       }
+      if (focused.name === 'gimmicktype') {
+        const gameModeOpt = interaction.options.getString('gamemode');
+        const all = [
+          { name: '4 or Nil', value: '4 OR NIL' },
+          { name: 'Bid 3', value: 'BID 3' },
+          { name: 'Bid Hearts', value: 'BID HEARTS' },
+          { name: 'Crazy Aces', value: 'CRAZY ACES' },
+          { name: 'Suicide', value: 'SUICIDE' }
+        ];
+        const list = gameModeOpt === 'solo' ? all.filter(o => o.value !== 'SUICIDE') : all;
+        const q = String(focused.value || '').toLowerCase();
+        const filtered = list.filter(o => o.name.toLowerCase().includes(q));
+        await interaction.respond(filtered.slice(0,25));
+        return;
+      }
     } catch (e) {
       console.error('Autocomplete error:', e);
     }
