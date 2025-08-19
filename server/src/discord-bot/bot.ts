@@ -23,30 +23,9 @@ const RESULTS_CHANNEL_ID = '1404128066296610878';
 
 
 // Store active game lines
-interface GameLine {
-  messageId: string;
-  hostId: string;
-  hostName: string;
-  coins: number;
-  gameMode: string;
-  maxPoints: number;
-  minPoints: number;
-  gameType: string;
-  screamer: string | null;
-  assassin: string | null;
-  nil: string | null;
-  blindNil: string | null;
-  players: {
-    userId: string;
-    username: string;
-    seat: number;
-    avatar?: string; // Optional avatar URL
-  }[];
-  createdAt: number;
-}
-
+interface GameLine { messageId: string; channelId: string; hostId: string; hostName: string; coins: number; gameMode: string; maxPoints: number; minPoints: number; gameType: string; screamer: string | null; assassin: string | null; nil: string | null; blindNil: string | null; players: { userId: string; username: string; seat: number; avatar?: string }[]; createdAt: number; timeout?: NodeJS.Timeout }
 const activeGameLines = new Map<string, GameLine>();
-
+const channelToOpenLine = new Map<string, string>();
 
 
 // Load verified users from database on startup
@@ -375,14 +354,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const highRoomId = '1403844895445221445';
 
     if (interaction.isChatInputCommand() && ['game','whiz','mirror','gimmick'].includes(interaction.commandName)) {
-      const channelId = interaction.channelId;
+      // Per-channel guard: allow only one open line per channel
+      const openInChannel = channelToOpenLine.get(interaction.channelId);
+      if (openInChannel && activeGameLines.has(openInChannel)) {
+        await interaction.editReply('❌ There is already an open game line in this room. Please wait until it fills or is cancelled.');
+        return;
+      }
       const coins = interaction.options.getInteger('coins', true);
 
-      if (channelId === lowRoomId && (coins < 100000 || coins > 900000)) {
+      const chId = interaction.channelId;
+      if (chId === lowRoomId && (coins < 100000 || coins > 900000)) {
         await interaction.reply({ content: '❌ In low-room, buy-in must be between 100k and 900k.', ephemeral: true });
         return;
       }
-      if (channelId === highRoomId && coins < 1000000) {
+      if (chId === highRoomId && coins < 1000000) {
         await interaction.reply({ content: '❌ In high-room, buy-in must be 1M or higher.', ephemeral: true });
         return;
       }
@@ -410,7 +395,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     
     // Handle game line buttons
-    if (interaction.customId === 'join_game' || interaction.customId === 'leave_game' || interaction.customId === 'start_game') {
+    if (interaction.customId === 'join_game' || interaction.customId === 'leave_game' || interaction.customId === 'cancel_game') {
       await interaction.deferReply({ ephemeral: true });
       
       try {
@@ -480,21 +465,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
           
           await interaction.editReply('❌ You have left the game.');
           
-        } else if (interaction.customId === 'start_game') {
-          // Only host can start the game
-          if (userId !== gameLine.hostId) {
-            await interaction.editReply('❌ Only the host can start the game!');
+        } else if (interaction.customId === 'cancel_game') {
+          // Only host or admins can cancel
+          const isHost = userId === gameLine.hostId;
+          const roles = (interaction.member?.roles as any);
+          const isAdmin = !!(roles && (roles.cache ? roles.cache.has('1403850350091436123') : Array.isArray(roles) ? roles.includes('1403850350091436123') : false));
+          if (!isHost && !isAdmin) {
+            await interaction.editReply('❌ Only the host or an admin can cancel this game.');
             return;
           }
-          
-          // Check if game is full
-          if (gameLine.players.length < 4) {
-            await interaction.editReply('❌ Need 4 players to start the game!');
-            return;
-          }
-          
-          await createGameAndNotifyPlayers(interaction.message, gameLine);
-          await interaction.editReply('🚀 Starting the game...');
+          activeGameLines.delete(messageId);
+          channelToOpenLine.delete(gameLine.channelId);
+          if (gameLine.timeout) clearTimeout(gameLine.timeout);
+          // Disable buttons
+          const disabledRow = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder().setCustomId('join_game').setLabel('Join Game').setStyle(ButtonStyle.Success).setEmoji('✅').setDisabled(true),
+              new ButtonBuilder().setCustomId('leave_game').setLabel('Leave Game').setStyle(ButtonStyle.Danger).setEmoji('❌').setDisabled(true),
+              new ButtonBuilder().setCustomId('cancel_game').setLabel('Cancel Game').setStyle(ButtonStyle.Secondary).setEmoji('🛑').setDisabled(true)
+            );
+          await interaction.message.edit({ components: [disabledRow] });
+          await interaction.editReply('🛑 Game line cancelled.');
         }
       } catch (error) {
         console.error('Error handling game button:', error);
@@ -621,6 +612,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Store the game line data
       const gameLine: GameLine = {
         messageId: reply.id,
+        channelId: interaction.channelId,
         hostId: interaction.user.id,
         hostName: interaction.user.username,
         coins,
@@ -644,6 +636,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
       };
       
       activeGameLines.set(reply.id, gameLine);
+      // Per-channel guard: record open line for this channel
+      channelToOpenLine.set(interaction.channelId, reply.id);
+      // Auto-cancel after 20 minutes if not filled
+      gameLine.timeout = setTimeout(async () => {
+        const current = activeGameLines.get(reply.id);
+        if (!current) return;
+        try {
+          await interaction.followUp({ content: '⌛ Game line auto-cancelled after 20 minutes of inactivity.', ephemeral: false });
+          activeGameLines.delete(reply.id);
+          channelToOpenLine.delete(interaction.channelId);
+          // Disable buttons on the original message
+          const disabledRow = new ActionRowBuilder<ButtonBuilder>()
+            .addComponents(
+              new ButtonBuilder().setCustomId('join_game').setLabel('Join Game').setStyle(ButtonStyle.Success).setEmoji('✅').setDisabled(true),
+              new ButtonBuilder().setCustomId('leave_game').setLabel('Leave Game').setStyle(ButtonStyle.Danger).setEmoji('❌').setDisabled(true),
+              new ButtonBuilder().setCustomId('cancel_game').setLabel('Cancel Game').setStyle(ButtonStyle.Secondary).setEmoji('🛑').setDisabled(true)
+            );
+          await interaction.editReply({ components: [disabledRow] });
+        } catch (e) {
+          console.error('Auto-cancel failed:', e);
+        }
+      }, 20 * 60 * 1000);
     } catch (error) {
       console.error('Error in game command:', error);
       await interaction.editReply('❌ Error creating game line');
@@ -1046,6 +1060,8 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       
       // Remove game line from active list
       activeGameLines.delete(message.id);
+      channelToOpenLine.delete(gameLine.channelId);
+      if (gameLine.timeout) clearTimeout(gameLine.timeout);
       
       // Build special rules text for final embed
       let finalSpecialRulesText = '';
