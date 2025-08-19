@@ -531,6 +531,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         gameType = 'MIRROR';
       } else if (interaction.commandName === 'gimmick') {
         gameType = interaction.options.getString('gimmicktype', true);
+        // Block Suicide for Solo games
+        if (gameMode === 'solo' && gameType === 'SUICIDE') {
+          await interaction.editReply('❌ Suicide is partners-only. Please choose a different gimmick for Solo games.');
+          return;
+        }
       }
       
       // Format coins for display
