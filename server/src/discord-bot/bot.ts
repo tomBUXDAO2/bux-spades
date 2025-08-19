@@ -342,7 +342,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       if (focused.name === 'gimmicktype') {
-        const gameModeOpt = interaction.options.getString('gamemode');
+        // Read gamemode robustly from provided options
+        let gameModeOpt = interaction.options.getString('gamemode');
+        if (!gameModeOpt) {
+          const gm = (interaction.options as any).data?.find?.((d: any) => d?.name === 'gamemode');
+          if (gm && typeof gm.value === 'string') gameModeOpt = gm.value;
+        }
         const all = [
           { name: '4 or Nil', value: '4 OR NIL' },
           { name: 'Bid 3', value: 'BID 3' },

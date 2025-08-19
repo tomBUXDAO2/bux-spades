@@ -784,7 +784,7 @@ const HomePage: React.FC = () => {
                               height={32}
                               className="w-full h-full object-cover"
                             />
-                          </div>
+                    </div>
                         )}
                         <div className={`max-w-[80%] ${msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
                           <div className="flex justify-between items-center mb-1">
