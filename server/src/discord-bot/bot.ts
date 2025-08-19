@@ -600,11 +600,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setStyle(ButtonStyle.Danger)
             .setEmoji('❌'),
           new ButtonBuilder()
-            .setCustomId('start_game')
-            .setLabel('Start Game')
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🚀')
-            .setDisabled(true) // Disabled until 4 players join
+            .setCustomId('cancel_game')
+            .setLabel('Cancel Game')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🛑')
+            .setDisabled(false)
         );
       
       const reply = await interaction.editReply({ embeds: [embed], components: [row] });
