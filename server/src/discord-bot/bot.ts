@@ -955,11 +955,11 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
           .setStyle(ButtonStyle.Danger)
           .setEmoji('❌'),
         new ButtonBuilder()
-          .setCustomId('start_game')
-          .setLabel('Start Game')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('🚀')
-          .setDisabled(gameLine.players.length < 4)
+          .setCustomId('cancel_game')
+          .setLabel('Cancel Game')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🛑')
+          .setDisabled(false)
       );
     
     await message.edit({ embeds: [embed], components: [row] });
