@@ -1750,6 +1750,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         } else {
           // Partners mode game over check
           console.log('[GAME OVER CHECK] Team 1 score:', game.team1TotalScore, 'Team 2 score:', game.team2TotalScore, 'Max points:', maxPoints, 'Min points:', minPoints);
+          console.log('[GAME OVER DEBUG] Game status:', game.status, 'Game mode:', game.gameMode);
+          console.log('[GAME OVER DEBUG] Team 1 <= minPoints:', game.team1TotalScore <= minPoints);
+          console.log('[GAME OVER DEBUG] Team 2 <= minPoints:', game.team2TotalScore <= minPoints);
+          console.log('[GAME OVER DEBUG] Team 1 >= maxPoints:', game.team1TotalScore >= maxPoints);
+          console.log('[GAME OVER DEBUG] Team 2 >= maxPoints:', game.team2TotalScore >= maxPoints);
           
           // Check if game should end (only when there's a clear winner)
           let shouldEndGame = false;
@@ -1795,6 +1800,84 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               console.error('Failed to update stats/coins:', err);
             });
             // Fallback: ensure completed game is logged to DB and Discord for league games
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
+              .catch((e) => console.error('Failed to log completed game (fallback):', e));
+          }
+        }
+      }
+      
+      // Game over check - run this more frequently
+      const maxPoints = game.maxPoints;
+      const minPoints = game.minPoints;
+      
+      if (maxPoints !== undefined && minPoints !== undefined) {
+        if (game.gameMode === 'SOLO') {
+          const playerScores = game.playerScores || [0, 0, 0, 0];
+          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          
+          if (isGameOver) {
+            console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
+            game.status = 'FINISHED';
+            
+            let winningPlayer = 0;
+            let highestScore = playerScores[0];
+            for (let i = 1; i < playerScores.length; i++) {
+              if (playerScores[i] > highestScore) {
+                highestScore = playerScores[i];
+                winningPlayer = i;
+              }
+            }
+            
+            io.to(game.id).emit('game_over', {
+              playerScores: game.playerScores,
+              winningPlayer: winningPlayer,
+            });
+            
+            updateStatsAndCoins(game, winningPlayer).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+            
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
+              .catch((e) => console.error('Failed to log completed game (fallback):', e));
+          }
+        } else {
+          // Partners mode
+          const team1Score = game.team1TotalScore || 0;
+          const team2Score = game.team2TotalScore || 0;
+          
+          let shouldEndGame = false;
+          let winningTeam = null;
+          
+          if (team1Score <= minPoints) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          } else if (team2Score <= minPoints) {
+            shouldEndGame = true;
+            winningTeam = 1;
+          } else if (team1Score >= maxPoints && team1Score > team2Score) {
+            shouldEndGame = true;
+            winningTeam = 1;
+          } else if (team2Score >= maxPoints && team2Score > team1Score) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          }
+          
+          if (shouldEndGame && winningTeam) {
+            console.log('[GAME OVER] Partners game ended! Team 1:', team1Score, 'Team 2:', team2Score, 'Winner:', winningTeam);
+            game.status = 'FINISHED';
+            
+            io.to(game.id).emit('game_over', {
+              team1Score: team1Score,
+              team2Score: team2Score,
+              winningTeam: winningTeam,
+            });
+            
+            updateStatsAndCoins(game, winningTeam).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+            
             void import('./lib/gameLogger')
               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
               .catch((e) => console.error('Failed to log completed game (fallback):', e));
@@ -3079,13 +3162,13 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
             where: { id: userId },
             data: { coins: { increment: prizeAmount } }
           });
-          // Track coin aggregates
+          // Track coin aggregates - winners get prize amount, but net is prize minus buy-in
           await prisma.userStats.update({
             where: { userId },
             data: {
               totalCoinsWon: { increment: prizeAmount },
               totalCoinsLost: { increment: 0 },
-              netCoins: { increment: prizeAmount }
+              netCoins: { increment: prizeAmount - buyIn }
             }
           });
           

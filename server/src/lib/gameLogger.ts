@@ -31,30 +31,38 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		// Update existing Game row for completion snapshot
 		let dbGame;
 		if (game.dbGameId) {
-			// Update existing game record
-			dbGame = await prisma.game.update({
-				where: { id: game.dbGameId },
-				data: {
-					bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-					specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-					solo,
-					whiz,
-					mirror,
-					gimmick,
-					screamer,
-					assassin,
-					completed: true,
-					cancelled: false,
-					finalScore,
-					winner,
-					gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
-					league: (game as any).league || false,
-					specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-					status: 'FINISHED'
-				}
-			});
-			console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
-		} else {
+			try {
+				// Update existing game record
+				dbGame = await prisma.game.update({
+					where: { id: game.dbGameId },
+					data: {
+						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+						specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+						solo,
+						whiz,
+						mirror,
+						gimmick,
+						screamer,
+						assassin,
+						completed: true,
+						cancelled: false,
+						finalScore,
+						winner,
+						gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
+						league: (game as any).league || false,
+						specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+						status: 'FINISHED'
+					}
+				});
+				console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
+			} catch (updateError) {
+				console.error('[GAME UPDATE FAILED] Could not update existing game, creating new one:', updateError);
+				// Fall back to creating new game if update fails
+				game.dbGameId = null;
+			}
+		}
+		
+		if (!game.dbGameId) {
 			// Fallback: create new game record if dbGameId is missing
 			dbGame = await prisma.game.create({
 				data: {
@@ -86,10 +94,21 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		}
 
 		// Players
+		console.log('[GAME LOGGER] Creating GamePlayer records for game:', dbGame.id);
+		console.log('[GAME LOGGER] Players array:', game.players?.map((p: any) => ({ id: p?.id, type: p?.type, username: p?.username })));
+		
 		for (let i = 0; i < 4; i++) {
 			const player = game.players[i];
-			if (!player || player.type !== 'human') continue;
+			if (!player || player.type !== 'human') {
+				console.log(`[GAME LOGGER] Skipping player ${i}:`, player ? `type=${player.type}` : 'null');
+				continue;
+			}
 			const userId = player.id;
+			if (!userId) {
+				console.log(`[GAME LOGGER] Player ${i} has no userId:`, player);
+				continue;
+			}
+			
 			let team: number | null = null;
 			if (gameMode === 'PARTNERS') team = i === 0 || i === 2 ? 1 : 2;
 			const finalBid = player.bid || 0;
@@ -99,23 +118,30 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			let won = false;
 			if (gameMode === 'SOLO') won = i === winner;
 			else won = team === winner;
-			await prisma.gamePlayer.create({
-				data: {
-					gameId: dbGame.id,
-					userId,
-					position: i,
-					team,
-					bid: finalBid,
-					bags: finalBags,
-					points: finalPoints,
-					finalScore: finalPoints,
-					finalBags,
-					finalPoints,
-					won,
-					username: player.username,
-					discordId: player.discordId || null
-				}
-			});
+			
+			try {
+				await prisma.gamePlayer.create({
+					data: {
+						gameId: dbGame.id,
+						userId,
+						position: i,
+						team,
+						bid: finalBid,
+						bags: finalBags,
+						points: finalPoints,
+						finalScore: finalPoints,
+						finalBags,
+						finalPoints,
+						won,
+						username: player.username,
+						discordId: player.discordId || null
+					}
+				});
+				console.log(`[GAME LOGGER] Created GamePlayer for ${player.username} at position ${i}`);
+			} catch (playerError) {
+				console.error(`[GAME LOGGER] Failed to create GamePlayer for position ${i}:`, playerError);
+				console.error(`[GAME LOGGER] Player data:`, player);
+			}
 		}
 
 		const playerResults = {
@@ -169,5 +195,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		}
 	} catch (err) {
 		console.error('Failed to log completed game (server):', err);
+		console.error('Game object:', JSON.stringify(game, null, 2));
+		console.error('Winning team/player:', winningTeamOrPlayer);
 	}
 } 

@@ -1172,29 +1172,11 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       return;
     }
     
-    // Resolve mentions: map internal user IDs to Discord IDs where needed
-    const idToMention = new Map<string, string>();
-    const idToName = new Map<string, string>();
-    for (const p of gameData.players) {
-      const rawId = p.userId as string;
-      if (!rawId) continue;
-      const looksLikeDiscordId = /^\d{15,20}$/.test(rawId);
-      if (looksLikeDiscordId) {
-        idToMention.set(rawId, `<@${rawId}>`);
-      } else {
-        try {
-          const user = await prisma.user.findUnique({ where: { id: rawId }, select: { discordId: true, username: true } });
-          if (user?.discordId) idToMention.set(rawId, `<@${user.discordId}>`);
-          if (user?.username) idToName.set(rawId, user.username);
-        } catch (_) {}
-      }
-    }
-    
-    // Determine winners and losers
+    // Use Discord IDs directly for mentions
     const winnersRaw = gameData.players.filter((p: any) => p.won);
     const losersRaw = gameData.players.filter((p: any) => !p.won);
-    const winners = winnersRaw.map((p: any) => idToMention.get(p.userId) || (idToName.get(p.userId) || 'Unknown'));
-    const losers = losersRaw.map((p: any) => idToMention.get(p.userId) || (idToName.get(p.userId) || 'Unknown'));
+    const winners = winnersRaw.map((p: any) => `<@${p.userId}>`);
+    const losers = losersRaw.map((p: any) => `<@${p.userId}>`);
     
     // Calculate coins won with 10% rake
     // Partners: each winner gets 1.8x buy-in
