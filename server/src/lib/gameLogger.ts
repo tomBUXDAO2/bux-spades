@@ -82,7 +82,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					finalScore: finalPoints,
 					finalBags,
 					finalPoints,
-					won
+					won,
+					username: player.username,
+					discordId: player.discordId || null
 				}
 			});
 		}

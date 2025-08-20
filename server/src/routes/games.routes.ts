@@ -2779,7 +2779,9 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           finalScore: finalPoints,
           finalBags: finalBags,
           finalPoints: finalPoints,
-          won
+          won,
+          username: player.username,
+          discordId: (player as any).discordId || null
         }
       });
     }

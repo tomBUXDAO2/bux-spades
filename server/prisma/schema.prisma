@@ -75,6 +75,9 @@ model GamePlayer {
   finalBags   Int?
   finalPoints Int?
   won         Boolean?
+  // Denormalized for easier DB inspection
+  username    String?
+  discordId   String?
   game        Game     @relation(fields: [gameId], references: [id])
   user        User     @relation(fields: [userId], references: [id])
 
