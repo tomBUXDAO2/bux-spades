@@ -21,6 +21,11 @@ interface PlayerStats {
   screamerWon?: number;
   assassinPlayed?: number;
   assassinWon?: number;
+  // Mode-specific totals
+  partnersGamesPlayed?: number;
+  partnersGamesWon?: number;
+  soloGamesPlayed?: number;
+  soloGamesWon?: number;
 }
 
 interface Player {
@@ -49,13 +54,24 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsBid: 0,
     blindNilsMade: 0,
   };
-  const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  // Apply mode filter for totals
+  const filteredGamesPlayed = mode === 'partners'
+    ? (player.stats?.partnersGamesPlayed ?? 0)
+    : mode === 'solo'
+      ? (player.stats?.soloGamesPlayed ?? 0)
+      : (stats.gamesPlayed ?? 0);
+  const filteredGamesWon = mode === 'partners'
+    ? (player.stats?.partnersGamesWon ?? 0)
+    : mode === 'solo'
+      ? (player.stats?.soloGamesWon ?? 0)
+      : (stats.gamesWon ?? 0);
+  const winPercent = filteredGamesPlayed ? Math.round((filteredGamesWon / filteredGamesPlayed) * 100) : 0;
   const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
   const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
 
   // Defaults for all game modes and special rules
-  const regPlayed = stats.regPlayed ?? stats.gamesPlayed ?? 0;
-  const regWon = stats.regWon ?? stats.gamesWon ?? 0;
+  const regPlayed = stats.regPlayed ?? 0;
+  const regWon = stats.regWon ?? 0;
   const whizPlayed = stats.whizPlayed ?? 0;
   const whizWon = stats.whizWon ?? 0;
   const mirrorPlayed = stats.mirrorPlayed ?? 0;
@@ -149,11 +165,11 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-indigo-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm16 0a2 2 0 0 0-2-2h-1v16h1a2 2 0 0 0 2-2V6zm-7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
-              {stats.gamesPlayed} <span className="text-xs font-normal text-slate-400 ml-1">Played</span>
+              {filteredGamesPlayed} <span className="text-xs font-normal text-slate-400 ml-1">Played</span>
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-yellow-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7zm4.24 11h11.52l1.26-8.18-3.5 3.5-3.52-6.34-3.52 6.34-3.5-3.5L6.24 18z"/></svg>
-              {stats.gamesWon} <span className="text-xs font-normal text-slate-400 ml-1">Won</span>
+              {filteredGamesWon} <span className="text-xs font-normal text-slate-400 ml-1">Won</span>
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-orange-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
