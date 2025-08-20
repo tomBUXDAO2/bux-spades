@@ -34,9 +34,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
 				gameMode: game.gameMode,
 				bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-				specialRules: Object.keys(specialRules)
-					.filter((key) => specialRules[key])
-					.map((key) => (key === 'screamer' ? 'SCREAMER' : 'ASSASSIN')) as any[],
+				specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
 				minPoints: game.minPoints,
 				maxPoints: game.maxPoints,
 				buyIn: game.buyIn,
@@ -51,11 +49,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				cancelled: false,
 				finalScore,
 				winner,
-				gameType: whiz ? 'WHIZ' : mirror ? 'MIRROR' : gimmick ? 'GIMMICK' : 'REGULAR',
+				gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
 				league: (game as any).league || false,
-				specialRulesApplied: Object.keys(specialRules)
-					.filter((key) => specialRules[key])
-					.map((key) => (key === 'screamer' ? 'SCREAMER' : 'ASSASSIN')) as any[],
+				specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
 				status: 'FINISHED'
 			}
 		});
@@ -94,7 +90,8 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		const playerResults = {
 			players: game.players.map((p: any, i: number) => ({
 				position: i,
-				userId: p?.discordId || p?.id,
+				userId: p?.id, // DB user id
+				discordId: p?.discordId || null,
 				username: p?.username,
 				team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
 				finalBid: p?.bid || 0,
@@ -130,7 +127,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				const data = {
 					buyIn: game.buyIn,
 					players: game.players.map((p: any, i: number) => ({
-						userId: p?.discordId || p?.id || '',
+						userId: p?.id || '', // DB id
 						won: game.gameMode === 'SOLO' ? i === winningTeamOrPlayer : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
 					}))
 				};
