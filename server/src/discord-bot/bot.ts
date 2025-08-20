@@ -660,17 +660,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const current = activeGameLines.get(reply.id);
         if (!current) return;
         try {
-          await interaction.followUp({ content: '⌛ Game line auto-cancelled after 20 minutes of inactivity.', ephemeral: false });
+          // Announce publicly in the channel
+          const channel = await client.channels.fetch(current.channelId) as TextChannel;
+          if (channel) {
+            await channel.send('⌛ Game line auto-cancelled after 20 minutes of inactivity.');
+            // Disable buttons on the original message
+            const msg = await channel.messages.fetch(current.messageId);
+            const disabledRow = new ActionRowBuilder<ButtonBuilder>()
+              .addComponents(
+                new ButtonBuilder().setCustomId('join_game').setLabel('Join Game').setStyle(ButtonStyle.Success).setEmoji('✅').setDisabled(true),
+                new ButtonBuilder().setCustomId('leave_game').setLabel('Leave Game').setStyle(ButtonStyle.Danger).setEmoji('❌').setDisabled(true),
+                new ButtonBuilder().setCustomId('cancel_game').setLabel('Cancel Game').setStyle(ButtonStyle.Secondary).setEmoji('🛑').setDisabled(true)
+              );
+            await msg.edit({ components: [disabledRow] });
+          }
           activeGameLines.delete(reply.id);
-          channelToOpenLine.delete(interaction.channelId);
-          // Disable buttons on the original message
-          const disabledRow = new ActionRowBuilder<ButtonBuilder>()
-            .addComponents(
-              new ButtonBuilder().setCustomId('join_game').setLabel('Join Game').setStyle(ButtonStyle.Success).setEmoji('✅').setDisabled(true),
-              new ButtonBuilder().setCustomId('leave_game').setLabel('Leave Game').setStyle(ButtonStyle.Danger).setEmoji('❌').setDisabled(true),
-              new ButtonBuilder().setCustomId('cancel_game').setLabel('Cancel Game').setStyle(ButtonStyle.Secondary).setEmoji('🛑').setDisabled(true)
-            );
-          await interaction.editReply({ components: [disabledRow] });
+          channelToOpenLine.delete(current.channelId);
         } catch (e) {
           console.error('Auto-cancel failed:', e);
         }
