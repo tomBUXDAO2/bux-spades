@@ -3035,20 +3035,18 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
         where: { userId },
         data: {
           gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 }
+          gamesWon: { increment: isWinner ? 1 : 0 },
+          // Mode-specific counters
+          partnersGamesPlayed: { increment: game.gameMode === 'PARTNERS' ? 1 : 0 },
+          partnersGamesWon: { increment: game.gameMode === 'PARTNERS' && isWinner ? 1 : 0 },
+          soloGamesPlayed: { increment: game.gameMode === 'SOLO' ? 1 : 0 },
+          soloGamesWon: { increment: game.gameMode === 'SOLO' && isWinner ? 1 : 0 }
         }
       });
       
-      // Handle coin buy-in and prizes
+      // Handle coin prizes only (buy-in was already debited at game start)
       const buyIn = game.buyIn || 0;
       if (buyIn > 0) {
-        // Deduct buy-in from all players
-        await prisma.user.update({
-          where: { id: userId },
-          data: { coins: { decrement: buyIn } }
-        });
-        
-        // Award prizes to winners
         if (isWinner) {
           let prizeAmount = 0;
           const totalPot = buyIn * 4;
@@ -3068,8 +3066,27 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
             where: { id: userId },
             data: { coins: { increment: prizeAmount } }
           });
+          // Track coin aggregates
+          await prisma.userStats.update({
+            where: { userId },
+            data: {
+              totalCoinsWon: { increment: prizeAmount },
+              totalCoinsLost: { increment: 0 },
+              netCoins: { increment: prizeAmount }
+            }
+          });
           
           console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool})`);
+        } else {
+          // Loser: count the buy-in as lost (already deducted at start)
+          await prisma.userStats.update({
+            where: { userId },
+            data: {
+              totalCoinsWon: { increment: 0 },
+              totalCoinsLost: { increment: buyIn },
+              netCoins: { decrement: buyIn }
+            }
+          });
         }
       }
       
@@ -3077,6 +3094,14 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
     } catch (err: any) {
       console.error('Failed to update stats/coins for user', userId, err);
     }
+  }
+  
+  // Ensure results logging + Discord embed for league games
+  try {
+    const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+    await logCompletedGameToDbAndDiscord(game as any, winningTeamOrPlayer);
+  } catch (e) {
+    console.error('Post-completion logging failed:', e);
   }
 }
 
