@@ -55,16 +55,18 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsMade: 0,
   };
   // Apply mode filter for totals
+  const allPlayedFromFormats = (stats.regPlayed ?? 0) + (stats.whizPlayed ?? 0) + (stats.mirrorPlayed ?? 0) + (stats.gimmickPlayed ?? 0);
+  const allWonFromFormats = (stats.regWon ?? 0) + (stats.whizWon ?? 0) + (stats.mirrorWon ?? 0) + (stats.gimmickWon ?? 0);
   const filteredGamesPlayed = mode === 'partners'
     ? (player.stats?.partnersGamesPlayed ?? 0)
     : mode === 'solo'
       ? (player.stats?.soloGamesPlayed ?? 0)
-      : (stats.gamesPlayed ?? 0);
+      : allPlayedFromFormats;
   const filteredGamesWon = mode === 'partners'
     ? (player.stats?.partnersGamesWon ?? 0)
     : mode === 'solo'
       ? (player.stats?.soloGamesWon ?? 0)
-      : (stats.gamesWon ?? 0);
+      : allWonFromFormats;
   const winPercent = filteredGamesPlayed ? Math.round((filteredGamesWon / filteredGamesPlayed) * 100) : 0;
   const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
   const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
