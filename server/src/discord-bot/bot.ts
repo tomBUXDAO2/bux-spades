@@ -437,6 +437,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const seatOrder = [0, 2, 1, 3] as const;
           const seat = seatOrder[gameLine.players.length] ?? gameLine.players.length;
           
+          // Validate that the Discord user has an app account and enough coins
+          try {
+            const dbUser = await prisma.user.findUnique({ where: { discordId: userId } });
+            if (!dbUser) {
+              await interaction.editReply('❌ You need to log in to the app with your Discord account before joining game lines. Please visit https://bux-spades.pro/ and log in, then try again.');
+              return;
+            }
+            if ((dbUser.coins ?? 0) < gameLine.coins) {
+              await interaction.editReply(`❌ You do not have enough coins to join.\nRequired: ${gameLine.coins.toLocaleString()} | Your balance: ${(dbUser.coins ?? 0).toLocaleString()}\nPlease open a support ticket in <#1406332512476860446> to purchase more coins.`);
+              return;
+            }
+          } catch (e) {
+            console.error('Join validation failed:', e);
+            await interaction.editReply('❌ Could not validate your account right now. Please try again shortly.');
+            return;
+          }
+          
           // Add player to game
           // Get the user's avatar
           const user = await client.users.fetch(userId);
@@ -567,6 +584,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.editReply('❌ Suicide is partners-only. Please choose a different gimmick for Solo games.');
           return;
         }
+      }
+      
+      // Validate host account exists in DB and has enough coins
+      try {
+        const host = await prisma.user.findUnique({ where: { discordId: interaction.user.id } });
+        if (!host) {
+          await interaction.editReply('❌ You need to log in to the app with your Discord account before creating game lines. Please visit https://bux-spades.pro/ and log in, then try again.');
+          return;
+        }
+        if ((host.coins ?? 0) < coins) {
+          await interaction.editReply(`❌ You do not have enough coins to create this game line.\nRequired: ${coins.toLocaleString()} | Your balance: ${(host.coins ?? 0).toLocaleString()}\nPlease open a support ticket in <#1406332512476860446> to purchase more coins.`);
+          return;
+        }
+      } catch (e) {
+        console.error('Host validation failed:', e);
+        await interaction.editReply('❌ Could not validate your account right now. Please try again shortly.');
+        return;
       }
       
       // Format coins for display
@@ -723,10 +757,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const leagueWins = (stats.partnersGamesWon ?? 0) + (stats.soloGamesWon ?? 0);
       const leagueWinPct = leagueGames > 0 ? ((leagueWins / leagueGames) * 100).toFixed(1) : '0.0';
       
-      const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle(`📊 Stats for ${targetUser.username}`)
-        .setThumbnail(targetUser.displayAvatarURL({ extension: 'png', size: 128 }))
+              const embed = new EmbedBuilder()
+          .setColor(0x00ff00)
+          .setTitle(`📊 Stats for ${targetUser.username}`)
+          .setThumbnail(targetUser.displayAvatarURL({ extension: 'png', size: 128 }))
         .addFields(
           { name: 'TOTAL GAMES:', value: '\u200b', inline: false },
           { name: '🎮 Games', value: stats.gamesPlayed.toString(), inline: true },

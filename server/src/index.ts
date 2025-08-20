@@ -1255,6 +1255,19 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         spadesBroken: false
       };
       
+      // Update game status in database
+      if (game.dbGameId) {
+        try {
+          await prisma.game.update({
+            where: { id: game.dbGameId },
+            data: { status: 'PLAYING' }
+          });
+          console.log('[DB STATUS UPDATE] Updated game status to PLAYING in database:', game.dbGameId);
+        } catch (err) {
+          console.error('Failed to update game status in database:', err);
+        }
+      }
+      
               // FORCE GAME LOGGING - Create game in database immediately
       if (!game.dbGameId) {
         try {

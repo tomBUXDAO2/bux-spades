@@ -28,33 +28,62 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			winner = winningTeamOrPlayer; // 1 or 2
 		}
 
-		// Create or update Game row for completion snapshot
-		const dbGame = await prisma.game.create({
-			data: {
-				creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
-				gameMode: game.gameMode,
-				bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-				specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-				minPoints: game.minPoints,
-				maxPoints: game.maxPoints,
-				buyIn: game.buyIn,
-				solo,
-				whiz,
-				mirror,
-				gimmick,
-				screamer,
-				assassin,
-				rated: true,
-				completed: true,
-				cancelled: false,
-				finalScore,
-				winner,
-				gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
-				league: (game as any).league || false,
-				specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-				status: 'FINISHED'
-			}
-		});
+		// Update existing Game row for completion snapshot
+		let dbGame;
+		if (game.dbGameId) {
+			// Update existing game record
+			dbGame = await prisma.game.update({
+				where: { id: game.dbGameId },
+				data: {
+					bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+					specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+					solo,
+					whiz,
+					mirror,
+					gimmick,
+					screamer,
+					assassin,
+					completed: true,
+					cancelled: false,
+					finalScore,
+					winner,
+					gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
+					league: (game as any).league || false,
+					specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+					status: 'FINISHED'
+				}
+			});
+			console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
+		} else {
+			// Fallback: create new game record if dbGameId is missing
+			dbGame = await prisma.game.create({
+				data: {
+					creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
+					gameMode: game.gameMode,
+					bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+					specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+					minPoints: game.minPoints,
+					maxPoints: game.maxPoints,
+					buyIn: game.buyIn,
+					solo,
+					whiz,
+					mirror,
+					gimmick,
+					screamer,
+					assassin,
+					rated: true,
+					completed: true,
+					cancelled: false,
+					finalScore,
+					winner,
+					gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
+					league: (game as any).league || false,
+					specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+					status: 'FINISHED'
+				}
+			});
+			console.log('[GAME COMPLETED] Created new game record in database:', dbGame.id);
+		}
 
 		// Players
 		for (let i = 0; i < 4; i++) {
