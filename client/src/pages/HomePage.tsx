@@ -469,22 +469,42 @@ const HomePage: React.FC = () => {
   };
 
   // Handler to open stats for current user
-  const handleOpenMyStats = () => {
+  const handleOpenMyStats = async () => {
     if (!user) return;
-    setSelectedPlayer({
-      username: user.username,
-      avatar: user.avatar,
-      stats: user.stats || {
-        gamesPlayed: 0,
-        gamesWon: 0,
-        nilsBid: 0,
-        nilsMade: 0,
-        blindNilsBid: 0,
-        blindNilsMade: 0,
-      },
-      coins: user.coins,
-    });
-    setIsPlayerStatsOpen(true);
+    try {
+      const response = await api.get(`/api/users/${user.id}/stats`);
+      const stats = await response.json();
+      setSelectedPlayer({
+        username: user.username,
+        avatar: user.avatar,
+        stats: stats || {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          nilsBid: 0,
+          nilsMade: 0,
+          blindNilsBid: 0,
+          blindNilsMade: 0,
+        },
+        coins: user.coins,
+      });
+      setIsPlayerStatsOpen(true);
+    } catch (e) {
+      console.error('Error fetching my stats:', e);
+      setSelectedPlayer({
+        username: user.username,
+        avatar: user.avatar,
+        stats: user.stats || {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          nilsBid: 0,
+          nilsMade: 0,
+          blindNilsBid: 0,
+          blindNilsMade: 0,
+        },
+        coins: user.coins,
+      });
+      setIsPlayerStatsOpen(true);
+    }
   };
 
   // Handler to open stats for another player
