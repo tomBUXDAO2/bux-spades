@@ -50,18 +50,24 @@ model Game {
 }
 
 model GamePlayer {
-  id        String   @id
-  gameId    String
-  userId    String
-  position  Int
-  team      Int?
-  bid       Int?
-  bags      Int      @default(0)
-  points    Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-  Game      Game     @relation(fields: [gameId], references: [id])
-  User      User     @relation(fields: [userId], references: [id])
+  id          String   @id
+  gameId      String
+  userId      String
+  position    Int
+  team        Int?
+  bid         Int?
+  bags        Int      @default(0)
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  finalScore  Int?
+  finalBags   Int?
+  finalPoints Int?
+  won         Boolean?
+  discordId   String?
+  username    String?
+  Game        Game     @relation(fields: [gameId], references: [id])
+  User        User     @relation(fields: [userId], references: [id])
 
   @@unique([gameId, position])
 }
@@ -125,19 +131,30 @@ model User {
 }
 
 model UserStats {
-  id            String   @id
-  userId        String   @unique
-  gamesPlayed   Int      @default(0)
-  gamesWon      Int      @default(0)
-  nilsBid       Int      @default(0)
-  nilsMade      Int      @default(0)
-  blindNilsBid  Int      @default(0)
-  blindNilsMade Int      @default(0)
-  totalBags     Int      @default(0)
-  bagsPerGame   Float    @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime
-  User          User     @relation(fields: [userId], references: [id])
+  id                  String   @id
+  userId              String   @unique
+  gamesPlayed         Int      @default(0)
+  gamesWon            Int      @default(0)
+  nilsBid             Int      @default(0)
+  nilsMade            Int      @default(0)
+  blindNilsBid        Int      @default(0)
+  blindNilsMade       Int      @default(0)
+  totalBags           Int      @default(0)
+  bagsPerGame         Float    @default(0)
+  partnersGamesPlayed Int?     @default(0)
+  partnersGamesWon    Int?     @default(0)
+  partnersTotalBags   Int?     @default(0)
+  partnersBagsPerGame Float?   @default(0)
+  soloGamesPlayed     Int?     @default(0)
+  soloGamesWon        Int?     @default(0)
+  soloTotalBags       Int?     @default(0)
+  soloBagsPerGame     Float?   @default(0)
+  totalCoinsWon       Int?     @default(0)
+  totalCoinsLost      Int?     @default(0)
+  netCoins            Int?     @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+  User                User     @relation(fields: [userId], references: [id])
 }
 
 model GameResult {

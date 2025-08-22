@@ -498,7 +498,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   // Join game room for real-time updates
-  socket.on('join_game', ({ gameId }) => {
+  socket.on('join_game', async ({ gameId }) => {
     console.log('[SERVER DEBUG] join_game event received:', { 
       gameId, 
       socketId: socket.id, 
@@ -596,6 +596,38 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             position: originalSeatIndex
           };
           
+          // Create GamePlayer record in database for score tracking (if it doesn't exist)
+          try {
+            const existingGamePlayer = await prisma.gamePlayer.findFirst({
+              where: {
+                gameId: game.id,
+                userId: socket.userId
+              }
+            });
+            
+            if (!existingGamePlayer) {
+              await prisma.gamePlayer.create({
+                data: {
+                  gameId: game.id,
+                  userId: socket.userId,
+                  position: originalSeatIndex,
+                  team: game.gameMode === 'PARTNERS' ? (originalSeatIndex === 0 || originalSeatIndex === 2 ? 1 : 2) : null,
+                  bid: null,
+                  bags: 0,
+                  points: 0,
+                  username: playerUsername,
+                  discordId: null
+                }
+              });
+              console.log('[RECONNECT DEBUG] Created GamePlayer record for reconnected player:', socket.userId);
+            } else {
+              console.log('[RECONNECT DEBUG] GamePlayer record already exists for reconnected player:', socket.userId);
+            }
+          } catch (error) {
+            console.error('[RECONNECT DEBUG] Failed to create GamePlayer record:', error);
+            // Don't fail the reconnect if GamePlayer creation fails
+          }
+          
           // Remove player from spectators if they were added there during disconnect
           const spectatorIndex = game.spectators?.findIndex(s => s.id === socket.userId);
           if (spectatorIndex !== -1) {
@@ -683,6 +715,27 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             type: 'human',
             position: emptySeatIndex
           };
+          
+          // Create GamePlayer record in database for score tracking
+          try {
+            await prisma.gamePlayer.create({
+              data: {
+                gameId: game.id,
+                userId: socket.userId,
+                position: emptySeatIndex,
+                team: game.gameMode === 'PARTNERS' ? (emptySeatIndex === 0 || emptySeatIndex === 2 ? 1 : 2) : null,
+                bid: null,
+                bags: 0,
+                points: 0,
+                username: playerUsername,
+                discordId: null
+              }
+            });
+            console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId);
+          } catch (error) {
+            console.error('[SOCKET JOIN DEBUG] Failed to create GamePlayer record:', error);
+            // Don't fail the join if GamePlayer creation fails
+          }
           
           // Clear any existing seat replacement for this seat
           const replacementId = `${game.id}-${emptySeatIndex}`;

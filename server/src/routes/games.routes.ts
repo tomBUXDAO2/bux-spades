@@ -349,6 +349,27 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
     gamePlayers: game.players.map(p => p ? p.id : 'null') 
   });
 
+  // Create GamePlayer record in database for score tracking
+  try {
+    await prisma.gamePlayer.create({
+      data: {
+        gameId: game.id,
+        userId: player.id,
+        position: seatIndex,
+        team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+        bid: null,
+        bags: 0,
+        points: 0,
+        username: player.username,
+        discordId: null
+      }
+    });
+    console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id);
+  } catch (error) {
+    console.error('[HTTP JOIN DEBUG] Failed to create GamePlayer record:', error);
+    // Don't fail the join if GamePlayer creation fails
+  }
+
   res.json(game);
   io.emit('games_updated', games);
   // Emit game_update to the game room for real-time sync
