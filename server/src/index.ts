@@ -3442,3 +3442,94 @@ function ensureLeagueReady(game: any) {
 		game.leagueReady = [false, false, false, false];
 	}
 }
+
+// Periodic game completion check - runs every 10 seconds
+setInterval(() => {
+  games.forEach((game: Game) => {
+    if (game.status === 'PLAYING') {
+      const maxPoints = game.maxPoints;
+      const minPoints = game.minPoints;
+      
+      if (maxPoints !== undefined && minPoints !== undefined) {
+        if (game.gameMode === 'SOLO') {
+          const playerScores = game.playerScores || [0, 0, 0, 0];
+          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          
+          if (isGameOver) {
+            console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
+            game.status = 'FINISHED';
+            
+            let winningPlayer = 0;
+            let highestScore = playerScores[0];
+            for (let i = 1; i < playerScores.length; i++) {
+              if (playerScores[i] > highestScore) {
+                highestScore = playerScores[i];
+                winningPlayer = i;
+              }
+            }
+            
+            io.to(game.id).emit('game_over', {
+              playerScores: game.playerScores,
+              winningPlayer: winningPlayer,
+            });
+            
+            // Update stats and coins in DB
+            updateStatsAndCoins(game, winningPlayer).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+            
+            // Log completed game to DB and Discord
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
+              .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+          }
+        } else {
+          // Partners mode game over check
+          let shouldEndGame = false;
+          let winningTeam = null;
+          
+          // If either team is below minPoints, they lose immediately
+          if (game.team1TotalScore <= minPoints) {
+            shouldEndGame = true;
+            winningTeam = 2;
+          } else if (game.team2TotalScore <= minPoints) {
+            shouldEndGame = true;
+            winningTeam = 1;
+          }
+          // If either team is above maxPoints, check if they have a clear lead
+          else if (game.team1TotalScore >= maxPoints) {
+            if (game.team1TotalScore > game.team2TotalScore) {
+              shouldEndGame = true;
+              winningTeam = 1;
+            }
+          } else if (game.team2TotalScore >= maxPoints) {
+            if (game.team2TotalScore > game.team1TotalScore) {
+              shouldEndGame = true;
+              winningTeam = 2;
+            }
+          }
+          
+          if (shouldEndGame && winningTeam) {
+            console.log('[PERIODIC CHECK] Partners game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
+            game.status = 'FINISHED';
+            io.to(game.id).emit('game_over', {
+              team1Score: game.team1TotalScore,
+              team2Score: game.team2TotalScore,
+              winningTeam,
+            });
+            
+            // Update stats and coins in DB
+            updateStatsAndCoins(game, winningTeam).catch(err => {
+              console.error('Failed to update stats/coins:', err);
+            });
+            
+            // Log completed game to DB and Discord
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
+              .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+          }
+        }
+      }
+    }
+  });
+}, 10000); // Check every 10 seconds
