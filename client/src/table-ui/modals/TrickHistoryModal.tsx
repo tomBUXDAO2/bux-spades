@@ -47,14 +47,18 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
   const fetchTrickHistory = async () => {
     setLoading(true);
     try {
+      console.log('[TRICK HISTORY] Fetching trick history for game:', gameId);
       const response = await fetch(`/api/games/${gameId}/trick-history`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      console.log('[TRICK HISTORY] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[TRICK HISTORY] Received data:', data);
         setTrickHistory(data.trickHistory || []);
         
         // Start with the most recent trick
@@ -63,9 +67,13 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
           setCurrentRoundIndex(data.trickHistory.length - 1);
           setCurrentTrickIndex(lastRound.tricks.length - 1);
         }
+      } else {
+        console.error('[TRICK HISTORY] Response not ok:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('[TRICK HISTORY] Error response:', errorText);
       }
     } catch (error) {
-      console.error('Failed to fetch trick history:', error);
+      console.error('[TRICK HISTORY] Failed to fetch trick history:', error);
     } finally {
       setLoading(false);
     }
