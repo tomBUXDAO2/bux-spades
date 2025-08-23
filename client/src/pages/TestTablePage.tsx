@@ -254,10 +254,11 @@ export default function TestTablePage() {
     const mockGame = createMockGame();
     
     // Update the first player to be the current user if available
-    if (user) {
+    if (user && mockGame.players[0]) {
       mockGame.players[0] = {
         ...mockGame.players[0],
         id: user.id,
+        name: user.username || 'TestPlayer1',
         username: user.username || 'TestPlayer1',
         avatar: user.avatar || '/default-pfp.jpg'
       };
