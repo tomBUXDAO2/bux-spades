@@ -10,6 +10,7 @@ import Register from '@/components/auth/Register';
 import AuthCallback from '@/components/auth/AuthCallback';
 import HomePage from './pages/HomePage';
 import TablePage from './pages/TablePage';
+import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import { SocketProvider } from './context/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
@@ -81,6 +82,10 @@ const router = createBrowserRouter(
         {
           path: "table/:gameId",
           element: <ProtectedRoute><TablePage /></ProtectedRoute>
+        },
+        {
+          path: "test-table",
+          element: <ProtectedRoute><TestTablePage /></ProtectedRoute>
         },
         {
           path: "*",

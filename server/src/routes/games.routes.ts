@@ -3523,4 +3523,41 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
   }
 });
 
+// Get trick history for a game
+router.get('/:id/trick-history', requireAuth, async (req, res) => {
+  try {
+    const gameId = req.params.id;
+    
+    // Find the game in memory
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    // Get trick history from database
+    const trickHistory = await trickLogger.getGameTrickHistory(game.dbGameId || gameId);
+    
+    // Transform the data to include player information
+    const transformedHistory = trickHistory.map((round: any) => ({
+      roundNumber: round.roundNumber,
+      tricks: round.tricks.map((trick: any) => ({
+        trickNumber: trick.trickNumber,
+        leadPlayerId: trick.leadPlayerId,
+        winningPlayerId: trick.winningPlayerId,
+        cards: trick.cards.map((card: any) => ({
+          suit: card.suit,
+          value: card.value,
+          position: card.position,
+          playerId: card.playerId
+        })).sort((a: any, b: any) => a.position - b.position)
+      }))
+    }));
+    
+    res.json({ trickHistory: transformedHistory });
+  } catch (error) {
+    console.error('[TRICK HISTORY] Error fetching trick history:', error);
+    res.status(500).json({ error: 'Failed to fetch trick history' });
+  }
+});
+
 export default router; 

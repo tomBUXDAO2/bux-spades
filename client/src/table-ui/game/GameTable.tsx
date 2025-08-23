@@ -9,6 +9,7 @@ import HandSummaryModal from './HandSummaryModal';
 import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
 import SoloWinnerModal from './SoloWinnerModal';
+import TrickHistoryModal from '../modals/TrickHistoryModal';
 
 
 import BiddingInterface from './BiddingInterface';
@@ -142,6 +143,7 @@ interface GameTableProps {
   // Add rejoin button props
   shouldShowRejoinButton?: boolean;
   onRejoinGame?: () => void;
+
 }
 
 
@@ -1532,9 +1534,9 @@ export default function GameTable({
     } else if (Array.isArray(playableCards)) {
       effectivePlayableCards = playableCards;
     }
-    const cardUIWidth = Math.floor(isMobile ? 65 : 100 * scaleFactor);
-    const cardUIHeight = Math.floor(isMobile ? 90 : 140 * scaleFactor);
-    const overlapOffset = Math.floor(isMobile ? -35 : -40 * scaleFactor);
+         const cardUIWidth = Math.floor(isMobile ? 80 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 100 : 120) * scaleFactor);
+     const cardUIHeight = Math.floor(isMobile ? 112 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168) * scaleFactor);
+     const overlapOffset = Math.floor(isMobile ? -45 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? -40 : -55) * scaleFactor);
 
     // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
@@ -1548,8 +1550,8 @@ export default function GameTable({
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: isMobile ? '-50px' : '-40px',
-          height: `${Math.floor(cardUIHeight * 1)}px`,
+          bottom: isMobile ? '-100px' : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? '-80px' : '-20px'),
+          height: `${Math.floor(cardUIHeight * 1.2)}px`,
           paddingTop: '12px',
           overflow: 'visible',
           pointerEvents: 'none',
@@ -1590,6 +1592,7 @@ export default function GameTable({
                   zIndex: 50 + index,
                   pointerEvents: 'auto',
                   opacity: isVisible ? 1 : 0,
+                                       filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
                 }}
                 onClick={() => {
                   console.log('[CARD CLICK DEBUG] Card clicked:', card, 'isPlayable:', isPlayable, 'gameState.status:', gameState.status);
@@ -1601,12 +1604,12 @@ export default function GameTable({
                   }
                 }}
               >
-                <div className="relative">
+                <div className="relative p-0 m-0" style={{ padding: 0, margin: 0, lineHeight: 0, boxSizing: 'border-box' }}>
                   <CardImage
                     card={card}
                     width={cardUIWidth}
                     height={cardUIHeight}
-                    className={`rounded-lg shadow-md ${isPlayable ? 'hover:shadow-lg' : ''}`}
+                    className={`shadow-xl ${isPlayable ? 'hover:shadow-lg' : ''}`}
                     alt={`${card.rank}${card.suit}`}
                     faceDown={!cardsRevealed && gameState.status === "BIDDING"}
                   />
@@ -1844,7 +1847,7 @@ export default function GameTable({
       
       // Call the server to complete the game
       try {
-        const response = await fetch(`/api/games/${gameState.id}/complete`, {
+        const response = await fetch(`https://bux-spades-server.fly.dev/api/games/${gameState.id}/complete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1927,6 +1930,7 @@ export default function GameTable({
   }, [gameState.status, gameState.winningTeam, showWinner, showLoser]);
 
   const [showGameInfo, setShowGameInfo] = useState(false);
+  const [showTrickHistory, setShowTrickHistory] = useState(false);
   const infoRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -1989,10 +1993,10 @@ export default function GameTable({
             card={card}
             width={Math.floor(isMobile ? 85 * scaleFactor : 90 * scaleFactor)}
             height={Math.floor(isMobile ? 120 * scaleFactor : 130 * scaleFactor)}
-            className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
+            className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''} ${i === 0 ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
             alt={`${card.rank} of ${card.suit}`}
           />
-          {isWinningCard && (
+          {(isWinningCard || i === 0) && (
             <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
               ✓
             </div>
@@ -2367,7 +2371,7 @@ export default function GameTable({
           src={`/cards/${getCardImage(card)}`}
           alt={alt || `${card.rank}${card.suit}`}
           className={className}
-          style={{ width, height, objectFit: 'contain' }}
+          style={{ width, height, objectFit: 'fill', padding: 0, margin: 0, borderRadius: '8px' }}
         />
       );
     }
@@ -2438,8 +2442,8 @@ export default function GameTable({
 
         {/* Bottom right corner (rotated) */}
         <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={isTableCard && isMobile ? { fontSize: '0.8rem' } : (isMobile ? { fontSize: '3.5rem' } : {})}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={isTableCard && isMobile ? { fontSize: '0.6rem' } : (isMobile ? { fontSize: '3.0rem' } : {})}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: '0.8rem' }}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: '0.6rem' }}>{suitSymbol}</div>
         </div>
       </div>
     );
@@ -2546,12 +2550,12 @@ export default function GameTable({
           {/* Game table area - add padding on top and bottom */}
           <div className="w-[70%] p-2 flex flex-col h-full">
             {/* Game table with more space top and bottom */}
-            <div className="relative mb-2" style={{ 
-              background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
-              borderRadius: `${Math.floor(64 * scaleFactor)}px`,
-              border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
-              height: isMobile ? 'calc(100% - 30px)' : '100%'
-            }}>
+            <div className="relative mb-2"                 style={{
+                  background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
+                  borderRadius: `${Math.floor(64 * scaleFactor)}px`,
+                  border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
+                  height: isMobile ? 'calc(100% - 80px)' : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 'calc(100% - 80px)' : 'calc(100% - 200px)')
+                }}>
               {/* Trick cards overlay - covers the whole table area */}
               <div className="absolute inset-0 pointer-events-none z-20">
                 {renderTrickCards()}
@@ -2580,9 +2584,17 @@ export default function GameTable({
                   >
                     <IoInformationCircleOutline className="h-5 w-5" />
                   </button>
-
-
                 </div>
+                <button
+                  onClick={() => setShowTrickHistory(true)}
+                  className="p-2 bg-gray-800/90 text-white rounded-full hover:bg-gray-700 transition shadow-lg"
+                  style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}
+                  title="View Trick History"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </button>
               </div>
               
               {/* Scoreboard in top right corner - inside the table */}
@@ -2870,10 +2882,14 @@ export default function GameTable({
 
             {/* Cards area - show for actual players or face-down cards for spectators */}
             {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
-              <div className="bg-gray-800/50 rounded-lg relative mb-0" 
-                   style={{ 
-                     height: isMobile ? `${Math.floor(30 * scaleFactor)}px` : `${Math.floor(110 * scaleFactor)}px`
-                   }}>
+                              <div className="bg-gray-800/50 rounded-lg relative mb-0" 
+                     style={{ 
+                        height: isMobile 
+                          ? `${Math.floor(40 * scaleFactor)}px`
+                          : (window.innerWidth >= 900 && window.innerWidth <= 1300 
+                              ? `${Math.floor(40 * scaleFactor)}px` 
+                              : `${Math.floor(200 * scaleFactor)}px`)
+                     }}>
                 {myPlayerIndex !== -1 ? (
                   renderPlayerHand()
                 ) : (
@@ -2923,6 +2939,14 @@ export default function GameTable({
             />
           ) : null;
         })()}
+
+        {/* Trick History Modal */}
+        <TrickHistoryModal
+          isOpen={showTrickHistory}
+          onClose={() => setShowTrickHistory(false)}
+          gameId={gameState.id}
+          players={sanitizedPlayers}
+        />
 
       </div>
 
