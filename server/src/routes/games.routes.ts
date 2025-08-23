@@ -172,6 +172,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           status: 'WAITING',
           allowNil: newGame.rules.allowNil,
           allowBlindNil: newGame.rules.allowBlindNil,
+          league: (newGame as any).league || false,
         }
       });
       
@@ -351,20 +352,24 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
 
   // Create GamePlayer record in database for score tracking
   try {
-    await prisma.gamePlayer.create({
-      data: {
-        gameId: game.id,
-        userId: player.id,
-        position: seatIndex,
-        team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
-        bid: null,
-        bags: 0,
-        points: 0,
-        username: player.username,
-        discordId: null
-      }
-    });
-    console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id);
+    if (game.dbGameId) {
+      await prisma.gamePlayer.create({
+        data: {
+          gameId: game.dbGameId,
+          userId: player.id,
+          position: seatIndex,
+          team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+          bid: null,
+          bags: 0,
+          points: 0,
+          username: player.username,
+          discordId: null
+        }
+      });
+      console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id, 'in game:', game.dbGameId);
+    } else {
+      console.log('[HTTP JOIN DEBUG] No dbGameId available for GamePlayer creation');
+    }
   } catch (error) {
     console.error('[HTTP JOIN DEBUG] Failed to create GamePlayer record:', error);
     // Don't fail the join if GamePlayer creation fails

@@ -600,26 +600,30 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           try {
             const existingGamePlayer = await prisma.gamePlayer.findFirst({
               where: {
-                gameId: game.id,
+                gameId: game.dbGameId || game.id,
                 userId: socket.userId
               }
             });
             
             if (!existingGamePlayer) {
-              await prisma.gamePlayer.create({
-                data: {
-                  gameId: game.id,
-                  userId: socket.userId,
-                  position: originalSeatIndex,
-                  team: game.gameMode === 'PARTNERS' ? (originalSeatIndex === 0 || originalSeatIndex === 2 ? 1 : 2) : null,
-                  bid: null,
-                  bags: 0,
-                  points: 0,
-                  username: playerUsername,
-                  discordId: null
-                }
-              });
-              console.log('[RECONNECT DEBUG] Created GamePlayer record for reconnected player:', socket.userId);
+              if (game.dbGameId) {
+                await prisma.gamePlayer.create({
+                  data: {
+                    gameId: game.dbGameId,
+                    userId: socket.userId,
+                    position: originalSeatIndex,
+                    team: game.gameMode === 'PARTNERS' ? (originalSeatIndex === 0 || originalSeatIndex === 2 ? 1 : 2) : null,
+                    bid: null,
+                    bags: 0,
+                    points: 0,
+                    username: playerUsername,
+                    discordId: null
+                  }
+                });
+                console.log('[RECONNECT DEBUG] Created GamePlayer record for reconnected player:', socket.userId, 'in game:', game.dbGameId);
+              } else {
+                console.log('[RECONNECT DEBUG] No dbGameId available for GamePlayer creation');
+              }
             } else {
               console.log('[RECONNECT DEBUG] GamePlayer record already exists for reconnected player:', socket.userId);
             }
@@ -718,20 +722,24 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           // Create GamePlayer record in database for score tracking
           try {
-            await prisma.gamePlayer.create({
-              data: {
-                gameId: game.id,
-                userId: socket.userId,
-                position: emptySeatIndex,
-                team: game.gameMode === 'PARTNERS' ? (emptySeatIndex === 0 || emptySeatIndex === 2 ? 1 : 2) : null,
-                bid: null,
-                bags: 0,
-                points: 0,
-                username: playerUsername,
-                discordId: null
-              }
-            });
-            console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId);
+            if (game.dbGameId) {
+              await prisma.gamePlayer.create({
+                data: {
+                  gameId: game.dbGameId,
+                  userId: socket.userId,
+                  position: emptySeatIndex,
+                  team: game.gameMode === 'PARTNERS' ? (emptySeatIndex === 0 || emptySeatIndex === 2 ? 1 : 2) : null,
+                  bid: null,
+                  bags: 0,
+                  points: 0,
+                  username: playerUsername,
+                  discordId: null
+                }
+              });
+              console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId, 'in game:', game.dbGameId);
+            } else {
+              console.log('[SOCKET JOIN DEBUG] No dbGameId available for GamePlayer creation');
+            }
           } catch (error) {
             console.error('[SOCKET JOIN DEBUG] Failed to create GamePlayer record:', error);
             // Don't fail the join if GamePlayer creation fails
