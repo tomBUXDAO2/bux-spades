@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
@@ -6,8 +6,6 @@ import { useSocket } from '../context/SocketContext';
 import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
 
-import { socketApi } from '../table-ui/lib/socketApi';
-import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
 import TableInactivityModal from '../components/modals/TableInactivityModal';
 
@@ -18,161 +16,152 @@ const createMockGame = (): GameState => ({
   players: [
     {
       id: 'user-1',
+      name: 'TestPlayer1',
       username: 'TestPlayer1',
       avatar: '/default-pfp.jpg',
-      seat: 0,
       position: 0,
-      isHost: true,
-      isReady: true,
-      coins: 10000,
-      stats: {
-        gamesPlayed: 25,
-        gamesWon: 15,
-        winRate: 60,
-        totalCoins: 50000
-      }
+      team: 1,
+      isDealer: true,
+      hand: [],
+      bid: 3,
+      tricks: 2
     },
     {
       id: 'user-2',
+      name: 'TestPlayer2',
       username: 'TestPlayer2',
       avatar: '/default-pfp.jpg',
-      seat: 1,
       position: 1,
-      isHost: false,
-      isReady: true,
-      coins: 8000,
-      stats: {
-        gamesPlayed: 30,
-        gamesWon: 18,
-        winRate: 60,
-        totalCoins: 45000
-      }
+      team: 2,
+      isDealer: false,
+      hand: [],
+      bid: 4,
+      tricks: 1
     },
     {
       id: 'user-3',
+      name: 'TestPlayer3',
       username: 'TestPlayer3',
       avatar: '/default-pfp.jpg',
-      seat: 2,
       position: 2,
-      isHost: false,
-      isReady: true,
-      coins: 12000,
-      stats: {
-        gamesPlayed: 20,
-        gamesWon: 12,
-        winRate: 60,
-        totalCoins: 60000
-      }
+      team: 1,
+      isDealer: false,
+      hand: [],
+      bid: 2,
+      tricks: 3
     },
     {
       id: 'user-4',
+      name: 'TestPlayer4',
       username: 'TestPlayer4',
       avatar: '/default-pfp.jpg',
-      seat: 3,
       position: 3,
-      isHost: false,
-      isReady: true,
-      coins: 15000,
-      stats: {
-        gamesPlayed: 35,
-        gamesWon: 22,
-        winRate: 63,
-        totalCoins: 75000
-      }
+      team: 2,
+      isDealer: false,
+      hand: [],
+      bid: 4,
+      tricks: 2
     }
   ],
   currentPlayer: 'user-1',
   hands: [
     [
-      { rank: 'A', suit: 'S', value: 14 },
-      { rank: 'K', suit: 'S', value: 13 },
-      { rank: 'Q', suit: 'S', value: 12 },
-      { rank: 'J', suit: 'S', value: 11 },
-      { rank: '10', suit: 'S', value: 10 },
-      { rank: '9', suit: 'S', value: 9 },
-      { rank: '8', suit: 'S', value: 8 },
-      { rank: '7', suit: 'S', value: 7 },
-      { rank: '6', suit: 'S', value: 6 },
-      { rank: '5', suit: 'S', value: 5 },
-      { rank: '4', suit: 'S', value: 4 },
-      { rank: '3', suit: 'S', value: 3 },
-      { rank: '2', suit: 'S', value: 2 }
+      { rank: 'A', suit: '♠', value: 14 },
+      { rank: 'K', suit: '♠', value: 13 },
+      { rank: 'Q', suit: '♠', value: 12 },
+      { rank: 'J', suit: '♠', value: 11 },
+      { rank: '10', suit: '♠', value: 10 },
+      { rank: '9', suit: '♠', value: 9 },
+      { rank: '8', suit: '♠', value: 8 },
+      { rank: '7', suit: '♠', value: 7 },
+      { rank: '6', suit: '♠', value: 6 },
+      { rank: '5', suit: '♠', value: 5 },
+      { rank: '4', suit: '♠', value: 4 },
+      { rank: '3', suit: '♠', value: 3 },
+      { rank: '2', suit: '♠', value: 2 }
     ],
     [
-      { rank: 'A', suit: 'H', value: 14 },
-      { rank: 'K', suit: 'H', value: 13 },
-      { rank: 'Q', suit: 'H', value: 12 },
-      { rank: 'J', suit: 'H', value: 11 },
-      { rank: '10', suit: 'H', value: 10 },
-      { rank: '9', suit: 'H', value: 9 },
-      { rank: '8', suit: 'H', value: 8 },
-      { rank: '7', suit: 'H', value: 7 },
-      { rank: '6', suit: 'H', value: 6 },
-      { rank: '5', suit: 'H', value: 5 },
-      { rank: '4', suit: 'H', value: 4 },
-      { rank: '3', suit: 'H', value: 3 },
-      { rank: '2', suit: 'H', value: 2 }
+      { rank: 'A', suit: '♥', value: 14 },
+      { rank: 'K', suit: '♥', value: 13 },
+      { rank: 'Q', suit: '♥', value: 12 },
+      { rank: 'J', suit: '♥', value: 11 },
+      { rank: '10', suit: '♥', value: 10 },
+      { rank: '9', suit: '♥', value: 9 },
+      { rank: '8', suit: '♥', value: 8 },
+      { rank: '7', suit: '♥', value: 7 },
+      { rank: '6', suit: '♥', value: 6 },
+      { rank: '5', suit: '♥', value: 5 },
+      { rank: '4', suit: '♥', value: 4 },
+      { rank: '3', suit: '♥', value: 3 },
+      { rank: '2', suit: '♥', value: 2 }
     ],
     [
-      { rank: 'A', suit: 'D', value: 14 },
-      { rank: 'K', suit: 'D', value: 13 },
-      { rank: 'Q', suit: 'D', value: 12 },
-      { rank: 'J', suit: 'D', value: 11 },
-      { rank: '10', suit: 'D', value: 10 },
-      { rank: '9', suit: 'D', value: 9 },
-      { rank: '8', suit: 'D', value: 8 },
-      { rank: '7', suit: 'D', value: 7 },
-      { rank: '6', suit: 'D', value: 6 },
-      { rank: '5', suit: 'D', value: 5 },
-      { rank: '4', suit: 'D', value: 4 },
-      { rank: '3', suit: 'D', value: 3 },
-      { rank: '2', suit: 'D', value: 2 }
+      { rank: 'A', suit: '♦', value: 14 },
+      { rank: 'K', suit: '♦', value: 13 },
+      { rank: 'Q', suit: '♦', value: 12 },
+      { rank: 'J', suit: '♦', value: 11 },
+      { rank: '10', suit: '♦', value: 10 },
+      { rank: '9', suit: '♦', value: 9 },
+      { rank: '8', suit: '♦', value: 8 },
+      { rank: '7', suit: '♦', value: 7 },
+      { rank: '6', suit: '♦', value: 6 },
+      { rank: '5', suit: '♦', value: 5 },
+      { rank: '4', suit: '♦', value: 4 },
+      { rank: '3', suit: '♦', value: 3 },
+      { rank: '2', suit: '♦', value: 2 }
     ],
     [
-      { rank: 'A', suit: 'C', value: 14 },
-      { rank: 'K', suit: 'C', value: 13 },
-      { rank: 'Q', suit: 'C', value: 12 },
-      { rank: 'J', suit: 'C', value: 11 },
-      { rank: '10', suit: 'C', value: 10 },
-      { rank: '9', suit: 'C', value: 9 },
-      { rank: '8', suit: 'C', value: 8 },
-      { rank: '7', suit: 'C', value: 7 },
-      { rank: '6', suit: 'C', value: 6 },
-      { rank: '5', suit: 'C', value: 5 },
-      { rank: '4', suit: 'C', value: 4 },
-      { rank: '3', suit: 'C', value: 3 },
-      { rank: '2', suit: 'C', value: 2 }
+      { rank: 'A', suit: '♣', value: 14 },
+      { rank: 'K', suit: '♣', value: 13 },
+      { rank: 'Q', suit: '♣', value: 12 },
+      { rank: 'J', suit: '♣', value: 11 },
+      { rank: '10', suit: '♣', value: 10 },
+      { rank: '9', suit: '♣', value: 9 },
+      { rank: '8', suit: '♣', value: 8 },
+      { rank: '7', suit: '♣', value: 7 },
+      { rank: '6', suit: '♣', value: 6 },
+      { rank: '5', suit: '♣', value: 5 },
+      { rank: '4', suit: '♣', value: 4 },
+      { rank: '3', suit: '♣', value: 3 },
+      { rank: '2', suit: '♣', value: 2 }
     ]
   ],
+  currentTrick: [
+    { rank: 'A', suit: '♠', value: 14, playedBy: { id: 'user-2', name: 'TestPlayer2', team: 2, position: 1, isDealer: false, hand: [] } },
+    { rank: 'K', suit: '♥', value: 13, playedBy: { id: 'user-3', name: 'TestPlayer3', team: 1, position: 2, isDealer: false, hand: [] } },
+    { rank: 'Q', suit: '♦', value: 12, playedBy: { id: 'user-4', name: 'TestPlayer4', team: 2, position: 3, isDealer: false, hand: [] } }
+  ],
+  completedTricks: [],
+  rules: {
+    gameType: 'REGULAR',
+    allowNil: true,
+    allowBlindNil: true,
+    numHands: 13,
+    coinAmount: 100
+  },
+  round: 1,
+  maxPoints: 500,
+  minPoints: 0,
+  creatorId: 'user-1',
   bidding: {
-    currentBidderIndex: 0,
-    currentPlayer: 'user-1',
-    bids: [3, 2, 4, 1],
-    round: 1
+    phase: 'COMPLETED',
+    bids: {
+      'user-1': 3,
+      'user-2': 4,
+      'user-3': 2,
+      'user-4': 4
+    },
+    totalBid: 13
   },
   play: {
-    currentPlayer: 'user-1',
-    currentPlayerIndex: 0,
-    currentTrick: [
-      { rank: 'A', suit: 'H', value: 14, playerIndex: 1 },
-      { rank: 'K', suit: 'H', value: 13, playerIndex: 2 },
-      { rank: 'Q', suit: 'H', value: 12, playerIndex: 3 }
-    ],
-    trickNumber: 1,
-    spadesBroken: false
-  },
-  tricks: [],
-  scores: [0, 0, 0, 0],
-  bids: [3, 2, 4, 1],
-  tricksWon: [0, 0, 0, 0],
-  specialRules: {
-    screamer: false,
-    nil: true,
-    blindNil: true
-  },
-  gameSettings: {
-    maxScore: 500,
-    coinBet: 1000
+    phase: 'ACTIVE',
+    currentTrick: 4,
+    tricksWon: {
+      'user-1': 2,
+      'user-2': 1,
+      'user-3': 3,
+      'user-4': 2
+    }
   }
 });
 
@@ -181,15 +170,13 @@ export default function TestTablePage() {
   const { user } = useAuth();
   const { socket } = useSocket();
   const navigate = useNavigate();
-  const [game, setGame] = useState<GameState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-
-  // Modal state
+  const [game, setGame] = useState<GameState>(createMockGame());
   const [showStartWarning, setShowStartWarning] = useState(false);
   const [showBotWarning, setShowBotWarning] = useState(false);
   const [emptySeats, setEmptySeats] = useState(0);
   const [botCount, setBotCount] = useState(0);
+
+  // Modal state
   const [showInactivityModal, setShowInactivityModal] = useState(false);
 
   // Check if device is mobile or tablet
@@ -220,7 +207,6 @@ export default function TestTablePage() {
         } else if ((document.documentElement as any).msRequestFullscreen) {
           await (document.documentElement as any).msRequestFullscreen();
         }
-        setIsFullScreen(true);
       } catch (error) {
         console.log('Full-screen request failed:', error);
       }
@@ -237,7 +223,6 @@ export default function TestTablePage() {
       } else if ((document as any).msExitFullscreen) {
         await (document as any).msExitFullscreen();
       }
-      setIsFullScreen(false);
     } catch (error) {
       console.log('Exit full-screen failed:', error);
     }
@@ -246,7 +231,7 @@ export default function TestTablePage() {
   // Listen for full-screen changes
   useEffect(() => {
     const handleFullScreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      // setIsFullScreen(!!document.fullscreenElement); // This line was removed
     };
 
     document.addEventListener('fullscreenchange', handleFullScreenChange);
@@ -284,7 +269,6 @@ export default function TestTablePage() {
     
     setGame(mockGame);
     updateModalState(mockGame);
-    setIsLoading(false);
 
     // Request full-screen on mobile/tablet after game loads
     if (isMobileOrTablet()) {
@@ -295,7 +279,7 @@ export default function TestTablePage() {
 
     return () => {
       // Exit full-screen when leaving the page
-      if (isFullScreen) {
+      if (isMobileOrTablet() && document.fullscreenElement) {
         exitFullScreen();
       }
     };
@@ -319,18 +303,15 @@ export default function TestTablePage() {
   };
 
   const handleJoinGame = async () => {
-    console.log('[TEST TABLE] Join game called (mock)');
-    // In test mode, we don't actually join a game
+    console.log('Joining test game...');
   };
 
   const handleLeaveTable = async () => {
-    console.log('[TEST TABLE] Leave table called (mock)');
     navigate('/');
   };
 
   const handleStartGame = async () => {
-    console.log('[TEST TABLE] Start game called (mock)');
-    // In test mode, we don't actually start a game
+    console.log('Starting test game...');
   };
 
   // Modal handlers
@@ -342,19 +323,15 @@ export default function TestTablePage() {
     setShowBotWarning(false);
   };
 
-  const handlePlayWithBots = async () => {
-    console.log('[TEST TABLE] Play with bots called (mock)');
+  const handlePlayWithBots = () => {
     setShowStartWarning(false);
+    handleStartGame();
   };
 
-  const handleStartWithBots = async () => {
-    console.log('[TEST TABLE] Start with bots called (mock)');
+  const handleStartWithBots = () => {
     setShowBotWarning(false);
+    handleStartGame();
   };
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
 
   if (!game) {
     return <div>Game not found</div>;
@@ -376,19 +353,17 @@ export default function TestTablePage() {
         {/* Full-screen toggle button for mobile/tablet */}
         {isMobileOrTablet() && (
           <button
-            onClick={isFullScreen ? exitFullScreen : requestFullScreen}
-            className="fixed top-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg shadow-lg transition-colors"
-            title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}
+            onClick={() => {
+              if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+              }
+            }}
+            className="fixed top-4 right-4 z-50 bg-gray-800/90 text-white p-2 rounded-full hover:bg-gray-700 transition sm:hidden"
+            title="Toggle Fullscreen"
           >
-            {isFullScreen ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            )}
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
           </button>
         )}
         
@@ -410,7 +385,6 @@ export default function TestTablePage() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={false}
-          isTestMode={true}
         />
       </div>
 
