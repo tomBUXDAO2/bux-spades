@@ -1837,10 +1837,34 @@ export default function GameTable({
   useEffect(() => {
     if (!socket) return;
 
-    const handleGameOver = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
+    const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
       console.log('[GAME OVER] Socket event received:', data);
       console.log('[GAME OVER] Current game status:', gameState.status);
       console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
+      
+      // Call the server to complete the game
+      try {
+        const response = await fetch(`/api/games/${gameState.id}/complete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            winningTeam: data.winningTeam,
+            team1Score: data.team1Score,
+            team2Score: data.team2Score
+          })
+        });
+        
+        if (response.ok) {
+          console.log('[GAME OVER] Game completion API call successful');
+        } else {
+          console.error('[GAME OVER] Game completion API call failed:', response.status);
+        }
+      } catch (error) {
+        console.error('[GAME OVER] Error calling game completion API:', error);
+      }
       
       setShowHandSummary(false);
       setHandSummaryData(null);

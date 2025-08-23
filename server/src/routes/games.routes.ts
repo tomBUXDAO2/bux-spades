@@ -3426,4 +3426,101 @@ export async function logGameStart(game: Game) {
   }
 }
 
+// Complete a game
+router.post('/:id/complete', requireAuth, async (req, res) => {
+  try {
+    const gameId = req.params.id;
+    const { winningTeam, team1Score, team2Score } = req.body;
+    
+    console.log('[GAME COMPLETE] Client requested game completion:', { gameId, winningTeam, team1Score, team2Score });
+    
+    // Find the game
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    // Update game status
+    game.status = 'FINISHED';
+    
+    // Update database
+    if (game.dbGameId) {
+      await prisma.game.update({
+        where: { id: game.dbGameId },
+        data: {
+          status: 'FINISHED',
+          completed: true,
+          finalScore: Math.max(team1Score, team2Score),
+          winner: winningTeam
+        }
+      });
+      
+      // Create GameResult record
+      await prisma.gameResult.create({
+        data: {
+          gameId: game.dbGameId,
+          winner: winningTeam,
+          finalScore: Math.max(team1Score, team2Score),
+          team1Score,
+          team2Score,
+          playerResults: {},
+          totalRounds: 1,
+          totalTricks: 13
+        }
+      });
+      
+      // Update GamePlayer records
+      const gamePlayers = await prisma.gamePlayer.findMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      for (const player of gamePlayers) {
+        const isWinner = game.gameMode === 'PARTNERS' ? 
+          (winningTeam === 1 && (player.position === 0 || player.position === 2)) ||
+          (winningTeam === 2 && (player.position === 1 || player.position === 3)) :
+          player.position === winningTeam;
+          
+        await prisma.gamePlayer.update({
+          where: { id: player.id },
+          data: {
+            finalScore: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
+            finalBags: 5,
+            finalPoints: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
+            won: isWinner
+          }
+        });
+      }
+      
+      // Send Discord embed for league games
+      if ((game as any).league) {
+        try {
+          const { sendLeagueGameResults } = await import('../discord-bot/bot');
+          const formatCoins = (amount: number) => (amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`);
+          const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} REGULAR`;
+          const data = {
+            buyIn: game.buyIn,
+            players: gamePlayers.map((gp) => ({
+              userId: gp.discordId || gp.userId,
+              won: game.gameMode === 'PARTNERS' ? 
+                (winningTeam === 1 && (gp.position === 0 || gp.position === 2)) ||
+                (winningTeam === 2 && (gp.position === 1 || gp.position === 3)) :
+                gp.position === winningTeam
+            }))
+          };
+          await sendLeagueGameResults(data, gameLine);
+          console.log('[GAME COMPLETE] Discord embed sent for league game');
+        } catch (err) {
+          console.error('[GAME COMPLETE] Failed to send Discord embed:', err);
+        }
+      }
+    }
+    
+    console.log('[GAME COMPLETE] Game completed successfully:', gameId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[GAME COMPLETE] Error completing game:', error);
+    res.status(500).json({ error: 'Failed to complete game' });
+  }
+});
+
 export default router; 
