@@ -125,11 +125,7 @@ const createMockGame = (): GameState => ({
       { rank: '2', suit: '♣' }
     ]
   ],
-  currentTrick: [
-    { rank: 'A', suit: '♠', playedBy: { id: 'user-2', name: 'TestPlayer2', team: 2, position: 1, isDealer: false, hand: [] } },
-    { rank: 'K', suit: '♥', playedBy: { id: 'user-3', name: 'TestPlayer3', team: 1, position: 2, isDealer: false, hand: [] } },
-    { rank: 'Q', suit: '♦', playedBy: { id: 'user-4', name: 'TestPlayer4', team: 2, position: 3, isDealer: false, hand: [] } }
-  ],
+  currentTrick: [],
   completedTricks: [],
   rules: {
     gameType: 'REGULAR',
