@@ -251,16 +251,15 @@ export default function TestTablePage() {
 
     console.log('[TEST TABLE] Initializing with mock data');
     
-    // Create mock game data
     const mockGame = createMockGame();
     
-    // Update the first player to be the current user
-    if (mockGame.players[0]) {
+    // Update the first player to be the current user if available
+    if (user) {
       mockGame.players[0] = {
         ...mockGame.players[0],
         id: user.id,
-        username: user.username,
-        avatar: user.avatar
+        username: user.username || 'TestPlayer1',
+        avatar: user.avatar || '/default-pfp.jpg'
       };
     }
     
@@ -281,23 +280,6 @@ export default function TestTablePage() {
       }
     };
   }, [user, navigate]);
-
-  const playCardSound = () => {
-    try {
-      // Try to use preloaded audio first
-      if ((window as any).cardAudio) {
-        (window as any).cardAudio.currentTime = 0;
-        (window as any).cardAudio.play().catch((err: any) => console.log('Card audio play failed:', err));
-      } else {
-        // Fallback to creating new audio
-        const audio = new Audio('/sounds/card.wav');
-        audio.volume = 0.3;
-        audio.play().catch((err: any) => console.log('Card audio play failed:', err));
-      }
-    } catch (error) {
-      console.log('Card audio not supported or failed to load:', error);
-    }
-  };
 
   const handleJoinGame = async () => {
     console.log('Joining test game...');
