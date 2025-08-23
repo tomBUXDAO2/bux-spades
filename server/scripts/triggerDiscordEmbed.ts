@@ -8,7 +8,7 @@ async function triggerDiscordEmbed() {
     // Get the completed league game
     const game = await prisma.game.findFirst({
       where: {
-        id: 'cmenk0qit00015x8bguay3msw',
+        id: 'cmenlrf4w0001yueg0uakbbre',
         status: 'FINISHED',
         league: true
       }
@@ -21,7 +21,14 @@ async function triggerDiscordEmbed() {
 
     console.log('Found completed game:', game.id);
 
-    // Create a mock game object for the gameLogger
+    // Get the actual GamePlayer records with Discord IDs
+    const gamePlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id }
+    });
+
+    console.log('GamePlayer records:', gamePlayers);
+
+    // Create a mock game object for the gameLogger with real player data
     const mockGame = {
       id: game.id,
       dbGameId: game.id,
@@ -34,12 +41,15 @@ async function triggerDiscordEmbed() {
       },
       specialRules: {},
       league: true,
-      players: [
-        { id: 'player1', username: 'Nichole', type: 'human' },
-        { id: 'player2', username: 'GEM', type: 'human' },
-        { id: 'player3', username: 'SandyRM', type: 'human' },
-        { id: 'player4', username: 'RobinH', type: 'human' }
-      ]
+      buyIn: 200000,
+      maxPoints: 350,
+      minPoints: -100,
+      players: gamePlayers.map((gp, i) => ({
+        id: gp.userId,
+        discordId: gp.discordId,
+        username: gp.username,
+        type: 'human'
+      }))
     };
 
     // Trigger the Discord embed

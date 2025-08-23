@@ -353,6 +353,12 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
   // Create GamePlayer record in database for score tracking
   try {
     if (game.dbGameId) {
+      // Get the user's Discord ID from the database
+      const user = await prisma.user.findUnique({
+        where: { id: player.id },
+        select: { discordId: true }
+      });
+      
       await prisma.gamePlayer.create({
         data: {
           gameId: game.dbGameId,
@@ -363,10 +369,10 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
           bags: 0,
           points: 0,
           username: player.username,
-          discordId: null
+          discordId: user?.discordId || null
         }
       });
-      console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id, 'in game:', game.dbGameId);
+      console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
     } else {
       console.log('[HTTP JOIN DEBUG] No dbGameId available for GamePlayer creation');
     }

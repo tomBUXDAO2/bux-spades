@@ -723,6 +723,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Create GamePlayer record in database for score tracking
           try {
             if (game.dbGameId) {
+              // Get the user's Discord ID from the database
+              const user = await prisma.user.findUnique({
+                where: { id: socket.userId },
+                select: { discordId: true }
+              });
+              
               await prisma.gamePlayer.create({
                 data: {
                   gameId: game.dbGameId,
@@ -733,10 +739,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                   bags: 0,
                   points: 0,
                   username: playerUsername,
-                  discordId: null
+                  discordId: user?.discordId || null
                 }
               });
-              console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId, 'in game:', game.dbGameId);
+              console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
             } else {
               console.log('[SOCKET JOIN DEBUG] No dbGameId available for GamePlayer creation');
             }

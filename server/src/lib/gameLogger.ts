@@ -184,7 +184,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				const data = {
 					buyIn: game.buyIn,
 					players: game.players.map((p: any, i: number) => ({
-						userId: p?.id || '', // DB id
+						userId: p?.discordId || p?.id || '', // Use Discord ID if available, fallback to DB id
 						won: game.gameMode === 'SOLO' ? i === winningTeamOrPlayer : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
 					}))
 				};
