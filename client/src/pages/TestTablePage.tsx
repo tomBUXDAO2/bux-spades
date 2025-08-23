@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import GameTable from '../table-ui/game/GameTable';
 import type { GameState } from '../types/game';
 
@@ -66,70 +65,70 @@ const createMockGame = (): GameState => ({
   currentPlayer: 'user-1',
   hands: [
     [
-      { rank: 'A', suit: '♠', value: 14 },
-      { rank: 'K', suit: '♠', value: 13 },
-      { rank: 'Q', suit: '♠', value: 12 },
-      { rank: 'J', suit: '♠', value: 11 },
-      { rank: '10', suit: '♠', value: 10 },
-      { rank: '9', suit: '♠', value: 9 },
-      { rank: '8', suit: '♠', value: 8 },
-      { rank: '7', suit: '♠', value: 7 },
-      { rank: '6', suit: '♠', value: 6 },
-      { rank: '5', suit: '♠', value: 5 },
-      { rank: '4', suit: '♠', value: 4 },
-      { rank: '3', suit: '♠', value: 3 },
-      { rank: '2', suit: '♠', value: 2 }
+      { rank: 'A', suit: '♠' },
+      { rank: 'K', suit: '♠' },
+      { rank: 'Q', suit: '♠' },
+      { rank: 'J', suit: '♠' },
+      { rank: '10', suit: '♠' },
+      { rank: '9', suit: '♠' },
+      { rank: '8', suit: '♠' },
+      { rank: '7', suit: '♠' },
+      { rank: '6', suit: '♠' },
+      { rank: '5', suit: '♠' },
+      { rank: '4', suit: '♠' },
+      { rank: '3', suit: '♠' },
+      { rank: '2', suit: '♠' }
     ],
     [
-      { rank: 'A', suit: '♥', value: 14 },
-      { rank: 'K', suit: '♥', value: 13 },
-      { rank: 'Q', suit: '♥', value: 12 },
-      { rank: 'J', suit: '♥', value: 11 },
-      { rank: '10', suit: '♥', value: 10 },
-      { rank: '9', suit: '♥', value: 9 },
-      { rank: '8', suit: '♥', value: 8 },
-      { rank: '7', suit: '♥', value: 7 },
-      { rank: '6', suit: '♥', value: 6 },
-      { rank: '5', suit: '♥', value: 5 },
-      { rank: '4', suit: '♥', value: 4 },
-      { rank: '3', suit: '♥', value: 3 },
-      { rank: '2', suit: '♥', value: 2 }
+      { rank: 'A', suit: '♥' },
+      { rank: 'K', suit: '♥' },
+      { rank: 'Q', suit: '♥' },
+      { rank: 'J', suit: '♥' },
+      { rank: '10', suit: '♥' },
+      { rank: '9', suit: '♥' },
+      { rank: '8', suit: '♥' },
+      { rank: '7', suit: '♥' },
+      { rank: '6', suit: '♥' },
+      { rank: '5', suit: '♥' },
+      { rank: '4', suit: '♥' },
+      { rank: '3', suit: '♥' },
+      { rank: '2', suit: '♥' }
     ],
     [
-      { rank: 'A', suit: '♦', value: 14 },
-      { rank: 'K', suit: '♦', value: 13 },
-      { rank: 'Q', suit: '♦', value: 12 },
-      { rank: 'J', suit: '♦', value: 11 },
-      { rank: '10', suit: '♦', value: 10 },
-      { rank: '9', suit: '♦', value: 9 },
-      { rank: '8', suit: '♦', value: 8 },
-      { rank: '7', suit: '♦', value: 7 },
-      { rank: '6', suit: '♦', value: 6 },
-      { rank: '5', suit: '♦', value: 5 },
-      { rank: '4', suit: '♦', value: 4 },
-      { rank: '3', suit: '♦', value: 3 },
-      { rank: '2', suit: '♦', value: 2 }
+      { rank: 'A', suit: '♦' },
+      { rank: 'K', suit: '♦' },
+      { rank: 'Q', suit: '♦' },
+      { rank: 'J', suit: '♦' },
+      { rank: '10', suit: '♦' },
+      { rank: '9', suit: '♦' },
+      { rank: '8', suit: '♦' },
+      { rank: '7', suit: '♦' },
+      { rank: '6', suit: '♦' },
+      { rank: '5', suit: '♦' },
+      { rank: '4', suit: '♦' },
+      { rank: '3', suit: '♦' },
+      { rank: '2', suit: '♦' }
     ],
     [
-      { rank: 'A', suit: '♣', value: 14 },
-      { rank: 'K', suit: '♣', value: 13 },
-      { rank: 'Q', suit: '♣', value: 12 },
-      { rank: 'J', suit: '♣', value: 11 },
-      { rank: '10', suit: '♣', value: 10 },
-      { rank: '9', suit: '♣', value: 9 },
-      { rank: '8', suit: '♣', value: 8 },
-      { rank: '7', suit: '♣', value: 7 },
-      { rank: '6', suit: '♣', value: 6 },
-      { rank: '5', suit: '♣', value: 5 },
-      { rank: '4', suit: '♣', value: 4 },
-      { rank: '3', suit: '♣', value: 3 },
-      { rank: '2', suit: '♣', value: 2 }
+      { rank: 'A', suit: '♣' },
+      { rank: 'K', suit: '♣' },
+      { rank: 'Q', suit: '♣' },
+      { rank: 'J', suit: '♣' },
+      { rank: '10', suit: '♣' },
+      { rank: '9', suit: '♣' },
+      { rank: '8', suit: '♣' },
+      { rank: '7', suit: '♣' },
+      { rank: '6', suit: '♣' },
+      { rank: '5', suit: '♣' },
+      { rank: '4', suit: '♣' },
+      { rank: '3', suit: '♣' },
+      { rank: '2', suit: '♣' }
     ]
   ],
   currentTrick: [
-    { rank: 'A', suit: '♠', value: 14, playedBy: { id: 'user-2', name: 'TestPlayer2', team: 2, position: 1, isDealer: false, hand: [] } },
-    { rank: 'K', suit: '♥', value: 13, playedBy: { id: 'user-3', name: 'TestPlayer3', team: 1, position: 2, isDealer: false, hand: [] } },
-    { rank: 'Q', suit: '♦', value: 12, playedBy: { id: 'user-4', name: 'TestPlayer4', team: 2, position: 3, isDealer: false, hand: [] } }
+    { rank: 'A', suit: '♠', playedBy: { id: 'user-2', name: 'TestPlayer2', team: 2, position: 1, isDealer: false, hand: [] } },
+    { rank: 'K', suit: '♥', playedBy: { id: 'user-3', name: 'TestPlayer3', team: 1, position: 2, isDealer: false, hand: [] } },
+    { rank: 'Q', suit: '♦', playedBy: { id: 'user-4', name: 'TestPlayer4', team: 2, position: 3, isDealer: false, hand: [] } }
   ],
   completedTricks: [],
   rules: {
@@ -166,9 +165,7 @@ const createMockGame = (): GameState => ({
 });
 
 export default function TestTablePage() {
-  console.log('🚨🚨🚨 [TEST TABLE] TestTablePage component loaded at:', new Date().toISOString());
   const { user } = useAuth();
-  const { socket } = useSocket();
   const navigate = useNavigate();
   const [game, setGame] = useState<GameState>(createMockGame());
   const [showStartWarning, setShowStartWarning] = useState(false);
@@ -377,7 +374,7 @@ export default function TestTablePage() {
           joinGame={handleJoinGame}
           onLeaveTable={handleLeaveTable}
           startGame={handleStartGame}
-          user={user}
+          user={user || undefined}
           showStartWarning={showStartWarning}
           showBotWarning={showBotWarning}
           onCloseStartWarning={handleCloseStartWarning}
