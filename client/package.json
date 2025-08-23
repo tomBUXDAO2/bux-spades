@@ -40,7 +40,8 @@
     "mobile:android": "expo start --android",
     "mobile:build": "expo build",
     "build:mobile": "node scripts/build-mobile.js",
-    "dev:mobile": "vite --config vite.mobile.config.ts"
+    "dev:mobile": "vite --config vite.mobile.config.ts",
+    "optimize-images": "node scripts/optimize-images.js"
   },
   "devDependencies": {
     "@types/react-native": "^0.73.0",

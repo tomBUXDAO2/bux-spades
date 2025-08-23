@@ -12,6 +12,7 @@ import SoloWinnerModal from './SoloWinnerModal';
 import TrickHistoryModal from '../modals/TrickHistoryModal';
 
 
+
 import BiddingInterface from './BiddingInterface';
 
 import LandscapePrompt from '../../LandscapePrompt';
@@ -1358,7 +1359,7 @@ export default function GameTable({
             {/* playedCard && (
               <div className="flex justify-center mt-2">
                 <img
-                  src={`/cards/${getCardImage(playedCard)}`}
+                  src={`/optimized/cards/${getCardImage(playedCard)}`}
                   alt={`${playedCard.rank} of ${playedCard.suit}`}
                   style={{ width: 60, height: 90, objectFit: 'contain', borderRadius: 8, boxShadow: '0 2px 8px #0004' }}
                 />
@@ -2341,7 +2342,7 @@ export default function GameTable({
     return `${rank}${suit}.png`;
   };
 
-  // Simple stateless card image component to prevent flickering
+  // Optimized card image component - no loading states during gameplay
   const CardImage = ({ card, width, height, className, alt, faceDown = false }: {
     card: Card;
     width: number;
@@ -2354,7 +2355,7 @@ export default function GameTable({
     const isLargeScreen = window.innerWidth >= 900;
 
     if (faceDown) {
-    return (
+      return (
         <div
           className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
           style={{ width, height }}
@@ -2364,14 +2365,21 @@ export default function GameTable({
       );
     }
 
-    // Use PNG images for large screens, CSS for small screens
+    // Use optimized PNG images for large screens, CSS for small screens
     if (isLargeScreen) {
       return (
         <img
-          src={`/cards/${getCardImage(card)}`}
+          src={`/optimized/cards/${getCardImage(card)}`}
           alt={alt || `${card.rank}${card.suit}`}
           className={className}
-          style={{ width, height, objectFit: 'fill', padding: 0, margin: 0, borderRadius: '8px' }}
+          style={{ 
+            width, 
+            height, 
+            objectFit: 'fill', 
+            padding: 0, 
+            margin: 0, 
+            borderRadius: '8px'
+          }}
         />
       );
     }

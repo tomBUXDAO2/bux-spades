@@ -64,7 +64,7 @@ const Login: React.FC = () => {
         <div className="flex flex-col items-center">
           <div className="flex items-center space-x-4">
             <img 
-                              src="/bux-spades.png" 
+                              src="/optimized/bux-spades.png" 
               alt="BUX"
               className="h-24 w-auto" 
             />

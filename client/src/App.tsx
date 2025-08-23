@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   RouterProvider,
   createBrowserRouter,
@@ -16,6 +16,7 @@ import { SocketProvider } from './context/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
+import { preloadImages } from './utils/imagePreloader';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;
@@ -104,6 +105,11 @@ const router = createBrowserRouter(
 const AppWithSocket: React.FC = () => {
   const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();
   const { showInstallPrompt, dismissPrompt } = usePWAInstall();
+  
+  // Preload images on app start
+  useEffect(() => {
+    preloadImages();
+  }, []);
   
   return (
     <SocketProvider>

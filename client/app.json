@@ -4,10 +4,10 @@
     "slug": "bux-spades",
     "version": "1.0.0",
     "orientation": "landscape",
-    "icon": "./public/bux-spades.png",
+    "icon": "./public/optimized/bux-spades.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./public/bux-spades.png",
+      "image": "./public/optimized/bux-spades.png",
       "resizeMode": "contain",
       "backgroundColor": "#1f2937"
     },
@@ -20,7 +20,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./public/bux-spades.png",
+        "foregroundImage": "./public/optimized/bux-spades.png",
         "backgroundColor": "#1f2937"
       },
       "package": "com.buxspades.app"

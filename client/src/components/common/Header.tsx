@@ -110,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <img 
-                              src="/bux-spades.png" 
+                              src="/optimized/bux-spades.png" 
               alt="BUX"
               className="h-8 w-auto" 
             />
