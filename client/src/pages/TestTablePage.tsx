@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import GameTable from '../table-ui/game/GameTable';
-import type { GameState } from '../types/game';
+import type { GameState, Card, Rank, Suit } from '../types/game';
 
 import LandscapePrompt from '../LandscapePrompt';
 import TableInactivityModal from '../components/modals/TableInactivityModal';
@@ -86,7 +86,7 @@ const createMockGame = (): GameState => {
       position: 0,
       team: 1,
       isDealer: true,
-        hand: hands[0], // Use the actual cards from hands array
+      hand: hands[0] as Card[], // Cast to Card[] type
       bid: 3,
       tricks: 2
     },
@@ -98,7 +98,7 @@ const createMockGame = (): GameState => {
       position: 1,
       team: 2,
       isDealer: false,
-        hand: hands[1], // Use the actual cards from hands array
+      hand: hands[1] as Card[], // Cast to Card[] type
       bid: 4,
       tricks: 1
     },
@@ -110,7 +110,7 @@ const createMockGame = (): GameState => {
       position: 2,
       team: 1,
       isDealer: false,
-        hand: hands[2], // Use the actual cards from hands array
+      hand: hands[2] as Card[], // Cast to Card[] type
       bid: 2,
       tricks: 3
     },
@@ -122,18 +122,18 @@ const createMockGame = (): GameState => {
       position: 3,
       team: 2,
       isDealer: false,
-        hand: hands[3], // Use the actual cards from hands array
+      hand: hands[3] as Card[], // Cast to Card[] type
       bid: 4,
       tricks: 2
     }
   ],
   currentPlayer: 'user-1',
-    hands: hands, // Keep the hands array as well for compatibility
-    currentTrick: [
-      { rank: 'A', suit: '♠', playerIndex: 0 },
-      { rank: 'K', suit: '♥', playerIndex: 1 },
-      { rank: 'Q', suit: '♦', playerIndex: 2 },
-      { rank: 'J', suit: '♣', playerIndex: 3 }
+  hands: hands, // Keep the hands array as well for compatibility
+  currentTrick: [
+    { rank: 'A' as Rank, suit: '♠' as Suit },
+    { rank: 'K' as Rank, suit: '♥' as Suit },
+    { rank: 'Q' as Rank, suit: '♦' as Suit },
+    { rank: 'J' as Rank, suit: '♣' as Suit }
   ],
   completedTricks: [],
   rules: {
@@ -159,14 +159,13 @@ const createMockGame = (): GameState => {
   },
   play: {
     phase: 'ACTIVE',
-    currentTrick: 4,
-      currentTrick: [
-        { rank: 'A', suit: '♠', playerIndex: 0 },
-        { rank: 'K', suit: '♥', playerIndex: 1 },
-        { rank: 'Q', suit: '♦', playerIndex: 2 },
-        { rank: 'J', suit: '♣', playerIndex: 3 }
-      ],
-      trickWinner: 1,
+    currentTrick: [
+      { rank: 'A' as Rank, suit: '♠' as Suit },
+      { rank: 'K' as Rank, suit: '♥' as Suit },
+      { rank: 'Q' as Rank, suit: '♦' as Suit },
+      { rank: 'J' as Rank, suit: '♣' as Suit }
+    ],
+    trickWinner: 1,
     tricksWon: {
       'user-1': 2,
       'user-2': 1,
