@@ -59,21 +59,29 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
       if (response.ok) {
         const data = await response.json();
         console.log('[TRICK HISTORY] Received data:', data);
-        setTrickHistory(data.trickHistory || []);
+        console.log('[TRICK HISTORY] Trick history length:', data.trickHistory?.length || 0);
         
-        // Start with the most recent trick
         if (data.trickHistory && data.trickHistory.length > 0) {
+          console.log('[TRICK HISTORY] First round tricks:', data.trickHistory[0].tricks?.length || 0);
+          setTrickHistory(data.trickHistory);
+          
+          // Start with the most recent trick
           const lastRound = data.trickHistory[data.trickHistory.length - 1];
           setCurrentRoundIndex(data.trickHistory.length - 1);
           setCurrentTrickIndex(lastRound.tricks.length - 1);
+        } else {
+          console.log('[TRICK HISTORY] No trick history data available');
+          setTrickHistory([]);
         }
       } else {
         console.error('[TRICK HISTORY] Response not ok:', response.status, response.statusText);
         const errorText = await response.text();
         console.error('[TRICK HISTORY] Error response:', errorText);
+        setTrickHistory([]);
       }
     } catch (error) {
       console.error('[TRICK HISTORY] Failed to fetch trick history:', error);
+      setTrickHistory([]);
     } finally {
       setLoading(false);
     }
@@ -155,7 +163,12 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
           </div>
         ) : trickHistory.length === 0 ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-gray-400 text-lg">No trick history available</div>
+            <div className="text-center">
+              <div className="text-gray-400 text-lg mb-2">No trick history available</div>
+              <div className="text-gray-500 text-sm">
+                This game may not have any completed tricks yet, or the game hasn't been logged to the database.
+              </div>
+            </div>
           </div>
         ) : (
           <>

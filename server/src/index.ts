@@ -1745,6 +1745,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         // Set game status to indicate hand is completed
         game.status = 'HAND_COMPLETED';
+        (game as any).handCompletedTime = Date.now(); // Track when hand was completed
         
         // NEW: Log completed hand to database
         trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -2034,6 +2035,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         // Set game status to indicate hand is completed
         game.status = 'HAND_COMPLETED';
+        (game as any).handCompletedTime = Date.now(); // Track when hand was completed
         
         console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
           ...handSummary,
@@ -2163,6 +2165,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // Force hand completion regardless of trick number
           console.log('[FAILSAFE] Forcing hand completion due to empty hands');
           game.status = 'HAND_COMPLETED';
+          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -3540,6 +3543,73 @@ setInterval(() => {
               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
               .catch((e) => console.error('Failed to log completed game (periodic check):', e));
           }
+        }
+      }
+    } else if (game.status === 'HAND_COMPLETED') {
+      // NEW: Fallback mechanism for games stuck in HAND_COMPLETED status
+      // Check if game has been in HAND_COMPLETED status for more than 30 seconds
+      const handCompletedTime = (game as any).handCompletedTime || 0;
+      const timeSinceHandCompleted = Date.now() - handCompletedTime;
+      
+      if (timeSinceHandCompleted > 30000) { // 30 seconds
+        console.log('[PERIODIC CHECK] Game stuck in HAND_COMPLETED status for 30+ seconds, auto-starting next hand:', game.id);
+        
+        // Auto-start next hand
+        try {
+          // Move dealer to the left (next position)
+          const newDealerIndex = (game.dealerIndex + 1) % 4;
+          game.dealerIndex = newDealerIndex;
+
+          // Reset game state for new hand
+          game.status = 'BIDDING';
+          game.hands = dealCards(game.players, newDealerIndex);
+          game.bidding = {
+            currentBidderIndex: (newDealerIndex + 1) % 4,
+            currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
+            bids: [null, null, null, null],
+            nilBids: {}
+          };
+          game.play = undefined;
+
+          // Reset player trick counts for new hand
+          game.players.forEach(player => {
+            if (player) {
+              player.tricks = 0;
+            }
+          });
+
+          // Emit new hand started event with dealing phase
+          console.log('[PERIODIC CHECK] Emitting new_hand_started event (fallback)');
+          io.to(game.id).emit('new_hand_started', {
+            dealerIndex: newDealerIndex,
+            hands: game.hands,
+            currentBidderIndex: game.bidding.currentBidderIndex
+          });
+
+          // Emit game update
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+          // Add delay before starting bidding phase
+          setTimeout(() => {
+            console.log('[PERIODIC CHECK] Starting bidding phase after delay (fallback)');
+            
+            // Emit bidding ready event
+            io.to(game.id).emit('bidding_ready', {
+              currentBidderIndex: game.bidding.currentBidderIndex,
+              currentPlayer: game.bidding.currentPlayer
+            });
+
+            // If first bidder is a bot, trigger their bid
+            const firstBidder = game.players[game.bidding.currentBidderIndex];
+            if (firstBidder && firstBidder.type === 'bot') {
+              setTimeout(() => {
+                botMakeMove(game, game.bidding.currentBidderIndex);
+              }, 600); // Reduced delay for faster bot bidding
+            }
+          }, 1200); // Reduced delay after dealing
+          
+        } catch (error) {
+          console.error('[PERIODIC CHECK] Error auto-starting next hand:', error);
         }
       }
     }

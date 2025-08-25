@@ -1972,6 +1972,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
           
           // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
+          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -2049,6 +2050,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         
                   // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
+          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -2195,6 +2197,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         
                   // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
+          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -2309,6 +2312,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Force hand completion regardless of trick number
         console.log('[FAILSAFE] Forcing hand completion due to empty hands');
         game.status = 'HAND_COMPLETED';
+        (game as any).handCompletedTime = Date.now(); // Track when hand was completed
         
         // NEW: Log completed hand to database
         trickLogger.logCompletedHand(game).catch((err: Error) => {

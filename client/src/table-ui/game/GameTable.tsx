@@ -10,8 +10,7 @@ import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
 import SoloWinnerModal from './SoloWinnerModal';
 import TrickHistoryModal from '../modals/TrickHistoryModal';
-
-
+import SpeechBubble from '../components/SpeechBubble';
 
 import BiddingInterface from './BiddingInterface';
 
@@ -455,6 +454,15 @@ export default function GameTable({
   const [showCoinDebit, setShowCoinDebit] = useState(false);
   const [coinDebitAmount, setCoinDebitAmount] = useState(0);
   
+  // Speech bubble state
+  const [speechBubbles, setSpeechBubbles] = useState<{
+    [playerId: string]: {
+      message: string;
+      playerName: string;
+      isVisible: boolean;
+    };
+  }>({});
+  
   // Timer effect for turn countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -516,6 +524,46 @@ export default function GameTable({
       socket.off('game_started', handleGameStarted);
     };
   }, [game.players, game.buyIn]);
+  
+  // Handle chat messages for speech bubbles
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleChatMessage = (data: { gameId: string; message: ChatMessage }) => {
+      const { message } = data;
+      
+      // Only show speech bubbles for seated players (not spectators)
+      const isSeatedPlayer = game.players.some(p => p && p.id === message.userId);
+      
+      if (isSeatedPlayer && message.userId !== 'system') {
+        setSpeechBubbles(prev => ({
+          ...prev,
+          [message.userId]: {
+            message: message.message,
+            playerName: message.userName,
+            isVisible: true
+          }
+        }));
+      }
+    };
+    
+    socket.on('chat_message', handleChatMessage);
+    
+    return () => {
+      socket.off('chat_message', handleChatMessage);
+    };
+  }, [socket, game.players]);
+  
+  // Handle speech bubble fade out
+  const handleSpeechBubbleFadeOut = (playerId: string) => {
+    setSpeechBubbles(prev => ({
+      ...prev,
+      [playerId]: {
+        ...prev[playerId],
+        isVisible: false
+      }
+    }));
+  };
   
   const isMyTurn = game.currentPlayer === propUser?.id;
   const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
@@ -1380,6 +1428,19 @@ export default function GameTable({
             amount={coinDebitAmount} 
             isVisible={showCoinDebit} 
           />
+        )}
+        
+        {/* Speech bubble */}
+        {speechBubbles[player.id] && (
+          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2">
+            <SpeechBubble
+              message={speechBubbles[player.id].message}
+              playerName={speechBubbles[player.id].playerName}
+              isVisible={speechBubbles[player.id].isVisible}
+              onFadeOut={() => handleSpeechBubbleFadeOut(player.id)}
+              maxLength={50}
+            />
+          </div>
         )}
       </div>
     );
