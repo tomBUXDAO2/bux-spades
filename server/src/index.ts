@@ -1810,6 +1810,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               console.error('Failed to update stats/coins:', err);
             });
             // Fallback: ensure completed game is logged to DB and Discord for league games
+            console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
+            console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
             void import('./lib/gameLogger')
               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
               .catch((e) => console.error('Failed to log completed game (fallback):', e));
@@ -1867,6 +1869,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               console.error('Failed to update stats/coins:', err);
             });
             // Fallback: ensure completed game is logged to DB and Discord for league games
+            console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
+            console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
             void import('./lib/gameLogger')
               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
               .catch((e) => console.error('Failed to log completed game (fallback):', e));
@@ -2103,6 +2107,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             console.error('Failed to update stats/coins:', err);
           });
           // Fallback: ensure completed game is logged to DB and Discord for league games
+          console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
+          console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
           void import('./lib/gameLogger')
             .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
             .catch((e) => console.error('Failed to log completed game (fallback):', e));

@@ -13,9 +13,21 @@ const getApiUrl = () => {
   return 'http://localhost:3000';
 };
 
-// Get authentication token from localStorage
+// Get authentication token from localStorage, sessionStorage, or in-memory storage
 const getAuthToken = () => {
-  return localStorage.getItem('sessionToken');
+  // Try localStorage first
+  let token = localStorage.getItem('sessionToken');
+  if (token) return token;
+  
+  // Try sessionStorage if localStorage failed
+  token = sessionStorage.getItem('sessionToken');
+  if (token) return token;
+  
+  // Try in-memory storage as last resort
+  token = (window as any).__tempSessionToken;
+  if (token) return token;
+  
+  return null;
 };
 
 // Create a fetch wrapper that uses the correct API URL

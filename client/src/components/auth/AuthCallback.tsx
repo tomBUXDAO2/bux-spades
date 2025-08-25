@@ -26,7 +26,32 @@ const AuthCallback: React.FC = () => {
             sessionToken: token
           };
           setUser(userData);
+          
+          // Try to store user data in localStorage, but handle quota exceeded error
+          try {
+            localStorage.setItem('userData', JSON.stringify(userData));
+          } catch (storageError) {
+            console.warn('Failed to store user data in localStorage (quota exceeded):', storageError);
+            // Clear localStorage and try again
+            try {
+              localStorage.clear();
           localStorage.setItem('userData', JSON.stringify(userData));
+            } catch (retryError) {
+              console.error('Failed to store user data even after clearing localStorage:', retryError);
+              // Try storing just essential data
+              try {
+                const essentialData = {
+                  id: userData.id,
+                  username: userData.username,
+                  sessionToken: userData.sessionToken
+                };
+                localStorage.setItem('userData', JSON.stringify(essentialData));
+              } catch (finalError) {
+                console.error('Failed to store even essential user data:', finalError);
+                // Continue without storing - the user is still logged in via sessionToken
+              }
+            }
+          }
           
           // Check if user has an active game
           if (response.data.activeGame) {
@@ -51,7 +76,31 @@ const AuthCallback: React.FC = () => {
     const token = searchParams.get('token');
     if (token) {
       console.log('Discord callback received token:', token);
+      
+      // Try to store session token in localStorage, but handle quota exceeded error
+      try {
+        localStorage.setItem('sessionToken', token);
+      } catch (storageError) {
+        console.warn('Failed to store session token in localStorage (quota exceeded):', storageError);
+        // Clear localStorage and try again
+        try {
+          localStorage.clear();
       localStorage.setItem('sessionToken', token);
+        } catch (retryError) {
+          console.error('Failed to store session token even after clearing localStorage:', retryError);
+          // Try storing in sessionStorage as fallback
+          try {
+            sessionStorage.setItem('sessionToken', token);
+            console.log('Stored session token in sessionStorage as fallback');
+          } catch (sessionError) {
+            console.error('Failed to store session token in sessionStorage:', sessionError);
+            // Store in memory as last resort
+            (window as any).__tempSessionToken = token;
+            console.log('Stored session token in memory as last resort');
+          }
+        }
+      }
+      
       fetchUserProfile(token);
     } else {
       console.error('No token received in Discord callback');

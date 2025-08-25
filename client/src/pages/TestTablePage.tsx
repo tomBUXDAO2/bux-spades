@@ -9,7 +9,72 @@ import LandscapePrompt from '../LandscapePrompt';
 import TableInactivityModal from '../components/modals/TableInactivityModal';
 
 // Mock game data for development
-const createMockGame = (): GameState => ({
+const createMockGame = (): GameState => {
+  // Create the hands array first with realistic mixed card distributions
+  const hands = [
+    [
+      { rank: 'A', suit: '♠' },
+      { rank: 'K', suit: '♠' },
+      { rank: 'Q', suit: '♠' },
+      { rank: 'J', suit: '♠' },
+      { rank: '10', suit: '♠' },
+      { rank: 'A', suit: '♥' },
+      { rank: 'K', suit: '♥' },
+      { rank: 'Q', suit: '♥' },
+      { rank: 'A', suit: '♦' },
+      { rank: 'K', suit: '♦' },
+      { rank: 'A', suit: '♣' },
+      { rank: 'K', suit: '♣' },
+      { rank: 'Q', suit: '♣' }
+    ],
+    [
+      { rank: '9', suit: '♠' },
+      { rank: '8', suit: '♠' },
+      { rank: '7', suit: '♠' },
+      { rank: '6', suit: '♠' },
+      { rank: '5', suit: '♠' },
+      { rank: 'J', suit: '♥' },
+      { rank: '10', suit: '♥' },
+      { rank: '9', suit: '♥' },
+      { rank: '8', suit: '♥' },
+      { rank: 'Q', suit: '♦' },
+      { rank: 'J', suit: '♦' },
+      { rank: '10', suit: '♦' },
+      { rank: 'J', suit: '♣' }
+    ],
+    [
+      { rank: '4', suit: '♠' },
+      { rank: '3', suit: '♠' },
+      { rank: '2', suit: '♠' },
+      { rank: '7', suit: '♥' },
+      { rank: '6', suit: '♥' },
+      { rank: '5', suit: '♥' },
+      { rank: '4', suit: '♥' },
+      { rank: '3', suit: '♥' },
+      { rank: '2', suit: '♥' },
+      { rank: '9', suit: '♦' },
+      { rank: '8', suit: '♦' },
+      { rank: '7', suit: '♦' },
+      { rank: '6', suit: '♦' }
+    ],
+    [
+      { rank: '5', suit: '♦' },
+      { rank: '4', suit: '♦' },
+      { rank: '3', suit: '♦' },
+      { rank: '2', suit: '♦' },
+      { rank: '10', suit: '♣' },
+      { rank: '9', suit: '♣' },
+      { rank: '8', suit: '♣' },
+      { rank: '7', suit: '♣' },
+      { rank: '6', suit: '♣' },
+      { rank: '5', suit: '♣' },
+      { rank: '4', suit: '♣' },
+      { rank: '3', suit: '♣' },
+      { rank: '2', suit: '♣' }
+    ]
+  ];
+
+  return {
   id: 'test-game-123',
   status: 'PLAYING',
   players: [
@@ -21,7 +86,7 @@ const createMockGame = (): GameState => ({
       position: 0,
       team: 1,
       isDealer: true,
-      hand: [],
+        hand: hands[0], // Use the actual cards from hands array
       bid: 3,
       tricks: 2
     },
@@ -33,7 +98,7 @@ const createMockGame = (): GameState => ({
       position: 1,
       team: 2,
       isDealer: false,
-      hand: [],
+        hand: hands[1], // Use the actual cards from hands array
       bid: 4,
       tricks: 1
     },
@@ -45,7 +110,7 @@ const createMockGame = (): GameState => ({
       position: 2,
       team: 1,
       isDealer: false,
-      hand: [],
+        hand: hands[2], // Use the actual cards from hands array
       bid: 2,
       tricks: 3
     },
@@ -57,75 +122,19 @@ const createMockGame = (): GameState => ({
       position: 3,
       team: 2,
       isDealer: false,
-      hand: [],
+        hand: hands[3], // Use the actual cards from hands array
       bid: 4,
       tricks: 2
     }
   ],
   currentPlayer: 'user-1',
-  hands: [
-    [
-      { rank: 'A', suit: '♠' },
-      { rank: 'K', suit: '♠' },
-      { rank: 'Q', suit: '♠' },
-      { rank: 'J', suit: '♠' },
-      { rank: '10', suit: '♠' },
-      { rank: '9', suit: '♠' },
-      { rank: '8', suit: '♠' },
-      { rank: '7', suit: '♠' },
-      { rank: '6', suit: '♠' },
-      { rank: '5', suit: '♠' },
-      { rank: '4', suit: '♠' },
-      { rank: '3', suit: '♠' },
-      { rank: '2', suit: '♠' }
-    ],
-    [
-      { rank: 'A', suit: '♥' },
-      { rank: 'K', suit: '♥' },
-      { rank: 'Q', suit: '♥' },
-      { rank: 'J', suit: '♥' },
-      { rank: '10', suit: '♥' },
-      { rank: '9', suit: '♥' },
-      { rank: '8', suit: '♥' },
-      { rank: '7', suit: '♥' },
-      { rank: '6', suit: '♥' },
-      { rank: '5', suit: '♥' },
-      { rank: '4', suit: '♥' },
-      { rank: '3', suit: '♥' },
-      { rank: '2', suit: '♥' }
-    ],
-    [
-      { rank: 'A', suit: '♦' },
-      { rank: 'K', suit: '♦' },
-      { rank: 'Q', suit: '♦' },
-      { rank: 'J', suit: '♦' },
-      { rank: '10', suit: '♦' },
-      { rank: '9', suit: '♦' },
-      { rank: '8', suit: '♦' },
-      { rank: '7', suit: '♦' },
-      { rank: '6', suit: '♦' },
-      { rank: '5', suit: '♦' },
-      { rank: '4', suit: '♦' },
-      { rank: '3', suit: '♦' },
-      { rank: '2', suit: '♦' }
-    ],
-    [
-      { rank: 'A', suit: '♣' },
-      { rank: 'K', suit: '♣' },
-      { rank: 'Q', suit: '♣' },
-      { rank: 'J', suit: '♣' },
-      { rank: '10', suit: '♣' },
-      { rank: '9', suit: '♣' },
-      { rank: '8', suit: '♣' },
-      { rank: '7', suit: '♣' },
-      { rank: '6', suit: '♣' },
-      { rank: '5', suit: '♣' },
-      { rank: '4', suit: '♣' },
-      { rank: '3', suit: '♣' },
-      { rank: '2', suit: '♣' }
-    ]
+    hands: hands, // Keep the hands array as well for compatibility
+    currentTrick: [
+      { rank: 'A', suit: '♠', playerIndex: 0 },
+      { rank: 'K', suit: '♥', playerIndex: 1 },
+      { rank: 'Q', suit: '♦', playerIndex: 2 },
+      { rank: 'J', suit: '♣', playerIndex: 3 }
   ],
-  currentTrick: [],
   completedTricks: [],
   rules: {
     gameType: 'REGULAR',
@@ -151,6 +160,13 @@ const createMockGame = (): GameState => ({
   play: {
     phase: 'ACTIVE',
     currentTrick: 4,
+      currentTrick: [
+        { rank: 'A', suit: '♠', playerIndex: 0 },
+        { rank: 'K', suit: '♥', playerIndex: 1 },
+        { rank: 'Q', suit: '♦', playerIndex: 2 },
+        { rank: 'J', suit: '♣', playerIndex: 3 }
+      ],
+      trickWinner: 1,
     tricksWon: {
       'user-1': 2,
       'user-2': 1,
@@ -158,7 +174,8 @@ const createMockGame = (): GameState => ({
       'user-4': 2
     }
   }
-});
+  };
+};
 
 export default function TestTablePage() {
   const { user } = useAuth();
@@ -345,7 +362,7 @@ export default function TestTablePage() {
         
         {/* Test mode indicator */}
         <div className="fixed top-4 left-4 z-50 bg-yellow-500 text-black px-3 py-1 rounded-lg font-semibold shadow-lg">
-          TEST MODE
+          TEST MODE - Card Sizing
         </div>
         
         <GameTable
@@ -361,6 +378,8 @@ export default function TestTablePage() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={false}
+          testAnimatingTrick={true}
+          testTrickWinner={1}
         />
       </div>
 

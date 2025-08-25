@@ -99,14 +99,20 @@ export class SocketManager {
       token: localStorage.getItem('token')
     });
     
-    // Get token from localStorage
-    const token = localStorage.getItem('sessionToken') || localStorage.getItem('token');
+    // Get token from localStorage, sessionStorage, or memory
+    const token = localStorage.getItem('sessionToken') || 
+                  localStorage.getItem('token') || 
+                  sessionStorage.getItem('sessionToken') || 
+                  (window as any).__tempSessionToken;
+    
     if (!token) {
-      console.error('SocketManager: No session token found');
+      console.error('SocketManager: No session token found in any storage location');
       this.state.isReady = false;
       this.notifyStateChange();
       return;
     }
+    
+    console.log('SocketManager: Found session token in storage');
 
     this.session = { token, userId, username };
     
@@ -149,10 +155,8 @@ export class SocketManager {
       rememberUpgrade: true,
       // Add more robust settings for page refresh scenarios
       closeOnBeforeunload: false, // Don't close on page unload
-      // Mobile-specific optimizations
-      extraHeaders: isMobile ? {
-        'User-Agent': navigator.userAgent
-      } : undefined
+      // Mobile-specific optimizations - removed User-Agent header to fix CORS
+      extraHeaders: undefined
     });
 
     this.setupSocketListeners();

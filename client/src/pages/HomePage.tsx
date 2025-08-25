@@ -65,7 +65,7 @@ const HomePage: React.FC = () => {
   const [activeChatTab, setActiveChatTab] = useState<'chat' | 'players'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [onlinePlayers, setOnlinePlayers] = useState<any[]>([]);
-  const onlineCount = onlinePlayers.filter(p => p.online).length;
+  const onlineCount = Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.online).length : 0;
   const [isPlayerStatsOpen, setIsPlayerStatsOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -89,7 +89,7 @@ const HomePage: React.FC = () => {
 
   // Check for league games when homepage loads
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isAuthenticated) return;
 
     const checkForLeagueGames = async () => {
       try {
@@ -132,11 +132,11 @@ const HomePage: React.FC = () => {
     };
 
     checkForLeagueGames();
-  }, [user, navigate]);
+  }, [user, navigate, isAuthenticated]);
 
   // Periodic check for league games (fallback for missed real-time events)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isAuthenticated) return;
     
     console.log('[PERIODIC LEAGUE CHECK] Setting up periodic check for user:', user.id);
     
@@ -177,7 +177,7 @@ const HomePage: React.FC = () => {
       console.log('[PERIODIC LEAGUE CHECK] Cleaning up periodic check');
       clearInterval(interval);
     };
-  }, [user, navigate]);
+  }, [user, navigate, isAuthenticated]);
 
   // Socket event handlers
   useEffect(() => {
@@ -326,11 +326,14 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const filteredGames = games.filter(game => {
+  // Debug games data
+  console.log('[HOMEPAGE DEBUG] Games data:', { games, type: typeof games, isArray: Array.isArray(games) });
+  
+  const filteredGames = Array.isArray(games) ? games.filter(game => {
     if (filter === 'waiting') return game.status === 'WAITING';
     if (filter === 'in-progress') return game.status === 'PLAYING';
     return game.status === 'WAITING'; // Default to waiting games
-  });
+  }) : [];
 
   // Handler to join a game as a player, with seat index
   const handleJoinGame = async (gameId: string, seatIndex: number) => {
@@ -883,11 +886,11 @@ const HomePage: React.FC = () => {
                   <div className="flex items-center justify-between h-8">
                     <span className="flex items-center gap-2 text-slate-200 text-lg font-bold">
                       <img src="/friend.svg" alt="Friends" className="w-8 h-8" style={{ filter: 'invert(1) brightness(2)' }} />
-                      Friends: {onlinePlayers.filter(p => p.status === 'friend').length}
+                      Friends: {Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.status === 'friend').length : 0}
                     </span>
                     <span className="flex items-center gap-1 text-slate-300 text-sm font-medium">
                       <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-                      {onlinePlayers.filter(p => p.status === 'friend' && p.online).length} Online
+                      {Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.status === 'friend' && p.online).length : 0} Online
                     </span>
                   </div>
                   <div className="flex items-center gap-4 mt-2">
@@ -927,7 +930,7 @@ const HomePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-                  {onlinePlayers
+                  {Array.isArray(onlinePlayers) ? onlinePlayers
                     .filter(player =>
                       playerFilter === 'all' ? true :
                       playerFilter === 'friends' ? player.status === 'friend' :
@@ -1010,8 +1013,10 @@ const HomePage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                    ))}
-                  {onlinePlayers.length === 0 && (
+                    )) : (
+                      <div className="text-center text-slate-400 py-4">No players found.</div>
+                    )}
+                  {Array.isArray(onlinePlayers) && onlinePlayers.length === 0 && (
                     <div className="text-center text-slate-400 py-4">No players found.</div>
                   )}
                 </div>

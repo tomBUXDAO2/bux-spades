@@ -31,14 +31,28 @@ const channelToOpenLine = new Map<string, string>();
 // Load verified users from database on startup
 async function loadVerifiedUsersFromDatabase() {
   try {
-    // Get all users with discordId (these are Discord users)
+    console.log('[DISCORD BOT] Starting to load verified users from database...');
+    
+    // First, let's check how many total users we have
+    const totalUsers = await prisma.user.count();
+    console.log('[DISCORD BOT] Total users in database:', totalUsers);
+    
+    const usersWithDiscord = await prisma.user.count({
+      where: {
+        discordId: { not: null }
+      }
+    });
+    console.log('[DISCORD BOT] Users with Discord ID:', usersWithDiscord);
+    
+    // Get all users with discordId (these are Discord users) - limit to recent users to reduce data transfer
     const users = await prisma.user.findMany({
       where: {
         discordId: { not: null }
       },
       select: {
         discordId: true
-      }
+      },
+      take: 1000 // Limit to 1000 most recent users to reduce data transfer
     });
     
     // Add all Discord users to the verified set (they've been verified through OAuth2)
@@ -52,6 +66,14 @@ async function loadVerifiedUsersFromDatabase() {
     console.log(`Loaded ${oauth2VerifiedUsers.size} verified users from database`);
   } catch (error) {
     console.error('Error loading verified users from database:', error);
+    
+    // Check if it's a quota exceeded error
+    if (error instanceof Error && error.message.includes('data transfer quota')) {
+      console.warn('Database quota exceeded - Discord bot will continue without loading verified users');
+      console.warn('Consider upgrading your Neon database plan or optimizing queries');
+    } else {
+      console.error('Unexpected error loading verified users:', error);
+    }
   }
 }
 
@@ -1163,6 +1185,9 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
 
 // Function to send league game results to Discord
 async function sendLeagueGameResults(gameData: any, gameLine: string) {
+  console.log('[DISCORD BOT] sendLeagueGameResults called with data:', gameData);
+  console.log('[DISCORD BOT] Game line:', gameLine);
+  
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
     const channel = await guild.channels.fetch(RESULTS_CHANNEL_ID) as TextChannel;
@@ -1248,7 +1273,17 @@ if (token && token.trim() !== '') {
     // Register slash commands
     await registerCommands();
     // Load verified users from database after successful login
+    try {
+      // Test database connection first
+      console.log('[DISCORD BOT] Testing database connection...');
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('[DISCORD BOT] Database connection successful');
+      
     await loadVerifiedUsersFromDatabase();
+    } catch (dbError) {
+      console.warn('Database error during startup - Discord bot will continue without verified users:', dbError);
+      console.warn('The bot will still function, but verified users will need to be loaded manually');
+    }
   }).catch((error) => {
     console.error('Failed to start Discord bot:', error);
     console.log('Discord bot will not be available');

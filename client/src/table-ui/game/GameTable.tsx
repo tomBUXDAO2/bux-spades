@@ -144,6 +144,9 @@ interface GameTableProps {
   // Add rejoin button props
   shouldShowRejoinButton?: boolean;
   onRejoinGame?: () => void;
+  // Add test props for trick highlighting
+  testAnimatingTrick?: boolean;
+  testTrickWinner?: number | null;
 
 }
 
@@ -434,7 +437,10 @@ export default function GameTable({
   onCloseBotWarning,
   emptySeats = 0,
   botCount = 0,
-  isSpectator = false
+  isSpectator = false,
+  // Add test props with defaults
+  testAnimatingTrick = false,
+  testTrickWinner = null
 }: GameTableProps) {
   const { socket, isAuthenticated } = useSocket();
   // Using propUser elsewhere; no need to pull from AuthContext here
@@ -1535,9 +1541,40 @@ export default function GameTable({
     } else if (Array.isArray(playableCards)) {
       effectivePlayableCards = playableCards;
     }
-         const cardUIWidth = Math.floor(isMobile ? 80 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 100 : 120) * scaleFactor);
-     const cardUIHeight = Math.floor(isMobile ? 112 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168) * scaleFactor);
-     const overlapOffset = Math.floor(isMobile ? -45 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? -40 : -55) * scaleFactor);
+         const cardUIWidth = Math.floor(isMobile ? 55 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 100 : 120) * scaleFactor);
+     const cardUIHeight = Math.floor(isMobile ? 77 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168) * scaleFactor);
+     let overlapOffset;
+                 if (window.innerWidth < 600) {
+        overlapOffset = Math.floor(-40 * scaleFactor);
+      } else if (window.innerWidth >= 600 && window.innerWidth < 650) {
+        overlapOffset = Math.floor(-27 * scaleFactor);
+      } else if (window.innerWidth >= 650 && window.innerWidth < 700) {
+        overlapOffset = Math.floor(-40 * scaleFactor);
+      } else if (window.innerWidth >= 700 && window.innerWidth < 750) {
+        overlapOffset = Math.floor(-35 * scaleFactor);
+      } else if (window.innerWidth >= 750 && window.innerWidth < 800) {
+        overlapOffset = Math.floor(-30 * scaleFactor);
+      } else if (window.innerWidth >= 800 && window.innerWidth < 850) {
+        overlapOffset = Math.floor(-25 * scaleFactor);
+      } else if (window.innerWidth >= 850 && window.innerWidth < 900) {
+        overlapOffset = Math.floor(-20 * scaleFactor);
+      } else if (window.innerWidth >= 900 && window.innerWidth <= 1200) {
+        overlapOffset = Math.floor(-40 * scaleFactor);
+     } else if (window.innerWidth >= 1201 && window.innerWidth <= 1300) {
+       overlapOffset = Math.floor(-35 * scaleFactor);
+     } else if (window.innerWidth >= 1400 && window.innerWidth <= 1499) {
+       overlapOffset = Math.floor(-50 * scaleFactor);
+     } else if (window.innerWidth >= 1500 && window.innerWidth <= 1599) {
+       overlapOffset = Math.floor(-45 * scaleFactor);
+     } else if (window.innerWidth >= 1600 && window.innerWidth <= 1699) {
+       overlapOffset = Math.floor(-40 * scaleFactor);
+     } else if (window.innerWidth >= 1700 && window.innerWidth <= 1799) {
+       overlapOffset = Math.floor(-35 * scaleFactor);
+     } else if (window.innerWidth >= 1800) {
+       overlapOffset = Math.floor(-30 * scaleFactor);
+     } else {
+       overlapOffset = Math.floor(-55 * scaleFactor);
+     }
 
     // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
@@ -1551,15 +1588,16 @@ export default function GameTable({
       <div
         className="absolute inset-x-0 flex justify-center"
         style={{
-          bottom: isMobile ? '-100px' : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? '-80px' : '-20px'),
-          height: `${Math.floor(cardUIHeight * 1.2)}px`,
-          paddingTop: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          height: `${Math.floor((isMobile ? 111 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188)))}px`,
+          paddingTop: '0px',
           overflow: 'visible',
           pointerEvents: 'none',
           zIndex: 50,
         }}
       >
-        <div className="flex">
+        <div className="flex items-center justify-center h-full w-full">
           {sortedHand.map((card: Card, index: number) => {
             const isPlayable = (gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
@@ -1982,7 +2020,15 @@ export default function GameTable({
       if (displayPosition === -1 || displayPosition === undefined) return null;
       
       // Check if this card is the winning card
-      const isWinningCard = animatingTrick && trickWinner !== null && seatIndex === trickWinner;
+      const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
+      
+      // Debug logging
+      console.log('[TRICK CARD DEBUG]', {
+        windowHeight: window.innerHeight,
+        isMobile,
+        cardWidth: isMobile ? 50 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 25 : window.innerHeight >= 400 && window.innerHeight < 500 ? 43 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 64 : window.innerHeight > 550 && window.innerHeight < 600 ? 57 : window.innerHeight >= 600 && window.innerHeight < 650 ? 64 : window.innerHeight >= 650 && window.innerHeight < 700 ? 71 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160),
+        cardHeight: isMobile ? 69 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 35 : window.innerHeight >= 400 && window.innerHeight < 500 ? 60 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 120 : window.innerHeight > 550 && window.innerHeight <= 600 ? 130 : window.innerHeight > 600 && window.innerHeight < 650 ? 90 : window.innerHeight >= 650 && window.innerHeight < 700 ? 100 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160)
+      });
       
       return (
         <div
@@ -1990,14 +2036,24 @@ export default function GameTable({
           className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
           style={{ pointerEvents: 'none' }}
         >
-          <CardImage
-            card={card}
-            width={Math.floor(isMobile ? 85 * scaleFactor : 90 * scaleFactor)}
-            height={Math.floor(isMobile ? 120 * scaleFactor : 130 * scaleFactor)}
-            className={`transition-all duration-300 ${isWinningCard ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''} ${i === 0 ? 'shadow-[0_0_20px_4px_gold] scale-110' : ''}`}
-            alt={`${card.rank} of ${card.suit}`}
-          />
-          {(isWinningCard || i === 0) && (
+          <div 
+            className={`transition-all duration-300`}
+            style={{ 
+                            width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
+              height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
+            }}
+          >
+            <div style={{ opacity: isWinningCard ? 1 : 0.7 }}>
+              <CardImage
+                card={card}
+                width={isMobile ? 50 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50)}
+                height={isMobile ? 69 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)}
+                className="rounded-lg transition-all duration-300"
+                alt={`${card.rank} of ${card.suit}`}
+              />
+            </div>
+          </div>
+          {isWinningCard && (
             <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
               ✓
             </div>
@@ -2338,7 +2394,14 @@ export default function GameTable({
   // Get card image filename from card data
   const getCardImage = (card: Card): string => {
     const rank = card.rank;
-    const suit = card.suit;
+    // Convert Unicode suit symbols to single letters for PNG filenames
+    const suitMap: Record<string, string> = {
+      '♠': 'S',
+      '♥': 'H', 
+      '♦': 'D',
+      '♣': 'C'
+    };
+    const suit = suitMap[card.suit] || card.suit;
     return `${rank}${suit}.png`;
   };
 
@@ -2351,11 +2414,11 @@ export default function GameTable({
     alt?: string;
     faceDown?: boolean;
   }) => {
-    // Check if we're on a large screen (>= 900px)
-    const isLargeScreen = window.innerWidth >= 900;
+    // Check if we're on a large screen (>= 900px width AND > 449px height)
+    const isLargeScreen = window.innerWidth >= 900 && window.innerHeight > 449;
 
     if (faceDown) {
-      return (
+    return (
         <div
           className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
           style={{ width, height }}
@@ -2373,9 +2436,9 @@ export default function GameTable({
           alt={alt || `${card.rank}${card.suit}`}
           className={className}
           style={{ 
-            width, 
+            width: width - 2, 
             height, 
-            objectFit: 'fill', 
+            objectFit: 'contain', 
             padding: 0, 
             margin: 0, 
             borderRadius: '8px'
@@ -2410,25 +2473,26 @@ export default function GameTable({
 
     // Determine if this is a table card (smaller) or hand card (larger)
     const isTableCard = width <= 70; // Table cards are typically 60-70px wide, hand cards are larger
+    const isVerySmallTableCard = height <= 65; // Very small table cards need extra small text
     
     // Check if we're on mobile (small screen)
     const isMobile = window.innerWidth < 900;
     
     // Adjust sizing based on card type and screen size
     const cornerRankSize = isTableCard 
-      ? (isMobile ? 'text-xs' : 'text-sm') 
+      ? (isVerySmallTableCard ? 'text-xs' : (isMobile ? 'text-xs' : 'text-sm'))
       : (isMobile ? 'text-xl' : 'text-base');
     const cornerSuitSize = isTableCard 
-      ? (isMobile ? 'text-xs' : 'text-xs') 
+      ? (isVerySmallTableCard ? 'text-xs' : (isMobile ? 'text-xs' : 'text-xs'))
       : (isMobile ? 'text-lg' : 'text-xs');
     const centerSuitSize = isTableCard 
-      ? (isMobile ? 'text-lg' : 'text-2xl') 
+      ? (isVerySmallTableCard ? 'text-base' : (isMobile ? 'text-lg' : 'text-2xl'))
       : (isMobile ? 'text-3xl' : 'text-3xl');
     const cornerPosition = isTableCard 
-      ? (isMobile ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5') 
+      ? (isVerySmallTableCard ? 'top-0.5 left-0.5' : (isMobile ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5'))
       : (isMobile ? 'top-1 left-1' : 'top-1 left-1');
     const cornerWidth = isTableCard 
-      ? (isMobile ? 'w-3' : 'w-5') 
+      ? (isVerySmallTableCard ? 'w-2' : (isMobile ? 'w-3' : 'w-5'))
       : (isMobile ? 'w-6' : 'w-6');
 
     return (
@@ -2439,8 +2503,8 @@ export default function GameTable({
       >
         {/* Top left corner */}
         <div className={`absolute ${cornerPosition} font-bold ${cornerWidth} text-center`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: '0.8rem' }}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: '0.6rem' }}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: isVerySmallTableCard ? '0.6rem' : '0.8rem' }}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: isVerySmallTableCard ? '0.4rem' : '0.6rem' }}>{suitSymbol}</div>
         </div>
 
         {/* Center large suit */}
@@ -2450,8 +2514,8 @@ export default function GameTable({
 
         {/* Bottom right corner (rotated) */}
         <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
-          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: '0.8rem' }}>{card.rank}</div>
-          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: '0.6rem' }}>{suitSymbol}</div>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: isVerySmallTableCard ? '0.6rem' : '0.8rem' }}>{card.rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: isVerySmallTableCard ? '0.4rem' : '0.6rem' }}>{suitSymbol}</div>
         </div>
       </div>
     );
@@ -2559,11 +2623,11 @@ export default function GameTable({
           <div className="w-[70%] p-2 flex flex-col h-full">
             {/* Game table with more space top and bottom */}
             <div className="relative mb-2"                 style={{
-                  background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
-                  borderRadius: `${Math.floor(64 * scaleFactor)}px`,
-                  border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
-                  height: isMobile ? 'calc(100% - 80px)' : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 'calc(100% - 80px)' : 'calc(100% - 200px)')
-                }}>
+              background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
+              borderRadius: `${Math.floor(64 * scaleFactor)}px`,
+              border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
+                  height: isMobile ? 'calc(100% - 80px)' : (window.innerWidth >= 900 ? 'calc(100% - 100px)' : 'calc(100% - 200px)')
+            }}>
               {/* Trick cards overlay - covers the whole table area */}
               <div className="absolute inset-0 pointer-events-none z-20">
                 {renderTrickCards()}
@@ -2890,14 +2954,10 @@ export default function GameTable({
 
             {/* Cards area - show for actual players or face-down cards for spectators */}
             {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
-                              <div className="bg-gray-800/50 rounded-lg relative mb-0" 
-                     style={{ 
-                        height: isMobile 
-                          ? `${Math.floor(40 * scaleFactor)}px`
-                          : (window.innerWidth >= 900 && window.innerWidth <= 1300 
-                              ? `${Math.floor(40 * scaleFactor)}px` 
-                              : `${Math.floor(200 * scaleFactor)}px`)
-                     }}>
+              <div className="bg-gray-800/50 rounded-lg relative mb-0 mt-auto" 
+                   style={{ 
+                        height: `${Math.floor((window.innerWidth < 900 ? 77 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168)) * scaleFactor + 20)}px`
+                   }}>
                 {myPlayerIndex !== -1 ? (
                   renderPlayerHand()
                 ) : (

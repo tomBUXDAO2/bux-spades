@@ -2,6 +2,11 @@ import { prisma } from './prisma';
 import type { Game } from '../types/game';
 
 export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPlayer: number) {
+	console.log('[GAME LOGGER] Starting game completion logging for game:', game.id);
+	console.log('[GAME LOGGER] Game league property:', (game as any).league);
+	console.log('[GAME LOGGER] Game mode:', game.gameMode);
+	console.log('[GAME LOGGER] Winning team/player:', winningTeamOrPlayer);
+	
 	try {
 		// Determine settings
 		const gameMode = game.gameMode;
@@ -173,29 +178,65 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 }
 			}
 		});
-
-		// Discord
+		console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+		
+		// Send Discord results for league games
 		if ((game as any).league) {
 			try {
 				const { sendLeagueGameResults } = await import('../discord-bot/bot');
-				const formatCoins = (amount: number) => (amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`);
+				
+				// Create game line string
+				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
+				// Prefer bidType (e.g., WHIZ, MIRROR(S)), fallback to gameType from rules
 				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
 				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
-				const data = {
+				
+				// Prepare game data for Discord
+				const gameData = {
 					buyIn: game.buyIn,
 					players: game.players.map((p: any, i: number) => ({
-						userId: p?.discordId || p?.id || '', // Use Discord ID if available, fallback to DB id
-						won: game.gameMode === 'SOLO' ? i === winningTeamOrPlayer : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+						userId: p?.id || '',
+						won: game.gameMode === 'SOLO' 
+							? i === winningTeamOrPlayer 
+							: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
 					}))
 				};
-				await sendLeagueGameResults(data, gameLine);
-			} catch (err) {
-				console.error('Failed to send Discord results:', err);
+				
+				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
+				await sendLeagueGameResults(gameData, gameLine);
+			} catch (error) {
+				console.error('Failed to send Discord results:', error);
 			}
 		}
+		
 	} catch (err) {
 		console.error('Failed to log completed game (server):', err);
-		console.error('Game object:', JSON.stringify(game, null, 2));
-		console.error('Winning team/player:', winningTeamOrPlayer);
+		
+		// Even if database logging fails, try to send Discord embed for league games
+		if ((game as any).league) {
+			try {
+				console.log('[DISCORD FALLBACK] Database logging failed, but attempting Discord embed for league game');
+				const { sendLeagueGameResults } = await import('../discord-bot/bot');
+				
+				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
+				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
+				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
+				
+				const gameData = {
+					buyIn: game.buyIn,
+					players: game.players.map((p: any, i: number) => ({
+						userId: p?.id || '',
+						won: game.gameMode === 'SOLO' 
+							? i === winningTeamOrPlayer 
+							: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+					}))
+				};
+				
+				await sendLeagueGameResults(gameData, gameLine);
+				console.log('[DISCORD FALLBACK] Discord embed sent successfully despite database failure');
+			} catch (discordError) {
+				console.error('Failed to send Discord results (fallback):', discordError);
+			}
+		}
 	}
 } 
