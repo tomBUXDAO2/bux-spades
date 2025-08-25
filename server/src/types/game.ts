@@ -22,6 +22,7 @@ export interface GamePlayer {
 	tricks?: number;
 	team?: number;
 	isDealer?: boolean;
+	discordId?: string; // Discord ID for Discord mentions
 }
 
 export interface Game {
