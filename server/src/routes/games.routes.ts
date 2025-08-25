@@ -2879,15 +2879,24 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
         const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
         
+        // Fetch GamePlayer records from database to get Discord IDs
+        const gamePlayers = await prisma.gamePlayer.findMany({
+          where: { gameId: dbGame.id },
+          select: { userId: true, discordId: true, position: true }
+        });
+        
         // Prepare game data for Discord
         const gameData = {
           buyIn: game.buyIn,
-          players: game.players.map((p, i) => ({
-            userId: p?.discordId || p?.id || '', // Use Discord ID if available, fallback to database ID
-            won: game.gameMode === 'SOLO' 
-              ? i === winningTeamOrPlayer 
-              : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
-          }))
+          players: game.players.map((p, i) => {
+            const dbPlayer = gamePlayers.find(gp => gp.position === i);
+            return {
+              userId: dbPlayer?.discordId || p?.id || '', // Use Discord ID from database, fallback to database ID
+              won: game.gameMode === 'SOLO' 
+                ? i === winningTeamOrPlayer 
+                : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+            };
+          })
         };
         
         console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
