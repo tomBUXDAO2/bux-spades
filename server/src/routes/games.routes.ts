@@ -2042,10 +2042,12 @@ export function botPlayCard(game: Game, seatIndex: number) {
         if (game.team1Bags >= 10) {
           game.team1TotalScore -= 100;
           game.team1Bags -= 10;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
         }
         if (game.team2Bags >= 10) {
           game.team2TotalScore -= 100;
           game.team2Bags -= 10;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
         
                   // Set game status to indicate hand is completed
@@ -2189,10 +2191,12 @@ export function botPlayCard(game: Game, seatIndex: number) {
         if (game.team1Bags >= 10) {
           game.team1TotalScore -= 100;
           game.team1Bags -= 10;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
         }
         if (game.team2Bags >= 10) {
           game.team2TotalScore -= 100;
           game.team2Bags -= 10;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
         
                   // Set game status to indicate hand is completed

@@ -1737,10 +1737,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         if (game.team1Bags >= 10) {
           game.team1TotalScore -= 100;
           game.team1Bags -= 10;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
         }
         if (game.team2Bags >= 10) {
           game.team2TotalScore -= 100;
           game.team2Bags -= 10;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
         
         // Set game status to indicate hand is completed
@@ -2027,10 +2029,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         if (game.team1Bags >= 10) {
           game.team1TotalScore -= 100;
           game.team1Bags -= 10;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
         }
         if (game.team2Bags >= 10) {
           game.team2TotalScore -= 100;
           game.team2Bags -= 10;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
         
         // Set game status to indicate hand is completed
@@ -3023,15 +3027,8 @@ function calculatePartnersHandScore(game: Game) {
     }
   }
   
-  // Bag penalty
-  if (team1Bags >= 10) {
-    team1Score -= 100;
-    team1Bags -= 10;
-  }
-  if (team2Bags >= 10) {
-    team2Score -= 100;
-    team2Bags -= 10;
-  }
+  // NOTE: Bag penalty is NOT applied here - it should be applied to running totals in the calling code
+  // This function only calculates the hand score and new bags for this hand
   
   // Validate total tricks equals 13
   const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
@@ -3557,59 +3554,133 @@ setInterval(() => {
         // Auto-start next hand
         try {
           // Move dealer to the left (next position)
-          const newDealerIndex = (game.dealerIndex + 1) % 4;
-          game.dealerIndex = newDealerIndex;
-
+          game.dealerIndex = (game.dealerIndex + 1) % 4;
+          
           // Reset game state for new hand
           game.status = 'BIDDING';
-          game.hands = dealCards(game.players, newDealerIndex);
           game.bidding = {
-            currentBidderIndex: (newDealerIndex + 1) % 4,
-            currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
+            currentPlayer: game.players[game.dealerIndex]?.id || '',
+            currentBidderIndex: game.dealerIndex,
             bids: [null, null, null, null],
             nilBids: {}
           };
           game.play = undefined;
-
-          // Reset player trick counts for new hand
+          
+          // Reset player states
           game.players.forEach(player => {
             if (player) {
+              player.hand = [];
+              player.bid = undefined;
               player.tricks = 0;
             }
           });
-
-          // Emit new hand started event with dealing phase
-          console.log('[PERIODIC CHECK] Emitting new_hand_started event (fallback)');
-          io.to(game.id).emit('new_hand_started', {
-            dealerIndex: newDealerIndex,
-            hands: game.hands,
-            currentBidderIndex: game.bidding.currentBidderIndex
-          });
-
-          // Emit game update
-          io.to(game.id).emit('game_update', enrichGameForClient(game));
-
-          // Add delay before starting bidding phase
-          setTimeout(() => {
-            console.log('[PERIODIC CHECK] Starting bidding phase after delay (fallback)');
-            
-            // Emit bidding ready event
-            io.to(game.id).emit('bidding_ready', {
-              currentBidderIndex: game.bidding.currentBidderIndex,
-              currentPlayer: game.bidding.currentPlayer
-            });
-
-            // If first bidder is a bot, trigger their bid
-            const firstBidder = game.players[game.bidding.currentBidderIndex];
-            if (firstBidder && firstBidder.type === 'bot') {
-              setTimeout(() => {
-                botMakeMove(game, game.bidding.currentBidderIndex);
-              }, 600); // Reduced delay for faster bot bidding
+          
+          // Deal new cards
+          const hands = dealCards(game.players, game.dealerIndex);
+          game.hands = hands;
+          
+          // Assign hands to players
+          game.players.forEach((player, index) => {
+            if (player) {
+              player.hand = hands[index] || [];
             }
-          }, 1200); // Reduced delay after dealing
+          });
+          
+          console.log('[PERIODIC CHECK] Auto-started new hand for game:', game.id);
+          
+          // Emit events
+          io.to(game.id).emit('new_hand_started', {
+            dealerIndex: game.dealerIndex,
+            hands: game.players.map(p => p?.hand || [])
+          });
+          io.to(game.id).emit('bidding_ready', {
+            currentPlayer: game.bidding.currentPlayer
+          });
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
           
         } catch (error) {
-          console.error('[PERIODIC CHECK] Error auto-starting next hand:', error);
+          console.error('[PERIODIC CHECK] Failed to auto-start new hand:', error);
+        }
+      } else {
+        // Check for game over while in HAND_COMPLETED status
+        const maxPoints = game.maxPoints;
+        const minPoints = game.minPoints;
+        
+        if (maxPoints !== undefined && minPoints !== undefined) {
+          if (game.gameMode === 'SOLO') {
+            const playerScores = game.playerScores || [0, 0, 0, 0];
+            const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+            
+            if (isGameOver) {
+              console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
+              game.status = 'FINISHED';
+              
+              let winningPlayer = 0;
+              let highestScore = playerScores[0];
+              for (let i = 1; i < playerScores.length; i++) {
+                if (playerScores[i] > highestScore) {
+                  highestScore = playerScores[i];
+                  winningPlayer = i;
+                }
+              }
+              
+              io.to(game.id).emit('game_over', {
+                playerScores: game.playerScores,
+                winningPlayer: winningPlayer,
+              });
+              
+              updateStatsAndCoins(game, winningPlayer).catch(err => {
+                console.error('Failed to update stats/coins:', err);
+              });
+              
+              void import('./lib/gameLogger')
+                .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
+                .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+            }
+          } else {
+            // Partners mode game over check
+            let shouldEndGame = false;
+            let winningTeam = null;
+            
+            // If either team is below minPoints, they lose immediately
+            if (game.team1TotalScore <= minPoints) {
+              shouldEndGame = true;
+              winningTeam = 2;
+            } else if (game.team2TotalScore <= minPoints) {
+              shouldEndGame = true;
+              winningTeam = 1;
+            }
+            // If either team is above maxPoints, check if they have a clear lead
+            else if (game.team1TotalScore >= maxPoints) {
+              if (game.team1TotalScore > game.team2TotalScore) {
+                shouldEndGame = true;
+                winningTeam = 1;
+              }
+            } else if (game.team2TotalScore >= maxPoints) {
+              if (game.team2TotalScore > game.team1TotalScore) {
+                shouldEndGame = true;
+                winningTeam = 2;
+              }
+            }
+            
+            if (shouldEndGame && winningTeam) {
+              console.log('[PERIODIC CHECK] Partners game ended while in HAND_COMPLETED! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
+              game.status = 'FINISHED';
+              io.to(game.id).emit('game_over', {
+                team1Score: game.team1TotalScore,
+                team2Score: game.team2TotalScore,
+                winningTeam,
+              });
+              
+              updateStatsAndCoins(game, winningTeam).catch(err => {
+                console.error('Failed to update stats/coins:', err);
+              });
+              
+              void import('./lib/gameLogger')
+                .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
+                .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+            }
+          }
         }
       }
     }
