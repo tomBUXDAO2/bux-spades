@@ -225,11 +225,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
               <div className="text-sm font-extrabold text-slate-100">{gimmickWon}/{gimmickPlayed}</div>
             </div>
           </div>
-          {mode !== 'all' && (
-            <div className="text-xs text-slate-500 text-center mt-1">
-              Showing {mode === 'partners' ? 'partners' : 'solo'} games only
-            </div>
-          )}
+
         </div>
 
         {/* Special Rules and Nil Stats - side by side, ultra compact */}
