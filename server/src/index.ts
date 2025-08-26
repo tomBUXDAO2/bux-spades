@@ -1938,15 +1938,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             
             // Update database status to FINISHED
             if (game.dbGameId) {
-              try {
-                await prisma.game.update({
-                  where: { id: game.dbGameId },
-                  data: { status: 'FINISHED' }
-                });
+              prisma.game.update({
+                where: { id: game.dbGameId },
+                data: { status: 'FINISHED' }
+              }).then(() => {
                 console.log('[GAME OVER] Updated database status to FINISHED for partners game:', game.dbGameId);
-              } catch (error) {
+              }).catch((error) => {
                 console.error('[GAME OVER] Failed to update database status for partners game:', error);
-              }
+              });
             }
             
             io.to(game.id).emit('game_over', {
