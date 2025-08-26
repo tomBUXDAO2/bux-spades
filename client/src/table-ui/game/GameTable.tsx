@@ -463,6 +463,9 @@ export default function GameTable({
     };
   }>({});
   
+  // Leave table confirmation state
+  const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
+  
   // Timer effect for turn countdown - show to all players
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -2240,9 +2243,18 @@ export default function GameTable({
 
   // Return the JSX for the component
   const handleLeaveTable = () => {
+    setShowLeaveConfirmation(true);
+  };
+
+  const handleConfirmLeave = () => {
+    setShowLeaveConfirmation(false);
     if (typeof onLeaveTable === 'function') {
       onLeaveTable();
     }
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveConfirmation(false);
   };
 
   // Handle timer expiration - remove player from table via socket
@@ -3322,6 +3334,32 @@ export default function GameTable({
       )}
 
       {renderLeagueOverlay()}
+
+      {/* Leave Table Confirmation Modal */}
+      {showLeaveConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
+            <h3 className="text-white text-lg font-bold mb-4">Leave Table?</h3>
+            <p className="text-gray-300 mb-6">
+              Are you sure you want to leave this table? You will lose your seat and any ongoing game.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelLeave}
+                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmLeave}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+              >
+                Leave Table
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </>
   );
