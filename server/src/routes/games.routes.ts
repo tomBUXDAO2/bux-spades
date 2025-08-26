@@ -2868,8 +2868,8 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     
     console.log(`Created comprehensive game result record for game ${dbGame.id}`);
     
-    // Send Discord results for league games
-    if ((game as any).league) {
+    // Send Discord results for league games (only once per game)
+    if ((game as any).league && !(game as any).discordResultsSent) {
       try {
         const { sendLeagueGameResults } = await import('../discord-bot/bot');
         
@@ -2891,12 +2891,21 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           orderBy: { position: 'asc' }
         });
         
+        console.log('[DISCORD RESULTS DEBUG] GamePlayers with Discord IDs:', gamePlayers.map(gp => ({
+          position: gp.position,
+          username: gp.username,
+          gamePlayerDiscordId: gp.discordId,
+          userDiscordId: gp.user?.discordId
+        })));
+        
         // Prepare game data for Discord - always show all 4 original players
         const gameData = {
           buyIn: game.buyIn,
           players: gamePlayers.map((dbPlayer, i) => {
+            const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
+            console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
             return {
-              userId: dbPlayer.user?.discordId || dbPlayer.userId || '', // Use actual Discord ID from User table, fallback to database ID
+              userId: discordId, // Use actual Discord ID from User table, fallback to database ID
               won: game.gameMode === 'SOLO' 
                 ? i === winningTeamOrPlayer 
                 : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
@@ -2906,6 +2915,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         
         console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
         await sendLeagueGameResults(gameData, gameLine);
+        (game as any).discordResultsSent = true; // Mark as sent to prevent duplicates
       } catch (error) {
         console.error('Failed to send Discord results:', error);
       }

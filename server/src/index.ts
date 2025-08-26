@@ -739,7 +739,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                   bags: 0,
                   points: 0,
                   username: playerUsername,
-                  discordId: user?.discordId || null
+                  discordId: user?.discordId || null // This should be the actual Discord ID
                 }
               });
               console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
