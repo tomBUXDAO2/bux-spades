@@ -2458,7 +2458,7 @@ function calculatePartnersHandScore(game: Game) {
     team2Score += team2Bags;
   } else {
     team2Score -= team2Bid * 10;
-    team1Bags = 0; // No bags for failed bids
+    team2Bags = 0; // No bags for failed bids
   }
   
   // Nil and Blind Nil
