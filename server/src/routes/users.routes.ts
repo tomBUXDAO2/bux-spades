@@ -132,10 +132,10 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         gamesWon: stats.partnersGamesWon || 0,
         totalBags: stats.partnersTotalBags || 0,
         bagsPerGame: stats.partnersBagsPerGame || 0,
-        nilsBid: stats.nilsBid || 0,
-        nilsMade: stats.nilsMade || 0,
-        blindNilsBid: stats.blindNilsBid || 0,
-        blindNilsMade: stats.blindNilsMade || 0,
+        nilsBid: 0, // Will calculate from filtered games
+        nilsMade: 0, // Will calculate from filtered games
+        blindNilsBid: 0, // Will calculate from filtered games
+        blindNilsMade: 0, // Will calculate from filtered games
       };
     } else if (gameMode === 'SOLO') {
       responseStats = {
@@ -143,10 +143,10 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         gamesWon: stats.soloGamesWon || 0,
         totalBags: stats.soloTotalBags || 0,
         bagsPerGame: stats.soloBagsPerGame || 0,
-        nilsBid: stats.nilsBid || 0,
-        nilsMade: stats.nilsMade || 0,
-        blindNilsBid: stats.blindNilsBid || 0,
-        blindNilsMade: stats.blindNilsMade || 0,
+        nilsBid: 0, // Will calculate from filtered games
+        nilsMade: 0, // Will calculate from filtered games
+        blindNilsBid: 0, // Will calculate from filtered games
+        blindNilsMade: 0, // Will calculate from filtered games
       };
     } else {
       // ALL games - use overall stats
@@ -160,6 +160,28 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         blindNilsBid: stats.blindNilsBid,
         blindNilsMade: stats.blindNilsMade,
       };
+    }
+    
+    // For PARTNERS and SOLO modes, we need to calculate nil stats from the filtered games
+    if (gameMode === 'PARTNERS' || gameMode === 'SOLO') {
+      // Get nil stats from GameResult table for the filtered games
+      const gameIds = filteredGames.map(gp => (gp.game as any).id);
+      const gameResults = await prisma.gameResult.findMany({
+        where: {
+          gameId: { in: gameIds }
+        }
+      });
+      
+      for (const result of gameResults) {
+        const playerResults = result.playerResults as any;
+        const playerResult = playerResults.find((p: any) => p.userId === userId);
+        if (playerResult) {
+          responseStats.nilsBid += playerResult.nilsBid || 0;
+          responseStats.nilsMade += playerResult.nilsMade || 0;
+          responseStats.blindNilsBid += playerResult.blindNilsBid || 0;
+          responseStats.blindNilsMade += playerResult.blindNilsMade || 0;
+        }
+      }
     }
     
     res.json({

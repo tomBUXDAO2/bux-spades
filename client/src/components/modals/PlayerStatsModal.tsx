@@ -127,11 +127,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             <input type="radio" name="mode" value="solo" checked={mode === 'solo'} onChange={() => handleModeChange('solo')} className="w-3 h-3 accent-indigo-500" />
             SOLO
           </label>
-          {loading && (
-            <div className="text-xs text-slate-400 ml-2">
-              Loading...
-            </div>
-          )}
         </div>
 
         {/* Avatar, username, buttons, and stats - all in one compact container */}
