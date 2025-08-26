@@ -57,8 +57,11 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
       setLoading(true);
       try {
         const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
-        const response = await api.get(`/api/users/${player.id}/stats?gameMode=${gameModeParam}`);
+        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
+        console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
+        const response = await api.get(url);
         const stats = await response.json();
+        console.log('[PLAYER STATS MODAL] Received stats:', stats);
         setCurrentStats(stats);
       } catch (error) {
         console.error('Error fetching player stats:', error);
