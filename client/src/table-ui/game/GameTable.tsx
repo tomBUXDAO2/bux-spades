@@ -1118,7 +1118,7 @@ export default function GameTable({
           // Check if this specific player is on timer - only show overlay for current player who is timing out
       // @ts-ignore
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
-      const isCurrentPlayer = player && player.id === propUser?.id;
+
       const isPlayerOnTimer = shouldShowTimer && turnTimer <= 10; // Show timer to all players when 10 seconds or less
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
