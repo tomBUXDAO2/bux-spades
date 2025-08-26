@@ -1063,6 +1063,11 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         const t = (gameLine.gameType || 'regular').toLowerCase();
         if (t === 'whiz') return 'WHIZ';
         if (t === 'mirror' || t === 'mirrors') return 'MIRROR';
+        if (t === 'suicide') return 'SUICIDE';
+        if (t === 'bid3' || t === 'bid 3') return 'BID 3';
+        if (t === 'bidhearts' || t === 'bid hearts') return 'BID HEARTS';
+        if (t === '4ornil' || t === '4 or nil') return '4 OR NIL';
+        if (t === 'crazyaces' || t === 'crazy aces') return 'CRAZY ACES';
         return 'REG';
       })(),
       league: true, // Mark as league game
