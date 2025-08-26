@@ -1125,6 +1125,8 @@ export default function GameTable({
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
 
       const isPlayerOnTimer = shouldShowTimer && turnTimer <= 10; // Show timer to all players when 10 seconds or less
+      const isCurrentPlayer = player && player.id === propUser?.id;
+      const shouldShowTimerOnPlayer = isPlayerOnTimer && isCurrentPlayer; // Only overlay on current player's PFP
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
@@ -1380,7 +1382,7 @@ export default function GameTable({
                     </>
                   )}
                   {/* Timer overlay for last 10 seconds */}
-                  {isPlayerOnTimer && (
+                  {shouldShowTimerOnPlayer && (
                     <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
                                              <span className="text-white font-bold text-lg">{turnTimer}</span>
                     </div>
@@ -1431,7 +1433,7 @@ export default function GameTable({
         
         {/* Speech bubble */}
         {speechBubbles[player.id] && (
-          <div className="absolute -top-20 left-1/2 transform -translate-x-1/2">
+          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 z-50">
             <SpeechBubble
               message={speechBubbles[player.id].message}
               playerName={speechBubbles[player.id].playerName}
@@ -2103,7 +2105,7 @@ export default function GameTable({
               height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
             }}
           >
-            <div style={{ opacity: isWinningCard ? 1 : 0.7 }}>
+            <div style={{ opacity: (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) ? (isWinningCard ? 1 : 0.7) : 1 }}>
               <CardImage
                 card={card}
                 width={isMobile ? 50 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50)}
