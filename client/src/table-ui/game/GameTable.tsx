@@ -463,27 +463,21 @@ export default function GameTable({
     };
   }>({});
   
-  // Timer effect for turn countdown
+  // Timer effect for turn countdown - show to all players
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (gameState.status === 'BIDDING' || gameState.status === 'PLAYING') {
-      const isCurrentPlayer = game.currentPlayer === propUser?.id;
-      
-      if (isCurrentPlayer) {
-        // Start timer for human players
-        setTurnTimer(30); // Reset to 30 when it becomes your turn
-        interval = setInterval(() => {
-          setTurnTimer((prev) => {
-            if (prev <= 1) {
-              return 30; // Reset to 30 when it reaches 0
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setTurnTimer(30); // Reset timer when not current player's turn
-      }
+      // Show timer to all players, not just current player
+      setTurnTimer(30); // Reset to 30 when game state changes
+      interval = setInterval(() => {
+        setTurnTimer((prev) => {
+          if (prev <= 1) {
+            return 30; // Reset to 30 when it reaches 0
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } else {
       setTurnTimer(30); // Reset timer when not in active game state
     }
@@ -1125,7 +1119,7 @@ export default function GameTable({
       // @ts-ignore
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
       const isCurrentPlayer = player && player.id === propUser?.id;
-      const isPlayerOnTimer = isCurrentPlayer && shouldShowTimer && turnTimer <= 10;
+      const isPlayerOnTimer = shouldShowTimer && turnTimer <= 10; // Show timer to all players when 10 seconds or less
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
