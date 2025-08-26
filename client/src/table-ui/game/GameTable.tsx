@@ -538,6 +538,11 @@ export default function GameTable({
             isVisible: true
           }
         }));
+        
+        // Auto-hide speech bubble after 4 seconds
+        setTimeout(() => {
+          handleSpeechBubbleFadeOut(message.userId);
+        }, 4000);
       }
     };
     
