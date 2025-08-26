@@ -164,18 +164,33 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     
     // For PARTNERS and SOLO modes, we need to calculate nil stats from the filtered games
     if (gameMode === 'PARTNERS' || gameMode === 'SOLO') {
-      // For now, use the database totals but filter by game mode
-      // This is a simpler approach that won't cause connection issues
-      if (gameMode === 'PARTNERS') {
-        responseStats.nilsBid = Math.floor(stats.nilsBid * 0.8); // Rough estimate for partners games
-        responseStats.nilsMade = Math.floor(stats.nilsMade * 0.8);
-        responseStats.blindNilsBid = Math.floor(stats.blindNilsBid * 0.8);
-        responseStats.blindNilsMade = Math.floor(stats.blindNilsMade * 0.8);
-      } else {
-        responseStats.nilsBid = Math.floor(stats.nilsBid * 0.2); // Rough estimate for solo games
-        responseStats.nilsMade = Math.floor(stats.nilsMade * 0.2);
-        responseStats.blindNilsBid = Math.floor(stats.blindNilsBid * 0.2);
-        responseStats.blindNilsMade = Math.floor(stats.blindNilsMade * 0.2);
+      // Calculate nil stats from the filtered games only
+      // This ensures we only count nils from games of the selected mode
+      if (filteredGames.length > 0) {
+        // Get the game IDs from filtered games
+        const gameIds = filteredGames.map(gp => gp.gameId).filter(id => id);
+        
+        if (gameIds.length > 0) {
+          // Fetch GameResult records for these games to get nil stats
+          const gameResults = await prisma.gameResult.findMany({
+            where: {
+              gameId: { in: gameIds },
+              playerId: userId
+            },
+            select: {
+              nilsBid: true,
+              nilsMade: true,
+              blindNilsBid: true,
+              blindNilsMade: true
+            }
+          });
+          
+          // Sum up the nil stats from the filtered games
+          responseStats.nilsBid = gameResults.reduce((sum, result) => sum + (result.nilsBid || 0), 0);
+          responseStats.nilsMade = gameResults.reduce((sum, result) => sum + (result.nilsMade || 0), 0);
+          responseStats.blindNilsBid = gameResults.reduce((sum, result) => sum + (result.blindNilsBid || 0), 0);
+          responseStats.blindNilsMade = gameResults.reduce((sum, result) => sum + (result.blindNilsMade || 0), 0);
+        }
       }
     }
     
