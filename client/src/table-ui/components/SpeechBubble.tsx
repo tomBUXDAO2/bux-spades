@@ -45,19 +45,14 @@ export default function SpeechBubble({
         isFading ? 'opacity-0' : 'opacity-100'
       }`}
       style={{
-        maxWidth: '200px',
-        minWidth: '100px'
+        maxWidth: '250px',
+        minWidth: '120px'
       }}
     >
       {/* Speech bubble */}
-      <div className="bg-white text-gray-800 rounded-lg px-3 py-2 shadow-lg border border-gray-200 relative">
-        {/* Player name */}
-        <div className="text-xs font-semibold text-gray-600 mb-1 truncate">
-          {playerName}
-        </div>
-        
+      <div className="bg-white text-gray-800 rounded-lg px-4 py-3 shadow-lg border border-gray-200 relative">
         {/* Message */}
-        <div className="text-sm leading-tight">
+        <div className="text-base font-bold leading-tight">
           {displayMessage}
         </div>
         
