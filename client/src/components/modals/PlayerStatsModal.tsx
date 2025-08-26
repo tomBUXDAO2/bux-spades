@@ -47,14 +47,12 @@ interface PlayerStatsModalProps {
 const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // Fetch stats when mode changes or player changes
   useEffect(() => {
     if (!isOpen || !player || !player.id) return;
 
     const fetchStats = async () => {
-      setLoading(true);
       try {
         const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
         const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
@@ -67,8 +65,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         console.error('Error fetching player stats:', error);
         // Fallback to original stats
         setCurrentStats(player.stats);
-      } finally {
-        setLoading(false);
       }
     };
 
