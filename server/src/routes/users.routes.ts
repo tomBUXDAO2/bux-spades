@@ -124,14 +124,20 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
     }
     
+    // Calculate bag counts from filtered games
+    let totalBagsFromFiltered = 0;
+    for (const gp of filteredGames) {
+      totalBagsFromFiltered += gp.bags || 0;
+    }
+
     // Determine which stats to return based on gameMode
     let responseStats;
     if (gameMode === 'PARTNERS') {
       responseStats = {
         gamesPlayed: partnersGamesPlayed, // Use actual count from filtered games
         gamesWon: partnersGamesWon, // Use actual count from filtered games
-        totalBags: stats.partnersTotalBags || 0,
-        bagsPerGame: stats.partnersBagsPerGame || 0,
+        totalBags: totalBagsFromFiltered, // Use actual bags from filtered games
+        bagsPerGame: partnersGamesPlayed > 0 ? totalBagsFromFiltered / partnersGamesPlayed : 0,
         nilsBid: 0, // Will calculate from filtered games
         nilsMade: 0, // Will calculate from filtered games
         blindNilsBid: 0, // Will calculate from filtered games
@@ -141,8 +147,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       responseStats = {
         gamesPlayed: soloGamesPlayed, // Use actual count from filtered games
         gamesWon: soloGamesWon, // Use actual count from filtered games
-        totalBags: stats.soloTotalBags || 0,
-        bagsPerGame: stats.soloBagsPerGame || 0,
+        totalBags: totalBagsFromFiltered, // Use actual bags from filtered games
+        bagsPerGame: soloGamesPlayed > 0 ? totalBagsFromFiltered / soloGamesPlayed : 0,
         nilsBid: 0, // Will calculate from filtered games
         nilsMade: 0, // Will calculate from filtered games
         blindNilsBid: 0, // Will calculate from filtered games
@@ -154,8 +160,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       responseStats = {
         gamesPlayed: totalGamesFromFiltered, // Use actual count from filtered games
         gamesWon: stats.gamesWon,
-        totalBags: stats.totalBags,
-        bagsPerGame: stats.bagsPerGame,
+        totalBags: totalBagsFromFiltered, // Use actual bags from filtered games
+        bagsPerGame: totalGamesFromFiltered > 0 ? totalBagsFromFiltered / totalGamesFromFiltered : 0,
         nilsBid: stats.nilsBid,
         nilsMade: stats.nilsMade,
         blindNilsBid: stats.blindNilsBid,
