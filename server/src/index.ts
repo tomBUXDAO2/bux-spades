@@ -1795,15 +1795,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             
             // Update database status to FINISHED
             if (game.dbGameId) {
-              try {
-                await prisma.game.update({
-                  where: { id: game.dbGameId },
-                  data: { status: 'FINISHED' }
-                });
+              prisma.game.update({
+                where: { id: game.dbGameId },
+                data: { status: 'FINISHED' }
+              }).then(() => {
                 console.log('[GAME OVER] Updated database status to FINISHED for solo game:', game.dbGameId);
-              } catch (error) {
+              }).catch((error) => {
                 console.error('[GAME OVER] Failed to update database status for solo game:', error);
-              }
+              });
             }
             
             let winningPlayer = 0;
@@ -1869,7 +1868,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (shouldEndGame && winningTeam) {
             console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-            await completeGame(game, winningTeam);
+            completeGame(game, winningTeam).catch(err => {
+              console.error('Failed to complete game:', err);
+            });
           }
         }
       }
@@ -2108,7 +2109,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         if (shouldEndGame && winningTeam) {
           console.log('[GAME OVER] Game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-          await completeGame(game, winningTeam);
+          completeGame(game, winningTeam).catch(err => {
+            console.error('Failed to complete game:', err);
+          });
         }
         return;
       }
