@@ -38,6 +38,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     const userId = req.params.id;
     const gameMode = req.query.gameMode as 'PARTNERS' | 'SOLO' | 'ALL' | undefined;
     
+    console.log('[USER STATS API] Request received:', { userId, gameMode, query: req.query });
+    
     const stats = await prisma.userStats.findUnique({
       where: { userId }
     });
@@ -56,6 +58,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
     });
     
+    console.log('[USER STATS API] Found games:', games.length);
+    
     // Filter games based on gameMode if specified
     let filteredGames = games;
     if (gameMode && gameMode !== 'ALL') {
@@ -63,6 +67,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         const g = gp.game as any;
         return g?.gameMode === gameMode;
       });
+      console.log('[USER STATS API] Filtered games for', gameMode, ':', filteredGames.length);
     }
     
     // Initialize counters
