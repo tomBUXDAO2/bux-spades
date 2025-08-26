@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../../lib/api';
 
 interface PlayerStats {
   gamesPlayed: number;
@@ -34,6 +35,7 @@ interface Player {
   stats: PlayerStats;
   status: 'friend' | 'blocked' | 'not_friend';
   coins?: number;
+  id?: string; // Add id for API calls
 }
 
 interface PlayerStatsModalProps {
@@ -44,9 +46,35 @@ interface PlayerStatsModalProps {
 
 const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
+  const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch stats when mode changes or player changes
+  useEffect(() => {
+    if (!isOpen || !player || !player.id) return;
+
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
+        const response = await api.get(`/api/users/${player.id}/stats?gameMode=${gameModeParam}`);
+        const stats = await response.json();
+        setCurrentStats(stats);
+      } catch (error) {
+        console.error('Error fetching player stats:', error);
+        // Fallback to original stats
+        setCurrentStats(player.stats);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [isOpen, player, mode]);
+
   if (!isOpen || !player) return null;
 
-  const stats = player.stats || {
+  const stats = currentStats || player.stats || {
     gamesPlayed: 0,
     gamesWon: 0,
     nilsBid: 0,
@@ -54,24 +82,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsBid: 0,
     blindNilsMade: 0,
   };
-  // Apply mode filter for totals
-  const allPlayedFromFormats = (stats.regPlayed ?? 0) + (stats.whizPlayed ?? 0) + (stats.mirrorPlayed ?? 0) + (stats.gimmickPlayed ?? 0);
-  const allWonFromFormats = (stats.regWon ?? 0) + (stats.whizWon ?? 0) + (stats.mirrorWon ?? 0) + (stats.gimmickWon ?? 0);
-  const filteredGamesPlayed = mode === 'partners'
-    ? (player.stats?.partnersGamesPlayed ?? 0)
-    : mode === 'solo'
-      ? (player.stats?.soloGamesPlayed ?? 0)
-      : allPlayedFromFormats;
-  const filteredGamesWon = mode === 'partners'
-    ? (player.stats?.partnersGamesWon ?? 0)
-    : mode === 'solo'
-      ? (player.stats?.soloGamesWon ?? 0)
-      : allWonFromFormats;
-  const winPercent = filteredGamesPlayed ? Math.round((filteredGamesWon / filteredGamesPlayed) * 100) : 0;
+
+  const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
   const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
   const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
 
-  // Defaults for all game modes and special rules
+  // Game mode breakdown stats
   const regPlayed = stats.regPlayed ?? 0;
   const regWon = stats.regWon ?? 0;
   const whizPlayed = stats.whizPlayed ?? 0;
@@ -85,6 +101,10 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const assassinPlayed = stats.assassinPlayed ?? 0;
   const assassinWon = stats.assassinWon ?? 0;
 
+  const handleModeChange = (newMode: 'all' | 'partners' | 'solo') => {
+    setMode(newMode);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1">
       <div className="bg-slate-800 rounded-lg w-full max-w-[85vw] max-h-[98vh] overflow-y-auto mx-1 p-2 sm:p-3 animate-fade-in relative border border-white/20">
@@ -93,17 +113,22 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         {/* Radio buttons - ultra compact */}
         <div className="flex justify-center gap-2 mb-2">
           <label className="flex items-center gap-1 cursor-pointer text-indigo-400 text-xs font-bold uppercase">
-            <input type="radio" name="mode" value="all" checked={mode === 'all'} onChange={() => setMode('all')} className="w-3 h-3 accent-indigo-500" />
+            <input type="radio" name="mode" value="all" checked={mode === 'all'} onChange={() => handleModeChange('all')} className="w-3 h-3 accent-indigo-500" />
             ALL
           </label>
           <label className="flex items-center gap-1 cursor-pointer text-indigo-400 text-xs font-bold uppercase">
-            <input type="radio" name="mode" value="partners" checked={mode === 'partners'} onChange={() => setMode('partners')} className="w-3 h-3 accent-indigo-500" />
+            <input type="radio" name="mode" value="partners" checked={mode === 'partners'} onChange={() => handleModeChange('partners')} className="w-3 h-3 accent-indigo-500" />
             PARTNERS
           </label>
           <label className="flex items-center gap-1 cursor-pointer text-indigo-400 text-xs font-bold uppercase">
-            <input type="radio" name="mode" value="solo" checked={mode === 'solo'} onChange={() => setMode('solo')} className="w-3 h-3 accent-indigo-500" />
+            <input type="radio" name="mode" value="solo" checked={mode === 'solo'} onChange={() => handleModeChange('solo')} className="w-3 h-3 accent-indigo-500" />
             SOLO
           </label>
+          {loading && (
+            <div className="text-xs text-slate-400 ml-2">
+              Loading...
+            </div>
+          )}
         </div>
 
         {/* Avatar, username, buttons, and stats - all in one compact container */}
@@ -167,11 +192,11 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-indigo-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm16 0a2 2 0 0 0-2-2h-1v16h1a2 2 0 0 0 2-2V6zm-7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
-              {filteredGamesPlayed} <span className="text-xs font-normal text-slate-400 ml-1">Played</span>
+              {stats.gamesPlayed} <span className="text-xs font-normal text-slate-400 ml-1">Played</span>
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-yellow-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M2 7l5 5 5-9 5 9 5-5-2 13H4L2 7zm4.24 11h11.52l1.26-8.18-3.5 3.5-3.52-6.34-3.52 6.34-3.5-3.5L6.24 18z"/></svg>
-              {filteredGamesWon} <span className="text-xs font-normal text-slate-400 ml-1">Won</span>
+              {stats.gamesWon} <span className="text-xs font-normal text-slate-400 ml-1">Won</span>
             </div>
             <div className="flex items-center text-sm sm:text-base font-extrabold text-orange-400">
               <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>

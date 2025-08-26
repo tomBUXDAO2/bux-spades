@@ -36,6 +36,8 @@ router.get('/', requireAuth, async (req, res) => {
 router.get('/:id/stats', requireAuth, async (req, res) => {
   try {
     const userId = req.params.id;
+    const gameMode = req.query.gameMode as 'PARTNERS' | 'SOLO' | 'ALL' | undefined;
+    
     const stats = await prisma.userStats.findUnique({
       where: { userId }
     });
@@ -53,6 +55,15 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         }
       }
     });
+    
+    // Filter games based on gameMode if specified
+    let filteredGames = games;
+    if (gameMode && gameMode !== 'ALL') {
+      filteredGames = games.filter(gp => {
+        const g = gp.game as any;
+        return g?.gameMode === gameMode;
+      });
+    }
     
     // Initialize counters
     let partnersGamesPlayed = 0;
@@ -72,7 +83,13 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       ASSASSIN: { played: 0, won: 0 }
     } as Record<string, { played: number; won: number }>;
     
-    for (const gp of games) {
+    // Count nil stats from filtered games
+    let nilsBid = 0;
+    let nilsMade = 0;
+    let blindNilsBid = 0;
+    let blindNilsMade = 0;
+    
+    for (const gp of filteredGames) {
       const g = gp.game as any;
       const mode = g?.gameMode as 'PARTNERS' | 'SOLO' | undefined;
       if (mode === 'PARTNERS') {
@@ -102,14 +119,52 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
     }
     
+    // Determine which stats to return based on gameMode
+    let responseStats;
+    if (gameMode === 'PARTNERS') {
+      responseStats = {
+        gamesPlayed: stats.partnersGamesPlayed || 0,
+        gamesWon: stats.partnersGamesWon || 0,
+        totalBags: stats.partnersTotalBags || 0,
+        bagsPerGame: stats.partnersBagsPerGame || 0,
+        nilsBid: stats.nilsBid || 0,
+        nilsMade: stats.nilsMade || 0,
+        blindNilsBid: stats.blindNilsBid || 0,
+        blindNilsMade: stats.blindNilsMade || 0,
+      };
+    } else if (gameMode === 'SOLO') {
+      responseStats = {
+        gamesPlayed: stats.soloGamesPlayed || 0,
+        gamesWon: stats.soloGamesWon || 0,
+        totalBags: stats.soloTotalBags || 0,
+        bagsPerGame: stats.soloBagsPerGame || 0,
+        nilsBid: stats.nilsBid || 0,
+        nilsMade: stats.nilsMade || 0,
+        blindNilsBid: stats.blindNilsBid || 0,
+        blindNilsMade: stats.blindNilsMade || 0,
+      };
+    } else {
+      // ALL games - use overall stats
+      responseStats = {
+        gamesPlayed: stats.gamesPlayed,
+        gamesWon: stats.gamesWon,
+        totalBags: stats.totalBags,
+        bagsPerGame: stats.bagsPerGame,
+        nilsBid: stats.nilsBid,
+        nilsMade: stats.nilsMade,
+        blindNilsBid: stats.blindNilsBid,
+        blindNilsMade: stats.blindNilsMade,
+      };
+    }
+    
     res.json({
-      ...stats,
-      // mode breakdown
+      ...responseStats,
+      // mode breakdown (always show filtered results)
       partnersGamesPlayed,
       partnersGamesWon,
       soloGamesPlayed,
       soloGamesWon,
-      // format breakdown (use 0 defaults if missing)
+      // format breakdown (filtered by gameMode if specified)
       regPlayed: fmt.REGULAR?.played || 0,
       regWon: fmt.REGULAR?.won || 0,
       whizPlayed: fmt.WHIZ?.played || 0,
@@ -118,7 +173,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       mirrorWon: fmt.MIRRORS?.won || 0,
       gimmickPlayed: fmt.GIMMICK?.played || 0,
       gimmickWon: fmt.GIMMICK?.won || 0,
-      // special rules breakdown
+      // special rules breakdown (filtered by gameMode if specified)
       screamerPlayed: special.SCREAMER?.played || 0,
       screamerWon: special.SCREAMER?.won || 0,
       assassinPlayed: special.ASSASSIN?.played || 0,

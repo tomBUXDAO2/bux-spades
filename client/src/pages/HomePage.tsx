@@ -518,6 +518,7 @@ const HomePage: React.FC = () => {
       const stats = await response.json();
       
       setSelectedPlayer({
+        id: player.id, // Add player ID for API calls
         username: player.username,
         avatar: player.avatar,
         status: player.status,
@@ -536,6 +537,7 @@ const HomePage: React.FC = () => {
       console.error('Error fetching player stats:', error);
       // Fallback with default stats if fetch fails
       setSelectedPlayer({
+        id: player.id, // Add player ID for API calls
         username: player.username,
         avatar: player.avatar,
         status: player.status,
