@@ -2880,22 +2880,23 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
         
         // Fetch GamePlayer records from database and get actual Discord IDs from User table
+        // Always get all 4 players who started the game, even if they left
         const gamePlayers = await prisma.gamePlayer.findMany({
           where: { gameId: dbGame.id },
           include: {
             user: {
-              select: { discordId: true }
+              select: { discordId: true, username: true }
             }
-          }
+          },
+          orderBy: { position: 'asc' }
         });
         
-        // Prepare game data for Discord
+        // Prepare game data for Discord - always show all 4 original players
         const gameData = {
           buyIn: game.buyIn,
-          players: game.players.map((p, i) => {
-            const dbPlayer = gamePlayers.find(gp => gp.position === i);
+          players: gamePlayers.map((dbPlayer, i) => {
             return {
-              userId: dbPlayer?.user?.discordId || p?.id || '', // Use actual Discord ID from User table, fallback to database ID
+              userId: dbPlayer.user?.discordId || dbPlayer.userId || '', // Use actual Discord ID from User table, fallback to database ID
               won: game.gameMode === 'SOLO' 
                 ? i === winningTeamOrPlayer 
                 : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
