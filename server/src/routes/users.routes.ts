@@ -128,8 +128,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     let responseStats;
     if (gameMode === 'PARTNERS') {
       responseStats = {
-        gamesPlayed: stats.partnersGamesPlayed || 0,
-        gamesWon: stats.partnersGamesWon || 0,
+        gamesPlayed: partnersGamesPlayed, // Use actual count from filtered games
+        gamesWon: partnersGamesWon, // Use actual count from filtered games
         totalBags: stats.partnersTotalBags || 0,
         bagsPerGame: stats.partnersBagsPerGame || 0,
         nilsBid: 0, // Will calculate from filtered games
@@ -139,8 +139,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       };
     } else if (gameMode === 'SOLO') {
       responseStats = {
-        gamesPlayed: stats.soloGamesPlayed || 0,
-        gamesWon: stats.soloGamesWon || 0,
+        gamesPlayed: soloGamesPlayed, // Use actual count from filtered games
+        gamesWon: soloGamesWon, // Use actual count from filtered games
         totalBags: stats.soloTotalBags || 0,
         bagsPerGame: stats.soloBagsPerGame || 0,
         nilsBid: 0, // Will calculate from filtered games
@@ -149,9 +149,10 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         blindNilsMade: 0, // Will calculate from filtered games
       };
     } else {
-      // ALL games - use overall stats
+      // ALL games - use overall stats but ensure they match the actual game count
+      const totalGamesFromFiltered = partnersGamesPlayed + soloGamesPlayed;
       responseStats = {
-        gamesPlayed: stats.gamesPlayed,
+        gamesPlayed: totalGamesFromFiltered, // Use actual count from filtered games
         gamesWon: stats.gamesWon,
         totalBags: stats.totalBags,
         bagsPerGame: stats.bagsPerGame,
