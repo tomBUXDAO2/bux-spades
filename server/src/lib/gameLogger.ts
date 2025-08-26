@@ -180,86 +180,11 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		});
 		console.log(`Created comprehensive game result record for game ${dbGame.id}`);
 		
-		// Send Discord results for league games
-		if ((game as any).league) {
-			try {
-				const { sendLeagueGameResults } = await import('../discord-bot/bot');
-				
-				// Create game line string
-				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
-				// Prefer bidType (e.g., WHIZ, MIRROR(S)), fallback to gameType from rules
-				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
-				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
-				
-				// Fetch GamePlayer records from database and get actual Discord IDs from User table
-				// Always get all 4 players who started the game, even if they left
-				const gamePlayers = await prisma.gamePlayer.findMany({
-					where: { gameId: dbGame.id },
-					include: {
-						user: {
-							select: { discordId: true, username: true }
-						}
-					},
-					orderBy: { position: 'asc' }
-				});
-				
-				console.log('[GAME LOGGER DISCORD DEBUG] GamePlayers with Discord IDs:', gamePlayers.map(gp => ({
-					position: gp.position,
-					username: gp.username,
-					gamePlayerDiscordId: gp.discordId,
-					userDiscordId: gp.user?.discordId
-				})));
-				
-				// Prepare game data for Discord - always show all 4 original players
-				const gameData = {
-					buyIn: game.buyIn,
-					players: gamePlayers.map((dbPlayer, i) => {
-						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
-						console.log(`[GAME LOGGER DISCORD DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
-						return {
-							userId: discordId, // Use actual Discord ID from User table, fallback to database ID
-							won: game.gameMode === 'SOLO' 
-								? i === winningTeamOrPlayer 
-								: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
-						};
-					})
-				};
-				
-				console.log('[GAME LOGGER DISCORD] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
-				await sendLeagueGameResults(gameData, gameLine);
-			} catch (error) {
-				console.error('Failed to send Discord results:', error);
-			}
-		}
+		// Discord embed is handled by logCompletedGame function - do not send here
 		
 	} catch (err) {
 		console.error('Failed to log completed game (server):', err);
 		
-		// Even if database logging fails, try to send Discord embed for league games
-		if ((game as any).league) {
-			try {
-				console.log('[DISCORD FALLBACK] Database logging failed, but attempting Discord embed for league game');
-				const { sendLeagueGameResults } = await import('../discord-bot/bot');
-				
-				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
-				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
-				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
-				
-				const gameData = {
-					buyIn: game.buyIn,
-					players: game.players.map((p: any, i: number) => ({
-						userId: p?.id || '',
-						won: game.gameMode === 'SOLO' 
-							? i === winningTeamOrPlayer 
-							: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
-					}))
-				};
-				
-				await sendLeagueGameResults(gameData, gameLine);
-				console.log('[DISCORD FALLBACK] Discord embed sent successfully despite database failure');
-			} catch (discordError) {
-				console.error('Failed to send Discord results (fallback):', discordError);
-			}
-		}
+		// Discord embed is handled by logCompletedGame function - do not send here
 	}
 } 

@@ -2916,6 +2916,12 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
         await sendLeagueGameResults(gameData, gameLine);
         (game as any).discordResultsSent = true; // Mark as sent to prevent duplicates
+        
+        // Also set a global flag to prevent duplicates across different functions
+        if (!(global as any).discordResultsSentForGame) {
+          (global as any).discordResultsSentForGame = {};
+        }
+        (global as any).discordResultsSentForGame[game.id] = true;
       } catch (error) {
         console.error('Failed to send Discord results:', error);
       }
@@ -3523,40 +3529,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
         });
       }
       
-      // Send Discord embed for league games
-      if ((game as any).league) {
-        try {
-          const { sendLeagueGameResults } = await import('../discord-bot/bot');
-          const formatCoins = (amount: number) => (amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`);
-          const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} REGULAR`;
-          
-          // Fetch GamePlayer records from database and get actual Discord IDs from User table
-          const gamePlayersWithDiscord = await prisma.gamePlayer.findMany({
-            where: { gameId: game.dbGameId },
-            include: {
-              user: {
-                select: { discordId: true, username: true }
-              }
-            },
-            orderBy: { position: 'asc' }
-          });
-          
-          const data = {
-            buyIn: game.buyIn,
-            players: gamePlayersWithDiscord.map((gp) => ({
-              userId: gp.user?.discordId || gp.discordId || gp.userId || '',
-              won: game.gameMode === 'PARTNERS' ? 
-                (winningTeam === 1 && (gp.position === 0 || gp.position === 2)) ||
-                (winningTeam === 2 && (gp.position === 1 || gp.position === 3)) :
-                gp.position === winningTeam
-            }))
-          };
-          await sendLeagueGameResults(data, gameLine);
-          console.log('[GAME COMPLETE] Discord embed sent for league game');
-        } catch (err) {
-          console.error('[GAME COMPLETE] Failed to send Discord embed:', err);
-        }
-      }
+      // Discord embed is handled by logCompletedGame function - do not send here
     }
     
     console.log('[GAME COMPLETE] Game completed successfully:', gameId);
