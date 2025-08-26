@@ -3529,10 +3529,22 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
           const { sendLeagueGameResults } = await import('../discord-bot/bot');
           const formatCoins = (amount: number) => (amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`);
           const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} REGULAR`;
+          
+          // Fetch GamePlayer records from database and get actual Discord IDs from User table
+          const gamePlayersWithDiscord = await prisma.gamePlayer.findMany({
+            where: { gameId: game.dbGameId },
+            include: {
+              user: {
+                select: { discordId: true, username: true }
+              }
+            },
+            orderBy: { position: 'asc' }
+          });
+          
           const data = {
             buyIn: game.buyIn,
-            players: gamePlayers.map((gp) => ({
-              userId: gp.discordId || gp.userId,
+            players: gamePlayersWithDiscord.map((gp) => ({
+              userId: gp.user?.discordId || gp.discordId || gp.userId || '',
               won: game.gameMode === 'PARTNERS' ? 
                 (winningTeam === 1 && (gp.position === 0 || gp.position === 2)) ||
                 (winningTeam === 2 && (gp.position === 1 || gp.position === 3)) :

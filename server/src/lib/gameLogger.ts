@@ -191,18 +191,41 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
 				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
 				
-				// Prepare game data for Discord
+				// Fetch GamePlayer records from database and get actual Discord IDs from User table
+				// Always get all 4 players who started the game, even if they left
+				const gamePlayers = await prisma.gamePlayer.findMany({
+					where: { gameId: dbGame.id },
+					include: {
+						user: {
+							select: { discordId: true, username: true }
+						}
+					},
+					orderBy: { position: 'asc' }
+				});
+				
+				console.log('[GAME LOGGER DISCORD DEBUG] GamePlayers with Discord IDs:', gamePlayers.map(gp => ({
+					position: gp.position,
+					username: gp.username,
+					gamePlayerDiscordId: gp.discordId,
+					userDiscordId: gp.user?.discordId
+				})));
+				
+				// Prepare game data for Discord - always show all 4 original players
 				const gameData = {
 					buyIn: game.buyIn,
-					players: game.players.map((p: any, i: number) => ({
-						userId: p?.id || '',
-						won: game.gameMode === 'SOLO' 
-							? i === winningTeamOrPlayer 
-							: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
-					}))
+					players: gamePlayers.map((dbPlayer, i) => {
+						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
+						console.log(`[GAME LOGGER DISCORD DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
+						return {
+							userId: discordId, // Use actual Discord ID from User table, fallback to database ID
+							won: game.gameMode === 'SOLO' 
+								? i === winningTeamOrPlayer 
+								: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+						};
+					})
 				};
 				
-				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
+				console.log('[GAME LOGGER DISCORD] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
 				await sendLeagueGameResults(gameData, gameLine);
 			} catch (error) {
 				console.error('Failed to send Discord results:', error);
