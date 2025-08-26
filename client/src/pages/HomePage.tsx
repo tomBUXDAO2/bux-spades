@@ -473,13 +473,17 @@ const HomePage: React.FC = () => {
 
   // Handler to open stats for current user
   const handleOpenMyStats = async () => {
-    if (!user) return;
     try {
-      const response = await api.get(`/api/users/${user.id}/stats`);
+      // Fetch user stats from the server with ALL mode for initial load
+      const response = await api.get(`/api/users/${user.id}/stats?gameMode=ALL`);
       const stats = await response.json();
+      
       setSelectedPlayer({
+        id: user.id, // Add user ID for API calls
         username: user.username,
         avatar: user.avatar,
+        status: 'not_friend' as const,
+        coins: user.coins,
         stats: stats || {
           gamesPlayed: 0,
           gamesWon: 0,
@@ -488,15 +492,18 @@ const HomePage: React.FC = () => {
           blindNilsBid: 0,
           blindNilsMade: 0,
         },
-        coins: user.coins,
       });
       setIsPlayerStatsOpen(true);
-    } catch (e) {
-      console.error('Error fetching my stats:', e);
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      // Fallback with default stats if fetch fails
       setSelectedPlayer({
+        id: user.id, // Add user ID for API calls
         username: user.username,
         avatar: user.avatar,
-        stats: user.stats || {
+        status: 'not_friend' as const,
+        coins: user.coins,
+        stats: {
           gamesPlayed: 0,
           gamesWon: 0,
           nilsBid: 0,
@@ -504,7 +511,6 @@ const HomePage: React.FC = () => {
           blindNilsBid: 0,
           blindNilsMade: 0,
         },
-        coins: user.coins,
       });
       setIsPlayerStatsOpen(true);
     }
@@ -513,8 +519,8 @@ const HomePage: React.FC = () => {
   // Handler to open stats for another player
   const handleOpenPlayerStats = async (player: any) => {
     try {
-      // Fetch player stats from the server
-      const response = await api.get(`/api/users/${player.id}/stats`);
+      // Fetch player stats from the server with ALL mode for initial load
+      const response = await api.get(`/api/users/${player.id}/stats?gameMode=ALL`);
       const stats = await response.json();
       
       setSelectedPlayer({
