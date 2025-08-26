@@ -105,8 +105,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
       <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header with radio buttons - full width */}
         <div className="p-6 border-b border-slate-700">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-white">Player Stats</h2>
+          <div className="flex justify-end mb-4">
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-white text-2xl"
@@ -115,8 +114,8 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             </button>
           </div>
           
-          {/* Radio buttons - much larger */}
-          <div className="flex gap-6">
+          {/* Radio buttons - centered */}
+          <div className="flex justify-center gap-6">
             <label className="flex items-center cursor-pointer">
               <input
                 type="radio"
@@ -153,12 +152,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           </div>
         </div>
 
-        {/* Main content - two columns */}
+        {/* Main content - two columns with equal height */}
         <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
             
             {/* Left Column - Shaded stats + Nil stats */}
-            <div className="space-y-6">
+            <div className="flex flex-col space-y-6">
               {/* Shaded stats div - only left half */}
               <div className="bg-slate-700 rounded-lg p-6">
                 <div className="flex items-center mb-4">
@@ -212,8 +211,8 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 </div>
               </div>
 
-              {/* Nil Stats - larger and clearer */}
-              <div className="bg-slate-700 rounded-lg p-6">
+              {/* Nil Stats - larger and clearer with vertical line */}
+              <div className="bg-slate-700 rounded-lg p-6 flex-1">
                 <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">Nil Stats</h3>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="text-center">
@@ -222,7 +221,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                     <div className="text-2xl font-bold text-white mb-2 mt-4">{stats.nilsMade}</div>
                     <div className="text-lg text-slate-300">Nils Made</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center relative">
+                    {/* Vertical line separator */}
+                    <div className="absolute left-0 top-0 bottom-0 w-px bg-slate-600"></div>
                     <div className="text-2xl font-bold text-white mb-2">{stats.blindNilsBid}</div>
                     <div className="text-lg text-slate-300">Blind Nils Bid</div>
                     <div className="text-2xl font-bold text-white mb-2 mt-4">{stats.blindNilsMade}</div>
@@ -234,7 +235,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                     <div className="text-2xl font-bold text-green-400">{nilPercent}%</div>
                     <div className="text-lg text-slate-300">Nils % Made</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center relative">
+                    {/* Vertical line separator */}
+                    <div className="absolute left-0 top-0 bottom-0 w-px bg-slate-600"></div>
                     <div className="text-2xl font-bold text-green-400">{blindNilPercent}%</div>
                     <div className="text-lg text-slate-300">Blind Nils % Made</div>
                   </div>
@@ -243,9 +246,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             </div>
 
             {/* Right Column - Game modes + Special rules */}
-            <div className="space-y-6">
+            <div className="flex flex-col space-y-6">
               {/* Game Mode Breakdown */}
-              <div className="bg-slate-700 rounded-lg p-6">
+              <div className="bg-slate-700 rounded-lg p-6 flex-1">
                 <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">Game Mode Breakdown</h3>
                 <div className="text-lg text-slate-400 text-center mb-4">(won/played)</div>
                 <div className="grid grid-cols-2 gap-4">
@@ -269,7 +272,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
               </div>
 
               {/* Special Rules */}
-              <div className="bg-slate-700 rounded-lg p-6">
+              <div className="bg-slate-700 rounded-lg p-6 flex-1">
                 <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">Special Rules</h3>
                 <div className="text-lg text-slate-400 text-center mb-4">(won/played)</div>
                 <div className="grid grid-cols-2 gap-6">
