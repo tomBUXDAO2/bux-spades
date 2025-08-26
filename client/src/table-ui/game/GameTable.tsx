@@ -1436,7 +1436,6 @@ export default function GameTable({
           <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 z-50">
             <SpeechBubble
               message={speechBubbles[player.id].message}
-              playerName={speechBubbles[player.id].playerName}
               isVisible={speechBubbles[player.id].isVisible}
               onFadeOut={() => handleSpeechBubbleFadeOut(player.id)}
               maxLength={50}

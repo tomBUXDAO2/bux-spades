@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 
 interface SpeechBubbleProps {
   message: string;
-  playerName: string;
   isVisible: boolean;
   onFadeOut: () => void;
   maxLength?: number;
@@ -10,7 +9,6 @@ interface SpeechBubbleProps {
 
 export default function SpeechBubble({ 
   message, 
-  playerName, 
   isVisible, 
   onFadeOut, 
   maxLength = 50 
