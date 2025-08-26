@@ -164,33 +164,24 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     
     // For PARTNERS and SOLO modes, we need to calculate nil stats from the filtered games
     if (gameMode === 'PARTNERS' || gameMode === 'SOLO') {
-      // Calculate nil stats from the filtered games only
-      // This ensures we only count nils from games of the selected mode
-      if (filteredGames.length > 0) {
-        // Get the game IDs from filtered games
-        const gameIds = filteredGames.map(gp => gp.gameId).filter(id => id);
+      // Calculate nil stats proportionally based on filtered games vs total games
+      const totalGames = stats.gamesPlayed || 1; // Avoid division by zero
+      const filteredGamesCount = filteredGames.length;
+      
+      if (filteredGamesCount > 0) {
+        // Calculate the proportion of nil stats that should belong to this game mode
+        const proportion = filteredGamesCount / totalGames;
         
-        if (gameIds.length > 0) {
-          // Fetch GameResult records for these games to get nil stats
-          const gameResults = await prisma.gameResult.findMany({
-            where: {
-              gameId: { in: gameIds },
-              playerId: userId
-            },
-            select: {
-              nilsBid: true,
-              nilsMade: true,
-              blindNilsBid: true,
-              blindNilsMade: true
-            }
-          });
-          
-          // Sum up the nil stats from the filtered games
-          responseStats.nilsBid = gameResults.reduce((sum, result) => sum + (result.nilsBid || 0), 0);
-          responseStats.nilsMade = gameResults.reduce((sum, result) => sum + (result.nilsMade || 0), 0);
-          responseStats.blindNilsBid = gameResults.reduce((sum, result) => sum + (result.blindNilsBid || 0), 0);
-          responseStats.blindNilsMade = gameResults.reduce((sum, result) => sum + (result.blindNilsMade || 0), 0);
-        }
+        responseStats.nilsBid = Math.round(stats.nilsBid * proportion);
+        responseStats.nilsMade = Math.round(stats.nilsMade * proportion);
+        responseStats.blindNilsBid = Math.round(stats.blindNilsBid * proportion);
+        responseStats.blindNilsMade = Math.round(stats.blindNilsMade * proportion);
+      } else {
+        // No games of this mode, so no nil stats
+        responseStats.nilsBid = 0;
+        responseStats.nilsMade = 0;
+        responseStats.blindNilsBid = 0;
+        responseStats.blindNilsMade = 0;
       }
     }
     
