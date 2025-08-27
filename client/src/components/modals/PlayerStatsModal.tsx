@@ -227,7 +227,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             {/* Game Mode Breakdown */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6">
               <h3 className="text-3xl font-bold text-white mb-2">Game Mode Breakdown</h3>
-              <div className="text-slate-300 text-lg mb-6">
+              <div className="text-slate-300 text-lg mb-6 text-right">
                 <span className="mr-4">(won/played)</span>
                 <span>(win %)</span>
               </div>
@@ -265,10 +265,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
             {/* Special Rules */}
             <div className="bg-slate-700 rounded-lg p-4">
-              <h3 className="text-xl font-bold text-white mb-2">Special Rules</h3>
-              <div className="text-slate-300 text-lg mb-3">
-                <span className="mr-4">(won/played)</span>
-                <span>(win %)</span>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xl font-bold text-white">Special Rules</h3>
+                <div className="text-slate-300 text-lg text-right">
+                  <span className="mr-4">(won/played)</span>
+                  <span>(win %)</span>
+                </div>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
