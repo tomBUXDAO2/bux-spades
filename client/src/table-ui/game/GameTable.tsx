@@ -10,7 +10,7 @@ import SeatReplacementModal from './SeatReplacementModal';
 import WinnerModal from './WinnerModal';
 import SoloWinnerModal from './SoloWinnerModal';
 import TrickHistoryModal from '../modals/TrickHistoryModal';
-import SpeechBubble from '../components/SpeechBubble';
+
 
 import BiddingInterface from './BiddingInterface';
 
@@ -454,14 +454,9 @@ export default function GameTable({
   const [showCoinDebit, setShowCoinDebit] = useState(false);
   const [coinDebitAmount, setCoinDebitAmount] = useState(0);
   
-  // Speech bubble state
-  const [speechBubbles, setSpeechBubbles] = useState<{
-    [playerId: string]: {
-      message: string;
-      playerName: string;
-      isVisible: boolean;
-    };
-  }>({});
+
+  
+
   
   // Leave table confirmation state
   const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
@@ -522,50 +517,7 @@ export default function GameTable({
     };
   }, [game.players, game.buyIn]);
   
-  // Handle chat messages for speech bubbles
-  useEffect(() => {
-    if (!socket) return;
-    
-    const handleChatMessage = (data: { gameId: string; message: ChatMessage }) => {
-      const { message } = data;
-      
-      // Only show speech bubbles for seated players (not spectators)
-      const isSeatedPlayer = game.players.some(p => p && p.id === message.userId);
-      
-      if (isSeatedPlayer && message.userId !== 'system') {
-        setSpeechBubbles(prev => ({
-          ...prev,
-          [message.userId]: {
-            message: message.message,
-            playerName: message.userName,
-            isVisible: true
-          }
-        }));
-        
-        // Auto-hide speech bubble after 4 seconds
-        setTimeout(() => {
-          handleSpeechBubbleFadeOut(message.userId);
-        }, 4000);
-      }
-    };
-    
-    socket.on('chat_message', handleChatMessage);
-    
-    return () => {
-      socket.off('chat_message', handleChatMessage);
-    };
-  }, [socket, game.players]);
-  
-  // Handle speech bubble fade out
-  const handleSpeechBubbleFadeOut = (playerId: string) => {
-    setSpeechBubbles(prev => ({
-      ...prev,
-      [playerId]: {
-        ...prev[playerId],
-        isVisible: false
-      }
-    }));
-  };
+
   
   const isMyTurn = game.currentPlayer === propUser?.id;
   const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
@@ -1346,7 +1298,7 @@ export default function GameTable({
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
-          backdrop-blur-sm bg-white/10 rounded-xl overflow-hidden
+          ${playerGradient} rounded-xl overflow-hidden
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
           transition-all duration-200
         `}>
@@ -1394,22 +1346,27 @@ export default function GameTable({
               </div>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <div className={`w-full px-2 py-1 rounded-lg shadow-sm ${playerGradient}`} style={{ width: isMobile ? '50px' : '70px' }}>
+              <div className="w-full px-2 py-1 rounded-lg shadow-sm" style={{ width: isMobile ? '50px' : '70px' }}>
                 <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
                   {displayName}
                 </div>
               </div>
               {/* Bid/Trick counter for bots, same as humans */}
-              <div className="backdrop-blur-md bg-white/20 rounded-full px-2 py-0.5 shadow-inner flex items-center justify-center gap-1"
-                   style={{ width: isMobile ? '50px' : '70px' }}>
-                <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 600 }}>
+              <div className="bg-white rounded-full px-2 py-1 shadow-inner flex items-center justify-center gap-1"
+                   style={{ 
+                     width: isMobile ? '60px' : '80px',
+                     minWidth: isMobile ? '60px' : '80px',
+                     height: isMobile ? '24px' : '28px',
+                     minHeight: isMobile ? '24px' : '28px'
+                   }}>
+                <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: 600, color: 'black', minWidth: isMobile ? '8px' : '10px', textAlign: 'center' }}>
                   {gameState.status === "WAITING" ? "0" : madeCount}
                 </span>
-                <span className="text-white/70" style={{ fontSize: isMobile ? '9px' : '11px' }}>/</span>
-                <span className="text-white font-semibold" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+                <span style={{ fontSize: isMobile ? '11px' : '13px', color: 'black' }}>/</span>
+                <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: 600, color: 'black', minWidth: isMobile ? '8px' : '10px', textAlign: 'center' }}>
                   {gameState.status === "WAITING" ? "0" : bidCount}
                 </span>
-                <span style={{ fontSize: isMobile ? '10px' : '12px' }} className="ml-1">
+                <span style={{ fontSize: isMobile ? '12px' : '14px', minWidth: isMobile ? '12px' : '14px', textAlign: 'center' }}>
                   {madeStatus}
                 </span>
               </div>
@@ -1434,15 +1391,19 @@ export default function GameTable({
           />
         )}
         
-        {/* Speech bubble */}
-        {speechBubbles[player.id] && (
-          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 z-50">
-            <SpeechBubble
-              message={speechBubbles[player.id].message}
-              isVisible={speechBubbles[player.id].isVisible}
-              onFadeOut={() => handleSpeechBubbleFadeOut(player.id)}
-              maxLength={50}
-            />
+        {/* Single arrow for West player only */}
+        {position === 1 && (
+          <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-4">
+            <div 
+              className="w-0 h-0 border-transparent"
+              style={{
+                borderLeftWidth: '16px',
+                borderRightWidth: '16px',
+                borderTopWidth: '0px',
+                borderBottomWidth: '16px',
+                borderBottomColor: 'white'
+              }}
+            ></div>
           </div>
         )}
       </div>
@@ -3360,6 +3321,8 @@ export default function GameTable({
           </div>
         </div>
       )}
+
+
 
     </>
   );

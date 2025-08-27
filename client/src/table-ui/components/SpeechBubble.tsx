@@ -5,13 +5,17 @@ interface SpeechBubbleProps {
   isVisible: boolean;
   onFadeOut: () => void;
   maxLength?: number;
+  position?: 'left' | 'bottom'; // Add position prop
+  playerPosition?: number; // Add player position for specific cases
 }
 
 export default function SpeechBubble({ 
   message, 
   isVisible, 
   onFadeOut, 
-  maxLength = 50 
+  maxLength = 50,
+  position = 'bottom', // Default to bottom
+  playerPosition // Add playerPosition prop
 }: SpeechBubbleProps) {
   const [isFading, setIsFading] = useState(false);
 
@@ -47,16 +51,76 @@ export default function SpeechBubble({
         minWidth: '120px'
       }}
     >
-      {/* Speech bubble */}
-      <div className="bg-white text-gray-800 rounded-lg px-4 py-3 shadow-lg border border-gray-200 relative">
+      {/* Speech bubble - HIDDEN FOR TESTING */}
+      <div className="bg-white text-gray-800 rounded-lg px-4 py-3 relative" style={{ display: 'none' }}>
         {/* Message */}
-        <div className="text-base font-bold leading-tight">
+        <div className={`text-base font-bold leading-tight ${
+          playerPosition === 3 ? 'text-right' : 'text-left'
+        }`}>
           {displayMessage}
         </div>
-        
-        {/* Speech bubble tail */}
-        <div className="absolute -bottom-2 left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"></div>
       </div>
+      
+      {/* Speech bubble tail - VISIBLE FOR TESTING */}
+      {playerPosition === 1 ? (
+        // West player (position 1) - arrow pointing up from bottom of container
+        <div 
+          className="absolute w-0 h-0 border-transparent"
+          style={{
+            bottom: '-8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            borderLeftWidth: '16px',
+            borderRightWidth: '16px',
+            borderTopWidth: '0px',
+            borderBottomWidth: '16px',
+            borderBottomColor: 'white'
+          }}
+        ></div>
+      ) : playerPosition === 3 ? (
+        // East player (position 3) - arrow pointing up from bottom of container
+        <div 
+          className="absolute w-0 h-0 border-transparent"
+          style={{
+            bottom: '-8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            borderLeftWidth: '16px',
+            borderRightWidth: '16px',
+            borderTopWidth: '0px',
+            borderBottomWidth: '16px',
+            borderBottomColor: 'white'
+          }}
+        ></div>
+      ) : position === 'left' ? (
+        // North/South players (position 0/2) - arrow pointing right from right edge of container
+        <div 
+          className="absolute w-0 h-0 border-transparent"
+          style={{
+            top: '50%',
+            transform: 'translateY(-50%)',
+            right: '-8px',
+            borderLeftWidth: '16px',
+            borderRightWidth: '0px',
+            borderTopWidth: '16px',
+            borderBottomWidth: '16px',
+            borderLeftColor: 'white'
+          }}
+        ></div>
+      ) : (
+        // Fallback for bottom-positioned bubbles (shouldn't be used with new logic)
+        <div 
+          className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-transparent"
+          style={{
+            top: '-8px',
+            borderLeftWidth: '16px',
+            borderRightWidth: '16px',
+            borderTopWidth: '0px',
+            borderBottomWidth: '16px',
+            borderBottomColor: 'white'
+          }}
+        ></div>
+      )}
     </div>
   );
 } 
