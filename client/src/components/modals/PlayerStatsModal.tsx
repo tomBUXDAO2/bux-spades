@@ -226,12 +226,10 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           <div className="flex flex-col">
             {/* Game Mode Breakdown */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-3xl font-bold text-white">Game Mode Breakdown</h3>
-                <div className="text-slate-300 text-lg">
-                  <span className="mr-4">(won/played)</span>
-                  <span>(win %)</span>
-                </div>
+              <h3 className="text-3xl font-bold text-white mb-2">Game Mode Breakdown</h3>
+              <div className="text-slate-300 text-lg mb-6">
+                <span className="mr-4">(won/played)</span>
+                <span>(win %)</span>
               </div>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -267,12 +265,10 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
             {/* Special Rules */}
             <div className="bg-slate-700 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xl font-bold text-white">Special Rules</h3>
-                <div className="text-slate-300 text-lg">
-                  <span className="mr-4">(won/played)</span>
-                  <span>(win %)</span>
-                </div>
+              <h3 className="text-xl font-bold text-white mb-2">Special Rules</h3>
+              <div className="text-slate-300 text-lg mb-3">
+                <span className="mr-4">(won/played)</span>
+                <span>(win %)</span>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
@@ -280,6 +276,13 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   <div className="flex space-x-8">
                     <span className="text-lg text-white">{specialRules.screamer}</span>
                     <span className="text-lg text-white">{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-lg text-white">Assassin</span>
+                  <div className="flex space-x-8">
+                    <span className="text-lg text-white">{specialRules.assassin}</span>
+                    <span className="text-lg text-white">{stats.assassinPlayed ? Math.round(((stats.assassinWon || 0) / stats.assassinPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
               </div>
