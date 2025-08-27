@@ -49,7 +49,7 @@ interface User {
   email: string;
   avatar: string | null;
   coins: number;
-  sessionToken?: string;
+  isAuthenticated?: boolean;
   stats?: {
     gamesPlayed: number;
     gamesWon: number;
@@ -65,7 +65,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   setUser: (user: User | null) => void;
-  login: (email: string, password: string) => Promise<{ activeGame?: { id: string; status: string } }>;
+  login: (username: string, password: string) => Promise<{ activeGame?: { id: string; status: string } }>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (username: string, avatar: string) => Promise<void>;
@@ -82,14 +82,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('sessionToken') || 
-                  sessionStorage.getItem('sessionToken') || 
-                  (window as any).__tempSessionToken;
-    if (token) {
-      fetchProfile();
-    } else {
-      setLoading(false);
+    // Check if user data exists in localStorage
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.isAuthenticated) {
+          setUser(parsedUser);
+        }
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
     }
+    
+    // Always try to fetch fresh profile data
+    fetchProfile();
   }, []);
 
   // Listen for session invalidation events
@@ -99,7 +106,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setShowSessionInvalidatedModal(true);
       // Clear user data
       setUser(null);
-      localStorage.removeItem('sessionToken');
       localStorage.removeItem('userData');
     };
 
@@ -112,26 +118,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('sessionToken') || 
-                    sessionStorage.getItem('sessionToken') || 
-                    (window as any).__tempSessionToken;
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      console.log('Fetching profile with token:', token);
+      console.log('Fetching profile with session authentication');
       const response = await axios.get('/api/auth/profile', {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        withCredentials: true // Include cookies for session auth
       });
       
       if (response.data?.user) {
         const userData = {
           ...response.data.user,
-          sessionToken: token
+          isAuthenticated: true
         };
         setUser(userData);
         
@@ -146,41 +141,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('userData', JSON.stringify(userData));
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
-            // Continue without storing - the user is still logged in via sessionToken
+            // Continue without storing - the user is still logged in via session
           }
         }
       } else {
         console.error('Invalid profile response:', response.data);
-        localStorage.removeItem('sessionToken');
+        setUser(null);
+        localStorage.removeItem('userData');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      localStorage.removeItem('sessionToken');
+      setUser(null);
+      localStorage.removeItem('userData');
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     try {
       setError(null);
-      console.log('Attempting login with:', { email });
+      console.log('Attempting login with:', { username });
       const response = await axios.post(
         '/api/auth/login',
-        { email, password },
+        { username, password },
         {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          withCredentials: true
         }
       );
 
-      if (response.data?.token && response.data?.user) {
+      if (response.data?.user) {
         console.log('Login successful:', response.data);
-        localStorage.setItem('sessionToken', response.data.token);
         const userData = {
           ...response.data.user,
-          sessionToken: response.data.token
+          isAuthenticated: true
         };
         setUser(userData);
         
@@ -195,21 +189,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('userData', JSON.stringify(userData));
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
-            // Continue without storing - the user is still logged in via sessionToken
+            // Continue without storing - the user is still logged in via session
           }
         }
-        
-        // Return active game information if available
+
         return { activeGame: response.data.activeGame };
       } else {
-        console.error('Invalid login response:', response.data);
-        throw new Error('Invalid response from server');
+        throw new Error('Invalid login response');
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials and try again.';
+      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
       setError(errorMessage);
-      throw new Error(errorMessage);
+      throw error;
     }
   };
 
@@ -221,18 +213,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         '/api/auth/register',
         { username, email, password },
         {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          withCredentials: true
         }
       );
 
-      if (response.data?.token && response.data?.user) {
+      if (response.data?.message) {
         console.log('Registration successful:', response.data);
-        localStorage.setItem('sessionToken', response.data.token);
+        // Registration successful, but user needs to login
+        // Don't automatically log them in - they should login after registration
+      } else {
+        console.error('Invalid registration response:', response.data);
+        throw new Error('Invalid response from server');
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Call server logout endpoint to clear session
+      await axios.post('/api/auth/logout', {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      // Clear local data regardless of server response
+      localStorage.removeItem('userData');
+      sessionStorage.removeItem('userData');
+      setUser(null);
+    }
+  };
+
+  const updateProfile = async (username: string, avatar: string) => {
+    try {
+      setError(null);
+
+      console.log('Attempting profile update:', { username, avatar });
+      const response = await axios.put(
+        '/api/auth/profile',
+        { username, avatar },
+        {
+          withCredentials: true
+        }
+      );
+
+      if (response.data?.user) {
+        console.log('Profile update successful:', response.data);
         const userData = {
           ...response.data.user,
-          sessionToken: response.data.token
+          isAuthenticated: true
         };
         setUser(userData);
         
@@ -247,64 +279,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('userData', JSON.stringify(userData));
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
-            // Continue without storing - the user is still logged in via sessionToken
+            // Continue without storing - the user is still logged in via session
           }
         }
-      } else {
-        console.error('Invalid registration response:', response.data);
-        throw new Error('Invalid response from server');
-      }
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Registration failed. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('sessionToken');
-    localStorage.removeItem('userData');
-    sessionStorage.removeItem('sessionToken');
-    sessionStorage.removeItem('userData');
-    setUser(null);
-  };
-
-  const updateProfile = async (username: string, avatar: string) => {
-    try {
-      setError(null);
-      const token = localStorage.getItem('sessionToken');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      console.log('Attempting profile update:', { username, avatar });
-      const response = await axios.put(
-        '/api/auth/profile',
-        { username, avatar },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.data?.user) {
-        console.log('Profile update successful:', response.data);
-        const userData = {
-          ...response.data.user,
-          sessionToken: token
-        };
-        setUser(userData);
-        localStorage.setItem('userData', JSON.stringify(userData));
       } else {
         console.error('Invalid profile update response:', response.data);
         throw new Error('Invalid response from server');
       }
     } catch (error: any) {
       console.error('Profile update error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Profile update failed. Please try again.';
+      const errorMessage = error.response?.data?.error || error.message || 'Profile update failed. Please try again.';
       setError(errorMessage);
       throw new Error(errorMessage);
     }

@@ -9,21 +9,18 @@ const AuthCallback: React.FC = () => {
   const { setUser } = useAuth();
 
   useEffect(() => {
-    const fetchUserProfile = async (token: string) => {
+    const fetchUserProfile = async () => {
       try {
-        console.log('Fetching profile with Discord token:', token);
+        console.log('Fetching profile with session authentication');
         const response = await axios.get('/api/auth/profile', {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
+          withCredentials: true // Include cookies for session auth
         });
         
         if (response.data?.user) {
           console.log('Discord login successful:', response.data);
           const userData = {
             ...response.data.user,
-            sessionToken: token
+            isAuthenticated: true
           };
           setUser(userData);
           
@@ -35,7 +32,7 @@ const AuthCallback: React.FC = () => {
             // Clear localStorage and try again
             try {
               localStorage.clear();
-          localStorage.setItem('userData', JSON.stringify(userData));
+              localStorage.setItem('userData', JSON.stringify(userData));
             } catch (retryError) {
               console.error('Failed to store user data even after clearing localStorage:', retryError);
               // Try storing just essential data
@@ -43,12 +40,12 @@ const AuthCallback: React.FC = () => {
                 const essentialData = {
                   id: userData.id,
                   username: userData.username,
-                  sessionToken: userData.sessionToken
+                  isAuthenticated: true
                 };
                 localStorage.setItem('userData', JSON.stringify(essentialData));
               } catch (finalError) {
                 console.error('Failed to store even essential user data:', finalError);
-                // Continue without storing - the user is still logged in via sessionToken
+                // Continue without storing - the user is still logged in via session
               }
             }
           }
@@ -63,47 +60,22 @@ const AuthCallback: React.FC = () => {
           }
         } else {
           console.error('Invalid profile response:', response.data);
-          localStorage.removeItem('sessionToken');
           navigate('/login', { replace: true });
         }
       } catch (error: any) {
         console.error('Error fetching profile after Discord login:', error);
-        localStorage.removeItem('sessionToken');
         navigate('/login', { replace: true });
       }
     };
 
-    const token = searchParams.get('token');
-    if (token) {
-      console.log('Discord callback received token:', token);
-      
-      // Try to store session token in localStorage, but handle quota exceeded error
-      try {
-        localStorage.setItem('sessionToken', token);
-      } catch (storageError) {
-        console.warn('Failed to store session token in localStorage (quota exceeded):', storageError);
-        // Clear localStorage and try again
-        try {
-          localStorage.clear();
-      localStorage.setItem('sessionToken', token);
-        } catch (retryError) {
-          console.error('Failed to store session token even after clearing localStorage:', retryError);
-          // Try storing in sessionStorage as fallback
-          try {
-            sessionStorage.setItem('sessionToken', token);
-            console.log('Stored session token in sessionStorage as fallback');
-          } catch (sessionError) {
-            console.error('Failed to store session token in sessionStorage:', sessionError);
-            // Store in memory as last resort
-            (window as any).__tempSessionToken = token;
-            console.log('Stored session token in memory as last resort');
-          }
-        }
-      }
-      
-      fetchUserProfile(token);
+    const success = searchParams.get('success');
+    const userId = searchParams.get('userId');
+    
+    if (success === 'true' && userId) {
+      console.log('Discord callback received success:', { success, userId });
+      fetchUserProfile();
     } else {
-      console.error('No token received in Discord callback');
+      console.error('No success or userId received in Discord callback');
       navigate('/login', { replace: true });
     }
   }, [searchParams, navigate, setUser]);
