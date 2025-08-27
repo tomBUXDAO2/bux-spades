@@ -37,7 +37,7 @@ async function triggerDiscordEmbed() {
 
     console.log('Found GameResult - Winner:', gameResult.winner, 'Team 1 Score:', gameResult.team1Score, 'Team 2 Score:', gameResult.team2Score);
 
-    // Create mock game object for Discord embed
+    // Create game object using actual game data from database
     const mockGame = {
       id: game.id,
       dbGameId: game.id,
@@ -45,7 +45,9 @@ async function triggerDiscordEmbed() {
       team1TotalScore: gameResult.team1Score,
       team2TotalScore: gameResult.team2Score,
       rules: {
-        bidType: game.bidType
+        bidType: game.bidType,
+        allowNil: game.allowNil,
+        allowBlindNil: game.allowBlindNil
       },
       specialRules: {},
       league: true,

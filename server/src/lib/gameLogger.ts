@@ -216,7 +216,12 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				// Create game line string
 				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
 				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
-				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
+				let gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
+				
+				// Add nil and blind nil rules to the game line
+				if (game.rules?.allowNil !== undefined || game.rules?.allowBlindNil !== undefined) {
+					gameLine += ` nil ${game.rules.allowNil ? '☑️' : '❌'} bn ${game.rules.allowBlindNil ? '☑️' : '❌'}`;
+				}
 				
 				// Get GamePlayer records with Discord IDs
 				const gamePlayers = await prisma.gamePlayer.findMany({

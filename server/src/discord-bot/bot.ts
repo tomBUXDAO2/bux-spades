@@ -1108,6 +1108,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       const playerMentions = gameLine.players.map(p => `<@${p.userId}>`).join(' ');
       
       // Build game line format: "100k Partners 100/-100 Regular nil tick bn cross"
+      const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
       let gameLineFormat = `${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1)} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.charAt(0).toUpperCase() + gameLine.gameType.slice(1)}`;
       
       // Add nil and blind nil indicators
@@ -1115,31 +1116,20 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         gameLineFormat += ` nil ${gameLine.nil === 'yes' ? '☑️' : '❌'} bn ${gameLine.blindNil === 'yes' ? '☑️' : '❌'}`;
       }
       
-      // Build team information
-      let teamInfo = '';
-      if (gameLine.gameMode === 'partners') {
-        // Preserve fixed seat mapping using seat property
-        const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).sort((a,b)=>a.seat-b.seat).map(p => `<@${p.userId}>`);
-        const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).sort((a,b)=>a.seat-b.seat).map(p => `<@${p.userId}>`);
-        teamInfo = `🔴 **Red Team:** ${redTeam.join(', ')}\n🔵 **Blue Team:** ${blueTeam.join(', ')}`;
-      } else {
-        // Solo mode
-        const soloColors = ['🔴', '🔵', '🟠', '🟢'];
-        const colorNames = ['Red', 'Blue', 'Orange', 'Green'];
-        teamInfo = gameLine.players.map((p, index) => 
-          `${soloColors[index]} **${colorNames[index]} Player:** <@${p.userId}>`
-        ).join('\n');
-      }
+      // Build team info
+      const teamInfo = gameLine.players.map((p: any) => {
+        const team = p.seat === 0 || p.seat === 2 ? '🔴 Red Team' : '🔵 Blue Team';
+        return `${team}: @${p.username}`;
+      }).join('\n');
       
-      // Create game ready embed
-      const gameReadyEmbed = new EmbedBuilder()
+      const embed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('🎮 Table Up!')
         .setDescription(`**${gameLineFormat}**\n\n${teamInfo}\n\n**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**\n\n**GOOD LUCK! 🍀**`)
         .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .setTimestamp();
       
-      await message.reply({ embeds: [gameReadyEmbed] });
+      await message.reply({ embeds: [embed] });
       
       // Remove game line from active list
       activeGameLines.delete(message.id);
@@ -1244,22 +1234,6 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       resultsEmbed.addFields(
         { name: '📊 Final Score', value: `Team 1: ${gameData.team1Score} | Team 2: ${gameData.team2Score}`, inline: false }
       );
-    }
-
-    // Add nil/blind nil rules if available
-    if (gameData.allowNil !== undefined || gameData.allowBlindNil !== undefined) {
-      const nilRules = [];
-      if (gameData.allowNil !== undefined) {
-        nilRules.push(`Nil: ${gameData.allowNil ? '☑️' : '❌'}`);
-      }
-      if (gameData.allowBlindNil !== undefined) {
-        nilRules.push(`Blind Nil: ${gameData.allowBlindNil ? '☑️' : '❌'}`);
-      }
-      if (nilRules.length > 0) {
-        resultsEmbed.addFields(
-          { name: '🎯 Game Rules', value: nilRules.join(' | '), inline: false }
-        );
-      }
     }
     
     await channel.send({ embeds: [resultsEmbed] });
