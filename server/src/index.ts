@@ -2279,6 +2279,18 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
       });
 
+      // Start a new round in DB for this hand
+      if (game.dbGameId) {
+        const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
+        import('./lib/trickLogger').then(({ trickLogger }) => {
+          trickLogger.startRound(game.dbGameId!, roundNumber).then(() => {
+            console.log(`[ROUND STARTED] Round ${roundNumber} started for game:`, game.dbGameId);
+          }).catch((err: Error) => {
+            console.error('Failed to start round logging for new hand:', err);
+          });
+        }).catch((e: Error) => console.error('Failed to import trickLogger for start_new_hand:', e));
+      }
+
       // Emit new hand started event with dealing phase
       console.log('[START NEW HAND] Emitting new_hand_started event');
       io.to(game.id).emit('new_hand_started', {
