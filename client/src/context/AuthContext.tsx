@@ -82,21 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
 
   useEffect(() => {
-    // Check if user data exists in localStorage
-    const userData = localStorage.getItem('userData');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        if (parsedUser.isAuthenticated) {
-          setUser(parsedUser);
-        }
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
+    const token = localStorage.getItem('sessionToken') || 
+                  sessionStorage.getItem('sessionToken') || 
+                  (window as any).__tempSessionToken;
+    if (token) {
+      fetchProfile();
+    } else {
+      setLoading(false);
     }
-    
-    // Always try to fetch fresh profile data
-    fetchProfile();
   }, []);
 
   // Listen for session invalidation events
@@ -106,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setShowSessionInvalidatedModal(true);
       // Clear user data
       setUser(null);
+      localStorage.removeItem('sessionToken');
       localStorage.removeItem('userData');
     };
 
@@ -118,15 +112,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async () => {
     try {
-      console.log('Fetching profile with session authentication');
+      const token = localStorage.getItem('sessionToken') || 
+                    sessionStorage.getItem('sessionToken') || 
+                    (window as any).__tempSessionToken;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching profile with token:', token);
       const response = await axios.get('/api/auth/profile', {
-        withCredentials: true // Include cookies for session auth
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
       
       if (response.data?.user) {
         const userData = {
           ...response.data.user,
-          isAuthenticated: true
+          sessionToken: token
         };
         setUser(userData);
         
@@ -141,18 +146,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('userData', JSON.stringify(userData));
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
-            // Continue without storing - the user is still logged in via session
+            // Continue without storing - the user is still logged in via sessionToken
           }
         }
       } else {
         console.error('Invalid profile response:', response.data);
-        setUser(null);
-        localStorage.removeItem('userData');
+        localStorage.removeItem('sessionToken');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setUser(null);
-      localStorage.removeItem('userData');
+      localStorage.removeItem('sessionToken');
     } finally {
       setLoading(false);
     }

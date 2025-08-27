@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import passport from 'passport';
+import jwt from 'jsonwebtoken';
 
 // Import Discord bot functions (optional)
 let checkAndUpdateUserRole: any = null;
@@ -31,12 +32,10 @@ router.get(
   async (req, res) => {
     const user = (req as any).user;
     
-    console.log('Discord callback - Session debug:', {
-      sessionID: req.sessionID,
-      user: user,
-      authenticated: req.isAuthenticated(),
-      hasSession: !!req.session,
-      cookies: req.headers.cookie
+    console.log('Discord callback - User authenticated:', {
+      userId: user.id,
+      username: user.username,
+      discordId: user.discordId
     });
 
     // Check Facebook connection and update Discord role
@@ -50,9 +49,14 @@ router.get(
       }
     }
 
-    // Redirect to frontend with success
+    // Generate JWT token
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'fallback-secret', {
+      expiresIn: '7d',
+    });
+
+    // Redirect to frontend with token
     res.redirect(
-      `${process.env.CLIENT_URL}/auth/callback?success=true&userId=${user.id}`
+      `${process.env.CLIENT_URL}/auth/callback?token=${token}`
     );
   }
 );
