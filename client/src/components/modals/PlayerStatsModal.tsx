@@ -103,34 +103,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
       <div className="bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-slate-600">
-          <div className="flex items-center space-x-4">
-            <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
-            <div>
-              <h2 className="text-3xl font-bold text-white">{player.username}</h2>
-              <div className="flex items-center space-x-6 mt-2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">⭐</span>
-                  <span className="text-xl text-white">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-blue-400">🏁</span>
-                  <span className="text-xl text-white">{stats.gamesPlayed} Played</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-green-400">🎒</span>
-                  <span className="text-xl text-white">{stats.totalBags} Bags</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-purple-400">🏆</span>
-                  <span className="text-xl text-white">{stats.gamesWon} Won</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-orange-400">✅</span>
-                  <span className="text-xl text-white">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <h2 className="text-3xl font-bold text-white">Player Stats</h2>
           
           {/* Radio buttons and close button */}
           <div className="flex items-center space-x-6">
@@ -182,6 +155,36 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         <div className="flex p-6 space-x-6 h-full">
           {/* Left Column */}
           <div className="flex-1 flex flex-col h-full">
+            {/* Player Profile Card */}
+            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+              <div className="flex items-center space-x-4 mb-4">
+                <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
+                <h3 className="text-3xl font-bold text-white">{player.username}</h3>
+              </div>
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">⭐</span>
+                  <span className="text-xl text-white">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-blue-400">🏁</span>
+                  <span className="text-xl text-white">{stats.gamesPlayed} Played</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-green-400">🎒</span>
+                  <span className="text-xl text-white">{stats.totalBags} Bags</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-purple-400">🏆</span>
+                  <span className="text-xl text-white">{stats.gamesWon} Won</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-orange-400">✅</span>
+                  <span className="text-xl text-white">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
+                </div>
+              </div>
+            </div>
+
             {/* Nil Stats */}
             <div className="bg-slate-700 rounded-lg p-6 flex-1">
               <h3 className="text-2xl font-bold text-white mb-4">Nil Stats</h3>
