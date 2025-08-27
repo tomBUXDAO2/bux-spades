@@ -1,287 +1,207 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { z } from 'zod';
-import { games } from '../gamesStore';
-import type { Game } from '../types/game';
-
-
-// Validation schemas
-const registerSchema = z.object({
-  username: z.string().min(3).max(20),
-  email: z.string().email(),
-  password: z.string().min(6),
-});
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
-});
-
-// JWT token generation
-const generateToken = (userId: string): string => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || '', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  } as any);
-};
+import bcrypt from 'bcrypt';
+import { prisma } from '../lib/prisma';
 
 export const register = async (req: Request, res: Response) => {
-  console.log('Register endpoint hit', req.body); // Log when register is hit
   try {
-    const { username, email, password } = registerSchema.parse(req.body);
+    const { username, email, password } = req.body;
 
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { email },
           { username },
-        ],
-      },
+          { email }
+        ]
+      }
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        message: 'User with this email or username already exists',
-      });
+      return res.status(400).json({ error: 'Username or email already exists' });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with default avatar
+    // Create user
+    const now = new Date();
+    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const user = await prisma.user.create({
       data: {
+        id: userId,
         username,
         email,
         password: hashedPassword,
         avatar: '/default-pfp.jpg',
-        coins: 5000000, // 5 million coins
-      },
+        coins: 5000000,
+        createdAt: now,
+        updatedAt: now
+      } as any
     });
 
     // Create user stats
-    const stats = await prisma.userStats.create({
+    const statsId = `stats_${userId}_${Date.now()}`;
+    await prisma.userStats.create({
       data: {
-        userId: user.id,
-      },
+        id: statsId,
+        userId: userId,
+        createdAt: now,
+        updatedAt: now
+      } as any
     });
 
-    const token = generateToken(user.id);
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        coins: user.coins,
-        stats: stats,
-      },
-    });
+    res.status(201).json({ message: 'User created successfully', userId: user.id });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        message: 'Invalid input data',
-        errors: error.errors,
-      });
-    }
-    console.error('Registration error:', error); // Log all errors
-    res.status(500).json({
-      message: 'Internal server error',
-    });
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const login = async (req: Request, res: Response) => {
-  console.log('Login endpoint hit', req.body); // Log when login is hit
   try {
-    const { email, password } = loginSchema.parse(req.body);
+    const { username, password } = req.body;
 
-    // Find user with stats
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        stats: true,
-      },
+    // Find user
+    const user = await prisma.user.findFirst({
+      where: { username },
+      include: { UserStats: true }
     });
 
-    if (!user || !user.password) {
-      return res.status(401).json({
-        message: 'Invalid email or password',
-      });
+    if (!user || !user.UserStats) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const stats = user.UserStats as any;
 
-    if (!isValidPassword) {
-      return res.status(401).json({
-        message: 'Invalid email or password',
-      });
+    // Check password
+    if (!user.password || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate token
-    const token = generateToken(user.id);
-
-    // Check if user is in an active game
-    console.log('[ACTIVE GAME DEBUG] Checking for active games for user:', user.id);
-    console.log('[ACTIVE GAME DEBUG] User details:', {
-      id: user.id,
-      username: user.username,
-      discordId: user.discordId
-    });
-    console.log('[ACTIVE GAME DEBUG] Available games:', games.map(g => ({ 
-      id: g.id, 
-      status: g.status, 
-      league: (g as any).league,
-      players: g.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null)
-    })));
-    
-    const activeGame = games.find((game: Game) => {
-      const isPlayer = game.players.some((player: any) => 
-        player && player.id === user.id && player.type === 'human'
-      );
-      const isLeagueGame = (game as any).league;
-      const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
-      const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
-      
-      console.log(`[ACTIVE GAME DEBUG] Game ${game.id}: isPlayer=${isPlayer}, status=${game.status}, isLeagueGame=${isLeagueGame}, isActiveGame=${isActiveGame}, isLeagueGameWaiting=${isLeagueGameWaiting}`);
-      console.log(`[ACTIVE GAME DEBUG] Game ${game.id} players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
-      
-      // GAIL DEBUG: Special logging for league games to help identify user mismatches
-      if (isLeagueGame && game.status === 'WAITING') {
-        console.log(`[GAIL DEBUG] League game ${game.id} - Checking user matching:`);
-        console.log(`[GAIL DEBUG] Current user:`, { id: user.id, username: user.username, discordId: user.discordId });
-        console.log(`[GAIL DEBUG] Game players:`, game.players.map(p => p ? { id: p.id, username: p.username, type: p.type } : null));
-        
-        // Check if any player has a similar username (case-insensitive)
-        const similarUsername = game.players.find(p => p && p.username.toLowerCase() === user.username.toLowerCase());
-        if (similarUsername) {
-          console.log(`[GAIL DEBUG] Found similar username but different ID:`, {
-            gamePlayer: { id: similarUsername.id, username: similarUsername.username },
-            currentUser: { id: user.id, username: user.username }
-          });
-        }
+    // Set session
+    req.login(user, (err) => {
+      if (err) {
+        console.error('Login error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
       }
-      
-      return isPlayer && (isActiveGame || isLeagueGameWaiting);
-    });
-    
-    console.log('[ACTIVE GAME DEBUG] Found active game:', activeGame ? { id: activeGame.id, status: activeGame.status } : null);
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        coins: user.coins,
-        stats: user.stats,
-      },
-      activeGame: activeGame ? {
-        id: activeGame.id,
-        status: activeGame.status
-      } : null,
+      res.json({ 
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          discordId: user.discordId,
+          avatar: user.avatar,
+          coins: user.coins
+        }
+      });
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        message: 'Invalid input data',
-        errors: error.errors,
-      });
-    }
-    console.error('Login error:', error); // Log all errors
-    res.status(500).json({
-      message: 'Internal server error',
-    });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
+};
+
+export const logout = (req: Request, res: Response) => {
+  req.logout((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+    res.json({ message: 'Logout successful' });
+  });
 };
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
-    let user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { stats: true },
+    const user = await prisma.user.findUnique({
+      where: { id: (req.user as any).id },
+      include: { UserStats: true }
     });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Refresh avatar from Discord if missing/default and discordId exists
-    if (user.discordId && (!user.avatar || user.avatar === '/default-pfp.jpg')) {
-      try {
-        const token = process.env.DISCORD_BOT_TOKEN;
-        if (token) {
-          // @ts-ignore Node 18+ has global fetch
-          const resp = await fetch(`https://discord.com/api/v10/users/${user.discordId}`, {
-            headers: { Authorization: `Bot ${token}` }
-          });
-          if (resp.ok) {
-            const du: any = await resp.json();
-            if (du.avatar) {
-              const avatarUrl = `https://cdn.discordapp.com/avatars/${user.discordId}/${du.avatar}.png`;
-              user = await prisma.user.update({ where: { id: user.id }, data: { avatar: avatarUrl }, include: { stats: true } });
-              console.log('[PROFILE] Refreshed avatar from Discord for', user.username);
-            }
-          } else {
-            console.log('[PROFILE] Discord fetch failed', resp.status);
-          }
-        }
-      } catch (e) {
-        console.log('[PROFILE] Discord avatar refresh error', (e as any)?.message);
-      }
-    }
-
-    // Check active game
-    const activeGame = games.find((game: Game) => {
-      const isPlayer = game.players.some((player: any) => player && player.id === userId && player.type === 'human');
-      const isLeagueGame = (game as any).league;
-      const isActiveGame = game.status === 'BIDDING' || game.status === 'PLAYING' || game.status === 'HAND_COMPLETED';
-      const isLeagueGameWaiting = isLeagueGame && game.status === 'WAITING';
-      return isPlayer && (isActiveGame || isLeagueGameWaiting);
-    });
+    const stats = user.UserStats as any;
 
     res.json({
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
+        discordId: user.discordId,
         avatar: user.avatar,
         coins: user.coins,
-        stats: user.stats,
-      },
-      activeGame: activeGame ? { id: activeGame.id, status: activeGame.status } : null,
+        stats: {
+          gamesPlayed: stats?.gamesPlayed || 0,
+          gamesWon: stats?.gamesWon || 0,
+          nilsBid: stats?.nilsBid || 0,
+          nilsMade: stats?.nilsMade || 0,
+          blindNilsBid: stats?.blindNilsBid || 0,
+          blindNilsMade: stats?.blindNilsMade || 0,
+          totalBags: stats?.totalBags || 0,
+          bagsPerGame: stats?.bagsPerGame || 0
+        }
+      }
     });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
-    const { username, avatar } = req.body;
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
-    console.log('[SERVER DEBUG] Profile update request:', { userId, username, avatarLength: avatar ? avatar.length : 0, hasAvatar: !!avatar });
+    const { username, email, avatar } = req.body;
+    const userId = (req.user as any).id;
 
-    const user = await prisma.user.update({
+    // Check if username is already taken
+    if (username) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          username,
+          NOT: { id: userId }
+        }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+    }
+
+    // Update user
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { username, avatar },
+      data: {
+        ...(username && { username }),
+        ...(email && { email }),
+        ...(avatar && { avatar }),
+        updatedAt: new Date()
+      }
     });
 
-    console.log('[SERVER DEBUG] Profile update successful:', { userId: user.id, username: user.username, avatar: user.avatar });
-
-    res.json({ user: { id: user.id, username: user.username, email: user.email, avatar: user.avatar, coins: user.coins } });
+    res.json({ 
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        discordId: updatedUser.discordId,
+        avatar: updatedUser.avatar,
+        coins: updatedUser.coins
+      }
+    });
   } catch (error) {
-    console.error('[SERVER DEBUG] Update profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }; 

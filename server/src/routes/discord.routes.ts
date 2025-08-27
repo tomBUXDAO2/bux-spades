@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import passport from 'passport';
-import jwt from 'jsonwebtoken';
 
 // Import Discord bot functions (optional)
 let checkAndUpdateUserRole: any = null;
@@ -31,9 +30,6 @@ router.get(
   passport.authenticate('discord', { failureRedirect: '/login' }),
   async (req, res) => {
     const user = (req as any).user;
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || '', {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    } as any);
 
     // Check Facebook connection and update Discord role
     if (user.discordId && checkAndUpdateUserRole) {
@@ -46,9 +42,9 @@ router.get(
       }
     }
 
-    // Redirect to frontend with token
+    // Redirect to frontend with success
     res.redirect(
-      `${process.env.CLIENT_URL}/auth/callback?token=${token}`
+      `${process.env.CLIENT_URL}/auth/callback?success=true&userId=${user.id}`
     );
   }
 );
