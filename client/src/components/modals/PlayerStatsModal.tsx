@@ -106,7 +106,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           <h2 className="text-3xl font-bold text-white">Player Stats</h2>
           
           {/* Radio buttons and close button */}
-          <div className="flex items-center space-x-6">
+          <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center space-x-4">
               <label className="flex items-center space-x-2">
                 <input
@@ -152,16 +152,16 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         </div>
 
         {/* Content - Two columns with equal height */}
-        <div className="flex p-6 space-x-6 h-full">
+        <div className="grid grid-cols-2 gap-6 p-6">
           {/* Left Column */}
-          <div className="flex-1 flex flex-col h-full">
+          <div className="flex flex-col">
             {/* Player Profile Card */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6">
               <div className="flex items-center space-x-4 mb-4">
                 <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
                 <h3 className="text-3xl font-bold text-white">{player.username}</h3>
               </div>
-              <div className="flex items-center space-x-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center space-x-2">
                   <span className="text-yellow-400">⭐</span>
                   <span className="text-xl text-white">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
@@ -229,7 +229,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           </div>
 
           {/* Right Column */}
-          <div className="flex-1 flex flex-col h-full">
+          <div className="flex flex-col">
             {/* Game Mode Breakdown */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6 flex-1">
               <h3 className="text-3xl font-bold text-white mb-2">Game Mode Breakdown</h3>
