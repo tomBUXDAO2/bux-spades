@@ -106,7 +106,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           <h2 className="text-3xl font-bold text-white">Player Stats</h2>
           
           {/* Radio buttons and close button */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-4">
               <label className="flex items-center space-x-2">
                 <input
@@ -161,26 +161,28 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
                 <h3 className="text-3xl font-bold text-white">{player.username}</h3>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">⭐</span>
-                  <span className="text-xl text-white">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
+                  <span className="text-yellow-400 text-2xl">⭐</span>
+                  <span className="text-2xl font-bold text-yellow-400">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-blue-400">🏁</span>
-                  <span className="text-xl text-white">{stats.gamesPlayed} Played</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-green-400">🎒</span>
-                  <span className="text-xl text-white">{stats.totalBags} Bags</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-purple-400">🏆</span>
-                  <span className="text-xl text-white">{stats.gamesWon} Won</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-orange-400">✅</span>
-                  <span className="text-xl text-white">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-blue-400">🏁</span>
+                    <span className="text-xl text-blue-400">{stats.gamesPlayed} Played</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-purple-400">🏆</span>
+                    <span className="text-xl text-purple-400">{stats.gamesWon} Won</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-green-400">🎒</span>
+                    <span className="text-xl text-green-400">{stats.totalBags} Bags</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-orange-400">✅</span>
+                    <span className="text-xl text-orange-400">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -232,12 +234,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           <div className="flex flex-col">
             {/* Game Mode Breakdown */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6 flex-1">
-              <h3 className="text-3xl font-bold text-white mb-2">Game Mode Breakdown</h3>
+              <h3 className="text-3xl font-bold text-white mb-4">Game Mode Breakdown</h3>
               <div className="text-slate-300 text-lg mb-6 text-right">
                 <span className="mr-4">(won/played)</span>
                 <span>(win %)</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <span className="text-xl text-white">Regular</span>
                   <div className="flex space-x-8">
