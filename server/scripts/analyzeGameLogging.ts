@@ -4,15 +4,9 @@ const prisma = new PrismaClient();
 
 async function analyzeGameLogging() {
   try {
-    // Get the most recent completed game
-    const game = await prisma.game.findFirst({
-      where: {
-        status: 'FINISHED',
-        league: true
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
+    // Get the specific game we were working with
+    const game = await prisma.game.findUnique({
+      where: { id: 'cmeufuo1o018kxq2e4o7aaqqg' }
     });
 
     if (!game) {

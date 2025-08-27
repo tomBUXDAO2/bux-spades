@@ -1,115 +1,118 @@
 import { PrismaClient } from '@prisma/client';
-import { trickLogger } from '../src/lib/trickLogger';
+import { logCompletedGameToDbAndDiscord } from '../src/lib/gameLogger';
 
 const prisma = new PrismaClient();
 
 async function testGameLogging() {
-  console.log('🎮 Testing Game Logging Fix...\n');
-
   try {
-    // Test 1: Check current database state
-    console.log('📊 Current Database State:');
-    const games = await prisma.game.count();
-    const rounds = await prisma.round.count();
-    const tricks = await prisma.trick.count();
-    const cards = await prisma.card.count();
-    console.log(`   Games: ${games}`);
-    console.log(`   Rounds: ${rounds}`);
-    console.log(`   Tricks: ${tricks}`);
-    console.log(`   Cards: ${cards}\n`);
-
-    // Test 2: Create a test user
-    console.log('👤 Creating test user...');
-    const testUser = await prisma.user.findFirst();
-    if (!testUser) {
-      throw new Error('No users found in database');
+    console.log('Testing game logging functionality...');
+    
+    // Test database connection
+    await prisma.$connect();
+    console.log('✅ Database connection successful');
+    
+    // Get a real user from the database
+    const realUser = await prisma.user.findFirst();
+    if (!realUser) {
+      console.log('❌ No users found in database. Please create a user first.');
+      return;
     }
-    console.log(`   Using user: ${testUser.username}\n`);
-
-    // Test 3: Create a test game (simulating logGameStart)
-    console.log('🎮 Creating test game...');
-    const testGame = await prisma.game.create({
-      data: {
-        creatorId: testUser.id,
-        gameMode: 'PARTNERS',
+    
+    console.log(`✅ Using real user: ${realUser.username} (${realUser.id})`);
+    
+    // Create a mock game object for testing
+    const mockGame: any = {
+      id: 'test-game-' + Date.now(),
+      dbGameId: null, // Will be created
+      gameMode: 'PARTNERS' as const,
+      team1TotalScore: 250,
+      team2TotalScore: 200,
+      buyIn: 10000,
+      minPoints: 250,
+      maxPoints: 500,
+      rules: {
         bidType: 'REGULAR',
-        specialRules: [],
-        minPoints: -200,
-        maxPoints: 500,
-        buyIn: 1000,
-        rated: false, // Unrated game with bots
-        status: 'PLAYING',
-      }
-    });
-    console.log(`   Created game: ${testGame.id}\n`);
-
-    // Test 4: Start round logging (simulating the fix)
-    console.log('🔄 Testing round creation...');
-    const roundId = await trickLogger.startRound(testGame.id, 1);
-    console.log(`   Round started: ${roundId}\n`);
-
-    // Test 5: Test trick logging
-    console.log('🃏 Testing trick logging...');
-    const trickData = {
-      roundId,
-      trickNumber: 1,
-      leadPlayerId: testUser.id,
-      winningPlayerId: testUser.id,
-      cards: [
-        { playerId: testUser.id, suit: 'SPADES', value: 14, position: 0 },
-        { playerId: 'bot-1', suit: 'HEARTS', value: 13, position: 1 },
-        { playerId: 'bot-2', suit: 'DIAMONDS', value: 12, position: 2 },
-        { playerId: 'bot-3', suit: 'CLUBS', value: 11, position: 3 },
-      ]
-    };
-
-    const trickId = await trickLogger.logTrick(trickData);
-    console.log(`   Trick logged: ${trickId}\n`);
-
-    // Test 6: Verify results
-    console.log('📊 Verifying results...');
-    const finalGames = await prisma.game.count();
-    const finalRounds = await prisma.round.count();
-    const finalTricks = await prisma.trick.count();
-    const finalCards = await prisma.card.count();
-
-    console.log(`   Final Games: ${finalGames}`);
-    console.log(`   Final Rounds: ${finalRounds}`);
-    console.log(`   Final Tricks: ${finalTricks}`);
-    console.log(`   Final Cards: ${finalCards}\n`);
-
-    // Test 7: Test statistics
-    console.log('📈 Testing statistics...');
-    const stats = await trickLogger.getGameTrickStats(testGame.id);
-    console.log(`   Total Rounds: ${stats.totalRounds}`);
-    console.log(`   Total Tricks: ${stats.totalTricks}`);
-    console.log(`   Total Cards: ${stats.totalCards}\n`);
-
-    // Test 8: Clean up
-    console.log('🧹 Cleaning up...');
-    await prisma.card.deleteMany({
-      where: {
-        trick: {
-          round: { gameId: testGame.id }
+        allowNil: true,
+        allowBlindNil: false
+      },
+      specialRules: {},
+      league: true,
+      players: [
+        {
+          id: realUser.id,
+          type: 'human',
+          username: realUser.username,
+          discordId: realUser.discordId,
+          bid: 3,
+          tricks: 4,
+          bags: 1
+        },
+        {
+          id: realUser.id, // Using same user for test
+          type: 'human',
+          username: realUser.username + '_2',
+          discordId: realUser.discordId,
+          bid: 2,
+          tricks: 3,
+          bags: 1
+        },
+        {
+          id: realUser.id, // Using same user for test
+          type: 'human',
+          username: realUser.username + '_3',
+          discordId: realUser.discordId,
+          bid: 4,
+          tricks: 3,
+          bags: 0
+        },
+        {
+          id: realUser.id, // Using same user for test
+          type: 'human',
+          username: realUser.username + '_4',
+          discordId: realUser.discordId,
+          bid: 4,
+          tricks: 3,
+          bags: 0
         }
-      }
-    });
-    await prisma.trick.deleteMany({
+      ],
+      createdAt: Date.now() - 3600000 // 1 hour ago
+    };
+    
+    console.log('Testing game logging with mock data...');
+    await logCompletedGameToDbAndDiscord(mockGame, 1); // Team 1 wins
+    
+    console.log('✅ Game logging test completed successfully');
+    
+    // Check if the game was created in the database
+    const games = await prisma.game.findMany({
       where: {
-        round: { gameId: testGame.id }
+        creatorId: realUser.id
+      },
+      include: {
+        GamePlayer: true,
+        GameResult: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 1
+    });
+    
+    if (games.length > 0) {
+      const game = games[0];
+      console.log('✅ Game created in database:', game.id);
+      console.log('✅ Game players:', game.GamePlayer.length);
+      console.log('✅ Game result:', game.GameResult ? 'created' : 'missing');
+      
+      if (game.GameResult) {
+        console.log('✅ Final score:', game.GameResult.finalScore);
+        console.log('✅ Winner:', game.GameResult.winner);
+        console.log('✅ Team scores:', game.GameResult.team1Score, 'vs', game.GameResult.team2Score);
       }
-    });
-    await prisma.round.deleteMany({
-      where: { gameId: testGame.id }
-    });
-    await prisma.game.delete({
-      where: { id: testGame.id }
-    });
-    console.log('   Cleanup completed\n');
-
-    console.log('✅ Game logging fix test completed successfully!');
-    console.log('🎯 The fix should now work correctly for real games!');
-
+    } else {
+      console.log('❌ No game found in database');
+    }
+    
   } catch (error) {
     console.error('❌ Test failed:', error);
   } finally {
@@ -117,5 +120,4 @@ async function testGameLogging() {
   }
 }
 
-// Run the test
 testGameLogging(); 

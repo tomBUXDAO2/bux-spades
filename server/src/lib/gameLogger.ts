@@ -43,19 +43,6 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					data: {
 						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
 						specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-						solo,
-						whiz,
-						mirror,
-						gimmick,
-						screamer,
-						assassin,
-						completed: true,
-						cancelled: false,
-						finalScore,
-						winner,
-						gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
-						league: (game as any).league || false,
-						specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
 						status: 'FINISHED'
 					}
 				});
@@ -69,8 +56,11 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		
 		if (!game.dbGameId) {
 			// Fallback: create new game record if dbGameId is missing
+			const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			const now = new Date();
 			dbGame = await prisma.game.create({
 				data: {
+					id: gameId,
 					creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
 					gameMode: game.gameMode,
 					bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
@@ -78,22 +68,10 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					minPoints: game.minPoints,
 					maxPoints: game.maxPoints,
 					buyIn: game.buyIn,
-					solo,
-					whiz,
-					mirror,
-					gimmick,
-					screamer,
-					assassin,
-					rated: true,
-					completed: true,
-					cancelled: false,
-					finalScore,
-					winner,
-					gameType: whiz ? 'WHIZ' : mirror ? 'MIRRORS' : gimmick ? 'GIMMICK' : 'REGULAR',
-					league: (game as any).league || false,
-					specialRulesApplied: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-					status: 'FINISHED'
-				}
+					status: 'FINISHED',
+					createdAt: now,
+					updatedAt: now
+				} as any
 			});
 			console.log('[GAME COMPLETED] Created new game record in database:', dbGame.id);
 		}
@@ -125,6 +103,8 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			else won = team === winner;
 			
 			try {
+				const playerId = `player_${dbGame.id}_${i}_${Date.now()}`;
+				const now = new Date();
 				// Use upsert to handle existing records
 				await prisma.gamePlayer.upsert({
 					where: {
@@ -146,6 +126,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						discordId: player.discordId || null
 					},
 					create: {
+						id: playerId,
 						gameId: dbGame.id,
 						userId,
 						position: i,
@@ -158,8 +139,10 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						finalPoints,
 						won,
 						username: player.username,
-						discordId: player.discordId || null
-					}
+						discordId: player.discordId || null,
+						createdAt: now,
+						updatedAt: now
+					} as any
 				});
 				console.log(`[GAME LOGGER] Upserted GamePlayer for ${player.username} at position ${i}`);
 			} catch (playerError) {
@@ -189,8 +172,11 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		});
 
 		if (!existingGameResult) {
+			const resultId = `result_${dbGame.id}_${Date.now()}`;
+			const now = new Date();
 			await prisma.gameResult.create({
 				data: {
+					id: resultId,
 					gameId: dbGame.id,
 					winner,
 					finalScore,
@@ -200,8 +186,10 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					playerResults,
 					totalRounds: game.rounds?.length || 0,
 					totalTricks: game.play?.tricks?.length || 0,
-					specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 }
-				}
+					specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 },
+					createdAt: now,
+					updatedAt: now
+				} as any
 			});
 			console.log(`Created comprehensive game result record for game ${dbGame.id}`);
 		} else {
@@ -227,7 +215,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				const gamePlayers = await prisma.gamePlayer.findMany({
 					where: { gameId: dbGame.id },
 					include: {
-						user: {
+						User: {
 							select: { discordId: true, username: true }
 						}
 					},
@@ -242,7 +230,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					allowNil: game.rules?.allowNil || false,
 					allowBlindNil: game.rules?.allowBlindNil || false,
 					players: gamePlayers.map((dbPlayer, i) => {
-						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
+						const discordId = dbPlayer.User?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
 						console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
 						return {
 							userId: discordId,

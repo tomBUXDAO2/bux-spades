@@ -7,61 +7,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String        @id @default(cuid())
-  email        String?       @unique
-  username     String        @unique
-  password     String?       @default("")
-  discordId    String?       @unique
-  avatar       String?       @default("/default-pfp.jpg")
-  coins        Int           @default(5000000)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  blockedBy    BlockedUser[] @relation("BlockedByUser")
-  blockedUsers BlockedUser[] @relation("UserBlocked")
-  friendsOf    Friend[]      @relation("FriendsOfUser")
-  friends      Friend[]      @relation("UserFriends")
-  gamesCreated Game[]        @relation("GameCreator")
-  gamesPlayed  GamePlayer[]
-  stats        UserStats?
+model BlockedUser {
+  id                               String   @id
+  userId                           String
+  blockedId                        String
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime
+  User_BlockedUser_blockedIdToUser User     @relation("BlockedUser_blockedIdToUser", fields: [blockedId], references: [id])
+  User_BlockedUser_userIdToUser    User     @relation("BlockedUser_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, blockedId])
+}
+
+model Friend {
+  id                         String   @id
+  userId                     String
+  friendId                   String
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime
+  User_Friend_friendIdToUser User     @relation("Friend_friendIdToUser", fields: [friendId], references: [id])
+  User_Friend_userIdToUser   User     @relation("Friend_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, friendId])
 }
 
 model Game {
-  id                  String        @id @default(cuid())
-  creatorId           String
-  status              GameStatus    @default(WAITING)
-  gameMode            GameMode
-  bidType             BidType
-  specialRules        SpecialRule[]
-  minPoints           Int
-  maxPoints           Int
-  buyIn               Int
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  solo                Boolean       @default(false)
-  whiz                Boolean       @default(false)
-  mirror              Boolean       @default(false)
-  gimmick             Boolean       @default(false)
-  screamer            Boolean       @default(false)
-  assassin            Boolean       @default(false)
-  rated               Boolean?      @default(false)
-  completed           Boolean?      @default(false)
-  cancelled           Boolean?      @default(false)
-  finalScore          Int?
-  winner              Int?
-  gameType            String?       @default("REGULAR")
-  specialRulesApplied SpecialRule[]
-  league              Boolean?      @default(false)
-  allowNil            Boolean?      @default(true)
-  allowBlindNil       Boolean?      @default(false)
-  creator             User          @relation("GameCreator", fields: [creatorId], references: [id])
-  players             GamePlayer[]
-  gameResult          GameResult?
-  rounds              Round[]
+  id           String        @id
+  creatorId    String
+  status       GameStatus    @default(WAITING)
+  gameMode     GameMode
+  bidType      BidType
+  specialRules SpecialRule[]
+  minPoints    Int
+  maxPoints    Int
+  buyIn        Int
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime
+  User         User          @relation(fields: [creatorId], references: [id])
+  GamePlayer   GamePlayer[]
+  Round        Round[]
+  GameResult   GameResult?
 }
 
 model GamePlayer {
-  id          String   @id @default(cuid())
+  id          String   @id
   gameId      String
   userId      String
   position    Int
@@ -70,60 +59,79 @@ model GamePlayer {
   bags        Int      @default(0)
   points      Int      @default(0)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime
   finalScore  Int?
   finalBags   Int?
   finalPoints Int?
   won         Boolean?
-  // Denormalized for easier DB inspection
-  username    String?
   discordId   String?
-  game        Game     @relation(fields: [gameId], references: [id])
-  user        User     @relation(fields: [userId], references: [id])
+  username    String?
+  Game        Game     @relation(fields: [gameId], references: [id])
+  User        User     @relation(fields: [userId], references: [id])
 
   @@unique([gameId, position])
 }
 
 model Round {
-  id          String   @id @default(cuid())
+  id          String   @id
   gameId      String
   roundNumber Int
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  game        Game     @relation(fields: [gameId], references: [id])
-  tricks      Trick[]
+  updatedAt   DateTime
+  Game        Game     @relation(fields: [gameId], references: [id])
+  Trick       Trick[]
 
   @@unique([gameId, roundNumber])
 }
 
 model Trick {
-  id              String   @id @default(cuid())
+  id              String   @id
   roundId         String
+  trickNumber     Int      // Trick number within the round (1-13)
   leadPlayerId    String
   winningPlayerId String
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  trickNumber     Int
-  cards           Card[]
-  round           Round    @relation(fields: [roundId], references: [id])
+  updatedAt       DateTime
+  Card            Card[]
+  Round           Round    @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, trickNumber])
 }
 
 model Card {
-  id        String   @id @default(cuid())
+  id        String   @id
   trickId   String
   playerId  String
   suit      Suit
   value     Int
+  position  Int      // Position in the trick (0-3)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  position  Int
-  trick     Trick    @relation(fields: [trickId], references: [id])
+  updatedAt DateTime
+  Trick     Trick    @relation(fields: [trickId], references: [id])
+}
+
+model User {
+  id                                      String        @id
+  email                                   String?       @unique
+  username                                String        @unique
+  password                                String?       @default("")
+  discordId                               String?       @unique
+  avatar                                  String?       @default("/default-pfp.jpg")
+  coins                                   Int           @default(5000000)
+  createdAt                               DateTime      @default(now())
+  updatedAt                               DateTime
+  BlockedUser_BlockedUser_blockedIdToUser BlockedUser[] @relation("BlockedUser_blockedIdToUser")
+  BlockedUser_BlockedUser_userIdToUser    BlockedUser[] @relation("BlockedUser_userIdToUser")
+  Friend_Friend_friendIdToUser            Friend[]      @relation("Friend_friendIdToUser")
+  Friend_Friend_userIdToUser              Friend[]      @relation("Friend_userIdToUser")
+  Game                                    Game[]
+  GamePlayer                              GamePlayer[]
+  UserStats                               UserStats?
+  UserGameStats                           UserGameStats[]
 }
 
 model UserStats {
-  id                  String   @id @default(cuid())
+  id                  String   @id
   userId              String   @unique
   gamesPlayed         Int      @default(0)
   gamesWon            Int      @default(0)
@@ -131,8 +139,6 @@ model UserStats {
   nilsMade            Int      @default(0)
   blindNilsBid        Int      @default(0)
   blindNilsMade       Int      @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
   totalBags           Int      @default(0)
   bagsPerGame         Float    @default(0)
   partnersGamesPlayed Int?     @default(0)
@@ -146,60 +152,26 @@ model UserStats {
   totalCoinsWon       Int?     @default(0)
   totalCoinsLost      Int?     @default(0)
   netCoins            Int?     @default(0)
-  user                User     @relation(fields: [userId], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+  User                User     @relation(fields: [userId], references: [id])
 }
 
 model GameResult {
-  id            String   @id @default(cuid())
+  id            String   @id
   gameId        String   @unique
-  winner        Int
+  winner        Int      // Player position of winner (0-3)
   finalScore    Int
-  gameDuration  Int?
+  gameDuration  Int?     // Duration in seconds
   team1Score    Int?
   team2Score    Int?
-  playerResults Json
-  totalRounds   Int
-  totalTricks   Int
-  specialEvents Json?
+  playerResults Json     // Detailed results for each player
+  totalRounds   Int      // Number of rounds/hands played
+  totalTricks   Int      // Total tricks across all rounds
+  specialEvents Json?    // Special events like nils, blind nils, etc.
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  game          Game     @relation(fields: [gameId], references: [id])
-}
-
-model Friend {
-  id        String   @id @default(cuid())
-  userId    String
-  friendId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  friend    User     @relation("FriendsOfUser", fields: [friendId], references: [id])
-  user      User     @relation("UserFriends", fields: [userId], references: [id])
-
-  @@unique([userId, friendId])
-}
-
-model BlockedUser {
-  id        String   @id @default(cuid())
-  userId    String
-  blockedId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  blocked   User     @relation("BlockedByUser", fields: [blockedId], references: [id])
-  user      User     @relation("UserBlocked", fields: [userId], references: [id])
-
-  @@unique([userId, blockedId])
-}
-
-enum GameStatus {
-  WAITING
-  PLAYING
-  FINISHED
-  CANCELLED
-}
-
-enum GameMode {
-  PARTNERS
-  SOLO
+  updatedAt     DateTime
+  Game          Game     @relation(fields: [gameId], references: [id])
 }
 
 enum BidType {
@@ -207,6 +179,18 @@ enum BidType {
   WHIZ
   MIRRORS
   GIMMICK
+}
+
+enum GameMode {
+  PARTNERS
+  SOLO
+}
+
+enum GameStatus {
+  WAITING
+  PLAYING
+  FINISHED
+  CANCELLED
 }
 
 enum SpecialRule {
@@ -219,4 +203,30 @@ enum Suit {
   HEARTS
   DIAMONDS
   CLUBS
+}
+
+enum GimmickType {
+  SUICIDE
+  BID_4_OR_NIL
+  BID_3
+  BID_HEARTS
+}
+
+model UserGameStats {
+  id          String      @id @default(uuid())
+  userId      String
+  gameMode    GameMode
+  bidType     BidType
+  gimmickType GimmickType?
+  screamer    Boolean     @default(false)
+  assassin    Boolean     @default(false)
+  gamesPlayed Int         @default(0)
+  gamesWon    Int         @default(0)
+  nilsBid     Int         @default(0)
+  nilsMade    Int         @default(0)
+  blindNilsBid  Int       @default(0)
+  blindNilsMade Int       @default(0)
+  User        User        @relation(fields: [userId], references: [id])
+
+  @@unique([userId, gameMode, bidType, gimmickType, screamer, assassin])
 }

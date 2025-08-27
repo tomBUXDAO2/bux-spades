@@ -763,15 +763,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Get user stats from database
       const user = await prisma.user.findFirst({
         where: { discordId: targetUser.id },
-        include: { stats: true }
+        include: { UserStats: true }
       });
       
-      if (!user || !user.stats) {
+      if (!user || !user.UserStats) {
         await interaction.editReply(`❌ No stats found for ${targetUser.username}`);
         return;
       }
       
-      const stats = user.stats as any;
+      const stats = user.UserStats as any;
       
       // Calculate win percentages
       const totalWinPercentage = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(1) : '0.0';
