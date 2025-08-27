@@ -232,7 +232,11 @@ const HomePage: React.FC = () => {
           ...prev,
           ...newlyOnline.map(id => {
             const player = onlinePlayers.find(p => p.id === id);
-            const name = player?.username || player?.name || 'Someone';
+            const name = player?.username || player?.name;
+            // Only show join message if we have the actual username
+            if (!name) {
+              return null;
+            }
             return {
               id: `system-${Date.now()}-${id}`,
               userId: 'system',
@@ -240,7 +244,7 @@ const HomePage: React.FC = () => {
               message: `${name} joined the lobby`,
               timestamp: Date.now()
             } as ChatMessage;
-          })
+          }).filter(Boolean) // Remove null entries
         ]);
       }
       onlineIdsRef.current = onlineUserIds;
