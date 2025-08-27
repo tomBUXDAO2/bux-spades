@@ -1290,6 +1290,19 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Store the bid
     game.bidding.bids[playerIndex] = finalBid;
     
+    // Update player's bid in game state
+    if (game.players[playerIndex]) {
+      game.players[playerIndex].bid = finalBid;
+    }
+    
+    // Update GamePlayer record in DB
+    if (game.dbGameId && game.players[playerIndex]?.type === 'human') {
+      const { updateGamePlayerRecord } = await import('./routes/games.routes');
+      updateGamePlayerRecord(game, playerIndex).catch((err: Error) => {
+        console.error('Failed to update GamePlayer record after bid:', err);
+      });
+    }
+    
     // Clear turn timeout for this player since they acted
     clearTurnTimeout(game, userId);
     
@@ -1643,6 +1656,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (game.players[winnerIndex]) {
         game.players[winnerIndex].tricks = (game.players[winnerIndex].tricks || 0) + 1;
         console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex].tricks);
+        
+        // Update GamePlayer record in DB
+        if (game.dbGameId && game.players[winnerIndex]?.type === 'human') {
+          import('./routes/games.routes').then(({ updateGamePlayerRecord }) => {
+            updateGamePlayerRecord(game, winnerIndex).catch((err: Error) => {
+              console.error('Failed to update GamePlayer record after trick win:', err);
+            });
+          });
+        }
         console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
       }
       

@@ -1909,6 +1909,13 @@ export function botPlayCard(game: Game, seatIndex: number) {
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
         console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
+        
+        // Update GamePlayer record in DB
+        if (game.dbGameId && game.players[winnerIndex]?.type === 'human') {
+          updateGamePlayerRecord(game, winnerIndex).catch(err => {
+            console.error('Failed to update GamePlayer record after trick win:', err);
+          });
+        }
         console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
       }
         // Store the completed trick for animation before clearing
@@ -3018,7 +3025,40 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
 			bags = Math.max(0, playerTricks - playerBid);
 		}
 		
+		// Calculate final score for this player
+		let finalScore = 0;
+		if (game.gameMode === 'SOLO') {
+			finalScore = game.playerScores?.[i] || 0;
+		} else {
+			// Partners mode - use team score
+			if (i === 0 || i === 2) {
+				finalScore = game.team1TotalScore || 0;
+			} else {
+				finalScore = game.team2TotalScore || 0;
+			}
+		}
+		
 		try {
+			// Update GamePlayer record with final game data
+			if (game.dbGameId) {
+				await prisma.gamePlayer.updateMany({
+					where: { 
+						gameId: game.dbGameId,
+						userId: userId
+					},
+					data: {
+						bid: playerBid,
+						bags: bags,
+						points: finalScore,
+						finalScore: finalScore,
+						finalBags: bags,
+						finalPoints: finalScore,
+						won: isWinner
+					}
+				});
+				console.log(`Updated GamePlayer for ${player.username}: bid=${playerBid}, tricks=${playerTricks}, bags=${bags}, finalScore=${finalScore}, won=${isWinner}`);
+			}
+			
 			// Handle coin buy-in and prizes (only for rated games)
 			const buyIn = game.buyIn || 0;
 			if (buyIn > 0) {
@@ -3555,11 +3595,20 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
           (winningTeam === 2 && (player.position === 1 || player.position === 3)) :
           player.position === winningTeam;
           
+        // Get actual player data from game state
+        const gamePlayer = game.players[player.position];
+        const playerBid = gamePlayer?.bid || 0;
+        const playerTricks = gamePlayer?.tricks || 0;
+        const playerBags = Math.max(0, playerTricks - playerBid);
+        
         await prisma.gamePlayer.update({
           where: { id: player.id },
           data: {
+            bid: playerBid,
+            bags: playerBags,
+            points: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
             finalScore: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
-            finalBags: 5,
+            finalBags: playerBags,
             finalPoints: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
             won: isWinner
           }
@@ -3613,5 +3662,35 @@ router.get('/:id/trick-history', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch trick history' });
   }
 });
+
+// Helper to update GamePlayer record during the game
+export async function updateGamePlayerRecord(game: Game, playerIndex: number) {
+  if (!game.dbGameId) return;
+  
+  const player = game.players[playerIndex];
+  if (!player || player.type !== 'human') return;
+  
+  try {
+    const playerBid = player.bid || 0;
+    const playerTricks = player.tricks || 0;
+    const playerBags = Math.max(0, playerTricks - playerBid);
+    
+    await prisma.gamePlayer.updateMany({
+      where: { 
+        gameId: game.dbGameId,
+        userId: player.id
+      },
+      data: {
+        bid: playerBid,
+        bags: playerBags,
+        points: 0 // Will be updated at game completion
+      }
+    });
+    
+    console.log(`Updated GamePlayer for ${player.username}: bid=${playerBid}, tricks=${playerTricks}, bags=${playerBags}`);
+  } catch (err) {
+    console.error('Failed to update GamePlayer record:', err);
+  }
+}
 
 export default router; 
