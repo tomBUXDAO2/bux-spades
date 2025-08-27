@@ -232,11 +232,18 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				// Prepare game data for Discord
 				const gameData = {
 					buyIn: game.buyIn,
+					team1Score: game.team1TotalScore || 0,
+					team2Score: game.team2TotalScore || 0,
 					players: gamePlayers.map((dbPlayer, i) => {
 						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
 						console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
 						return {
 							userId: discordId,
+							username: dbPlayer.username,
+							bid: dbPlayer.bid,
+							bags: dbPlayer.bags,
+							nil: dbPlayer.nil || false,
+							blindNil: dbPlayer.blindNil || false,
 							won: game.gameMode === 'SOLO' 
 								? i === winningTeamOrPlayer 
 								: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))

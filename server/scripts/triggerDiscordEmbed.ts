@@ -5,58 +5,66 @@ const prisma = new PrismaClient();
 
 async function triggerDiscordEmbed() {
   try {
-    // Get the completed league game
-    const game = await prisma.game.findFirst({
-      where: {
-        id: 'cmenlrf4w0001yueg0uakbbre',
-        status: 'FINISHED',
-        league: true
-      }
+    const gameId = 'cmeufuo1o018kxq2e4o7aaqqg';
+    
+    console.log('Triggering Discord embed for game:', gameId);
+    
+    // Get the game
+    const game = await prisma.game.findUnique({
+      where: { id: gameId }
     });
 
     if (!game) {
-      console.log('Game not found or not completed');
+      console.log('Game not found');
       return;
     }
 
-    console.log('Found completed game:', game.id);
-
-    // Get the actual GamePlayer records with Discord IDs
-    const gamePlayers = await prisma.gamePlayer.findMany({
-      where: { gameId: game.id }
+    // Get the players
+    const players = await prisma.gamePlayer.findMany({
+      where: { gameId },
+      orderBy: { position: 'asc' }
     });
 
-    console.log('GamePlayer records:', gamePlayers);
+    // Get the game result
+    const gameResult = await prisma.gameResult.findUnique({
+      where: { gameId }
+    });
 
-    // Create a mock game object for the gameLogger with real player data
+    if (!gameResult) {
+      console.log('GameResult not found');
+      return;
+    }
+
+    console.log('Found GameResult - Winner:', gameResult.winner, 'Team 1 Score:', gameResult.team1Score, 'Team 2 Score:', gameResult.team2Score);
+
+    // Create mock game object for Discord embed
     const mockGame = {
       id: game.id,
       dbGameId: game.id,
       gameMode: game.gameMode,
-      team1TotalScore: 350,
-      team2TotalScore: 100,
-      playerScores: [350, 100, 350, 100], // Mock scores
+      team1TotalScore: gameResult.team1Score,
+      team2TotalScore: gameResult.team2Score,
       rules: {
         bidType: game.bidType
       },
       specialRules: {},
       league: true,
-      buyIn: 200000,
-      maxPoints: 350,
-      minPoints: -100,
-      players: gamePlayers.map((gp, i) => ({
-        id: gp.userId,
-        discordId: gp.discordId,
-        username: gp.username,
+      buyIn: game.buyIn,
+      maxPoints: game.maxPoints,
+      minPoints: game.minPoints,
+      players: players.map(p => ({
+        id: p.userId,
+        discordId: p.discordId,
+        username: p.username,
         type: 'human'
       }))
     };
 
-    // Trigger the Discord embed
     console.log('Triggering Discord embed...');
-    await logCompletedGameToDbAndDiscord(mockGame, 1); // Team 1 wins
+    await logCompletedGameToDbAndDiscord(mockGame, gameResult.winner);
 
-    console.log('Discord embed triggered successfully!');
+    console.log('✅ Discord embed triggered successfully!');
+
   } catch (error) {
     console.error('Error triggering Discord embed:', error);
   } finally {

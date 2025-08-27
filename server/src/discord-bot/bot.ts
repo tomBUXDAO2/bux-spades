@@ -1238,6 +1238,24 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       )
       .setColor(0x00ff00)
       .setTimestamp();
+
+    // Add final scores if available
+    if (gameData.team1Score !== undefined && gameData.team2Score !== undefined) {
+      resultsEmbed.addFields(
+        { name: '📊 Final Score', value: `Team 1: ${gameData.team1Score} | Team 2: ${gameData.team2Score}`, inline: false }
+      );
+    }
+
+    // Add player details with nil indicators
+    const playerDetails = gameData.players.map((p: any) => {
+      const nilIndicator = p.nil ? '✅' : p.blindNil ? '🎯' : '';
+      const nilText = p.nil ? ' (Nil)' : p.blindNil ? ' (Blind Nil)' : '';
+      return `${p.username}${nilText} ${nilIndicator} - Bid: ${p.bid}, Bags: ${p.bags}`;
+    });
+
+    resultsEmbed.addFields(
+      { name: '👥 Player Details', value: playerDetails.join('\n'), inline: false }
+    );
     
     await channel.send({ embeds: [resultsEmbed] });
     console.log('Sent league game results to Discord');
