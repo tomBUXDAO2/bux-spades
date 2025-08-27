@@ -104,13 +104,24 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         soloGamesPlayed++;
         if (gp.won) soloGamesWon++;
       }
-      // Determine format key from bidType/gameType
+      
+      // Determine format key from bidType/gameType with better logging
       const bidType = (g?.bidType || g?.gameType || 'REGULAR') as string;
       const key = bidType.toUpperCase(); // REGULAR | WHIZ | MIRROR(S) | GIMMICK
       const normalized = key === 'MIRROR' ? 'MIRRORS' : key;
-      if (!fmt[normalized]) fmt[normalized] = { played: 0, won: 0 };
-      fmt[normalized].played++;
-      if (gp.won) fmt[normalized].won++;
+      
+      console.log(`[USER STATS API] Game ${g?.id}: bidType=${bidType}, normalized=${normalized}, won=${gp.won}`);
+      
+      // Ensure we have a valid category
+      if (!fmt[normalized]) {
+        console.log(`[USER STATS API] Unknown bidType: ${bidType}, defaulting to REGULAR`);
+        fmt['REGULAR'].played++;
+        if (gp.won) fmt['REGULAR'].won++;
+      } else {
+        fmt[normalized].played++;
+        if (gp.won) fmt[normalized].won++;
+      }
+      
       // Special rules
       const hasScreamer = g?.screamer === true || (Array.isArray(g?.specialRulesApplied) && g.specialRulesApplied.includes('SCREAMER'));
       const hasAssassin = g?.assassin === true || (Array.isArray(g?.specialRulesApplied) && g.specialRulesApplied.includes('ASSASSIN'));
@@ -123,6 +134,16 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         if (gp.won) special.ASSASSIN.won++;
       }
     }
+    
+    // Log the breakdown totals for debugging
+    console.log('[USER STATS API] Format breakdown totals:', {
+      REGULAR: fmt.REGULAR,
+      WHIZ: fmt.WHIZ,
+      MIRRORS: fmt.MIRRORS,
+      GIMMICK: fmt.GIMMICK,
+      totalWon: fmt.REGULAR.won + fmt.WHIZ.won + fmt.MIRRORS.won + fmt.GIMMICK.won,
+      totalPlayed: fmt.REGULAR.played + fmt.WHIZ.played + fmt.MIRRORS.played + fmt.GIMMICK.played
+    });
     
     // Calculate bag counts from filtered games
     let totalBagsFromFiltered = 0;
