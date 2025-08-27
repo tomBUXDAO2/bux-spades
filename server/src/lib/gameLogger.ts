@@ -180,11 +180,59 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		});
 		console.log(`Created comprehensive game result record for game ${dbGame.id}`);
 		
-		// Discord embed is handled by logCompletedGame function - do not send here
+		// Send Discord results for league games
+		if ((game as any).league && !(game as any).discordResultsSent) {
+			try {
+				const { sendLeagueGameResults } = await import('../discord-bot/bot');
+				
+				// Create game line string
+				const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
+				const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
+				const gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
+				
+				// Get GamePlayer records with Discord IDs
+				const gamePlayers = await prisma.gamePlayer.findMany({
+					where: { gameId: dbGame.id },
+					include: {
+						user: {
+							select: { discordId: true, username: true }
+						}
+					},
+					orderBy: { position: 'asc' }
+				});
+				
+				// Prepare game data for Discord
+				const gameData = {
+					buyIn: game.buyIn,
+					players: gamePlayers.map((dbPlayer, i) => {
+						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
+						console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
+						return {
+							userId: discordId,
+							won: game.gameMode === 'SOLO' 
+								? i === winningTeamOrPlayer 
+								: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
+						};
+					})
+				};
+				
+				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
+				await sendLeagueGameResults(gameData, gameLine);
+				(game as any).discordResultsSent = true;
+				
+				// Set global flag to prevent duplicates
+				if (!(global as any).discordResultsSentForGame) {
+					(global as any).discordResultsSentForGame = {};
+				}
+				(global as any).discordResultsSentForGame[game.id] = true;
+				
+				console.log('[DISCORD RESULTS] Successfully sent Discord embed for game:', game.id);
+			} catch (error) {
+				console.error('Failed to send Discord results:', error);
+			}
+		}
 		
 	} catch (err) {
 		console.error('Failed to log completed game (server):', err);
-		
-		// Discord embed is handled by logCompletedGame function - do not send here
 	}
 } 
