@@ -83,35 +83,20 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsMade: 0,
   };
 
-  const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
-  const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
-  const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
+  const winPercentage = stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
 
-  // Game mode breakdown stats
-  const regPlayed = stats.regPlayed ?? 0;
-  const regWon = stats.regWon ?? 0;
-  const whizPlayed = stats.whizPlayed ?? 0;
-  const whizWon = stats.whizWon ?? 0;
-  const mirrorPlayed = stats.mirrorPlayed ?? 0;
-  const mirrorWon = stats.mirrorWon ?? 0;
-  const gimmickPlayed = stats.gimmickPlayed ?? 0;
-  const gimmickWon = stats.gimmickWon ?? 0;
-  const screamerPlayed = stats.screamerPlayed ?? 0;
-  const screamerWon = stats.screamerWon ?? 0;
-  const assassinPlayed = stats.assassinPlayed ?? 0;
-  const assassinWon = stats.assassinWon ?? 0;
-
-  // New variables for new code
-  const winPercentage = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  // Calculate game mode breakdown
   const gameModeBreakdown = {
-    regular: `${regWon}/${regPlayed}`,
-    whiz: `${whizWon}/${whizPlayed}`,
-    mirrors: `${mirrorWon}/${mirrorPlayed}`,
-    gimmick: `${gimmickWon}/${gimmickPlayed}`,
+    regular: `${stats.gameModeBreakdown?.regular?.won || 0}/${stats.gameModeBreakdown?.regular?.played || 0}`,
+    whiz: `${stats.gameModeBreakdown?.whiz?.won || 0}/${stats.gameModeBreakdown?.whiz?.played || 0}`,
+    mirrors: `${stats.gameModeBreakdown?.mirrors?.won || 0}/${stats.gameModeBreakdown?.mirrors?.played || 0}`,
+    gimmick: `${stats.gameModeBreakdown?.gimmick?.won || 0}/${stats.gameModeBreakdown?.gimmick?.played || 0}`
   };
+
+  // Calculate special rules breakdown
   const specialRules = {
-    screamer: `${screamerWon}/${screamerPlayed}`,
-    assassin: `${assassinWon}/${assassinPlayed}`,
+    screamer: `${stats.specialRulesBreakdown?.screamer?.won || 0}/${stats.specialRulesBreakdown?.screamer?.played || 0}`,
+    assassin: `${stats.specialRulesBreakdown?.assassin?.won || 0}/${stats.specialRulesBreakdown?.assassin?.played || 0}`
   };
 
   return (
