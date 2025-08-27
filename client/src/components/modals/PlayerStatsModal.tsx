@@ -83,7 +83,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsMade: 0,
   };
 
-  const winPercentage = stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
 
   // Calculate game mode breakdown
   const gameModeBreakdown = {
@@ -100,121 +99,125 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-8 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header with close button and radio buttons on same row */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex space-x-6">
-            <label className="flex items-center space-x-3">
-              <input
-                type="radio"
-                name="gameMode"
-                value="all"
-                checked={mode === 'all'}
-                onChange={() => setMode('all')}
-                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-              />
-              <span className="text-lg text-white">ALL</span>
-            </label>
-            <label className="flex items-center space-x-3">
-              <input
-                type="radio"
-                name="gameMode"
-                value="partners"
-                checked={mode === 'partners'}
-                onChange={() => setMode('partners')}
-                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-              />
-              <span className="text-lg text-white">PARTNERS</span>
-            </label>
-            <label className="flex items-center space-x-3">
-              <input
-                type="radio"
-                name="gameMode"
-                value="solo"
-                checked={mode === 'solo'}
-                onChange={() => setMode('solo')}
-                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-              />
-              <span className="text-lg text-white">SOLO</span>
-            </label>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white text-2xl font-bold"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
-          <div className="flex flex-col">
-            {/* Main Stats */}
-            <div className="bg-slate-700 rounded-lg p-6 mb-6">
-              <div className="flex items-center space-x-4 mb-4">
-                <img
-                  src={player.avatar || '/default-pfp.jpg'}
-                  alt={player.username}
-                  className="w-16 h-16 rounded-full"
-                />
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{player.username}</h2>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-lg">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-slate-600">
+          <div className="flex items-center space-x-4">
+            <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
+            <div>
+              <h2 className="text-3xl font-bold text-white">{player.username}</h2>
+              <div className="flex items-center space-x-6 mt-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-yellow-400">⭐</span>
-                  <span className="text-white">{winPercentage}% Win</span>
+                  <span className="text-xl text-white">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">🪙</span>
-                  <span className="text-white">{stats.totalCoinsWon?.toLocaleString() || 0}</span>
+                  <span className="text-blue-400">🏁</span>
+                  <span className="text-xl text-white">{stats.gamesPlayed} Played</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-blue-400">📊</span>
-                  <span className="text-white">{stats.gamesPlayed} Played</span>
+                  <span className="text-green-400">🎒</span>
+                  <span className="text-xl text-white">{stats.totalBags} Bags</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">🏆</span>
-                  <span className="text-white">{stats.gamesWon} Won</span>
+                  <span className="text-purple-400">🏆</span>
+                  <span className="text-xl text-white">{stats.gamesWon} Won</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-green-400">👜</span>
-                  <span className="text-white">{stats.totalBags} Bags</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-green-400">✓</span>
-                  <span className="text-white">{stats.bagsPerGame?.toFixed(1) || 0} Bags/G</span>
+                  <span className="text-orange-400">✅</span>
+                  <span className="text-xl text-white">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
                 </div>
               </div>
             </div>
+          </div>
+          
+          {/* Radio buttons and close button */}
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="all"
+                  checked={mode === 'all'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">ALL</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="partners"
+                  checked={mode === 'partners'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">PARTNERS</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="solo"
+                  checked={mode === 'solo'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">SOLO</span>
+              </label>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white text-3xl hover:text-gray-300"
+            >
+              ×
+            </button>
+          </div>
+        </div>
 
-            {/* Nil Stats Table */}
-            <div className="bg-slate-700 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Nil Stats</h3>
+        {/* Content - Two columns with equal height */}
+        <div className="flex p-6 space-x-6 h-full">
+          {/* Left Column */}
+          <div className="flex-1 flex flex-col h-full">
+            {/* Nil Stats */}
+            <div className="bg-slate-700 rounded-lg p-6 flex-1">
+              <h3 className="text-2xl font-bold text-white mb-4">Nil Stats</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-white">
                   <thead>
-                    <tr className="border-b border-slate-600">
-                      <th className="text-left py-2 px-2">Type</th>
-                      <th className="text-center py-2 px-2">Bid</th>
-                      <th className="text-center py-2 px-2">Made</th>
-                      <th className="text-center py-2 px-2">%</th>
+                    <tr className="border-b border-slate-500">
+                      <th className="text-left py-2 text-lg">Type</th>
+                      <th className="text-center py-2 text-lg">Bid</th>
+                      <th className="text-center py-2 text-lg">Made</th>
+                      <th className="text-center py-2 text-lg">%</th>
+                      <th className="text-center py-2 text-lg">Points</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-b border-slate-600">
-                      <td className="py-2 px-2">Nil</td>
-                      <td className="text-center py-2 px-2">{stats.nilsBid || 0}</td>
-                      <td className="text-center py-2 px-2">{stats.nilsMade || 0}</td>
-                      <td className="text-center py-2 px-2">{stats.nilsBid && stats.nilsMade ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%</td>
+                      <td className="py-3 text-lg">Nil</td>
+                      <td className="text-center py-3 text-lg">{stats.nilsBid}</td>
+                      <td className="text-center py-3 text-lg">{stats.nilsMade}</td>
+                      <td className="text-center py-3 text-lg">
+                        {stats.nilsBid > 0 ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%
+                      </td>
+                      <td className="text-center py-3 text-lg">
+                        +{(stats.nilsMade * 100) + ((stats.nilsBid - stats.nilsMade) * -100)}
+                      </td>
                     </tr>
                     <tr>
-                      <td className="py-2 px-2">Blind Nil</td>
-                      <td className="text-center py-2 px-2">{stats.blindNilsBid || 0}</td>
-                      <td className="text-center py-2 px-2">{stats.blindNilsMade || 0}</td>
-                      <td className="text-center py-2 px-2">{stats.blindNilsBid && stats.blindNilsMade ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%</td>
+                      <td className="py-3 text-lg">Blind Nil</td>
+                      <td className="text-center py-3 text-lg">{stats.blindNilsBid}</td>
+                      <td className="text-center py-3 text-lg">{stats.blindNilsMade}</td>
+                      <td className="text-center py-3 text-lg">
+                        {stats.blindNilsBid > 0 ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%
+                      </td>
+                      <td className="text-center py-3 text-lg">
+                        +{(stats.blindNilsMade * 100) + ((stats.blindNilsBid - stats.blindNilsMade) * -100)}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -223,9 +226,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           </div>
 
           {/* Right Column */}
-          <div className="flex flex-col">
+          <div className="flex-1 flex flex-col h-full">
             {/* Game Mode Breakdown */}
-            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+            <div className="bg-slate-700 rounded-lg p-6 mb-6 flex-1">
               <h3 className="text-3xl font-bold text-white mb-2">Game Mode Breakdown</h3>
               <div className="text-slate-300 text-lg mb-6 text-right">
                 <span className="mr-4">(won/played)</span>
