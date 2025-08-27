@@ -238,28 +238,28 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   <span className="text-xl text-white">Regular</span>
                   <div className="flex space-x-8">
                     <span className="text-xl text-white">{gameModeBreakdown.regular}</span>
-                    <span className="text-xl text-white">{stats.regPlayed ? Math.round((stats.regWon / stats.regPlayed) * 100) : 0}%</span>
+                    <span className="text-xl text-white">{stats.regPlayed ? Math.round(((stats.regWon || 0) / stats.regPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xl text-white">Whiz</span>
                   <div className="flex space-x-8">
                     <span className="text-xl text-white">{gameModeBreakdown.whiz}</span>
-                    <span className="text-xl text-white">{stats.whizPlayed ? Math.round((stats.whizWon / stats.whizPlayed) * 100) : 0}%</span>
+                    <span className="text-xl text-white">{stats.whizPlayed ? Math.round(((stats.whizWon || 0) / stats.whizPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xl text-white">Mirrors</span>
                   <div className="flex space-x-8">
                     <span className="text-xl text-white">{gameModeBreakdown.mirrors}</span>
-                    <span className="text-xl text-white">{stats.mirrorPlayed ? Math.round((stats.mirrorWon / stats.mirrorPlayed) * 100) : 0}%</span>
+                    <span className="text-xl text-white">{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xl text-white">Gimmick</span>
                   <div className="flex space-x-8">
                     <span className="text-xl text-white">{gameModeBreakdown.gimmick}</span>
-                    <span className="text-xl text-white">{stats.gimmickPlayed ? Math.round((stats.gimmickWon / stats.gimmickPlayed) * 100) : 0}%</span>
+                    <span className="text-xl text-white">{stats.gimmickPlayed ? Math.round(((stats.gimmickWon || 0) / stats.gimmickPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
               </div>
@@ -279,7 +279,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   <span className="text-lg text-white">Screamer</span>
                   <div className="flex space-x-8">
                     <span className="text-lg text-white">{specialRules.screamer}</span>
-                    <span className="text-lg text-white">{stats.screamerPlayed ? Math.round((stats.screamerWon / stats.screamerPlayed) * 100) : 0}%</span>
+                    <span className="text-lg text-white">{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
                   </div>
                 </div>
               </div>
