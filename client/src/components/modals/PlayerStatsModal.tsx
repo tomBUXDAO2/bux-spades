@@ -40,12 +40,11 @@ interface Player {
 }
 
 interface PlayerStatsModalProps {
+  player: Player;
   isOpen: boolean;
-  onClose: () => void;
-  player: Player | null;
 }
 
-const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
+export default function PlayerStatsModal({ player, isOpen }: PlayerStatsModalProps) {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
@@ -83,23 +82,20 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     blindNilsMade: 0,
   };
 
-  const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
-  const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
-  const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
+  const winPercentage = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
 
   // Game mode breakdown stats
-  const regPlayed = stats.regPlayed ?? 0;
-  const regWon = stats.regWon ?? 0;
-  const whizPlayed = stats.whizPlayed ?? 0;
-  const whizWon = stats.whizWon ?? 0;
-  const mirrorPlayed = stats.mirrorPlayed ?? 0;
-  const mirrorWon = stats.mirrorWon ?? 0;
-  const gimmickPlayed = stats.gimmickPlayed ?? 0;
-  const gimmickWon = stats.gimmickWon ?? 0;
-  const screamerPlayed = stats.screamerPlayed ?? 0;
-  const screamerWon = stats.screamerWon ?? 0;
-  const assassinPlayed = stats.assassinPlayed ?? 0;
-  const assassinWon = stats.assassinWon ?? 0;
+  const gameModeBreakdown = {
+    regular: { played: stats.regPlayed ?? 0, won: stats.regWon ?? 0 },
+    whiz: { played: stats.whizPlayed ?? 0, won: stats.whizWon ?? 0 },
+    mirrors: { played: stats.mirrorPlayed ?? 0, won: stats.mirrorWon ?? 0 },
+    gimmick: { played: stats.gimmickPlayed ?? 0, won: stats.gimmickWon ?? 0 }
+  };
+
+  const specialRules = {
+    screamer: { played: stats.screamerPlayed ?? 0, won: stats.screamerWon ?? 0 },
+    assassin: { played: stats.assassinPlayed ?? 0, won: stats.assassinWon ?? 0 }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -162,7 +158,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-yellow-400">{winPercent}%</div>
+                    <div className="text-3xl font-bold text-yellow-400">{winPercentage}%</div>
                     <div className="text-sm text-slate-300">Win</div>
                   </div>
                   <div className="text-center">
@@ -220,19 +216,19 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-lg text-slate-300">Regular</span>
-                    <span className="text-lg text-white">{regWon}/{regPlayed}</span>
+                    <span className="text-lg text-white">{gameModeBreakdown.regular.won}/{gameModeBreakdown.regular.played}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-lg text-slate-300">Whiz</span>
-                    <span className="text-lg text-white">{whizWon}/{whizPlayed}</span>
+                    <span className="text-lg text-white">{gameModeBreakdown.whiz.won}/{gameModeBreakdown.whiz.played}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-lg text-slate-300">Mirrors</span>
-                    <span className="text-lg text-white">{mirrorWon}/{mirrorPlayed}</span>
+                    <span className="text-lg text-white">{gameModeBreakdown.mirrors.won}/{gameModeBreakdown.mirrors.played}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-lg text-slate-300">Gimmick</span>
-                    <span className="text-lg text-white">{gimmickWon}/{gimmickPlayed}</span>
+                    <span className="text-lg text-white">{gameModeBreakdown.gimmick.won}/{gameModeBreakdown.gimmick.played}</span>
                   </div>
                 </div>
               </div>
@@ -243,11 +239,11 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-300">Screamer</span>
-                    <span className="text-white">{screamerWon}/{screamerPlayed}</span>
+                    <span className="text-white">{specialRules.screamer.won}/{specialRules.screamer.played}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-300">Assassin</span>
-                    <span className="text-white">{assassinWon}/{assassinPlayed}</span>
+                    <span className="text-white">{specialRules.assassin.won}/{specialRules.assassin.played}</span>
                   </div>
                 </div>
               </div>
