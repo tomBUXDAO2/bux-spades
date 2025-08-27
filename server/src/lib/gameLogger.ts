@@ -237,13 +237,19 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					players: gamePlayers.map((dbPlayer, i) => {
 						const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
 						console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
+						
+						// Check if player bid nil or blind nil
+						const playerId = dbPlayer.userId;
+						const nilBid = game.bidding?.nilBids?.[playerId] || false;
+						const blindNilBid = game.rules?.allowBlindNil && dbPlayer.bid === 0 && !nilBid;
+						
 						return {
 							userId: discordId,
 							username: dbPlayer.username,
 							bid: dbPlayer.bid,
 							bags: dbPlayer.bags,
-							nil: dbPlayer.nil || false,
-							blindNil: dbPlayer.blindNil || false,
+							nil: nilBid,
+							blindNil: blindNilBid,
 							won: game.gameMode === 'SOLO' 
 								? i === winningTeamOrPlayer 
 								: (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
