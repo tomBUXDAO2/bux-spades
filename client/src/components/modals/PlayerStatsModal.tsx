@@ -247,41 +247,41 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
             {/* Right Column - Game modes + Special rules */}
             <div className="flex flex-col space-y-6">
-              {/* Game Mode Breakdown */}
+              {/* Game Mode Breakdown - taller with more spacing */}
               <div className="bg-slate-700 rounded-lg p-6 flex-1">
-                <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">Game Mode Breakdown</h3>
-                <div className="text-lg text-slate-400 text-center mb-4">(won/played)</div>
-                <div className="grid grid-cols-2 gap-4">
+                <h3 className="text-xl font-bold text-indigo-400 mb-6 text-center">Game Mode Breakdown</h3>
+                <div className="text-lg text-slate-400 text-center mb-6">(won/played)</div>
+                <div className="grid grid-cols-2 gap-6">
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Regular</div>
-                    <div className="text-2xl font-bold text-slate-100">{regWon}/{regPlayed}</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-4">Regular</div>
+                    <div className="text-3xl font-bold text-slate-100">{regWon}/{regPlayed}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Whiz</div>
-                    <div className="text-2xl font-bold text-slate-100">{whizWon}/{whizPlayed}</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-4">Whiz</div>
+                    <div className="text-3xl font-bold text-slate-100">{whizWon}/{whizPlayed}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Mirrors</div>
-                    <div className="text-2xl font-bold text-slate-100">{mirrorWon}/{mirrorPlayed}</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-4">Mirrors</div>
+                    <div className="text-3xl font-bold text-slate-100">{mirrorWon}/{mirrorPlayed}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Gimmick</div>
-                    <div className="text-2xl font-bold text-slate-100">{gimmickWon}/{gimmickPlayed}</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-4">Gimmick</div>
+                    <div className="text-3xl font-bold text-slate-100">{gimmickWon}/{gimmickPlayed}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Special Rules */}
-              <div className="bg-slate-700 rounded-lg p-6 flex-1">
-                <h3 className="text-xl font-bold text-indigo-400 mb-4 text-center">Special Rules</h3>
-                <div className="text-lg text-slate-400 text-center mb-4">(won/played)</div>
-                <div className="grid grid-cols-2 gap-6">
+              {/* Special Rules - more compact */}
+              <div className="bg-slate-700 rounded-lg p-4">
+                <h3 className="text-xl font-bold text-indigo-400 mb-3 text-center">Special Rules</h3>
+                <div className="text-lg text-slate-400 text-center mb-3">(won/played)</div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Screamer</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-1">Screamer</div>
                     <div className="text-2xl font-bold text-slate-100">{screamerWon}/{screamerPlayed}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold text-slate-200 mb-2">Assassin</div>
+                    <div className="text-lg font-semibold text-slate-200 mb-1">Assassin</div>
                     <div className="text-2xl font-bold text-slate-100">{assassinWon}/{assassinPlayed}</div>
                   </div>
                 </div>
