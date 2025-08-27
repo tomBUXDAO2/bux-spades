@@ -2704,6 +2704,17 @@ function startPlayAgainTimer(game: Game) {
   const timer = setTimeout(() => {
     console.log(`[PLAY AGAIN] Timer expired for game ${game.id}, auto-removing non-responding players`);
     
+    // For league games, never auto-remove players after play-again
+    if ((game as any).league) {
+      console.log('[PLAY AGAIN] League game detected; skipping auto-removal of non-responding players');
+      // Clear timer and responses
+      playAgainTimers.delete(game.id);
+      playAgainResponses.delete(game.id);
+      // Optionally, we could reset the game for a new round without removing players
+      resetGameForNewRound(game);
+      return;
+    }
+    
     // Get human players who didn't respond
     const humanPlayers = game.players.filter(p => p && p.type === 'human');
     const responses = playAgainResponses.get(game.id) || new Set();
@@ -2742,9 +2753,6 @@ function startPlayAgainTimer(game: Game) {
   }, 30000);
   
   playAgainTimers.set(game.id, { gameId: game.id, timer, expiresAt });
-  playAgainResponses.set(game.id, new Set());
-  
-  console.log(`[PLAY AGAIN] Timer started for game ${game.id}, expires at ${new Date(expiresAt).toISOString()}`);
 }
 
 function resetGameForNewRound(game: Game) {
@@ -3327,63 +3335,29 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
     
     console.log(`[TURN TIMEOUT] Player ${player.username} consecutive timeouts: ${consecutiveTimeouts}`);
     
-    if (consecutiveTimeouts >= 3) {
-      // Remove player after 3 consecutive timeouts
-      console.log(`[TURN TIMEOUT] Player ${player.username} removed after 3 consecutive timeouts`);
-      game.players[playerIndex] = null;
-      turnTimeouts.delete(timeoutKey);
-      
-      // Check if any human players remain
-      const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
-      if (remainingHumanPlayers.length === 0) {
-        console.log(`[TURN TIMEOUT] No human players remaining in game ${game.id}, closing game`);
-        const gameIndex = games.findIndex(g => g.id === game.id);
-        if (gameIndex !== -1) {
-          games.splice(gameIndex, 1);
-        }
-        io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
-        return;
-      }
-      
-      // Start seat replacement
-      if (game.status !== 'WAITING') {
-        startSeatReplacement(game, playerIndex);
-      }
-      
-      io.to(game.id).emit('system_message', {
-        message: `${player.username} was removed due to inactivity`,
-        type: 'warning'
-      });
-      
-      // Update all clients to reflect the player removal
-      emitGameUpdateToPlayers(game);
-      
-      // Update lobby for all clients
-      io.emit('games_updated', games);
-    } else {
-      // Bot acts for player
-      console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
-      if (phase === 'bidding') {
-        console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
-        // Mark this as a bot action to prevent timeout clearing
-        (game as any).botActionInProgress = true;
-        botMakeMove(game, playerIndex);
-        (game as any).botActionInProgress = false;
-      } else if (phase === 'playing') {
-        console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
-        // Use the dedicated human timeout handler
-        const { handleHumanTimeout } = require('./routes/games.routes');
-        handleHumanTimeout(game, playerIndex);
-      }
-      
-      // Clear the timeout timer but keep the consecutive count
-      clearTurnTimeoutOnly(game, player.id);
-      
-      // Update consecutive timeouts (don't reset to 0)
-      turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: null, consecutiveTimeouts });
-      console.log(`[TURN TIMEOUT DEBUG] Updated timeout count for ${player.username}: ${consecutiveTimeouts}`);
+    // Never remove players due to consecutive timeouts; always have bot act for them
+    // Bot acts for player
+    console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
+    if (phase === 'bidding') {
+      console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
+      // Mark this as a bot action to prevent timeout clearing
+      (game as any).botActionInProgress = true;
+      botMakeMove(game, playerIndex);
+      (game as any).botActionInProgress = false;
+    } else if (phase === 'playing') {
+      console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
+      // Use the dedicated human timeout handler
+      const { handleHumanTimeout } = require('./routes/games.routes');
+      handleHumanTimeout(game, playerIndex);
     }
-  }, 30000); // 30 seconds
+    
+    // Clear the timeout timer but keep the consecutive count
+    clearTurnTimeoutOnly(game, player.id);
+    
+    // Update consecutive timeouts (don't reset to 0)
+    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: null, consecutiveTimeouts });
+    console.log(`[TURN TIMEOUT DEBUG] Updated timeout count for ${player.username}: ${consecutiveTimeouts}`);
+  }, 30000);
   
   // Initialize with current consecutive timeouts (don't reset to 0)
   const currentTimeouts = turnTimeouts.get(timeoutKey);

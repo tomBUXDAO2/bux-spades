@@ -1979,6 +1979,24 @@ export function botPlayCard(game: Game, seatIndex: number) {
             console.error('Failed to log completed hand to database:', err);
           });
           
+          // Persist cumulative scores to DB after each hand (solo)
+          if (game.dbGameId) {
+            try {
+              const maxScore = Math.max(...(game.playerScores || [0,0,0,0]));
+              const winningPlayerIndex = (game.playerScores || []).indexOf(maxScore);
+                          prisma.game.update({
+              where: { id: game.dbGameId },
+              data: {
+                status: 'PLAYING',
+                finalScore: maxScore,
+                winner: winningPlayerIndex
+              }
+            }).catch((e) => console.error('[ROUND PERSIST SOLO] prisma update failed:', e));
+            } catch (e) {
+              console.error('[ROUND PERSIST SOLO] Failed to persist cumulative round scores:', e);
+            }
+          }
+          
           console.log('[HAND COMPLETED] Solo mode - Emitting hand_completed event with data:', {
             // Current hand scores (for hand summary display)
             team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
@@ -2058,6 +2076,25 @@ export function botPlayCard(game: Game, seatIndex: number) {
           trickLogger.logCompletedHand(game).catch((err: Error) => {
             console.error('Failed to log completed hand to database:', err);
           });
+          
+          // Persist cumulative scores to DB after each hand (partners)
+          if (game.dbGameId) {
+            try {
+              prisma.game.update({
+                where: { id: game.dbGameId },
+                data: {
+                  // Keep status PLAYING between hands
+                  status: 'PLAYING',
+                  // Store cumulative totals into auxiliary fields
+                  // Using finalScore as latest leading score allows recovery
+                  finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
+                  winner: game.team1TotalScore! >= game.team2TotalScore! ? 1 : 2
+                }
+              }).catch((e) => console.error('[ROUND PERSIST] prisma update failed:', e));
+            } catch (e) {
+              console.error('[ROUND PERSIST] Failed to persist cumulative round scores:', e);
+            }
+          }
           
           console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with data:', {
           ...handSummary,
