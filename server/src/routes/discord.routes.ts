@@ -30,6 +30,14 @@ router.get(
   passport.authenticate('discord', { failureRedirect: '/login' }),
   async (req, res) => {
     const user = (req as any).user;
+    
+    console.log('Discord callback - Session debug:', {
+      sessionID: req.sessionID,
+      user: user,
+      authenticated: req.isAuthenticated(),
+      hasSession: !!req.session,
+      cookies: req.headers.cookie
+    });
 
     // Check Facebook connection and update Discord role
     if (user.discordId && checkAndUpdateUserRole) {

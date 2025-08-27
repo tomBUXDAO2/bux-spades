@@ -147,7 +147,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Set to false to allow HTTP in development and avoid HTTPS issues
     sameSite: 'lax',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
@@ -172,6 +172,22 @@ app.use('/api', discordRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/social', socialRoutes);
+
+// Debug route to check session status
+app.get('/api/debug/session', (req, res) => {
+  console.log('Session debug:', {
+    sessionID: req.sessionID,
+    user: req.user,
+    authenticated: req.isAuthenticated(),
+    cookies: req.headers.cookie
+  });
+  res.json({
+    sessionID: req.sessionID,
+    user: req.user,
+    authenticated: req.isAuthenticated(),
+    hasSession: !!req.session
+  });
+});
 
 // Add this at the end, after all routes
 // Error handling middleware
