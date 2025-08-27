@@ -20,11 +20,8 @@ RUN npx prisma generate
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
-
 # Expose port
 EXPOSE 3000
 
-# Start the server
-CMD ["npm", "start"] 
+# Start the server with tsx (TypeScript execution)
+CMD ["npx", "tsx", "src/index.ts"] 
