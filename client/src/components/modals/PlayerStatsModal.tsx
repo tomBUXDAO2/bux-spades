@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 
 interface PlayerStats {
@@ -27,7 +27,7 @@ interface PlayerStats {
   partnersGamesWon?: number;
   soloGamesPlayed?: number;
   soloGamesWon?: number;
-  totalCoins?: number; // Added for new code
+  totalCoinsWon?: number; // Added for new code
 }
 
 interface Player {
@@ -40,12 +40,12 @@ interface Player {
 }
 
 interface PlayerStatsModalProps {
-  player: Player;
   isOpen: boolean;
   onClose: () => void;
+  player: Player | null;
 }
 
-export default function PlayerStatsModal({ player, isOpen, onClose }: PlayerStatsModalProps) {
+const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
@@ -83,179 +83,198 @@ export default function PlayerStatsModal({ player, isOpen, onClose }: PlayerStat
     blindNilsMade: 0,
   };
 
-  const winPercentage = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  const winPercent = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  const nilPercent = stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0;
+  const blindNilPercent = stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0;
 
   // Game mode breakdown stats
-  const gameModeBreakdown = {
-    regular: { played: stats.regPlayed ?? 0, won: stats.regWon ?? 0 },
-    whiz: { played: stats.whizPlayed ?? 0, won: stats.whizWon ?? 0 },
-    mirrors: { played: stats.mirrorPlayed ?? 0, won: stats.mirrorWon ?? 0 },
-    gimmick: { played: stats.gimmickPlayed ?? 0, won: stats.gimmickWon ?? 0 }
-  };
+  const regPlayed = stats.regPlayed ?? 0;
+  const regWon = stats.regWon ?? 0;
+  const whizPlayed = stats.whizPlayed ?? 0;
+  const whizWon = stats.whizWon ?? 0;
+  const mirrorPlayed = stats.mirrorPlayed ?? 0;
+  const mirrorWon = stats.mirrorWon ?? 0;
+  const gimmickPlayed = stats.gimmickPlayed ?? 0;
+  const gimmickWon = stats.gimmickWon ?? 0;
+  const screamerPlayed = stats.screamerPlayed ?? 0;
+  const screamerWon = stats.screamerWon ?? 0;
+  const assassinPlayed = stats.assassinPlayed ?? 0;
+  const assassinWon = stats.assassinWon ?? 0;
 
+  // New variables for new code
+  const winPercentage = stats.gamesPlayed ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0;
+  const gameModeBreakdown = {
+    regular: `${regWon}/${regPlayed}`,
+    whiz: `${whizWon}/${whizPlayed}`,
+    mirrors: `${mirrorWon}/${mirrorPlayed}`,
+    gimmick: `${gimmickWon}/${gimmickPlayed}`,
+  };
   const specialRules = {
-    screamer: { played: stats.screamerPlayed ?? 0, won: stats.screamerWon ?? 0 },
-    assassin: { played: stats.assassinPlayed ?? 0, won: stats.assassinWon ?? 0 }
+    screamer: `${screamerWon}/${screamerPlayed}`,
+    assassin: `${assassinWon}/${assassinPlayed}`,
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          {/* Close button */}
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white text-2xl font-bold"
-            >
-              ×
-            </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-slate-800 rounded-lg p-8 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        {/* Header with close button and radio buttons on same row */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex space-x-6">
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="gameMode"
+                value="all"
+                checked={mode === 'all'}
+                onChange={() => setMode('all')}
+                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
+              />
+              <span className="text-lg text-white">ALL</span>
+            </label>
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="gameMode"
+                value="partners"
+                checked={mode === 'partners'}
+                onChange={() => setMode('partners')}
+                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
+              />
+              <span className="text-lg text-white">PARTNERS</span>
+            </label>
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="gameMode"
+                value="solo"
+                checked={mode === 'solo'}
+                onChange={() => setMode('solo')}
+                className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
+              />
+              <span className="text-lg text-white">SOLO</span>
+            </label>
           </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white text-2xl font-bold"
+          >
+            ×
+          </button>
+        </div>
 
-          {/* Radio buttons - centered, no gap above */}
-          <div className="flex justify-center mb-6">
-            <div className="flex space-x-6">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gameMode"
-                  value="all"
-                  checked={mode === 'all'}
-                  onChange={() => setMode('all')}
-                  className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
+          <div className="flex flex-col">
+            {/* Main Stats */}
+            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+              <div className="flex items-center space-x-4 mb-4">
+                <img
+                  src={player.avatar || '/default-pfp.jpg'}
+                  alt={player.username}
+                  className="w-16 h-16 rounded-full"
                 />
-                <span className="text-lg text-white">ALL</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gameMode"
-                  value="partners"
-                  checked={mode === 'partners'}
-                  onChange={() => setMode('partners')}
-                  className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-                />
-                <span className="text-lg text-white">PARTNERS</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gameMode"
-                  value="solo"
-                  checked={mode === 'solo'}
-                  onChange={() => setMode('solo')}
-                  className="w-5 h-5 text-blue-600 bg-slate-700 border-slate-600 focus:ring-blue-500"
-                />
-                <span className="text-lg text-white">SOLO</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Two-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left column */}
-            <div className="flex flex-col">
-              {/* Main stats */}
-              <div className="bg-slate-700 rounded-lg p-6 mb-6">
-                <div className="flex items-center space-x-4 mb-4">
-                  <img
-                    src={player.avatar || '/default-pfp.jpg'}
-                    alt={player.username}
-                    className="w-16 h-16 rounded-full"
-                  />
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">{player.username}</h2>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-yellow-400">{winPercentage}%</div>
-                    <div className="text-sm text-slate-300">Win</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-yellow-400">{stats.totalCoins?.toLocaleString() || '0'}</div>
-                    <div className="text-sm text-slate-300">Coins</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-blue-400">{stats.gamesPlayed || 0}</div>
-                    <div className="text-sm text-slate-300">Played</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-green-400">{stats.gamesWon || 0}</div>
-                    <div className="text-sm text-slate-300">Won</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-purple-400">{stats.totalBags || 0}</div>
-                    <div className="text-sm text-slate-300">Bags</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-orange-400">{stats.bagsPerGame?.toFixed(1) || '0.0'}</div>
-                    <div className="text-sm text-slate-300">Bags/G</div>
-                  </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{player.username}</h2>
                 </div>
               </div>
-
-              {/* Nil Stats - Horizontal inline layout */}
-              <div className="bg-slate-700 rounded-lg p-4">
-                <h3 className="text-xl font-bold text-white mb-4">Nil Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Nil:</span>
-                    <div className="flex space-x-4">
-                      <span className="text-white">{stats.nilsBid || 0} bid</span>
-                      <span className="text-white">{stats.nilsMade || 0} made</span>
-                      <span className="text-white">{stats.nilsBid ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Blind Nil:</span>
-                    <div className="flex space-x-4">
-                      <span className="text-white">{stats.blindNilsBid || 0} bid</span>
-                      <span className="text-white">{stats.blindNilsMade || 0} made</span>
-                      <span className="text-white">{stats.blindNilsBid ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%</span>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 gap-4 text-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">⭐</span>
+                  <span className="text-white">{winPercentage}% Win</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">🪙</span>
+                  <span className="text-white">{stats.totalCoinsWon?.toLocaleString() || 0}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-blue-400">📊</span>
+                  <span className="text-white">{stats.gamesPlayed} Played</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">🏆</span>
+                  <span className="text-white">{stats.gamesWon} Won</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-green-400">👜</span>
+                  <span className="text-white">{stats.totalBags} Bags</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-green-400">✓</span>
+                  <span className="text-white">{stats.bagsPerGame?.toFixed(1) || 0} Bags/G</span>
                 </div>
               </div>
             </div>
 
-            {/* Right column */}
-            <div className="flex flex-col">
-              {/* Game Mode Breakdown */}
-              <div className="bg-slate-700 rounded-lg p-6 mb-6">
-                <h3 className="text-3xl font-bold text-white mb-6">Game Mode Breakdown</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg text-slate-300">Regular</span>
-                    <span className="text-lg text-white">{gameModeBreakdown.regular.won}/{gameModeBreakdown.regular.played}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg text-slate-300">Whiz</span>
-                    <span className="text-lg text-white">{gameModeBreakdown.whiz.won}/{gameModeBreakdown.whiz.played}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg text-slate-300">Mirrors</span>
-                    <span className="text-lg text-white">{gameModeBreakdown.mirrors.won}/{gameModeBreakdown.mirrors.played}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg text-slate-300">Gimmick</span>
-                    <span className="text-lg text-white">{gameModeBreakdown.gimmick.won}/{gameModeBreakdown.gimmick.played}</span>
-                  </div>
+            {/* Nil Stats Table */}
+            <div className="bg-slate-700 rounded-lg p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Nil Stats</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-white">
+                  <thead>
+                    <tr className="border-b border-slate-600">
+                      <th className="text-left py-2 px-2">Type</th>
+                      <th className="text-center py-2 px-2">Bid</th>
+                      <th className="text-center py-2 px-2">Made</th>
+                      <th className="text-center py-2 px-2">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-600">
+                      <td className="py-2 px-2">Nil</td>
+                      <td className="text-center py-2 px-2">{stats.nilsBid || 0}</td>
+                      <td className="text-center py-2 px-2">{stats.nilsMade || 0}</td>
+                      <td className="text-center py-2 px-2">{stats.nilsBid && stats.nilsMade ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 px-2">Blind Nil</td>
+                      <td className="text-center py-2 px-2">{stats.blindNilsBid || 0}</td>
+                      <td className="text-center py-2 px-2">{stats.blindNilsMade || 0}</td>
+                      <td className="text-center py-2 px-2">{stats.blindNilsBid && stats.blindNilsMade ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="flex flex-col">
+            {/* Game Mode Breakdown */}
+            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+              <h3 className="text-3xl font-bold text-white mb-6">Game Mode Breakdown</h3>
+              <p className="text-slate-300 mb-6">(won/played)</p>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-xl text-white">Regular</span>
+                  <span className="text-xl text-white">{gameModeBreakdown.regular}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xl text-white">Whiz</span>
+                  <span className="text-xl text-white">{gameModeBreakdown.whiz}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xl text-white">Mirrors</span>
+                  <span className="text-xl text-white">{gameModeBreakdown.mirrors}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xl text-white">Gimmick</span>
+                  <span className="text-xl text-white">{gameModeBreakdown.gimmick}</span>
                 </div>
               </div>
+            </div>
 
-              {/* Special Rules */}
-              <div className="bg-slate-700 rounded-lg p-4">
-                <h3 className="text-xl font-bold text-white mb-3">Special Rules</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Screamer</span>
-                    <span className="text-white">{specialRules.screamer.won}/{specialRules.screamer.played}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Assassin</span>
-                    <span className="text-white">{specialRules.assassin.won}/{specialRules.assassin.played}</span>
-                  </div>
+            {/* Special Rules */}
+            <div className="bg-slate-700 rounded-lg p-4">
+              <h3 className="text-xl font-bold text-white mb-3">Special Rules</h3>
+              <p className="text-slate-300 mb-3">(won/played)</p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg text-white">Screamer</span>
+                  <span className="text-lg text-white">{specialRules.screamer}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-lg text-white">Assassin</span>
+                  <span className="text-lg text-white">{specialRules.assassin}</span>
                 </div>
               </div>
             </div>
@@ -264,4 +283,6 @@ export default function PlayerStatsModal({ player, isOpen, onClose }: PlayerStat
       </div>
     </div>
   );
-} 
+};
+
+export default PlayerStatsModal; 
