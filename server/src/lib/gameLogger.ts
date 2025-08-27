@@ -125,8 +125,27 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			else won = team === winner;
 			
 			try {
-				await prisma.gamePlayer.create({
-					data: {
+				// Use upsert to handle existing records
+				await prisma.gamePlayer.upsert({
+					where: {
+						gameId_position: {
+							gameId: dbGame.id,
+							position: i
+						}
+					},
+					update: {
+						team,
+						bid: finalBid,
+						bags: finalBags,
+						points: finalPoints,
+						finalScore: finalPoints,
+						finalBags,
+						finalPoints,
+						won,
+						username: player.username,
+						discordId: player.discordId || null
+					},
+					create: {
 						gameId: dbGame.id,
 						userId,
 						position: i,
@@ -142,9 +161,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						discordId: player.discordId || null
 					}
 				});
-				console.log(`[GAME LOGGER] Created GamePlayer for ${player.username} at position ${i}`);
+				console.log(`[GAME LOGGER] Upserted GamePlayer for ${player.username} at position ${i}`);
 			} catch (playerError) {
-				console.error(`[GAME LOGGER] Failed to create GamePlayer for position ${i}:`, playerError);
+				console.error(`[GAME LOGGER] Failed to upsert GamePlayer for position ${i}:`, playerError);
 				console.error(`[GAME LOGGER] Player data:`, player);
 			}
 		}
@@ -164,21 +183,30 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			}))
 		};
 
-		await prisma.gameResult.create({
-			data: {
-				gameId: dbGame.id,
-				winner,
-				finalScore,
-				gameDuration: Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000),
-				team1Score,
-				team2Score,
-				playerResults,
-				totalRounds: game.rounds?.length || 0,
-				totalTricks: game.play?.tricks?.length || 0,
-				specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 }
-			}
+		// Check if GameResult already exists
+		const existingGameResult = await prisma.gameResult.findUnique({
+			where: { gameId: dbGame.id }
 		});
-		console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+
+		if (!existingGameResult) {
+			await prisma.gameResult.create({
+				data: {
+					gameId: dbGame.id,
+					winner,
+					finalScore,
+					gameDuration: Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000),
+					team1Score,
+					team2Score,
+					playerResults,
+					totalRounds: game.rounds?.length || 0,
+					totalTricks: game.play?.tricks?.length || 0,
+					specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 }
+				}
+			});
+			console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+		} else {
+			console.log(`GameResult already exists for game ${dbGame.id}, skipping creation`);
+		}
 		
 		// Send Discord results for league games
 		if ((game as any).league && !(game as any).discordResultsSent) {
