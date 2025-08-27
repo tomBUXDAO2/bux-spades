@@ -87,16 +87,16 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
   // Calculate game mode breakdown
   const gameModeBreakdown = {
-    regular: `${stats.gameModeBreakdown?.regular?.won || 0}/${stats.gameModeBreakdown?.regular?.played || 0}`,
-    whiz: `${stats.gameModeBreakdown?.whiz?.won || 0}/${stats.gameModeBreakdown?.whiz?.played || 0}`,
-    mirrors: `${stats.gameModeBreakdown?.mirrors?.won || 0}/${stats.gameModeBreakdown?.mirrors?.played || 0}`,
-    gimmick: `${stats.gameModeBreakdown?.gimmick?.won || 0}/${stats.gameModeBreakdown?.gimmick?.played || 0}`
+    regular: `${stats.gameMode?.regular?.won || 0}/${stats.gameMode?.regular?.played || 0}`,
+    whiz: `${stats.gameMode?.whiz?.won || 0}/${stats.gameMode?.whiz?.played || 0}`,
+    mirrors: `${stats.gameMode?.mirrors?.won || 0}/${stats.gameMode?.mirrors?.played || 0}`,
+    gimmick: `${stats.gameMode?.gimmick?.won || 0}/${stats.gameMode?.gimmick?.played || 0}`
   };
 
   // Calculate special rules breakdown
   const specialRules = {
-    screamer: `${stats.specialRulesBreakdown?.screamer?.won || 0}/${stats.specialRulesBreakdown?.screamer?.played || 0}`,
-    assassin: `${stats.specialRulesBreakdown?.assassin?.won || 0}/${stats.specialRulesBreakdown?.assassin?.played || 0}`
+    screamer: `${stats.specialRules?.screamer?.won || 0}/${stats.specialRules?.screamer?.played || 0}`,
+    assassin: `${stats.specialRules?.assassin?.won || 0}/${stats.specialRules?.assassin?.played || 0}`
   };
 
   return (
