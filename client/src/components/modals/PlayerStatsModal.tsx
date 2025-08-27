@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 
 interface PlayerStats {
@@ -42,9 +42,10 @@ interface Player {
 interface PlayerStatsModalProps {
   player: Player;
   isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function PlayerStatsModal({ player, isOpen }: PlayerStatsModalProps) {
+export default function PlayerStatsModal({ player, isOpen, onClose }: PlayerStatsModalProps) {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
@@ -101,6 +102,16 @@ export default function PlayerStatsModal({ player, isOpen }: PlayerStatsModalPro
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
+          {/* Close button */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white text-2xl font-bold"
+            >
+              ×
+            </button>
+          </div>
+
           {/* Radio buttons - centered, no gap above */}
           <div className="flex justify-center mb-6">
             <div className="flex space-x-6">
@@ -253,6 +264,4 @@ export default function PlayerStatsModal({ player, isOpen }: PlayerStatsModalPro
       </div>
     </div>
   );
-};
-
-export default PlayerStatsModal; 
+} 
