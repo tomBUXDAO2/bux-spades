@@ -244,7 +244,7 @@ const HomePage: React.FC = () => {
               message: `${name} joined the lobby`,
               timestamp: Date.now()
             } as ChatMessage;
-          }).filter(Boolean) // Remove null entries
+          }).filter((msg): msg is ChatMessage => msg !== null) // Type guard to remove null entries
         ]);
       }
       onlineIdsRef.current = onlineUserIds;
