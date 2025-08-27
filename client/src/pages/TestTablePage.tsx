@@ -188,29 +188,7 @@ export default function TestTablePage() {
   // Modal state
   const [showInactivityModal, setShowInactivityModal] = useState(false);
 
-  // Test speech bubbles for all 4 players
-  const [testSpeechBubbles, setTestSpeechBubbles] = useState({
-    'user-1': {
-      message: 'Hello everyone!',
-      playerName: 'TestPlayer1',
-      isVisible: true
-    },
-    'user-2': {
-      message: 'Good luck!',
-      playerName: 'TestPlayer2',
-      isVisible: true
-    },
-    'user-3': {
-      message: 'Let\'s play!',
-      playerName: 'TestPlayer3',
-      isVisible: true
-    },
-    'user-4': {
-      message: 'Ready to win!',
-      playerName: 'TestPlayer4',
-      isVisible: true
-    }
-  });
+
 
   // Check if device is mobile or tablet
   const isMobileOrTablet = () => {
@@ -403,7 +381,6 @@ export default function TestTablePage() {
           isSpectator={false}
           testAnimatingTrick={true}
           testTrickWinner={1}
-          testSpeechBubbles={testSpeechBubbles}
         />
       </div>
 
