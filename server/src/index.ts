@@ -1422,6 +1422,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   
   // Round logging is now started when game is created
       
+      // START ROUND LOGGING FOR FIRST HAND
+      if (game.dbGameId) {
+        try {
+          await trickLogger.startRound(game.dbGameId, 1);
+          console.log('[ROUND STARTED] Round 1 started for game:', game.dbGameId);
+        } catch (err) {
+          console.error('Failed to start round logging for first hand:', err);
+        }
+      }
+      
       console.log('[BIDDING COMPLETE] Moving to play phase, first player:', firstPlayer.username, 'at index:', (game.dealerIndex + 1) % 4);
       
       io.to(game.id).emit('bidding_complete', { bids: game.bidding.bids });
