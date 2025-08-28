@@ -1431,7 +1431,7 @@ export default function GameTable({
         )}
         
         {/* Speech bubble for West player only */}
-        {position === 1 && recentChatMessages[player.id] && (
+        {position === 1 && player && recentChatMessages[player.id] && (
           <>
             <div 
               className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-4 w-0 h-0 border-transparent"
@@ -1468,7 +1468,7 @@ export default function GameTable({
         )}
         
         {/* Speech bubble for East player only */}
-        {position === 3 && recentChatMessages[player.id] && (
+        {position === 3 && player && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 top-full right-1/2 translate-x-1/2 mt-4">
             <div 
@@ -1507,7 +1507,7 @@ export default function GameTable({
         )}
         
         {/* Speech bubble for North player only */}
-        {position === 0 && recentChatMessages[player.id] && (
+        {position === 0 && player && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
@@ -1546,7 +1546,7 @@ export default function GameTable({
         )}
         
         {/* Speech bubble for South player only */}
-        {position === 2 && recentChatMessages[player.id] && (
+        {position === 2 && player && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
