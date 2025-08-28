@@ -1108,9 +1108,9 @@ export default function GameTable({
       // @ts-ignore
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
 
-      const isPlayerOnTimer = shouldShowTimer && turnTimer <= 10; // Show timer to all players when 10 seconds or less
-      const isCurrentPlayer = player && player.id === propUser?.id;
-      const shouldShowTimerOnPlayer = isPlayerOnTimer && isCurrentPlayer; // Only overlay on current player's PFP
+      // Check if this specific player is the current player (timing out)
+      const isCurrentPlayer = player && player.id === gameState.currentPlayer;
+      const shouldShowTimerOnPlayer = shouldShowTimer && turnTimer <= 10 && isCurrentPlayer; // Only overlay on current player's PFP
       
       // Check if this player is on countdown overlay
       const isPlayerOnCountdown = countdownPlayer && countdownPlayer.playerId === player?.id;
