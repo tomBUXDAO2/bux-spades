@@ -2705,10 +2705,15 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
     try {
       const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = new Date();
+      
+      // Find a valid human player for creatorId, or use null if no humans
+      const humanPlayer = game.players.find(p => p && p.type === 'human');
+      const creatorId = humanPlayer?.id || null;
+      
       const dbGame = await prisma.game.create({
         data: {
           id: gameId,
-          creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
+          creatorId: creatorId,
           gameMode: game.gameMode,
           bidType: 'REGULAR',
           specialRules: [],

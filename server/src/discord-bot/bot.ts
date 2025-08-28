@@ -1049,9 +1049,45 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
 // Helper function to create game and notify players
 async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
   try {
+    // Find the database User ID for the host
+    let hostUser = await prisma.user.findFirst({
+      where: { discordId: gameLine.hostId }
+    });
+    
+    if (!hostUser) {
+      // Create user if doesn't exist
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date();
+      
+      hostUser = await prisma.user.create({
+        data: {
+          id: userId,
+          username: gameLine.hostName,
+          discordId: gameLine.hostId,
+          coins: 5000000,
+          avatar: null,
+          createdAt: now,
+          updatedAt: now
+        } as any
+      });
+      
+      // Create user stats
+      const statsId = `stats_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await prisma.userStats.create({
+        data: {
+          id: statsId,
+          userId: hostUser.id,
+          createdAt: now,
+          updatedAt: now
+        } as any
+      });
+      
+      console.log(`[DISCORD BOT] Created new user for host ${gameLine.hostName}: ${hostUser.id}`);
+    }
+    
     // Create game on the server
     const gameData = {
-      creatorId: gameLine.hostId,
+      creatorId: hostUser.id, // Use database User ID, not Discord ID
       creatorName: gameLine.hostName,
       buyIn: gameLine.coins,
       gameMode: gameLine.gameMode.toUpperCase(),
@@ -1088,7 +1124,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
     };
 
     // Sign a short-lived JWT so the API accepts this request
-    const token = jwt.sign({ userId: gameLine.hostId }, process.env.JWT_SECRET || '', { expiresIn: '5m' } as any);
+    const token = jwt.sign({ userId: hostUser.id }, process.env.JWT_SECRET || '', { expiresIn: '5m' } as any);
     
     // Make API call to create game
     const response = await fetch(`${INTERNAL_API_URL}/api/games`, {

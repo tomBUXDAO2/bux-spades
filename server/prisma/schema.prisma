@@ -33,7 +33,7 @@ model Friend {
 
 model Game {
   id           String        @id
-  creatorId    String
+  creatorId    String?
   status       GameStatus    @default(WAITING)
   gameMode     GameMode
   bidType      BidType
@@ -44,7 +44,7 @@ model Game {
   rated        Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime
-  User         User          @relation(fields: [creatorId], references: [id])
+  User         User?         @relation(fields: [creatorId], references: [id])
   GamePlayer   GamePlayer[]
   GameResult   GameResult?
   Round        Round[]
