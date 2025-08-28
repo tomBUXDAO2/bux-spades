@@ -1430,8 +1430,8 @@ export default function GameTable({
           />
         )}
         
-        {/* Single arrow for West player only */}
-        {position === 1 && (
+        {/* Speech bubble for West player only */}
+        {position === 1 && recentChatMessages[player.id] && (
           <>
             <div 
               className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-4 w-0 h-0 border-transparent"
@@ -1452,25 +1452,23 @@ export default function GameTable({
                   maxWidth: '140px'
                 }}
               >
-                {recentChatMessages[player.id] && (
-                  <div className="text-gray-800 font-black" style={{ 
-                    fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {recentChatMessages[player.id].message}
-                  </div>
-                )}
+                <div className="text-gray-800 font-black" style={{ 
+                  fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {recentChatMessages[player.id].message}
+                </div>
               </div>
             </div>
           </>
         )}
         
-        {/* Single arrow for East player only */}
-        {position === 3 && (
+        {/* Speech bubble for East player only */}
+        {position === 3 && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 top-full right-1/2 translate-x-1/2 mt-4">
             <div 
@@ -1493,25 +1491,23 @@ export default function GameTable({
                   maxWidth: '140px'
                 }}
               >
-                {recentChatMessages[player.id] && (
-                  <div className="text-gray-800 font-black text-right" style={{ 
-                    fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {recentChatMessages[player.id].message}
-                  </div>
-                )}
+                <div className="text-gray-800 font-black text-right" style={{ 
+                  fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {recentChatMessages[player.id].message}
+                </div>
               </div>
             </div>
           </>
         )}
         
-        {/* Single arrow for North player only */}
-        {position === 0 && (
+        {/* Speech bubble for North player only */}
+        {position === 0 && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
@@ -1534,25 +1530,23 @@ export default function GameTable({
                   maxWidth: '140px'
                 }}
               >
-                {recentChatMessages[player.id] && (
-                  <div className="text-gray-800 font-black text-right" style={{ 
-                    fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {recentChatMessages[player.id].message}
-                  </div>
-                )}
+                <div className="text-gray-800 font-black text-right" style={{ 
+                  fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {recentChatMessages[player.id].message}
+                </div>
               </div>
             </div>
           </>
         )}
         
-        {/* Single arrow for South player only */}
-        {position === 2 && (
+        {/* Speech bubble for South player only */}
+        {position === 2 && recentChatMessages[player.id] && (
           <>
             <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
@@ -1575,18 +1569,16 @@ export default function GameTable({
                   maxWidth: '140px'
                 }}
               >
-                {recentChatMessages[player.id] && (
-                  <div className="text-gray-800 font-black text-right" style={{ 
-                    fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {recentChatMessages[player.id].message}
-                  </div>
-                )}
+                <div className="text-gray-800 font-black text-right" style={{ 
+                  fontSize: recentChatMessages[player.id].message.length <= 4 ? '1.5rem' : '1rem',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {recentChatMessages[player.id].message}
+                </div>
               </div>
             </div>
           </>
