@@ -6,6 +6,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import passport from 'passport';
+import session from 'express-session';
 
 import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
@@ -47,6 +48,22 @@ const httpServer = createServer(app);
 // Body parsing middleware MUST come first
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session middleware for OAuth flows
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback-session-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport and restore authentication state
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Strict CORS handler
 const httpAllowedOrigins = [

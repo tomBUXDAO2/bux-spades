@@ -30,34 +30,45 @@ router.get(
   '/auth/discord/callback',
   passport.authenticate('discord', { failureRedirect: '/login' }),
   async (req, res) => {
-    const user = (req as any).user;
-    
-    console.log('Discord callback - User authenticated:', {
-      userId: user.id,
-      username: user.username,
-      discordId: user.discordId
-    });
-
-    // Check Facebook connection and update Discord role
-    if (user.discordId && checkAndUpdateUserRole) {
-      try {
-        console.log(`Checking Facebook connection for Discord user: ${user.discordId}`);
-        await checkAndUpdateUserRole(user.discordId);
-      } catch (error) {
-        console.error('Error checking Facebook connection:', error);
-        // Don't fail the auth if Discord bot check fails
+    try {
+      const user = (req as any).user;
+      
+      if (!user) {
+        console.error('Discord callback - No user found in request');
+        return res.redirect(`${process.env.CLIENT_URL}/login?error=no_user`);
       }
+      
+      console.log('Discord callback - User authenticated:', {
+        userId: user.id,
+        username: user.username,
+        discordId: user.discordId
+      });
+
+      // Check Facebook connection and update Discord role
+      if (user.discordId && checkAndUpdateUserRole) {
+        try {
+          console.log(`Checking Facebook connection for Discord user: ${user.discordId}`);
+          await checkAndUpdateUserRole(user.discordId);
+        } catch (error) {
+          console.error('Error checking Facebook connection:', error);
+          // Don't fail the auth if Discord bot check fails
+        }
+      }
+
+      // Generate JWT token
+      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'fallback-secret', {
+        expiresIn: '7d',
+      });
+
+      // Redirect to frontend with token
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      console.log('Redirecting to:', `${clientUrl}/auth/callback?token=${token}`);
+      res.redirect(`${clientUrl}/auth/callback?token=${token}`);
+    } catch (error) {
+      console.error('Discord callback error:', error);
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      res.redirect(`${clientUrl}/login?error=auth_failed`);
     }
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'fallback-secret', {
-      expiresIn: '7d',
-    });
-
-    // Redirect to frontend with token
-    res.redirect(
-      `${process.env.CLIENT_URL}/auth/callback?token=${token}`
-    );
   }
 );
 
