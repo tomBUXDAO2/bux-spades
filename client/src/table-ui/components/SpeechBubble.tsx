@@ -70,10 +70,10 @@ export default function SpeechBubble({
             bottom: '-8px',
             left: '50%',
             transform: 'translateX(-50%)',
-            borderLeftWidth: '16px',
-            borderRightWidth: '16px',
+            borderLeftWidth: '8px',
+            borderRightWidth: '8px',
             borderTopWidth: '0px',
-            borderBottomWidth: '16px',
+            borderBottomWidth: '24px',
             borderBottomColor: 'white'
           }}
         ></div>

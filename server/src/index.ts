@@ -6,7 +6,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import passport from 'passport';
-import session from 'express-session';
+
 import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
@@ -141,22 +141,8 @@ const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
 // Export io for use in routes
 export { io, onlineUsers };
 
-// Session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // Set to false to allow HTTP in development and avoid HTTPS issues
-    sameSite: 'lax',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
-
-// Passport middleware
+// Passport middleware (for Discord OAuth2 only)
 app.use(passport.initialize());
-app.use(passport.session());
 
 // Debug middleware to log requests
 if (process.env.NODE_ENV !== 'production') {
@@ -173,21 +159,7 @@ app.use('/api/games', gamesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/social', socialRoutes);
 
-// Debug route to check session status
-app.get('/api/debug/session', (req, res) => {
-  console.log('Session debug:', {
-    sessionID: req.sessionID,
-    user: req.user,
-    authenticated: req.isAuthenticated(),
-    cookies: req.headers.cookie
-  });
-  res.json({
-    sessionID: req.sessionID,
-    user: req.user,
-    authenticated: req.isAuthenticated(),
-    hasSession: !!req.session
-  });
-});
+
 
 // Add this at the end, after all routes
 // Error handling middleware

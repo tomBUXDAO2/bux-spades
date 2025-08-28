@@ -77,7 +77,7 @@ const AuthCallback: React.FC = () => {
     if (token) {
       console.log('Discord callback received token:', token);
       
-      // Try to store session token in localStorage, but handle quota exceeded error
+      // Store the JWT token in localStorage
       try {
         localStorage.setItem('sessionToken', token);
       } catch (storageError) {
@@ -88,22 +88,13 @@ const AuthCallback: React.FC = () => {
           localStorage.setItem('sessionToken', token);
         } catch (retryError) {
           console.error('Failed to store session token even after clearing localStorage:', retryError);
-          // Try storing in sessionStorage as fallback
-          try {
-            sessionStorage.setItem('sessionToken', token);
-            console.log('Stored session token in sessionStorage as fallback');
-          } catch (sessionError) {
-            console.error('Failed to store session token in sessionStorage:', sessionError);
-            // Store in memory as last resort
-            (window as any).__tempSessionToken = token;
-            console.log('Stored session token in memory as last resort');
-          }
+          // Continue without storing - the user can still use the token for this session
         }
       }
       
       fetchUserProfile(token);
     } else {
-      console.error('No token received in Discord callback');
+      console.error('No token received from Discord callback');
       navigate('/login', { replace: true });
     }
   }, [searchParams, navigate, setUser]);

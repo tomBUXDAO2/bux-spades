@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
 import BlindNilModal from './BlindNilModal';
@@ -25,7 +25,7 @@ import { createPortal } from 'react-dom';
 
 import { api } from '@/lib/api';
 import { isGameOver, getPlayerColor } from '../lib/gameRules';
-// import { useAuth } from '@/context/AuthContext';
+
 
 // Coin debit animation component
 const CoinDebitAnimation = ({ amount, isVisible }: { amount: number, isVisible: boolean }) => {
@@ -442,8 +442,6 @@ export default function GameTable({
   testTrickWinner = null
 }: GameTableProps) {
   const { socket, isAuthenticated } = useSocket();
-  // Using propUser elsewhere; no need to pull from AuthContext here
-// const { user } = useAuth();
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
   
   // Timer state for turn countdown
@@ -1430,21 +1428,130 @@ export default function GameTable({
           />
         )}
         
-        {/* Single arrow for West player only */}
-        {position === 1 && (
-          <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-4">
-            <div 
-              className="w-0 h-0 border-transparent"
-              style={{
-                borderLeftWidth: '16px',
-                borderRightWidth: '16px',
-                borderTopWidth: '0px',
-                borderBottomWidth: '16px',
-                borderBottomColor: 'white'
-              }}
-            ></div>
-          </div>
-        )}
+        {/* Render active speech bubbles for this position */}
+        {activeSpeechBubbles
+          .filter(bubble => bubble.position === position)
+          .map(bubble => {
+            const isShortMessage = bubble.message.length <= 4;
+            const fontSize = isShortMessage ? '1.5rem' : '1rem';
+            
+            return (
+              <React.Fragment key={bubble.id}>
+                {/* Arrow for Left player */}
+                {position === 1 && (
+                  <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-4 w-0 h-0 border-transparent" style={{ borderLeftWidth: '8px', borderRightWidth: '8px', borderTopWidth: '0px', borderBottomWidth: '24px', borderBottomColor: 'white' }}></div>
+                )}
+                
+                {/* Speech bubble container for Left player */}
+                {position === 1 && (
+                  <div className="absolute z-50 top-full left-0 mt-10 ml-4">
+                    <div className="bg-white rounded-lg px-4 py-3 mt-[-8px]" style={{ minWidth: '120px', maxWidth: '140px' }}>
+                      <div className="text-gray-800 font-black" style={{ 
+                        fontSize,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {bubble.message}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        
+        {/* Render active speech bubbles for Right player */}
+        {activeSpeechBubbles
+          .filter(bubble => bubble.position === 3)
+          .map(bubble => {
+            const isShortMessage = bubble.message.length <= 4;
+            const fontSize = isShortMessage ? '1.5rem' : '1rem';
+            
+            return (
+              <React.Fragment key={bubble.id}>
+                <div className="absolute z-50 top-full right-1/2 translate-x-1/2 mt-4">
+                  <div className="w-0 h-0 border-transparent" style={{ borderLeftWidth: '8px', borderRightWidth: '8px', borderTopWidth: '0px', borderBottomWidth: '24px', borderBottomColor: 'white' }}></div>
+                </div>
+                <div className="absolute z-50 top-full right-0 mt-10 mr-4">
+                  <div className="bg-white rounded-lg px-4 py-3 mt-[-8px]" style={{ minWidth: '120px', maxWidth: '140px' }}>
+                    <div className="text-gray-800 font-black text-right" style={{ 
+                      fontSize,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {bubble.message}
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        
+        {/* Render active speech bubbles for Bottom player */}
+        {activeSpeechBubbles
+          .filter(bubble => bubble.position === 0)
+          .map(bubble => {
+            const isShortMessage = bubble.message.length <= 4;
+            const fontSize = isShortMessage ? '1.5rem' : '1rem';
+            
+            return (
+              <React.Fragment key={bubble.id}>
+                <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
+                  <div className="w-0 h-0 border-transparent" style={{ borderLeftWidth: '24px', borderRightWidth: '0px', borderTopWidth: '8px', borderBottomWidth: '8px', borderLeftColor: 'white' }}></div>
+                </div>
+                <div className="absolute z-50 bottom-0 left-0 mb-4" style={{ marginBottom: '15px', left: 'calc(-30px - 140px)' }}>
+                  <div className="bg-white rounded-lg px-4 py-3 mr-[-8px]" style={{ minWidth: '120px', maxWidth: '140px' }}>
+                    <div className="text-gray-800 font-black text-right" style={{ 
+                      fontSize,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {bubble.message}
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        
+        {/* Render active speech bubbles for Top player */}
+        {activeSpeechBubbles
+          .filter(bubble => bubble.position === 2)
+          .map(bubble => {
+            const isShortMessage = bubble.message.length <= 4;
+            const fontSize = isShortMessage ? '1.5rem' : '1rem';
+            
+            return (
+              <React.Fragment key={bubble.id}>
+                <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
+                  <div className="w-0 h-0 border-transparent" style={{ borderLeftWidth: '24px', borderRightWidth: '0px', borderTopWidth: '8px', borderBottomWidth: '8px', borderLeftColor: 'white' }}></div>
+                </div>
+                <div className="absolute z-50 top-0 left-0 mt-4" style={{ marginTop: '15px', left: 'calc(-30px - 140px)' }}>
+                  <div className="bg-white rounded-lg px-4 py-3 mr-[-8px]" style={{ minWidth: '120px', maxWidth: '140px' }}>
+                    <div className="text-gray-800 font-black text-right" style={{ 
+                      fontSize,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {bubble.message}
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
       </div>
     );
   };
@@ -2142,6 +2249,48 @@ export default function GameTable({
     };
   }, [socket]);
 
+  // Handle chat messages for speech bubbles
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleChatMessage = (data: { gameId: string; message: ChatMessage }) => {
+      const { message } = data;
+      
+      // Only show speech bubbles for seated players (not system messages)
+      if (message.userId === 'system') return;
+      
+      // Find the player's position
+      const player = gameState.players.find(p => p && p.id === message.userId);
+      if (!player) return;
+      
+      const playerIndex = gameState.players.findIndex(p => p && p.id === message.userId);
+      if (playerIndex === -1) return;
+      
+      // Create speech bubble
+      const speechBubble = {
+        id: `speech-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: message.userId,
+        userName: message.userName,
+        message: message.message,
+        position: playerIndex,
+        timestamp: Date.now()
+      };
+      
+      // Add to active speech bubbles
+      setActiveSpeechBubbles(prev => [...prev, speechBubble]);
+      
+      // Remove after 5 seconds
+      setTimeout(() => {
+        setActiveSpeechBubbles(prev => prev.filter(bubble => bubble.id !== speechBubble.id));
+      }, 5000);
+    };
+    
+    socket.on('chat_message', handleChatMessage);
+    return () => {
+      socket.off('chat_message', handleChatMessage);
+    };
+  }, [socket, gameState.players]);
+
   // Loosen the chatReady guard so Chat UI renders for both players and spectators
   const chatReady = Boolean(gameState?.id);
 
@@ -2314,6 +2463,16 @@ export default function GameTable({
   const [animatingTrick, setAnimatingTrick] = useState(false);
   const [animatedTrickCards, setAnimatedTrickCards] = useState<Card[]>([]);
   const [trickCompleted, setTrickCompleted] = useState(false);
+  
+  // Speech bubble state for chat messages
+  const [activeSpeechBubbles, setActiveSpeechBubbles] = useState<Array<{
+    id: string;
+    userId: string;
+    userName: string;
+    message: string;
+    position: number;
+    timestamp: number;
+  }>>([]);
 
   // Listen for trick_complete event and animate trick
   useEffect(() => {

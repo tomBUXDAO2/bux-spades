@@ -82,9 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('sessionToken') || 
-                  sessionStorage.getItem('sessionToken') || 
-                  (window as any).__tempSessionToken;
+    const token = localStorage.getItem('sessionToken');
     if (token) {
       fetchProfile();
     } else {
@@ -112,9 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('sessionToken') || 
-                    sessionStorage.getItem('sessionToken') || 
-                    (window as any).__tempSessionToken;
+      const token = localStorage.getItem('sessionToken');
       if (!token) {
         setLoading(false);
         return;
@@ -144,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             localStorage.clear();
             localStorage.setItem('userData', JSON.stringify(userData));
+            localStorage.setItem('sessionToken', token);
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
             // Continue without storing - the user is still logged in via sessionToken
@@ -173,13 +170,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       );
 
-      if (response.data?.user) {
+      if (response.data?.user && response.data?.token) {
         console.log('Login successful:', response.data);
         const userData = {
           ...response.data.user,
           isAuthenticated: true
         };
         setUser(userData);
+        
+        // Store the JWT token
+        localStorage.setItem('sessionToken', response.data.token);
         
         // Try to store user data in localStorage, but handle quota exceeded error
         try {
@@ -190,6 +190,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             localStorage.clear();
             localStorage.setItem('userData', JSON.stringify(userData));
+            localStorage.setItem('sessionToken', response.data.token);
           } catch (retryError) {
             console.error('Failed to store user data even after clearing localStorage:', retryError);
             // Continue without storing - the user is still logged in via session
@@ -245,6 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       // Clear local data regardless of server response
       localStorage.removeItem('userData');
+      localStorage.removeItem('sessionToken');
       sessionStorage.removeItem('userData');
       setUser(null);
     }
