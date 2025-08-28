@@ -3379,45 +3379,60 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
     clearTimeout(existingTimeout.timer);
   }
   
-  // Start 30-second timeout
-  console.log(`[TURN TIMEOUT DEBUG] Starting 30-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
-  const timer = setTimeout(() => {
-    console.log(`[TURN TIMEOUT] Player ${player.username} timed out on ${phase} turn`);
+  // Start 20-second timer to show countdown overlay
+  console.log(`[TURN TIMEOUT DEBUG] Starting 20-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
+  const countdownTimer = setTimeout(() => {
+    console.log(`[TURN TIMEOUT] Player ${player.username} reached 20 seconds - showing countdown overlay`);
     
-    // Get current consecutive timeouts
-    const currentTimeouts = turnTimeouts.get(timeoutKey);
-    const consecutiveTimeouts = (currentTimeouts?.consecutiveTimeouts || 0) + 1;
+    // Emit countdown start event to show 10-second overlay
+    io.to(game.id).emit('countdown_start', {
+      playerId: player.id,
+      playerIndex: playerIndex,
+      timeLeft: 10
+    });
     
-    console.log(`[TURN TIMEOUT] Player ${player.username} consecutive timeouts: ${consecutiveTimeouts}`);
+    // Start 10-second countdown timer
+    const finalTimer = setTimeout(() => {
+      console.log(`[TURN TIMEOUT] Player ${player.username} timed out on ${phase} turn after 30 seconds total`);
+      
+      // Get current consecutive timeouts
+      const currentTimeouts = turnTimeouts.get(timeoutKey);
+      const consecutiveTimeouts = (currentTimeouts?.consecutiveTimeouts || 0) + 1;
+      
+      console.log(`[TURN TIMEOUT] Player ${player.username} consecutive timeouts: ${consecutiveTimeouts}`);
+      
+      // Bot acts for player (NEVER remove player - they can refresh and rejoin)
+      console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
+      if (phase === 'bidding') {
+        console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
+        // Mark this as a bot action to prevent timeout clearing
+        (game as any).botActionInProgress = true;
+        botMakeMove(game, playerIndex);
+        (game as any).botActionInProgress = false;
+      } else if (phase === 'playing') {
+        console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
+        // Use the dedicated human timeout handler
+        const { handleHumanTimeout } = require('./routes/games.routes');
+        handleHumanTimeout(game, playerIndex);
+      }
+      
+      // Clear the timeout timer but keep the consecutive count
+      clearTurnTimeoutOnly(game, player.id);
+      
+      // Update consecutive timeouts (don't reset to 0)
+      turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: null, consecutiveTimeouts });
+      console.log(`[TURN TIMEOUT DEBUG] Updated timeout count for ${player.username}: ${consecutiveTimeouts}`);
+    }, 10000); // 10 second countdown
     
-    // Never remove players due to consecutive timeouts; always have bot act for them
-    // Bot acts for player
-    console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
-    if (phase === 'bidding') {
-      console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
-      // Mark this as a bot action to prevent timeout clearing
-      (game as any).botActionInProgress = true;
-      botMakeMove(game, playerIndex);
-      (game as any).botActionInProgress = false;
-    } else if (phase === 'playing') {
-      console.log(`[TURN TIMEOUT] Human player timed out in playing phase, acting for player ${player.username} at seat ${playerIndex}`);
-      // Use the dedicated human timeout handler
-      const { handleHumanTimeout } = require('./routes/games.routes');
-      handleHumanTimeout(game, playerIndex);
-    }
+    // Store the final timer
+    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: finalTimer, consecutiveTimeouts: existingTimeout?.consecutiveTimeouts || 0 });
     
-    // Clear the timeout timer but keep the consecutive count
-    clearTurnTimeoutOnly(game, player.id);
-    
-    // Update consecutive timeouts (don't reset to 0)
-    turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: null, consecutiveTimeouts });
-    console.log(`[TURN TIMEOUT DEBUG] Updated timeout count for ${player.username}: ${consecutiveTimeouts}`);
-  }, 30000);
+  }, 20000); // 20 second initial timer
   
   // Initialize with current consecutive timeouts (don't reset to 0)
   const currentTimeouts = turnTimeouts.get(timeoutKey);
   const currentConsecutiveTimeouts = currentTimeouts?.consecutiveTimeouts || 0;
-  turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer, consecutiveTimeouts: currentConsecutiveTimeouts });
+  turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: countdownTimer, consecutiveTimeouts: currentConsecutiveTimeouts });
   console.log(`[TURN TIMEOUT DEBUG] Set timeout for ${player.username} with consecutive timeouts: ${currentConsecutiveTimeouts}`);
 }
 

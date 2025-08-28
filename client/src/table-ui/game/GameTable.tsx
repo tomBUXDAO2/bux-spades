@@ -449,6 +449,7 @@ export default function GameTable({
   // Timer state for turn countdown
   const [turnTimer, setTurnTimer] = useState<number>(30);
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
+  const [countdownPlayer, setCountdownPlayer] = useState<{playerId: string, playerIndex: number, timeLeft: number} | null>(null);
   
   // Coin debit animation state
   const [showCoinDebit, setShowCoinDebit] = useState(false);
@@ -491,6 +492,34 @@ export default function GameTable({
   useEffect(() => {
     initializeAudio();
   }, []);
+  
+  // Listen for countdown start events
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleCountdownStart = (data: {playerId: string, playerIndex: number, timeLeft: number}) => {
+      console.log('[COUNTDOWN] Starting countdown for player:', data);
+      setCountdownPlayer(data);
+      
+      // Start countdown timer
+      const countdownInterval = setInterval(() => {
+        setCountdownPlayer(prev => {
+          if (!prev) return null;
+          if (prev.timeLeft <= 1) {
+            clearInterval(countdownInterval);
+            return null; // Countdown finished
+          }
+          return { ...prev, timeLeft: prev.timeLeft - 1 };
+        });
+      }, 1000);
+    };
+    
+    socket.on('countdown_start', handleCountdownStart);
+    
+    return () => {
+      socket.off('countdown_start', handleCountdownStart);
+    };
+  }, [socket]);
   
   // Handle game started event to show coin debit animation
   useEffect(() => {
@@ -1082,6 +1111,9 @@ export default function GameTable({
       const isPlayerOnTimer = shouldShowTimer && turnTimer <= 10; // Show timer to all players when 10 seconds or less
       const isCurrentPlayer = player && player.id === propUser?.id;
       const shouldShowTimerOnPlayer = isPlayerOnTimer && isCurrentPlayer; // Only overlay on current player's PFP
+      
+      // Check if this player is on countdown overlay
+      const isPlayerOnCountdown = countdownPlayer && countdownPlayer.playerId === player?.id;
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
@@ -1340,6 +1372,13 @@ export default function GameTable({
                   {shouldShowTimerOnPlayer && (
                     <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
                                              <span className="text-white font-bold text-lg">{turnTimer}</span>
+                    </div>
+                  )}
+                  
+                  {/* Countdown overlay for timed out player */}
+                  {isPlayerOnCountdown && (
+                    <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
                     </div>
                   )}
                 </div>
