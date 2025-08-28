@@ -23,5 +23,5 @@ COPY . .
 # Expose port
 EXPOSE 3000
 
-# Start the test server
-CMD ["node", "test-server.js"] 
+# Start the server with tsx (TypeScript execution)
+CMD ["npx", "tsx", "src/index.ts"] 
