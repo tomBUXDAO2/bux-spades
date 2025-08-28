@@ -2693,8 +2693,11 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
   // FORCE GAME LOGGING - Create game in database immediately
   if (!game.dbGameId) {
     try {
+      const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date();
       const dbGame = await prisma.game.create({
         data: {
+          id: gameId,
           creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
           gameMode: game.gameMode,
           bidType: 'REGULAR',
@@ -2704,7 +2707,9 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
           buyIn: game.buyIn,
           rated: game.players.filter(p => p && p.type === 'human').length === 4,
           status: 'PLAYING',
-        }
+          createdAt: now,
+          updatedAt: now
+        } as any
       });
       
       game.dbGameId = dbGame.id;

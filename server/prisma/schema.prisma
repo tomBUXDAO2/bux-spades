@@ -41,12 +41,13 @@ model Game {
   minPoints    Int
   maxPoints    Int
   buyIn        Int
+  rated        Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime
   User         User          @relation(fields: [creatorId], references: [id])
   GamePlayer   GamePlayer[]
-  Round        Round[]
   GameResult   GameResult?
+  Round        Round[]
 }
 
 model GamePlayer {
@@ -87,11 +88,11 @@ model Round {
 model Trick {
   id              String   @id
   roundId         String
-  trickNumber     Int      // Trick number within the round (1-13)
   leadPlayerId    String
   winningPlayerId String
   createdAt       DateTime @default(now())
   updatedAt       DateTime
+  trickNumber     Int
   Card            Card[]
   Round           Round    @relation(fields: [roundId], references: [id])
 
@@ -104,30 +105,30 @@ model Card {
   playerId  String
   suit      Suit
   value     Int
-  position  Int      // Position in the trick (0-3)
   createdAt DateTime @default(now())
   updatedAt DateTime
+  position  Int
   Trick     Trick    @relation(fields: [trickId], references: [id])
 }
 
 model User {
-  id                                      String        @id
-  email                                   String?       @unique
-  username                                String        @unique
-  password                                String?       @default("")
-  discordId                               String?       @unique
-  avatar                                  String?       @default("/default-pfp.jpg")
-  coins                                   Int           @default(5000000)
-  createdAt                               DateTime      @default(now())
+  id                                      String          @id
+  email                                   String?         @unique
+  username                                String          @unique
+  password                                String?         @default("")
+  discordId                               String?         @unique
+  avatar                                  String?         @default("/default-pfp.jpg")
+  coins                                   Int             @default(5000000)
+  createdAt                               DateTime        @default(now())
   updatedAt                               DateTime
-  BlockedUser_BlockedUser_blockedIdToUser BlockedUser[] @relation("BlockedUser_blockedIdToUser")
-  BlockedUser_BlockedUser_userIdToUser    BlockedUser[] @relation("BlockedUser_userIdToUser")
-  Friend_Friend_friendIdToUser            Friend[]      @relation("Friend_friendIdToUser")
-  Friend_Friend_userIdToUser              Friend[]      @relation("Friend_userIdToUser")
+  BlockedUser_BlockedUser_blockedIdToUser BlockedUser[]   @relation("BlockedUser_blockedIdToUser")
+  BlockedUser_BlockedUser_userIdToUser    BlockedUser[]   @relation("BlockedUser_userIdToUser")
+  Friend_Friend_friendIdToUser            Friend[]        @relation("Friend_friendIdToUser")
+  Friend_Friend_userIdToUser              Friend[]        @relation("Friend_userIdToUser")
   Game                                    Game[]
   GamePlayer                              GamePlayer[]
-  UserStats                               UserStats?
   UserGameStats                           UserGameStats[]
+  UserStats                               UserStats?
 }
 
 model UserStats {
@@ -139,6 +140,8 @@ model UserStats {
   nilsMade            Int      @default(0)
   blindNilsBid        Int      @default(0)
   blindNilsMade       Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
   totalBags           Int      @default(0)
   bagsPerGame         Float    @default(0)
   partnersGamesPlayed Int?     @default(0)
@@ -152,26 +155,43 @@ model UserStats {
   totalCoinsWon       Int?     @default(0)
   totalCoinsLost      Int?     @default(0)
   netCoins            Int?     @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime
   User                User     @relation(fields: [userId], references: [id])
 }
 
 model GameResult {
   id            String   @id
   gameId        String   @unique
-  winner        Int      // Player position of winner (0-3)
+  winner        Int
   finalScore    Int
-  gameDuration  Int?     // Duration in seconds
+  gameDuration  Int?
   team1Score    Int?
   team2Score    Int?
-  playerResults Json     // Detailed results for each player
-  totalRounds   Int      // Number of rounds/hands played
-  totalTricks   Int      // Total tricks across all rounds
-  specialEvents Json?    // Special events like nils, blind nils, etc.
+  playerResults Json
+  totalRounds   Int
+  totalTricks   Int
+  specialEvents Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   Game          Game     @relation(fields: [gameId], references: [id])
+}
+
+model UserGameStats {
+  id            String       @id @default(uuid())
+  userId        String
+  gameMode      GameMode
+  bidType       BidType
+  gimmickType   GimmickType?
+  screamer      Boolean      @default(false)
+  assassin      Boolean      @default(false)
+  gamesPlayed   Int          @default(0)
+  gamesWon      Int          @default(0)
+  nilsBid       Int          @default(0)
+  nilsMade      Int          @default(0)
+  blindNilsBid  Int          @default(0)
+  blindNilsMade Int          @default(0)
+  User          User         @relation(fields: [userId], references: [id])
+
+  @@unique([userId, gameMode, bidType, gimmickType, screamer, assassin])
 }
 
 enum BidType {
@@ -210,23 +230,4 @@ enum GimmickType {
   BID_4_OR_NIL
   BID_3
   BID_HEARTS
-}
-
-model UserGameStats {
-  id          String      @id @default(uuid())
-  userId      String
-  gameMode    GameMode
-  bidType     BidType
-  gimmickType GimmickType?
-  screamer    Boolean     @default(false)
-  assassin    Boolean     @default(false)
-  gamesPlayed Int         @default(0)
-  gamesWon    Int         @default(0)
-  nilsBid     Int         @default(0)
-  nilsMade    Int         @default(0)
-  blindNilsBid  Int       @default(0)
-  blindNilsMade Int       @default(0)
-  User        User        @relation(fields: [userId], references: [id])
-
-  @@unique([userId, gameMode, bidType, gimmickType, screamer, assassin])
 }
