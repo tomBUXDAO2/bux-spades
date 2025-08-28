@@ -31,6 +31,10 @@ const createGameSchema = z.object({
 	biddingOption: z.string().optional(),
 	specialRules: z.any().optional(),
 	league: z.boolean().optional(),
+	creatorId: z.string().optional(),
+	creatorName: z.string().optional(),
+	creatorImage: z.string().nullable().optional(),
+	gameType: z.string().optional(),
 	players: z.array(z.object({
 		userId: z.string().optional(),
 		discordId: z.string().optional(),
