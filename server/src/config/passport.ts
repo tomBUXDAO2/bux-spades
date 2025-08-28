@@ -11,6 +11,23 @@ passport.use(new DiscordStrategy({
   scope: ['identify', 'email']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    // Fetch current Discord user data to get nickname and avatar
+    const discordUserResponse = await fetch('https://discord.com/api/users/@me', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    
+    let currentNickname = profile.username;
+    let currentAvatar = profile.avatar;
+    
+    if (discordUserResponse.ok) {
+      const discordUser = await discordUserResponse.json();
+      // Use nickname if available, otherwise use username
+      currentNickname = discordUser.global_name || discordUser.username;
+      currentAvatar = discordUser.avatar;
+    }
+
     // Check if user already exists
     let user = await prisma.user.findUnique({
       where: { discordId: profile.id }
@@ -23,11 +40,11 @@ passport.use(new DiscordStrategy({
       user = await prisma.user.create({
         data: {
           id: userId,
-          username: profile.username,
+          username: currentNickname,
           discordId: profile.id,
           email: profile.email || null,
           password: '',
-          avatar: profile.avatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png` : '/default-pfp.jpg',
+          avatar: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : '/default-pfp.jpg',
           createdAt: now,
           updatedAt: now
         } as any
@@ -43,10 +60,22 @@ passport.use(new DiscordStrategy({
           updatedAt: now
         } as any
       });
+    } else {
+      // Update existing user with current Discord data
+      const now = new Date();
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          username: currentNickname,
+          avatar: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : user.avatar,
+          updatedAt: now
+        } as any
+      });
     }
 
     return done(null, user);
   } catch (error) {
+    console.error('Discord strategy error:', error);
     return done(error as Error);
   }
 }));
