@@ -1966,7 +1966,7 @@ export default function GameTable({
         setShowHandSummary(true);
       }, 500);
     }
-  }, [gameState.status, gameState.team1TotalScore, gameState.team2TotalScore, handSummaryData, showHandSummary]);
+  }, [gameState.status, gameState.team1TotalScore, gameState.team2TotalScore, handSummaryData]); // Removed showHandSummary from dependencies
 
   // Fallback mechanism disabled - only use server-provided hand completion data
   // This prevents duplicate hand summary modals with random data
