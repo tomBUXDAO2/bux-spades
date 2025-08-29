@@ -3704,9 +3704,19 @@ setInterval(() => {
             });
             
             // Log completed game to DB and Discord
+            console.log('[GAME COMPLETION] About to log completed game to DB and Discord for game:', game.id);
             void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
-              .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+              .then(({ logCompletedGameToDbAndDiscord }) => {
+                console.log('[GAME COMPLETION] Successfully imported gameLogger, calling logCompletedGameToDbAndDiscord');
+                return logCompletedGameToDbAndDiscord(game, winningTeam);
+              })
+              .then(() => {
+                console.log('[GAME COMPLETION] Successfully logged game completion for game:', game.id);
+              })
+              .catch((e) => {
+                console.error('[GAME COMPLETION ERROR] Failed to log completed game (periodic check):', e);
+                console.error('[GAME COMPLETION ERROR] Stack trace:', e.stack);
+              });
           }
         }
       }
