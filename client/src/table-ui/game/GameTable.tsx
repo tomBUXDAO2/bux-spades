@@ -540,7 +540,7 @@ export default function GameTable({
   
 
   
-  const isMyTurn = game.currentPlayer === propUser?.id;
+  // const isMyTurn = game.currentPlayer === propUser?.id; // Removed unused variable
   
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => {
