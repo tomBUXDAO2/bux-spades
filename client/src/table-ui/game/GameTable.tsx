@@ -2021,12 +2021,36 @@ export default function GameTable({
       }));
     };
 
+    const handleBiddingComplete = (data: any) => {
+      console.log('[BIDDING COMPLETE] Bidding completed:', data);
+      setBiddingReady(true);
+      setGameState(prev => ({
+        ...prev,
+        status: 'PLAYING',
+        currentPlayer: prev.players[((prev as any).dealerIndex + 1) % 4]?.id || ''
+      }));
+    };
+
+    const handlePlayStart = (data: any) => {
+      console.log('[PLAY START] Play phase started:', data);
+      setBiddingReady(true);
+      setGameState(prev => ({
+        ...prev,
+        status: 'PLAYING',
+        currentPlayer: prev.players[data.currentPlayerIndex]?.id || ''
+      }));
+    };
+
     socket.on('new_hand_started', handleNewHandStarted);
     socket.on('bidding_ready', handleBiddingReady);
+    socket.on('bidding_complete', handleBiddingComplete);
+    socket.on('play_start', handlePlayStart);
 
     return () => {
       socket.off('new_hand_started', handleNewHandStarted);
       socket.off('bidding_ready', handleBiddingReady);
+      socket.off('bidding_complete', handleBiddingComplete);
+      socket.off('play_start', handlePlayStart);
     };
   }, [socket]);
 
