@@ -82,8 +82,8 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		
 		for (let i = 0; i < 4; i++) {
 			const player = game.players[i];
-			if (!player || player.type !== 'human') {
-				console.log(`[GAME LOGGER] Skipping player ${i}:`, player ? `type=${player.type}` : 'null');
+			if (!player) {
+				console.log(`[GAME LOGGER] Skipping player ${i}: null`);
 				continue;
 			}
 			const userId = player.id;
