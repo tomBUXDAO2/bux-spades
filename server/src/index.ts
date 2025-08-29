@@ -1655,8 +1655,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       game.play.trickNumber += 1;
       
       // NEW: Log the completed trick to database
+      console.log('[TRICK LOGGING] Attempting to log trick', game.play.trickNumber, 'for game', game.id, 'dbGameId:', game.dbGameId);
       trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
-        console.error('Failed to log trick to database:', err);
+        console.error('[TRICK LOGGING ERROR] Failed to log trick to database:', err);
+        console.error('[TRICK LOGGING ERROR] Game state:', {
+          id: game.id,
+          dbGameId: game.dbGameId,
+          trickNumber: game.play.trickNumber,
+          hasPlay: !!game.play,
+          hasTricks: !!game.play?.tricks,
+          tricksLength: game.play?.tricks?.length
+        });
       });
       // Set current player to the winner of the trick
       game.play.currentPlayerIndex = winnerIndex;
@@ -3045,7 +3054,8 @@ function calculatePartnersHandScore(game: Game) {
   if (team1Tricks >= team1Bid) {
     team1Score += team1Bid * 10;
     team1Bags = team1Tricks - team1Bid;
-    team1Score += team1Bags;
+    // Bags are worth 1 point each, but bag penalty is applied to running total, not hand score
+    // So we don't add bags to the hand score here
   } else {
     team1Score -= team1Bid * 10;
     team1Bags = 0; // No bags for failed bids
@@ -3054,7 +3064,8 @@ function calculatePartnersHandScore(game: Game) {
   if (team2Tricks >= team2Bid) {
     team2Score += team2Bid * 10;
     team2Bags = team2Tricks - team2Bid;
-    team2Score += team2Bags;
+    // Bags are worth 1 point each, but bag penalty is applied to running total, not hand score
+    // So we don't add bags to the hand score here
   } else {
     team2Score -= team2Bid * 10;
     team2Bags = 0; // No bags for failed bids
