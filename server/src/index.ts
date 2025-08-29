@@ -3502,7 +3502,7 @@ export function clearTurnTimeoutOnly(game: Game, playerId: string) {
 
 const PORT = Number(process.env.PORT) || 3000;
 
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log('Server configuration:', {
     port: PORT,
@@ -3516,6 +3516,9 @@ httpServer.listen(PORT, '0.0.0.0', () => {
       transports: ['polling', 'websocket']
     }
   });
+  
+  // Load active games from database on startup
+  await loadActiveGamesFromDatabase();
 });
 
 // Add helper to ensure leagueReady array exists
@@ -3806,3 +3809,85 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
     .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeamOrPlayer))
     .catch((e) => console.error('Failed to log completed game (fallback):', e));
 }
+
+// Load active games from database on startup
+async function loadActiveGamesFromDatabase() {
+  try {
+    console.log('[STARTUP] Loading active games from database...');
+    
+    // Load games that are not finished
+    const activeGames = await prisma.game.findMany({
+      where: {
+        status: {
+          in: ['WAITING', 'PLAYING']
+        }
+      }
+    });
+    
+    console.log(`[STARTUP] Found ${activeGames.length} active games in database`);
+    
+    for (const dbGame of activeGames) {
+      console.log(`[STARTUP] Loading game ${dbGame.id} (${dbGame.status})`);
+      
+      // Convert database game to in-memory game format
+      const game: Game = {
+        id: dbGame.id,
+        dbGameId: dbGame.id,
+        status: dbGame.status as any,
+        gameMode: dbGame.gameMode as any,
+        minPoints: dbGame.minPoints,
+        maxPoints: dbGame.maxPoints,
+        buyIn: dbGame.buyIn,
+        rated: dbGame.rated,
+        league: dbGame.league,
+        currentPlayer: null, // Will be set when players join
+        players: Array(4).fill(null),
+        lastActivity: dbGame.updatedAt.getTime(),
+        createdAt: dbGame.createdAt.getTime(),
+                  rules: {
+            gameType: dbGame.gameMode as any,
+            allowNil: true,
+            allowBlindNil: true,
+            coinAmount: dbGame.buyIn || 0,
+            maxPoints: dbGame.maxPoints,
+            minPoints: dbGame.minPoints,
+            bidType: dbGame.bidType as any,
+            gimmickType: 'NONE'
+          },
+        specialRules: dbGame.specialRules as any || {}
+      };
+      
+      // Load players for this game
+      const gamePlayers = await prisma.gamePlayer.findMany({
+        where: { gameId: dbGame.id },
+        orderBy: { position: 'asc' }
+      });
+      
+      // Restore players
+      for (const dbPlayer of gamePlayers) {
+        if (dbPlayer.position >= 0 && dbPlayer.position < 4) {
+          game.players[dbPlayer.position] = {
+            id: dbPlayer.userId,
+            username: dbPlayer.username,
+            avatar: null, // Will be restored when player joins
+            type: 'human',
+            position: dbPlayer.position,
+            tricks: 0, // Will be restored from game state
+            bid: dbPlayer.bid,
+            hand: [] // Will be restored from game state
+          };
+        }
+      }
+      
+      // Add to in-memory games store
+      games.push(game);
+      console.log(`[STARTUP] Restored game ${dbGame.id} with ${gamePlayers.length} players`);
+    }
+    
+    console.log(`[STARTUP] Successfully loaded ${games.length} games into memory`);
+  } catch (error) {
+    console.error('[STARTUP] Failed to load active games from database:', error);
+  }
+}
+
+// ... existing code ...
