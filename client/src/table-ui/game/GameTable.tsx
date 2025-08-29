@@ -447,7 +447,7 @@ export default function GameTable({
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
   
   // Timer state for turn countdown
-  const [turnTimer, setTurnTimer] = useState<number>(30);
+
   const [autoPlayCount, setAutoPlayCount] = useState<{[key: string]: number}>({});
   const [countdownPlayer, setCountdownPlayer] = useState<{playerId: string, playerIndex: number, timeLeft: number} | null>(null);
   
@@ -462,31 +462,7 @@ export default function GameTable({
   // Leave table confirmation state
   const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
   
-  // Timer effect for turn countdown - show to all players
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (gameState.status === 'BIDDING' || gameState.status === 'PLAYING') {
-      // Show timer to all players, not just current player
-      setTurnTimer(30); // Reset to 30 when game state changes
-      interval = setInterval(() => {
-        setTurnTimer((prev) => {
-          if (prev <= 1) {
-            return 30; // Reset to 30 when it reaches 0
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      setTurnTimer(30); // Reset timer when not in active game state
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [game.status, game.currentPlayer, propUser?.id]);
+  // Timer effect removed - using server-side countdown system instead
   
   // Initialize audio when component mounts
   useEffect(() => {
@@ -520,6 +496,22 @@ export default function GameTable({
       socket.off('countdown_start', handleCountdownStart);
     };
   }, [socket]);
+
+  // Listen for new hand started events
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleNewHandStartedEvent = (data: any) => {
+      console.log('[NEW HAND STARTED] Event received:', data);
+      handleNewHandStarted();
+    };
+    
+    socket.on('new_hand_started', handleNewHandStartedEvent);
+    
+    return () => {
+      socket.off('new_hand_started', handleNewHandStartedEvent);
+    };
+  }, [socket]);
   
   // Handle game started event to show coin debit animation
   useEffect(() => {
@@ -549,7 +541,6 @@ export default function GameTable({
 
   
   const isMyTurn = game.currentPlayer === propUser?.id;
-  const shouldShowTimer = isMyTurn && (game.status === 'BIDDING' || game.status === 'PLAYING');
   
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => {
@@ -742,16 +733,48 @@ export default function GameTable({
     }
   };
 
-  // Function to start a new hand
-  const handleStartNewHand = () => {
-    console.log('[START NEW HAND] Function called');
+  // Function to handle hand summary continue
+  const handleHandSummaryContinue = () => {
+    console.log('[HAND SUMMARY CONTINUE] Function called');
     console.log('Socket connected:', socket?.connected);
     console.log('Game ID:', gameState.id);
     console.log('Socket ID:', socket?.id);
-    console.log('Socket object:', socket);
     
+    // Close modal locally for this player
     setShowHandSummary(false);
     setHandSummaryData(null);
+    
+    // Emit hand summary continue event to server
+    if (socket && gameState.id) {
+      console.log('[HAND SUMMARY CONTINUE] Emitting hand_summary_continue event...');
+      console.log('[HAND SUMMARY CONTINUE] Socket ready state:', { connected: socket.connected, id: socket.id });
+      
+      if (socket.connected) {
+        socket.emit('hand_summary_continue', { gameId: gameState.id }, (response: any) => {
+          console.log('[HAND SUMMARY CONTINUE] Server response:', response);
+        });
+        console.log('[HAND SUMMARY CONTINUE] hand_summary_continue event emitted');
+      } else {
+        console.error('[HAND SUMMARY CONTINUE] Socket not connected, cannot emit event');
+        // Try to reconnect and emit
+        socket.connect();
+        setTimeout(() => {
+          if (socket.connected) {
+            console.log('[HAND SUMMARY CONTINUE] Retrying emit after reconnect...');
+            socket.emit('hand_summary_continue', { gameId: gameState.id }, (response: any) => {
+              console.log('[HAND SUMMARY CONTINUE] Server response (retry):', response);
+            });
+          }
+        }, 1000);
+      }
+    } else {
+      console.error('[HAND SUMMARY CONTINUE] Cannot emit: socket or gameState.id missing', { socket: !!socket, gameId: gameState.id });
+    }
+  };
+
+  // Function to handle new hand started (called when server starts new hand)
+  const handleNewHandStarted = () => {
+    console.log('[NEW HAND STARTED] Function called');
     
     // Reset dealing state for new hand
     setDealingComplete(false);
@@ -763,33 +786,6 @@ export default function GameTable({
     setIsBlindNil(false);
     setCardsRevealed(false);
     setBlindNilDismissed(false);
-    
-    // Emit start new hand event to server
-    if (socket && gameState.id) {
-      console.log('[START NEW HAND] Emitting start_new_hand event...');
-      console.log('[START NEW HAND] Socket ready state:', { connected: socket.connected, id: socket.id });
-      
-      if (socket.connected) {
-        socket.emit('start_new_hand', { gameId: gameState.id }, (response: any) => {
-          console.log('[START NEW HAND] Server response:', response);
-        });
-        console.log('[START NEW HAND] start_new_hand event emitted');
-      } else {
-        console.error('[START NEW HAND] Socket not connected, cannot emit event');
-        // Try to reconnect and emit
-        socket.connect();
-        setTimeout(() => {
-          if (socket.connected) {
-            console.log('[START NEW HAND] Retrying emit after reconnect...');
-            socket.emit('start_new_hand', { gameId: gameState.id }, (response: any) => {
-              console.log('[START NEW HAND] Server response (retry):', response);
-            });
-          }
-        }, 1000);
-      }
-    } else {
-      console.error('[START NEW HAND] Cannot emit: socket or gameState.id missing', { socket: !!socket, gameId: gameState.id });
-    }
   };
 
   // Restore user assignment
@@ -1104,16 +1100,16 @@ export default function GameTable({
   const renderPlayerPosition = (position: number) => {
     const player = orderedPlayers[position];
     
-          // Check if this specific player is on timer - only show overlay for current player who is timing out
+              // Check if this specific player is on timer - only show overlay for current player who is timing out
       // @ts-ignore
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
 
-      // Check if this specific player is the current player (timing out)
-      const isCurrentPlayer = player && player.id === gameState.currentPlayer;
-      const shouldShowTimerOnPlayer = shouldShowTimer && turnTimer <= 10 && isCurrentPlayer; // Only overlay on current player's PFP
-      
       // Check if this player is on countdown overlay
       const isPlayerOnCountdown = countdownPlayer && countdownPlayer.playerId === player?.id;
+      
+      // Check if this specific player is the current player (timing out)
+      const isCurrentPlayer = player && player.id === gameState.currentPlayer;
+      const shouldShowTimerOnPlayer = isPlayerOnCountdown && isCurrentPlayer; // Only overlay on current player's PFP when server sends countdown
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
@@ -1371,7 +1367,7 @@ export default function GameTable({
                   {/* Timer overlay for last 10 seconds */}
                   {shouldShowTimerOnPlayer && (
                     <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                                             <span className="text-white font-bold text-lg">{turnTimer}</span>
+                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
                     </div>
                   )}
                   
@@ -3251,7 +3247,7 @@ export default function GameTable({
             onClose={() => setShowHandSummary(false)}
             gameState={gameState}
             handSummaryData={handSummaryData}
-            onNextHand={handleStartNewHand}
+            onNextHand={handleHandSummaryContinue}
             />
           ) : null;
         })()}
