@@ -659,11 +659,19 @@ export default function GameTable({
           bid = 0; // Partner bid something, must nil
         } else {
           // Use normal bidding logic
+          if (!myHand || !Array.isArray(myHand)) {
+            console.log('[TIMER] No hand available for bidding, skipping auto-bid');
+            return;
+          }
           const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
           bid = Math.min(13, Math.max(0, expectedTricks));
         }
       } else if (game.forcedBid === 'BID4NIL') {
         // 4 OR NIL: bid 4 or nil
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for BID4NIL, skipping auto-bid');
+          return;
+        }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
         bid = spadesCount > 0 ? 4 : 0;
       } else if (game.forcedBid === 'BID3') {
@@ -671,16 +679,32 @@ export default function GameTable({
         bid = 3;
       } else if (game.forcedBid === 'BIDHEARTS') {
         // BID HEARTS: bid number of hearts
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for BIDHEARTS, skipping auto-bid');
+          return;
+        }
         bid = myHand.filter((c: Card) => c.suit === '♥').length;
       } else if (game.forcedBid === 'CRAZY ACES') {
         // CRAZY ACES: bid 3 for each ace
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for CRAZY ACES, skipping auto-bid');
+          return;
+        }
         const acesCount = myHand.filter((c: Card) => c.rank === 'A').length;
         bid = acesCount * 3;
       } else if (game.rules?.gameType === 'MIRROR') {
         // Mirror: bid number of spades
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for MIRROR, skipping auto-bid');
+          return;
+        }
         bid = myHand.filter((c: Card) => isSpade(c)).length;
       } else if (game.rules?.gameType === 'WHIZ') {
         // Whiz: bid number of spades, or nil if no spades
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for WHIZ, skipping auto-bid');
+          return;
+        }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
         const hasAceSpades = myHand.some((c: Card) => isSpade(c) && c.rank === 'A');
         if (spadesCount === 0) {
@@ -694,6 +718,10 @@ export default function GameTable({
         }
       } else {
         // Regular bidding: use bot logic
+        if (!myHand || !Array.isArray(myHand)) {
+          console.log('[TIMER] No hand available for regular bidding, skipping auto-bid');
+          return;
+        }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
         const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
         bid = Math.min(13, Math.max(0, expectedTricks));
@@ -718,7 +746,7 @@ export default function GameTable({
       const myHand = game.hands?.find((_, index) => game.players[index]?.id === currentPlayerId);
       console.log('[AUTO PLAY DEBUG] My hand:', myHand);
       
-      if (myHand && myHand.length > 0) {
+      if (myHand && Array.isArray(myHand) && myHand.length > 0) {
         const playableCards = getPlayableCards(game, myHand, game.play?.currentTrick?.length === 0, false);
         const cardToPlay = playableCards.length > 0 ? playableCards[0] : myHand[0];
         console.log('[TIMER] Auto-playing card:', cardToPlay);
@@ -729,6 +757,8 @@ export default function GameTable({
             card: cardToPlay 
           });
         }
+      } else {
+        console.log('[TIMER] No hand available for auto-play, skipping');
       }
     }
   };
