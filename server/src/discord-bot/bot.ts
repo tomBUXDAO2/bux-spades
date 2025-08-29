@@ -1156,7 +1156,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       // Build team info
       const teamInfo = gameLine.players.map((p: any) => {
         const team = p.seat === 0 || p.seat === 2 ? '🔴 Red Team' : '🔵 Blue Team';
-        return `${team}: @${p.username}`;
+        return `${team}: <@${p.userId}>`;
       }).join('\n');
       
       const embed = new EmbedBuilder()
