@@ -170,66 +170,73 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
         players: newGame.players.length
       });
       
-      const dbGame = await prisma.game.create({
-        data: {
-          id: newGame.id, // Use the game's ID as the database ID
-          creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
-          gameMode: newGame.gameMode,
-          bidType: dbBidType,
-          specialRules: [],
-          minPoints: newGame.minPoints,
-          maxPoints: newGame.maxPoints,
-          buyIn: newGame.buyIn,
-          rated: (newGame as any).rated !== undefined ? (newGame as any).rated : newGame.players.filter(p => p && p.type === 'human').length === 4,
-          status: 'WAITING',
-          allowNil: newGame.rules.allowNil,
-          allowBlindNil: newGame.rules.allowBlindNil,
-          league: (newGame as any).league || false,
-          updatedAt: new Date()
-        }
-      });
+      // Determine if this is a rated game (4 human players, no bots)
+      const humanPlayers = newGame.players.filter(p => p && p.type === 'human').length;
+      const isRated = humanPlayers === 4;
       
-      newGame.dbGameId = dbGame.id;
-      console.log('[FORCE GAME LOGGED] Game forced to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
-      
-      // Log all players for the game
-      console.log('[PLAYER LOGGING] Logging players for game:', newGame.dbGameId);
-      for (let i = 0; i < newGame.players.length; i++) {
-        const player = newGame.players[i];
-        if (player) {
-          try {
-            await prisma.gamePlayer.create({
-              data: {
-                id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
-                gameId: newGame.dbGameId,
-                userId: player.id,
-                position: i,
-                team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
-                bid: null,
-                bags: 0,
-                points: 0,
-                username: player.username,
-                discordId: player.type === 'human' ? player.id : null,
-                updatedAt: new Date()
-              } as any
-            });
-            console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
-          } catch (err) {
-            console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
+      // Only log to database if this is a rated game
+      if (isRated) {
+        const dbGame = await prisma.game.create({
+          data: {
+            id: newGame.id, // Use the game's ID as the database ID
+            creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
+            gameMode: newGame.gameMode,
+            bidType: dbBidType,
+            specialRules: [],
+            minPoints: newGame.minPoints,
+            maxPoints: newGame.maxPoints,
+            buyIn: newGame.buyIn,
+            rated: true, // This is a rated game (4 human players)
+            status: 'WAITING',
+            allowNil: newGame.rules.allowNil,
+            allowBlindNil: newGame.rules.allowBlindNil,
+            league: (newGame as any).league || false,
+            updatedAt: new Date()
+          }
+        });
+        
+        newGame.dbGameId = dbGame.id;
+        console.log('[GAME LOGGED] Rated game logged to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
+        
+        // Log all players for the rated game
+        console.log('[PLAYER LOGGING] Logging players for rated game:', newGame.dbGameId);
+        for (let i = 0; i < newGame.players.length; i++) {
+          const player = newGame.players[i];
+          if (player) {
+            try {
+              await prisma.gamePlayer.create({
+                data: {
+                  id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
+                  gameId: newGame.dbGameId,
+                  userId: player.id,
+                  position: i,
+                  team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
+                  bid: null,
+                  bags: 0,
+                  points: 0,
+                  username: player.username,
+                  discordId: player.type === 'human' ? player.id : null,
+                  updatedAt: new Date()
+                } as any
+              });
+              console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
+            } catch (err) {
+              console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
+            }
           }
         }
+        
+        // Start round logging immediately when rated game is created
+        try {
+          const { trickLogger } = await import('../lib/trickLogger');
+          await trickLogger.startRound(newGame.dbGameId, 1);
+          console.log('[ROUND STARTED] Round 1 started for rated game:', newGame.dbGameId);
+        } catch (err) {
+          console.error('Failed to start round logging for rated game:', err);
+        }
+      } else {
+        console.log('[GAME NOT LOGGED] Unrated game (has bots) - not logging to database. Human players:', humanPlayers);
       }
-      
-      // Start round logging immediately when game is created
-      try {
-        const { trickLogger } = await import('../lib/trickLogger');
-        await trickLogger.startRound(newGame.dbGameId, 1);
-        console.log('[ROUND STARTED] Round 1 started for game:', newGame.dbGameId);
-      } catch (err) {
-        console.error('Failed to start round logging:', err);
-      }
-      
-
     } catch (err) {
       console.error('Failed to force log game start:', err);
     }
@@ -639,89 +646,21 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   // If any seat is a bot, set isBotGame true
   game.isBotGame = game.players.some(p => p && p.type === 'bot');
   
-  // For testing purposes, allow bot games to be logged
-  const shouldLogGame = !game.isBotGame || process.env.NODE_ENV === 'development';
+  // Only log rated games (4 human players, no bots)
+  const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
+  const isRated = humanPlayers === 4;
   
-  // FORCE GAME LOGGING - Create game in database if not already logged
-  if (shouldLogGame && !game.dbGameId) {
-    try {
-      console.log('[GAME START DEBUG] Creating game in database for bot game:', {
-        id: game.id,
-        isBotGame: game.isBotGame,
-        shouldLogGame,
-        players: game.players.map(p => p ? { type: p.type, username: p.username } : null)
-      });
-      
-      const dbBidType = ((): any => {
-        const opt = game.rules.bidType;
-        if (opt === 'WHIZ') return 'WHIZ';
-        if (opt === 'MIRROR') return 'MIRRORS';
-        if (opt === 'SUICIDE' || opt === '4 OR NIL' || opt === 'BID 3' || opt === 'BID HEARTS' || opt === 'CRAZY ACES') return 'GIMMICK';
-        return 'REGULAR';
-      })();
-      
-      const dbGame = await prisma.game.create({
-        data: {
-          id: game.id,
-          creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
-          gameMode: game.gameMode,
-          bidType: dbBidType,
-          specialRules: [],
-          minPoints: game.minPoints,
-          maxPoints: game.maxPoints,
-          buyIn: game.buyIn,
-          rated: false, // Bot games are not rated
-          league: false, // Bot games are not league games
-          status: 'BIDDING',
-          allowNil: game.rules.allowNil,
-          allowBlindNil: game.rules.allowBlindNil,
-          updatedAt: new Date()
-        } as any
-      });
-      
-      game.dbGameId = dbGame.id;
-      console.log('[FORCE GAME LOGGED] Bot game forced to database with ID:', game.dbGameId);
-      
-      // Log all players (including bots) for bot games
-      console.log('[PLAYER LOGGING] Logging players for bot game:', game.dbGameId);
-      for (let i = 0; i < game.players.length; i++) {
-        const player = game.players[i];
-        if (player) {
-          try {
-            await prisma.gamePlayer.create({
-              data: {
-                id: `player_${game.dbGameId}_${i}_${Date.now()}`,
-                gameId: game.dbGameId,
-                userId: player.id,
-                position: i,
-                team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
-                bid: null,
-                bags: 0,
-                points: 0,
-                username: player.username,
-                discordId: player.type === 'human' ? player.id : null,
-                updatedAt: new Date()
-              } as any
-            });
-            console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
-          } catch (err) {
-            console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
-          }
-        }
-      }
-      
-      // Start round logging immediately when game is created
-      try {
-        const { trickLogger } = await import('../lib/trickLogger');
-        await trickLogger.startRound(game.dbGameId, 1);
-        console.log('[ROUND STARTED] Round 1 started for bot game:', game.dbGameId);
-      } catch (err) {
-        console.error('Failed to start round logging for bot game:', err);
-      }
-      
-    } catch (err) {
-      console.error('Failed to force log bot game start:', err);
-    }
+  if (isRated && !game.dbGameId) {
+    console.log('[GAME START DEBUG] Creating rated game in database:', {
+      id: game.id,
+      isBotGame: game.isBotGame,
+      humanPlayers,
+      players: game.players.map(p => p ? { type: p.type, username: p.username } : null)
+    });
+    
+    // This rated game will be logged by the game creation logic above
+  } else if (!isRated) {
+    console.log('[GAME START DEBUG] Unrated game (has bots) - not logging to database. Human players:', humanPlayers);
   }
   
   if (!game.isBotGame) {
