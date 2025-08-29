@@ -173,7 +173,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           minPoints: newGame.minPoints,
           maxPoints: newGame.maxPoints,
           buyIn: newGame.buyIn,
-          rated: newGame.players.filter(p => p && p.type === 'human').length === 4,
+          rated: (newGame as any).rated !== undefined ? (newGame as any).rated : newGame.players.filter(p => p && p.type === 'human').length === 4,
           status: 'WAITING',
           allowNil: newGame.rules.allowNil,
           allowBlindNil: newGame.rules.allowBlindNil,
