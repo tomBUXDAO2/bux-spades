@@ -1840,6 +1840,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Emit game update with new status
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         
+        // Start hand summary timer for all players to respond
+        startHandSummaryTimer(game);
+        
         // --- Game over check ---
         // Use the actual game settings - these should always be set when game is created
         const maxPoints = game.maxPoints;
@@ -2306,13 +2309,42 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     io.to(game.id).emit('game_update', enrichGameForClient(game));
   });
 
-  // Start new hand event
-  socket.on('start_new_hand', ({ gameId }) => {
-    console.log('[SERVER] start_new_hand event received:', { gameId, socketId: socket.id, userId: socket.userId });
-    console.log('[SERVER] Socket auth status:', { isAuthenticated: socket.isAuthenticated, userId: socket.userId });
+  // Hand summary continue tracking
+  const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
+  const handSummaryTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
+
+  // Function to start hand summary timer
+  function startHandSummaryTimer(game: Game) {
+    console.log('[HAND SUMMARY] Starting 10-second timer for game:', game.id);
+    
+    // Clear any existing timer for this game
+    const existingTimer = handSummaryTimers.get(game.id);
+    if (existingTimer) {
+      clearTimeout(existingTimer.timer);
+    }
+
+    // Start 10-second timer
+    const timer = setTimeout(() => {
+      console.log('[HAND SUMMARY] Timer expired for game:', game.id);
+      
+      // Clear responses and timer
+      handSummaryResponses.delete(game.id);
+      handSummaryTimers.delete(game.id);
+      
+      // Start new hand regardless of responses
+      startNewHand(game);
+    }, 10000); // 10 seconds
+
+    // Store timer
+    handSummaryTimers.set(game.id, { gameId: game.id, timer, expiresAt: Date.now() + 10000 });
+  }
+
+  // Hand summary continue event
+  socket.on('hand_summary_continue', ({ gameId }) => {
+    console.log('[SERVER] hand_summary_continue event received:', { gameId, socketId: socket.id, userId: socket.userId });
     
     if (!socket.isAuthenticated || !socket.userId) {
-      console.log('Unauthorized start_new_hand attempt');
+      console.log('Unauthorized hand_summary_continue attempt');
       socket.emit('error', { message: 'Not authorized' });
       return;
     }
@@ -2325,91 +2357,136 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         return;
       }
 
-      // Check if game is already completed - don't allow new hands
-      if (game.status === 'COMPLETED') {
-        console.log('[START NEW HAND] Game is already completed, cannot start new hand');
-        socket.emit('error', { message: 'Game is already completed' });
+      // Check if game is in HAND_COMPLETED status
+      if (game.status !== 'HAND_COMPLETED') {
+        console.log('[HAND SUMMARY] Game is not in HAND_COMPLETED status');
+        socket.emit('error', { message: 'Game is not ready for hand summary' });
         return;
       }
 
-      console.log('[START NEW HAND] Starting new hand for game:', gameId);
-
-      // Check if all seats are filled
-      const filledSeats = game.players.filter(p => p !== null).length;
-      if (filledSeats < 4) {
-        console.log('[START NEW HAND] Not all seats are filled, cannot start new hand');
-        socket.emit('error', { message: 'All seats must be filled before starting a new hand' });
-        return;
+      // Initialize response tracking for this game if not exists
+      if (!handSummaryResponses.has(gameId)) {
+        handSummaryResponses.set(gameId, new Set());
       }
 
-      // Move dealer to the left (next position)
-      const newDealerIndex = (game.dealerIndex + 1) % 4;
-      game.dealerIndex = newDealerIndex;
+      // Add this player to the responses
+      const responses = handSummaryResponses.get(gameId)!;
+      responses.add(socket.userId);
+      
+      console.log('[HAND SUMMARY] Player clicked continue:', socket.userId);
+      console.log('[HAND SUMMARY] Responses so far:', Array.from(responses));
+      console.log('[HAND SUMMARY] Total players:', game.players.filter(p => p && p.type === 'human').length);
 
-      // Reset game state for new hand
-      game.status = 'BIDDING';
-      game.hands = dealCards(game.players, newDealerIndex);
-      game.bidding = {
-        currentBidderIndex: (newDealerIndex + 1) % 4,
-        currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
-        bids: [null, null, null, null],
-        nilBids: {}
-      };
-      game.play = undefined;
+      // Check if all human players have responded
+      const humanPlayers = game.players.filter(p => p && p.type === 'human');
+      const allHumanPlayersResponded = humanPlayers.every(player => responses.has(player.id));
 
-      // Reset player trick counts for new hand
-      game.players.forEach(player => {
-        if (player) {
-          player.tricks = 0;
-        }
-      });
-
-      // Start a new round in DB for this hand
-      if (game.dbGameId) {
-        const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
-        import('./lib/trickLogger').then(({ trickLogger }) => {
-          trickLogger.startRound(game.dbGameId!, roundNumber).then(() => {
-            console.log(`[ROUND STARTED] Round ${roundNumber} started for game:`, game.dbGameId);
-          }).catch((err: Error) => {
-            console.error('Failed to start round logging for new hand:', err);
-          });
-        }).catch((e: Error) => console.error('Failed to import trickLogger for start_new_hand:', e));
-      }
-
-      // Emit new hand started event with dealing phase
-      console.log('[START NEW HAND] Emitting new_hand_started event');
-      io.to(game.id).emit('new_hand_started', {
-        dealerIndex: newDealerIndex,
-        hands: game.hands,
-        currentBidderIndex: game.bidding.currentBidderIndex
-      });
-
-      // Emit game update
-      io.to(game.id).emit('game_update', enrichGameForClient(game));
-
-      // Add delay before starting bidding phase
-      setTimeout(() => {
-        console.log('[START NEW HAND] Starting bidding phase after delay');
+      if (allHumanPlayersResponded) {
+        console.log('[HAND SUMMARY] All players responded, starting new hand');
         
-        // Emit bidding ready event
-        io.to(game.id).emit('bidding_ready', {
-          currentBidderIndex: game.bidding.currentBidderIndex,
-          currentPlayer: game.bidding.currentPlayer
-        });
-
-        // If first bidder is a bot, trigger their bid
-        const firstBidder = game.players[game.bidding.currentBidderIndex];
-        if (firstBidder && firstBidder.type === 'bot') {
-          setTimeout(() => {
-            botMakeMove(game, game.bidding.currentBidderIndex);
-          }, 600); // Reduced delay for faster bot bidding
+        // Clear the timer and responses
+        const timer = handSummaryTimers.get(gameId);
+        if (timer) {
+          clearTimeout(timer.timer);
+          handSummaryTimers.delete(gameId);
         }
-      }, 1200); // Reduced delay after dealing
+        handSummaryResponses.delete(gameId);
+
+        // Start the new hand
+        startNewHand(game);
+      } else {
+        console.log('[HAND SUMMARY] Not all players responded yet, waiting...');
+        // Emit confirmation to this player that their continue was received
+        socket.emit('hand_summary_continue_confirmed');
+      }
 
     } catch (error) {
-      console.error('Error in start_new_hand:', error);
+      console.error('Error in hand_summary_continue:', error);
       socket.emit('error', { message: 'Internal server error' });
     }
+  });
+
+  // Start new hand event (now only called internally)
+  function startNewHand(game: Game) {
+    console.log('[START NEW HAND] Starting new hand for game:', game.id);
+
+    // Check if all seats are filled
+    const filledSeats = game.players.filter(p => p !== null).length;
+    if (filledSeats < 4) {
+      console.log('[START NEW HAND] Not all seats are filled, cannot start new hand');
+      return;
+    }
+
+    // Move dealer to the left (next position)
+    const newDealerIndex = (game.dealerIndex + 1) % 4;
+    game.dealerIndex = newDealerIndex;
+
+    // Reset game state for new hand
+    game.status = 'BIDDING';
+    game.hands = dealCards(game.players, newDealerIndex);
+    game.bidding = {
+      currentBidderIndex: (newDealerIndex + 1) % 4,
+      currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
+      bids: [null, null, null, null],
+      nilBids: {}
+    };
+    game.play = undefined;
+
+    // Reset player trick counts for new hand
+    game.players.forEach(player => {
+      if (player) {
+        player.tricks = 0;
+      }
+    });
+
+    // Start a new round in DB for this hand
+    if (game.dbGameId) {
+      const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
+      import('./lib/trickLogger').then(({ trickLogger }) => {
+        trickLogger.startRound(game.dbGameId!, roundNumber).then(() => {
+          console.log(`[ROUND STARTED] Round ${roundNumber} started for game:`, game.dbGameId);
+        }).catch((err: Error) => {
+          console.error('Failed to start round logging for new hand:', err);
+        });
+      }).catch((e: Error) => console.error('Failed to import trickLogger for start_new_hand:', e));
+    }
+
+    // Emit new hand started event with dealing phase
+    console.log('[START NEW HAND] Emitting new_hand_started event');
+    io.to(game.id).emit('new_hand_started', {
+      dealerIndex: newDealerIndex,
+      hands: game.hands,
+      currentBidderIndex: game.bidding.currentBidderIndex
+    });
+
+    // Emit game update
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+    // Add delay before starting bidding phase
+    setTimeout(() => {
+      console.log('[START NEW HAND] Starting bidding phase after delay');
+      
+      // Emit bidding ready event
+      io.to(game.id).emit('bidding_ready', {
+        currentBidderIndex: game.bidding.currentBidderIndex,
+        currentPlayer: game.bidding.currentPlayer
+      });
+
+      // If first bidder is a bot, trigger their bid
+      const firstBidder = game.players[game.bidding.currentBidderIndex];
+      if (firstBidder && firstBidder.type === 'bot') {
+        setTimeout(() => {
+          botMakeMove(game, game.bidding.currentBidderIndex);
+        }, 600); // Reduced delay for faster bot bidding
+      }
+    }, 1200); // Reduced delay after dealing
+  }
+
+  // Legacy start_new_hand event (for backward compatibility, but now just calls hand_summary_continue)
+  socket.on('start_new_hand', ({ gameId }) => {
+    console.log('[SERVER] Legacy start_new_hand event received, redirecting to hand_summary_continue');
+    // Emit the hand_summary_continue event instead
+    socket.emit('hand_summary_continue', { gameId });
   });
 
   // Close table event
