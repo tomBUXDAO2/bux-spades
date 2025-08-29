@@ -2599,15 +2599,8 @@ function calculatePartnersHandScore(game: Game) {
     }
   }
   
-  // Bag penalty
-  if (team1Bags >= 10) {
-    team1Score -= 100;
-    team1Bags -= 10;
-  }
-  if (team2Bags >= 10) {
-    team2Score -= 100;
-    team2Bags -= 10;
-  }
+  // Bag penalty - REMOVED from hand scoring (only applies to running totals)
+  // Hand scores should include bag points, penalties only apply to running totals
   
   // Validate total tricks equals 13
   const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
