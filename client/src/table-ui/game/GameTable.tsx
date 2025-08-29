@@ -33,7 +33,7 @@ const CoinDebitAnimation = ({ amount, isVisible }: { amount: number, isVisible: 
   
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-      <div className="text-red-500 font-bold text-lg px-3 py-1 rounded-lg animate-[floatUp_3s_ease-out_forwards]">
+      <div className="text-red-500 font-bold text-lg px-3 py-1 rounded-lg animate-[floatUp_3s_ease-out_forwards] bg-black bg-opacity-80 border-2 border-red-500">
         -{(amount / 1000).toFixed(0)}k
       </div>
     </div>
@@ -490,10 +490,24 @@ export default function GameTable({
       }, 1000);
     };
     
+    // Clear countdown when any player acts (bidding or playing)
+    const handlePlayerActed = () => {
+      console.log('[COUNTDOWN] Player acted, clearing countdown');
+      setCountdownPlayer(null);
+    };
+    
     socket.on('countdown_start', handleCountdownStart);
+    socket.on('bidding_ready', handlePlayerActed);
+    socket.on('bidding_complete', handlePlayerActed);
+    socket.on('play_start', handlePlayerActed);
+    socket.on('trick_completed', handlePlayerActed);
     
     return () => {
       socket.off('countdown_start', handleCountdownStart);
+      socket.off('bidding_ready', handlePlayerActed);
+      socket.off('bidding_complete', handlePlayerActed);
+      socket.off('play_start', handlePlayerActed);
+      socket.off('trick_completed', handlePlayerActed);
     };
   }, [socket]);
 
@@ -1547,10 +1561,10 @@ export default function GameTable({
                 }}
               ></div>
             </div>
-            {/* Speech bubble container */}
-            <div className="absolute z-50 bottom-0 left-0 mb-4" style={{ marginBottom: '15px', left: 'calc(-30px - 140px)' }}>
+            {/* Speech bubble container - right justified */}
+            <div className="absolute z-50 bottom-0 right-0 mb-4" style={{ marginBottom: '15px', right: 'calc(-30px - 140px)' }}>
               <div 
-                className="bg-white rounded-lg px-4 py-3 mr-[-8px]"
+                className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
                   minWidth: '120px',
                   maxWidth: '140px'
@@ -1586,10 +1600,10 @@ export default function GameTable({
                 }}
               ></div>
             </div>
-            {/* Speech bubble container */}
-            <div className="absolute z-50 top-0 left-0 mt-4" style={{ marginTop: '15px', left: 'calc(-30px - 140px)' }}>
+            {/* Speech bubble container - right justified */}
+            <div className="absolute z-50 top-0 right-0 mt-4" style={{ marginTop: '15px', right: 'calc(-30px - 140px)' }}>
               <div 
-                className="bg-white rounded-lg px-4 py-3 mr-[-8px]"
+                className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
                   minWidth: '120px',
                   maxWidth: '140px'
