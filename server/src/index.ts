@@ -1863,19 +1863,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-            game.status = 'FINISHED';
-            
-            // Update database status to FINISHED
-            if (game.dbGameId) {
-              prisma.game.update({
-                where: { id: game.dbGameId },
-                data: { status: 'FINISHED' }
-              }).then(() => {
-                console.log('[GAME OVER] Updated database status to FINISHED for solo game:', game.dbGameId);
-              }).catch((error) => {
-                console.error('[GAME OVER] Failed to update database status for solo game:', error);
-              });
-            }
             
             let winningPlayer = 0;
             let highestScore = playerScores[0];
@@ -1887,20 +1874,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             }
             game.winningPlayer = winningPlayer;
             
-            io.to(game.id).emit('game_over', {
-              playerScores: game.playerScores,
-              winningPlayer: game.winningPlayer,
+            // Use completeGame function to ensure proper logging
+            completeGame(game, winningPlayer).catch(err => {
+              console.error('Failed to complete solo game:', err);
             });
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningPlayer).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-            // Fallback: ensure completed game is logged to DB and Discord for league games
-            console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
-            console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
-            void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
-              .catch((e) => console.error('Failed to log completed game (fallback):', e));
           }
         } else {
           // Partners mode game over check
@@ -2006,49 +1983,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (shouldEndGame && winningTeam) {
             console.log('[GAME OVER] Partners game ended! Team 1:', team1Score, 'Team 2:', team2Score, 'Winner:', winningTeam);
-            game.status = 'FINISHED';
             
-            // Update database status to FINISHED
-            if (game.dbGameId) {
-              prisma.game.update({
-                where: { id: game.dbGameId },
-                data: { status: 'FINISHED' }
-              }).then(() => {
-                console.log('[GAME OVER] Updated database status to FINISHED for partners game:', game.dbGameId);
-              }).catch((error) => {
-                console.error('[GAME OVER] Failed to update database status for partners game:', error);
-              });
-            }
-            
-            io.to(game.id).emit('game_over', {
-              team1Score: team1Score,
-              team2Score: team2Score,
-              winningTeam: winningTeam,
+            // Use completeGame function to ensure proper logging
+            completeGame(game, winningTeam).catch(err => {
+              console.error('Failed to complete partners game:', err);
             });
-            
-            updateStatsAndCoins(game, winningTeam).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-            
-            console.log('[GAME COMPLETION] About to call gameLogger for game:', game.id, 'winningTeam:', winningTeam);
-            void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => {
-                console.log('[GAME COMPLETION] Successfully imported gameLogger, calling with game:', game.id);
-                return logCompletedGameToDbAndDiscord(game, winningTeam);
-              })
-              .then(() => {
-                console.log('[GAME COMPLETION] gameLogger completed successfully for game:', game.id);
-              })
-              .catch((e) => {
-                console.error('[GAME COMPLETION] Failed to log completed game:', e);
-                console.error('[GAME COMPLETION] Game state:', {
-                  id: game.id,
-                  dbGameId: game.dbGameId,
-                  league: (game as any).league,
-                  rated: (game as any).rated,
-                  status: game.status
-                });
-              });
           }
         }
       }
@@ -3904,7 +3843,6 @@ setInterval(() => {
             
             if (isGameOver) {
               console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
-              game.status = 'FINISHED';
               
               let winningPlayer = 0;
               let highestScore = playerScores[0];
@@ -3915,18 +3853,10 @@ setInterval(() => {
                 }
               }
               
-              io.to(game.id).emit('game_over', {
-                playerScores: game.playerScores,
-                winningPlayer: winningPlayer,
+              // Use completeGame function to ensure proper logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (periodic check):', err);
               });
-              
-              updateStatsAndCoins(game, winningPlayer).catch(err => {
-                console.error('Failed to update stats/coins:', err);
-              });
-              
-              void import('./lib/gameLogger')
-                .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
-                .catch((e) => console.error('Failed to log completed game (periodic check):', e));
             }
           } else {
             // Partners mode game over check
