@@ -1106,6 +1106,7 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
         if (t === 'crazyaces' || t === 'crazy aces') return 'CRAZY ACES';
         return 'REG';
       })(),
+      rated: true, // Discord games are always rated (4 human players)
       league: true, // Mark as league game
       specialRules: {
         screamer: gameLine.screamer === 'yes',
