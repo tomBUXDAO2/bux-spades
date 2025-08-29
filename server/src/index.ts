@@ -2006,9 +2006,25 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               console.error('Failed to update stats/coins:', err);
             });
             
+            console.log('[GAME COMPLETION] About to call gameLogger for game:', game.id, 'winningTeam:', winningTeam);
             void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
-              .catch((e) => console.error('Failed to log completed game (fallback):', e));
+              .then(({ logCompletedGameToDbAndDiscord }) => {
+                console.log('[GAME COMPLETION] Successfully imported gameLogger, calling with game:', game.id);
+                return logCompletedGameToDbAndDiscord(game, winningTeam);
+              })
+              .then(() => {
+                console.log('[GAME COMPLETION] gameLogger completed successfully for game:', game.id);
+              })
+              .catch((e) => {
+                console.error('[GAME COMPLETION] Failed to log completed game:', e);
+                console.error('[GAME COMPLETION] Game state:', {
+                  id: game.id,
+                  dbGameId: game.dbGameId,
+                  league: (game as any).league,
+                  rated: (game as any).rated,
+                  status: game.status
+                });
+              });
           }
         }
       }
