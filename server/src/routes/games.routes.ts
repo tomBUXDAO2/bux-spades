@@ -2555,7 +2555,7 @@ function calculatePartnersHandScore(game: Game) {
   if (team1Tricks >= team1Bid) {
     team1Score += team1Bid * 10;
     team1Bags = team1Tricks - team1Bid;
-    team1Score += team1Bags;
+    team1Score += team1Bags; // Add bag points to hand score
   } else {
     team1Score -= team1Bid * 10;
     team1Bags = 0; // No bags for failed bids
@@ -2564,7 +2564,7 @@ function calculatePartnersHandScore(game: Game) {
   if (team2Tricks >= team2Bid) {
     team2Score += team2Bid * 10;
     team2Bags = team2Tricks - team2Bid;
-    team2Score += team2Bags;
+    team2Score += team2Bags; // Add bag points to hand score
   } else {
     team2Score -= team2Bid * 10;
     team2Bags = 0; // No bags for failed bids
