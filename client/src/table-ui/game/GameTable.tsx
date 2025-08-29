@@ -794,6 +794,7 @@ export default function GameTable({
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
+  const [finalPlayerState, setFinalPlayerState] = useState<(Player | Bot | null)[]>([]);
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
@@ -2139,6 +2140,9 @@ export default function GameTable({
       console.log('[GAME STATUS] Game finished/completed, winning team:', winningTeam);
       console.log('[GAME STATUS] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
+      // Capture final player state before anyone can leave
+      setFinalPlayerState([...gameState.players]);
+      
       setShowHandSummary(false);
       setHandSummaryData(null);
       
@@ -2163,6 +2167,7 @@ export default function GameTable({
       setShowLoser(false);
       setShowHandSummary(false);
       setHandSummaryData(null);
+      setFinalPlayerState([]); // Clear final player state
     }
   }, [gameState.status, gameState.winningTeam, showWinner, showLoser]);
 
@@ -3456,7 +3461,7 @@ export default function GameTable({
           onTimerExpire={handleTimerExpire}
           buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}
           onLeaveTable={handleLeaveTable}
-          players={gameState.players}
+          players={finalPlayerState.length > 0 ? finalPlayerState : gameState.players}
           isRated={gameState.players.filter(p => p && !isBot(p)).length === 4}
         />
       )}
@@ -3481,7 +3486,7 @@ export default function GameTable({
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           onLeaveTable={handleLeaveTable}
-          players={gameState.players}
+          players={finalPlayerState.length > 0 ? finalPlayerState : gameState.players}
         />
       )}
 
@@ -3500,7 +3505,7 @@ export default function GameTable({
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           onLeaveTable={handleLeaveTable}
-          players={gameState.players}
+          players={finalPlayerState.length > 0 ? finalPlayerState : gameState.players}
         />
       )}
 
