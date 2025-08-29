@@ -3168,8 +3168,7 @@ function calculatePartnersHandScore(game: Game) {
   if (team1Tricks >= team1Bid) {
     team1Score += team1Bid * 10;
     team1Bags = team1Tricks - team1Bid;
-    // Bags are worth 1 point each, but bag penalty is applied to running total, not hand score
-    // So we don't add bags to the hand score here
+    team1Score += team1Bags; // Bags are worth 1 point each
   } else {
     team1Score -= team1Bid * 10;
     team1Bags = 0; // No bags for failed bids
@@ -3178,8 +3177,7 @@ function calculatePartnersHandScore(game: Game) {
   if (team2Tricks >= team2Bid) {
     team2Score += team2Bid * 10;
     team2Bags = team2Tricks - team2Bid;
-    // Bags are worth 1 point each, but bag penalty is applied to running total, not hand score
-    // So we don't add bags to the hand score here
+    team2Score += team2Bags; // Bags are worth 1 point each
   } else {
     team2Score -= team2Bid * 10;
     team2Bags = 0; // No bags for failed bids
