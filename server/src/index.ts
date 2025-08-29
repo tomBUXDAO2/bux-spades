@@ -3613,7 +3613,13 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
     }
   });
   
-  // REMOVED: Loading crashed games from database - this was causing duplicate tables
+  // Load active games from database
+  try {
+    await loadActiveGamesFromDatabase();
+    console.log(`📋 Loaded ${games.length} active games from database`);
+  } catch (error) {
+    console.error('Failed to load active games from database:', error);
+  }
 });
 
 // Add helper to ensure leagueReady array exists
@@ -3621,6 +3627,113 @@ function ensureLeagueReady(game: any) {
 	if (!Array.isArray(game.leagueReady) || game.leagueReady.length !== 4) {
 		game.leagueReady = [false, false, false, false];
 	}
+}
+
+// Load active games from database
+async function loadActiveGamesFromDatabase() {
+  try {
+    console.log('[LOAD GAMES] Loading active games from database...');
+    
+    // Get games with WAITING or PLAYING status
+    const dbGames = await prisma.game.findMany({
+      where: {
+        status: {
+          in: ['WAITING', 'PLAYING']
+        }
+      },
+      include: {
+        GamePlayer: {
+          include: {
+            User: true
+          },
+          orderBy: {
+            position: 'asc'
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    console.log(`[LOAD GAMES] Found ${dbGames.length} active games in database`);
+    
+    for (const dbGame of dbGames) {
+      try {
+        // Skip if game already exists in memory
+        if (games.find(g => g.id === dbGame.id)) {
+          console.log(`[LOAD GAMES] Game ${dbGame.id} already exists in memory, skipping`);
+          continue;
+        }
+        
+        // Reconstruct game object from database
+        const game: any = {
+          id: dbGame.id,
+          dbGameId: dbGame.id,
+          status: dbGame.status,
+          gameMode: dbGame.gameMode,
+          maxPoints: dbGame.maxPoints,
+          minPoints: dbGame.minPoints,
+          buyIn: dbGame.buyIn,
+          rated: dbGame.rated,
+          league: dbGame.league,
+          dealerIndex: 0, // Default to position 0
+          createdAt: dbGame.createdAt,
+          team1TotalScore: 0,
+          team2TotalScore: 0,
+          team1Bags: 0,
+          team2Bags: 0,
+          players: [],
+          hands: [],
+          bidding: {
+            currentPlayer: '',
+            currentBidderIndex: 0,
+            bids: [null, null, null, null],
+            nilBids: {}
+          },
+          play: undefined,
+          rounds: [],
+          leagueReady: [false, false, false, false]
+        };
+        
+        // Reconstruct players
+        for (const dbPlayer of dbGame.GamePlayer) {
+          const user = dbPlayer.User;
+          game.players[dbPlayer.position] = {
+            id: user.id,
+            username: user.username,
+            discordId: user.discordId,
+            avatar: user.avatar,
+            type: 'human',
+            position: dbPlayer.position,
+            hand: [],
+            bid: null,
+            tricks: 0,
+            isDealer: dbPlayer.position === game.dealerIndex
+          };
+        }
+        
+        // Set current player for bidding
+        if (game.status === 'WAITING') {
+          game.bidding.currentPlayer = game.players[game.dealerIndex]?.id || '';
+          game.bidding.currentBidderIndex = game.dealerIndex;
+        }
+        
+        // Add to games array
+        games.push(game);
+        console.log(`[LOAD GAMES] Loaded game ${game.id} with ${game.players.filter((p: any) => p).length} players`);
+        
+      } catch (gameError) {
+        console.error(`[LOAD GAMES] Failed to load game ${dbGame.id}:`, gameError);
+      }
+    }
+    
+    console.log(`[LOAD GAMES] Successfully loaded ${games.length} games into memory`);
+    
+  } catch (error) {
+    console.error('[LOAD GAMES] Failed to load games from database:', error);
+    throw error;
+  }
 }
 
 // Periodic game completion check - runs every 10 seconds
