@@ -13,8 +13,8 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
       return null;
     }
 
-    // Fetch current Discord user data
-    const discordUserResponse = await fetch('https://discord.com/api/users/@me', {
+    // Fetch current Discord user data using the user's Discord ID
+    const discordUserResponse = await fetch(`https://discord.com/api/users/${user.discordId}`, {
       headers: {
         Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
       }
