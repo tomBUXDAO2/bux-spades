@@ -163,6 +163,13 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
         if (opt === 'SUICIDE' || opt === '4 OR NIL' || opt === 'BID 3' || opt === 'BID HEARTS' || opt === 'CRAZY ACES') return 'GIMMICK';
         return 'REGULAR';
       })();
+      console.log('[GAME CREATION DEBUG] Creating game in database:', {
+        id: newGame.id,
+        rated: (newGame as any).rated,
+        league: (newGame as any).league,
+        players: newGame.players.length
+      });
+      
       const dbGame = await prisma.game.create({
         data: {
           id: newGame.id, // Use the game's ID as the database ID
@@ -178,11 +185,12 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           allowNil: newGame.rules.allowNil,
           allowBlindNil: newGame.rules.allowBlindNil,
           league: (newGame as any).league || false,
+          updatedAt: new Date()
         }
       });
       
       newGame.dbGameId = dbGame.id;
-      console.log('[FORCE GAME LOGGED] Game forced to database with ID:', newGame.dbGameId);
+      console.log('[FORCE GAME LOGGED] Game forced to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
       
       // Start round logging immediately when game is created
       try {
