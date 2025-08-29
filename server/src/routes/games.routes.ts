@@ -611,6 +611,63 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   // If any seat is a bot, set isBotGame true
   game.isBotGame = game.players.some(p => p && p.type === 'bot');
   
+  // For testing purposes, allow bot games to be logged
+  const shouldLogGame = !game.isBotGame || process.env.NODE_ENV === 'development';
+  
+  // FORCE GAME LOGGING - Create game in database if not already logged
+  if (shouldLogGame && !game.dbGameId) {
+    try {
+      console.log('[GAME START DEBUG] Creating game in database for bot game:', {
+        id: game.id,
+        isBotGame: game.isBotGame,
+        shouldLogGame,
+        players: game.players.map(p => p ? { type: p.type, username: p.username } : null)
+      });
+      
+      const dbBidType = ((): any => {
+        const opt = game.rules.bidType;
+        if (opt === 'WHIZ') return 'WHIZ';
+        if (opt === 'MIRROR') return 'MIRRORS';
+        if (opt === 'SUICIDE' || opt === '4 OR NIL' || opt === 'BID 3' || opt === 'BID HEARTS' || opt === 'CRAZY ACES') return 'GIMMICK';
+        return 'REGULAR';
+      })();
+      
+      const dbGame = await prisma.game.create({
+        data: {
+          id: game.id,
+          creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
+          gameMode: game.gameMode,
+          bidType: dbBidType,
+          specialRules: [],
+          minPoints: game.minPoints,
+          maxPoints: game.maxPoints,
+          buyIn: game.buyIn,
+          rated: false, // Bot games are not rated
+          league: false, // Bot games are not league games
+          status: 'BIDDING',
+          allowNil: game.rules.allowNil,
+          allowBlindNil: game.rules.allowBlindNil,
+          updatedAt: new Date()
+        } as any
+      });
+      
+      game.dbGameId = dbGame.id;
+      console.log('[FORCE GAME LOGGED] Bot game forced to database with ID:', game.dbGameId);
+      
+      // Start round logging immediately when game is created
+      try {
+        const { trickLogger } = await import('../lib/trickLogger');
+        await trickLogger.startRound(game.dbGameId, 1);
+        console.log('[ROUND STARTED] Round 1 started for bot game:', game.dbGameId);
+      } catch (err) {
+        console.error('Failed to start round logging for bot game:', err);
+      }
+      
+    } catch (err) {
+      console.error('Failed to force log bot game start:', err);
+    }
+  }
+  
   if (!game.isBotGame) {
     // Debit buy-in from each human player's coin balance
     try {
