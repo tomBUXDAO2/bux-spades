@@ -654,6 +654,34 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
       game.dbGameId = dbGame.id;
       console.log('[FORCE GAME LOGGED] Bot game forced to database with ID:', game.dbGameId);
       
+      // Log all players (including bots) for bot games
+      console.log('[PLAYER LOGGING] Logging players for bot game:', game.dbGameId);
+      for (let i = 0; i < game.players.length; i++) {
+        const player = game.players[i];
+        if (player) {
+          try {
+            await prisma.gamePlayer.create({
+              data: {
+                id: `player_${game.dbGameId}_${i}_${Date.now()}`,
+                gameId: game.dbGameId,
+                userId: player.id,
+                position: i,
+                team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
+                bid: null,
+                bags: 0,
+                points: 0,
+                username: player.username,
+                discordId: player.type === 'human' ? player.id : null,
+                updatedAt: new Date()
+              } as any
+            });
+            console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
+          } catch (err) {
+            console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
+          }
+        }
+      }
+      
       // Start round logging immediately when game is created
       try {
         const { trickLogger } = await import('../lib/trickLogger');
