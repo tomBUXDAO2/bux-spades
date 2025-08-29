@@ -25,6 +25,7 @@ async function testTrickLogging() {
     
     const testGame = await prisma.game.create({
       data: {
+        id: `test_game_${Date.now()}`,
         creatorId: testUser.id,
         gameMode: 'PARTNERS',
         bidType: 'REGULAR',
@@ -34,6 +35,7 @@ async function testTrickLogging() {
         buyIn: 1000,
         rated: false,
         status: 'PLAYING',
+        updatedAt: new Date(),
       }
     });
     console.log('Test game created with ID:', testGame.id);
@@ -47,7 +49,7 @@ async function testTrickLogging() {
     console.log('\n3. Verifying round in database...');
     const round = await prisma.round.findUnique({
       where: { id: roundId },
-      include: { game: true }
+      include: { Game: true }
     });
     console.log('Round found:', round ? 'YES' : 'NO');
     if (round) {
@@ -55,7 +57,7 @@ async function testTrickLogging() {
         id: round.id,
         gameId: round.gameId,
         roundNumber: round.roundNumber,
-        gameStatus: round.game.status
+        gameStatus: round.Game.status
       });
     }
     
@@ -81,7 +83,7 @@ async function testTrickLogging() {
     console.log('\n5. Verifying trick in database...');
     const trick = await prisma.trick.findUnique({
       where: { id: trickId },
-      include: { cards: true, round: true }
+      include: { Card: true, Round: true }
     });
     console.log('Trick found:', trick ? 'YES' : 'NO');
     if (trick) {
@@ -91,9 +93,9 @@ async function testTrickLogging() {
         trickNumber: trick.trickNumber,
         leadPlayerId: trick.leadPlayerId,
         winningPlayerId: trick.winningPlayerId,
-        cardCount: trick.cards.length
+        cardCount: trick.Card.length
       });
-      console.log('Cards:', trick.cards.map(card => ({
+      console.log('Cards:', trick.Card.map(card => ({
         suit: card.suit,
         value: card.value,
         position: card.position,

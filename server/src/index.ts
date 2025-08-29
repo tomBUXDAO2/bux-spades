@@ -1358,6 +1358,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         try {
           const dbGame = await prisma.game.create({
             data: {
+              id: game.id, // Use the game's ID as the database ID
               creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
               gameMode: game.gameMode,
               bidType: 'REGULAR',
@@ -1387,6 +1388,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             console.log('[GAME NOT IN DB] Game with dbGameId not found in database, recreating...');
             const newDbGame = await prisma.game.create({
               data: {
+                id: game.id, // Use the game's ID as the database ID
                 creatorId: game.players.find(p => p && p.type === 'human')?.id || 'unknown',
                 gameMode: game.gameMode,
                 bidType: 'REGULAR',

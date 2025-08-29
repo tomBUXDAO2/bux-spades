@@ -165,6 +165,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
       })();
       const dbGame = await prisma.game.create({
         data: {
+          id: newGame.id, // Use the game's ID as the database ID
           creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
           gameMode: newGame.gameMode,
           bidType: dbBidType,

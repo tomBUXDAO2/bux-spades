@@ -56,7 +56,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		
 		if (!game.dbGameId) {
 			// Fallback: create new game record if dbGameId is missing
-			const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+			const gameId = game.id || `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 			const now = new Date();
 			dbGame = await prisma.game.create({
 				data: {

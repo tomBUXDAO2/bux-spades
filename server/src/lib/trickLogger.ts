@@ -29,11 +29,14 @@ export class TrickLogger {
    */
   async startRound(gameId: string, roundNumber: number): Promise<string> {
     try {
+      const roundId = `round_${gameId}_${roundNumber}_${Date.now()}`;
       const round = await prisma.round.create({
         data: {
+          id: roundId,
           gameId,
           roundNumber,
-        },
+          updatedAt: new Date(),
+        } as any,
       });
 
       this.gameRounds.set(gameId, round.id);
@@ -53,25 +56,30 @@ export class TrickLogger {
   async logTrick(trickData: TrickLogData): Promise<string> {
     try {
       // Create the trick record
+      const trickId = `trick_${trickData.roundId}_${trickData.trickNumber}_${Date.now()}`;
       const trick = await prisma.trick.create({
         data: {
+          id: trickId,
           roundId: trickData.roundId,
           trickNumber: trickData.trickNumber,
           leadPlayerId: trickData.leadPlayerId,
           winningPlayerId: trickData.winningPlayerId,
-        },
+          updatedAt: new Date(),
+        } as any,
       });
 
       // Create all card records for this trick
-      const cardPromises = trickData.cards.map(card => 
+      const cardPromises = trickData.cards.map((card, index) => 
         prisma.card.create({
           data: {
+            id: `card_${trick.id}_${index}_${Date.now()}`,
             trickId: trick.id,
             playerId: card.playerId,
             suit: this.getFullSuitName(card.suit) as any, // Convert and cast to Suit enum
             value: card.value,
             position: card.position,
-          },
+            updatedAt: new Date(),
+          } as any,
         })
       );
 
@@ -207,14 +215,14 @@ export class TrickLogger {
 
       const tricks = await prisma.trick.count({
         where: {
-          round: { gameId }
+          Round: { gameId }
         }
       });
 
       const cards = await prisma.card.count({
         where: {
-          trick: {
-            round: { gameId }
+          Trick: {
+            Round: { gameId }
           }
         }
       });
@@ -242,9 +250,9 @@ export class TrickLogger {
       const rounds = await prisma.round.findMany({
         where: { gameId },
         include: {
-          tricks: {
+          Trick: {
             include: {
-              cards: true,
+              Card: true,
             },
             orderBy: {
               trickNumber: 'asc',
