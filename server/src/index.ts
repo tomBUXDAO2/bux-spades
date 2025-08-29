@@ -11,6 +11,7 @@ import session from 'express-session';
 import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
+import { syncDiscordUserData } from './lib/discordSync';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
@@ -188,7 +189,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Socket.IO connection handling
-io.use((socket: AuthenticatedSocket, next) => {
+io.use(async (socket: AuthenticatedSocket, next) => {
   const auth = socket.handshake.auth;
   const authHeader = socket.handshake.headers.authorization;
   const token = auth?.token || (authHeader && authHeader.split(' ')[1]);
@@ -218,13 +219,33 @@ io.use((socket: AuthenticatedSocket, next) => {
     const authUserId = typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.id : auth.userId;
 
     if (decoded.userId === authUserId) {
+      // Sync Discord data before setting socket auth
+      let finalUsername = auth.username || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined);
+      let finalAvatar = auth.avatar || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined);
+      
+      try {
+        const syncedData = await syncDiscordUserData(authUserId);
+        if (syncedData) {
+          finalUsername = syncedData.username;
+          finalAvatar = syncedData.avatar;
+          console.log(`[SOCKET AUTH] Synced Discord data for ${authUserId}:`, {
+            oldUsername: auth.username,
+            newUsername: finalUsername,
+            oldAvatar: auth.avatar,
+            newAvatar: finalAvatar
+          });
+        }
+      } catch (error) {
+        console.error(`[SOCKET AUTH] Failed to sync Discord data for ${authUserId}:`, error);
+      }
+      
       socket.userId = authUserId;
       socket.auth = { 
         ...auth, 
         token,
         userId: authUserId,
-        username: auth.username || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.username : undefined),
-        avatar: auth.avatar || (typeof auth.userId === 'object' && auth.userId.user ? auth.userId.user.avatar : undefined)
+        username: finalUsername,
+        avatar: finalAvatar
       };
       
       console.log('Socket auth debug:', {
