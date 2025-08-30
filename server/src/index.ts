@@ -3455,27 +3455,27 @@ function emitGameUpdateToPlayers(game: Game) {
 
 // Start turn timeout for human players
 export function startTurnTimeout(game: Game, playerIndex: number, phase: 'bidding' | 'playing') {
-  console.log(`[TIMEOUT DEBUG] startTurnTimeout called for playerIndex: ${playerIndex}, phase: ${phase}`);
+  // console.log(`[TIMEOUT DEBUG] startTurnTimeout called for playerIndex: ${playerIndex}, phase: ${phase}`);
   const player = game.players[playerIndex];
-  console.log(`[TIMEOUT DEBUG] Player found: ${player?.username}, type: ${player?.type}`);
+  // console.log(`[TIMEOUT DEBUG] Player found: ${player?.username}, type: ${player?.type}`);
   if (!player || player.type !== 'human') {
-    console.log(`[TIMEOUT DEBUG] Not starting timeout - player is null or not human`);
+    // console.log(`[TIMEOUT DEBUG] Not starting timeout - player is null or not human`);
     return;
   }
   
   const timeoutKey = `${game.id}-${player.id}`;
   
-  console.log(`[TURN TIMEOUT DEBUG] Starting timeout for player ${player.username} (${player.id}) at seat ${playerIndex}, phase: ${phase}`);
+  // console.log(`[TURN TIMEOUT DEBUG] Starting timeout for player ${player.username} (${player.id}) at seat ${playerIndex}, phase: ${phase}`);
   
   // Clear any existing timeout
   const existingTimeout = turnTimeouts.get(timeoutKey);
   if (existingTimeout) {
-    console.log(`[TURN TIMEOUT DEBUG] Clearing existing timeout for ${player.username}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
+    // console.log(`[TURN TIMEOUT DEBUG] Clearing existing timeout for ${player.username}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
     clearTimeout(existingTimeout.timer);
   }
   
   // Start 20-second timer to show countdown overlay
-  console.log(`[TURN TIMEOUT DEBUG] Starting 20-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
+  // console.log(`[TURN TIMEOUT DEBUG] Starting 20-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
   const countdownTimer = setTimeout(() => {
     console.log(`[TURN TIMEOUT] Player ${player.username} reached 20 seconds - showing countdown overlay`);
     

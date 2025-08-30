@@ -1878,7 +1878,7 @@ export default function GameTable({
   }, [(gameState as any)?.bidding?.bids]);
 
   const renderPlayerHand = () => {
-    console.log('[DEBUG] renderPlayerHand called', { myHand, handImagesLoaded, gameStateStatus: gameState.status });
+    // console.log('[DEBUG] renderPlayerHand called', { myHand, handImagesLoaded, gameStateStatus: gameState.status });
     if (!myHand || myHand.length === 0) return null;
     const sortedHand = sortCards(myHand);
     const isLeadingTrick = currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0;
@@ -1887,9 +1887,9 @@ export default function GameTable({
     const isMyTurn = (gameState.status === "PLAYING" || gameState.status === "BIDDING") && gameState.currentPlayer === currentPlayerId;
     // Only log if these exist
     if (typeof playableCards !== 'undefined' && typeof myHand !== 'undefined') {
-      console.log('[DEBUG] isMyTurn:', isMyTurn);
-      console.log('[DEBUG] playableCards:', playableCards);
-      console.log('[DEBUG] myHand:', myHand);
+          // console.log('[DEBUG] isMyTurn:', isMyTurn);
+    // console.log('[DEBUG] playableCards:', playableCards);
+    // console.log('[DEBUG] myHand:', myHand);
     }
     // Defensive: only use myHand and playableCards if defined
     let effectivePlayableCards: typeof myHand = [];
@@ -1946,9 +1946,9 @@ export default function GameTable({
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
     const visibleCount = showAllCards ? (sortedHand && Array.isArray(sortedHand) ? sortedHand.length : 0) : dealtCardCount;
 
-    console.log('[DEBUG] isMyTurn:', isMyTurn);
-    console.log('[DEBUG] playableCards:', playableCards);
-    console.log('[DEBUG] myHand:', myHand);
+    // console.log('[DEBUG] isMyTurn:', isMyTurn);
+    // console.log('[DEBUG] playableCards:', playableCards);
+    // console.log('[DEBUG] myHand:', myHand);
 
     return (
       <div
@@ -2559,7 +2559,7 @@ export default function GameTable({
 
   // After: const [gameState, setGameState] = useState(game);
   useEffect(() => {
-    console.log('[DEBUG] GameTable received new game prop:', game);
+    // console.log('[DEBUG] GameTable received new game prop:', game);
     setGameState(game);
   }, [game]);
 
@@ -2803,7 +2803,7 @@ export default function GameTable({
       
       // Listen for clear_trick event to immediately clear table cards
       const handleClearTrick = () => {
-        console.log('[DEBUG] Received clear_trick event, clearing table cards immediately');
+        // console.log('[DEBUG] Received clear_trick event, clearing table cards immediately');
         setAnimatedTrickCards([]);
         setTrickWinner(null);
         setAnimatingTrick(false);
@@ -2826,7 +2826,7 @@ export default function GameTable({
   // Play win.mp3 when trick winner is announced
   useEffect(() => {
     if (animatingTrick && trickWinner !== null) {
-      console.log('[DEBUG] Playing win.mp3 for trick winner:', trickWinner);
+      // console.log('[DEBUG] Playing win.mp3 for trick winner:', trickWinner);
       playWinSound();
     }
   }, [animatingTrick, trickWinner]);
@@ -3402,7 +3402,7 @@ export default function GameTable({
                     {gameState.currentPlayer
                       ? (() => {
                           // Robust debug logging for player ID mapping
-                          console.log('[DEBUG] Waiting for player:', gameState.currentPlayer, 'All player IDs:', sanitizedPlayers.map(p => p && p.id));
+                          // console.log('[DEBUG] Waiting for player:', gameState.currentPlayer, 'All player IDs:', sanitizedPlayers.map(p => p && p.id));
                           // Try to find the player by ID
                           let waitingPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && String(p.id) === String(gameState.currentPlayer)) || null;
                           // If not found, try to find by loose equality (in case of type mismatch)
@@ -3525,11 +3525,11 @@ export default function GameTable({
         {/* Hand Summary Modal - Pass currentHandSummary */}
         {(() => {
           const shouldShow = showHandSummary && !isGameOver(gameState);
-          console.log('[MODAL DEBUG] showHandSummary:', showHandSummary, 'isGameOver:', isGameOver(gameState), 'shouldShow:', shouldShow);
-          console.log('[MODAL DEBUG] Current gameState scores:', {
-            team1TotalScore: gameState.team1TotalScore,
-            team2TotalScore: gameState.team2TotalScore
-          });
+            // console.log('[MODAL DEBUG] showHandSummary:', showHandSummary, 'isGameOver:', isGameOver(gameState), 'shouldShow:', shouldShow);
+  // console.log('[MODAL DEBUG] Current gameState scores:', {
+  //   team1TotalScore: gameState.team1TotalScore,
+  //   team2TotalScore: gameState.team2TotalScore
+  // });
           return shouldShow ? (
           <HandSummaryModal
             isOpen={showHandSummary}
