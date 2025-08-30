@@ -961,7 +961,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (!hostReplaced && game.status !== 'COMPLETED') {
         console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
         console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
-        startSeatReplacement(game, playerIdx);
+        // Don't start seat replacement when a player intentionally leaves
+        // startSeatReplacement(game, playerIdx);
+        console.log(`[LEAVE GAME DEBUG] Skipping seat replacement for intentional leave`);
       } else if (game.status === 'COMPLETED') {
         console.log(`[LEAVE GAME DEBUG] Game is completed, not starting seat replacement`);
       }
