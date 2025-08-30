@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaEllipsisV } from 'react-icons/fa';
 
 interface PlayerProfileDropdownProps {
   player: {
