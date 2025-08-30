@@ -43,6 +43,7 @@ export default function PlayerProfileDropdown({
   }, []);
 
   const handleEmojiClick = (emoji: string) => {
+    console.log('Emoji selected:', emoji);
     onEmojiReaction(emoji);
     setShowEmojiPicker(false);
     setIsOpen(false);
@@ -87,6 +88,7 @@ export default function PlayerProfileDropdown({
             <>
               <button
                 onClick={() => {
+                  console.log('Emoji button clicked');
                   setShowEmojiPicker(true);
                   onShowEmojiPicker();
                 }}
@@ -97,6 +99,7 @@ export default function PlayerProfileDropdown({
               </button>
               <button
                 onClick={() => {
+                  console.log('My Stats button clicked');
                   onViewStats();
                   setIsOpen(false);
                 }}
@@ -109,6 +112,7 @@ export default function PlayerProfileDropdown({
           ) : (
             <button
               onClick={() => {
+                console.log('View Stats button clicked');
                 onViewStats();
                 setIsOpen(false);
               }}

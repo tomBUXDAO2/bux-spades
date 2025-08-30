@@ -2555,11 +2555,13 @@ export default function GameTable({
 
   // Handler functions for player profile features
   const handleViewPlayerStats = (player: any) => {
+    console.log('handleViewPlayerStats called with player:', player);
     setSelectedPlayer(player);
     setShowPlayerStats(true);
   };
 
   const handleEmojiReaction = (playerId: string, emoji: string) => {
+    console.log('handleEmojiReaction called with playerId:', playerId, 'emoji:', emoji);
     setEmojiReactions(prev => ({
       ...prev,
       [playerId]: { emoji, timestamp: Date.now() }
