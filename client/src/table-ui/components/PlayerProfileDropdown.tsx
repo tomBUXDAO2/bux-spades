@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PlayerProfileDropdownProps {
   player: {
@@ -47,6 +48,18 @@ export default function PlayerProfileDropdown({
     setIsOpen(false);
   };
 
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.top - 40,
+        left: rect.left + (rect.width / 2) - 64
+      });
+    }
+  }, [isOpen]);
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Profile Picture with Dropdown Trigger */}
@@ -64,15 +77,13 @@ export default function PlayerProfileDropdown({
         {children}
       </div>
 
-      {/* Main Dropdown Menu - rendered outside overflow container */}
-      {isOpen && !showEmojiPicker && (
+      {/* Main Dropdown Menu - rendered via portal outside component tree */}
+      {isOpen && !showEmojiPicker && createPortal(
         <div 
-          className="absolute z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
+          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
           style={{ 
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: '8px'
+            top: dropdownPosition.top,
+            left: dropdownPosition.left
           }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
@@ -112,18 +123,17 @@ export default function PlayerProfileDropdown({
               View Stats
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Emoji Picker - rendered outside overflow container */}
-      {showEmojiPicker && (
+      {/* Emoji Picker - rendered via portal outside component tree */}
+      {showEmojiPicker && createPortal(
         <div 
-          className="absolute z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
+          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
           style={{ 
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: '8px'
+            top: dropdownPosition.top - 80,
+            left: dropdownPosition.left - 32
           }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
@@ -140,7 +150,8 @@ export default function PlayerProfileDropdown({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
