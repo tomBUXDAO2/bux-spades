@@ -3571,13 +3571,8 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
     }
   });
   
-  // Load active games from database
-  try {
-    await loadActiveGamesFromDatabase();
-    console.log(`📋 Loaded ${games.length} active games from database`);
-  } catch (error) {
-    console.error('Failed to load active games from database:', error);
-  }
+  // Server restart - clear all games (no restoration)
+  console.log('🔄 Server restarted - all games cleared');
 });
 
 // Add helper to ensure leagueReady array exists
@@ -3606,6 +3601,25 @@ async function loadActiveGamesFromDatabase() {
           },
           orderBy: {
             position: 'asc'
+          }
+        },
+        Round: {
+          include: {
+            Trick: {
+              include: {
+                Card: {
+                  orderBy: {
+                    playedAt: 'asc'
+                  }
+                }
+              },
+              orderBy: {
+                trickNumber: 'asc'
+              }
+            }
+          },
+          orderBy: {
+            roundNumber: 'asc'
           }
         }
       },
@@ -3671,15 +3685,74 @@ async function loadActiveGamesFromDatabase() {
           };
         }
         
-        // Set current player for bidding
+        // Restore game state based on status
         if (game.status === 'WAITING') {
+          // Game is waiting for players to join
           game.bidding.currentPlayer = game.players[game.dealerIndex]?.id || '';
           game.bidding.currentBidderIndex = game.dealerIndex;
+        } else if (game.status === 'PLAYING') {
+          // Game is in progress - restore full state
+          const currentRound = dbGame.Round[dbGame.Round.length - 1];
+          if (currentRound) {
+            // Restore current round state
+            game.currentRound = currentRound.roundNumber;
+            game.dealerIndex = currentRound.dealerIndex || 0;
+            
+            // Restore hands from current round
+            if (currentRound.hands) {
+              try {
+                game.hands = JSON.parse(currentRound.hands);
+              } catch (e) {
+                console.log(`[LOAD GAMES] Failed to parse hands for game ${game.id}, using empty hands`);
+                game.hands = [[], [], [], []];
+              }
+            }
+            
+            // Restore bidding state
+            if (currentRound.bids) {
+              try {
+                const bids = JSON.parse(currentRound.bids);
+                game.bidding.bids = bids;
+                game.bidding.currentBidderIndex = currentRound.currentBidderIndex || 0;
+                game.bidding.currentPlayer = game.players[game.bidding.currentBidderIndex]?.id || '';
+              } catch (e) {
+                console.log(`[LOAD GAMES] Failed to parse bids for game ${game.id}`);
+              }
+            }
+            
+            // Restore current trick
+            const currentTrick = currentRound.Trick[currentRound.Trick.length - 1];
+            if (currentTrick && currentTrick.Card.length > 0) {
+              game.play = {
+                currentTrick: currentTrick.Card.map((card: any) => ({
+                  suit: card.suit,
+                  rank: card.rank,
+                  playerId: card.playerId
+                })),
+                currentPlayer: currentTrick.currentPlayer || game.players[0]?.id,
+                spadesBroken: currentTrick.spadesBroken || false,
+                tricks: currentRound.Trick.map((trick: any) => ({
+                  cards: trick.Card.map((card: any) => ({
+                    suit: card.suit,
+                    rank: card.rank,
+                    playerId: card.playerId
+                  })),
+                  winner: trick.winner
+                }))
+              };
+            }
+            
+            // Restore scores
+            game.team1TotalScore = currentRound.team1Score || 0;
+            game.team2TotalScore = currentRound.team2Score || 0;
+            game.team1Bags = currentRound.team1Bags || 0;
+            game.team2Bags = currentRound.team2Bags || 0;
+          }
         }
         
         // Add to games array
         games.push(game);
-        console.log(`[LOAD GAMES] Loaded game ${game.id} with ${game.players.filter((p: any) => p).length} players`);
+        console.log(`[LOAD GAMES] Loaded game ${game.id} with ${game.players.filter((p: any) => p).length} players, status: ${game.status}`);
         
       } catch (gameError) {
         console.error(`[LOAD GAMES] Failed to load game ${dbGame.id}:`, gameError);
