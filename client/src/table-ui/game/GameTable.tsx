@@ -1451,7 +1451,13 @@ export default function GameTable({
                       )}
                       {/* Remove button positioned outside overflow container */}
                       {canRemovePlayer && (
-                        <div className="absolute -bottom-2 -left-2 z-50">
+                        <div 
+                          className="absolute z-50"
+                          style={{
+                            bottom: '-8px',
+                            left: '-8px'
+                          }}
+                        >
                           <button
                             className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
                             title={isHuman ? "Remove Player" : "Remove Bot"}
@@ -1502,7 +1508,13 @@ export default function GameTable({
                     />
                     {/* Remove button positioned outside overflow container */}
                     {canRemovePlayer && (
-                      <div className="absolute -bottom-2 -left-2 z-50">
+                      <div 
+                        className="absolute z-50"
+                        style={{
+                          bottom: '-8px',
+                          left: '-8px'
+                        }}
+                      >
                         <button
                           className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
                           title={isHuman ? "Remove Player" : "Remove Bot"}

@@ -30,6 +30,14 @@ export default function EmojiReaction({ emoji, onComplete }: EmojiReactionProps)
       className={`absolute inset-0 flex items-center justify-center z-50 transition-opacity duration-500 ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
+      style={{ 
+        position: 'absolute',
+        top: '-50%',
+        left: '-50%',
+        width: '200%',
+        height: '200%',
+        zIndex: 50
+      }}
     >
       <div className="text-7xl animate-bounce">
         {emoji}
