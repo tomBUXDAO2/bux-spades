@@ -1799,19 +1799,28 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
         
         // Add new bags to running total
-        game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
-        game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+        const oldTeam1Bags = game.team1Bags || 0;
+        const oldTeam2Bags = game.team2Bags || 0;
+        game.team1Bags = oldTeam1Bags + handSummary.team1Bags;
+        game.team2Bags = oldTeam2Bags + handSummary.team2Bags;
+        
+        console.log('[BAG DEBUG] Before penalty - Team 1 bags:', oldTeam1Bags, '+', handSummary.team1Bags, '=', game.team1Bags);
+        console.log('[BAG DEBUG] Before penalty - Team 2 bags:', oldTeam2Bags, '+', handSummary.team2Bags, '=', game.team2Bags);
         
         // Apply bag penalty to running total if needed
         if (game.team1Bags >= 10) {
-          game.team1TotalScore -= 100;
-          game.team1Bags -= 10;
-          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
+          const penaltyApplied = Math.floor(game.team1Bags / 10) * 100;
+          const bagsRemoved = Math.floor(game.team1Bags / 10) * 10;
+          game.team1TotalScore -= penaltyApplied;
+          game.team1Bags -= bagsRemoved;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
         }
         if (game.team2Bags >= 10) {
-          game.team2TotalScore -= 100;
-          game.team2Bags -= 10;
-          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
+          const penaltyApplied = Math.floor(game.team2Bags / 10) * 100;
+          const bagsRemoved = Math.floor(game.team2Bags / 10) * 10;
+          game.team2TotalScore -= penaltyApplied;
+          game.team2Bags -= bagsRemoved;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
         
         // Set game status to indicate hand is completed
@@ -3133,9 +3142,14 @@ function calculatePartnersHandScore(game: Game) {
       } else {
         if (team1.includes(i)) team1Score -= 100;
         else team2Score -= 100;
-        // Bags for failed nil go to team
-        if (team1.includes(i)) team1Bags += tricks;
-        else team2Bags += tricks;
+        // Bags for failed nil go to team AND add bag points to score
+        if (team1.includes(i)) {
+          team1Bags += tricks;
+          team1Score += tricks; // Add bag points to score
+        } else {
+          team2Bags += tricks;
+          team2Score += tricks; // Add bag points to score
+        }
       }
     } else if (bid === -1) { // Blind Nil (use -1 for blind nil)
       if (tricks === 0) {
@@ -3144,9 +3158,14 @@ function calculatePartnersHandScore(game: Game) {
       } else {
         if (team1.includes(i)) team1Score -= 200;
         else team2Score -= 200;
-        // Bags for failed blind nil go to team
-        if (team1.includes(i)) team1Bags += tricks;
-        else team2Bags += tricks;
+        // Bags for failed blind nil go to team AND add bag points to score
+        if (team1.includes(i)) {
+          team1Bags += tricks;
+          team1Score += tricks; // Add bag points to score
+        } else {
+          team2Bags += tricks;
+          team2Score += tricks; // Add bag points to score
+        }
       }
     }
   }

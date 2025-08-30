@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Client, GatewayIntentBits, Events, GuildMember, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, TextChannel } from 'discord.js';
 import prisma from '../lib/prisma';
 import { registerCommands } from './commands';
@@ -15,10 +18,10 @@ const client = new Client({
   ],
 });
 
-const LEAGUE_ROLE_ID = '1403953667501195284';
-const GUILD_ID = '1403837418494492763';
-const VERIFICATION_CHANNEL_ID = '1403960351107715073';
-const RESULTS_CHANNEL_ID = '1404128066296610878';
+const LEAGUE_ROLE_ID = process.env.LEAGUE_ROLE_ID || '1403953667501195284';
+const GUILD_ID = process.env.DISCORD_GUILD_ID || '1403837418494492763';
+const VERIFICATION_CHANNEL_ID = process.env.VERIFICATION_CHANNEL_ID || '1403960351107715073';
+const RESULTS_CHANNEL_ID = process.env.RESULTS_CHANNEL_ID || '1404128066296610878';
 
 
 
