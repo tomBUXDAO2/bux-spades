@@ -1,6 +1,22 @@
 import { prisma } from './prisma';
 import type { Game } from '../types/game';
 
+// Retry mechanism for database operations
+async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number = 3, delay: number = 1000): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.log(`[RETRY] Database operation failed (attempt ${attempt}/${maxRetries}):`, error);
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPlayer: number) {
 	console.log('[GAME LOGGER] Starting game completion logging for game:', game.id);
 	console.log('[GAME LOGGER] Game league property:', (game as any).league);
@@ -37,14 +53,16 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		let dbGame;
 		if (game.dbGameId) {
 			try {
-				// Update existing game record
-				dbGame = await prisma.game.update({
-					where: { id: game.dbGameId },
-					data: {
-						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-						specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-						status: 'FINISHED'
-					}
+				// Update existing game record with retry
+				dbGame = await retryOperation(async () => {
+					return await prisma.game.update({
+						where: { id: game.dbGameId },
+						data: {
+							bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+							specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+							status: 'FINISHED'
+						}
+					});
 				});
 				console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
 			} catch (updateError) {
@@ -58,20 +76,22 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			// Fallback: create new game record if dbGameId is missing
 			const gameId = game.id || `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 			const now = new Date();
-			dbGame = await prisma.game.create({
-				data: {
-					id: gameId,
-					creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
-					gameMode: game.gameMode,
-					bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-					specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
-					minPoints: game.minPoints,
-					maxPoints: game.maxPoints,
-					buyIn: game.buyIn,
-					status: 'FINISHED',
-					createdAt: now,
-					updatedAt: now
-				} as any
+			dbGame = await retryOperation(async () => {
+				return await prisma.game.create({
+					data: {
+						id: gameId,
+						creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
+						gameMode: game.gameMode,
+						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+						specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+						minPoints: game.minPoints,
+						maxPoints: game.maxPoints,
+						buyIn: game.buyIn,
+						status: 'FINISHED',
+						createdAt: now,
+						updatedAt: now
+					} as any
+				});
 			});
 			console.log('[GAME COMPLETED] Created new game record in database:', dbGame.id);
 		}
@@ -174,22 +194,24 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		if (!existingGameResult) {
 			const resultId = `result_${dbGame.id}_${Date.now()}`;
 			const now = new Date();
-			await prisma.gameResult.create({
-				data: {
-					id: resultId,
-					gameId: dbGame.id,
-					winner,
-					finalScore,
-					gameDuration: Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000),
-					team1Score,
-					team2Score,
-					playerResults,
-					totalRounds: game.rounds?.length || 0,
-					totalTricks: game.play?.tricks?.length || 0,
-					specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 },
-					createdAt: now,
-					updatedAt: now
-				} as any
+			await retryOperation(async () => {
+				return await prisma.gameResult.create({
+					data: {
+						id: resultId,
+						gameId: dbGame.id,
+						winner,
+						finalScore,
+						gameDuration: Math.floor((Date.now() - (game.createdAt || Date.now())) / 1000),
+						team1Score,
+						team2Score,
+						playerResults,
+						totalRounds: game.rounds?.length || 0,
+						totalTricks: game.play?.tricks?.length || 0,
+						specialEvents: { nils: game.bidding?.nilBids || {}, totalHands: game.hands?.length || 0 },
+						createdAt: now,
+						updatedAt: now
+					} as any
+				});
 			});
 			console.log(`Created comprehensive game result record for game ${dbGame.id}`);
 		} else {
@@ -242,7 +264,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				};
 				
 				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
-				await sendLeagueGameResults(gameData, gameLine);
+				await retryOperation(async () => {
+					return await sendLeagueGameResults(gameData, gameLine);
+				}, 2, 2000); // Retry Discord embed up to 2 times with 2 second delay
 				(game as any).discordResultsSent = true;
 				
 				// Set global flag to prevent duplicates
