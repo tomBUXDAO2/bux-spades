@@ -1562,7 +1562,7 @@ export default function GameTable({
               ></div>
             </div>
             {/* Speech bubble container */}
-            <div className="absolute z-50 bottom-0 right-0 mb-4" style={{ marginBottom: '15px', right: '170px' }}>
+            <div className="absolute z-50 bottom-0 right-0 mb-4" style={{ marginBottom: '15px', right: '180px' }}>
               <div 
                 className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
@@ -1601,7 +1601,7 @@ export default function GameTable({
               ></div>
             </div>
             {/* Speech bubble container */}
-            <div className="absolute z-50 top-0 right-0 mt-4" style={{ marginTop: '15px', right: '170px' }}>
+            <div className="absolute z-50 top-0 right-0 mt-4" style={{ marginTop: '15px', right: '180px' }}>
               <div 
                 className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
