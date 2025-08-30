@@ -187,6 +187,18 @@ export class SocketManager {
       try {
         const activeGameId = localStorage.getItem('activeGameId');
         if (activeGameId && this.socket && this.socket.connected) {
+          // Check if we've recently failed to join this game
+          const lastFailedJoin = localStorage.getItem('lastFailedJoin');
+          const lastFailedGameId = lastFailedJoin ? JSON.parse(lastFailedJoin).gameId : null;
+          const lastFailedTime = lastFailedJoin ? JSON.parse(lastFailedJoin).timestamp : 0;
+          const timeSinceLastFail = Date.now() - lastFailedTime;
+          
+          // Don't retry if we failed to join this same game in the last 30 seconds
+          if (lastFailedGameId === activeGameId && timeSinceLastFail < 30000) {
+            console.log('[SOCKET MANAGER] Skipping auto-join - recently failed to join this game');
+            return;
+          }
+          
           setTimeout(() => {
             if (this.socket && this.socket.connected) {
               console.log('[SOCKET MANAGER] Auto-join on connect for game:', activeGameId);
@@ -277,6 +289,18 @@ export class SocketManager {
         try {
           const activeGameId = localStorage.getItem('activeGameId');
           if (activeGameId && this.socket && this.socket.connected) {
+            // Check if we've recently failed to join this game
+            const lastFailedJoin = localStorage.getItem('lastFailedJoin');
+            const lastFailedGameId = lastFailedJoin ? JSON.parse(lastFailedJoin).gameId : null;
+            const lastFailedTime = lastFailedJoin ? JSON.parse(lastFailedJoin).timestamp : 0;
+            const timeSinceLastFail = Date.now() - lastFailedTime;
+            
+            // Don't retry if we failed to join this same game in the last 30 seconds
+            if (lastFailedGameId === activeGameId && timeSinceLastFail < 30000) {
+              console.log('[SOCKET MANAGER] Skipping auto-join - recently failed to join this game');
+              return;
+            }
+            
             console.log('[SOCKET MANAGER] Auto-join on authenticated for game:', activeGameId);
             this.socket.emit('join_game', { gameId: activeGameId });
           }
@@ -290,6 +314,20 @@ export class SocketManager {
       console.error('Socket error:', error);
       this.state.isReady = false;
       this.state.error = error.message;
+      
+      // If it's a "Game not found" error, clear the invalid game ID from localStorage
+      if (error.message === 'Game not found') {
+        console.log('[SOCKET MANAGER] Clearing invalid game ID from localStorage');
+        const activeGameId = localStorage.getItem('activeGameId');
+        if (activeGameId) {
+          // Record this failed join attempt
+          localStorage.setItem('lastFailedJoin', JSON.stringify({
+            gameId: activeGameId,
+            timestamp: Date.now()
+          }));
+        }
+        localStorage.removeItem('activeGameId');
+      }
       
       // Don't disconnect on error - let Socket.IO handle reconnection
       console.log('Socket error occurred, letting Socket.IO handle reconnection');
@@ -418,6 +456,12 @@ export class SocketManager {
     }
     
     this.notifyStateChange();
+  }
+
+  public clearActiveGame(): void {
+    console.log('[SOCKET MANAGER] Clearing active game from localStorage');
+    localStorage.removeItem('activeGameId');
+    localStorage.removeItem('lastFailedJoin');
   }
 
   public isInitialized(): boolean {
