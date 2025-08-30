@@ -3492,6 +3492,12 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       const trickCounts = game.players.map((p, i) => `${i}: ${p?.username} = ${p?.tricks || 0}`);
       console.log('[HUMAN TIMEOUT TRICK COUNT DEBUG] All player trick counts:', trickCounts);
       
+      // Store the completed trick for animation before clearing
+      const completedTrick = [...game.play.currentTrick];
+      
+      // Clear the trick immediately for proper game state
+      game.play.currentTrick = [];
+      
       // Check if hand is complete
       if (game.play.trickNumber === 13) {
         console.log('[HUMAN TIMEOUT HAND COMPLETION] Hand complete, calculating scores');
@@ -3508,16 +3514,25 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         return;
       }
       
-      // Emit game update
+      // Emit immediate game update with cleared trick and updated trick counts
+      console.log('[HUMAN TIMEOUT TRICK DEBUG] Emitting game_update with currentPlayer:', game.play?.currentPlayer, 'currentPlayerIndex:', game.play?.currentPlayerIndex);
+      
+      // Send game update to all players in the room
       io.to(game.id).emit('game_update', enrichGameForClient(game));
-      io.to(game.id).emit('play_update', {
-        currentPlayerIndex: winnerIndex,
-        currentTrick: game.play.currentTrick,
-        hands: game.hands.map((h, i) => ({
-          playerId: game.players[i]?.id,
-          handCount: h.length,
-        })),
+      
+      // Emit trick complete with the stored trick data for animation
+      io.to(game.id).emit('trick_complete', {
+        trick: {
+          cards: completedTrick,
+          winnerIndex,
+        },
+        trickNumber: game.play.trickNumber,
       });
+      
+      // Emit clear trick event after animation delay
+      setTimeout(() => {
+        io.to(game.id).emit('clear_trick');
+      }, 2000);
       
       // If the next player is a bot, trigger their move with a delay
       const nextPlayer = game.players[winnerIndex];

@@ -2599,6 +2599,29 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
   });
 
+  // Handle emoji reactions
+  socket.on('emoji_reaction', ({ gameId, playerId, emoji }) => {
+    console.log(`[EMOJI REACTION] Player ${playerId} reacted with ${emoji} in game ${gameId}`);
+    
+    // Broadcast emoji reaction to all players in the game
+    io.to(gameId).emit('emoji_reaction', {
+      playerId: playerId,
+      emoji: emoji
+    });
+  });
+
+  // Handle send emoji
+  socket.on('send_emoji', ({ gameId, fromPlayerId, toPlayerId, emoji }) => {
+    console.log(`[SEND EMOJI] Player ${fromPlayerId} sending ${emoji} to ${toPlayerId} in game ${gameId}`);
+    
+    // Broadcast send emoji to all players in the game
+    io.to(gameId).emit('send_emoji', {
+      fromPlayerId: fromPlayerId,
+      toPlayerId: toPlayerId,
+      emoji: emoji
+    });
+  });
+
   // When a player disconnects, preserve ready state as requested (no auto-clear)
   socket.on('disconnect', () => {
     try {
@@ -3455,27 +3478,32 @@ function emitGameUpdateToPlayers(game: Game) {
 
 // Start turn timeout for human players
 export function startTurnTimeout(game: Game, playerIndex: number, phase: 'bidding' | 'playing') {
-  // console.log(`[TIMEOUT DEBUG] startTurnTimeout called for playerIndex: ${playerIndex}, phase: ${phase}`);
+  console.log(`[TIMEOUT DEBUG] startTurnTimeout called for playerIndex: ${playerIndex}, phase: ${phase}`);
   const player = game.players[playerIndex];
-  // console.log(`[TIMEOUT DEBUG] Player found: ${player?.username}, type: ${player?.type}`);
+  console.log(`[TIMEOUT DEBUG] Player found: ${player?.username}, type: ${player?.type}`);
   if (!player || player.type !== 'human') {
-    // console.log(`[TIMEOUT DEBUG] Not starting timeout - player is null or not human`);
+    console.log(`[TIMEOUT DEBUG] Not starting timeout - player is null or not human`);
     return;
   }
   
+  // Always start timeout for human players, regardless of consecutive timeout count
   const timeoutKey = `${game.id}-${player.id}`;
+  const currentTimeouts = turnTimeouts.get(timeoutKey);
+  const currentConsecutiveTimeouts = currentTimeouts?.consecutiveTimeouts || 0;
   
-  // console.log(`[TURN TIMEOUT DEBUG] Starting timeout for player ${player.username} (${player.id}) at seat ${playerIndex}, phase: ${phase}`);
+  console.log(`[TIMEOUT DEBUG] Player ${player.username} has ${currentConsecutiveTimeouts} consecutive timeouts - starting timeout anyway`);
+  
+  console.log(`[TURN TIMEOUT DEBUG] Starting timeout for player ${player.username} (${player.id}) at seat ${playerIndex}, phase: ${phase}`);
   
   // Clear any existing timeout
   const existingTimeout = turnTimeouts.get(timeoutKey);
   if (existingTimeout) {
-    // console.log(`[TURN TIMEOUT DEBUG] Clearing existing timeout for ${player.username}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
+    console.log(`[TURN TIMEOUT DEBUG] Clearing existing timeout for ${player.username}, consecutive timeouts: ${existingTimeout.consecutiveTimeouts}`);
     clearTimeout(existingTimeout.timer);
   }
   
   // Start 20-second timer to show countdown overlay
-  // console.log(`[TURN TIMEOUT DEBUG] Starting 20-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
+  console.log(`[TURN TIMEOUT DEBUG] Starting 20-second timer for ${player.username} at seat ${playerIndex}, phase: ${phase}`);
   const countdownTimer = setTimeout(() => {
     console.log(`[TURN TIMEOUT] Player ${player.username} reached 20 seconds - showing countdown overlay`);
     
@@ -3498,6 +3526,12 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
       
       // Bot acts for player (NEVER remove player - they can refresh and rejoin)
       console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
+      
+      // If player has 3 or more consecutive timeouts, use faster bot response
+      if (consecutiveTimeouts >= 3) {
+        console.log(`[TURN TIMEOUT] Player ${player.username} has ${consecutiveTimeouts} consecutive timeouts - using fast bot response`);
+      }
+      
       if (phase === 'bidding') {
         console.log(`[TURN TIMEOUT] Calling botMakeMove for player ${player.username} at seat ${playerIndex}`);
         // Mark this as a bot action to prevent timeout clearing
@@ -3525,8 +3559,6 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
   }, 20000); // 20 second initial timer
   
   // Initialize with current consecutive timeouts (don't reset to 0)
-  const currentTimeouts = turnTimeouts.get(timeoutKey);
-  const currentConsecutiveTimeouts = currentTimeouts?.consecutiveTimeouts || 0;
   turnTimeouts.set(timeoutKey, { gameId: game.id, playerId: player.id, timer: countdownTimer, consecutiveTimeouts: currentConsecutiveTimeouts });
   console.log(`[TURN TIMEOUT DEBUG] Set timeout for ${player.username} with consecutive timeouts: ${currentConsecutiveTimeouts}`);
 }
