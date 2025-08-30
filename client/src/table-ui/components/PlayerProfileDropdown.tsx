@@ -52,14 +52,26 @@ export default function PlayerProfileDropdown({
       {/* Profile Picture with Dropdown Trigger */}
       <div 
         className="cursor-pointer relative group"
-        onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={() => setIsOpen(true)}
+        onMouseLeave={() => {
+          setTimeout(() => {
+            if (!showEmojiPicker) {
+              setIsOpen(false);
+            }
+          }, 100);
+        }}
       >
         {children}
       </div>
 
       {/* Main Dropdown Menu */}
       {isOpen && !showEmojiPicker && (
-        <div className="absolute z-[9999] mt-2 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)' }}>
+        <div 
+          className="absolute z-[9999] mb-2 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1" 
+          style={{ bottom: '100%', left: '50%', transform: 'translateX(-50%)' }}
+          onMouseEnter={() => setIsOpen(true)}
+          onMouseLeave={() => setIsOpen(false)}
+        >
           {isCurrentUser ? (
             <>
               <button
@@ -100,7 +112,12 @@ export default function PlayerProfileDropdown({
 
       {/* Emoji Picker */}
       {showEmojiPicker && (
-        <div className="absolute z-[9999] mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-2" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)' }}>
+        <div 
+          className="absolute z-[9999] mb-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-2" 
+          style={{ bottom: '100%', left: '50%', transform: 'translateX(-50%)' }}
+          onMouseEnter={() => setIsOpen(true)}
+          onMouseLeave={() => setIsOpen(false)}
+        >
           <div className="text-xs text-gray-500 mb-2 px-2">Quick React</div>
           <div className="grid grid-cols-5 gap-1">
             {EMOJI_OPTIONS.map((emoji, index) => (
