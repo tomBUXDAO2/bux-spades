@@ -199,10 +199,21 @@ export class SocketManager {
             return;
           }
           
+          // Double-check that the game ID still exists (in case it was cleared by another event)
+          const currentActiveGameId = localStorage.getItem('activeGameId');
+          if (currentActiveGameId !== activeGameId) {
+            console.log('[SOCKET MANAGER] Skipping auto-join - game ID was cleared by another event');
+            return;
+          }
+          
           setTimeout(() => {
-            if (this.socket && this.socket.connected) {
+            // Triple-check before actually joining
+            const finalActiveGameId = localStorage.getItem('activeGameId');
+            if (finalActiveGameId === activeGameId && this.socket && this.socket.connected) {
               console.log('[SOCKET MANAGER] Auto-join on connect for game:', activeGameId);
               this.socket.emit('join_game', { gameId: activeGameId });
+            } else {
+              console.log('[SOCKET MANAGER] Skipping auto-join - game ID was cleared before timeout');
             }
           }, 200);
         }
