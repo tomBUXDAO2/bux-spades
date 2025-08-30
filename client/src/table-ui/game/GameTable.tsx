@@ -2633,8 +2633,14 @@ export default function GameTable({
   const handleConfirmLeave = () => {
     setShowLeaveConfirmation(false);
     console.log('[GAME TABLE] User confirmed leave, emitting leave_game event');
+    console.log('[GAME TABLE] Socket connected:', socket?.connected);
+    console.log('[GAME TABLE] Game ID:', gameState?.id);
+    console.log('[GAME TABLE] User ID:', user?.id);
     if (socket && gameState?.id && user?.id) {
       socket.emit('leave_game', { gameId: gameState.id, userId: user.id });
+      console.log('[GAME TABLE] leave_game event emitted');
+    } else {
+      console.log('[GAME TABLE] Cannot emit leave_game - missing socket, gameId, or userId');
     }
     // Also call the parent's onLeaveTable for cleanup
     if (typeof onLeaveTable === 'function') {
