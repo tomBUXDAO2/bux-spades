@@ -64,11 +64,17 @@ export default function PlayerProfileDropdown({
         {children}
       </div>
 
-      {/* Main Dropdown Menu */}
+      {/* Main Dropdown Menu - rendered outside overflow container */}
       {isOpen && !showEmojiPicker && (
         <div 
-          className="absolute z-[9999] mb-2 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1" 
-          style={{ bottom: '100%', left: '50%', transform: 'translateX(-50%)' }}
+          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
+          style={{ 
+            bottom: 'auto',
+            left: 'auto',
+            transform: 'none',
+            top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 40 : 0,
+            left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 64 : 0
+          }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
         >
@@ -79,7 +85,7 @@ export default function PlayerProfileDropdown({
                   setShowEmojiPicker(true);
                   onShowEmojiPicker();
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center border-b border-gray-600"
               >
                 <span className="mr-2">😀</span>
                 Emoji
@@ -89,7 +95,7 @@ export default function PlayerProfileDropdown({
                   onViewStats();
                   setIsOpen(false);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
               >
                 <span className="mr-2">📊</span>
                 My Stats
@@ -101,7 +107,7 @@ export default function PlayerProfileDropdown({
                 onViewStats();
                 setIsOpen(false);
               }}
-              className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+              className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
             >
               <span className="mr-2">📊</span>
               View Stats
@@ -110,21 +116,27 @@ export default function PlayerProfileDropdown({
         </div>
       )}
 
-      {/* Emoji Picker */}
+      {/* Emoji Picker - rendered outside overflow container */}
       {showEmojiPicker && (
         <div 
-          className="absolute z-[9999] mb-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-2" 
-          style={{ bottom: '100%', left: '50%', transform: 'translateX(-50%)' }}
+          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
+          style={{ 
+            bottom: 'auto',
+            left: 'auto',
+            transform: 'none',
+            top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 120 : 0,
+            left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 128 : 0
+          }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
         >
-          <div className="text-xs text-gray-500 mb-2 px-2">Quick React</div>
+          <div className="text-xs text-gray-300 mb-2 px-2">Quick React</div>
           <div className="grid grid-cols-5 gap-1">
             {EMOJI_OPTIONS.map((emoji, index) => (
               <button
                 key={index}
                 onClick={() => handleEmojiClick(emoji)}
-                className="w-8 h-8 text-lg hover:bg-gray-100 rounded flex items-center justify-center transition-colors"
+                className="w-8 h-8 text-lg hover:bg-gray-700 rounded flex items-center justify-center transition-colors"
               >
                 {emoji}
               </button>
