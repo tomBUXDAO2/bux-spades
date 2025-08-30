@@ -506,12 +506,68 @@ export default function GameTable({
     socket.on('play_start', handlePlayerActed);
     socket.on('trick_completed', handlePlayerActed);
     
+    // Emoji reaction handlers
+    const handleEmojiReactionReceived = (data: { playerId: string; emoji: string }) => {
+      console.log('Received emoji reaction:', data);
+      setEmojiReactions(prev => ({
+        ...prev,
+        [data.playerId]: { emoji: data.emoji, timestamp: Date.now() }
+      }));
+    };
+    
+    const handleSendEmojiReceived = (data: { fromPlayerId: string; toPlayerId: string; emoji: string }) => {
+      console.log('Received send emoji:', data);
+      
+      // Get positions of both players
+      const fromPlayerElement = document.querySelector(`[data-player-id="${data.fromPlayerId}"]`);
+      const toPlayerElement = document.querySelector(`[data-player-id="${data.toPlayerId}"]`);
+      
+      if (!fromPlayerElement || !toPlayerElement) {
+        console.log('Cannot animate emoji - player elements not found');
+        return;
+      }
+
+      const fromRect = fromPlayerElement.getBoundingClientRect();
+      const toRect = toPlayerElement.getBoundingClientRect();
+
+      const fromPosition = {
+        x: fromRect.left + fromRect.width / 2,
+        y: fromRect.top + fromRect.height / 2
+      };
+
+      const toPosition = {
+        x: toRect.left + toRect.width / 2,
+        y: toRect.top + toRect.height / 2
+      };
+
+      // Create unique ID for this emoji travel
+      const travelId = `emoji-travel-${Date.now()}-${Math.random()}`;
+
+      // Add emoji travel to state
+      setEmojiTravels(prev => [...prev, {
+        id: travelId,
+        emoji: data.emoji,
+        fromPosition,
+        toPosition
+      }]);
+
+      // Remove emoji travel when animation completes
+      setTimeout(() => {
+        setEmojiTravels(prev => prev.filter(travel => travel.id !== travelId));
+      }, 3000); // 3 seconds total (0.5s travel + 2s display + 0.5s fade)
+    };
+    
+    socket.on('emoji_reaction', handleEmojiReactionReceived);
+    socket.on('send_emoji', handleSendEmojiReceived);
+    
     return () => {
       socket.off('countdown_start', handleCountdownStart);
       socket.off('bidding_ready', handlePlayerActed);
       socket.off('bidding_complete', handlePlayerActed);
       socket.off('play_start', handlePlayerActed);
       socket.off('trick_completed', handlePlayerActed);
+      socket.off('emoji_reaction', handleEmojiReactionReceived);
+      socket.off('send_emoji', handleSendEmojiReceived);
     };
   }, [socket]);
 
@@ -2618,6 +2674,17 @@ export default function GameTable({
 
   const handleEmojiReaction = (playerId: string, emoji: string) => {
     console.log('handleEmojiReaction called with playerId:', playerId, 'emoji:', emoji);
+    
+    // Emit socket event to broadcast emoji reaction to all players
+    if (socket && gameState?.id) {
+      socket.emit('emoji_reaction', {
+        gameId: gameState.id,
+        playerId: playerId,
+        emoji: emoji
+      });
+    }
+    
+    // Update local state immediately for instant feedback
     setEmojiReactions(prev => ({
       ...prev,
       [playerId]: { emoji, timestamp: Date.now() }
@@ -2634,6 +2701,16 @@ export default function GameTable({
 
   const handleSendEmoji = (targetPlayerId: string, emoji: string) => {
     console.log('handleSendEmoji called with targetPlayerId:', targetPlayerId, 'emoji:', emoji);
+    
+    // Emit socket event to broadcast emoji send to all players
+    if (socket && gameState?.id && user?.id) {
+      socket.emit('send_emoji', {
+        gameId: gameState.id,
+        fromPlayerId: user.id,
+        toPlayerId: targetPlayerId,
+        emoji: emoji
+      });
+    }
     
     // Get current user's position
     const currentPlayer = gameState.players.find(p => p && p.id === user?.id);
