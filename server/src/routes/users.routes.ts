@@ -53,7 +53,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       where: { userId },
       include: {
         Game: {
-          select: { gameMode: true, bidType: true, gameType: true, specialRulesApplied: true, screamer: true, assassin: true, status: true, completed: true }
+          select: { gameMode: true, bidType: true, specialRules: true, screamer: true, assassin: true, status: true }
         }
       }
     });
@@ -105,8 +105,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         if (gp.won) soloGamesWon++;
       }
       
-      // Determine format key from bidType/gameType with better logging
-      const bidType = (g?.bidType || g?.gameType || 'REGULAR') as string;
+      // Determine format key from bidType with better logging
+      const bidType = (g?.bidType || 'REGULAR') as string;
       const key = bidType.toUpperCase(); // REGULAR | WHIZ | MIRROR(S) | GIMMICK
       const normalized = key === 'MIRROR' ? 'MIRRORS' : key;
       
@@ -123,8 +123,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
       
       // Special rules
-      const hasScreamer = g?.screamer === true || (Array.isArray(g?.specialRulesApplied) && g.specialRulesApplied.includes('SCREAMER'));
-      const hasAssassin = g?.assassin === true || (Array.isArray(g?.specialRulesApplied) && g.specialRulesApplied.includes('ASSASSIN'));
+      const hasScreamer = g?.screamer === true || (Array.isArray(g?.specialRules) && g.specialRules.includes('SCREAMER'));
+      const hasAssassin = g?.assassin === true || (Array.isArray(g?.specialRules) && g.specialRules.includes('ASSASSIN'));
       if (hasScreamer) {
         special.SCREAMER.played++;
         if (gp.won) special.SCREAMER.won++;
