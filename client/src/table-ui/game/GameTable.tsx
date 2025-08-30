@@ -2043,7 +2043,7 @@ export default function GameTable({
           currentBidderIndex: data.currentBidderIndex,
           bids: [null, null, null, null],
           nilBids: {},
-          currentPlayer: data.hands && data.hands.length > 0 && prev.players && Array.isArray(prev.players) && prev.players[(data.dealerIndex + 1) % 4]
+          currentPlayer: data.hands && Array.isArray(data.hands) && data.hands.length > 0 && prev.players && Array.isArray(prev.players) && prev.players[(data.dealerIndex + 1) % 4]
             ? prev.players[(data.dealerIndex + 1) % 4]!.id
             : prev.bidding?.currentPlayer
         },
