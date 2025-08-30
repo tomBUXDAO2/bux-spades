@@ -1419,7 +1419,7 @@ export default function GameTable({
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
-          ${playerGradient} rounded-xl overflow-hidden
+          ${playerGradient} rounded-xl
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
           transition-all duration-200
         `}>
@@ -1449,15 +1449,9 @@ export default function GameTable({
                           onComplete={() => handleEmojiComplete(player.id)}
                         />
                       )}
-                      {/* Remove button positioned outside overflow container */}
+                      {/* Remove button */}
                       {canRemovePlayer && (
-                        <div 
-                          className="absolute z-50"
-                          style={{
-                            bottom: '-8px',
-                            left: '-8px'
-                          }}
-                        >
+                        <div className="absolute -bottom-2 -left-2 z-50">
                           <button
                             className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
                             title={isHuman ? "Remove Player" : "Remove Bot"}
@@ -1506,15 +1500,9 @@ export default function GameTable({
                       height={avatarHeight}
                       className="rounded-full object-cover"
                     />
-                    {/* Remove button positioned outside overflow container */}
+                    {/* Remove button */}
                     {canRemovePlayer && (
-                      <div 
-                        className="absolute z-50"
-                        style={{
-                          bottom: '-8px',
-                          left: '-8px'
-                        }}
-                      >
+                      <div className="absolute -bottom-2 -left-2 z-50">
                         <button
                           className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
                           title={isHuman ? "Remove Player" : "Remove Bot"}
