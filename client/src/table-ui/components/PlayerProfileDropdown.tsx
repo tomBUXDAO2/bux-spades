@@ -32,7 +32,9 @@ export default function PlayerProfileDropdown({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      console.log('Click outside detected, target:', event.target);
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        console.log('Closing dropdown due to click outside');
         setIsOpen(false);
         setShowEmojiPicker(false);
       }
@@ -89,12 +91,17 @@ export default function PlayerProfileDropdown({
             top: dropdownPosition.top,
             left: dropdownPosition.left
           }}
+          onClick={(e) => {
+            console.log('Dropdown container clicked');
+            e.stopPropagation();
+          }}
         >
           {isCurrentUser ? (
             <>
               <button
-                onClick={() => {
+                onClick={(e) => {
                   console.log('Emoji button clicked');
+                  e.stopPropagation();
                   setShowEmojiPicker(true);
                   onShowEmojiPicker();
                 }}
@@ -104,8 +111,9 @@ export default function PlayerProfileDropdown({
                 Emoji
               </button>
               <button
-                onClick={() => {
+                onClick={(e) => {
                   console.log('My Stats button clicked');
+                  e.stopPropagation();
                   onViewStats();
                   setIsOpen(false);
                 }}
@@ -117,8 +125,9 @@ export default function PlayerProfileDropdown({
             </>
           ) : (
             <button
-              onClick={() => {
+              onClick={(e) => {
                 console.log('View Stats button clicked');
+                e.stopPropagation();
                 onViewStats();
                 setIsOpen(false);
               }}
