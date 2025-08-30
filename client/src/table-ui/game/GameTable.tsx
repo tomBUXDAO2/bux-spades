@@ -1433,7 +1433,7 @@ export default function GameTable({
                   onShowEmojiPicker={() => {}}
                   onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
                 >
-                  <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                  <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
                     <div className="bg-gray-900 rounded-full p-0.5 relative">
                       <img
                         src={displayAvatar}
@@ -1491,7 +1491,7 @@ export default function GameTable({
                   </div>
                 </PlayerProfileDropdown>
               ) : (
-                <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={displayAvatar}
