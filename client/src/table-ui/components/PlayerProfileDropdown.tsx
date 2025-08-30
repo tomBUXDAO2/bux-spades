@@ -71,11 +71,26 @@ export default function PlayerProfileDropdown({
             setIsOpen(true);
             const rect = dropdownRef.current?.getBoundingClientRect();
             if (rect) {
-              setDropdownPosition({
-                top: rect.top - 60,
-                left: rect.left + (rect.width / 2) - 64
-              });
-              console.log('Dropdown position set:', { top: rect.top - 60, left: rect.left + (rect.width / 2) - 64 });
+              // Check if dropdown would be off-screen above
+              const dropdownHeight = 80; // Approximate height of dropdown
+              const spaceAbove = rect.top;
+              const spaceBelow = window.innerHeight - rect.bottom;
+              
+              let top, left;
+              if (spaceAbove < dropdownHeight && spaceBelow > dropdownHeight) {
+                // Position below if not enough space above but enough below
+                top = rect.bottom + 10;
+                left = rect.left + (rect.width / 2) - 64;
+                console.log('Positioning dropdown below profile picture');
+              } else {
+                // Default position above
+                top = rect.top - 60;
+                left = rect.left + (rect.width / 2) - 64;
+                console.log('Positioning dropdown above profile picture');
+              }
+              
+              setDropdownPosition({ top, left });
+              console.log('Dropdown position set:', { top, left });
             }
           } else {
             console.log('Closing dropdown...');
