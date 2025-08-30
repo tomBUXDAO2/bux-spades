@@ -50,28 +50,25 @@ export default function PlayerProfileDropdown({
 
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
-  useEffect(() => {
-    if (isOpen && dropdownRef.current) {
-      const rect = dropdownRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.top - 60,
-        left: rect.left + (rect.width / 2) - 64
-      });
-    }
-  }, [isOpen]);
-
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Profile Picture with Dropdown Trigger */}
       <div 
         className="cursor-pointer relative group"
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => {
-          setTimeout(() => {
-            if (!showEmojiPicker) {
-              setIsOpen(false);
+        onClick={() => {
+          if (!isOpen) {
+            setIsOpen(true);
+            const rect = dropdownRef.current?.getBoundingClientRect();
+            if (rect) {
+              setDropdownPosition({
+                top: rect.top - 60,
+                left: rect.left + (rect.width / 2) - 64
+              });
             }
-          }, 100);
+          } else {
+            setIsOpen(false);
+            setShowEmojiPicker(false);
+          }
         }}
       >
         {children}
@@ -85,8 +82,6 @@ export default function PlayerProfileDropdown({
             top: dropdownPosition.top,
             left: dropdownPosition.left
           }}
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
         >
           {isCurrentUser ? (
             <>
@@ -135,8 +130,6 @@ export default function PlayerProfileDropdown({
             top: dropdownPosition.top - 100,
             left: dropdownPosition.left - 32
           }}
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
         >
           <div className="text-xs text-gray-300 mb-2 px-2">Quick React</div>
           <div className="grid grid-cols-5 gap-1">
