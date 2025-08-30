@@ -22,6 +22,7 @@ import { FaMinus } from 'react-icons/fa';
 import PlayerStatsModal from '../../components/modals/PlayerStatsModal';
 import PlayerProfileDropdown from '../components/PlayerProfileDropdown';
 import EmojiReaction from '../components/EmojiReaction';
+import EmojiTravel from '../components/EmojiTravel';
 import { useSocket } from '../../context/SocketContext';
 import { createPortal } from 'react-dom';
 
@@ -1436,8 +1437,9 @@ export default function GameTable({
                   onViewStats={() => handleViewPlayerStats(player)}
                   onShowEmojiPicker={() => {}}
                   onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
+                  onSendEmoji={(emoji) => handleSendEmoji(player.id, emoji)}
                 >
-                  <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                  <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
                     <div className="bg-gray-900 rounded-full p-0.5 relative">
                       <img
                         src={displayAvatar}
@@ -1495,7 +1497,7 @@ export default function GameTable({
                   </div>
                 </PlayerProfileDropdown>
               ) : (
-                <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
                   <div className="bg-gray-900 rounded-full p-0.5">
                     <img
                       src={displayAvatar}
@@ -2630,6 +2632,57 @@ export default function GameTable({
     });
   };
 
+  const handleSendEmoji = (targetPlayerId: string, emoji: string) => {
+    console.log('handleSendEmoji called with targetPlayerId:', targetPlayerId, 'emoji:', emoji);
+    
+    // Get current user's position
+    const currentPlayer = gameState.players.find(p => p && p.id === user?.id);
+    const targetPlayer = gameState.players.find(p => p && p.id === targetPlayerId);
+    
+    if (!currentPlayer || !targetPlayer) {
+      console.log('Cannot send emoji - player not found');
+      return;
+    }
+
+    // Get positions of both players
+    const currentPlayerElement = document.querySelector(`[data-player-id="${currentPlayer.id}"]`);
+    const targetPlayerElement = document.querySelector(`[data-player-id="${targetPlayerId}"]`);
+    
+    if (!currentPlayerElement || !targetPlayerElement) {
+      console.log('Cannot send emoji - player elements not found');
+      return;
+    }
+
+    const currentRect = currentPlayerElement.getBoundingClientRect();
+    const targetRect = targetPlayerElement.getBoundingClientRect();
+
+    const fromPosition = {
+      x: currentRect.left + currentRect.width / 2,
+      y: currentRect.top + currentRect.height / 2
+    };
+
+    const toPosition = {
+      x: targetRect.left + targetRect.width / 2,
+      y: targetRect.top + targetRect.height / 2
+    };
+
+    // Create unique ID for this emoji travel
+    const travelId = `emoji-travel-${Date.now()}-${Math.random()}`;
+
+    // Add emoji travel to state
+    setEmojiTravels(prev => [...prev, {
+      id: travelId,
+      emoji,
+      fromPosition,
+      toPosition
+    }]);
+
+    // Remove emoji travel when animation completes
+    setTimeout(() => {
+      setEmojiTravels(prev => prev.filter(travel => travel.id !== travelId));
+    }, 3000); // 3 seconds total (0.5s travel + 2s display + 0.5s fade)
+  };
+
   const handleConfirmLeave = () => {
     setShowLeaveConfirmation(false);
     console.log('[GAME TABLE] User confirmed leave, emitting leave_game event');
@@ -2714,6 +2767,12 @@ export default function GameTable({
   const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [emojiReactions, setEmojiReactions] = useState<Record<string, { emoji: string; timestamp: number }>>({});
+  const [emojiTravels, setEmojiTravels] = useState<Array<{
+    id: string;
+    emoji: string;
+    fromPosition: { x: number; y: number };
+    toPosition: { x: number; y: number };
+  }>>([]);
 
   // Listen for trick_complete event and animate trick
   useEffect(() => {
@@ -3733,6 +3792,19 @@ export default function GameTable({
           players={gameState.players}
         />
       )}
+
+      {/* Emoji Travel Animations */}
+      {emojiTravels.map((travel) => (
+        <EmojiTravel
+          key={travel.id}
+          emoji={travel.emoji}
+          fromPosition={travel.fromPosition}
+          toPosition={travel.toPosition}
+          onComplete={() => {
+            setEmojiTravels(prev => prev.filter(t => t.id !== travel.id));
+          }}
+        />
+      ))}
 
       {renderLeagueOverlay()}
 

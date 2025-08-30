@@ -12,6 +12,7 @@ interface PlayerProfileDropdownProps {
   onViewStats: () => void;
   onShowEmojiPicker: () => void;
   onEmojiReaction: (emoji: string) => void;
+  onSendEmoji?: (emoji: string) => void;
   children: React.ReactNode;
 }
 
@@ -24,6 +25,7 @@ export default function PlayerProfileDropdown({
   onViewStats,
   onShowEmojiPicker,
   onEmojiReaction,
+  onSendEmoji,
   children
 }: PlayerProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +54,11 @@ export default function PlayerProfileDropdown({
 
   const handleEmojiClick = (emoji: string) => {
     console.log('Emoji selected:', emoji);
-    onEmojiReaction(emoji);
+    if (isCurrentUser) {
+      onEmojiReaction(emoji);
+    } else if (onSendEmoji) {
+      onSendEmoji(emoji);
+    }
     setShowEmojiPicker(false);
     setIsOpen(false);
   };
@@ -145,18 +151,31 @@ export default function PlayerProfileDropdown({
               </button>
             </>
           ) : (
-            <button
-              onClick={(e) => {
-                console.log('View Stats button clicked');
-                e.stopPropagation();
-                onViewStats();
-                setIsOpen(false);
-              }}
-              className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
-            >
-              <span className="mr-2">📊</span>
-              View Stats
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  console.log('Send Emoji button clicked');
+                  e.stopPropagation();
+                  setShowEmojiPicker(true);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center border-b border-gray-600"
+              >
+                <span className="mr-2">😀</span>
+                Send Emoji
+              </button>
+              <button
+                onClick={(e) => {
+                  console.log('View Stats button clicked');
+                  e.stopPropagation();
+                  onViewStats();
+                  setIsOpen(false);
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
+              >
+                <span className="mr-2">📊</span>
+                View Stats
+              </button>
+            </>
           )}
         </div>,
         document.body
