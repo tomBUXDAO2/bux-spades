@@ -31,7 +31,7 @@ export default function EmojiReaction({ emoji, onComplete }: EmojiReactionProps)
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      <div className="text-4xl animate-bounce">
+      <div className="text-7xl animate-bounce">
         {emoji}
       </div>
     </div>
