@@ -20,7 +20,6 @@ const EMOJI_OPTIONS = [
 ];
 
 export default function PlayerProfileDropdown({
-  player,
   isCurrentUser,
   onViewStats,
   onShowEmojiPicker,
