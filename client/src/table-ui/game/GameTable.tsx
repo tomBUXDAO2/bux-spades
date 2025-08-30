@@ -1757,7 +1757,7 @@ export default function GameTable({
     console.log('[DEBUG] renderPlayerHand called', { myHand, handImagesLoaded, gameStateStatus: gameState.status });
     if (!myHand || myHand.length === 0) return null;
     const sortedHand = sortCards(myHand);
-    const isLeadingTrick = currentTrick.length === 0;
+    const isLeadingTrick = currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0;
     const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted) : [];
     // --- FIX: If it's your turn and playableCards is empty, allow all cards ---
     const isMyTurn = (gameState.status === "PLAYING" || gameState.status === "BIDDING") && gameState.currentPlayer === currentPlayerId;
@@ -1770,7 +1770,7 @@ export default function GameTable({
     // Defensive: only use myHand and playableCards if defined
     let effectivePlayableCards: typeof myHand = [];
     if (isMyTurn && Array.isArray(myHand)) {
-      const isLeading = currentTrick.length === 0 || (trickCompleted && currentTrick.length === 4);
+      const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
       const spadesBroken = (gameState as any).play?.spadesBroken;
       if (isLeading && !spadesBroken && myHand.some(c => c.suit !== 'S')) {
         effectivePlayableCards = myHand.filter(c => c.suit !== 'S');
@@ -1857,9 +1857,9 @@ export default function GameTable({
                 isMyTurn: gameState.currentPlayer === currentPlayerId,
                 effectivePlayableCards: effectivePlayableCards.map((c: Card) => `${c.rank}${c.suit}`),
                 isPlayable,
-                isLeading: currentTrick.length === 0,
+                isLeading: currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0,
                 trickCompleted,
-                currentTrickLength: currentTrick.length
+                currentTrickLength: currentTrick && Array.isArray(currentTrick) ? currentTrick.length : 0
               });
             }
             return (
