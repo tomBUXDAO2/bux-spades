@@ -69,9 +69,6 @@ export default function PlayerProfileDropdown({
         <div 
           className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
           style={{ 
-            bottom: 'auto',
-            left: 'auto',
-            transform: 'none',
             top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 40 : 0,
             left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 64 : 0
           }}
@@ -121,9 +118,6 @@ export default function PlayerProfileDropdown({
         <div 
           className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
           style={{ 
-            bottom: 'auto',
-            left: 'auto',
-            transform: 'none',
             top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 120 : 0,
             left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 128 : 0
           }}
