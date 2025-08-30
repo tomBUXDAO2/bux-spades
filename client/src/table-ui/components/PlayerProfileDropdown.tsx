@@ -54,7 +54,7 @@ export default function PlayerProfileDropdown({
     if (isOpen && dropdownRef.current) {
       const rect = dropdownRef.current.getBoundingClientRect();
       setDropdownPosition({
-        top: rect.top - 40,
+        top: rect.top - 60,
         left: rect.left + (rect.width / 2) - 64
       });
     }
@@ -132,7 +132,7 @@ export default function PlayerProfileDropdown({
         <div 
           className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
           style={{ 
-            top: dropdownPosition.top - 80,
+            top: dropdownPosition.top - 100,
             left: dropdownPosition.left - 32
           }}
           onMouseEnter={() => setIsOpen(true)}
