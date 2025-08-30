@@ -50,7 +50,7 @@ export default function EmojiTravel({ emoji, fromPosition, toPosition, onComplet
         transition: 'opacity 0.5s ease-out'
       }}
     >
-      <div className="text-4xl animate-bounce">
+      <div className="text-7xl animate-bounce">
         {emoji}
       </div>
     </div>
