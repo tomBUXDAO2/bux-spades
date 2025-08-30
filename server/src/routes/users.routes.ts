@@ -52,7 +52,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     const games = await prisma.gamePlayer.findMany({
       where: { userId },
       include: {
-        game: {
+        Game: {
           select: { gameMode: true, bidType: true, gameType: true, specialRulesApplied: true, screamer: true, assassin: true, status: true, completed: true }
         }
       }
@@ -64,7 +64,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     let filteredGames = games;
     if (gameMode && gameMode !== 'ALL') {
       filteredGames = games.filter(gp => {
-        const g = gp.game as any;
+        const g = gp.Game as any;
         return g?.gameMode === gameMode;
       });
       console.log('[USER STATS API] Filtered games for', gameMode, ':', filteredGames.length);
@@ -95,7 +95,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     let blindNilsMade = 0;
     
     for (const gp of filteredGames) {
-      const g = gp.game as any;
+      const g = gp.Game as any;
       const mode = g?.gameMode as 'PARTNERS' | 'SOLO' | undefined;
       if (mode === 'PARTNERS') {
         partnersGamesPlayed++;
