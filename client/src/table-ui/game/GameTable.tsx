@@ -1351,23 +1351,64 @@ export default function GameTable({
     }
     // --- END NEW LOGIC ---
 
-    // Permission to remove bot: host (pre-game) or partner (mid-game)
-    const canRemoveBot = (() => {
-      if (!currentPlayerId) return false;
-      if (gameState.status === 'WAITING') {
-        // Host (seat 0) can always remove bots pre-game
-        return sanitizedPlayers[0]?.id === currentPlayerId;
-      } else {
-        // Mid-game: partner (original seat (originalPosition+2)%4) can remove bots
-        const originalPosition = player.position ?? position;
-        const partnerOriginalPosition = (originalPosition + 2) % 4;
-        const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
-        return partner?.id === currentPlayerId;
-      }
-    })();
+    // Check if this is a league game
+    const isLeagueGame = (gameState as any).league;
+    
+    // Check if there are spectators available to fill seats
+    const spectators = (gameState as any).spectators || [];
+    const hasAvailableSpectators = spectators.length > 0;
     // After rendering the player avatar/info, render the played card if any
     // const playedCard = player ? getPlayedCardForPlayer(player.id) : null;
     const isHuman = isPlayer(player);
+    
+    // Permission to remove player/bot based on game type and state
+    const canRemovePlayer = (() => {
+      if (!currentPlayerId) return false;
+      
+      // League games: Never allow removing players
+      if (isLeagueGame) {
+        return false;
+      }
+      
+      // Non-league games
+      if (gameState.status === 'WAITING') {
+        // Before game starts
+        if (isHuman) {
+          // Host can remove any player
+          if (sanitizedPlayers[0]?.id === currentPlayerId) {
+            return true;
+          }
+          // Human players can remove their partner if partner is a bot
+          const originalPosition = player.position ?? position;
+          const partnerOriginalPosition = (originalPosition + 2) % 4;
+          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+          return partner?.id === currentPlayerId && !isHuman; // Only if partner is bot
+        } else {
+          // Host can remove any bot
+          if (sanitizedPlayers[0]?.id === currentPlayerId) {
+            return true;
+          }
+          // Human players can remove their partner bot
+          const originalPosition = player.position ?? position;
+          const partnerOriginalPosition = (originalPosition + 2) % 4;
+          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+          return partner?.id === currentPlayerId;
+        }
+      } else {
+        // After game starts
+        if (isHuman) {
+          // Human players cannot be removed after game starts
+          return false;
+        } else {
+          // Bots can be removed by their partner ONLY if spectators are available
+          const originalPosition = player.position ?? position;
+          const partnerOriginalPosition = (originalPosition + 2) % 4;
+          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+          return partner?.id === currentPlayerId && hasAvailableSpectators;
+        }
+      }
+    })();
+    
     const displayName = isHuman ? player.username : 'Bot';
     const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
     return (
@@ -1403,10 +1444,10 @@ export default function GameTable({
                           onComplete={() => handleEmojiComplete(player.id)}
                         />
                       )}
-                      {canRemoveBot && (
+                      {canRemovePlayer && (
                         <button
-                          className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                          title="Remove Bot"
+                          className="absolute -bottom-2 -left-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                          title={isHuman ? "Remove Player" : "Remove Bot"}
                           onClick={() => handleRemoveBot(position)}
                           style={{ zIndex: 50 }}
                         >
@@ -1452,10 +1493,10 @@ export default function GameTable({
                       height={avatarHeight}
                       className="rounded-full object-cover"
                     />
-                    {canRemoveBot && (
+                    {canRemovePlayer && (
                       <button
-                        className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                        title="Remove Bot"
+                        className="absolute -bottom-2 -left-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                        title={isHuman ? "Remove Player" : "Remove Bot"}
                         onClick={() => handleRemoveBot(position)}
                         style={{ zIndex: 50 }}
                       >
