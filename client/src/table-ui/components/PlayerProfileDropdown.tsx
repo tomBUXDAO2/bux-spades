@@ -57,7 +57,9 @@ export default function PlayerProfileDropdown({
       <div 
         className="cursor-pointer relative group"
         onClick={() => {
+          console.log('Profile picture clicked, current isOpen:', isOpen);
           if (!isOpen) {
+            console.log('Opening dropdown...');
             setIsOpen(true);
             const rect = dropdownRef.current?.getBoundingClientRect();
             if (rect) {
@@ -65,8 +67,10 @@ export default function PlayerProfileDropdown({
                 top: rect.top - 60,
                 left: rect.left + (rect.width / 2) - 64
               });
+              console.log('Dropdown position set:', { top: rect.top - 60, left: rect.left + (rect.width / 2) - 64 });
             }
           } else {
+            console.log('Closing dropdown...');
             setIsOpen(false);
             setShowEmojiPicker(false);
           }
@@ -76,7 +80,9 @@ export default function PlayerProfileDropdown({
       </div>
 
       {/* Main Dropdown Menu - rendered via portal outside component tree */}
-      {isOpen && !showEmojiPicker && createPortal(
+      {isOpen && !showEmojiPicker && (() => {
+        console.log('Rendering main dropdown menu');
+        return createPortal(
         <div 
           className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
           style={{ 
@@ -124,7 +130,8 @@ export default function PlayerProfileDropdown({
           )}
         </div>,
         document.body
-      )}
+      );
+      })()}
 
       {/* Emoji Picker - rendered via portal outside component tree */}
       {showEmojiPicker && createPortal(
