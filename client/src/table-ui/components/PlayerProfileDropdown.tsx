@@ -67,10 +67,12 @@ export default function PlayerProfileDropdown({
       {/* Main Dropdown Menu - rendered outside overflow container */}
       {isOpen && !showEmojiPicker && (
         <div 
-          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
+          className="absolute z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
           style={{ 
-            top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 40 : 0,
-            left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 64 : 0
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px'
           }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
@@ -116,10 +118,12 @@ export default function PlayerProfileDropdown({
       {/* Emoji Picker - rendered outside overflow container */}
       {showEmojiPicker && (
         <div 
-          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
+          className="absolute z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
           style={{ 
-            top: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().top - 120 : 0,
-            left: dropdownRef.current ? dropdownRef.current.getBoundingClientRect().left + (dropdownRef.current.offsetWidth / 2) - 128 : 0
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '8px'
           }}
           onMouseEnter={() => setIsOpen(true)}
           onMouseLeave={() => setIsOpen(false)}
