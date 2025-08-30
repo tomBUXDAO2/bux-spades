@@ -19,6 +19,9 @@ import { IoExitOutline, IoInformationCircleOutline } from "react-icons/io5";
 import { useWindowSize } from '../../hooks/useWindowSize';
 import { FaRobot } from 'react-icons/fa';
 import { FaMinus } from 'react-icons/fa';
+import PlayerStatsModal from '../../components/modals/PlayerStatsModal';
+import PlayerProfileDropdown from '../components/PlayerProfileDropdown';
+import EmojiReaction from '../components/EmojiReaction';
 import { useSocket } from '../../context/SocketContext';
 import { createPortal } from 'react-dom';
 
@@ -1376,53 +1379,118 @@ export default function GameTable({
         `}>
           <div className={isSideSeat ? "flex flex-col items-center p-1.5 gap-1.5" : "flex items-center p-1.5 gap-1.5"}>
             <div className="relative">
-              <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
-                <div className="bg-gray-900 rounded-full p-0.5">
-                  <img
-                    src={displayAvatar}
-                    alt={displayName}
-                    width={avatarWidth}
-                    height={avatarHeight}
-                    className="rounded-full object-cover"
-                  />
-                  {canRemoveBot && (
-                    <button
-                      className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                      title="Remove Bot"
-                      onClick={() => handleRemoveBot(position)}
-                      style={{ zIndex: 50 }}
-                    >
-                      <FaMinus className="w-2.5 h-2.5" />
-                    </button>
-                  )}
-                  {/* Dealer chip for bots */}
-                  {player.isDealer && (
-                    <>
-                      {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
-                      <div className="absolute -bottom-1 -right-1">
-                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                          <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                            <span className="text-[8px] font-bold text-yellow-200">D</span>
+              {isHuman ? (
+                <PlayerProfileDropdown
+                  player={player}
+                  isCurrentUser={player.id === user?.id}
+                  onViewStats={() => handleViewPlayerStats(player)}
+                  onShowEmojiPicker={() => {}}
+                  onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
+                >
+                  <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                    <div className="bg-gray-900 rounded-full p-0.5 relative">
+                      <img
+                        src={displayAvatar}
+                        alt={displayName}
+                        width={avatarWidth}
+                        height={avatarHeight}
+                        className="rounded-full object-cover"
+                      />
+                      {/* Emoji reaction overlay */}
+                      {emojiReactions[player.id] && (
+                        <EmojiReaction
+                          emoji={emojiReactions[player.id].emoji}
+                          onComplete={() => handleEmojiComplete(player.id)}
+                        />
+                      )}
+                      {canRemoveBot && (
+                        <button
+                          className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                          title="Remove Bot"
+                          onClick={() => handleRemoveBot(position)}
+                          style={{ zIndex: 50 }}
+                        >
+                          <FaMinus className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                      {/* Dealer chip for bots */}
+                      {player.isDealer && (
+                        <>
+                          {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
+                          <div className="absolute -bottom-1 -right-1">
+                            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
+                              <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-yellow-200">D</span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      {/* Timer overlay for last 10 seconds */}
+                      {shouldShowTimerOnPlayer && (
+                        <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                          <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
+                        </div>
+                      )}
+                      
+                      {/* Countdown overlay for timed out player */}
+                      {isPlayerOnCountdown && (
+                        <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                          <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </PlayerProfileDropdown>
+              ) : (
+                <div className="rounded-full overflow-hidden p-0.5 bg-gradient-to-r from-gray-400 to-gray-600">
+                  <div className="bg-gray-900 rounded-full p-0.5">
+                    <img
+                      src={displayAvatar}
+                      alt={displayName}
+                      width={avatarWidth}
+                      height={avatarHeight}
+                      className="rounded-full object-cover"
+                    />
+                    {canRemoveBot && (
+                      <button
+                        className="absolute -bottom-1 -left-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
+                        title="Remove Bot"
+                        onClick={() => handleRemoveBot(position)}
+                        style={{ zIndex: 50 }}
+                      >
+                        <FaMinus className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                    {/* Dealer chip for bots */}
+                    {player.isDealer && (
+                      <>
+                        {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
+                        <div className="absolute -bottom-1 -right-1">
+                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
+                            <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
+                              <span className="text-[8px] font-bold text-yellow-200">D</span>
+                            </div>
                           </div>
                         </div>
+                      </>
+                    )}
+                    {/* Timer overlay for last 10 seconds */}
+                    {shouldShowTimerOnPlayer && (
+                      <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
                       </div>
-                    </>
-                  )}
-                  {/* Timer overlay for last 10 seconds */}
-                  {shouldShowTimerOnPlayer && (
-                    <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
-                    </div>
-                  )}
-                  
-                  {/* Countdown overlay for timed out player */}
-                  {isPlayerOnCountdown && (
-                    <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
-                    </div>
-                  )}
+                    )}
+                    
+                    {/* Countdown overlay for timed out player */}
+                    {isPlayerOnCountdown && (
+                      <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div className="flex flex-col items-center gap-1">
               <div className="w-full px-2 py-1 rounded-lg shadow-sm" style={{ width: isMobile ? '50px' : '70px' }}>
@@ -2485,6 +2553,27 @@ export default function GameTable({
     setShowLeaveConfirmation(true);
   };
 
+  // Handler functions for player profile features
+  const handleViewPlayerStats = (player: any) => {
+    setSelectedPlayer(player);
+    setShowPlayerStats(true);
+  };
+
+  const handleEmojiReaction = (playerId: string, emoji: string) => {
+    setEmojiReactions(prev => ({
+      ...prev,
+      [playerId]: { emoji, timestamp: Date.now() }
+    }));
+  };
+
+  const handleEmojiComplete = (playerId: string) => {
+    setEmojiReactions(prev => {
+      const newReactions = { ...prev };
+      delete newReactions[playerId];
+      return newReactions;
+    });
+  };
+
   const handleConfirmLeave = () => {
     setShowLeaveConfirmation(false);
     if (typeof onLeaveTable === 'function') {
@@ -2553,6 +2642,11 @@ export default function GameTable({
   const [animatingTrick, setAnimatingTrick] = useState(false);
   const [animatedTrickCards, setAnimatedTrickCards] = useState<Card[]>([]);
   const [trickCompleted, setTrickCompleted] = useState(false);
+  
+  // New state for player profile features
+  const [showPlayerStats, setShowPlayerStats] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  const [emojiReactions, setEmojiReactions] = useState<Record<string, { emoji: string; timestamp: number }>>({});
 
   // Listen for trick_complete event and animate trick
   useEffect(() => {
@@ -3294,6 +3388,7 @@ export default function GameTable({
                 lobbyMessages={lobbyMessages}
                 spectators={(gameState as any).spectators || []}
                 isSpectator={isSpectator}
+                onPlayerClick={handleViewPlayerStats}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 text-lg">Connecting chat...</div>
@@ -3573,6 +3668,13 @@ export default function GameTable({
       )}
 
       {renderLeagueOverlay()}
+
+      {/* Player Stats Modal */}
+      <PlayerStatsModal
+        isOpen={showPlayerStats}
+        onClose={() => setShowPlayerStats(false)}
+        player={selectedPlayer}
+      />
 
       {/* Leave Table Confirmation Modal */}
       {showLeaveConfirmation && (

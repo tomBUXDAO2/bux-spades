@@ -21,6 +21,7 @@ interface ChatProps {
   onToggleChatType?: () => void;
   lobbyMessages?: ChatMessage[];
   isSpectator?: boolean;
+  onPlayerClick?: (player: Player) => void;
 }
 
 // Export the ChatMessage interface
@@ -49,7 +50,7 @@ const EyeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block w-5 h-5 ml-1 align-middle"><path d="M12 5C5.63636 5 2 12 2 12C2 12 5.63636 19 12 19C18.3636 19 22 12 22 12C22 12 18.3636 5 12 5Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path><path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path></svg>
 );
 
-export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages, isSpectator = false }: ChatProps) {
+export default function Chat({ gameId, userId, userName, players, spectators, userAvatar, showPlayerListTab = true, chatType = 'game', onToggleChatType, lobbyMessages, isSpectator = false, onPlayerClick }: ChatProps) {
   const { socket, isAuthenticated, isConnected, isReady } = useSocket();
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -707,13 +708,17 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
               <span
                 className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(player.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
-                  setStatsPlayer({
-                    username: player.username || player.name,
-                    avatar: player.avatar || player.image || '/bot-avatar.jpg',
-                    stats: (player as any)?.stats || {},
-                    status: playerStatuses[player.id] || 'not_friend'
-                  });
-                  setIsStatsOpen(true);
+                  if (onPlayerClick) {
+                    onPlayerClick(player);
+                  } else {
+                    setStatsPlayer({
+                      username: player.username || player.name,
+                      avatar: player.avatar || player.image || '/bot-avatar.jpg',
+                      stats: (player as any)?.stats || {},
+                      status: playerStatuses[player.id] || 'not_friend'
+                    });
+                    setIsStatsOpen(true);
+                  }
                 }}
               >
                 {player.username || player.name}
@@ -777,13 +782,17 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
               <span
                 className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(spectator.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
-                  setStatsPlayer({
-                    username: spectator.username || spectator.name,
-                    avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
-                    stats: (spectator as any)?.stats || {},
-                    status: playerStatuses[spectator.id] || 'not_friend'
-                  });
-                  setIsStatsOpen(true);
+                  if (onPlayerClick) {
+                    onPlayerClick(spectator);
+                  } else {
+                    setStatsPlayer({
+                      username: spectator.username || spectator.name,
+                      avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
+                      stats: (spectator as any)?.stats || {},
+                      status: playerStatuses[spectator.id] || 'not_friend'
+                    });
+                    setIsStatsOpen(true);
+                  }
                 }}
               >
                 {spectator.username || spectator.name}

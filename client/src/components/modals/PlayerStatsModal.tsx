@@ -179,10 +179,14 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                     <span className="text-green-400">🎒</span>
                     <span className="text-xl text-green-400">{stats.totalBags} Bags</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-orange-400">✅</span>
-                    <span className="text-xl text-orange-400">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
-                  </div>
+                                  <div className="flex items-center space-x-2">
+                  <span className="text-orange-400">✅</span>
+                  <span className="text-xl text-orange-400">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-yellow-400">🪙</span>
+                  <span className="text-xl text-yellow-400">{player.coins?.toLocaleString() || '0'} Coins</span>
+                </div>
                 </div>
               </div>
             </div>
