@@ -676,9 +676,9 @@ export default function GameTable({
           if (!myHand || !Array.isArray(myHand)) {
             console.log('[TIMER] No hand available for bidding, skipping auto-bid');
             return;
-          }
-          const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
-          bid = Math.min(13, Math.max(0, expectedTricks));
+                  }
+        const expectedTricks = Math.max(1, Math.floor((myHand && Array.isArray(myHand) ? myHand.length : 0) / 3));
+        bid = Math.min(13, Math.max(0, expectedTricks));
         }
       } else if (game.forcedBid === 'BID4NIL') {
         // 4 OR NIL: bid 4 or nil
@@ -727,7 +727,7 @@ export default function GameTable({
           bid = spadesCount; // Must bid spades if have ace
         } else {
           // Can choose between spades count or nil
-          const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
+          const expectedTricks = Math.max(1, Math.floor((myHand && Array.isArray(myHand) ? myHand.length : 0) / 3));
           bid = expectedTricks >= spadesCount ? spadesCount : 0;
         }
       } else {
@@ -737,7 +737,7 @@ export default function GameTable({
           return;
         }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
-        const expectedTricks = Math.max(1, Math.floor(myHand.length / 3));
+        const expectedTricks = Math.max(1, Math.floor((myHand && Array.isArray(myHand) ? myHand.length : 0) / 3));
         bid = Math.min(13, Math.max(0, expectedTricks));
         
         // Consider nil if it makes sense
@@ -1671,17 +1671,17 @@ export default function GameTable({
   // When the game status changes to PLAYING, show all cards immediately
   useEffect(() => {
     if (gameState.status === 'PLAYING') {
-      setDealtCardCount(myHand.length);
+              setDealtCardCount(myHand && Array.isArray(myHand) ? myHand.length : 0);
       setDealingComplete(true); // Allow immediate play in PLAYING phase
     }
-  }, [gameState.status, myHand.length]);
+      }, [gameState.status, myHand && Array.isArray(myHand) ? myHand.length : 0]);
 
   // Fallback: If we're in BIDDING and have cards but dealing is not complete after 3 seconds, force completion
   useEffect(() => {
     if (gameState.status === 'BIDDING' && myHand && myHand.length > 0 && !dealingComplete) {
       const timeout = setTimeout(() => {
         console.log('[FALLBACK] Forcing dealing completion after timeout');
-        setDealtCardCount(myHand.length);
+        setDealtCardCount(myHand && Array.isArray(myHand) ? myHand.length : 0);
         setDealingComplete(true);
       }, 3000);
       
@@ -1820,7 +1820,7 @@ export default function GameTable({
 
     // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
     const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
-    const visibleCount = showAllCards ? sortedHand.length : dealtCardCount;
+    const visibleCount = showAllCards ? (sortedHand && Array.isArray(sortedHand) ? sortedHand.length : 0) : dealtCardCount;
 
     console.log('[DEBUG] isMyTurn:', isMyTurn);
     console.log('[DEBUG] playableCards:', playableCards);
@@ -1840,7 +1840,7 @@ export default function GameTable({
         }}
       >
         <div className="flex items-center justify-center h-full w-full">
-          {sortedHand.map((card: Card, index: number) => {
+          {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
             const isPlayable = (gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
               effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
