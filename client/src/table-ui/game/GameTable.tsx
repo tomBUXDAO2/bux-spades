@@ -1549,22 +1549,22 @@ export default function GameTable({
         {/* Speech bubble for North player only */}
         {position === 0 && player && recentChatMessages[player.id] && (
           <>
-            <div className="absolute z-50 left-full top-1/2 -translate-y-1/2 ml-4">
+            <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
                 className="w-0 h-0 border-transparent"
                 style={{
-                  borderRightWidth: '24px',
-                  borderLeftWidth: '0px',
+                  borderLeftWidth: '24px',
+                  borderRightWidth: '0px',
                   borderTopWidth: '8px',
                   borderBottomWidth: '8px',
-                  borderRightColor: 'white'
+                  borderLeftColor: 'white'
                 }}
               ></div>
             </div>
             {/* Speech bubble container */}
             <div className="absolute z-50 bottom-0 left-0 mb-4" style={{ marginBottom: '15px', left: 'calc(-30px - 140px)' }}>
               <div 
-                className="bg-white rounded-lg px-4 py-3 mr-[-8px]"
+                className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
                   minWidth: '120px',
                   maxWidth: '140px'
@@ -1588,22 +1588,22 @@ export default function GameTable({
         {/* Speech bubble for South player only */}
         {position === 2 && player && recentChatMessages[player.id] && (
           <>
-            <div className="absolute z-50 left-full top-1/2 -translate-y-1/2 ml-4">
+            <div className="absolute z-50 right-full top-1/2 -translate-y-1/2 mr-4">
               <div 
                 className="w-0 h-0 border-transparent"
                 style={{
-                  borderRightWidth: '24px',
-                  borderLeftWidth: '0px',
+                  borderLeftWidth: '24px',
+                  borderRightWidth: '0px',
                   borderTopWidth: '8px',
                   borderBottomWidth: '8px',
-                  borderRightColor: 'white'
+                  borderLeftColor: 'white'
                 }}
               ></div>
             </div>
             {/* Speech bubble container */}
             <div className="absolute z-50 top-0 left-0 mt-4" style={{ marginTop: '15px', left: 'calc(-30px - 140px)' }}>
               <div 
-                className="bg-white rounded-lg px-4 py-3 mr-[-8px]"
+                className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
                   minWidth: '120px',
                   maxWidth: '140px'
