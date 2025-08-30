@@ -728,16 +728,66 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   res.json(game);
 });
 
-// Remove a bot from a seat (host only, pre-game)
+// Remove a player/bot from a seat (pre-game)
 router.post('/:id/remove-bot', requireAuth, (req, res) => {
   const game = games.find(g => g.id === req.params.id);
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.status !== 'WAITING') return res.status(400).json({ error: 'Game already started' });
   const { seatIndex } = req.body;
   const requesterId = (req as AuthenticatedRequest).user!.id;
-  // Only host can remove bots
-  if (game.players[0]?.id !== requesterId) return res.status(403).json({ error: 'Only host can remove bots' });
-  if (seatIndex < 0 || seatIndex > 3 || !game.players[seatIndex] || game.players[seatIndex].type !== 'bot') return res.status(400).json({ error: 'Invalid seat or not a bot' });
+  
+  // Validate seat index
+  if (seatIndex < 0 || seatIndex > 3 || !game.players[seatIndex]) {
+    return res.status(400).json({ error: 'Invalid seat or no player at seat' });
+  }
+  
+  const playerToRemove = game.players[seatIndex];
+  const isHuman = playerToRemove.type === 'human';
+  const isBot = playerToRemove.type === 'bot';
+  
+  // Check if requester is trying to remove themselves
+  if (playerToRemove.id === requesterId) {
+    return res.status(400).json({ error: 'Cannot remove yourself' });
+  }
+  
+  // Check if this is a league game
+  const isLeagueGame = (game as any).league;
+  if (isLeagueGame) {
+    return res.status(403).json({ error: 'Cannot remove players in league games' });
+  }
+  
+  // Check if requester is host
+  const isHost = game.players[0]?.id === requesterId;
+  
+  // Determine if removal is allowed based on client-side rules
+  let canRemove = false;
+  
+  if (isHuman) {
+    // Host can remove any human player (except themselves)
+    if (isHost) {
+      canRemove = true;
+    } else {
+      // Human players can remove their partner if partner is a bot
+      const partnerSeat = (seatIndex + 2) % 4;
+      const partner = game.players[partnerSeat];
+      canRemove = partner?.id === requesterId && partner.type === 'bot';
+    }
+  } else if (isBot) {
+    // Host can remove any bot
+    if (isHost) {
+      canRemove = true;
+    } else {
+      // Human players can remove their partner bot
+      const partnerSeat = (seatIndex + 2) % 4;
+      const partner = game.players[partnerSeat];
+      canRemove = partner?.id === requesterId;
+    }
+  }
+  
+  if (!canRemove) {
+    return res.status(403).json({ error: 'Not authorized to remove this player' });
+  }
+  
   game.players[seatIndex] = null;
   io.emit('games_updated', games);
   io.to(game.id).emit('game_update', enrichGameForClient(game));
