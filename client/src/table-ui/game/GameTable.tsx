@@ -1109,6 +1109,10 @@ export default function GameTable({
   // Add remove bot handler
   const handleRemoveBot = async (seatIndex: number) => {
     try {
+      // Get the player type before removing them
+      const player = gameState.players[seatIndex];
+      const playerType = (player as any)?.type === 'bot' ? 'bot' : 'player';
+      
       const endpoint = gameState.status === 'WAITING'
         ? `/api/games/${gameState.id}/remove-bot`
         : `/api/games/${gameState.id}/remove-bot-midgame`;
@@ -1120,7 +1124,7 @@ export default function GameTable({
         // Update the local game state with the new data from the server
         const updatedGame = await res.json();
         setGameState(updatedGame);
-        setPendingSystemMessage(`A bot was removed from seat ${seatIndex + 1}.`);
+        setPendingSystemMessage(`A ${playerType} was removed from seat ${seatIndex + 1}.`);
       }
     } catch (err) {
       alert('Failed to remove bot');
