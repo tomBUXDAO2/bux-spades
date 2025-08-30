@@ -957,11 +957,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       socket.leave(gameId);
       
-      // Start seat replacement process for the empty seat (only if host wasn't replaced)
-      if (!hostReplaced) {
+      // Start seat replacement process for the empty seat (only if host wasn't replaced and game is not completed)
+      if (!hostReplaced && game.status !== 'COMPLETED') {
         console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
         console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
         startSeatReplacement(game, playerIdx);
+      } else if (game.status === 'COMPLETED') {
+        console.log(`[LEAVE GAME DEBUG] Game is completed, not starting seat replacement`);
       }
         
         // Emit game_update to the game room for real-time sync
