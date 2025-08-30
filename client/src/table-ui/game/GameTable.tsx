@@ -1365,6 +1365,11 @@ export default function GameTable({
     const canRemovePlayer = (() => {
       if (!currentPlayerId) return false;
       
+      // Never allow removing yourself
+      if (player.id === currentPlayerId) {
+        return false;
+      }
+      
       // League games: Never allow removing players
       if (isLeagueGame) {
         return false;
@@ -1374,7 +1379,7 @@ export default function GameTable({
       if (gameState.status === 'WAITING') {
         // Before game starts
         if (isHuman) {
-          // Host can remove any player
+          // Host can remove any player (except themselves)
           if (sanitizedPlayers[0]?.id === currentPlayerId) {
             return true;
           }
@@ -1444,15 +1449,17 @@ export default function GameTable({
                           onComplete={() => handleEmojiComplete(player.id)}
                         />
                       )}
+                      {/* Remove button positioned outside overflow container */}
                       {canRemovePlayer && (
-                        <button
-                          className="absolute -bottom-2 -left-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                          title={isHuman ? "Remove Player" : "Remove Bot"}
-                          onClick={() => handleRemoveBot(position)}
-                          style={{ zIndex: 50 }}
-                        >
-                          <FaMinus className="w-2.5 h-2.5" />
-                        </button>
+                        <div className="absolute -bottom-2 -left-2 z-50">
+                          <button
+                            className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
+                            title={isHuman ? "Remove Player" : "Remove Bot"}
+                            onClick={() => handleRemoveBot(position)}
+                          >
+                            <FaMinus className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
                       )}
                       {/* Dealer chip for bots */}
                       {player.isDealer && (
@@ -1493,15 +1500,17 @@ export default function GameTable({
                       height={avatarHeight}
                       className="rounded-full object-cover"
                     />
+                    {/* Remove button positioned outside overflow container */}
                     {canRemovePlayer && (
-                      <button
-                        className="absolute -bottom-2 -left-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition z-50"
-                        title={isHuman ? "Remove Player" : "Remove Bot"}
-                        onClick={() => handleRemoveBot(position)}
-                        style={{ zIndex: 50 }}
-                      >
-                        <FaMinus className="w-2.5 h-2.5" />
-                      </button>
+                      <div className="absolute -bottom-2 -left-2 z-50">
+                        <button
+                          className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
+                          title={isHuman ? "Remove Player" : "Remove Bot"}
+                          onClick={() => handleRemoveBot(position)}
+                        >
+                          <FaMinus className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
                     )}
                     {/* Dealer chip for bots */}
                     {player.isDealer && (
