@@ -33,7 +33,13 @@ export default function PlayerProfileDropdown({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       console.log('Click outside detected, target:', event.target);
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      
+      // Check if the click target is part of the dropdown menu (rendered via portal)
+      const target = event.target as Element;
+      const isDropdownMenu = target.closest('.dropdown-menu');
+      const isEmojiPicker = target.closest('.emoji-picker');
+      
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && !isDropdownMenu && !isEmojiPicker) {
         console.log('Closing dropdown due to click outside');
         setIsOpen(false);
         setShowEmojiPicker(false);
@@ -86,7 +92,7 @@ export default function PlayerProfileDropdown({
         console.log('Rendering main dropdown menu');
         return createPortal(
         <div 
-          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1" 
+          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1 dropdown-menu" 
           style={{ 
             top: dropdownPosition.top,
             left: dropdownPosition.left
@@ -145,7 +151,7 @@ export default function PlayerProfileDropdown({
       {/* Emoji Picker - rendered via portal outside component tree */}
       {showEmojiPicker && createPortal(
         <div 
-          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2" 
+          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2 emoji-picker" 
           style={{ 
             top: dropdownPosition.top - 100,
             left: dropdownPosition.left - 32
