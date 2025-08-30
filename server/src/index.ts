@@ -3668,6 +3668,7 @@ setInterval(() => {
             
             // Log completed game to DB and Discord
             console.log('[GAME COMPLETION] About to log completed game to DB and Discord for game:', game.id);
+            console.log('[GAME COMPLETION] Game league property (periodic check):', (game as any).league);
             void import('./lib/gameLogger')
               .then(({ logCompletedGameToDbAndDiscord }) => {
                 console.log('[GAME COMPLETION] Successfully imported gameLogger, calling logCompletedGameToDbAndDiscord');
@@ -3822,6 +3823,8 @@ setInterval(() => {
 // Single function to handle game completion
 async function completeGame(game: Game, winningTeamOrPlayer: number) {
   console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
+  console.log('[GAME COMPLETION] Game league property:', (game as any).league);
+  console.log('[GAME COMPLETION] Game status before:', game.status);
   
   // Set game status to FINISHED
   game.status = 'FINISHED';
@@ -3864,6 +3867,7 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
   // Log completed game to DB and Discord for league games
   console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
   console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
+  console.log('[GAME COMPLETION DEBUG] About to call logCompletedGameToDbAndDiscord for league game:', (game as any).league);
   void import('./lib/gameLogger')
     .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeamOrPlayer))
     .catch((e) => console.error('Failed to log completed game (fallback):', e));

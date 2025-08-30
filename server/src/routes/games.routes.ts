@@ -2992,6 +2992,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     
     // Send Discord results for league games (only once per game)
     if ((game as any).league && !(game as any).discordResultsSent) {
+      console.log('[DISCORD RESULTS] League game detected, attempting to send Discord embed for game:', game.id);
       try {
         const { sendLeagueGameResults } = await import('../discord-bot/bot');
         
@@ -3044,9 +3045,14 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           (global as any).discordResultsSentForGame = {};
         }
         (global as any).discordResultsSentForGame[game.id] = true;
+        
+        console.log('[DISCORD RESULTS] Successfully sent Discord embed for league game:', game.id);
       } catch (error) {
-        console.error('Failed to send Discord results:', error);
+        console.error('[DISCORD RESULTS ERROR] Failed to send Discord results for league game:', game.id, error);
+        console.error('[DISCORD RESULTS ERROR] Stack trace:', error.stack);
       }
+    } else {
+      console.log('[DISCORD RESULTS] Skipping Discord embed - league:', (game as any).league, 'already sent:', (game as any).discordResultsSent);
     }
     
   } catch (err) {
