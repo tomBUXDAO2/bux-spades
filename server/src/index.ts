@@ -961,9 +961,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (!hostReplaced && game.status !== 'COMPLETED') {
         console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
         console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
-        // Don't start seat replacement when a player intentionally leaves
-        // startSeatReplacement(game, playerIdx);
-        console.log(`[LEAVE GAME DEBUG] Skipping seat replacement for intentional leave`);
+        // Only start seat replacement for non-league games or if game is in progress
+        if (!(game as any).league || game.status !== 'WAITING') {
+          startSeatReplacement(game, playerIdx);
+          console.log(`[LEAVE GAME DEBUG] Started seat replacement for seat ${playerIdx}`);
+        } else {
+          console.log(`[LEAVE GAME DEBUG] Skipping seat replacement for league game in WAITING state`);
+        }
       } else if (game.status === 'COMPLETED') {
         console.log(`[LEAVE GAME DEBUG] Game is completed, not starting seat replacement`);
       }

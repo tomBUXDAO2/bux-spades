@@ -2619,6 +2619,11 @@ export default function GameTable({
 
   const handleConfirmLeave = () => {
     setShowLeaveConfirmation(false);
+    console.log('[GAME TABLE] User confirmed leave, emitting leave_game event');
+    if (socket && gameState?.id && user?.id) {
+      socket.emit('leave_game', { gameId: gameState.id, userId: user.id });
+    }
+    // Also call the parent's onLeaveTable for cleanup
     if (typeof onLeaveTable === 'function') {
       onLeaveTable();
     }
