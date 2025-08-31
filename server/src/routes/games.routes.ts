@@ -3782,14 +3782,33 @@ router.get('/:id/trick-history', requireAuth, async (req, res) => {
   try {
     const gameId = req.params.id;
     
-    // Find the game in memory
-    const game = games.find(g => g.id === gameId);
+    // Find the game in memory first
+    let game = games.find(g => g.id === gameId);
+    let dbGameId = gameId;
+    
+    // If game not found in memory, check database
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      console.log(`[TRICK HISTORY] Game ${gameId} not found in memory, checking database...`);
+      try {
+        const dbGame = await prisma.game.findUnique({
+          where: { id: gameId }
+        });
+        if (dbGame) {
+          console.log(`[TRICK HISTORY] Found game ${gameId} in database`);
+          dbGameId = dbGame.id;
+        } else {
+          return res.status(404).json({ error: 'Game not found' });
+        }
+      } catch (dbError) {
+        console.error('[TRICK HISTORY] Database error:', dbError);
+        return res.status(404).json({ error: 'Game not found' });
+      }
+    } else {
+      dbGameId = game.dbGameId || gameId;
     }
     
     // Get trick history from database
-    const trickHistory = await trickLogger.getGameTrickHistory(game.dbGameId || gameId);
+    const trickHistory = await trickLogger.getGameTrickHistory(dbGameId);
     
     // Transform the data to include player information
     const transformedHistory = trickHistory.map((round: any) => ({
