@@ -3036,19 +3036,31 @@ function invalidateUserSession(userId: string) {
 
 // Inactivity management functions
 function updateGameActivity(gameId: string) {
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    console.log(`[INACTIVITY] Game ${gameId} not found for activity update`);
+    return;
+  }
+  
   // Clear existing timer
   const existingTimer = tableInactivityTimers.get(gameId);
   if (existingTimer) {
     clearTimeout(existingTimer);
   }
   
-  // Set new timer
-  const timer = setTimeout(() => {
-    console.log(`[INACTIVITY] Game ${gameId} inactive for 10 minutes, closing table`);
-    closeInactiveTable(gameId);
-  }, INACTIVITY_TIMEOUT);
-  
-  tableInactivityTimers.set(gameId, timer);
+  // ONLY set inactivity timer for WAITING games
+  // Active games (BIDDING, PLAYING) should NOT have inactivity timers
+  if (game.status === 'WAITING') {
+    const timer = setTimeout(() => {
+      console.log(`[INACTIVITY] Game ${gameId} inactive for 10 minutes, closing table`);
+      closeInactiveTable(gameId);
+    }, INACTIVITY_TIMEOUT);
+    
+    tableInactivityTimers.set(gameId, timer);
+    console.log(`[INACTIVITY] Set inactivity timer for WAITING game ${gameId}`);
+  } else {
+    console.log(`[INACTIVITY] Skipping inactivity timer for active game ${gameId} (status: ${game.status})`);
+  }
 }
 
 function closeInactiveTable(gameId: string) {
@@ -3061,6 +3073,18 @@ function closeInactiveTable(gameId: string) {
   // NEVER close league games for inactivity - they are persistent
   if ((game as any).league) {
     console.log(`[INACTIVITY] LEAGUE game ${gameId} cannot be closed for inactivity - keeping alive`);
+    return;
+  }
+  
+  // NEVER close active games (BIDDING, PLAYING) for inactivity
+  if (game.status === 'BIDDING' || game.status === 'PLAYING') {
+    console.log(`[INACTIVITY] Active game ${gameId} (status: ${game.status}) cannot be closed for inactivity - keeping alive`);
+    return;
+  }
+  
+  // Only close WAITING games for inactivity
+  if (game.status !== 'WAITING') {
+    console.log(`[INACTIVITY] Game ${gameId} (status: ${game.status}) cannot be closed for inactivity - keeping alive`);
     return;
   }
   
