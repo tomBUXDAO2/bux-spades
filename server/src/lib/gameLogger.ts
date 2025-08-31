@@ -19,6 +19,12 @@ async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number
 
 export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPlayer: number) {
 	console.log('[GAME LOGGER] Starting game completion logging for game:', game.id);
+	console.log('[GAME LOGGER] Game object structure:', JSON.stringify({
+		id: game.id,
+		players: game.players?.map((p: any) => ({ id: p?.id, type: p?.type, username: p?.username })),
+		gameMode: game.gameMode,
+		status: game.status
+	}, null, 2));
 	console.log('[GAME LOGGER] Game league property:', (game as any).league);
 	console.log('[GAME LOGGER] Game mode:', game.gameMode);
 	console.log('[GAME LOGGER] Winning team/player:', winningTeamOrPlayer);
@@ -97,7 +103,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				return await prisma.game.create({
 					data: {
 						id: gameId,
-						creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
+						creatorId: game.creatorId || game.players.find((p: any) => p && p.type === 'human' && p.id)?.id || 'unknown',
 						gameMode: game.gameMode,
 						bidType: bidType as any,
 						specialRules: [],

@@ -2827,7 +2827,7 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
       
       // Find a valid human player for creatorId, or use null if no humans
       const humanPlayer = game.players.find(p => p && p.type === 'human');
-      const creatorId = humanPlayer?.id || null;
+      const creatorId = humanPlayer?.id || 'unknown';
       
       const dbGame = await prisma.game.create({
         data: {
