@@ -176,27 +176,52 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
       
       // Only log to database if this is a rated game
       if (isRated) {
-        const dbGame = await prisma.game.create({
-          data: {
-            id: newGame.id, // Use the game's ID as the database ID
+        try {
+          console.log('[GAME CREATION] Attempting to create game in database:', {
+            id: newGame.id,
             creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
             gameMode: newGame.gameMode,
             bidType: dbBidType,
-            specialRules: [],
             minPoints: newGame.minPoints,
             maxPoints: newGame.maxPoints,
             buyIn: newGame.buyIn,
-            rated: true, // This is a rated game (4 human players)
-            status: 'WAITING',
-            allowNil: newGame.rules.allowNil,
-            allowBlindNil: newGame.rules.allowBlindNil,
-            league: (newGame as any).league || false,
-            updatedAt: new Date()
-          }
-        });
-        
-        newGame.dbGameId = dbGame.id;
-        console.log('[GAME LOGGED] Rated game logged to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
+            league: (newGame as any).league || false
+          });
+          
+          const dbGame = await prisma.game.create({
+            data: {
+              id: newGame.id, // Use the game's ID as the database ID
+              creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
+              gameMode: newGame.gameMode,
+              bidType: dbBidType,
+              specialRules: [],
+              minPoints: newGame.minPoints,
+              maxPoints: newGame.maxPoints,
+              buyIn: newGame.buyIn,
+              rated: true, // This is a rated game (4 human players)
+              status: 'WAITING',
+              allowNil: newGame.rules.allowNil,
+              allowBlindNil: newGame.rules.allowBlindNil,
+              league: (newGame as any).league || false,
+              updatedAt: new Date()
+            }
+          });
+          
+          newGame.dbGameId = dbGame.id;
+          console.log('[GAME LOGGED] Rated game logged to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
+        } catch (error) {
+          console.error('[GAME CREATION ERROR] Failed to create game in database:', error);
+          console.error('[GAME CREATION ERROR] Game data:', {
+            id: newGame.id,
+            creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
+            gameMode: newGame.gameMode,
+            bidType: dbBidType,
+            minPoints: newGame.minPoints,
+            maxPoints: newGame.maxPoints,
+            buyIn: newGame.buyIn,
+            league: (newGame as any).league || false
+          });
+        }
         
         // Log all players for the rated game
         console.log('[PLAYER LOGGING] Logging players for rated game:', newGame.dbGameId);

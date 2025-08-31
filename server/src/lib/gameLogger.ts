@@ -103,7 +103,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				return await prisma.game.create({
 					data: {
 						id: gameId,
-						creatorId: game.players[0]?.id || 'unknown',
+						creatorId: game.creatorId || game.players.find((p: any) => p && p.type === 'human' && p.id)?.id || 'unknown',
 						gameMode: game.gameMode,
 						bidType: bidType as any,
 						specialRules: [],

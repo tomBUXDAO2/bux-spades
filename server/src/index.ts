@@ -23,6 +23,23 @@ import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
 import { trickLogger } from './lib/trickLogger';
 
+// EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
+process.on('uncaughtException', (error) => {
+  console.error('[EMERGENCY] Uncaught Exception:', error);
+  console.error('[EMERGENCY] Games in memory:', games.length);
+  games.forEach((game, i) => {
+    console.error(`[EMERGENCY] Game ${i}: ${game.id}, status: ${game.status}, players: ${game.players.filter(p => p).length}`);
+  });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[EMERGENCY] Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('[EMERGENCY] Games in memory:', games.length);
+  games.forEach((game, i) => {
+    console.error(`[EMERGENCY] Game ${i}: ${game.id}, status: ${game.status}, players: ${game.players.filter(p => p).length}`);
+  });
+});
+
 // Import Discord bot (only if bot token is provided and valid)
 let discordBot: any = null;
 if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_BOT_TOKEN.trim() !== '') {
@@ -978,29 +995,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         console.log(`User ${userId} left game ${gameId}`);
       }
 
-      // Check if there are any human players left
-      const hasHumanPlayers = game.players.some((p: GamePlayer | null) => p && p.type === 'human');
-      
-      console.log(`[LEAVE GAME DEBUG] Game ${gameId} - Human players remaining:`, hasHumanPlayers);
-      console.log(`[LEAVE GAME DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
-      
-      // If no human players remain, remove the game (but NEVER remove league games or active games)
-      if (!hasHumanPlayers && !(game as any).league && game.status === 'WAITING') {
-        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-        if (gameIdx !== -1) {
-          games.splice(gameIdx, 1);
-          io.emit('games_updated', games);
-          console.log(`[LEAVE GAME] Game ${gameId} removed (no human players left in non-league waiting game)`);
-        } else {
-          console.log(`[LEAVE GAME ERROR] Game ${gameId} not found in games array for removal`);
-        }
-      } else if (!hasHumanPlayers && (game as any).league) {
-        console.log(`[LEAVE GAME] LEAGUE game ${gameId} kept alive (no human players but league game)`);
-      } else if (game.status !== 'WAITING') {
-        console.log(`[LEAVE GAME] Game ${gameId} kept (game is active - status: ${game.status})`);
-      } else {
-        console.log(`[LEAVE GAME] Game ${gameId} kept (human players still present)`);
-      }
+      // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
+      console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
     } catch (error) {
       console.error('Error in leave_game:', error);
       socket.emit('error', { message: 'Internal server error' });
@@ -2504,7 +2500,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       if (playerIndex !== -1) {
         const disconnectedPlayer = game.players[playerIndex];
-        console.log('[DISCONNECT] Player disconnected from game:', disconnectedPlayer?.username, 'from game:', game.id);
+        console.log('[DISCONNECT] Player disconnected from game:', disconnectedPlayer?.username, 'from game:', game.id, 'status:', game.status);
         
         // Send system message
         if (disconnectedPlayer) {
@@ -2514,42 +2510,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           });
         }
         
-        // Check if only bots remain (but don't count disconnected players as "gone")
-        const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
-        
-        // Only delete the game if no human players remain, it's been abandoned for a while, and it's not active
-        // This prevents deleting games when players are just navigating between pages
-        // BUT NEVER delete league games or active games - they should persist
-        if (remainingHumanPlayers.length === 0 && !(game as any).league && game.status === 'WAITING') {
-          // Set a timeout to delete the game after 30 seconds if no humans rejoin
-          setTimeout(() => {
-            const gameStillExists = games.find(g => g.id === game.id);
-            if (gameStillExists) {
-              // Check if any human players have actually left the game (not just disconnected)
-              const humanPlayersStillInGame = gameStillExists.players.filter(p => p && p.type === 'human');
-              if (humanPlayersStillInGame.length === 0 && gameStillExists.status === 'WAITING') {
-                console.log('[DISCONNECT] Game abandoned for 30 seconds, closing non-league waiting game:', game.id);
-                const gameIndex = games.findIndex(g => g.id === game.id);
-                if (gameIndex !== -1) {
-                  games.splice(gameIndex, 1);
-                  io.to(game.id).emit('game_closed', { reason: 'game_abandoned' });
-                  // Update lobby for all clients
-                  const activeGames = games.filter(game => game.players.every(player => player !== null));
-                  io.emit('games_updated', activeGames);
-                }
-              } else {
-                console.log('[DISCONNECT] Human players still in game or game is active after 30 seconds, keeping game alive:', game.id);
-              }
-            }
-          }, 30000); // 30 second timeout
-        } else if (remainingHumanPlayers.length === 0 && (game as any).league) {
-          console.log('[DISCONNECT] LEAGUE game abandoned but keeping alive for rejoins:', game.id);
-          // For league games, keep them alive indefinitely - players can rejoin
-        } else if (game.status !== 'WAITING') {
-          console.log('[DISCONNECT] Game is active, keeping alive regardless of human players:', game.id, 'status:', game.status);
-        } else {
-          console.log('[DISCONNECT] Human players still in game, keeping game alive:', game.id);
-        }
+        // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
+        console.log('[DISCONNECT] EMERGENCY: Keeping ALL games alive:', game.id, 'status:', game.status);
       }
     });
   });
