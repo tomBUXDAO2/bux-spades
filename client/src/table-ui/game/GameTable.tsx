@@ -736,9 +736,9 @@ export default function GameTable({
           if (!myHand || !Array.isArray(myHand)) {
             console.log('[TIMER] No hand available for bidding, skipping auto-bid');
             return;
-                  }
+          }
         const expectedTricks = Math.max(1, Math.floor((myHand && Array.isArray(myHand) ? myHand.length : 0) / 3));
-        bid = Math.min(13, Math.max(0, expectedTricks));
+          bid = Math.min(13, Math.max(0, expectedTricks));
         }
       } else if (game.forcedBid === 'BID4NIL') {
         // 4 OR NIL: bid 4 or nil
@@ -1449,16 +1449,16 @@ export default function GameTable({
           const partnerOriginalPosition = (originalPosition + 2) % 4;
           const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
           return partner?.id === currentPlayerId && !isHuman; // Only if partner is bot
-        } else {
+      } else {
           // Host can remove any bot
           if (sanitizedPlayers[0]?.id === currentPlayerId) {
             return true;
           }
           // Human players can remove their partner bot
-          const originalPosition = player.position ?? position;
-          const partnerOriginalPosition = (originalPosition + 2) % 4;
-          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
-          return partner?.id === currentPlayerId;
+        const originalPosition = player.position ?? position;
+        const partnerOriginalPosition = (originalPosition + 2) % 4;
+        const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+        return partner?.id === currentPlayerId;
         }
       } else {
         // After game starts
@@ -1554,54 +1554,54 @@ export default function GameTable({
                 </PlayerProfileDropdown>
               ) : (
                 <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
-                  <div className="bg-gray-900 rounded-full p-0.5">
-                    <img
-                      src={displayAvatar}
-                      alt={displayName}
-                      width={avatarWidth}
-                      height={avatarHeight}
-                      className="rounded-full object-cover"
-                    />
+                <div className="bg-gray-900 rounded-full p-0.5">
+                  <img
+                    src={displayAvatar}
+                    alt={displayName}
+                    width={avatarWidth}
+                    height={avatarHeight}
+                    className="rounded-full object-cover"
+                  />
                     {/* Remove button */}
                     {canRemovePlayer && (
                       <div className="absolute -bottom-2 -left-2 z-50">
-                        <button
+                    <button
                           className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
                           title={isHuman ? "Remove Player" : "Remove Bot"}
-                          onClick={() => handleRemoveBot(position)}
-                        >
-                          <FaMinus className="w-2.5 h-2.5" />
-                        </button>
+                      onClick={() => handleRemoveBot(position)}
+                    >
+                      <FaMinus className="w-2.5 h-2.5" />
+                    </button>
                       </div>
-                    )}
-                    {/* Dealer chip for bots */}
-                    {player.isDealer && (
-                      <>
-                        {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
-                        <div className="absolute -bottom-1 -right-1">
-                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                            <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                              <span className="text-[8px] font-bold text-yellow-200">D</span>
-                            </div>
+                  )}
+                  {/* Dealer chip for bots */}
+                  {player.isDealer && (
+                    <>
+                      {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
+                      <div className="absolute -bottom-1 -right-1">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
+                          <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
+                            <span className="text-[8px] font-bold text-yellow-200">D</span>
                           </div>
                         </div>
-                      </>
-                    )}
-                    {/* Timer overlay for last 10 seconds */}
-                    {shouldShowTimerOnPlayer && (
-                      <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
                       </div>
-                    )}
-                    
-                    {/* Countdown overlay for timed out player */}
-                    {isPlayerOnCountdown && (
-                      <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
-                      </div>
-                    )}
-                  </div>
+                    </>
+                  )}
+                  {/* Timer overlay for last 10 seconds */}
+                  {shouldShowTimerOnPlayer && (
+                    <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
+                    </div>
+                  )}
+                  
+                  {/* Countdown overlay for timed out player */}
+                  {isPlayerOnCountdown && (
+                    <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
+                    </div>
+                  )}
                 </div>
+              </div>
               )}
             </div>
             <div className="flex flex-col items-center gap-1">

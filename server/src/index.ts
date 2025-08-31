@@ -984,16 +984,18 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       console.log(`[LEAVE GAME DEBUG] Game ${gameId} - Human players remaining:`, hasHumanPlayers);
       console.log(`[LEAVE GAME DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
       
-      // If no human players remain, remove the game
-      if (!hasHumanPlayers) {
+      // If no human players remain, remove the game (but NEVER remove league games)
+      if (!hasHumanPlayers && !(game as any).league) {
         const gameIdx = games.findIndex((g: Game) => g.id === gameId);
         if (gameIdx !== -1) {
           games.splice(gameIdx, 1);
           io.emit('games_updated', games);
-          console.log(`[LEAVE GAME] Game ${gameId} removed (no human players left)`);
+          console.log(`[LEAVE GAME] Game ${gameId} removed (no human players left in non-league game)`);
         } else {
           console.log(`[LEAVE GAME ERROR] Game ${gameId} not found in games array for removal`);
         }
+      } else if (!hasHumanPlayers && (game as any).league) {
+        console.log(`[LEAVE GAME] LEAGUE game ${gameId} kept alive (no human players but league game)`);
       } else {
         console.log(`[LEAVE GAME] Game ${gameId} kept (human players still present)`);
       }
@@ -1177,10 +1179,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       });
     }
     
-    // Check if only bots remain
+    // Check if only bots remain (but NEVER remove league games)
     const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
-    if (remainingHumanPlayers.length === 0) {
-      console.log('[REMOVE PLAYER] No human players remaining, closing game');
+    if (remainingHumanPlayers.length === 0 && !(game as any).league) {
+      console.log('[REMOVE PLAYER] No human players remaining, closing non-league game');
       // Remove game from games array
       const gameIndex = games.findIndex(g => g.id === gameId);
       if (gameIndex !== -1) {
@@ -1191,6 +1193,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Update lobby for all clients
       io.emit('games_updated', getActiveGames());
       return;
+    } else if (remainingHumanPlayers.length === 0 && (game as any).league) {
+      console.log('[REMOVE PLAYER] No human players remaining in LEAGUE game - keeping game alive for rejoins');
+      // For league games, keep the game alive even with no humans
+      // Players can rejoin league games
     }
     
     // Start seat replacement process (only if host wasn't replaced)
@@ -1270,6 +1276,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   socket.on('make_bid', async ({ gameId, userId, bid }) => {
     console.log('[BID DEBUG] make_bid received:', { gameId, userId, bid, socketId: socket.id });
     console.log('[BID DEBUG] Socket auth status:', { isAuthenticated: socket.isAuthenticated, userId: socket.userId });
+    
+
     
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized make_bid attempt');
@@ -2461,18 +2469,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
-    // Remove game from games array
-    const gameIndex = games.findIndex(g => g.id === gameId);
-    if (gameIndex !== -1) {
-      games.splice(gameIndex, 1);
+    // Remove game from games array (but NEVER remove league games)
+    if (!(game as any).league) {
+      const gameIndex = games.findIndex(g => g.id === gameId);
+      if (gameIndex !== -1) {
+        games.splice(gameIndex, 1);
+      }
+      
+      // Notify all clients that game is closed
+      io.to(game.id).emit('game_closed', { reason });
+      
+      // Update lobby for all clients
+      const activeGames = games.filter(game => game.players.every(player => player !== null));
+      io.emit('games_updated', activeGames);
+    } else {
+      console.log('[CLOSE TABLE] Cannot close league game - league games are persistent');
+      socket.emit('error', { message: 'Cannot close league games' });
     }
-    
-    // Notify all clients that game is closed
-    io.to(game.id).emit('game_closed', { reason });
-    
-    // Update lobby for all clients
-    const activeGames = games.filter(game => game.players.every(player => player !== null));
-    io.emit('games_updated', activeGames);
   });
 
   // Handle socket disconnection
@@ -2495,19 +2508,21 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           });
         }
         
-        // Check if only bots remain
+        // Check if only bots remain (but don't count disconnected players as "gone")
         const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
         
         // Only delete the game if no human players remain and it's been abandoned for a while
         // This prevents deleting games when players are just navigating between pages
-        if (remainingHumanPlayers.length === 0) {
+        // BUT NEVER delete league games - they should persist
+        if (remainingHumanPlayers.length === 0 && !(game as any).league) {
           // Set a timeout to delete the game after 30 seconds if no humans rejoin
           setTimeout(() => {
             const gameStillExists = games.find(g => g.id === game.id);
             if (gameStillExists) {
-              const stillNoHumans = gameStillExists.players.filter(p => p && p.type === 'human').length === 0;
-              if (stillNoHumans) {
-                console.log('[DISCONNECT] Game abandoned for 30 seconds, closing game:', game.id);
+              // Check if any human players have actually left the game (not just disconnected)
+              const humanPlayersStillInGame = gameStillExists.players.filter(p => p && p.type === 'human');
+              if (humanPlayersStillInGame.length === 0) {
+                console.log('[DISCONNECT] Game abandoned for 30 seconds, closing non-league game:', game.id);
                 const gameIndex = games.findIndex(g => g.id === game.id);
                 if (gameIndex !== -1) {
                   games.splice(gameIndex, 1);
@@ -2516,9 +2531,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                   const activeGames = games.filter(game => game.players.every(player => player !== null));
                   io.emit('games_updated', activeGames);
                 }
+              } else {
+                console.log('[DISCONNECT] Human players still in game after 30 seconds, keeping game alive:', game.id);
               }
             }
           }, 30000); // 30 second timeout
+        } else if (remainingHumanPlayers.length === 0 && (game as any).league) {
+          console.log('[DISCONNECT] LEAGUE game abandoned but keeping alive for rejoins:', game.id);
+          // For league games, keep them alive indefinitely - players can rejoin
+        } else {
+          console.log('[DISCONNECT] Human players still in game, keeping game alive:', game.id);
         }
       }
     });
@@ -3036,6 +3058,12 @@ function closeInactiveTable(gameId: string) {
     return;
   }
   
+  // NEVER close league games for inactivity - they are persistent
+  if ((game as any).league) {
+    console.log(`[INACTIVITY] LEAGUE game ${gameId} cannot be closed for inactivity - keeping alive`);
+    return;
+  }
+  
   // Remove game from games array
   const gameIndex = games.findIndex(g => g.id === gameId);
   if (gameIndex !== -1) {
@@ -3061,10 +3089,21 @@ function closeInactiveTable(gameId: string) {
 function startInactivityMonitoring() {
   console.log('[INACTIVITY] Starting inactivity monitoring system');
   
-  // Check for inactive games every minute
+  // Check for inactive games every minute (but NEVER check league games or active games)
   setInterval(() => {
     const now = Date.now();
     games.forEach(game => {
+      // Skip league games - they should never be closed for inactivity
+      if ((game as any).league) {
+        return;
+      }
+      
+      // Skip active games (BIDDING, PLAYING) - they are actively being played
+      if (game.status === 'BIDDING' || game.status === 'PLAYING') {
+        return;
+      }
+      
+      // Only check WAITING games for inactivity
       if (game.status === 'WAITING' && game.lastActivity) {
         const timeSinceActivity = now - game.lastActivity;
         if (timeSinceActivity >= INACTIVITY_TIMEOUT) {

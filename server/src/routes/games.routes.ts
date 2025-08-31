@@ -572,16 +572,18 @@ router.post('/:id/leave', requireAuth, (req, res) => {
   console.log(`[HTTP LEAVE DEBUG] Game ${game.id} - Human players remaining:`, hasHumanPlayers);
   console.log(`[HTTP LEAVE DEBUG] Current players:`, game.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`));
   
-  // If no human players remain, remove the game
-  if (!hasHumanPlayers) {
+  // If no human players remain, remove the game (but NEVER remove league games)
+  if (!hasHumanPlayers && !(game as any).league) {
     const gameIdx = games.findIndex((g: Game) => g.id === game.id);
     if (gameIdx !== -1) {
       games.splice(gameIdx, 1);
       io.emit('games_updated', games);
-      console.log(`[HTTP LEAVE] Game ${game.id} removed (no human players left)`);
+      console.log(`[HTTP LEAVE] Game ${game.id} removed (no human players left in non-league game)`);
     } else {
       console.log(`[HTTP LEAVE ERROR] Game ${game.id} not found in games array for removal`);
     }
+  } else if (!hasHumanPlayers && (game as any).league) {
+    console.log(`[HTTP LEAVE] LEAGUE game ${game.id} kept alive (no human players but league game)`);
   } else {
     console.log(`[HTTP LEAVE] Game ${game.id} kept (human players still present)`);
   }
