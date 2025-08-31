@@ -711,13 +711,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   if (onPlayerClick) {
                     onPlayerClick(player);
                   } else {
-                    setStatsPlayer({
-                      username: player.username || player.name,
-                      avatar: player.avatar || player.image || '/bot-avatar.jpg',
-                      stats: (player as any)?.stats || {},
-                      status: playerStatuses[player.id] || 'not_friend'
-                    });
-                    setIsStatsOpen(true);
+                  setStatsPlayer({
+                    username: player.username || player.name,
+                    avatar: player.avatar || player.image || '/bot-avatar.jpg',
+                    stats: (player as any)?.stats || {},
+                    status: playerStatuses[player.id] || 'not_friend'
+                  });
+                  setIsStatsOpen(true);
                   }
                 }}
               >
@@ -785,13 +785,13 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   if (onPlayerClick) {
                     onPlayerClick(spectator);
                   } else {
-                    setStatsPlayer({
-                      username: spectator.username || spectator.name,
-                      avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
-                      stats: (spectator as any)?.stats || {},
-                      status: playerStatuses[spectator.id] || 'not_friend'
-                    });
-                    setIsStatsOpen(true);
+                  setStatsPlayer({
+                    username: spectator.username || spectator.name,
+                    avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
+                    stats: (spectator as any)?.stats || {},
+                    status: playerStatuses[spectator.id] || 'not_friend'
+                  });
+                  setIsStatsOpen(true);
                   }
                 }}
               >
