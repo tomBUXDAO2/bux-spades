@@ -83,7 +83,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
 						gameMode: game.gameMode,
 						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
-						specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+						specialRules: [],
 						minPoints: game.minPoints,
 						maxPoints: game.maxPoints,
 						buyIn: game.buyIn,
