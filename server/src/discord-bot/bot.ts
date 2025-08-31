@@ -1145,6 +1145,14 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
     // Sign a short-lived JWT so the API accepts this request
     const token = jwt.sign({ userId: hostUser.id }, process.env.JWT_SECRET || '', { expiresIn: '5m' } as any);
     
+    console.log('[DISCORD BOT] Making API call to create game with data:', {
+      creatorId: gameData.creatorId,
+      creatorName: gameData.creatorName,
+      gameMode: gameData.gameMode,
+      biddingOption: gameData.biddingOption,
+      players: gameData.players.length
+    });
+    
     // Make API call to create game
     const response = await fetch(`${INTERNAL_API_URL}/api/games`, {
       method: 'POST',
@@ -1154,6 +1162,8 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       },
       body: JSON.stringify(gameData)
     });
+    
+    console.log('[DISCORD BOT] API response status:', response.status);
     
     if (response.ok) {
       const game = await response.json() as any;

@@ -2791,9 +2791,13 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
       const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const now = new Date();
       
-      // Find a valid human player for creatorId, or use null if no humans
+      // Find a valid human player for creatorId
       const humanPlayer = game.players.find(p => p && p.type === 'human');
-      const creatorId = humanPlayer?.id || 'unknown';
+      if (!humanPlayer) {
+        console.log('[SEAT REPLACEMENT] No human players found, skipping database logging');
+        return;
+      }
+      const creatorId = humanPlayer.id;
       
       const dbGame = await prisma.game.create({
         data: {
