@@ -1164,11 +1164,21 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       
       // Build game line format: "100k Partners 100/-100 Regular nil tick bn cross"
       const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
-      let gameLineFormat = `${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.charAt(0).toUpperCase() + gameLine.gameMode.slice(1)} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.charAt(0).toUpperCase() + gameLine.gameType.slice(1)}`;
+      let gameLineFormat = `${gameLine.coins >= 1000000 ? `${gameLine.coins / 1000000}M` : `${gameLine.coins / 1000}k`} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
       
-      // Add nil and blind nil indicators
+      // Add special rules to game line format
+      const specialRules = [];
+      if (gameLine.screamer === 'yes') specialRules.push('SCREAMER');
+      if (gameLine.assassin === 'yes') specialRules.push('ASSASSIN');
+      
+      // Add nil/blind nil settings only for regular games
       if (gameLine.gameType === 'regular') {
-        gameLineFormat += ` nil ${gameLine.nil === 'yes' ? '☑️' : '❌'} bn ${gameLine.blindNil === 'yes' ? '☑️' : '❌'}`;
+        if (gameLine.nil === 'no') specialRules.push('NO NIL');
+        if (gameLine.blindNil === 'yes') specialRules.push('BLIND NIL');
+      }
+      
+      if (specialRules.length > 0) {
+        gameLineFormat += `\n**Special Rules:** ${specialRules.join(' + ')}`;
       }
       
       // Build team info
