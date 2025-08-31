@@ -1571,11 +1571,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     }
     
     // Validate card is in player's hand
-    if (!game.hands) {
-      socket.emit('error', { message: 'Invalid hand state' });
+    if (!game.hands || !Array.isArray(game.hands)) {
+      socket.emit('error', { message: 'Invalid hand state - hands not initialized' });
       return;
     }
     const hands = game.hands.filter((h): h is Card[] => h !== null && h !== undefined);
+    if (hands.length !== 4) {
+      socket.emit('error', { message: 'Invalid hand state - hands array incomplete' });
+      return;
+    }
     const hand = hands[playerIndex]!;
     if (!hand || hand.length === 0) {
       socket.emit('error', { message: 'Invalid hand state' });
