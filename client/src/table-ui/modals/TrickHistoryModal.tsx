@@ -25,13 +25,15 @@ interface TrickHistoryModalProps {
   onClose: () => void;
   gameId: string;
   players: any[];
+  gameState?: any; // Add gameState prop
 }
 
 const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
   isOpen,
   onClose,
   gameId,
-  players
+  players,
+  gameState
 }) => {
   const [trickHistory, setTrickHistory] = useState<Round[]>([]);
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
@@ -39,52 +41,72 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && gameId) {
+    if (isOpen && gameId && gameState) {
       fetchTrickHistory();
     }
-  }, [isOpen, gameId]);
+  }, [isOpen, gameId, gameState]);
 
-  const fetchTrickHistory = async () => {
+  const fetchTrickHistory = () => {
     setLoading(true);
     try {
-      console.log('[TRICK HISTORY] Fetching trick history for game:', gameId);
-      const response = await fetch(`/api/games/${gameId}/trick-history`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      console.log('[TRICK HISTORY] Getting current hand trick history from game state');
       
-      console.log('[TRICK HISTORY] Response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[TRICK HISTORY] Received data:', data);
-        console.log('[TRICK HISTORY] Trick history length:', data.trickHistory?.length || 0);
-        
-        if (data.trickHistory && data.trickHistory.length > 0) {
-          console.log('[TRICK HISTORY] First round tricks:', data.trickHistory[0].tricks?.length || 0);
-          setTrickHistory(data.trickHistory);
-          
-          // Start with the most recent trick
-          const lastRound = data.trickHistory[data.trickHistory.length - 1];
-          setCurrentRoundIndex(data.trickHistory.length - 1);
-          setCurrentTrickIndex(lastRound.tricks.length - 1);
-        } else {
-          console.log('[TRICK HISTORY] No trick history data available');
-          setTrickHistory([]);
-        }
-      } else {
-        console.error('[TRICK HISTORY] Response not ok:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('[TRICK HISTORY] Error response:', errorText);
+      if (!gameState || !gameState.play || !gameState.play.tricks) {
+        console.log('[TRICK HISTORY] No current game state or tricks available');
         setTrickHistory([]);
+        return;
       }
+      
+      const currentTricks = gameState.play.tricks;
+      console.log('[TRICK HISTORY] Current tricks:', currentTricks.length);
+      
+      if (currentTricks.length === 0) {
+        console.log('[TRICK HISTORY] No tricks played yet in current hand');
+        setTrickHistory([]);
+        return;
+      }
+      
+      // Transform current game tricks to the expected format
+      const transformedTricks = currentTricks.map((trick: any, index: number) => ({
+        trickNumber: index + 1,
+        leadPlayerId: trick.cards[0]?.playedBy || players[0]?.id || '',
+        winningPlayerId: players[trick.winnerIndex]?.id || '',
+        cards: trick.cards.map((card: any, cardIndex: number) => ({
+          suit: card.suit,
+          value: getCardValue(card.rank),
+          position: cardIndex,
+          playerId: card.playedBy || players[card.playerIndex || 0]?.id || ''
+        }))
+      }));
+      
+      // Create a single round with current hand tricks
+      const currentRound = {
+        roundNumber: 1, // Current hand
+        tricks: transformedTricks
+      };
+      
+      console.log('[TRICK HISTORY] Transformed current hand:', currentRound);
+      setTrickHistory([currentRound]);
+      
+      // Start with the most recent trick
+      setCurrentRoundIndex(0);
+      setCurrentTrickIndex(transformedTricks.length - 1);
+      
     } catch (error) {
-      console.error('[TRICK HISTORY] Failed to fetch trick history:', error);
+      console.error('[TRICK HISTORY] Failed to get current hand trick history:', error);
       setTrickHistory([]);
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function to get card value
+  const getCardValue = (rank: string): number => {
+    const values: { [key: string]: number } = {
+      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+      'J': 11, 'Q': 12, 'K': 13, 'A': 14
+    };
+    return values[rank] || 0;
   };
 
   const getCardDisplay = (card: Card) => {

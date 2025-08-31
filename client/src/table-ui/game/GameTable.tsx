@@ -3624,6 +3624,7 @@ export default function GameTable({
           onClose={() => setShowTrickHistory(false)}
           gameId={gameState.id}
           players={sanitizedPlayers}
+          gameState={gameState}
         />
 
       </div>

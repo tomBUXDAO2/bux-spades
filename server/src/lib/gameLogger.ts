@@ -26,8 +26,25 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 	try {
 		// Determine settings
 		const gameMode = game.gameMode;
-		const bidType = game.rules?.bidType || 'REGULAR';
+		const rawBidType = game.rules?.bidType || 'REGULAR';
 		const specialRules = game.specialRules || {};
+		
+		// Convert bidType to proper enum values
+		let bidType: string;
+		switch (rawBidType) {
+			case 'REG':
+				bidType = 'REGULAR';
+				break;
+			case 'MIRROR':
+				bidType = 'MIRRORS';
+				break;
+			case 'WHIZ':
+			case 'GIMMICK':
+				bidType = rawBidType;
+				break;
+			default:
+				bidType = 'REGULAR';
+		}
 		const solo = gameMode === 'SOLO';
 		const whiz = bidType === 'WHIZ';
 		const mirror = bidType === 'MIRROR';
@@ -58,7 +75,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					return await prisma.game.update({
 						where: { id: game.dbGameId },
 						data: {
-							bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+							bidType: bidType as any,
 							specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
 							status: 'FINISHED'
 						}
@@ -82,7 +99,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						id: gameId,
 						creatorId: game.players.find((p: any) => p && p.type === 'human')?.id || 'unknown',
 						gameMode: game.gameMode,
-						bidType: (bidType === 'MIRROR' ? 'MIRRORS' : bidType) as any,
+						bidType: bidType as any,
 						specialRules: [],
 						minPoints: game.minPoints,
 						maxPoints: game.maxPoints,
