@@ -82,7 +82,12 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						where: { id: game.dbGameId },
 						data: {
 							bidType: bidType as any,
-							specialRules: (Object.keys(specialRules).filter((key) => !!specialRules[key]) as any[]).map((key) => key.toUpperCase()) as any[],
+							specialRules: (() => {
+								const rules: string[] = [];
+								if (specialRules.screamer) rules.push('SCREAMER');
+								if (specialRules.assassin) rules.push('ASSASSIN');
+								return rules;
+							})(),
 							status: 'FINISHED'
 						}
 					});
