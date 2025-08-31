@@ -77,7 +77,7 @@ router.get(
   '/auth/discord/connections',
   (req, res) => {
     const clientId = process.env.DISCORD_CLIENT_ID;
-    const redirectUri = `${process.env.CLIENT_URL}/api/auth/connections/callback`;
+    const redirectUri = `${process.env.SERVER_URL || 'https://bux-spades-server.fly.dev'}/api/auth/connections/callback`;
     const scope = 'connections identify';
     
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
@@ -108,16 +108,28 @@ router.get(
           client_secret: process.env.DISCORD_CLIENT_SECRET!,
           grant_type: 'authorization_code',
           code: code as string,
-          redirect_uri: `${process.env.CLIENT_URL}/api/auth/connections/callback`,
+          redirect_uri: `${process.env.SERVER_URL || 'https://bux-spades-server.fly.dev'}/api/auth/connections/callback`,
         }),
       });
 
       const tokenData = await tokenResponse.json() as any;
       
       console.log('Full token data received:', tokenData);
+      console.log('Token response status:', tokenResponse.status);
+      console.log('Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
       
       if (!tokenData.access_token) {
-        return res.status(400).json({ error: 'Failed to get access token' });
+        console.error('OAuth2 token exchange failed:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: tokenData.error,
+          errorDescription: tokenData.error_description,
+          fullResponse: tokenData
+        });
+        return res.status(400).json({ 
+          error: 'Failed to get access token',
+          details: tokenData.error_description || tokenData.error || 'Unknown OAuth2 error'
+        });
       }
 
       // Get user connections
