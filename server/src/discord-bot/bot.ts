@@ -187,10 +187,11 @@ async function checkAndUpdateUserRole(userId: string): Promise<void> {
     
     const guild = client.guilds.cache.get(GUILD_ID);
     if (!guild) {
-      console.error('Guild not found');
+      console.error(`❌ Guild not found! GUILD_ID: ${GUILD_ID}`);
+      console.error(`Available guilds: ${Array.from(client.guilds.cache.keys()).join(', ')}`);
       return;
     }
-    console.log(`Found guild: ${guild.name}`);
+    console.log(`✅ Found guild: ${guild.name} (${guild.id})`);
     
     const member = await guild.members.fetch(userId);
     console.log(`Found member: ${member.user.username} (${member.id})`);
@@ -285,6 +286,20 @@ async function postVerificationEmbed(): Promise<void> {
 client.once(Events.ClientReady, () => {
   console.log(`Discord bot logged in as ${client.user?.tag}`);
   console.log(`Monitoring guild: ${GUILD_ID}`);
+  
+  // Debug: List all guilds the bot can see
+  console.log('Available guilds:');
+  client.guilds.cache.forEach((guild, id) => {
+    console.log(`- ${guild.name} (${id})`);
+  });
+  
+  // Check if our target guild is accessible
+  const targetGuild = client.guilds.cache.get(GUILD_ID);
+  if (targetGuild) {
+    console.log(`✅ Target guild found: ${targetGuild.name}`);
+  } else {
+    console.log(`❌ Target guild NOT found! Available guilds: ${Array.from(client.guilds.cache.keys()).join(', ')}`);
+  }
   
   // Verification embed is now posted manually when needed
   // postVerificationEmbed();
