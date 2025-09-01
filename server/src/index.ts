@@ -1515,13 +1515,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (nextPlayer && nextPlayer.type === 'human') {
         console.log(`[TIMEOUT DEBUG] Starting timeout for human player ${nextPlayer.username}`);
         startTurnTimeout(game, next, 'bidding');
-      }
-      
-      // Start turn timeout for human players (duplicate code removed)
-      console.log(`[TIMEOUT DEBUG] Next player: ${nextPlayer?.username}, type: ${nextPlayer?.type}, index: ${next}`);
-      if (nextPlayer && nextPlayer.type === 'human') {
-        console.log(`[TIMEOUT DEBUG] Starting timeout for human player ${nextPlayer.username}`);
-        startTurnTimeout(game, next, 'bidding');
       } else {
         console.log(`[TIMEOUT DEBUG] Not starting timeout - player is bot or null`);
       }
@@ -1539,7 +1532,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     io.to(game.id).emit('game_update', enrichGameForClient(game));
     
     // Also emit bidding_update for immediate UI feedback if still in bidding phase
-    if (game.status === 'PLAYING') {
+    if (game.bidding && game.bidding.bids && !game.bidding.bids.every(b => b !== null)) {
       io.to(game.id).emit('bidding_update', {
         currentBidderIndex: game.bidding.currentBidderIndex,
         bids: game.bidding.bids,
