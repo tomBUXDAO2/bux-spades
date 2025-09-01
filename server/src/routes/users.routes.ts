@@ -53,7 +53,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       where: { userId },
       include: {
         Game: {
-          select: { gameMode: true, bidType: true, specialRules: true, screamer: true, assassin: true, status: true }
+          select: { gameMode: true, bidType: true, specialRules: true, status: true }
         }
       }
     });
@@ -123,8 +123,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
       
       // Special rules
-      const hasScreamer = g?.screamer === true || (Array.isArray(g?.specialRules) && g.specialRules.includes('SCREAMER'));
-      const hasAssassin = g?.assassin === true || (Array.isArray(g?.specialRules) && g.specialRules.includes('ASSASSIN'));
+      const hasScreamer = Array.isArray(g?.specialRules) && g.specialRules.includes('SCREAMER');
+      const hasAssassin = Array.isArray(g?.specialRules) && g.specialRules.includes('ASSASSIN');
       if (hasScreamer) {
         special.SCREAMER.played++;
         if (gp.won) special.SCREAMER.won++;
