@@ -512,7 +512,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.editReply(`✅ You have joined the game! You are seat ${seat}.`);
           
           // Check if game is full and create it
-          if (gameLine.players.length === 4) {
+          if (gameLine.players.length >= 4) {
             await createGameAndNotifyPlayers(interaction.message, gameLine);
           }
           
