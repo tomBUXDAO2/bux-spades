@@ -28,8 +28,8 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
     const discordUser = await discordUserResponse.json();
     
     // Get current nickname (global_name) or username
-    const currentNickname = discordUser.global_name || discordUser.username;
-    const currentAvatar = discordUser.avatar;
+    const currentNickname = (discordUser as any).global_name || (discordUser as any).username;
+    const currentAvatar = (discordUser as any).avatar;
 
     // Check if we need to update
     const avatarUrl = currentAvatar ? `https://cdn.discordapp.com/avatars/${user.discordId}/${currentAvatar}.png` : '/default-pfp.jpg';

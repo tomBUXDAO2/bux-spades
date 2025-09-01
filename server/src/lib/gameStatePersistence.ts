@@ -24,11 +24,10 @@ export async function saveGameState(game: Game): Promise<void> {
       } : null),
       currentRound: game.currentRound || 1,
       currentTrick: game.currentTrick || 1,
-      currentPlayer: game.currentPlayer?.id || null,
+      currentPlayer: typeof game.currentPlayer === 'string' ? game.currentPlayer : game.currentPlayer?.id || null,
       dealer: game.dealer || 0,
       status: game.status,
       gameMode: game.gameMode,
-      bidType: game.bidType,
       minPoints: game.minPoints,
       maxPoints: game.maxPoints,
       buyIn: game.buyIn,
@@ -53,7 +52,7 @@ export async function saveGameState(game: Game): Promise<void> {
       data: {
         currentRound: game.currentRound || 1,
         currentTrick: game.currentTrick || 1,
-        currentPlayer: game.currentPlayer?.id || null,
+        currentPlayer: typeof game.currentPlayer === 'string' ? game.currentPlayer : game.currentPlayer?.id || null,
         dealer: game.dealer || 0,
         gameState: gameState,
         lastActionAt: new Date(),
@@ -87,12 +86,12 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       }
     });
 
-    if (!dbGame || !dbGame.gameState) {
+    if (!dbGame || !(dbGame as any).gameState) {
       console.log(`[GAME STATE] No saved state found for game ${gameId}`);
       return null;
     }
 
-    const gameState = dbGame.gameState as any;
+    const gameState = (dbGame as any).gameState as any;
     
     // Reconstruct the game object
     const game: Game = {
@@ -109,7 +108,6 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       dealer: gameState.dealer || 0,
       status: gameState.status,
       gameMode: gameState.gameMode,
-      bidType: gameState.bidType,
       minPoints: gameState.minPoints,
       maxPoints: gameState.maxPoints,
       buyIn: gameState.buyIn,
@@ -147,7 +145,7 @@ export async function restoreAllActiveGames(): Promise<Game[]> {
     const activeGames = await prisma.game.findMany({
       where: {
         status: {
-          in: ['PLAYING', 'BIDDING']
+          in: ['PLAYING', 'BIDDING' as any]
         }
       }
     });
@@ -190,7 +188,7 @@ export async function checkForStuckGames(): Promise<void> {
     const stuckGames = await prisma.game.findMany({
       where: {
         status: {
-          in: ['PLAYING', 'BIDDING']
+          in: ['PLAYING', 'BIDDING' as any]
         },
         lastActionAt: {
           lt: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
@@ -199,7 +197,7 @@ export async function checkForStuckGames(): Promise<void> {
     });
 
     for (const stuckGame of stuckGames) {
-      console.log(`[STUCK GAME] Found stuck game ${stuckGame.id} - last action: ${stuckGame.lastActionAt}`);
+      console.log(`[STUCK GAME] Found stuck game ${stuckGame.id} - last action: ${(stuckGame as any).lastActionAt}`);
       
       // Auto-complete the game or reset it
       await prisma.game.update({

@@ -73,7 +73,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		}
 
 		// Update existing Game row for completion snapshot
-		let dbGame;
+		  let dbGame: any;
 		if (game.dbGameId) {
 			try {
 				// Update existing game record with retry
@@ -82,12 +82,12 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						where: { id: game.dbGameId },
 						data: {
 							bidType: bidType as any,
-							specialRules: (() => {
-								const rules: string[] = [];
-								if (specialRules.screamer) rules.push('SCREAMER');
-								if (specialRules.assassin) rules.push('ASSASSIN');
-								return rules;
-							})(),
+							        specialRules: (() => {
+          const rules: any[] = [];
+          if (specialRules.screamer) rules.push('SCREAMER');
+          if (specialRules.assassin) rules.push('ASSASSIN');
+          return rules;
+        })(),
 							status: 'FINISHED'
 						}
 					});

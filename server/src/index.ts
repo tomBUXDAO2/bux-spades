@@ -12,7 +12,7 @@ import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
 import { syncDiscordUserData } from './lib/discordSync';
-import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from './lib/gameStatePersistence';
+// import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from './lib/gameStatePersistence';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
@@ -1380,7 +1380,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Save game state immediately when game starts
       try {
-        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+        console.log('[GAME STATE] Game started - state saving disabled for now');
       } catch (err) {
         console.error('Failed to save game state at start:', err);
       }
@@ -1762,7 +1762,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Save game state after each trick completion
       try {
-        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+        console.log('[GAME STATE] Trick completed - state saving disabled for now');
       } catch (err) {
         console.error('Failed to save game state after trick:', err);
       }
@@ -3670,25 +3670,16 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   // Restore active games from database after server restart
   console.log('🔄 Server restarted - restoring active games from database...');
   try {
-    const restoredGames = await restoreAllActiveGames();
-    restoredGames.forEach(game => {
-      games.push(game);
-      console.log(`✅ Restored game ${game.id} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
-    });
-    console.log(`✅ Restored ${restoredGames.length} active games`);
+    console.log('✅ Server restarted successfully - game state persistence disabled for now');
   } catch (error) {
     console.error('❌ Failed to restore active games:', error);
   }
   
   // Start auto-saving game state
-  startGameStateAutoSave(games);
-  console.log('💾 Game state auto-save enabled (every 30 seconds)');
+  console.log('💾 Game state auto-save disabled for now');
   
   // Start stuck game checker
-  setInterval(() => {
-    checkForStuckGames();
-  }, 60000); // Check every minute
-  console.log('🔍 Stuck game checker enabled (every minute)');
+  console.log('🔍 Stuck game checker disabled for now');
 });
 
 // Add helper to ensure leagueReady array exists
