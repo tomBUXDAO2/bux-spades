@@ -721,7 +721,7 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
     }
   }
   
-  game.status = 'BIDDING';
+  game.status = 'PLAYING';
   
   // --- Dealer assignment and card dealing ---
   const dealerIndex = assignDealer(game.players, game.dealerIndex);
@@ -1265,7 +1265,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
     console.log('[BOT DEBUG] Player is human, acting for timeout:', bot.username);
   }
   // Only act if it's the bot's turn to bid
-  if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
+      if (game.status === 'PLAYING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
     setTimeout(() => {
       if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
@@ -3342,7 +3342,7 @@ export function enrichGameForClient(game: Game, userId?: string): Game {
 
   // Patch: Always set top-level currentPlayer for frontend
   let currentPlayer: string | undefined = undefined;
-  if (game.status === 'BIDDING' && game.bidding) {
+      if (game.status === 'PLAYING' && game.bidding) {
     currentPlayer = game.bidding.currentPlayer ?? '';
   } else if (game.status === 'PLAYING' && game.play) {
     currentPlayer = game.play.currentPlayer ?? '';
