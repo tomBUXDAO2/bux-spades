@@ -920,6 +920,9 @@ export default function GameTable({
   // Use the windowSize hook to get responsive information
   const windowSize = useWindowSize();
   
+  // Check if we need to scale down for very small screens (height <= 349px)
+  const isVerySmallScreen = windowSize.height <= 349;
+  
   // Use gameState for all game data
   const [gameState, setGameState] = useState(game);
   
@@ -1218,6 +1221,9 @@ export default function GameTable({
       // Check if this specific player is the current player (timing out)
       const isCurrentPlayer = player && player.id === gameState.currentPlayer;
       const shouldShowTimerOnPlayer = isPlayerOnCountdown && isCurrentPlayer; // Only overlay on current player's PFP when server sends countdown
+    
+
+    
     // Define getPositionClasses FIRST
     const getPositionClasses = (pos: number): string => {
       // Base positioning - moved to edge of table
@@ -1249,7 +1255,8 @@ export default function GameTable({
       return (
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
           <button
-            className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition"
+            className={`${isVerySmallScreen ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-slate-600 border border-slate-300 text-slate-200 flex items-center justify-center hover:bg-slate-500 transition`}
+            style={{ fontSize: isVerySmallScreen ? '10px' : '16px' }}
             onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatar })}
           >
             JOIN
@@ -1268,17 +1275,17 @@ export default function GameTable({
       return (
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
           <button
-            className="w-16 h-16 rounded-full bg-gray-600 border border-slate-300 text-white flex flex-col items-center justify-center hover:bg-gray-500 transition disabled:opacity-50 p-0 py-1"
+            className={`${isVerySmallScreen ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-gray-600 border border-slate-300 text-white flex flex-col items-center justify-center hover:bg-gray-500 transition disabled:opacity-50 p-0 py-1`}
             onClick={() => handleInviteBot(position)}
             disabled={invitingBotSeat === position}
-            style={{ fontSize: '10px', lineHeight: 1.1 }}
+            style={{ fontSize: isVerySmallScreen ? '8px' : '10px', lineHeight: 1.1 }}
           >
-            <span className="text-[10px] leading-tight mb-0">Invite</span>
+            <span className={`${isVerySmallScreen ? 'text-[8px]' : 'text-[10px]'} leading-tight mb-0`}>Invite</span>
             <span className="flex items-center justify-center my-0">
-              <span className="text-lg font-bold mr-0.5">+</span>
-              <FaRobot className="w-4 h-4" />
+              <span className={`${isVerySmallScreen ? 'text-sm' : 'text-lg'} font-bold mr-0.5`}>+</span>
+              <FaRobot className={isVerySmallScreen ? "w-3 h-3" : "w-4 h-4"} />
             </span>
-            <span className="text-[10px] leading-tight mt-0">{invitingBotSeat === position ? '...' : 'Bot'}</span>
+            <span className={`${isVerySmallScreen ? 'text-[8px]' : 'text-[10px]'} leading-tight mt-0`}>{invitingBotSeat === position ? '...' : 'Bot'}</span>
           </button>
         </div>
       );
@@ -1289,8 +1296,8 @@ export default function GameTable({
     // Shared variables for both bots and humans
     const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
     const isSideSeat = position === 1 || position === 3;
-    const avatarWidth = isMobile ? 32 : 40;
-    const avatarHeight = isMobile ? 32 : 40;
+    const avatarWidth = isVerySmallScreen ? 24 : (isMobile ? 32 : 40);
+    const avatarHeight = isVerySmallScreen ? 24 : (isMobile ? 32 : 40);
     
     // Determine game mode early for color selection
     const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
@@ -1484,7 +1491,7 @@ export default function GameTable({
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
           transition-all duration-200
         `}>
-          <div className={isSideSeat ? "flex flex-col items-center p-1.5 gap-1.5" : "flex items-center p-1.5 gap-1.5"}>
+          <div className={isSideSeat ? `flex flex-col items-center ${isVerySmallScreen ? 'p-1 gap-1' : 'p-1.5 gap-1.5'}` : `flex items-center ${isVerySmallScreen ? 'p-1 gap-1' : 'p-1.5 gap-1.5'}`}>
             <div className="relative">
               {isHuman ? (
                 <PlayerProfileDropdown
@@ -1515,11 +1522,11 @@ export default function GameTable({
                       {canRemovePlayer && (
                         <div className="absolute -bottom-2 -left-2 z-50">
                           <button
-                            className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
+                            className={`${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition`}
                             title={isHuman ? "Remove Player" : "Remove Bot"}
                             onClick={() => handleRemoveBot(position)}
                           >
-                            <FaMinus className="w-2.5 h-2.5" />
+                            <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
                           </button>
                         </div>
                       )}
@@ -1528,9 +1535,9 @@ export default function GameTable({
                         <>
                           {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
                           <div className="absolute -bottom-1 -right-1">
-                            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                              <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                                <span className="text-[8px] font-bold text-yellow-200">D</span>
+                            <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
+                              <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
+                                <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
                               </div>
                             </div>
                           </div>
@@ -1566,11 +1573,11 @@ export default function GameTable({
                     {canRemovePlayer && (
                       <div className="absolute -bottom-2 -left-2 z-50">
                     <button
-                          className="w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition"
+                          className={`${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition`}
                           title={isHuman ? "Remove Player" : "Remove Bot"}
                       onClick={() => handleRemoveBot(position)}
                     >
-                      <FaMinus className="w-2.5 h-2.5" />
+                      <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
                     </button>
                       </div>
                   )}
@@ -1579,9 +1586,9 @@ export default function GameTable({
                     <>
                       {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
                       <div className="absolute -bottom-1 -right-1">
-                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md">
-                          <div className="w-4 h-4 rounded-full bg-yellow-600 flex items-center justify-center">
-                            <span className="text-[8px] font-bold text-yellow-200">D</span>
+                        <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
+                          <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
+                            <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
                           </div>
                         </div>
                       </div>
@@ -1604,28 +1611,28 @@ export default function GameTable({
               </div>
               )}
             </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-full px-2 py-1 rounded-lg shadow-sm" style={{ width: isMobile ? '50px' : '70px' }}>
-                <div className="text-white font-medium truncate text-center" style={{ fontSize: isMobile ? '9px' : '11px' }}>
+            <div className={`flex flex-col items-center ${isVerySmallScreen ? 'gap-0.5' : 'gap-1'}`}>
+              <div className="w-full px-2 py-1 rounded-lg shadow-sm" style={{ width: isVerySmallScreen ? '40px' : (isMobile ? '50px' : '70px') }}>
+                <div className="text-white font-medium truncate text-center" style={{ fontSize: isVerySmallScreen ? '7px' : (isMobile ? '9px' : '11px') }}>
                   {displayName}
                 </div>
               </div>
               {/* Bid/Trick counter for bots, same as humans */}
               <div className="bg-white rounded-full px-2 py-1 shadow-inner flex items-center justify-center gap-1"
                    style={{ 
-                     width: isMobile ? '60px' : '80px',
-                     minWidth: isMobile ? '60px' : '80px',
-                     height: isMobile ? '24px' : '28px',
-                     minHeight: isMobile ? '24px' : '28px'
+                     width: isVerySmallScreen ? '45px' : (isMobile ? '60px' : '80px'),
+                     minWidth: isVerySmallScreen ? '45px' : (isMobile ? '60px' : '80px'),
+                     height: isVerySmallScreen ? '20px' : (isMobile ? '24px' : '28px'),
+                     minHeight: isVerySmallScreen ? '20px' : (isMobile ? '24px' : '28px')
                    }}>
-                <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: 600, color: 'black', minWidth: isMobile ? '8px' : '10px', textAlign: 'center' }}>
+                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
                   {gameState.status === "WAITING" ? "0" : madeCount}
                 </span>
-                <span style={{ fontSize: isMobile ? '11px' : '13px', color: 'black' }}>/</span>
-                <span style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: 600, color: 'black', minWidth: isMobile ? '8px' : '10px', textAlign: 'center' }}>
+                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), color: 'black' }}>/</span>
+                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
                   {gameState.status === "WAITING" ? "0" : bidCount}
                 </span>
-                <span style={{ fontSize: isMobile ? '12px' : '14px', minWidth: isMobile ? '12px' : '14px', textAlign: 'center' }}>
+                <span style={{ fontSize: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), minWidth: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), textAlign: 'center' }}>
                   {madeStatus}
                 </span>
               </div>
@@ -3279,7 +3286,7 @@ export default function GameTable({
               </div>
               
               {/* Scoreboard in top right corner - inside the table */}
-              <div className="absolute top-4 right-4 z-10 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg">
+              <div className={`absolute z-10 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg ${isVerySmallScreen ? 'top-[-6px] right-[-4px]' : 'top-4 right-4'}`}>
                 {gameState.gameMode === 'SOLO' ? (
                   // Solo mode - 4 individual players in 2 columns
                   <div className="grid grid-cols-2 gap-2">
