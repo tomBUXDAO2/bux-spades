@@ -2143,7 +2143,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
               where: { id: game.dbGameId },
               data: {
                 status: 'PLAYING',
-                finalScore: maxScore,
+                // finalScore: maxScore, // Field doesn't exist in schema
                 winner: winningPlayerIndex
               }
             }).catch((e) => console.error('[ROUND PERSIST SOLO] prisma update failed:', e));
@@ -2247,7 +2247,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
                   status: 'PLAYING',
                   // Store cumulative totals into auxiliary fields
                   // Using finalScore as latest leading score allows recovery
-                  finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
+                  // finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0), // Field doesn't exist in schema
                   winner: game.team1TotalScore! >= game.team2TotalScore! ? 1 : 2
                 }
               }).catch((e) => console.error('[ROUND PERSIST] prisma update failed:', e));

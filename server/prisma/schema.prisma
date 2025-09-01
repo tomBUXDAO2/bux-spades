@@ -32,25 +32,25 @@ model Friend {
 }
 
 model Game {
-  id           String        @id
-  creatorId    String
-  status       GameStatus    @default(WAITING)
-  gameMode     GameMode
-  bidType      BidType
-  specialRules SpecialRule[]
-  minPoints    Int
-  maxPoints    Int
-  buyIn        Int
-  rated        Boolean       @default(false)
-  allowNil     Boolean       @default(true)
-  allowBlindNil Boolean      @default(false)
-  league       Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime
-  User         User?         @relation(fields: [creatorId], references: [id])
-  GamePlayer   GamePlayer[]
-  GameResult   GameResult?
-  Round        Round[]
+  id            String        @id
+  creatorId     String
+  status        GameStatus    @default(WAITING)
+  gameMode      GameMode
+  bidType       BidType
+  specialRules  SpecialRule[]
+  minPoints     Int
+  maxPoints     Int
+  buyIn         Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  rated         Boolean       @default(false)
+  allowNil      Boolean       @default(true)
+  allowBlindNil Boolean       @default(false)
+  league        Boolean       @default(false)
+  User          User          @relation(fields: [creatorId], references: [id])
+  GamePlayer    GamePlayer[]
+  GameResult    GameResult?
+  Round         Round[]
 }
 
 model GamePlayer {
