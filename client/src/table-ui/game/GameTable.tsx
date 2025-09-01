@@ -1501,6 +1501,7 @@ export default function GameTable({
                   onShowEmojiPicker={() => {}}
                   onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
                   onSendEmoji={(emoji) => handleSendEmoji(player.id, emoji)}
+                  playerPosition={position}
                 >
                   <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
                     <div className="bg-gray-900 rounded-full p-0.5 relative">

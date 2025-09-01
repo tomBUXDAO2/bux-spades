@@ -14,6 +14,7 @@ interface PlayerProfileDropdownProps {
   onEmojiReaction: (emoji: string) => void;
   onSendEmoji?: (emoji: string) => void;
   children: React.ReactNode;
+  playerPosition?: number; // Add player position for positioning adjustments
 }
 
 const EMOJI_OPTIONS = [
@@ -26,7 +27,8 @@ export default function PlayerProfileDropdown({
   onShowEmojiPicker,
   onEmojiReaction,
   onSendEmoji,
-  children
+  children,
+  playerPosition
 }: PlayerProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -93,6 +95,19 @@ export default function PlayerProfileDropdown({
                 top = rect.top - 60;
                 left = rect.left + (rect.width / 2) - 64;
                 console.log('Positioning dropdown above profile picture');
+              }
+              
+              // Adjust positioning for left and right players to keep dropdowns within table
+              if (playerPosition === 1) {
+                // Left player (West) - move dropdown down and to the right
+                top += 20; // Move down by 20px
+                left += 20; // Move right by 20px
+                console.log('Adjusting dropdown for left player (West)');
+              } else if (playerPosition === 3) {
+                // Right player (East) - move dropdown down and to the left
+                top += 20; // Move down by 20px
+                left -= 20; // Move left by 20px
+                console.log('Adjusting dropdown for right player (East)');
               }
               
               setDropdownPosition({ top, left });
