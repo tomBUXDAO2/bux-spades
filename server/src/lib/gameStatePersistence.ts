@@ -164,7 +164,7 @@ export async function restoreAllActiveGames(): Promise<Game[]> {
     const activeGames = await (prisma.game.findMany as any)({
       where: {
         status: {
-          in: ['PLAYING', 'BIDDING']
+          in: ['PLAYING']
         }
       }
     });
@@ -192,7 +192,7 @@ export async function restoreAllActiveGames(): Promise<Game[]> {
 export function startGameStateAutoSave(games: Game[]): void {
   setInterval(() => {
     games.forEach(game => {
-      if (game.status === 'PLAYING' || game.status === 'BIDDING') {
+      if (game.status === 'PLAYING') {
         saveGameState(game);
       }
     });
@@ -207,7 +207,7 @@ export async function checkForStuckGames(): Promise<void> {
     const stuckGames = await (prisma.game.findMany as any)({
       where: {
         status: {
-          in: ['PLAYING', 'BIDDING'] as any
+          in: ['PLAYING'] as any
         },
         lastActionAt: {
           lt: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
