@@ -292,9 +292,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				};
 				
 				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
-				await retryOperation(async () => {
-					return await sendLeagueGameResults(gameData, gameLine);
-				}, 2, 2000); // Retry Discord embed up to 2 times with 2 second delay
+				await sendLeagueGameResults(gameData, gameLine);
 				(game as any).discordResultsSent = true;
 				
 				// Set global flag to prevent duplicates
