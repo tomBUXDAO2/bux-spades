@@ -207,7 +207,7 @@ export async function checkForStuckGames(): Promise<void> {
     const stuckGames = await (prisma.game.findMany as any)({
       where: {
         status: {
-          in: ['PLAYING', 'BIDDING']
+          in: ['PLAYING', 'BIDDING'] as any
         },
         lastActionAt: {
           lt: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
