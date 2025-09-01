@@ -1264,8 +1264,15 @@ export function botMakeMove(game: Game, seatIndex: number) {
   if (bot.type !== 'bot') {
     console.log('[BOT DEBUG] Player is human, acting for timeout:', bot.username);
   }
+  
+  // Validate that the player exists before proceeding
+  if (!bot || bot === null) {
+    console.log(`[BOT DEBUG] No player at seat ${seatIndex} - cannot make move`);
+    return;
+  }
+  
   // Only act if it's the bot's turn to bid
-      if (game.status === 'PLAYING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
+      if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
     setTimeout(() => {
       if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');

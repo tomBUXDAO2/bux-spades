@@ -211,6 +211,7 @@ enum GameMode {
 
 enum GameStatus {
   WAITING
+  BIDDING
   PLAYING
   FINISHED
   CANCELLED

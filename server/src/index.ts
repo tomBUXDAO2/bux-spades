@@ -707,7 +707,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           }
           
           // Fix bidding state if the game is in bidding phase
-          if (game.status === 'PLAYING' && game.bidding) {
+          if (game.status === 'BIDDING' && game.bidding) {
             console.log(`[RECONNECT] Fixing bidding state for reconnected player`);
             console.log(`[RECONNECT] Before fix - currentBidderIndex: ${game.bidding.currentBidderIndex}, currentPlayer: ${game.currentPlayer}`);
             
@@ -1073,7 +1073,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
       }
       game.isBotGame = !allHuman;
-      game.status = 'PLAYING';
+      game.status = 'BIDDING';
       // Dealer assignment and card dealing
       const dealerIndex = assignDealer(game.players, game.dealerIndex);
       game.dealerIndex = dealerIndex;
@@ -1502,6 +1502,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
       }
     } else {
+      // Validate that the next player exists before proceeding
+      if (!game.players[next] || game.players[next] === null) {
+        console.log(`[BIDDING ERROR] Next player at index ${next} is null or undefined, cannot continue bidding`);
+        socket.emit('error', { message: 'Invalid game state - missing player' });
+        return;
+      }
+      
       game.bidding.currentBidderIndex = next;
       game.bidding.currentPlayer = game.players[next]?.id ?? '';
       io.to(game.id).emit('bidding_update', {
@@ -2410,7 +2417,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     game.dealerIndex = newDealerIndex;
 
     // Reset game state for new hand
-    game.status = 'PLAYING';
+    game.status = 'BIDDING';
     game.hands = dealCards(game.players, newDealerIndex);
     game.bidding = {
       currentBidderIndex: (newDealerIndex + 1) % 4,
@@ -3072,8 +3079,8 @@ function closeInactiveTable(gameId: string) {
     return;
   }
   
-  // NEVER close active games (PLAYING) for inactivity
-  if (game.status === 'PLAYING') {
+  // NEVER close active games (BIDDING, PLAYING) for inactivity
+  if (game.status === 'BIDDING' || game.status === 'PLAYING') {
     console.log(`[INACTIVITY] Active game ${gameId} (status: ${game.status}) cannot be closed for inactivity - keeping alive`);
     return;
   }
@@ -3118,8 +3125,8 @@ function startInactivityMonitoring() {
         return;
       }
       
-      // Skip active games (PLAYING) - they are actively being played
-      if (game.status === 'PLAYING') {
+      // Skip active games (BIDDING, PLAYING) - they are actively being played
+      if (game.status === 'BIDDING' || game.status === 'PLAYING') {
         return;
       }
       
@@ -3818,7 +3825,7 @@ setInterval(() => {
           game.dealerIndex = (game.dealerIndex + 1) % 4;
           
           // Reset game state for new hand
-          game.status = 'PLAYING';
+          game.status = 'BIDDING';
           game.bidding = {
             currentPlayer: game.players[game.dealerIndex]?.id || '',
             currentBidderIndex: game.dealerIndex,
