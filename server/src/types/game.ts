@@ -23,6 +23,13 @@ export interface GamePlayer {
 	team?: number;
 	isDealer?: boolean;
 	discordId?: string; // Discord ID for Discord mentions
+	// Game state persistence fields
+	points?: number;
+	nil?: boolean;
+	blindNil?: boolean;
+	connected?: boolean;
+	lastAction?: string;
+	lastActionTime?: number;
 }
 
 export interface Game {
@@ -94,4 +101,13 @@ export interface Game {
 	league?: boolean; // Whether this is a league game created via Discord
 	// League ready states (index 0..3 corresponds to seat)
 	leagueReady?: boolean[];
+	// Game state persistence fields
+	currentRound?: number;
+	currentTrick?: number;
+	dealer?: number;
+	roundHistory?: any[];
+	currentTrickCards?: Card[];
+	lastAction?: string;
+	lastActionTime?: number;
+	updatedAt?: number;
 } 
