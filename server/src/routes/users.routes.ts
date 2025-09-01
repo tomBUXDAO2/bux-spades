@@ -178,9 +178,10 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     } else {
       // ALL games - use overall stats but ensure they match the actual game count
       const totalGamesFromFiltered = partnersGamesPlayed + soloGamesPlayed;
+      const totalWinsFromFiltered = partnersGamesWon + soloGamesWon;
       responseStats = {
         gamesPlayed: totalGamesFromFiltered, // Use actual count from filtered games
-        gamesWon: stats.gamesWon,
+        gamesWon: totalWinsFromFiltered, // Use actual count from filtered games
         totalBags: totalBagsFromFiltered, // Use actual bags from filtered games
         bagsPerGame: totalGamesFromFiltered > 0 ? totalBagsFromFiltered / totalGamesFromFiltered : 0,
         nilsBid: stats.nilsBid,
