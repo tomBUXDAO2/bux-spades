@@ -41,6 +41,17 @@ model Game {
   minPoints    Int
   maxPoints    Int
   buyIn        Int
+  rated        Boolean       @default(false)
+  allowNil     Boolean       @default(true)
+  allowBlindNil Boolean      @default(false)
+  league       Boolean       @default(false)
+  // Game state persistence for crash recovery
+  currentRound Int           @default(1)
+  currentTrick Int           @default(1)
+  currentPlayer String?
+  dealer       Int           @default(0)
+  gameState    Json?         // Full game state JSON
+  lastActionAt DateTime      @default(now())
   createdAt    DateTime      @default(now())
   updatedAt    DateTime
   User         User          @relation(fields: [creatorId], references: [id])
