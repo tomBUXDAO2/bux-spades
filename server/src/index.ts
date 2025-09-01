@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
 import { syncDiscordUserData } from './lib/discordSync';
+import { restoreAllActiveGames, startGameStateAutoSave } from './lib/gameStatePersistence';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
@@ -1375,6 +1376,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         spadesBroken: false
       };
       
+      // Save game state immediately when game starts
+      try {
+        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+      } catch (err) {
+        console.error('Failed to save game state at start:', err);
+      }
+      
       // Update game status in database
       if (game.dbGameId) {
         try {
@@ -1747,6 +1755,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Clear the trick immediately for proper game state
       game.play!.currentTrick = [];
+      
+      // Save game state after each trick completion
+      try {
+        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+      } catch (err) {
+        console.error('Failed to save game state after trick:', err);
+      }
       
       // Emit immediate game update with cleared trick and updated trick counts
       const enrichedGame = enrichGameForClient(game);
@@ -3648,8 +3663,22 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
     }
   });
   
-  // Server restart - clear all games (no restoration)
-  console.log('🔄 Server restarted - all games cleared');
+  // Restore active games from database after server restart
+  console.log('🔄 Server restarted - restoring active games from database...');
+  try {
+    const restoredGames = await restoreAllActiveGames();
+    restoredGames.forEach(game => {
+      games.push(game);
+      console.log(`✅ Restored game ${game.id} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
+    });
+    console.log(`✅ Restored ${restoredGames.length} active games`);
+  } catch (error) {
+    console.error('❌ Failed to restore active games:', error);
+  }
+  
+  // Start auto-saving game state
+  startGameStateAutoSave(games);
+  console.log('💾 Game state auto-save enabled (every 30 seconds)');
 });
 
 // Add helper to ensure leagueReady array exists
