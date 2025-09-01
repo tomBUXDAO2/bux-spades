@@ -162,9 +162,15 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <h3 className="text-3xl font-bold text-white">{player.username}</h3>
               </div>
               <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400 text-2xl">⭐</span>
-                  <span className="text-2xl font-bold text-yellow-400">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-yellow-400 text-2xl">⭐</span>
+                    <span className="text-2xl font-bold text-yellow-400">{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-yellow-400 text-2xl">🪙</span>
+                    <span className="text-2xl font-bold text-yellow-400">{player.coins?.toLocaleString() || '0'}</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
@@ -183,10 +189,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                     <span className="text-orange-400">✅</span>
                     <span className="text-xl text-orange-400">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
                   </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">🪙</span>
-                  <span className="text-xl text-yellow-400">{player.coins?.toLocaleString() || '0'} Coins</span>
-                </div>
                 </div>
               </div>
             </div>
