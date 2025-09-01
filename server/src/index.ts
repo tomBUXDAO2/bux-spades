@@ -978,7 +978,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.leave(gameId);
       
       // Start seat replacement process for the empty seat (only if host wasn't replaced and game is not completed)
-      if (!hostReplaced && game.status !== 'COMPLETED') {
+      if (!hostReplaced && game.status !== 'COMPLETED' && game.status !== 'FINISHED') {
         console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
         console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
         // Only start seat replacement for non-league games or if game is in progress
@@ -988,8 +988,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         } else {
           console.log(`[LEAVE GAME DEBUG] Skipping seat replacement for league game in WAITING state`);
         }
-      } else if (game.status === 'COMPLETED') {
-        console.log(`[LEAVE GAME DEBUG] Game is completed, not starting seat replacement`);
+      } else if (game.status === 'COMPLETED' || game.status === 'FINISHED') {
+        console.log(`[LEAVE GAME DEBUG] Game is completed/finished, not starting seat replacement`);
       }
         
         // Emit game_update to the game room for real-time sync
