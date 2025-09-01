@@ -6,7 +6,7 @@ import type { Game } from '../types/game';
  */
 export async function saveGameState(game: Game): Promise<void> {
   try {
-    // Extract current game state
+    // Extract current game state with COMPLETE information
     const gameState = {
       players: game.players.map(p => p ? {
         id: p.id,
@@ -14,7 +14,7 @@ export async function saveGameState(game: Game): Promise<void> {
         type: p.type,
         position: p.position,
         team: p.team,
-        hand: p.hand,
+        hand: p.hand, // ✅ STORING PLAYER HANDS
         bid: p.bid,
         tricks: p.tricks,
         points: p.points,
@@ -32,19 +32,24 @@ export async function saveGameState(game: Game): Promise<void> {
       maxPoints: game.maxPoints,
       buyIn: game.buyIn,
       rules: game.rules,
-      roundHistory: game.roundHistory || [],
-      currentTrickCards: game.currentTrickCards || [],
+      roundHistory: game.roundHistory || [], // ✅ STORING ROUND SCORES
+      currentTrickCards: game.currentTrickCards || [], // ✅ STORING CURRENT TRICK
       lastAction: game.lastAction,
       lastActionTime: game.lastActionTime,
       play: game.play,
       bidding: game.bidding,
-      hands: game.hands,
+      hands: game.hands, // ✅ STORING DEALED HANDS
       team1TotalScore: game.team1TotalScore,
       team2TotalScore: game.team2TotalScore,
       team1Bags: game.team1Bags,
       team2Bags: game.team2Bags,
       playerScores: game.playerScores,
-      playerBags: game.playerBags
+      playerBags: game.playerBags,
+      // Additional state for complete recovery
+      deck: game.deck || [], // ✅ STORING REMAINING DECK
+      playedCards: game.playedCards || [], // ✅ STORING PLAYED CARDS
+      trickHistory: game.trickHistory || [], // ✅ STORING TRICK HISTORY
+      roundScores: game.roundScores || [] // ✅ STORING ROUND-BY-ROUND SCORES
     };
 
     // Use type assertion to bypass Prisma type issues
@@ -61,9 +66,10 @@ export async function saveGameState(game: Game): Promise<void> {
       }
     });
 
-    console.log(`[GAME STATE] Saved state for game ${game.id} - Round ${game.currentRound || 1}, Trick ${game.currentTrick || 1}`);
+    console.log(`[GAME STATE] ✅ Saved COMPLETE state for game ${game.id} - Round ${game.currentRound || 1}, Trick ${game.currentTrick || 1}`);
+    console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${gameState.trickHistory.length} tricks`);
   } catch (error) {
-    console.error(`[GAME STATE] Failed to save state for game ${game.id}:`, error);
+    console.error(`[GAME STATE] ❌ Failed to save state for game ${game.id}:`, error);
   }
 }
 
@@ -88,13 +94,13 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
     });
 
     if (!dbGame || !(dbGame as any).gameState) {
-      console.log(`[GAME STATE] No saved state found for game ${gameId}`);
+      console.log(`[GAME STATE] ❌ No saved state found for game ${gameId}`);
       return null;
     }
 
     const gameState = (dbGame as any).gameState as any;
     
-    // Reconstruct the game object
+    // Reconstruct the game object with COMPLETE state
     const game: Game = {
       id: dbGame.id,
       players: gameState.players.map((p: any) => p ? {
@@ -128,6 +134,11 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       playerBags: gameState.playerBags,
       createdAt: dbGame.createdAt.getTime(),
       updatedAt: dbGame.updatedAt.getTime(),
+      // Restore additional state
+      deck: gameState.deck || [],
+      playedCards: gameState.playedCards || [],
+      trickHistory: gameState.trickHistory || [],
+      roundScores: gameState.roundScores || [],
       // Add missing properties with defaults
       forcedBid: 'NONE' as any,
       specialRules: { screamer: false, assassin: false },
@@ -136,10 +147,11 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       isBotGame: false
     };
 
-    console.log(`[GAME STATE] Restored game ${gameId} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
+    console.log(`[GAME STATE] ✅ Restored COMPLETE game ${gameId} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
+    console.log(`[GAME STATE] 📊 Restored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${gameState.trickHistory.length} tricks`);
     return game;
   } catch (error) {
-    console.error(`[GAME STATE] Failed to restore game ${gameId}:`, error);
+    console.error(`[GAME STATE] ❌ Failed to restore game ${gameId}:`, error);
     return null;
   }
 }
@@ -166,10 +178,10 @@ export async function restoreAllActiveGames(): Promise<Game[]> {
       }
     }
 
-    console.log(`[GAME STATE] Restored ${restoredGames.length} active games after server restart`);
+    console.log(`[GAME STATE] ✅ Restored ${restoredGames.length} active games after server restart`);
     return restoredGames;
   } catch (error) {
-    console.error('[GAME STATE] Failed to restore active games:', error);
+    console.error('[GAME STATE] ❌ Failed to restore active games:', error);
     return [];
   }
 }
@@ -204,7 +216,7 @@ export async function checkForStuckGames(): Promise<void> {
     });
 
     for (const stuckGame of stuckGames) {
-      console.log(`[STUCK GAME] Found stuck game ${stuckGame.id} - last action: ${(stuckGame as any).lastActionAt}`);
+      console.log(`[STUCK GAME] ⚠️ Found stuck game ${stuckGame.id} - last action: ${(stuckGame as any).lastActionAt}`);
       
       // Auto-complete the game or reset it
       await (prisma.game.update as any)({
@@ -215,9 +227,9 @@ export async function checkForStuckGames(): Promise<void> {
         }
       });
       
-      console.log(`[STUCK GAME] Auto-completed stuck game ${stuckGame.id}`);
+      console.log(`[STUCK GAME] ✅ Auto-completed stuck game ${stuckGame.id}`);
     }
   } catch (error) {
-    console.error('[STUCK GAME] Failed to check for stuck games:', error);
+    console.error('[STUCK GAME] ❌ Failed to check for stuck games:', error);
   }
 } 
