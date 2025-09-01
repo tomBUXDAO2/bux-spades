@@ -2143,8 +2143,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
               where: { id: game.dbGameId },
               data: {
                 status: 'PLAYING',
-                // finalScore: maxScore, // Field doesn't exist in schema
-                winner: winningPlayerIndex
+                // winner: winningPlayerIndex, // Field doesn't exist in schema
+                // winner: winningPlayerIndex, // Field doesn't exist in schema
               }
             }).catch((e) => console.error('[ROUND PERSIST SOLO] prisma update failed:', e));
             } catch (e) {
