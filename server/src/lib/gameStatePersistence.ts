@@ -208,15 +208,12 @@ export async function checkForStuckGames(): Promise<void> {
       where: {
         status: {
           in: ['PLAYING'] as any
-        },
-        lastActionAt: {
-          lt: new Date(Date.now() - 5 * 60 * 1000) // 5 minutes ago
         }
       }
     });
 
     for (const stuckGame of stuckGames) {
-      console.log(`[STUCK GAME] ⚠️ Found stuck game ${stuckGame.id} - last action: ${(stuckGame as any).lastActionAt}`);
+      console.log(`[STUCK GAME] ⚠️ Found stuck game ${stuckGame.id} - status: ${(stuckGame as any).status}`);
       
       // Auto-complete the game or reset it
       await (prisma.game.update as any)({
