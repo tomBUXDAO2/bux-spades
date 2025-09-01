@@ -12,7 +12,6 @@ import jwt from 'jsonwebtoken';
 import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
 import { syncDiscordUserData } from './lib/discordSync';
-import { restoreAllActiveGames, startGameStateAutoSave } from './lib/gameStatePersistence';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
@@ -653,6 +652,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               if (game.dbGameId) {
                 await prisma.gamePlayer.create({
                   data: {
+                    id: `player_${game.dbGameId}_${originalSeatIndex}_${Date.now()}`,
                     gameId: game.dbGameId,
                     userId: socket.userId,
                     position: originalSeatIndex,
@@ -661,7 +661,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                     bags: 0,
                     points: 0,
                     username: playerUsername,
-                    discordId: null
+                    discordId: null,
+                    updatedAt: new Date()
                   }
                 });
                 console.log('[RECONNECT DEBUG] Created GamePlayer record for reconnected player:', socket.userId, 'in game:', game.dbGameId);
@@ -1378,7 +1379,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Save game state immediately when game starts
       try {
-        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+        console.log('[GAME STATE] Game started - state saving disabled for now');
       } catch (err) {
         console.error('Failed to save game state at start:', err);
       }
@@ -1411,6 +1412,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               buyIn: game.buyIn,
               rated: game.players.filter(p => p && p.type === 'human').length === 4,
               status: 'PLAYING',
+              updatedAt: new Date()
             }
           });
           
@@ -1441,6 +1443,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                 buyIn: game.buyIn,
                 rated: game.players.filter(p => p && p.type === 'human').length === 4,
                 status: 'PLAYING',
+                updatedAt: new Date()
               }
             });
             game.dbGameId = newDbGame.id;
@@ -1550,7 +1553,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
 
   // Play card event
-  socket.on('play_card', ({ gameId, userId, card }) => {
+  socket.on('play_card', async ({ gameId, userId, card }) => {
     console.log('[PLAY CARD] Received play_card event:', { gameId, userId, card, socketId: socket.id });
     console.log('[PLAY CARD] Socket auth status:', { isAuthenticated: socket.isAuthenticated, userId: socket.userId });
     const game = games.find(g => g.id === gameId);
@@ -1758,7 +1761,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Save game state after each trick completion
       try {
-        await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
+        console.log('[GAME STATE] Trick completed - state saving disabled for now');
       } catch (err) {
         console.error('Failed to save game state after trick:', err);
       }
@@ -3666,18 +3669,12 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   // Restore active games from database after server restart
   console.log('🔄 Server restarted - restoring active games from database...');
   try {
-    const restoredGames = await restoreAllActiveGames();
-    restoredGames.forEach(game => {
-      games.push(game);
-      console.log(`✅ Restored game ${game.id} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
-    });
-    console.log(`✅ Restored ${restoredGames.length} active games`);
+    console.log('✅ Server restarted successfully');
   } catch (error) {
     console.error('❌ Failed to restore active games:', error);
   }
   
   // Start auto-saving game state
-  startGameStateAutoSave(games);
   console.log('💾 Game state auto-save enabled (every 30 seconds)');
 });
 

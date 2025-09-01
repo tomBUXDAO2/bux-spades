@@ -22,7 +22,7 @@ passport.use(new DiscordStrategy({
     let currentAvatar = profile.avatar;
     
     if (discordUserResponse.ok) {
-      const discordUser = await discordUserResponse.json();
+      const discordUser = await discordUserResponse.json() as any;
       // Use nickname if available, otherwise use username
       currentNickname = discordUser.global_name || discordUser.username;
       currentAvatar = discordUser.avatar;

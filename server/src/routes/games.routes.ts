@@ -91,18 +91,22 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           // Create user with Discord ID
           user = await prisma.user.create({
             data: {
+              id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               username: playerData.username,
               // Don't set a placeholder email; will be filled on first OAuth login
               discordId: playerData.discordId || playerData.userId,
               coins: 5000000, // Default coins
-              avatar: playerData.avatar || null // Use provided avatar or null
+              avatar: playerData.avatar || null, // Use provided avatar or null
+              updatedAt: new Date()
             }
           });
           
           // Create user stats
           await prisma.userStats.create({
             data: {
-              userId: user.id
+              id: `stats_${user.id}_${Date.now()}`,
+              userId: user.id,
+              updatedAt: new Date()
             }
           });
           
@@ -434,6 +438,7 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
       
       await prisma.gamePlayer.create({
         data: {
+          id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
           gameId: game.dbGameId,
           userId: player.id,
           position: seatIndex,
@@ -442,7 +447,8 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
           bags: 0,
           points: 0,
           username: player.username,
-          discordId: user?.discordId || null
+          discordId: user?.discordId || null,
+          updatedAt: new Date()
         }
       });
       console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
