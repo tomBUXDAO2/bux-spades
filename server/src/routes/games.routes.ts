@@ -4,6 +4,7 @@ import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption 
 import { io } from '../index';
 import { games } from '../gamesStore';
 import { startSeatReplacement } from "../index";
+import { playAgainTimers, playAgainResponses, originalPlayers } from '../index';
 import type { AuthenticatedSocket } from '../index';
 import { trickLogger } from '../lib/trickLogger';
 import prisma from '../lib/prisma';
@@ -213,61 +214,54 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           
           newGame.dbGameId = dbGame.id;
           console.log('[GAME LOGGED] Rated game logged to database with ID:', newGame.dbGameId, 'rated:', dbGame.rated, 'league:', dbGame.league);
-        } catch (error) {
-          console.error('[GAME CREATION ERROR] Failed to create game in database:', error);
-          console.error('[GAME CREATION ERROR] Game data:', {
-            id: newGame.id,
-            creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
-            gameMode: newGame.gameMode,
-            bidType: dbBidType,
-            minPoints: newGame.minPoints,
-            maxPoints: newGame.maxPoints,
-            buyIn: newGame.buyIn,
-            league: (newGame as any).league || false
-          });
-        }
-        
-        // Log all players for the rated game
-        console.log('[PLAYER LOGGING] Logging players for rated game:', newGame.dbGameId);
-        for (let i = 0; i < newGame.players.length; i++) {
-          const player = newGame.players[i];
-          if (player) {
-            try {
-              await prisma.gamePlayer.create({
-                data: {
-                  id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
-                  gameId: newGame.dbGameId,
-                  userId: player.id,
-                  position: i,
-                  team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
-                  bid: null,
-                  bags: 0,
-                  points: 0,
-                  username: player.username,
-                  discordId: player.type === 'human' ? player.id : null,
-                  updatedAt: new Date()
-                } as any
-              });
-              console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
-            } catch (err) {
-              console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
+          
+          // Log all players for the rated game
+          console.log('[PLAYER LOGGING] Logging players for rated game:', newGame.dbGameId);
+          for (let i = 0; i < newGame.players.length; i++) {
+            const player = newGame.players[i];
+            if (player) {
+              try {
+                await prisma.gamePlayer.create({
+                  data: {
+                    id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
+                    gameId: newGame.dbGameId,
+                    userId: player.id,
+                    position: i,
+                    team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
+                    bid: null,
+                    bags: 0,
+                    points: 0,
+                    username: player.username,
+                    discordId: player.type === 'human' ? player.id : null,
+                    updatedAt: new Date()
+                  } as any
+                });
+                console.log('[PLAYER LOGGED] Player logged:', player.username, 'at position', i);
+              } catch (err) {
+                console.error('[PLAYER LOGGING ERROR] Failed to log player:', player.username, 'at position', i, ':', err);
+              }
             }
           }
-        }
-        
-        // Start round logging immediately when rated game is created
-        try {
-          const { trickLogger } = await import('../lib/trickLogger');
-          await trickLogger.startRound(newGame.dbGameId, 1);
-          console.log('[ROUND STARTED] Round 1 started for rated game:', newGame.dbGameId);
-        } catch (err) {
-          console.error('Failed to start round logging for rated game:', err);
+        } catch (error) {
+          console.error('[GAME CREATION ERROR] Failed to create game in database:', error);
+          // Don't fail the game creation if database logging fails
         }
       } else {
         console.log('[GAME NOT LOGGED] Unrated game (has bots) - not logging to database. Human players:', humanPlayers);
       }
     } catch (err) {
       console.error('Failed to force log game start:', err);
+    }
+    
+    // Start round logging immediately when rated game is created
+    if (newGame.dbGameId) {
+      try {
+        const { trickLogger } = await import('../lib/trickLogger');
+        await trickLogger.startRound(newGame.dbGameId, 1);
+        console.log('[ROUND STARTED] Round 1 started for rated game:', newGame.dbGameId);
+      } catch (err) {
+        console.error('[ROUND START ERROR] Failed to start round logging for rated game:', err);
+      }
     }
     
     // Filter out league games in waiting status for lobby
@@ -449,7 +443,7 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
           username: player.username,
           discordId: user?.discordId || null,
           updatedAt: new Date()
-        }
+        } as any
       });
       console.log('[HTTP JOIN DEBUG] Created GamePlayer record for player:', player.id, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
     } else {
@@ -588,6 +582,32 @@ router.post('/:id/leave', requireAuth, (req, res) => {
   const specIdx = game.spectators.findIndex(s => s.id === userId);
   if (specIdx !== -1) {
     game.spectators.splice(specIdx, 1);
+  }
+  
+  // Check if this is during play again period and if an original player is leaving
+  const isPlayAgainPeriod = playAgainTimers.has(game.id);
+  const isOriginalPlayer = originalPlayers.get(game.id)?.includes(userId);
+  
+  if (isPlayAgainPeriod && isOriginalPlayer) {
+    console.log(`[HTTP LEAVE] Original player ${userId} left during play again period, closing table completely`);
+    
+    // Clear all play again data
+    const timer = playAgainTimers.get(game.id);
+    if (timer) {
+      clearTimeout(timer.timer);
+      playAgainTimers.delete(game.id);
+    }
+    playAgainResponses.delete(game.id);
+    originalPlayers.delete(game.id);
+    
+    // Close the table completely
+    const gameIdx = games.findIndex((g: Game) => g.id === game.id);
+    if (gameIdx !== -1) {
+      games.splice(gameIdx, 1);
+    }
+    io.to(game.id).emit('game_closed', { reason: 'original_player_left_during_play_again' });
+    io.emit('games_updated', games);
+    return res.json({ message: 'Game closed - original player left during play again period' });
   }
   
   // Start seat replacement process for the empty seat (only if host wasn't replaced)
@@ -2255,7 +2275,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
                   // Store cumulative totals into auxiliary fields
                   // Using finalScore as latest leading score allows recovery
                   // finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0), // Field doesn't exist in schema
-                  winner: game.team1TotalScore! >= game.team2TotalScore! ? 1 : 2
+                  // winner field removed from schema - using GameResult table instead
                 }
               }).catch((e) => console.error('[ROUND PERSIST] prisma update failed:', e));
             } catch (e) {
@@ -2952,7 +2972,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     }
     
     // Create game record in database with new fields
-    const dbGame = await prisma.game.create({
+    const dbGame = await (prisma.game.create as any)({
       data: {
         creatorId: game.players[0]?.id || 'unknown', // Use first player as creator
         status: 'FINISHED',
@@ -2966,23 +2986,22 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         minPoints: game.minPoints,
         maxPoints: game.maxPoints,
         buyIn: game.buyIn,
-        solo: game.gameMode === 'SOLO',
+        // Game completion tracking fields
         whiz: bidType === 'WHIZ',
         mirror: bidType === 'MIRROR',
         gimmick: bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES',
         screamer: specialRules.screamer || false,
         assassin: specialRules.assassin || false,
-        // NEW: Game completion tracking
         rated: true, // This is an all-human game
         completed: true,
         cancelled: false,
         finalScore,
         winner,
-        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === '4 OR NIL' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
         league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true).map(key => {
           if (key === 'screamer') return 'SCREAMER';
-          if (key === 'assassin') return 'ASSASSIN';
+          if (key === 'assassin') return 'SCREAMER';
           return 'SCREAMER'; // Default fallback
         }) as any[]
       }
@@ -3018,7 +3037,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         won = team === winner;
       }
       
-      await prisma.gamePlayer.create({
+      await (prisma.gamePlayer.create as any)({
         data: {
           gameId: dbGame.id,
           userId,
@@ -3063,7 +3082,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
       totalHands: game.hands?.length || 0
     };
     
-    await prisma.gameResult.create({
+    await (prisma.gameResult.create as any)({
       data: {
         gameId: dbGame.id,
         winner,
@@ -3097,7 +3116,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         const gamePlayers = await prisma.gamePlayer.findMany({
           where: { gameId: dbGame.id },
           include: {
-            user: {
+            User: {
               select: { discordId: true, username: true }
             }
           },
@@ -3108,14 +3127,14 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
           position: gp.position,
           username: gp.username,
           gamePlayerDiscordId: gp.discordId,
-          userDiscordId: gp.user?.discordId
+          userDiscordId: gp.User?.discordId
         })));
         
         // Prepare game data for Discord - always show all 4 original players
         const gameData = {
           buyIn: game.buyIn,
           players: gamePlayers.map((dbPlayer, i) => {
-            const discordId = dbPlayer.user?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
+            const discordId = dbPlayer.User?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
             console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
             return {
               userId: discordId, // Use actual Discord ID from User table, fallback to database ID
@@ -3139,7 +3158,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         console.log('[DISCORD RESULTS] Successfully sent Discord embed for league game:', game.id);
       } catch (error) {
         console.error('[DISCORD RESULTS ERROR] Failed to send Discord results for league game:', game.id, error);
-        console.error('[DISCORD RESULTS ERROR] Stack trace:', error.stack);
+        console.error('[DISCORD RESULTS ERROR] Stack trace:', (error as any).stack);
       }
     } else {
       console.log('[DISCORD RESULTS] Skipping Discord embed - league:', (game as any).league, 'already sent:', (game as any).discordResultsSent);
@@ -3659,7 +3678,7 @@ export async function logGameStart(game: Game) {
     }
     
     // Create initial game record in database
-    const dbGame = await prisma.game.create({
+    const dbGame = await (prisma.game.create as any)({
       data: {
         creatorId,
         status: 'PLAYING', // Game is now in progress
@@ -3705,7 +3724,7 @@ export async function logGameStart(game: Game) {
         team = (i === 0 || i === 2) ? 1 : 2;
       }
       
-      await prisma.gamePlayer.create({
+      await (prisma.gamePlayer.create as any)({
         data: {
           gameId: dbGame.id,
           userId, // Use 'bot' as placeholder for bot players
@@ -3749,7 +3768,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
     
     // Update database
     if (game.dbGameId) {
-      await prisma.game.update({
+      await (prisma.game.update as any)({
         where: { id: game.dbGameId },
         data: {
           status: 'FINISHED',
@@ -3760,7 +3779,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
       });
       
       // Create GameResult record
-      await prisma.gameResult.create({
+      await (prisma.gameResult.create as any)({
         data: {
           gameId: game.dbGameId,
           winner: winningTeam,
@@ -3790,7 +3809,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
         const playerTricks = gamePlayer?.tricks || 0;
         const playerBags = Math.max(0, playerTricks - playerBid);
         
-        await prisma.gamePlayer.update({
+        await (prisma.gamePlayer.update as any)({
           where: { id: player.id },
           data: {
             bid: playerBid,

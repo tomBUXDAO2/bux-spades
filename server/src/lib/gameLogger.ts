@@ -18,16 +18,9 @@ async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number
 }
 
 export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPlayer: number) {
+	const isProduction = process.env.NODE_ENV === 'production';
+	
 	console.log('[GAME LOGGER] Starting game completion logging for game:', game.id);
-	console.log('[GAME LOGGER] Game object structure:', JSON.stringify({
-		id: game.id,
-		players: game.players?.map((p: any) => ({ id: p?.id, type: p?.type, username: p?.username })),
-		gameMode: game.gameMode,
-		status: game.status
-	}, null, 2));
-	console.log('[GAME LOGGER] Game league property:', (game as any).league);
-	console.log('[GAME LOGGER] Game mode:', game.gameMode);
-	console.log('[GAME LOGGER] Winning team/player:', winningTeamOrPlayer);
 	
 	try {
 		// Determine settings
@@ -73,7 +66,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 		}
 
 		// Update existing Game row for completion snapshot
-		  let dbGame: any;
+		let dbGame: any;
 		if (game.dbGameId) {
 			try {
 				// Update existing game record with retry
@@ -82,17 +75,19 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						where: { id: game.dbGameId },
 						data: {
 							bidType: bidType as any,
-							        specialRules: (() => {
-          const rules: any[] = [];
-          if (specialRules.screamer) rules.push('SCREAMER');
-          if (specialRules.assassin) rules.push('ASSASSIN');
-          return rules;
-        })(),
+							specialRules: (() => {
+								const rules: any[] = [];
+								if (specialRules.screamer) rules.push('SCREAMER');
+								if (specialRules.assassin) rules.push('ASSASSIN');
+								return rules;
+							})(),
 							status: 'FINISHED'
 						}
 					});
 				});
-				console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
+				if (!isProduction) {
+					console.log('[GAME COMPLETED] Updated existing game in database:', game.dbGameId);
+				}
 			} catch (updateError) {
 				console.error('[GAME UPDATE FAILED] Could not update existing game, creating new one:', updateError);
 				// Fall back to creating new game if update fails
@@ -121,22 +116,30 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					} as any
 				});
 			});
-			console.log('[GAME COMPLETED] Created new game record in database:', dbGame.id);
+			if (!isProduction) {
+				console.log('[GAME COMPLETED] Created new game record in database:', dbGame.id);
+			}
 		}
 
 		// Players
-		console.log('[GAME LOGGER] Creating GamePlayer records for game:', dbGame.id);
-		console.log('[GAME LOGGER] Players array:', game.players?.map((p: any) => ({ id: p?.id, type: p?.type, username: p?.username })));
+		if (!isProduction) {
+			console.log('[GAME LOGGER] Creating GamePlayer records for game:', dbGame.id);
+			console.log('[GAME LOGGER] Players array:', game.players?.map((p: any) => ({ id: p?.id, type: p?.type, username: p?.username })));
+		}
 		
 		for (let i = 0; i < 4; i++) {
 			const player = game.players[i];
 			if (!player) {
-				console.log(`[GAME LOGGER] Skipping player ${i}: null`);
+				if (!isProduction) {
+					console.log(`[GAME LOGGER] Skipping player ${i}: null`);
+				}
 				continue;
 			}
 			const userId = player.id;
 			if (!userId) {
-				console.log(`[GAME LOGGER] Player ${i} has no userId:`, player);
+				if (!isProduction) {
+					console.log(`[GAME LOGGER] Player ${i} has no userId:`, player);
+				}
 				continue;
 			}
 			
@@ -192,7 +195,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 						updatedAt: now
 					} as any
 				});
-				console.log(`[GAME LOGGER] Upserted GamePlayer for ${player.username} at position ${i}`);
+				if (!isProduction) {
+					console.log(`[GAME LOGGER] Upserted GamePlayer for ${player.username} at position ${i}`);
+				}
 			} catch (playerError) {
 				console.error(`[GAME LOGGER] Failed to upsert GamePlayer for position ${i}:`, playerError);
 				console.error(`[GAME LOGGER] Player data:`, player);
@@ -241,9 +246,40 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					} as any
 				});
 			});
-			console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+			if (!isProduction) {
+				console.log(`Created comprehensive game result record for game ${dbGame.id}`);
+			}
 		} else {
-			console.log(`GameResult already exists for game ${dbGame.id}, skipping creation`);
+			if (!isProduction) {
+				console.log(`GameResult already exists for game ${dbGame.id}, skipping creation`);
+			}
+		}
+		
+		// Update GamePlayer records with won field
+		try {
+			for (let i = 0; i < game.players.length; i++) {
+				const player = game.players[i];
+				if (!player) continue;
+				
+				const isWinner = gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2);
+				
+				await prisma.gamePlayer.updateMany({
+					where: {
+						gameId: dbGame.id,
+						position: i
+					},
+					data: {
+						won: isWinner,
+						updatedAt: new Date()
+					}
+				});
+				
+				if (!isProduction) {
+					console.log(`[GAME LOGGER] Updated GamePlayer won field for position ${i}: ${isWinner}`);
+				}
+			}
+		} catch (updateError) {
+			console.error('[GAME LOGGER] Failed to update GamePlayer won fields:', updateError);
 		}
 		
 		// Send Discord results for league games
@@ -281,7 +317,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					allowBlindNil: game.rules?.allowBlindNil || false,
 					players: gamePlayers.map((dbPlayer, i) => {
 						const discordId = dbPlayer.User?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
-						console.log(`[DISCORD RESULTS DEBUG] Player ${i} (${dbPlayer.username}): discordId=${discordId}`);
+						if (!isProduction) {
+					
+						}
 						return {
 							userId: discordId,
 							won: game.gameMode === 'SOLO' 
@@ -291,7 +329,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					})
 				};
 				
-				console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
+				if (!isProduction) {
+					console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
+				}
 				await sendLeagueGameResults(gameData, gameLine);
 				(game as any).discordResultsSent = true;
 				
@@ -301,13 +341,22 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				}
 				(global as any).discordResultsSentForGame[game.id] = true;
 				
-				console.log('[DISCORD RESULTS] Successfully sent Discord embed for game:', game.id);
+				if (!isProduction) {
+					console.log('[DISCORD RESULTS] Successfully sent Discord embed for game:', game.id);
+				}
 			} catch (error) {
 				console.error('Failed to send Discord results:', error);
 			}
 		}
 		
 	} catch (err) {
-		console.error('Failed to log completed game (server):', err);
+		console.error('[GAME LOGGER] Failed to log completed game (server):', err);
+		console.error('[GAME LOGGER] Error details:', {
+			message: (err as any).message,
+			stack: (err as any).stack,
+			gameId: game?.id,
+			gameStatus: game?.status
+		});
+		throw err; // Re-throw to let caller know it failed
 	}
 } 

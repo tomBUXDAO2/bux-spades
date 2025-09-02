@@ -11,7 +11,7 @@ router.post('/friends/add', requireAuth, async (req, res) => {
   if (currentUserId === friendId) return res.status(400).json({ error: "Cannot add yourself as a friend." });
   try {
     await prisma.friend.create({
-      data: { userId: currentUserId, friendId }
+      data: { userId: currentUserId, friendId } as any
     });
     // Emit socket event to both users
     io.to(currentUserId).emit('friendAdded', { friendId });
@@ -60,7 +60,7 @@ router.post('/block', requireAuth, async (req, res) => {
   await prisma.friend.deleteMany({ where: { userId: currentUserId, friendId: blockId } });
   // Add to BlockedUser table
   await prisma.blockedUser.create({
-    data: { userId: currentUserId, blockedId: blockId }
+    data: { userId: currentUserId, blockedId: blockId } as any
   });
   // Emit socket events for real-time update
   io.to(currentUserId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh

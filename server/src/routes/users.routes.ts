@@ -48,7 +48,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       return res.status(404).json({ message: 'Stats not found' });
     }
     
-    // Compute per-mode and per-format breakdowns from historical games
+    // Compute per-mode and per-format breakdowns from COMPLETED games only
     const games = await prisma.gamePlayer.findMany({
       where: { userId },
       include: {
@@ -58,16 +58,24 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
     });
     
-    console.log('[USER STATS API] Found games:', games.length);
+    // Filter to only include completed games
+    const completedGames = games.filter(gp => {
+      const g = gp.Game as any;
+      return g?.status === 'FINISHED';
+    });
     
-    // Filter games based on gameMode if specified
-    let filteredGames = games;
+    console.log('[USER STATS API] Total games found:', games.length, 'Completed games:', completedGames.length);
+    
+    console.log('[USER STATS API] Found completed games:', completedGames.length);
+    
+    // Filter completed games based on gameMode if specified
+    let filteredGames = completedGames;
     if (gameMode && gameMode !== 'ALL') {
-      filteredGames = games.filter(gp => {
+      filteredGames = completedGames.filter(gp => {
         const g = gp.Game as any;
         return g?.gameMode === gameMode;
       });
-      console.log('[USER STATS API] Filtered games for', gameMode, ':', filteredGames.length);
+      console.log('[USER STATS API] Filtered completed games for', gameMode, ':', filteredGames.length);
     }
     
     // Initialize counters

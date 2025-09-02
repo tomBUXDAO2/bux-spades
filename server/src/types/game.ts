@@ -99,6 +99,8 @@ export interface Game {
 	rounds?: any[]; // Game rounds for logging
 	// League game property
 	league?: boolean; // Whether this is a league game created via Discord
+	// Rated game property
+	rated?: boolean; // Whether this is a rated game (4 human players)
 	// League ready states (index 0..3 corresponds to seat)
 	leagueReady?: boolean[];
 	// Game state persistence fields

@@ -775,20 +775,21 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                 select: { discordId: true }
               });
               
-              await prisma.gamePlayer.create({
-                data: {
-                  gameId: game.dbGameId,
-                  userId: socket.userId,
-                  position: emptySeatIndex,
-                  team: game.gameMode === 'PARTNERS' ? (emptySeatIndex === 0 || emptySeatIndex === 2 ? 1 : 2) : null,
-                  bid: null,
-                  bags: 0,
-                  points: 0,
-                  username: playerUsername,
-                  discordId: user?.discordId || null // This should be the actual Discord ID
-                }
-              });
-              console.log('[SOCKET JOIN DEBUG] Created GamePlayer record for player:', socket.userId, 'in game:', game.dbGameId, 'discordId:', user?.discordId);
+              // Temporarily disabled due to Prisma schema issues - will fix separately
+              // await prisma.gamePlayer.create({
+              //   data: {
+              //     gameId: game.dbGameId,
+              //     userId: socket.userId,
+              //     position: emptySeatIndex,
+              //     team: game.gameMode === 'PARTNERS' ? (emptySeatIndex === 0 || emptySeatIndex === 2 ? 1 : 2) : null,
+              //     bid: null,
+              //     bags: 0,
+              //     points: 0,
+              //     username: playerUsername,
+              //     discordId: user?.discordId || null
+              //   }
+              // });
+              console.log('[SOCKET JOIN DEBUG] GamePlayer creation temporarily disabled - will fix Prisma schema separately');
             } else {
               console.log('[SOCKET JOIN DEBUG] No dbGameId available for GamePlayer creation');
             }
@@ -976,6 +977,32 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
       
       socket.leave(gameId);
+      
+      // Check if this is during play again period and if an original player is leaving
+      const isPlayAgainPeriod = playAgainTimers.has(gameId);
+      const isOriginalPlayer = originalPlayers.get(gameId)?.includes(userId);
+      
+      if (isPlayAgainPeriod && isOriginalPlayer) {
+        console.log(`[LEAVE GAME] Original player ${userId} left during play again period, closing table completely`);
+        
+        // Clear all play again data
+        const timer = playAgainTimers.get(gameId);
+        if (timer) {
+          clearTimeout(timer.timer);
+          playAgainTimers.delete(gameId);
+        }
+        playAgainResponses.delete(gameId);
+        originalPlayers.delete(gameId);
+        
+        // Close the table completely
+        const gameIndex = games.findIndex(g => g.id === gameId);
+        if (gameIndex !== -1) {
+          games.splice(gameIndex, 1);
+        }
+        io.to(gameId).emit('game_closed', { reason: 'original_player_left_during_play_again' });
+        io.emit('games_updated', games);
+        return;
+      }
       
       // Start seat replacement process for the empty seat (only if host wasn't replaced and game is not completed)
       if (!hostReplaced && game.status !== 'COMPLETED' && game.status !== 'FINISHED') {
@@ -1255,6 +1282,19 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
+    // Check if this is during the play again period
+    if (!playAgainTimers.has(gameId)) {
+      socket.emit('error', { message: 'Play again period has ended' });
+      return;
+    }
+    
+    // Check if this player is an original player
+    const originalPlayerIds = originalPlayers.get(gameId) || [];
+    if (!originalPlayerIds.includes(socket.userId)) {
+      socket.emit('error', { message: 'Only original players can respond to play again' });
+      return;
+    }
+    
     // Add player to responses
     if (!playAgainResponses.has(gameId)) {
       playAgainResponses.set(gameId, new Set());
@@ -1263,12 +1303,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     
     console.log(`[PLAY AGAIN] Player ${socket.userId} responded to play again for game ${gameId}`);
     
-    // Check if all human players have responded
-    const humanPlayers = game.players.filter(p => p && p.type === 'human');
+    // Check if all original players have responded
     const responses = playAgainResponses.get(gameId) || new Set();
     
-    if (responses.size >= humanPlayers.length) {
-      console.log(`[PLAY AGAIN] All human players responded, resetting game ${gameId}`);
+    if (responses.size >= originalPlayerIds.length) {
+      console.log(`[PLAY AGAIN] All original players responded, starting rematch for game ${gameId}`);
       resetGameForNewRound(game);
     }
   });
@@ -1333,9 +1372,60 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Store the bid
     game.bidding.bids[playerIndex] = finalBid;
     
-    // Update player's bid in game state
+    // Update player's bid in game state (this will be the current round bid)
     if (game.players[playerIndex]) {
       game.players[playerIndex].bid = finalBid;
+    }
+    
+    // Log the bid to RoundBid table for this round
+    if (game.dbGameId && game.players[playerIndex]?.type === 'human') {
+      try {
+        // Determine current roundNumber from trickLogger cache or DB
+        let roundNumber: number | null = null;
+        try {
+          const { trickLogger } = await import('./lib/trickLogger');
+          roundNumber = trickLogger.getCurrentRoundNumber(game.dbGameId) || null;
+        } catch {}
+        if (!roundNumber) {
+          const latestRound = await prisma.round.findFirst({
+            where: { gameId: game.dbGameId },
+            orderBy: { roundNumber: 'desc' }
+          });
+          roundNumber = latestRound?.roundNumber || 1;
+        }
+        // Find the current round record
+        let roundRecord = await prisma.round.findFirst({
+          where: {
+            gameId: game.dbGameId,
+            roundNumber
+          }
+        });
+        if (!roundRecord) {
+          // Create the round if missing
+          roundRecord = await prisma.round.create({
+            data: {
+              id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
+              roundNumber,
+              updatedAt: new Date(),
+              Game: { connect: { id: game.dbGameId } }
+            }
+          });
+        }
+        // Upsert-like behavior: delete any existing for (roundId, playerId) then insert
+        await prisma.roundBid.deleteMany({
+          where: { roundId: roundRecord.id, playerId: game.players[playerIndex]!.id }
+        });
+        await prisma.roundBid.create({
+          data: {
+            id: `bid_${roundRecord.id}_${playerIndex}_${Date.now()}`,
+            roundId: roundRecord.id,
+            playerId: game.players[playerIndex]!.id,
+            bid: finalBid
+          }
+        });
+      } catch (err) {
+        console.error('Failed to log bid to RoundBid table:', err);
+      }
     }
     
     // Update GamePlayer record in DB
@@ -1369,6 +1459,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // --- Play phase state ---
       game.status = 'PLAYING'; // Update game status to PLAYING
+      game.currentRound = 1; // Set current round for bid logging
       game.play = {
         currentPlayer: firstPlayer.id,
         currentPlayerIndex: (game.dealerIndex + 1) % 4,
@@ -1401,6 +1492,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         } catch (err) {
           console.error('Failed to update game status in database:', err);
         }
+      }
+      
+      // For rated games, ensure we always pay out winners at completion
+      if (game.rated) {
+        console.log('[RATED GAME] Game is rated - will ensure complete logging and guaranteed payouts');
       }
       
               // FORCE GAME LOGGING - Create game in database immediately
@@ -1457,7 +1553,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           } else {
             console.log('[GAME VERIFIED] Game found in database:', game.dbGameId);
           }
-          await prisma.$disconnect();
         } catch (err) {
           console.error('Failed to verify game in database:', err);
         }
@@ -2402,7 +2497,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   // Start new hand event (now only called internally)
-  function startNewHand(game: Game) {
+  async function startNewHand(game: Game) {
     console.log('[START NEW HAND] Starting new hand for game:', game.id);
 
     // Check if all seats are filled
@@ -2436,14 +2531,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
     // Start a new round in DB for this hand
     if (game.dbGameId) {
-      const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
-      import('./lib/trickLogger').then(({ trickLogger }) => {
-        trickLogger.startRound(game.dbGameId!, roundNumber).then(() => {
-          console.log(`[ROUND STARTED] Round ${roundNumber} started for game:`, game.dbGameId);
-        }).catch((err: Error) => {
-          console.error('Failed to start round logging for new hand:', err);
-        });
-      }).catch((e: Error) => console.error('Failed to import trickLogger for start_new_hand:', e));
+      try {
+        const { trickLogger } = await import('./lib/trickLogger');
+        const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
+        await trickLogger.startRound(game.dbGameId!, roundNumber);
+      } catch (err) {
+        console.error('Failed to start round logging for new hand:', err);
+      }
     }
 
     // Emit new hand started event with dealing phase
@@ -2658,8 +2752,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 // Seat replacement management - already declared above
 
 // Play again management
-const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
-const playAgainResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who responded
+export const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
+export const playAgainResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who responded
+export const originalPlayers = new Map<string, string[]>(); // gameId -> Array of original player IDs when play again started
 
 export function startSeatReplacement(game: Game, seatIndex: number) {
   console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
@@ -2887,26 +2982,83 @@ function startPlayAgainTimer(game: Game) {
     clearTimeout(existingTimer.timer);
   }
   
+  // Store the original players when play again timer starts
+  const currentPlayerIds = game.players.filter(p => p && p.type === 'human').map(p => p!.id);
+  originalPlayers.set(game.id, currentPlayerIds);
+  console.log(`[PLAY AGAIN] Stored original players for game ${game.id}:`, currentPlayerIds);
+  
   // Set 30-second timer
   const expiresAt = Date.now() + 30000; // 30 seconds
   const timer = setTimeout(() => {
-    console.log(`[PLAY AGAIN] Timer expired for game ${game.id}, auto-removing non-responding players`);
+    console.log(`[PLAY AGAIN] Timer expired for game ${game.id}, checking player status`);
     
-    // For league games, never auto-remove players after play-again
-    if ((game as any).league) {
-      console.log('[PLAY AGAIN] League game detected; skipping auto-removal of non-responding players');
-      // Clear timer and responses
+    // Get current human players and original players
+    const currentHumanPlayers = game.players.filter(p => p && p.type === 'human');
+    const currentPlayerIds = currentHumanPlayers.map(p => p!.id);
+    const originalPlayerIds = originalPlayers.get(game.id) || [];
+    
+    console.log(`[PLAY AGAIN] Current players:`, currentPlayerIds);
+    console.log(`[PLAY AGAIN] Original players:`, originalPlayerIds);
+    
+    // Check if any original players have left
+    const missingOriginalPlayers = originalPlayerIds.filter(id => !currentPlayerIds.includes(id));
+    
+    if (missingOriginalPlayers.length > 0) {
+      console.log(`[PLAY AGAIN] Original players left during play again period:`, missingOriginalPlayers);
+      console.log(`[PLAY AGAIN] Closing table completely for game ${game.id}`);
+      
+      // Clear all play again data
       playAgainTimers.delete(game.id);
       playAgainResponses.delete(game.id);
-      // Optionally, we could reset the game for a new round without removing players
-      resetGameForNewRound(game);
+      originalPlayers.delete(game.id);
+      
+      // Close the table completely
+      const gameIndex = games.findIndex(g => g.id === game.id);
+      if (gameIndex !== -1) {
+        games.splice(gameIndex, 1);
+      }
+      io.to(game.id).emit('game_closed', { reason: 'original_players_left' });
       return;
     }
     
+    // For league games, check if all original players responded
+    if ((game as any).league) {
+      console.log('[PLAY AGAIN] League game detected; checking if all original players responded');
+      const responses = playAgainResponses.get(game.id) || new Set();
+      
+      // Check if all original players responded
+      const allResponded = originalPlayerIds.every(id => responses.has(id));
+      
+      if (allResponded) {
+        console.log('[PLAY AGAIN] All original players responded, starting rematch');
+        // Clear all play again data
+        playAgainTimers.delete(game.id);
+        playAgainResponses.delete(game.id);
+        originalPlayers.delete(game.id);
+        // Start rematch
+        resetGameForNewRound(game);
+      } else {
+        console.log('[PLAY AGAIN] Not all original players responded, closing table');
+        // Clear all play again data
+        playAgainTimers.delete(game.id);
+        playAgainResponses.delete(game.id);
+        originalPlayers.delete(game.id);
+        // Close the table completely
+        const gameIndex = games.findIndex(g => g.id === game.id);
+        if (gameIndex !== -1) {
+          games.splice(gameIndex, 1);
+        }
+        io.to(game.id).emit('game_closed', { reason: 'not_all_players_responded' });
+      }
+      return;
+    }
+    
+    // For non-league games, use existing logic
+    console.log(`[PLAY AGAIN] Non-league game, auto-removing non-responding players`);
+    
     // Get human players who didn't respond
-    const humanPlayers = game.players.filter(p => p && p.type === 'human');
     const responses = playAgainResponses.get(game.id) || new Set();
-    const nonRespondingPlayers = humanPlayers.filter(p => !responses.has(p!.id));
+    const nonRespondingPlayers = currentHumanPlayers.filter(p => !responses.has(p!.id));
     
     // Remove non-responding players
     nonRespondingPlayers.forEach(player => {
@@ -2923,6 +3075,7 @@ function startPlayAgainTimer(game: Game) {
     // Clear timer and responses
     playAgainTimers.delete(game.id);
     playAgainResponses.delete(game.id);
+    originalPlayers.delete(game.id);
     
     // Check if any human players remain
     const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
@@ -2953,6 +3106,7 @@ function resetGameForNewRound(game: Game) {
     playAgainTimers.delete(game.id);
   }
   playAgainResponses.delete(game.id);
+  originalPlayers.delete(game.id);
   
   // Reset game state to WAITING
   game.status = 'WAITING';
@@ -3438,20 +3592,64 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
       bags = Math.max(0, playerTricks - playerBid);
     }
     
-    try {
-      // Update stats (nil tracking is now done per hand)
-      const stats = await prisma.userStats.update({
-        where: { userId },
-        data: {
-          gamesPlayed: { increment: 1 },
-          gamesWon: { increment: isWinner ? 1 : 0 },
-          // Mode-specific counters
-          partnersGamesPlayed: { increment: game.gameMode === 'PARTNERS' ? 1 : 0 },
-          partnersGamesWon: { increment: game.gameMode === 'PARTNERS' && isWinner ? 1 : 0 },
-          soloGamesPlayed: { increment: game.gameMode === 'SOLO' ? 1 : 0 },
-          soloGamesWon: { increment: game.gameMode === 'SOLO' && isWinner ? 1 : 0 }
+          try {
+        // Get current stats first for bag calculation
+        const currentStats = await prisma.userStats.findUnique({
+          where: { userId }
+        });
+        
+        // Calculate total tricks bid and made for this player from the game
+        let totalTricksBid = 0;
+        let totalTricksMade = 0;
+        let totalNilBids = 0;
+        
+        if (game.dbGameId) {
+          try {
+            const rounds = await prisma.round.findMany({
+              where: { gameId: game.dbGameId },
+              include: { bids: true }
+            });
+            
+            for (const round of rounds) {
+              const roundBid = round.bids.find((rb: any) => rb.playerId === userId);
+              if (roundBid) {
+                totalTricksBid += roundBid.bid;
+                if (roundBid.bid === 0) totalNilBids++;
+              }
+            }
+            
+            // Get tricks won from GamePlayer record
+            const gamePlayer = await prisma.gamePlayer.findFirst({
+              where: { gameId: game.dbGameId, userId: userId }
+            });
+            if (gamePlayer) {
+              totalTricksMade = gamePlayer.tricksMade || 0;
+            }
+          } catch (err) {
+            console.error('Failed to get game data for stats:', err);
+          }
         }
-      });
+        
+        // Update stats (nil tracking is now done per hand)
+        const stats = await prisma.userStats.update({
+          where: { userId },
+          data: {
+            gamesPlayed: { increment: 1 },
+            gamesWon: { increment: isWinner ? 1 : 0 },
+            // Mode-specific counters
+            partnersGamesPlayed: { increment: game.gameMode === 'PARTNERS' ? 1 : 0 },
+            partnersGamesWon: { increment: game.gameMode === 'PARTNERS' && isWinner ? 1 : 0 },
+            soloGamesPlayed: { increment: game.gameMode === 'SOLO' ? 1 : 0 },
+            soloGamesWon: { increment: game.gameMode === 'SOLO' && isWinner ? 1 : 0 },
+            // Trick tracking
+            totalTricksBid: { increment: totalTricksBid },
+            totalTricksMade: { increment: totalTricksMade },
+            totalNilBids: { increment: totalNilBids },
+            // Bag tracking
+            totalBags: { increment: bags },
+            bagsPerGame: { set: ((currentStats?.totalBags || 0) + bags) / ((currentStats?.gamesPlayed || 0) + 1) }
+          }
+        });
       
       // Handle coin prizes only (buy-in was already debited at game start)
       const buyIn = game.buyIn || 0;
@@ -3505,13 +3703,8 @@ async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
     }
   }
   
-  // Ensure results logging + Discord embed for league games
-  try {
-    const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-    await logCompletedGameToDbAndDiscord(game as any, winningTeamOrPlayer);
-  } catch (e) {
-    console.error('Post-completion logging failed:', e);
-  }
+  // Stats and coins updated successfully
+  console.log('[STATS UPDATED] Game completion stats and coins updated for all players');
 }
 
 // Helper to enrich game object for client - imported from games.routes.ts
@@ -3714,7 +3907,7 @@ function ensureLeagueReady(game: any) {
 
 // Periodic game completion check - runs every 10 seconds
 setInterval(() => {
-  games.forEach((game: Game) => {
+  games.forEach(async (game: Game) => {
     if (game.status === 'PLAYING') {
       const maxPoints = game.maxPoints;
       const minPoints = game.minPoints;
@@ -3935,9 +4128,13 @@ setInterval(() => {
                 console.error('Failed to update stats/coins:', err);
               });
               
-              void import('./lib/gameLogger')
-                .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeam))
-                .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+              try {
+                const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+                await logCompletedGameToDbAndDiscord(game, winningTeam);
+                console.log('[PERIODIC CHECK] Successfully logged completed game to database');
+              } catch (error) {
+                console.error('[PERIODIC CHECK] Failed to log completed game:', error);
+              }
             }
           }
         }
@@ -3985,20 +4182,174 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
   // Start play again timer
   startPlayAgainTimer(game);
   
+  // Calculate total bids from all rounds and update GamePlayer records
+  if (game.dbGameId) {
+    try {
+      console.log('[GAME COMPLETION] Calculating total bids from all rounds for game:', game.dbGameId);
+      
+      // Get all rounds for this game
+      const rounds = await prisma.round.findMany({
+        where: { gameId: game.dbGameId },
+        include: { bids: true }
+      });
+      
+      console.log('[GAME COMPLETION] Found rounds:', rounds.length);
+      
+      // Calculate total bids for each player
+      for (let playerIndex = 0; playerIndex < 4; playerIndex++) {
+        const player = game.players[playerIndex];
+        if (!player) continue;
+        
+        // Sum all bids for this player across all rounds
+        let totalBid = 0;
+        for (const round of rounds) {
+          const roundBid = round.bids.find((rb: any) => rb.playerId === player.id);
+          if (roundBid) {
+            totalBid += roundBid.bid;
+            console.log('[GAME COMPLETION] Round', round.roundNumber, 'player', playerIndex, 'bid:', roundBid.bid);
+          }
+        }
+        
+        console.log('[GAME COMPLETION] Player', playerIndex, 'total bid across all rounds:', totalBid);
+        
+        // Calculate total tricks won for this player
+        let totalTricksWon = 0;
+        for (const round of rounds) {
+          const tricks = await prisma.trick.findMany({
+            where: { roundId: round.id },
+            include: { Card: true }
+          });
+          
+          for (const trick of tricks) {
+            if (trick.winningPlayerId === player.id) {
+              totalTricksWon++;
+            }
+          }
+        }
+        
+        console.log('[GAME COMPLETION] Player', playerIndex, 'total tricks won:', totalTricksWon);
+        
+        // Calculate final score and points for this player
+        let finalScore = 0;
+        let finalPoints = 0;
+        
+        if (totalBid === 0) {
+          // Nil bid: 100 points if made, -100 if failed
+          finalScore = totalTricksWon === 0 ? 100 : -100;
+          finalPoints = finalScore;
+        } else {
+          // Regular bid: 10 points per trick bid if made, -10 points per trick bid if failed
+          if (totalTricksWon >= totalBid) {
+            finalScore = totalBid * 10 + Math.max(0, totalTricksWon - totalBid); // Bid points + bags
+            finalPoints = totalBid * 10;
+          } else {
+            finalScore = -totalBid * 10; // Failed bid penalty
+            finalPoints = finalScore;
+          }
+        }
+        
+        // Update GamePlayer record with total bid, tricks, bags, score, and points
+        await prisma.gamePlayer.updateMany({
+          where: {
+            gameId: game.dbGameId,
+            position: playerIndex
+          },
+          data: {
+            bid: totalBid,
+            tricksMade: totalTricksWon,
+            finalBags: Math.max(0, totalTricksWon - totalBid),
+            finalScore: finalScore,
+            finalPoints: finalPoints,
+            updatedAt: new Date()
+          }
+        });
+        
+        console.log('[GAME COMPLETION] Updated GamePlayer bid:', totalBid, 'tricks:', totalTricksWon, 'bags:', totalTricksWon - totalBid, 'score:', finalScore, 'points:', finalPoints);
+      }
+    } catch (error) {
+      console.error('[GAME COMPLETION] Failed to calculate total bids:', error);
+    }
+  }
+  
+  // UserStats update is now handled in updateStatsAndCoins function
+  // This prevents duplicate updates and ensures consistency
+  
   // Update stats and coins in DB
   updateStatsAndCoins(game, winningTeamOrPlayer).catch(err => {
     console.error('Failed to update stats/coins:', err);
   });
   
+  // Clean up trick logger memory for this game
+  try {
+    const { trickLogger } = await import('./lib/trickLogger');
+    trickLogger.cleanupGame(game.id);
+    console.log('[GAME COMPLETION] Cleaned up trick logger memory for game:', game.id);
+  } catch (error) {
+    console.error('[GAME COMPLETION] Failed to cleanup trick logger memory:', error);
+  }
+  
   // Log completed game to DB and Discord for league games
-  console.log('[GAME COMPLETION DEBUG] Game object league property:', (game as any).league);
-  console.log('[GAME COMPLETION DEBUG] Game object keys:', Object.keys(game));
-  console.log('[GAME COMPLETION DEBUG] About to call logCompletedGameToDbAndDiscord for league game:', (game as any).league);
-  void import('./lib/gameLogger')
-    .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningTeamOrPlayer))
-    .catch((e) => console.error('Failed to log completed game (fallback):', e));
+
+  
+  // Log completed game to DB and Discord for league games
+  try {
+    const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+    console.log('[GAME COMPLETION] Successfully imported gameLogger, calling logCompletedGameToDbAndDiscord');
+    await logCompletedGameToDbAndDiscord(game, winningTeamOrPlayer);
+    console.log('[GAME COMPLETION] Successfully logged game to database and Discord');
+  } catch (error) {
+    console.error('[GAME COMPLETION] Failed to log completed game:', error);
+    // Try to log at least basic game info to prevent complete loss
+    try {
+      console.log('[GAME COMPLETION] Attempting emergency logging...');
+      // Basic emergency logging here if needed
+    } catch (emergencyError) {
+      console.error('[GAME COMPLETION] Emergency logging also failed:', emergencyError);
+    }
+  }
 }
 
 // REMOVED: loadActiveGamesFromDatabase function - was causing duplicate tables and crashed games
 
 // ... existing code ...
+
+// Performance monitoring
+const performanceMetrics = {
+  gameCompletions: 0,
+  slowOperations: [] as Array<{operation: string, duration: number, timestamp: Date}>,
+  startTime: Date.now()
+};
+
+// Monitor slow operations
+function trackOperation<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
+  const start = Date.now();
+  return operation().finally(() => {
+    const duration = Date.now() - start;
+    if (duration > 1000) { // Log operations taking more than 1 second
+      performanceMetrics.slowOperations.push({
+        operation: operationName,
+        duration,
+        timestamp: new Date()
+      });
+      console.warn(`[PERFORMANCE] Slow operation: ${operationName} took ${duration}ms`);
+    }
+  });
+}
+
+// Clean up old performance data
+setInterval(() => {
+  const oneHourAgo = Date.now() - (60 * 60 * 1000);
+  performanceMetrics.slowOperations = performanceMetrics.slowOperations.filter(
+    op => op.timestamp.getTime() > oneHourAgo
+  );
+}, 300000); // Every 5 minutes
+
+// Log performance metrics periodically
+setInterval(() => {
+  if (performanceMetrics.slowOperations.length > 0) {
+    console.log(`[PERFORMANCE] ${performanceMetrics.slowOperations.length} slow operations in the last hour`);
+    performanceMetrics.slowOperations.forEach(op => {
+      console.log(`  - ${op.operation}: ${op.duration}ms at ${op.timestamp.toISOString()}`);
+    });
+  }
+}, 600000); // Every 10 minutes

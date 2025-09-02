@@ -45,11 +45,11 @@ export async function saveGameState(game: Game): Promise<void> {
       team2Bags: game.team2Bags,
       playerScores: game.playerScores,
       playerBags: game.playerBags,
-      // Additional state for complete recovery
-      deck: game.deck || [], // ✅ STORING REMAINING DECK
-      playedCards: game.playedCards || [], // ✅ STORING PLAYED CARDS
-      trickHistory: game.trickHistory || [], // ✅ STORING TRICK HISTORY
-      roundScores: game.roundScores || [] // ✅ STORING ROUND-BY-ROUND SCORES
+      // Additional state for complete recovery - these are runtime properties, not database fields
+      // deck: game.deck || [], // ✅ STORING REMAINING DECK
+      // playedCards: game.playedCards || [], // ✅ STORING PLAYED CARDS
+      // trickHistory: game.trickHistory || [], // ✅ STORING TRICK HISTORY
+      // roundScores: game.roundScores || [] // ✅ STORING ROUND-BY-ROUND SCORES
     };
 
     // Use type assertion to bypass Prisma type issues
@@ -67,7 +67,7 @@ export async function saveGameState(game: Game): Promise<void> {
     });
 
     console.log(`[GAME STATE] ✅ Saved COMPLETE state for game ${game.id} - Round ${game.currentRound || 1}, Trick ${game.currentTrick || 1}`);
-    console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${gameState.trickHistory.length} tricks`);
+    console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${(gameState as any).trickHistory?.length || 0} tricks`);
   } catch (error) {
     console.error(`[GAME STATE] ❌ Failed to save state for game ${game.id}:`, error);
   }
@@ -134,11 +134,11 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       playerBags: gameState.playerBags,
       createdAt: dbGame.createdAt.getTime(),
       updatedAt: dbGame.updatedAt.getTime(),
-      // Restore additional state
-      deck: gameState.deck || [],
-      playedCards: gameState.playedCards || [],
-      trickHistory: gameState.trickHistory || [],
-      roundScores: gameState.roundScores || [],
+      // Restore additional state - these are runtime properties, not database fields
+      // deck: gameState.deck || [],
+      // playedCards: gameState.playedCards || [],
+      // trickHistory: gameState.trickHistory || [],
+      // roundScores: gameState.roundScores || [],
       // Add missing properties with defaults
       forcedBid: 'NONE' as any,
       specialRules: { screamer: false, assassin: false },

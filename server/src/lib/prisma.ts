@@ -9,31 +9,22 @@ export const prisma: PrismaClient = globalForPrisma.prisma || new PrismaClient({
       url: process.env.DATABASE_URL,
     },
   },
-  // Enhanced connection pooling and retry configuration
-  log: ['error', 'warn'],
-  // Connection pool settings
-  __internal: {
-    engine: {
-      connectionLimit: 10,
-      pool: {
-        min: 2,
-        max: 10,
-        acquireTimeoutMillis: 30000,
-        createTimeoutMillis: 30000,
-        destroyTimeoutMillis: 5000,
-        idleTimeoutMillis: 30000,
-        reapIntervalMillis: 1000,
-        createRetryIntervalMillis: 200,
-      },
-    },
-  },
+  // Optimized logging - only errors in production
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['error', 'warn'],
+  // Performance optimizations
+  errorFormat: 'minimal',
 });
+
+// Optimized connection health check - less frequent in production
+const healthCheckInterval = process.env.NODE_ENV === 'production' ? 300000 : 30000; // 5 min vs 30 sec
 
 // Add connection health check
 export async function checkDatabaseConnection() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    console.log('[DATABASE] Connection healthy');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[DATABASE] Connection healthy');
+    }
     return true;
   } catch (error) {
     console.error('[DATABASE] Connection failed:', error);
@@ -41,10 +32,10 @@ export async function checkDatabaseConnection() {
   }
 }
 
-// Periodic connection health check
+// Periodic connection health check - optimized frequency
 setInterval(async () => {
   await checkDatabaseConnection();
-}, 30000); // Check every 30 seconds
+}, healthCheckInterval);
 
 if (process.env.NODE_ENV !== 'production') {
 	globalForPrisma.prisma = prisma;
