@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSocket } from './SocketContext';
 
 // Configure axios defaults
 axios.defaults.baseURL = import.meta.env.PROD
@@ -80,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
+  const { socket } = useSocket();
 
   useEffect(() => {
     const token = localStorage.getItem('sessionToken');
@@ -107,6 +109,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('sessionInvalidated', handleSessionInvalidated as EventListener);
     };
   }, []);
+
+  // Listen for real-time coin updates
+  useEffect(() => {
+    if (!socket || !user) return;
+
+    const handleCoinUpdate = (data: { userId: string; newBalance: number }) => {
+      console.log('Coin update received:', data);
+      if (data.userId === user.id) {
+        setUser(prev => prev ? { ...prev, coins: data.newBalance } : null);
+        console.log('Updated user coin balance to:', data.newBalance);
+      }
+    };
+
+    socket.on('coin_updated', handleCoinUpdate);
+    
+    return () => {
+      socket.off('coin_updated', handleCoinUpdate);
+    };
+  }, [socket, user]);
 
   const fetchProfile = async () => {
     try {
