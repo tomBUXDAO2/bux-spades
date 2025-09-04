@@ -2025,10 +2025,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             }
             game.winningPlayer = winningPlayer;
             
-            // Use completeGame function to ensure proper logging
-            completeGame(game, winningPlayer).catch(err => {
-              console.error('Failed to complete solo game:', err);
-            });
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningPlayer);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (fallback):', err);
+              });
+            }
           }
         } else {
           // Partners mode game over check
@@ -2086,7 +2099,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-            game.status = 'FINISHED';
             
             let winningPlayer = 0;
             let highestScore = playerScores[0];
@@ -2097,18 +2109,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               }
             }
             
-            io.to(game.id).emit('game_over', {
-              playerScores: game.playerScores,
-              winningPlayer: winningPlayer,
-            });
-            
-            updateStatsAndCoins(game, winningPlayer).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-            
-            void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
-              .catch((e) => console.error('Failed to log completed game (fallback):', e));
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningPlayer);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (fallback):', err);
+              });
+            }
           }
         } else {
           // Partners mode
@@ -2135,10 +2152,23 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           if (shouldEndGame && winningTeam) {
             console.log('[GAME OVER] Partners game ended! Team 1:', team1Score, 'Team 2:', team2Score, 'Winner:', winningTeam);
             
-            // Use completeGame function to ensure proper logging
-            completeGame(game, winningTeam).catch(err => {
-              console.error('Failed to complete partners game:', err);
-            });
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningTeam);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningTeam).catch(err => {
+                console.error('Failed to complete partners game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningTeam).catch(err => {
+                console.error('Failed to complete partners game (fallback):', err);
+              });
+            }
           }
         }
       }
@@ -3448,20 +3478,12 @@ async function updateHandStats(game: Game) {
   console.log('[UPDATE HAND STATS] Function called for game:', game.id);
   console.log('[UPDATE HAND STATS] Game players:', game.players.map(p => p ? { id: p.id, type: p.type, bid: p.bid, tricks: p.tricks } : null));
   
-  // Check if this is an all-human game (no bots)
-  const humanPlayers = game.players.filter(p => p && p.type === 'human');
-  const isAllHumanGame = humanPlayers.length === 4;
-  
-  if (!isAllHumanGame) {
-    console.log('Skipping hand stats update - not an all-human game');
-    return;
-  }
-  
-  console.log('Updating hand stats for all-human game');
+  // For Discord league games, we know they are all-human games
+  console.log('Updating hand stats for game');
   
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];
-    if (!player || player.type !== 'human') continue;
+    if (!player) continue;
     const userId = player.id;
     if (!userId) continue; // Skip if no user ID
     
@@ -3525,6 +3547,9 @@ async function updateHandStats(game: Game) {
       console.log(`[UPDATE HAND STATS] Attempting to update stats for user ${userId} with data:`, {
         totalBags: newTotalBags,
         bagsPerGame: newBagsPerGame,
+        totalTricksBid: { increment: playerBid },
+        totalTricksMade: { increment: playerTricks },
+        totalNilBids: { increment: nilBidIncrement + blindNilBidIncrement },
         nilsBid: { increment: nilBidIncrement },
         nilsMade: { increment: nilMadeIncrement },
         blindNilsBid: { increment: blindNilBidIncrement },
@@ -3536,6 +3561,9 @@ async function updateHandStats(game: Game) {
         data: {
           totalBags: newTotalBags,
           bagsPerGame: newBagsPerGame,
+          totalTricksBid: { increment: playerBid },
+          totalTricksMade: { increment: playerTricks },
+          totalNilBids: { increment: nilBidIncrement + blindNilBidIncrement },
           nilsBid: { increment: nilBidIncrement },
           nilsMade: { increment: nilMadeIncrement },
           blindNilsBid: { increment: blindNilBidIncrement },
@@ -3552,20 +3580,15 @@ async function updateHandStats(game: Game) {
 
 // --- Stats and coins update helper ---
 async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
-  // Check if this is an all-human game (no bots)
-  const humanPlayers = game.players.filter(p => p && p.type === 'human');
-  const isAllHumanGame = humanPlayers.length === 4;
-  
-  if (!isAllHumanGame) {
-    console.log('Skipping stats/coins update - not an all-human game');
-    return;
-  }
-  
-  console.log('Updating stats and coins for all-human game');
+  // For Discord league games, we know they are all-human games
+  // The game.players array might not have type set correctly during completion
+  console.log('Updating stats and coins for game completion');
+  console.log('Game ID:', game.id, 'Winning team/player:', winningTeamOrPlayer);
+  console.log('Game players:', game.players.map(p => p ? `${p.username} (${p.type || 'unknown'})` : 'null'));
   
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];
-    if (!player || player.type !== 'human') continue;
+    if (!player) continue;
     const userId = player.id;
     if (!userId) continue; // Skip if no user ID
     
@@ -3973,33 +3996,24 @@ setInterval(() => {
           
           if (shouldEndGame && winningTeam) {
             console.log('[PERIODIC CHECK] Partners game ended! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
-            game.status = 'FINISHED';
-            io.to(game.id).emit('game_over', {
-              team1Score: game.team1TotalScore,
-              team2Score: game.team2TotalScore,
-              winningTeam,
-            });
             
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningTeam).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-            
-            // Log completed game to DB and Discord
-            console.log('[GAME COMPLETION] About to log completed game to DB and Discord for game:', game.id);
-            console.log('[GAME COMPLETION] Game league property (periodic check):', (game as any).league);
-            void import('./lib/gameLogger')
-              .then(({ logCompletedGameToDbAndDiscord }) => {
-                console.log('[GAME COMPLETION] Successfully imported gameLogger, calling logCompletedGameToDbAndDiscord');
-                return logCompletedGameToDbAndDiscord(game, winningTeam);
-              })
-              .then(() => {
-                console.log('[GAME COMPLETION] Successfully logged game completion for game:', game.id);
-              })
-              .catch((e) => {
-                console.error('[GAME COMPLETION ERROR] Failed to log completed game (periodic check):', e);
-                console.error('[GAME COMPLETION ERROR] Stack trace:', e.stack);
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningTeam);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningTeam).catch(err => {
+                console.error('Failed to complete partners game (periodic check):', err);
               });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningTeam).catch(err => {
+                console.error('Failed to complete partners game (periodic check):', err);
+              });
+            }
           }
         }
       }
@@ -4084,10 +4098,23 @@ setInterval(() => {
                 }
               }
               
-              // Use completeGame function to ensure proper logging
-              completeGame(game, winningPlayer).catch(err => {
-                console.error('Failed to complete solo game (periodic check):', err);
-              });
+              // First log the game to database, then complete it
+              try {
+                const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+                await logCompletedGameToDbAndDiscord(game, winningPlayer);
+                console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+                
+                // Now call completeGame with the logged game
+                completeGame(game, winningPlayer).catch(err => {
+                  console.error('Failed to complete solo game (periodic check):', err);
+                });
+              } catch (error) {
+                console.error('Failed to log game to database:', error);
+                // Fallback: try to complete without logging
+                completeGame(game, winningPlayer).catch(err => {
+                  console.error('Failed to complete solo game (periodic check):', err);
+                });
+              }
             }
           } else {
             // Partners mode game over check
@@ -4146,23 +4173,23 @@ setInterval(() => {
 // Single function to handle game completion
 async function completeGame(game: Game, winningTeamOrPlayer: number) {
   console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
-  console.log('[GAME COMPLETION] Game league property:', (game as any).league);
-  console.log('[GAME COMPLETION] Game status before:', game.status);
   
+  try {
   // Set game status to FINISHED
   game.status = 'FINISHED';
   
   // Update database status to FINISHED
   if (game.dbGameId) {
-    try {
       await prisma.game.update({
         where: { id: game.dbGameId },
-        data: { status: 'FINISHED' }
+        data: { 
+          status: 'FINISHED',
+          completed: true,
+          finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
+          winner: winningTeamOrPlayer
+        }
       });
       console.log('[GAME COMPLETION] Updated database status to FINISHED for game:', game.dbGameId);
-    } catch (error) {
-      console.error('[GAME COMPLETION] Failed to update database status:', error);
-    }
   }
   
   // Emit game over event
@@ -4182,10 +4209,17 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
   // Start play again timer
   startPlayAgainTimer(game);
   
-  // Calculate total bids from all rounds and update GamePlayer records
-  if (game.dbGameId) {
-    try {
-      console.log('[GAME COMPLETION] Calculating total bids from all rounds for game:', game.dbGameId);
+    // For partners games, calculate actual totals from database and update GamePlayer records
+    if (game.gameMode === 'PARTNERS' && game.dbGameId) {
+      console.log('[GAME COMPLETION] Calculating actual totals from database for partners game');
+      
+      // Get all GamePlayer records for this game to get the userIds
+      const gamePlayers = await prisma.gamePlayer.findMany({
+        where: { gameId: game.dbGameId },
+        orderBy: { position: 'asc' }
+      });
+      
+      console.log('[GAME COMPLETION] Found GamePlayer records:', gamePlayers.length);
       
       // Get all rounds for this game
       const rounds = await prisma.round.findMany({
@@ -4195,91 +4229,77 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
       
       console.log('[GAME COMPLETION] Found rounds:', rounds.length);
       
-      // Calculate total bids for each player
+      // Calculate totals for each player position
       for (let playerIndex = 0; playerIndex < 4; playerIndex++) {
-        const player = game.players[playerIndex];
-        if (!player) continue;
+        // Get player from GamePlayer records instead of game state
+        const gamePlayer = gamePlayers.find(gp => gp.position === playerIndex);
+        if (!gamePlayer || !gamePlayer.userId) {
+          console.log('[GAME COMPLETION] No GamePlayer record found for position', playerIndex);
+          continue;
+        }
         
         // Sum all bids for this player across all rounds
         let totalBid = 0;
+        let totalTricksWon = 0;
+        
         for (const round of rounds) {
-          const roundBid = round.bids.find((rb: any) => rb.playerId === player.id);
+          // Find this player's bid in this round
+          const roundBid = round.bids.find((rb: any) => rb.playerId === gamePlayer.userId);
           if (roundBid) {
             totalBid += roundBid.bid;
-            console.log('[GAME COMPLETION] Round', round.roundNumber, 'player', playerIndex, 'bid:', roundBid.bid);
           }
+        
+          // Count tricks won by this player in this round
+          const tricks = await prisma.trick.findMany({
+            where: { 
+              roundId: round.id,
+              winningPlayerId: gamePlayer.userId
+            }
+          });
+          totalTricksWon += tricks.length;
         }
         
-        console.log('[GAME COMPLETION] Player', playerIndex, 'total bid across all rounds:', totalBid);
+        // Calculate bags
+        const totalBags = Math.max(0, totalTricksWon - totalBid);
         
-        // Calculate total tricks won for this player
-        let totalTricksWon = 0;
-        for (const round of rounds) {
-          const tricks = await prisma.trick.findMany({
-            where: { roundId: round.id },
-            include: { Card: true }
+        // Determine if this player won
+        const isWinner = (winningTeamOrPlayer === 1 && (playerIndex === 0 || playerIndex === 2)) ||
+                     (winningTeamOrPlayer === 2 && (playerIndex === 1 || playerIndex === 3));
+        
+        // Calculate final score based on team result
+        const finalScore = isWinner ? 
+          Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0) : 
+          Math.min(game.team1TotalScore || 0, game.team2TotalScore || 0);
+        
+        // Update GamePlayer record with actual calculated data
+        await prisma.gamePlayer.update({
+          where: { id: gamePlayer.id },
+            data: {
+              bid: totalBid,
+              tricksMade: totalTricksWon,
+            bags: totalBags,
+            finalBags: totalBags,
+              finalScore: finalScore,
+            finalPoints: finalScore,
+              won: isWinner,
+              updatedAt: new Date()
+            }
           });
           
-          for (const trick of tricks) {
-            if (trick.winningPlayerId === player.id) {
-              totalTricksWon++;
-            }
-          }
-        }
-        
-        console.log('[GAME COMPLETION] Player', playerIndex, 'total tricks won:', totalTricksWon);
-        
-        // Calculate final score and points for this player
-        let finalScore = 0;
-        let finalPoints = 0;
-        
-        if (totalBid === 0) {
-          // Nil bid: 100 points if made, -100 if failed
-          finalScore = totalTricksWon === 0 ? 100 : -100;
-          finalPoints = finalScore;
-        } else {
-          // Regular bid: 10 points per trick bid if made, -10 points per trick bid if failed
-          if (totalTricksWon >= totalBid) {
-            finalScore = totalBid * 10 + Math.max(0, totalTricksWon - totalBid); // Bid points + bags
-            finalPoints = totalBid * 10;
-          } else {
-            finalScore = -totalBid * 10; // Failed bid penalty
-            finalPoints = finalScore;
-          }
-        }
-        
-        // Update GamePlayer record with total bid, tricks, bags, score, and points
-        await prisma.gamePlayer.updateMany({
-          where: {
-            gameId: game.dbGameId,
-            position: playerIndex
-          },
-          data: {
-            bid: totalBid,
-            tricksMade: totalTricksWon,
-            finalBags: Math.max(0, totalTricksWon - totalBid),
-            finalScore: finalScore,
-            finalPoints: finalPoints,
-            updatedAt: new Date()
-          }
-        });
-        
-        console.log('[GAME COMPLETION] Updated GamePlayer bid:', totalBid, 'tricks:', totalTricksWon, 'bags:', totalTricksWon - totalBid, 'score:', finalScore, 'points:', finalPoints);
+        console.log('[GAME COMPLETION] Updated player', playerIndex, 'bid:', totalBid, 'tricks:', totalTricksWon, 'bags:', totalBags, 'won:', isWinner);
       }
-    } catch (error) {
-      console.error('[GAME COMPLETION] Failed to calculate total bids:', error);
     }
-  }
-  
-  // UserStats update is now handled in updateStatsAndCoins function
-  // This prevents duplicate updates and ensures consistency
-  
-  // Update stats and coins in DB
-  updateStatsAndCoins(game, winningTeamOrPlayer).catch(err => {
+    
+    // Update stats and coins
+    try {
+      const { updateStatsAndCoins } = await import('./routes/games.routes');
+      await updateStatsAndCoins(game, winningTeamOrPlayer);
+      console.log('[GAME COMPLETION] Stats and coins updated successfully');
+    } catch (err) {
     console.error('Failed to update stats/coins:', err);
-  });
+    }
   
-  // Clean up trick logger memory for this game
+    // Clean up trick logger memory
   try {
     const { trickLogger } = await import('./lib/trickLogger');
     trickLogger.cleanupGame(game.id);
@@ -4288,24 +4308,10 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
     console.error('[GAME COMPLETION] Failed to cleanup trick logger memory:', error);
   }
   
-  // Log completed game to DB and Discord for league games
-
-  
-  // Log completed game to DB and Discord for league games
-  try {
-    const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-    console.log('[GAME COMPLETION] Successfully imported gameLogger, calling logCompletedGameToDbAndDiscord');
-    await logCompletedGameToDbAndDiscord(game, winningTeamOrPlayer);
-    console.log('[GAME COMPLETION] Successfully logged game to database and Discord');
+    console.log('[GAME COMPLETION] Game completion finished successfully');
+    
   } catch (error) {
-    console.error('[GAME COMPLETION] Failed to log completed game:', error);
-    // Try to log at least basic game info to prevent complete loss
-    try {
-      console.log('[GAME COMPLETION] Attempting emergency logging...');
-      // Basic emergency logging here if needed
-    } catch (emergencyError) {
-      console.error('[GAME COMPLETION] Emergency logging also failed:', emergencyError);
-    }
+    console.error('[GAME COMPLETION] Error completing game:', error);
   }
 }
 

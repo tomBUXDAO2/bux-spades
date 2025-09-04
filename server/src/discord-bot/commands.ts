@@ -252,6 +252,35 @@ const commands = [
   new SlashCommandBuilder()
     .setName('help')
     .setDescription('Show all available commands and how to use them'),
+  new SlashCommandBuilder()
+    .setName('pay')
+    .setDescription('Admin: credit coins to a user')
+    .addUserOption(option =>
+      option.setName('user')
+        .setDescription('User to credit')
+        .setRequired(true))
+    .addIntegerOption(option =>
+      option.setName('coins')
+        .setDescription('Amount of coins (100k to 50M)')
+        .setRequired(true)
+        .setMinValue(100000)
+        .setMaxValue(50000000)
+    ),
+  new SlashCommandBuilder()
+    .setName('leaderboard')
+    .setDescription('Show top 10 players by a metric')
+    .addStringOption(option =>
+      option.setName('metric')
+        .setDescription('Leaderboard metric')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Games Won', value: 'games_won' },
+          { name: 'Games Played', value: 'games_played' },
+          { name: 'Win %', value: 'win_pct' },
+          { name: 'Bags per Game', value: 'bags_per_game' },
+          { name: 'Nil Success %', value: 'nil_success_pct' }
+        )
+    ),
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN!);

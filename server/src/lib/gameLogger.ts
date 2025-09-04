@@ -204,19 +204,28 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			}
 		}
 
+		// Get the actual final scores from the database (already calculated by completeGame)
+		const dbGamePlayers = await prisma.gamePlayer.findMany({
+			where: { gameId: dbGame.id },
+			orderBy: { position: 'asc' }
+		});
+
 		const playerResults = {
-			players: game.players.map((p: any, i: number) => ({
-				position: i,
-				userId: p?.id, // DB user id
-				discordId: p?.discordId || null,
-				username: p?.username,
-				team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
-				finalBid: p?.bid || 0,
-				finalTricks: p?.tricks || 0,
-				finalBags: p ? Math.max(0, (p.tricks || 0) - (p.bid || 0)) : 0,
-				finalScore: gameMode === 'SOLO' ? game.playerScores?.[i] || 0 : 0,
-				won: gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2)
-			}))
+			players: game.players.map((p: any, i: number) => {
+				const dbPlayer = dbGamePlayers.find(gp => gp.position === i);
+				return {
+					position: i,
+					userId: p?.id, // DB user id
+					discordId: p?.discordId || null,
+					username: p?.username,
+					team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
+					finalBid: dbPlayer?.finalBid || 0,
+					finalTricks: dbPlayer?.finalTricks || 0,
+					finalBags: dbPlayer?.finalBags || 0,
+					finalScore: dbPlayer?.finalScore || 0,
+					won: gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2)
+				};
+			})
 		};
 
 		// Check if GameResult already exists
@@ -255,31 +264,9 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 			}
 		}
 		
-		// Update GamePlayer records with won field
-		try {
-			for (let i = 0; i < game.players.length; i++) {
-				const player = game.players[i];
-				if (!player) continue;
-				
-				const isWinner = gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2);
-				
-				await prisma.gamePlayer.updateMany({
-					where: {
-						gameId: dbGame.id,
-						position: i
-					},
-					data: {
-						won: isWinner,
-						updatedAt: new Date()
-					}
-				});
-				
-				if (!isProduction) {
-					console.log(`[GAME LOGGER] Updated GamePlayer won field for position ${i}: ${isWinner}`);
-				}
-			}
-		} catch (updateError) {
-			console.error('[GAME LOGGER] Failed to update GamePlayer won fields:', updateError);
+		// GamePlayer records are already updated by completeGame, no need to overwrite them
+		if (!isProduction) {
+			console.log(`[GAME LOGGER] GamePlayer records already updated by completeGame, skipping duplicate update`);
 		}
 		
 		// Send Discord results for league games

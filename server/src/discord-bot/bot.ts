@@ -22,8 +22,18 @@ const LEAGUE_ROLE_ID = process.env.LEAGUE_ROLE_ID || '1403953667501195284';
 const GUILD_ID = process.env.DISCORD_GUILD_ID || '1403837418494492763';
 const VERIFICATION_CHANNEL_ID = process.env.VERIFICATION_CHANNEL_ID || '1403960351107715073';
 const RESULTS_CHANNEL_ID = process.env.RESULTS_CHANNEL_ID || '1404128066296610878';
-
-
+const TEAM_CHANNEL_ID = process.env.TEAM_CHANNEL_ID || '1413152325559783535';
+const FACEBOOK_ICON_URL = 'https://www.bux-spades.pro/2023_Facebook_icon.svg';
+const PUBLIC_BASE = 'https://www.bux-spades.pro';
+const PHOTO_WILL = `${PUBLIC_BASE}/Will.jpg`;
+const PHOTO_TOM = `${PUBLIC_BASE}/Tom.jpg`;
+const PHOTO_NICHOLE = `${PUBLIC_BASE}/Nichole.jpg`;
+const PHOTO_DAN = `${PUBLIC_BASE}/Dan.jpg`;
+// Team member Discord IDs
+const TEAM_OWNER_ID = '1400546525951824024';
+const TEAM_DEV_ID = '931160720261939230';
+const TEAM_SUPPORT_ID = '290531269970755587';
+const TEAM_ADMIN_IDS = ['1195400053964161055', '1400602664437415956'];
 
 // Store active game lines
 interface GameLine { messageId: string; channelId: string; hostId: string; hostName: string; coins: number; gameMode: string; maxPoints: number; minPoints: number; gameType: string; screamer: string | null; assassin: string | null; nil: string | null; blindNil: string | null; players: { userId: string; username: string; seat: number; avatar?: string }[]; createdAt: number; timeout?: NodeJS.Timeout }
@@ -778,24 +788,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
       
       const targetUser = interaction.options.getUser('user') || interaction.user;
       
-      // Get user stats from database
+      // Get user stats from GamePlayer records (same source as app)
       const user = await prisma.user.findFirst({
-        where: { discordId: targetUser.id },
-        include: { UserStats: true }
+        where: { discordId: targetUser.id }
       });
       
-      if (!user || !user.UserStats) {
-        await interaction.editReply(`❌ No stats found for ${targetUser.username}`);
+      if (!user) {
+        await interaction.editReply(`❌ No user found for ${targetUser.username}`);
         return;
       }
       
-      const stats = user.UserStats as any;
+      // Get all GamePlayer records for this user (same filtering as app)
+      const gamePlayers = await prisma.gamePlayer.findMany({
+        where: { userId: user.id },
+        include: { Game: true }
+      });
       
-      // Calculate win percentages
-      const totalWinPercentage = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(1) : '0.0';
-      const leagueGames = (stats.partnersGamesPlayed ?? 0) + (stats.soloGamesPlayed ?? 0);
-      const leagueWins = (stats.partnersGamesWon ?? 0) + (stats.soloGamesWon ?? 0);
-      const leagueWinPct = leagueGames > 0 ? ((leagueWins / leagueGames) * 100).toFixed(1) : '0.0';
+      // Filter to only include FINISHED games (same as app)
+      const finishedGames = gamePlayers.filter(gp => gp.Game?.status === 'FINISHED');
+      
+      // Calculate stats from finished GamePlayer records
+      const totalGames = finishedGames.length;
+      const totalWins = finishedGames.filter(gp => gp.won).length;
+      const totalWinPercentage = totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : '0.0';
+      
+      // League games are all finished games (same as app)
+      const leagueGames = totalGames;
+      const leagueWins = totalWins;
+      const leagueWinPct = totalWinPercentage;
       
               const embed = new EmbedBuilder()
           .setColor(0x00ff00)
@@ -803,8 +823,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setThumbnail(targetUser.displayAvatarURL({ extension: 'png', size: 128 }))
         .addFields(
           { name: 'TOTAL GAMES:', value: '\u200b', inline: false },
-          { name: '🎮 Games', value: stats.gamesPlayed.toString(), inline: true },
-          { name: '🏆 Wins', value: stats.gamesWon.toString(), inline: true },
+          { name: '🎮 Games', value: totalGames.toString(), inline: true },
+          { name: '🏆 Wins', value: totalWins.toString(), inline: true },
           { name: '📈 Win Rate', value: `${totalWinPercentage}%`, inline: true },
           { name: '\u200b', value: '\u200b', inline: false },
           { name: 'LEAGUE GAMES:', value: '\u200b', inline: false },
@@ -857,8 +877,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             inline: false 
           },
           { 
-            name: '📊 Stats Commands', 
-            value: '\n**/stats** - Show your game statistics\n**/stats @user** - Show another user\'s statistics\n',
+            name: '📊 Stats & Leaderboards', 
+            value: '\n**/stats** - Show your game statistics\n**/stats @user** - Show another user\'s statistics\n**/leaderboard** - Top 10 by metric (Games Won, Games Played, Win %, Bags per Game, Nil Success %)\n',
             inline: false 
           },
           { 
@@ -880,6 +900,157 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (error) {
       console.error('Error showing help:', error);
       await interaction.editReply('❌ Error showing help. Please try again.');
+    }
+    return;
+  }
+  
+  // Handle pay command (admin only)
+  if (interaction.commandName === 'pay') {
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring pay reply:', error);
+      return;
+    }
+    
+    try {
+      if (!interaction.isChatInputCommand()) {
+        await interaction.editReply('❌ This command can only be used as a slash command.');
+        return;
+      }
+      const member = interaction.member as any;
+      const roles = member?.roles;
+      const isAdmin = !!(roles && (roles.cache ? roles.cache.has('1403850350091436123') : Array.isArray(roles) ? roles.includes('1403850350091436123') : false));
+      if (!isAdmin) {
+        await interaction.editReply('❌ You do not have permission to use this command.');
+        return;
+      }
+      const targetUser = interaction.options.getUser('user', true);
+      const amount = interaction.options.getInteger('coins', true);
+      if (amount < 100000 || amount > 50000000) {
+        await interaction.editReply('❌ Amount must be between 100,000 and 50,000,000 coins.');
+        return;
+      }
+      const user = await prisma.user.findFirst({ where: { discordId: targetUser.id } });
+      if (!user) {
+        await interaction.editReply(`❌ No linked app account found for ${targetUser}. Ask them to log in to the app via Discord first.`);
+        return;
+      }
+      const before = user.coins || 0;
+      await prisma.user.update({ where: { id: user.id }, data: { coins: { increment: amount } } });
+      const updated = await prisma.user.findUnique({ where: { id: user.id }, select: { coins: true } });
+      const after = updated?.coins || before + amount;
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('✅ Payment Successful')
+        .setDescription(`Credited coins to <@${targetUser.id}>`)
+        .addFields(
+          { name: 'Amount', value: `${formatCoins(amount)} (${amount.toLocaleString()})`, inline: true },
+          { name: 'Before', value: before.toLocaleString(), inline: true },
+          { name: 'After', value: after.toLocaleString(), inline: true }
+        )
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+      // Also post a public confirmation for transparency
+      try {
+        if (interaction.channel && 'send' in interaction.channel) {
+          await (interaction.channel as any).send({
+            content: `✅ Payment confirmed: <@${interaction.user.id}> credited ${formatCoins(amount)} (${amount.toLocaleString()}) to <@${targetUser.id}>`
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to send public payment confirmation:', e);
+      }
+    } catch (error) {
+      console.error('Error in pay command:', error);
+      await interaction.editReply('❌ Error processing payment.');
+    }
+    return;
+  }
+  
+  // Handle leaderboard command
+  if (interaction.commandName === 'leaderboard') {
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error deferring leaderboard reply:', error);
+      return;
+    }
+    
+    try {
+      if (!interaction.isChatInputCommand()) {
+        await interaction.editReply('❌ This command can only be used as a slash command.');
+        return;
+      }
+      const metric = interaction.options.getString('metric', true);
+      
+      // Fetch stats with associated user
+      const stats = await prisma.userStats.findMany({
+        include: { User: { select: { username: true, discordId: true } } },
+        take: 500 // sample enough to sort by computed metrics
+      });
+      
+      type Entry = { name: string; value: number; pct?: boolean; discordId?: string };
+      let entries: Entry[] = [];
+      
+      if (metric === 'games_won') {
+        entries = stats
+          .sort((a,b) => (b.gamesWon || 0) - (a.gamesWon || 0))
+          .slice(0, 10)
+          .map(s => ({ name: s.User?.username || 'Unknown', value: s.gamesWon || 0, discordId: s.User?.discordId || undefined }));
+      } else if (metric === 'games_played') {
+        entries = stats
+          .sort((a,b) => (b.gamesPlayed || 0) - (a.gamesPlayed || 0))
+          .slice(0, 10)
+          .map(s => ({ name: s.User?.username || 'Unknown', value: s.gamesPlayed || 0, discordId: s.User?.discordId || undefined }));
+      } else if (metric === 'win_pct') {
+        const filtered = stats.filter(s => (s.gamesPlayed || 0) > 0);
+        entries = filtered
+          .map(s => ({ s, pct: (s.gamesWon || 0) / (s.gamesPlayed || 1) }))
+          .sort((a,b) => b.pct - a.pct)
+          .slice(0, 10)
+          .map(({ s, pct }) => ({ name: s.User?.username || 'Unknown', value: Math.round(pct * 1000) / 10, pct: true, discordId: s.User?.discordId || undefined }));
+      } else if (metric === 'bags_per_game') {
+        entries = stats
+          .sort((a,b) => (b.bagsPerGame || 0) - (a.bagsPerGame || 0))
+          .slice(0, 10)
+          .map(s => ({ name: s.User?.username || 'Unknown', value: Number((s.bagsPerGame || 0).toFixed(2)), discordId: s.User?.discordId || undefined }));
+      } else if (metric === 'nil_success_pct') {
+        const filtered = stats.filter(s => ((s.nilsBid || 0) + (s.blindNilsBid || 0)) > 0);
+        entries = filtered
+          .map(s => {
+            const attempts = (s.nilsBid || 0) + (s.blindNilsBid || 0);
+            const made = (s.nilsMade || 0) + (s.blindNilsMade || 0);
+            const pct = attempts > 0 ? made / attempts : 0;
+            return { s, pct };
+          })
+          .sort((a,b) => b.pct - a.pct)
+          .slice(0, 10)
+          .map(({ s, pct }) => ({ name: s.User?.username || 'Unknown', value: Math.round(pct * 1000) / 10, pct: true, discordId: s.User?.discordId || undefined }));
+      }
+      
+      const titleMap: Record<string,string> = {
+        games_won: '🏆 Top 10 – Games Won',
+        games_played: '🎮 Top 10 – Games Played',
+        win_pct: '📈 Top 10 – Win %',
+        bags_per_game: '🧳 Top 10 – Bags per Game',
+        nil_success_pct: '🫥 Top 10 – Nil Success %'
+      };
+      const unit = metric === 'win_pct' || metric === 'nil_success_pct' ? '%' : '';
+      const lines = entries.map((e, i) => {
+        const display = e.pct ? `${e.value.toFixed(1)}%` : `${e.value.toLocaleString()}`;
+        const mention = e.discordId ? `<@${e.discordId}>` : e.name;
+        return `#${i+1} ${mention} — ${display}`;
+      });
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle(titleMap[metric] || 'Top 10')
+        .setDescription(lines.length ? lines.join('\n') : 'No data available yet.')
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Error in leaderboard command:', error);
+      await interaction.editReply('❌ Error fetching leaderboard.');
     }
     return;
   }
@@ -1334,6 +1505,70 @@ export {
   sendLeagueGameResults
 };
 
+// Post a one-time MEET THE TEAM embed if not already present
+async function postMeetTheTeamEmbedOnce(): Promise<void> {
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    const channel = await guild.channels.fetch(TEAM_CHANNEL_ID);
+    if (!channel || channel.type !== ChannelType.GuildText) {
+      console.warn('[DISCORD BOT] Team channel not found or not a text channel');
+      return;
+    }
+    const textChannel = channel as TextChannel;
+    // Check recent messages for an existing embed with our title
+    const messages = await textChannel.messages.fetch({ limit: 50 });
+    const alreadyPosted = messages.some(m => m.author.id === client.user?.id && m.embeds?.some(e => (e.title || '').toUpperCase() === 'MEET THE TEAM'));
+    if (alreadyPosted) {
+      console.log('[DISCORD BOT] MEET THE TEAM embed already present; skipping post');
+      return;
+    }
+    // First embed acts as header
+    const header = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setTitle('MEET THE TEAM')
+      .setThumbnail(`${PUBLIC_BASE}/bux-spades.png`)
+      .setTimestamp();
+    // Owner
+    const ownerEmbed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setAuthor({ name: 'William Perryman Sr.', url: 'https://www.facebook.com/williamperrymansr', iconURL: FACEBOOK_ICON_URL })
+      .setTitle('Server Owner')
+      .setDescription(`<@${TEAM_OWNER_ID}> — [Facebook Profile](https://www.facebook.com/williamperrymansr)`) 
+      .setThumbnail(PHOTO_WILL);
+    // Developer
+    const devEmbed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setAuthor({ name: 'Tom Garner', url: 'https://www.facebook.com/tomjgarner', iconURL: FACEBOOK_ICON_URL })
+      .setTitle('Game Developer')
+      .setDescription(`<@${TEAM_DEV_ID}> — [Facebook Profile](https://www.facebook.com/tomjgarner)`) 
+      .setThumbnail(PHOTO_TOM);
+    // Support
+    const supportEmbed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setAuthor({ name: 'Discord Support', iconURL: FACEBOOK_ICON_URL })
+      .setTitle('Discord Support')
+      .setDescription(`<@${TEAM_SUPPORT_ID}>`) 
+      .setThumbnail(PHOTO_NICHOLE);
+    // Admins (two embeds to show photos)
+    const admin1 = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setAuthor({ name: 'Nichole Foutz', url: 'https://www.facebook.com/nfoutz', iconURL: FACEBOOK_ICON_URL })
+      .setTitle('Admin')
+      .setDescription(`<@${TEAM_ADMIN_IDS[0]}> — [Facebook Profile](https://www.facebook.com/nfoutz)`) 
+      .setThumbnail(PHOTO_NICHOLE);
+    const admin2 = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setAuthor({ name: 'Dan Fedorka', url: 'https://www.facebook.com/ChosenWon666', iconURL: FACEBOOK_ICON_URL })
+      .setTitle('Admin')
+      .setDescription(`<@${TEAM_ADMIN_IDS[1]}> — [Facebook Profile](https://www.facebook.com/ChosenWon666)`) 
+      .setThumbnail(PHOTO_DAN);
+    await textChannel.send({ embeds: [header, ownerEmbed, devEmbed, supportEmbed, admin1, admin2] });
+    console.log('[DISCORD BOT] Posted MEET THE TEAM embed');
+  } catch (error) {
+    console.error('[DISCORD BOT] Failed to post MEET THE TEAM embed:', error);
+  }
+}
+
 // Start the bot when this module is loaded
 const token = process.env.DISCORD_BOT_TOKEN;
 console.log('Discord bot startup check:');
@@ -1357,6 +1592,8 @@ if (token && token.trim() !== '') {
       console.log('[DISCORD BOT] Database connection successful');
       
     await loadVerifiedUsersFromDatabase();
+    // Post the team embed once in the configured channel
+    await postMeetTheTeamEmbedOnce();
     } catch (dbError) {
       console.warn('Database error during startup - Discord bot will continue without verified users:', dbError);
       console.warn('The bot will still function, but verified users will need to be loaded manually');
