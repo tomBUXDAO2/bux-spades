@@ -23,7 +23,6 @@ const GUILD_ID = process.env.DISCORD_GUILD_ID || '1403837418494492763';
 const VERIFICATION_CHANNEL_ID = process.env.VERIFICATION_CHANNEL_ID || '1403960351107715073';
 const RESULTS_CHANNEL_ID = process.env.RESULTS_CHANNEL_ID || '1404128066296610878';
 const TEAM_CHANNEL_ID = process.env.TEAM_CHANNEL_ID || '1413152325559783535';
-const FACEBOOK_ICON_URL = 'https://www.bux-spades.pro/2023_Facebook_icon.svg';
 const PUBLIC_BASE = 'https://www.bux-spades.pro';
 const PHOTO_WILL = `${PUBLIC_BASE}/Will.jpg`;
 const PHOTO_TOM = `${PUBLIC_BASE}/Tom.jpg`;
@@ -1523,46 +1522,19 @@ async function postMeetTheTeamEmbedOnce(): Promise<void> {
       return;
     }
     // First embed acts as header
-    const header = new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle('MEET THE TEAM')
       .setThumbnail(`${PUBLIC_BASE}/bux-spades.png`)
+      .addFields(
+        { name: 'Server Owner', value: `<@${TEAM_OWNER_ID}> — [William Perryman Sr.](https://www.facebook.com/williamperrymansr)`, inline: false },
+        { name: 'Game Developer', value: `<@${TEAM_DEV_ID}> — [Tom Garner](https://www.facebook.com/tomjgarner)`, inline: false },
+        { name: 'Discord Support', value: `<@${TEAM_SUPPORT_ID}>`, inline: false },
+        { name: 'Admins', value: `<@${TEAM_ADMIN_IDS[0]}> — [Nichole Foutz](https://www.facebook.com/nfoutz)  •  <@${TEAM_ADMIN_IDS[1]}> — [Dan Fedorka](https://www.facebook.com/ChosenWon666)`, inline: false }
+      )
+      .setImage(PHOTO_WILL)
       .setTimestamp();
-    // Owner
-    const ownerEmbed = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setAuthor({ name: 'William Perryman Sr.', url: 'https://www.facebook.com/williamperrymansr', iconURL: FACEBOOK_ICON_URL })
-      .setTitle('Server Owner')
-      .setDescription(`<@${TEAM_OWNER_ID}> — [Facebook Profile](https://www.facebook.com/williamperrymansr)`) 
-      .setThumbnail(PHOTO_WILL);
-    // Developer
-    const devEmbed = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setAuthor({ name: 'Tom Garner', url: 'https://www.facebook.com/tomjgarner', iconURL: FACEBOOK_ICON_URL })
-      .setTitle('Game Developer')
-      .setDescription(`<@${TEAM_DEV_ID}> — [Facebook Profile](https://www.facebook.com/tomjgarner)`) 
-      .setThumbnail(PHOTO_TOM);
-    // Support
-    const supportEmbed = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setAuthor({ name: 'Discord Support', iconURL: FACEBOOK_ICON_URL })
-      .setTitle('Discord Support')
-      .setDescription(`<@${TEAM_SUPPORT_ID}>`) 
-      .setThumbnail(PHOTO_NICHOLE);
-    // Admins (two embeds to show photos)
-    const admin1 = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setAuthor({ name: 'Nichole Foutz', url: 'https://www.facebook.com/nfoutz', iconURL: FACEBOOK_ICON_URL })
-      .setTitle('Admin')
-      .setDescription(`<@${TEAM_ADMIN_IDS[0]}> — [Facebook Profile](https://www.facebook.com/nfoutz)`) 
-      .setThumbnail(PHOTO_NICHOLE);
-    const admin2 = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setAuthor({ name: 'Dan Fedorka', url: 'https://www.facebook.com/ChosenWon666', iconURL: FACEBOOK_ICON_URL })
-      .setTitle('Admin')
-      .setDescription(`<@${TEAM_ADMIN_IDS[1]}> — [Facebook Profile](https://www.facebook.com/ChosenWon666)`) 
-      .setThumbnail(PHOTO_DAN);
-    await textChannel.send({ embeds: [header, ownerEmbed, devEmbed, supportEmbed, admin1, admin2] });
+    await textChannel.send({ embeds: [embed] });
     console.log('[DISCORD BOT] Posted MEET THE TEAM embed');
   } catch (error) {
     console.error('[DISCORD BOT] Failed to post MEET THE TEAM embed:', error);
