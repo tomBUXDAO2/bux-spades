@@ -2344,10 +2344,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
               playerScores: game.playerScores,
               winningPlayer: game.winningPlayer,
             });
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningPlayer).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
+                      // Stats and coins will be updated by completeGame function
+          console.log('[GAME OVER] Solo game ended, stats/coins will be updated by completeGame');
           }
         } else {
           // Partners mode game over check
@@ -2388,10 +2386,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
             team2Score: game.team2TotalScore,
             winningTeam,
           });
-          // Update stats and coins in DB
-          updateStatsAndCoins(game, winningTeam).catch(err => {
-            console.error('Failed to update stats/coins:', err);
-          });
+          // Stats and coins will be updated by completeGame function
+          console.log('[GAME OVER] Partners game ended, stats/coins will be updated by completeGame');
         }
         }
         return;
@@ -2503,10 +2499,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
             team2Score: game.team2TotalScore,
             winningTeam,
           });
-          // Update stats and coins in DB
-          updateStatsAndCoins(game, winningTeam).catch(err => {
-            console.error('Failed to update stats/coins:', err);
-          });
+          // Stats and coins will be updated by completeGame function
+          console.log('[GAME OVER] Partners game ended, stats/coins will be updated by completeGame');
         }
         return;
       }
@@ -3174,42 +3168,51 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 	// Idempotency guard: skip if stats already applied for this game
 	try {
 		if (game.dbGameId) {
-			const gameRecord = await prisma.game.findUnique({ where: { id: game.dbGameId } });
-			const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
-			if (alreadyApplied) {
-				console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
-				return;
+			// Use a transaction to check and set the flag atomically
+			const result = await prisma.$transaction(async (tx) => {
+				// Check if stats already applied
+				const gameRecord = await tx.game.findUnique({ 
+					where: { id: game.dbGameId },
+					select: { gameState: true }
+				});
+				
+				const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
+				if (alreadyApplied) {
+					console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
+					return false; // Skip this update
+				}
+				
+				// Mark as applied immediately to prevent double execution
+				await tx.game.update({
+					where: { id: game.dbGameId },
+					data: {
+						gameState: { ...((gameRecord?.gameState as any) || {}), statsApplied: true } as any
+					}
+				});
+				
+				console.log('[STATS GUARD] Marked statsApplied=true for game', game.dbGameId);
+				return true; // Proceed with update
+			});
+			
+			if (!result) {
+				return; // Stats already applied, exit early
 			}
 		}
 	} catch (e) {
 		console.warn('[STATS GUARD] Could not check idempotency state, proceeding:', e);
 	}
-	// Determine player composition
-	const humanPlayers = game.players.filter(p => p && p.type === 'human');
-	const isAllHumanGame = humanPlayers.length === 4;
-	const isLeagueGame = (game as any).league === true;
+
+	// Always log completed league games (for results embed)
+	await logCompletedGame(game, winningTeamOrPlayer);
 	
-	// Always log completed league games (for results embed), even if bots replaced seats
-	// For non-league games, only log when all-human (legacy behavior)
-	if (isLeagueGame || isAllHumanGame) {
-		await logCompletedGame(game, winningTeamOrPlayer);
-	}
-	
-	// Only proceed with stats/coins updates for rated games (started with 4 humans)
-	const ratedGame = (game as any).isBotGame === false;
-	if (!ratedGame) {
-		console.log('Skipping stats/coins update - not a rated game (did not start with 4 humans)');
-		return;
-	}
-	
-	console.log('Updating stats and coins for rated game (started with 4 humans)');
+	console.log('Updating stats and coins for game completion');
 	
 	for (let i = 0; i < 4; i++) {
 		const player = game.players[i];
 		if (!player) continue;
 		const userId = player.id as string;
 		if (!userId) continue;
-		
+  
 		let isWinner = false;
 		if (game.gameMode === 'SOLO') {
 			// Solo mode: winningTeamOrPlayer is the winning player index
@@ -3218,43 +3221,47 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 			// Partners mode: winningTeamOrPlayer is the winning team (1 or 2)
 			isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
 		}
-		
+  
 		// Get bags from GamePlayer record (already calculated correctly)
 		let bags = 0;
 		if ((game as any).dbGameId) {
 			const gp = await prisma.gamePlayer.findFirst({ where: { gameId: (game as any).dbGameId, userId } });
-			bags = gp?.finalBags || 0;
+			if (gp) {
+				// Use the actual database data, not the game state data
+				bags = gp.finalBags || 0;
+				console.log(`[STATS DEBUG] Player ${player.username} (${userId}): database tricksMade=${gp.tricksMade}, database finalBags=${gp.finalBags}, using bags=${bags}`);
+			} else {
+				console.error(`[STATS ERROR] No GamePlayer record found for user ${userId} in game ${(game as any).dbGameId}`);
+			}
 		}
 		
 		try {
-			// Update GamePlayer record with final game data
-			if ((game as any).dbGameId) {
-				// Get the actual bid and tricks from GamePlayer record
-				const gp = await prisma.gamePlayer.findFirst({ where: { gameId: (game as any).dbGameId, userId } });
-				let finalScore = 0;
-				if (game.gameMode === 'SOLO') {
-					finalScore = gp?.finalScore || 0;
-				} else {
-					// partners: team score into finalScore field
-					finalScore = isWinner ? (game.team1TotalScore || 0) > (game.team2TotalScore || 0) ? (game.team1TotalScore || 0) : (game.team2TotalScore || 0)
-						: (game.team1TotalScore || 0) < (game.team2TotalScore || 0) ? (game.team1TotalScore || 0) : (game.team2TotalScore || 0);
-				}
-				await prisma.gamePlayer.updateMany({
-					where: { gameId: (game as any).dbGameId, userId },
+			// Update UserStats - try update first, create if not exists
+			try {
+				await prisma.userStats.update({
+					where: { userId },
 					data: {
-						bags: bags,
-						points: finalScore,
-						finalScore: finalScore,
-						finalBags: bags,
-						finalPoints: finalScore,
-						won: isWinner
+						gamesPlayed: { increment: 1 },
+						gamesWon: { increment: isWinner ? 1 : 0 },
+						totalBags: { increment: bags }
 					}
+				});
+			} catch (error) {
+				// UserStats doesn't exist, create it
+				await prisma.userStats.create({
+					data: {
+						id: userId, // Use userId as the id since it's unique
+						userId,
+						gamesPlayed: 1,
+						gamesWon: isWinner ? 1 : 0,
+						totalBags: bags
+					} as any
 				});
 			}
 			
 			// Handle coin prizes (buy-in was already deducted at game start)
 			const buyIn = game.buyIn || 0;
-			console.log(`[COIN DEBUG] Player ${player.username} (${userId}): isWinner=${isWinner}, buyIn=${buyIn}`);
+			console.log(`[COIN DEBUG] Player ${player.username} (${userId}): isWinner=${isWinner}, buyIn=${buyIn}, bags=${bags}`);
 			if (buyIn > 0 && isWinner) {
 				// Award prizes to winners only
 				let prizeAmount = 0;
@@ -3276,74 +3283,77 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 					prizeAmount = Math.floor(prizePool / 2); // Force exactly half for partners mode
 				}
 				
-				await prisma.user.update({ where: { id: userId }, data: { coins: { increment: prizeAmount } } });
-				console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool}, individual prize: ${prizeAmount})`);
+				try {
+					// Update coins with explicit error handling
+					const result = await prisma.user.update({ 
+						where: { id: userId }, 
+						data: { coins: { increment: prizeAmount } } 
+					});
+					console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${player.username} (${userId}). New balance: ${result.coins}`);
+					
+					// Emit real-time coin update to the client
+					try {
+						const { authenticatedSockets } = await import('../index');
+						const userSocket = authenticatedSockets.get(userId);
+						if (userSocket) {
+							userSocket.emit('coin_updated', { 
+								userId, 
+								newBalance: result.coins 
+							});
+							console.log(`[COIN EMIT] Emitted coin_updated event to user ${userId} with new balance ${result.coins}`);
+						} else {
+							console.log(`[COIN EMIT] User ${userId} not connected, cannot emit coin update`);
+						}
+					} catch (emitError) {
+						console.error(`[COIN EMIT ERROR] Failed to emit coin update for ${userId}:`, emitError);
+					}
+				} catch (coinError) {
+					console.error(`[COIN ERROR] Failed to award ${prizeAmount} coins to ${player.username} (${userId}):`, coinError);
+					// Try alternative update method
+					try {
+						const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+						if (currentUser) {
+							const newBalance = currentUser.coins + prizeAmount;
+							await prisma.user.update({ 
+								where: { id: userId }, 
+								data: { coins: newBalance } 
+							});
+							console.log(`[COIN FALLBACK] Awarded ${prizeAmount} coins to ${player.username} via fallback method. New balance: ${newBalance}`);
+							
+							// Emit real-time coin update to the client
+							try {
+								const { authenticatedSockets } = await import('../index');
+								const userSocket = authenticatedSockets.get(userId);
+								if (userSocket) {
+									userSocket.emit('coin_updated', { 
+										userId, 
+										newBalance: newBalance 
+									});
+									console.log(`[COIN EMIT] Emitted coin_updated event to user ${userId} with new balance ${newBalance}`);
+								} else {
+									console.log(`[COIN EMIT] User ${userId} not connected, cannot emit coin update`);
+								}
+							} catch (emitError) {
+								console.error(`[COIN EMIT ERROR] Failed to emit coin update for ${userId}:`, emitError);
+							}
+						}
+					} catch (fallbackError) {
+						console.error(`[COIN FALLBACK ERROR] Failed fallback update for ${player.username} (${userId}):`, fallbackError);
+					}
+				}
 			}
 			
-			// Partners game stats
-			const isSoloGame = game.gameMode === 'SOLO';
-			if (isSoloGame) {
-				await prisma.userStats.update({
-					where: { userId },
-					data: {
-						gamesPlayed: { increment: 1 },
-						gamesWon: { increment: isWinner ? 1 : 0 },
-						soloGamesPlayed: { increment: 1 },
-						soloGamesWon: { increment: isWinner ? 1 : 0 },
-						soloTotalBags: { increment: bags },
-						soloBagsPerGame: { set: 0 }
-					}
-				});
-				const currentStats = await prisma.userStats.findUnique({ where: { userId } });
-				if (currentStats?.soloGamesPlayed && currentStats.soloTotalBags) {
-					const newBagsPerGame = currentStats.soloTotalBags / currentStats.soloGamesPlayed;
-					await prisma.userStats.update({ where: { userId }, data: { soloBagsPerGame: newBagsPerGame } });
-				}
-			} else {
-				await prisma.userStats.update({
-					where: { userId },
-					data: {
-						gamesPlayed: { increment: 1 },
-						gamesWon: { increment: isWinner ? 1 : 0 },
-						partnersGamesPlayed: { increment: 1 },
-						partnersGamesWon: { increment: isWinner ? 1 : 0 },
-						partnersTotalBags: { increment: bags },
-						partnersBagsPerGame: { set: 0 }
-					}
-				});
-				const currentStats = await prisma.userStats.findUnique({ where: { userId } });
-				if (currentStats?.partnersGamesPlayed && currentStats.partnersTotalBags) {
-					const newBagsPerGame = currentStats.partnersTotalBags / currentStats.partnersGamesPlayed;
-					await prisma.userStats.update({ where: { userId }, data: { partnersBagsPerGame: newBagsPerGame } });
-				}
-			}
-			const overall = await prisma.userStats.findUnique({ where: { userId } });
-			if (overall?.gamesPlayed && overall.totalBags !== undefined) {
-				const newBpg = overall.totalBags / overall.gamesPlayed;
-				await prisma.userStats.update({ where: { userId }, data: { bagsPerGame: newBpg } });
-			}
 			console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
 		} catch (err) {
 			console.error('Failed to update stats/coins for user', userId, err);
 		}
 	}
-	// Mark stats applied in gameState to ensure idempotency
-	try {
-		if (game.dbGameId) {
-			await prisma.game.update({
-				where: { id: game.dbGameId },
-				data: {
-					gameState: { ...(game as any).gameState, statsApplied: true } as any
-				}
-			});
-			console.log('[STATS APPLIED] Marked statsApplied=true for game', game.dbGameId);
-		}
-	} catch (e) {
-		console.warn('[STATS GUARD] Could not set idempotency state:', e);
-	}
+	
 	// Stats and coins updated successfully
 	console.log('[STATS UPDATED] Game completion stats and coins updated for all players');
 }
+
+
 
 // Helper to enrich game object for client
 export function enrichGameForClient(game: Game, userId?: string): Game {

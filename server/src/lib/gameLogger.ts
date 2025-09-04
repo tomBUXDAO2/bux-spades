@@ -219,8 +219,8 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 					discordId: p?.discordId || null,
 					username: p?.username,
 					team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
-					finalBid: dbPlayer?.finalBid || 0,
-					finalTricks: dbPlayer?.finalTricks || 0,
+					finalBid: dbPlayer?.bid || 0,
+					finalTricks: dbPlayer?.tricksMade || 0,
 					finalBags: dbPlayer?.finalBags || 0,
 					finalScore: dbPlayer?.finalScore || 0,
 					won: gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2)

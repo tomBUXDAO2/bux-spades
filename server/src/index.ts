@@ -163,7 +163,7 @@ export interface AuthenticatedSocket extends Socket {
 }
 
 // Global state
-const authenticatedSockets = new Map<string, AuthenticatedSocket>();
+export const authenticatedSockets = new Map<string, AuthenticatedSocket>();
 const onlineUsers = new Set<string>();
 
 // Session management
@@ -3578,157 +3578,8 @@ async function updateHandStats(game: Game) {
   }
 }
 
-// --- Stats and coins update helper ---
-async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: number) {
-  // For Discord league games, we know they are all-human games
-  // The game.players array might not have type set correctly during completion
-  console.log('Updating stats and coins for game completion');
-  console.log('Game ID:', game.id, 'Winning team/player:', winningTeamOrPlayer);
-  console.log('Game players:', game.players.map(p => p ? `${p.username} (${p.type || 'unknown'})` : 'null'));
-  
-  for (let i = 0; i < 4; i++) {
-    const player = game.players[i];
-    if (!player) continue;
-    const userId = player.id;
-    if (!userId) continue; // Skip if no user ID
-    
-    let isWinner = false;
-    if (game.gameMode === 'SOLO') {
-      // Solo mode: winningTeamOrPlayer is the winning player index
-      isWinner = i === winningTeamOrPlayer;
-    } else {
-      // Partners mode: winningTeamOrPlayer is the winning team (1 or 2)
-      isWinner = (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3));
-    }
-    
-    // Calculate bags for this player
-    const playerBid = player.bid || 0;
-    const playerTricks = player.tricks || 0;
-    
-    // For nil and blind nil, all tricks count as bags if failed
-    let bags = 0;
-    if (playerBid === 0 || playerBid === -1) {
-      // Nil or blind nil: all tricks count as bags if failed
-      bags = playerTricks;
-    } else {
-      // Regular bid: only excess tricks count as bags
-      bags = Math.max(0, playerTricks - playerBid);
-    }
-    
-          try {
-        // Get current stats first for bag calculation
-        const currentStats = await prisma.userStats.findUnique({
-          where: { userId }
-        });
-        
-        // Calculate total tricks bid and made for this player from the game
-        let totalTricksBid = 0;
-        let totalTricksMade = 0;
-        let totalNilBids = 0;
-        
-        if (game.dbGameId) {
-          try {
-            const rounds = await prisma.round.findMany({
-              where: { gameId: game.dbGameId },
-              include: { bids: true }
-            });
-            
-            for (const round of rounds) {
-              const roundBid = round.bids.find((rb: any) => rb.playerId === userId);
-              if (roundBid) {
-                totalTricksBid += roundBid.bid;
-                if (roundBid.bid === 0) totalNilBids++;
-              }
-            }
-            
-            // Get tricks won from GamePlayer record
-            const gamePlayer = await prisma.gamePlayer.findFirst({
-              where: { gameId: game.dbGameId, userId: userId }
-            });
-            if (gamePlayer) {
-              totalTricksMade = gamePlayer.tricksMade || 0;
-            }
-          } catch (err) {
-            console.error('Failed to get game data for stats:', err);
-          }
-        }
-        
-        // Update stats (nil tracking is now done per hand)
-        const stats = await prisma.userStats.update({
-          where: { userId },
-          data: {
-            gamesPlayed: { increment: 1 },
-            gamesWon: { increment: isWinner ? 1 : 0 },
-            // Mode-specific counters
-            partnersGamesPlayed: { increment: game.gameMode === 'PARTNERS' ? 1 : 0 },
-            partnersGamesWon: { increment: game.gameMode === 'PARTNERS' && isWinner ? 1 : 0 },
-            soloGamesPlayed: { increment: game.gameMode === 'SOLO' ? 1 : 0 },
-            soloGamesWon: { increment: game.gameMode === 'SOLO' && isWinner ? 1 : 0 },
-            // Trick tracking
-            totalTricksBid: { increment: totalTricksBid },
-            totalTricksMade: { increment: totalTricksMade },
-            totalNilBids: { increment: totalNilBids },
-            // Bag tracking
-            totalBags: { increment: bags },
-            bagsPerGame: { set: ((currentStats?.totalBags || 0) + bags) / ((currentStats?.gamesPlayed || 0) + 1) }
-          }
-        });
-      
-      // Handle coin prizes only (buy-in was already debited at game start)
-      const buyIn = game.buyIn || 0;
-      if (buyIn > 0) {
-        if (isWinner) {
-          let prizeAmount = 0;
-          const totalPot = buyIn * 4;
-          const rake = Math.floor(totalPot * 0.1); // 10% rake
-          const prizePool = totalPot - rake;
-          
-          if (game.gameMode === 'SOLO') {
-            // Solo mode: 2nd place gets buy-in back, 1st place gets remainder
-            const secondPlacePrize = buyIn;
-            prizeAmount = prizePool - secondPlacePrize; // 1st place gets remainder
-          } else {
-            // Partners mode: winning team splits 90% of pot (2 winners)
-            prizeAmount = Math.floor(prizePool / 2); // Each winner gets half of 90%
-          }
-          
-          await prisma.user.update({
-            where: { id: userId },
-            data: { coins: { increment: prizeAmount } }
-          });
-          // Track coin aggregates - winners get prize amount, but net is prize minus buy-in
-          await prisma.userStats.update({
-            where: { userId },
-            data: {
-              totalCoinsWon: { increment: prizeAmount },
-              totalCoinsLost: { increment: 0 },
-              netCoins: { increment: prizeAmount - buyIn }
-            }
-          });
-          
-          console.log(`Awarded ${prizeAmount} coins to winner ${userId} (total pot: ${totalPot}, rake: ${rake}, prize pool: ${prizePool})`);
-        } else {
-          // Loser: count the buy-in as lost (already deducted at start)
-          await prisma.userStats.update({
-            where: { userId },
-            data: {
-              totalCoinsWon: { increment: 0 },
-              totalCoinsLost: { increment: buyIn },
-              netCoins: { decrement: buyIn }
-            }
-          });
-        }
-      }
-      
-      console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
-    } catch (err: any) {
-      console.error('Failed to update stats/coins for user', userId, err);
-    }
-  }
-  
-  // Stats and coins updated successfully
-  console.log('[STATS UPDATED] Game completion stats and coins updated for all players');
-}
+// Stats and coins are now handled by the completeGame function importing from games.routes.ts
+// This local function has been removed to prevent duplicate execution
 
 // Helper to enrich game object for client - imported from games.routes.ts
 
@@ -3958,11 +3809,6 @@ setInterval(() => {
               winningPlayer: winningPlayer,
             });
             
-            // Update stats and coins in DB
-            updateStatsAndCoins(game, winningPlayer).catch(err => {
-              console.error('Failed to update stats/coins:', err);
-            });
-            
             // Log completed game to DB and Discord
             void import('./lib/gameLogger')
               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
@@ -4149,10 +3995,6 @@ setInterval(() => {
                 team1Score: game.team1TotalScore,
                 team2Score: game.team2TotalScore,
                 winningTeam,
-              });
-              
-              updateStatsAndCoins(game, winningTeam).catch(err => {
-                console.error('Failed to update stats/coins:', err);
               });
               
               try {
