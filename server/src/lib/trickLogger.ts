@@ -43,6 +43,12 @@ export class TrickLogger {
    * Start a new round/hand for a game
    */
   async startRound(gameId: string, roundNumber: number): Promise<string> {
+    // Skip round creation for bot games
+    const game = games.find(g => g.id === gameId);
+    if (game && game.isBotGame) {
+      console.log(`[TRICK LOGGER] Skipping round creation for bot game ${gameId}`);
+      return `bot_round_${gameId}_${roundNumber}`;
+    }
     const isProduction = process.env.NODE_ENV === 'production';
     
     try {

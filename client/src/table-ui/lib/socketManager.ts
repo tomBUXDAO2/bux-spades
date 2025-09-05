@@ -498,7 +498,7 @@ export async function handleAuthenticatedSession() {
   const socketManager = getSocketManager();
   if (!socketManager.isInitialized()) {
     console.log('Socket not initialized, initializing...');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('sessionToken');
     if (!token) {
       console.error('No token found in localStorage');
       return;
@@ -538,12 +538,12 @@ export async function handleAuthenticatedSession() {
       } else {
         console.error('Invalid session response:', session);
         // Clear invalid token
-        localStorage.removeItem('token');
+        localStorage.removeItem('sessionToken');
       }
     } catch (error) {
       console.error('Error fetching session:', error);
       // Clear token on error
-      localStorage.removeItem('token');
+      localStorage.removeItem('sessionToken');
     }
   }
 } 
