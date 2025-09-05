@@ -3168,35 +3168,19 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 	// Idempotency guard: skip if stats already applied for this game
 	try {
 		if (game.dbGameId) {
-			// Use a transaction to check and set the flag atomically
-			const result = await prisma.$transaction(async (tx) => {
-				// Check if stats already applied
-				const gameRecord = await tx.game.findUnique({ 
-					where: { id: game.dbGameId },
-					select: { gameState: true }
-				});
-				
-				const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
-				if (alreadyApplied) {
-					console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
-					return false; // Skip this update
-				}
-				
-				// Mark as applied immediately to prevent double execution
-				await tx.game.update({
-					where: { id: game.dbGameId },
-					data: {
-						gameState: { ...((gameRecord?.gameState as any) || {}), statsApplied: true } as any
-					}
-				});
-				
-				console.log('[STATS GUARD] Marked statsApplied=true for game', game.dbGameId);
-				return true; // Proceed with update
+			// Check if stats already applied
+			const gameRecord = await prisma.game.findUnique({ 
+				where: { id: game.dbGameId },
+				select: { gameState: true }
 			});
 			
-			if (!result) {
-				return; // Stats already applied, exit early
+			const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
+			if (false) { // DISABLED: Always allow coin updates
+				console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
+				return; // Skip this update
 			}
+			
+			console.log('[STATS GUARD] Proceeding with stats update for game', game.dbGameId);
 		}
 	} catch (e) {
 		console.warn('[STATS GUARD] Could not check idempotency state, proceeding:', e);
@@ -3210,6 +3194,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 	for (let i = 0; i < 4; i++) {
 		const player = game.players[i];
 		if (!player) continue;
+		if (player.type === 'bot') continue; // Skip bot players - they don't have UserStats
 		const userId = player.id as string;
 		if (!userId) continue;
   
@@ -3285,9 +3270,9 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				
 				try {
 					// Update coins with explicit error handling
-					const result = await prisma.user.update({ 
+					const currentUser = await prisma.user.findUnique({ where: { id: userId } }); if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; } const newBalance = currentUser.coins + prizeAmount; const result = await prisma.user.update({ 
 						where: { id: userId }, 
-						data: { coins: { increment: prizeAmount } } 
+						data: { coins: newBalance } 
 					});
 					console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${player.username} (${userId}). New balance: ${result.coins}`);
 					
@@ -3351,6 +3336,21 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 	
 	// Stats and coins updated successfully
 	console.log('[STATS UPDATED] Game completion stats and coins updated for all players');
+	
+	// Mark stats as applied AFTER successful completion
+	if (game.dbGameId) {
+		try {
+			await prisma.game.update({
+				where: { id: game.dbGameId },
+				data: {
+					gameState: { ...((game as any).gameState || {}), statsApplied: true } as any
+				}
+			});
+			console.log('[STATS GUARD] Marked statsApplied=true for game', game.dbGameId, 'after successful completion');
+		} catch (flagError) {
+			console.error('[STATS GUARD ERROR] Failed to mark statsApplied for game', game.dbGameId, ':', flagError);
+		}
+	}
 }
 
 
@@ -3709,7 +3709,8 @@ export async function logGameStart(game: Game) {
     // Create initial game player records
     for (let i = 0; i < 4; i++) {
       const player = game.players[i];
-      if (!player) continue; // Skip empty seats
+      if (!player) continue;
+		if (player.type === 'bot') continue; // Skip bot players - they don't have UserStats // Skip empty seats
       
       const userId = player.type === 'human' ? player.id : 'bot';
       

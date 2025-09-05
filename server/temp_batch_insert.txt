@@ -1,0 +1,14 @@
+      // Optimized: Batch create all card records for this trick
+      const cardData = trickData.cards.map((card, index) => ({
+        id: `card_${trick.id}_${index}_${Date.now()}`,
+        trickId: trick.id,
+        playerId: card.playerId,
+        suit: this.getFullSuitName(card.suit) as any,
+        value: card.value,
+        position: card.position,
+        updatedAt: new Date(),
+      }));
+
+      await prisma.card.createMany({
+        data: cardData as any,
+      });

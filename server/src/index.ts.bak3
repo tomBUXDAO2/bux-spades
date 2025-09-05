@@ -1867,28 +1867,25 @@ io.on('connection', (socket: AuthenticatedSocket) => {
                   await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
                 } catch (err) {
                   console.error('Failed to save game state after trick:', err);
-                }
-      } catch (err) {
-        console.error('Failed to save game state after trick:', err);
-      }
-      
-      // Emit immediate game update with cleared trick and updated trick counts
-      const enrichedGame = enrichGameForClient(game);
-      console.log('[TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-      io.to(game.id).emit('game_update', enrichedGame);
+      // FIXED: Delay the game_update emission until after the animation completes
+      // This prevents the card from disappearing from the table while still in hand
+      setTimeout(() => {
+        // Emit game update with cleared trick and updated trick counts
+        const enrichedGame = enrichGameForClient(game);
+        console.log("[TRICK DEBUG] Emitting delayed game_update with currentPlayer:", enrichedGame.play?.currentPlayer, "currentPlayerIndex:", enrichedGame.play?.currentPlayerIndex);
+        io.to(game.id).emit("game_update", enrichedGame);
+        
+        // Start turn timeout for human players when trick is complete
+        const winnerPlayer = game.players[winnerIndex];
+        if (winnerPlayer && winnerPlayer.type === "human") {
+          startTurnTimeout(game, winnerIndex, "playing");
+        }
+      }, 2100); // Slightly longer than animation duration to ensure smooth transition
       
       // Emit clear trick event after animation delay
       setTimeout(() => {
-        io.to(game.id).emit('clear_trick');
-      }, 2000); // 2 second delay to match frontend animation
-      
-      // If all tricks played, move to hand summary/scoring
-      console.log('[HAND COMPLETION DEBUG] Checking hand completion - trickNumber:', game.play.trickNumber);
-      if (game.play.trickNumber === 13) {
-        console.log('[HAND COMPLETION DEBUG] Hand completion triggered! Emitting hand_completed event');
-        console.log('[HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
-        console.log('[HAND COMPLETION DEBUG] Full game object keys:', Object.keys(game));
-        console.log('[HAND COMPLETION DEBUG] Game rules:', game.rules);
+        io.to(game.id).emit("clear_trick");
+      }, 2000); // 2 second delay to match frontend animation        console.log('[HAND COMPLETION DEBUG] Game rules:', game.rules);
         // --- Hand summary and scoring ---
         
         if (game.gameMode === 'SOLO') {
@@ -2084,55 +2081,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             completeGame(game, winningTeam).catch(err => {
               console.error('Failed to complete game:', err);
             });
-          } else {
-            // Game is not over, start next hand immediately
-            console.log("[HAND TRANSITION] Starting next hand immediately");
-            setTimeout(() => {
-              // Move dealer to the left (next position)
-              game.dealerIndex = (game.dealerIndex + 1) % 4;
-              
-              // Reset game state for new hand
-              game.status = "BIDDING";
-              game.bidding = {
-                currentPlayer: game.players[game.dealerIndex]?.id || "",
-                currentBidderIndex: game.dealerIndex,
-                bids: [null, null, null, null],
-                nilBids: {}
-              };
-              game.play = undefined;
-              
-              // Reset player states
-              game.players.forEach(player => {
-                if (player) {
-                  player.hand = [];
-                  player.bid = undefined;
-                  player.tricks = 0;
-                }
-              });
-              
-              // Deal new cards
-              const hands = dealCards(game.players, game.dealerIndex);
-              game.hands = hands;
-              
-              // Assign hands to players
-              game.players.forEach((player, index) => {
-                if (player) {
-                  player.hand = hands[index] || [];
-                }
-              });
-              
-              console.log("[HAND TRANSITION] New hand started for game:", game.id);
-              
-              // Emit events
-              io.to(game.id).emit("new_hand_started", {
-                dealerIndex: game.dealerIndex,
-                hands: game.players.map(p => p?.hand || [])
-              });
-              io.to(game.id).emit("bidding_ready", {
-                currentBidder: game.dealerIndex
-              });
-              io.to(game.id).emit("game_update", enrichGameForClient(game));
-            }, 3000); // 3 second delay to show hand summary
           }
         }
       }
@@ -2381,7 +2329,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
             botPlayCard(game, game.play.currentPlayerIndex);
           }
-        }, 200); // Optimized delay for faster bot play
+        }, 800); // Reduced delay for faster bot play
       }
       // If the next player is a human, DO NOT trigger any bot moves - wait for human input
       
@@ -2459,7 +2407,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               game.players[nextPlayerIndex] && game.players[nextPlayerIndex]!.type === 'bot') {
             botPlayCard(game, nextPlayerIndex);
           }
-        }, 200); // Optimized delay for faster bot play
+        }, 800); // Reduced delay for faster bot play
       }
       // If the next player is a human, DO NOT trigger any bot moves - wait for human input
     }
@@ -3533,7 +3481,6 @@ async function updateHandStats(game: Game) {
   for (let i = 0; i < 4; i++) {
     const player = game.players[i];
     if (!player) continue;
-    if (player.type === 'bot') continue; // Skip bot players - they don't have UserStats
     const userId = player.id;
     if (!userId) continue; // Skip if no user ID
     
