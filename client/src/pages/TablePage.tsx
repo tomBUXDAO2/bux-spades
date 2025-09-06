@@ -725,17 +725,7 @@ export default function TablePage() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={isSpectator}
-        />          user={user}
-          showStartWarning={showStartWarning}
-          showBotWarning={showBotWarning}
-          onCloseStartWarning={handleCloseStartWarning}
-          onCloseBotWarning={handleCloseBotWarning}
-          emptySeats={emptySeats}
-          botCount={botCount}
-          isSpectator={isSpectator}
-
-        />
-      </div>
+        />      </div>
 
       {/* Mobile Modals - rendered using portal at document body level */}
       {showStartWarning && createPortal(
