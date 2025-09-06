@@ -712,7 +712,8 @@ export default function TablePage() {
         )}
         
         <GameTable
-        console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);          onLeaveTable={handleLeaveTable}
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);          game={game}
+          onLeaveTable={handleLeaveTable}
           startGame={handleStartGame}
           user={user}
           showStartWarning={showStartWarning}
