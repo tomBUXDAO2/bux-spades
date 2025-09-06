@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { Router } from 'express';
 import prisma from '../lib/prisma';
-import { onlineUsers } from '../server';
+import { onlineUsers } from '../index';
 import { requireAuth } from '../middleware/auth.middleware';
 const router = Router();
 

@@ -14,7 +14,14 @@ import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gam
 import { syncDiscordUserData } from './lib/discordSync';
 import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from './lib/gameStatePersistence';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
+import authRoutes from './routes/auth.routes';
+import discordRoutes from './routes/discord.routes';
+import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore } from './routes/games.routes';
+import usersRoutes from './routes/users.routes';
+import socialRoutes from './routes/social.routes';
 import './config/passport';
+import { enrichGameForClient } from './routes/games.routes';
+import { logGameStart } from './routes/games.routes';
 
 // EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
 process.on('uncaughtException', (error) => {
@@ -101,6 +108,7 @@ io.engine.on('connection_error', (err) => {
   console.error('Socket.IO connection error:', err);
 });
 
+// Socket.IO connection validation
 io.use((socket, next) => {
   const origin = socket.handshake.headers.origin;
   if (httpAllowedOrigins.includes(origin || '')) {
@@ -123,14 +131,22 @@ export interface AuthenticatedSocket extends Socket {
   };
 }
 
-// Socket state management
+// Global state
 const authenticatedSockets = new Map<string, AuthenticatedSocket>();
 const onlineUsers = new Set<string>();
 
-// Play again state management
-const playAgainTimers = new Map<string, { timer: NodeJS.Timeout; responses: Set<string> }>();
-const playAgainResponses = new Map<string, Set<string>>();
-const originalPlayers = new Map<string, string[]>(); // gameId -> array of original player IDs
+// Session management
+const userSessions = new Map<string, string>(); // userId -> sessionId
+const sessionToUser = new Map<string, string>(); // sessionId -> userId
+
+// Inactivity tracking
+const tableInactivityTimers = new Map<string, NodeJS.Timeout>();
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Play again management
+const playAgainTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
+const playAgainResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who responded
+const originalPlayers = new Map<string, string[]>(); // gameId -> Array of original player IDs when play again started
 
 function startSeatReplacement(game: Game, seatIndex: number) {
   console.log(`[SEAT REPLACEMENT DEBUG] Starting replacement for seat ${seatIndex} in game ${game.id}`);
@@ -145,15 +161,6 @@ function startSeatReplacement(game: Game, seatIndex: number) {
   
   // ... rest of the function implementation
 }
-
-// NOW IMPORT ROUTES AFTER io IS CREATED
-import authRoutes from './routes/auth.routes';
-import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore } from './routes/games.routes';
-import usersRoutes from './routes/users.routes';
-import socialRoutes from './routes/social.routes';
-import { enrichGameForClient } from './routes/games.routes';
-import { logGameStart } from './routes/games.routes';
 
 // Passport middleware (for Discord OAuth2 only)
 app.use(passport.initialize());
@@ -191,30 +198,35 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
     env: process.env.NODE_ENV,
     cors: {
       allowedOrigins: httpAllowedOrigins,
+      credentials: true
+    },
+    socket: {
+      path: '/socket.io',
+      transports: ['polling', 'websocket']
     }
   });
   
-  // Restore any active games from database
-  await restoreAllActiveGames();
+  // Restore active games from database after server restart
+  console.log('🔄 Server restarted - restoring active games from database...');
+  try {
+    const restoredGames = await restoreAllActiveGames();
+    restoredGames.forEach(game => {
+      games.push(game);
+      console.log(`✅ Restored game ${game.id} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
+    });
+    console.log(`✅ Restored ${restoredGames.length} active games`);
+  } catch (error) {
+    console.error('❌ Failed to restore active games:', error);
+  }
   
-  // Start game state auto-save (every 30 seconds)
+  // Start auto-saving game state
   startGameStateAutoSave(games);
+  console.log('💾 Game state auto-save enabled (every 30 seconds)');
   
-  // Start database health check (every 30 seconds)
-  setInterval(async () => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      console.log('[DATABASE] Connection healthy');
-    } catch (error) {
-      console.error('[DATABASE] Connection error:', error);
-    }
-  }, 30000);
-  
-  // Start stuck game checker (every minute)
+  // Start stuck game checker
   setInterval(() => {
     checkForStuckGames();
-  }, 60000);
-  
+  }, 60000); // Check every minute
   console.log('🔍 Stuck game checker enabled (every minute)');
 });
 

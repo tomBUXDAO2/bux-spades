@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
-import { io } from '../server';
+import { io } from '../index';
 import { games } from '../gamesStore';
-import { startSeatReplacement } from "../server";
-import { playAgainTimers, playAgainResponses, originalPlayers } from '../server';
-import type { AuthenticatedSocket } from '../server';
+import { startSeatReplacement } from "../index";
+import { playAgainTimers, playAgainResponses, originalPlayers } from '../index';
+import type { AuthenticatedSocket } from '../index';
 import { trickLogger } from '../lib/trickLogger';
 import prisma from '../lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';

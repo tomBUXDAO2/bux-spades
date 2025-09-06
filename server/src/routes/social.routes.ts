@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
-import { io } from '../server';
+// import { io } from '../server'; // REMOVED TO FIX CIRCULAR DEPENDENCY
 import { requireAuth } from '../middleware/auth.middleware';
 const router = Router();
 
@@ -14,8 +14,8 @@ router.post('/friends/add', requireAuth, async (req, res) => {
       data: { userId: currentUserId, friendId } as any
     });
     // Emit socket event to both users
-    io.to(currentUserId).emit('friendAdded', { friendId });
-    io.to(friendId).emit('friendAdded', { userId: currentUserId });
+    // io.to(currentUserId).emit('friendAdded', { friendId });
+    // io.to(friendId).emit('friendAdded', { userId: currentUserId });
     res.json({ success: true });
   } catch (error) {
     const err = error as any;
@@ -63,8 +63,8 @@ router.post('/block', requireAuth, async (req, res) => {
     data: { userId: currentUserId, blockedId: blockId } as any
   });
   // Emit socket events for real-time update
-  io.to(currentUserId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh
-  io.to(currentUserId).emit('blockedUser', { blockId });
+  // io.to(currentUserId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh
+  // io.to(currentUserId).emit('blockedUser', { blockId });
   res.json({ success: true });
 });
 
@@ -76,7 +76,7 @@ router.post('/unblock', requireAuth, async (req, res) => {
     where: { userId: currentUserId, blockedId: blockId }
   });
   // Emit socket event for real-time update
-  io.to(currentUserId).emit('blockedUser', { blockId });
+  // io.to(currentUserId).emit('blockedUser', { blockId });
   res.json({ success: true });
 });
 
