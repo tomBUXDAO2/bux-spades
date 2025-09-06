@@ -1,4 +1,5 @@
 import { io, authenticatedSockets, onlineUsers } from '../server';
+import { registerGameEventHandlers } from './gameEventHandlers';
 import { userSessions, sessionToUser } from './authentication';
 import { games } from '../gamesStore';
 import { enrichGameForClient } from '../routes/games.routes';
@@ -19,8 +20,11 @@ export function setupConnectionHandlers(io: any) {
     }
 
     // Emit online users update
-    io.emit('online_users_updated', Array.from(onlineUsers));
+    // Emit authenticated event to client
+    socket.emit("authenticated", { success: true, userId: socket.userId, username: socket.auth?.username, games: [] });    io.emit('online_users_updated', Array.from(onlineUsers));
 
+    // Register game event handlers
+    registerGameEventHandlers(socket);
     // Handle disconnect
     socket.on('disconnect', (reason) => {
       console.log(`[DISCONNECT] User ${socket.auth?.username} (${socket.userId}) disconnected: ${reason}`);

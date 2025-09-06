@@ -1,0 +1,102 @@
+--- a/src/socket/gameEventHandlers.ts
++++ b/src/socket/gameEventHandlers.ts
+@@ -37,6 +37,11 @@ export function setupGameEventHandlers(io: any) {
+     // Lobby chat message event
+     socket.on('lobby_chat_message', async ({ message }) => {
+       await handleLobbyChatMessage(socket, message);
+     });
++
++    // Fill seat with bot event
++    socket.on('fill_seat_with_bot', async ({ gameId, seatIndex }) => {
++      await handleFillSeatWithBot(socket, gameId, seatIndex);
++    });
+   });
+ }
+ 
+@@ -433,3 +438,67 @@ async function handleLobbyChatMessage(socket: AuthenticatedSocket, message: any
+   // Emit to all connected clients
+   io.emit('lobby_chat_message', message);
+ }
++
++async function handleFillSeatWithBot(socket: AuthenticatedSocket, gameId: string, seatIndex: number) {
++  console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
++  
++  if (!socket.isAuthenticated || !socket.userId) {
++    console.log('Unauthorized fill_seat_with_bot attempt');
++    socket.emit('error', { message: 'Not authorized' });
++    return;
++  }
++  
++  const game = games.find(g => g.id === gameId);
++  if (!game) {
++    socket.emit('error', { message: 'Game not found' });
++    return;
++  }
++  
++  // Check if seat is empty
++  if (game.players[seatIndex] !== null) {
++    socket.emit('error', { message: 'Seat is not empty' });
++    return;
++  }
++  
++  // Fill the seat with a bot (manual invitation)
++  addBotToSeat(game, seatIndex);
++}
++
++function addBotToSeat(game: Game, seatIndex: number) {
++  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
++  
++  // Check if seat is empty
++  if (game.players[seatIndex] !== null) {
++    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
++    return;
++  }
++  
++  // Create bot
++  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
++  const botNumber = Math.floor(Math.random() * 1000);
++  
++  game.players[seatIndex] = {
++    id: botId,
++    username: `Bot ${botNumber}`,
++    avatar: '/bot-avatar.jpg',
++    type: 'bot',
++    position: seatIndex
++  };
++  
++  // Send system message
++  io.to(game.id).emit('system_message', {
++    message: `A bot was invited to seat ${seatIndex + 1}`,
++    type: 'info'
++  });
++  
++  // Update all clients
++  const enrichedGame = enrichGameForClient(game);
++  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
++    gameId: game.id,
++    currentPlayerIndex: enrichedGame.play?.currentPlayerIndex,
++    players: enrichedGame.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`),
++    hands: enrichedGame.hands?.map((h, i) => `${i}: ${h?.length || 0} cards`)
++  });
++  io.to(game.id).emit('game_update', enrichedGame);
++  
++  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
++  
++  // Check if it's the bot's turn to play
++  if (game.play && game.play.currentPlayerIndex === seatIndex) {
++    console.log(`[BOT INVITATION] Bot at seat ${seatIndex} is current player, triggering bot play`);
++    setTimeout(() => {
++      console.log("[HAND TRANSITION DEBUG] setTimeout callback executing for game:", game.id);
++      botPlayCard(game, seatIndex);
++    }, 1000); // 1 second delay
++  }
++  
++  // Check if only bots remain after adding this bot
++  const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
++  if (remainingHumanPlayers.length === 0) {
++    console.log('[BOT INVITATION] No human players remaining after bot addition, closing game');
++    // Close the game if no human players remain
++    game.status = 'CANCELLED';
++    io.to(game.id).emit('game_update', enrichGameForClient(game));
++  }
++}

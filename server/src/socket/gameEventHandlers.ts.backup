@@ -1,0 +1,334 @@
+import { io } from '../server';
+import { games } from '../gamesStore';
+import { clearTurnTimeout, startTurnTimeout } from '../game-logic/timeoutHandlers';
+import { botMakeMove, botPlayCard, enrichGameForClient, assignDealer, dealCards } from '../routes/games.routes';
+import { trickLogger } from '../lib/trickLogger';
+import prisma from '../lib/prisma';
+import type { AuthenticatedSocket } from '../server';
+import type { Game, Card, ChatMessage } from '../types/game';
+
+// Export function to register game event handlers on individual sockets
+export function registerGameEventHandlers(socket: AuthenticatedSocket) {
+  console.log(`[GAME HANDLERS] Registering game event handlers for socket ${socket.id}`);
+
+  // Make bid event
+  socket.on('make_bid', async ({ gameId, userId, bid }) => {
+    await handleMakeBid(socket, gameId, userId, bid);
+  });
+
+  // Play card event
+  socket.on('play_card', async ({ gameId, userId, card }) => {
+    await handlePlayCard(socket, gameId, userId, card);
+  });
+
+  // Join game event
+  socket.on('join_game', async ({ gameId }) => {
+    await handleJoinGame(socket, gameId);
+  });
+
+  // Leave game event
+  socket.on('leave_game', async ({ gameId }) => {
+    await handleLeaveGame(socket, gameId);
+  });
+
+  // Chat message event
+  socket.on('chat_message', async ({ gameId, message }) => {
+    await handleChatMessage(socket, gameId, message);
+  });
+
+  // Lobby chat message event
+  socket.on('lobby_chat_message', async ({ message }) => {
+    await handleLobbyChatMessage(socket, message);
+  });
+
+  // Fill seat with bot event
+  socket.on('fill_seat_with_bot', async ({ gameId, seatIndex }) => {
+    await handleFillSeatWithBot(socket, gameId, seatIndex);
+  });
+
+  // Start game event
+  socket.on('start_game', async ({ gameId }) => {
+    await handleStartGame(socket, gameId);
+  });
+}
+
+// Backward compatibility - keep the original function name but just export the register function
+export function setupGameEventHandlers(io: any) {
+  // This is now handled by calling registerGameEventHandlers from connectionHandlers
+  console.log('[GAME HANDLERS] setupGameEventHandlers called - handlers will be registered per connection');
+}
+
+async function handleChatMessage(socket: AuthenticatedSocket, gameId: string, message: ChatMessage) {
+  console.log("=== CHAT MESSAGE EVENT RECEIVED ===");
+  console.log("Chat message received:", { gameId, message, socketId: socket.id, userId: socket.userId });
+
+  if (!socket.isAuthenticated || !socket.userId) {
+    socket.emit("error", { message: "Not authorized" });
+    return;
+  }
+
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit("error", { message: "Game not found" });
+    return;
+  }
+
+  game.lastActivity = Date.now();
+  updateGameActivity(gameId);
+
+  // Simple in-memory token bucket per socket
+  const now = Date.now();
+  const bucket = (socket.data as any).chatBucket || { tokens: 5, lastRefill: now };
+  const elapsed = now - bucket.lastRefill;
+  const refill = Math.floor(elapsed / 1000) * 2; // 2 tokens/sec
+  bucket.tokens = Math.min(20, bucket.tokens + refill);
+  bucket.lastRefill = now;
+  if (bucket.tokens <= 0) {
+    console.log("[CHAT RATE LIMIT] Dropping message due to rate limit, tokens:", bucket.tokens);
+    return; // drop silently
+  }
+  bucket.tokens -= 1;
+  (socket.data as any).chatBucket = bucket;
+
+  if (typeof message?.message !== "string" || message.message.length === 0 || message.message.length > 500) {
+    console.log("[CHAT VALIDATION] Invalid message format:", message);
+    return;
+  }
+  console.log("[CHAT VALIDATION] Message validation passed:", message);
+    console.log("[CHAT VALIDATION] Invalid message format:", message);
+    return;
+  }
+
+  // Broadcast to all players in the game room
+  io.to(gameId).emit("chat_message", { gameId, message });
+}
+
+async function handleLobbyChatMessage(socket: AuthenticatedSocket, message: ChatMessage) {
+  console.log("=== LOBBY CHAT MESSAGE EVENT RECEIVED ===");
+  console.log("Lobby chat message received:", { message, socketId: socket.id, userId: socket.userId });
+
+  if (!socket.isAuthenticated || !socket.userId) {
+    socket.emit("error", { message: "Not authorized" });
+    return;
+  }
+
+  // Simple in-memory token bucket per socket
+  const now = Date.now();
+  const bucket = (socket.data as any).chatBucket || { tokens: 5, lastRefill: now };
+  const elapsed = now - bucket.lastRefill;
+  const refill = Math.floor(elapsed / 1000) * 2; // 2 tokens/sec
+  bucket.tokens = Math.min(20, bucket.tokens + refill);
+  bucket.lastRefill = now;
+  if (bucket.tokens <= 0) {
+    console.log("[CHAT RATE LIMIT] Dropping message due to rate limit, tokens:", bucket.tokens);
+    return; // drop silently
+  }
+  bucket.tokens -= 1;
+  (socket.data as any).chatBucket = bucket;
+
+  if (typeof message?.message !== "string" || message.message.length === 0 || message.message.length > 500) {
+    console.log("[CHAT VALIDATION] Invalid message format:", message);
+    return;
+  }
+  console.log("[CHAT VALIDATION] Message validation passed:", message);
+    console.log("[CHAT VALIDATION] Invalid message format:", message);
+    return;
+  }
+
+  console.log("[CHAT BROADCAST] Broadcasting lobby chat message:", message);
+  // Broadcast to all connected users in lobby
+  io.emit("lobby_chat_message", message);
+}
+
+async function handleFillSeatWithBot(socket: AuthenticatedSocket, gameId: string, seatIndex: number) {
+  console.log("[FILL SEAT] Received fill_seat_with_bot event:", { gameId, seatIndex });
+  
+  if (!socket.isAuthenticated || !socket.userId) {
+    console.log("Unauthorized fill_seat_with_bot attempt");
+    socket.emit("error", { message: "Not authorized" });
+    return;
+  }
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit("error", { message: "Game not found" });
+    return;
+  }
+  
+  // Check if seat is empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[FILL SEAT] Seat ${seatIndex} is not empty, current player:`, game.players[seatIndex]);
+    // Send current game state to client instead of error
+    const enrichedGame = enrichGameForClient(game);
+    socket.emit("game_update", enrichedGame);
+    return;
+  }
+  
+  // Fill the seat with a bot (manual invitation)
+  addBotToSeat(game, seatIndex);
+}
+
+function addBotToSeat(game: Game, seatIndex: number) {
+  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
+  
+  // Check if seat is empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
+    return;
+  }
+  
+  // Create bot
+  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const botNumber = Math.floor(Math.random() * 1000);
+  
+  game.players[seatIndex] = {
+    id: botId,
+    username: `Bot ${botNumber}`,
+    avatar: "/bot-avatar.jpg",
+    type: "bot",
+    position: seatIndex
+  };
+  
+  // Send system message
+  io.to(game.id).emit("system_message", {
+    message: `A bot was invited to seat ${seatIndex + 1}`,
+    type: "info"
+  });
+  
+  // Update all clients
+  const enrichedGame = enrichGameForClient(game);
+  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
+    gameId: game.id,
+    currentPlayerIndex: enrichedGame.play?.currentPlayerIndex,
+    players: enrichedGame.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : "null"}`),
+    hands: enrichedGame.hands?.map((h, i) => `${i}: ${h?.length || 0} cards`)
+  });
+  io.to(game.id).emit("game_update", enrichedGame);
+  
+  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
+}
+
+async function handleStartGame(socket: AuthenticatedSocket, gameId: string) {
+  console.log("[START GAME] Received start_game event:", { gameId });
+  
+  try {
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    if (game.status !== 'WAITING') {
+      socket.emit('error', { message: 'Game already started' });
+      return;
+    }
+    
+    // Check if all seats are filled, if not, fill with bots
+    const emptySeats = game.players.filter(p => p === null).length;
+    if (emptySeats > 0) {
+      console.log(`[START GAME] Filling ${emptySeats} empty seats with bots`);
+      for (let i = 0; i < game.players.length; i++) {
+        if (game.players[i] === null) {
+          addBotToSeat(game, i);
+        }
+      }
+    }
+    
+    // Only deduct coins if all 4 players are human
+    const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
+    if (allHuman) {
+      try {
+        for (const player of game.players) {
+          if (player && player.type === 'human') {
+            await prisma.user.update({
+              where: { id: player.id },
+              data: { coins: { decrement: game.buyIn } }
+            });
+          }
+        }
+      } catch (err) {
+        socket.emit('error', { message: 'Failed to debit coins from players' });
+        return;
+      }
+    }
+    
+    game.isBotGame = !allHuman;
+    game.status = 'BIDDING';
+    
+    // Dealer assignment and card dealing
+    const dealerIndex = assignDealer(game.players, game.dealerIndex);
+    game.dealerIndex = dealerIndex;
+    
+    // Assign dealer chip/flag for UI
+    game.players.forEach((p, i) => {
+      if (p) p.isDealer = (i === dealerIndex);
+    });
+    
+    const hands = dealCards(game.players, dealerIndex);
+    game.hands = hands;
+    
+    // Bidding phase state
+    const firstBidder = game.players[(dealerIndex + 1) % 4];
+    if (!firstBidder) {
+      throw new Error('Invalid game state: no first bidder found');
+    }
+    
+    game.bidding = {
+      currentPlayer: firstBidder.id,
+      currentBidderIndex: (dealerIndex + 1) % 4,
+      bids: [null, null, null, null],
+      nilBids: {}
+    };
+    
+    // Emit to all players
+    io.emit('games_updated', games);
+    io.to(game.id).emit('game_started', {
+      dealerIndex,
+      hands: hands.map((hand, i) => ({
+        playerId: game.players[i]?.id,
+        hand
+      })),
+      bidding: game.bidding,
+    });
+    
+    // Emit game_update for client sync
+    console.log('[START GAME] Emitting game_update to all players');
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    
+    // If first bidder is a bot, trigger bot bidding immediately
+    if (firstBidder.type === 'bot') {
+      console.log('[START GAME] About to call botMakeMove for seat', (dealerIndex + 1) % 4, 'bot:', firstBidder.username);
+      botMakeMove(game, (dealerIndex + 1) % 4);
+    } else {
+      // Start turn timeout for human players when bidding phase begins
+      console.log('[START GAME] Starting timeout for first human bidder:', firstBidder.username);
+      startTurnTimeout(game, (dealerIndex + 1) % 4, 'bidding');
+    }
+  } catch (err) {
+    console.error('Error in start_game handler:', err);
+    socket.emit('error', { message: 'Failed to start game' });
+  }
+}
+
+function updateGameActivity(gameId: string) {
+  const game = games.find(g => g.id === gameId);
+  if (game) {
+    game.lastActivity = Date.now();
+  }
+}
+
+// Placeholder functions for the original handlers
+async function handleMakeBid(socket: AuthenticatedSocket, gameId: string, userId: string, bid: number) {
+  // TODO: Implement make bid logic
+}
+
+async function handlePlayCard(socket: AuthenticatedSocket, gameId: string, userId: string, card: Card) {
+  // TODO: Implement play card logic
+}
+
+async function handleJoinGame(socket: AuthenticatedSocket, gameId: string) {
+  // TODO: Implement join game logic
+}
+
+async function handleLeaveGame(socket: AuthenticatedSocket, gameId: string) {
+  // TODO: Implement leave game logic
+}

@@ -209,7 +209,7 @@ export class SocketManager {
             const finalActiveGameId = localStorage.getItem('activeGameId');
             if (finalActiveGameId === activeGameId && this.socket && this.socket.connected) {
               console.log('[SOCKET MANAGER] Auto-join on connect for game:', activeGameId);
-              this.socket.emit('join_game', { gameId: activeGameId });
+              this.socket.emit('join_game', { gameId: activeGameId, userId: this.session?.userId });
             } else {
               console.log('[SOCKET MANAGER] Skipping auto-join - game ID was cleared before timeout');
             }
@@ -311,7 +311,7 @@ export class SocketManager {
             }
             
             console.log('[SOCKET MANAGER] Auto-join on authenticated for game:', activeGameId);
-            this.socket.emit('join_game', { gameId: activeGameId });
+            this.socket.emit('join_game', { gameId: activeGameId, userId: this.session?.userId });
           }
         } catch {}
       }

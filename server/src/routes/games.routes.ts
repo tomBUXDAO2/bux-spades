@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
-import { io } from '../index';
+import { io } from '../server';
 import { games } from '../gamesStore';
-import { startSeatReplacement } from "../index";
-import { playAgainTimers, playAgainResponses, originalPlayers } from '../index';
-import type { AuthenticatedSocket } from '../index';
+import { startSeatReplacement } from "../server";
+import { playAgainTimers, playAgainResponses, originalPlayers } from '../server';
+import type { AuthenticatedSocket } from '../server';
 import { trickLogger } from '../lib/trickLogger';
 import prisma from '../lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -3278,7 +3278,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 					
 					// Emit real-time coin update to the client
 					try {
-						const { authenticatedSockets } = await import('../index');
+						const { authenticatedSockets } = await import('../server');
 						const userSocket = authenticatedSockets.get(userId);
 						if (userSocket) {
 							userSocket.emit('coin_updated', { 
@@ -3307,7 +3307,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 							
 							// Emit real-time coin update to the client
 							try {
-								const { authenticatedSockets } = await import('../index');
+								const { authenticatedSockets } = await import('../server');
 								const userSocket = authenticatedSockets.get(userId);
 								if (userSocket) {
 									userSocket.emit('coin_updated', { 

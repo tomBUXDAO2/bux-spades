@@ -2,7 +2,7 @@
 import { app, httpServer, io } from './server';
 import { setupSocketAuthentication } from './socket/authentication';
 import { setupConnectionHandlers } from './socket/connectionHandlers';
-import { setupGameEventHandlers } from './socket/gameEventHandlers';
+// import { setupGameEventHandlers } from './socket/gameEventHandlers';
 import { setupGameLogic } from './game-logic/gameLogic';
 
 // Setup socket authentication
@@ -12,7 +12,7 @@ setupSocketAuthentication(io);
 setupConnectionHandlers(io);
 
 // Setup game event handlers
-setupGameEventHandlers(io);
+// setupGameEventHandlers(io);
 
 // Setup game logic
 setupGameLogic();
