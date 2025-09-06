@@ -711,10 +711,21 @@ export default function TablePage() {
           </button>
         )}
         
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);
         <GameTable
-        console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);          onLeaveTable={handleLeaveTable}
+          game={game}
+          joinGame={handleJoinGame}
+          onLeaveTable={handleLeaveTable}
           startGame={handleStartGame}
           user={user}
+          showStartWarning={showStartWarning}
+          showBotWarning={showBotWarning}
+          onCloseStartWarning={handleCloseStartWarning}
+          onCloseBotWarning={handleCloseBotWarning}
+          emptySeats={emptySeats}
+          botCount={botCount}
+          isSpectator={isSpectator}
+        />          user={user}
           showStartWarning={showStartWarning}
           showBotWarning={showBotWarning}
           onCloseStartWarning={handleCloseStartWarning}
