@@ -16,7 +16,7 @@ import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } fro
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore, calculatePartnersHandScore } from './routes/games.routes';
+import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
@@ -1933,18 +1933,59 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           console.error('Failed to update hand stats:', err);
         });
         } else {
-          // Partners mode scoring - REMOVED DUPLICATE LOGIC
-          // Scoring is now handled in games.routes.ts to avoid double scoring
-          console.log("[SCORING] Hand completed - scoring handled by games.routes.ts");
+          // Partners mode scoring
+        const handSummary = calculatePartnersHandScore(game);
           
-          // Set game status to indicate hand is completed
-          game.status = 'HAND_COMPLETED';
-          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-          
-          // Log completed hand to database
-          trickLogger.logCompletedHand(game).catch((err: Error) => {
-            console.error('Failed to log completed hand to database:', err);
-          });
+        // Update running totals
+        game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
+        game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+        
+        // Add new bags to running total
+        const oldTeam1Bags = game.team1Bags || 0;
+        const oldTeam2Bags = game.team2Bags || 0;
+        game.team1Bags = oldTeam1Bags + handSummary.team1Bags;
+        game.team2Bags = oldTeam2Bags + handSummary.team2Bags;
+        
+        console.log('[BAG DEBUG] Before penalty - Team 1 bags:', oldTeam1Bags, '+', handSummary.team1Bags, '=', game.team1Bags);
+        console.log('[BAG DEBUG] Before penalty - Team 2 bags:', oldTeam2Bags, '+', handSummary.team2Bags, '=', game.team2Bags);
+        
+        // Apply bag penalty to running total if needed
+        if (game.team1Bags >= 10) {
+          const penaltyApplied = Math.floor(game.team1Bags / 10) * 100;
+          const bagsRemoved = Math.floor(game.team1Bags / 10) * 10;
+          game.team1TotalScore -= penaltyApplied;
+          game.team1Bags -= bagsRemoved;
+          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
+        }
+        if (game.team2Bags >= 10) {
+          const penaltyApplied = Math.floor(game.team2Bags / 10) * 100;
+          const bagsRemoved = Math.floor(game.team2Bags / 10) * 10;
+          game.team2TotalScore -= penaltyApplied;
+          game.team2Bags -= bagsRemoved;
+          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
+        }
+        
+        // Set game status to indicate hand is completed
+        game.status = 'HAND_COMPLETED';
+        (game as any).handCompletedTime = Date.now(); // Track when hand was completed
+        
+        // NEW: Log completed hand to database
+        trickLogger.logCompletedHand(game).catch((err: Error) => {
+          console.error('Failed to log completed hand to database:', err);
+        });
+        
+        io.to(game.id).emit('hand_completed', {
+          ...handSummary,
+          team1TotalScore: game.team1TotalScore,
+          team2TotalScore: game.team2TotalScore,
+          team1Bags: game.team1Bags,
+          team2Bags: game.team2Bags,
+        });
+        
+        // Update stats for this hand
+        updateHandStats(game).catch(err => {
+          console.error('Failed to update hand stats:', err);
+        });
         }
         
         // Emit game update with new status
@@ -1953,7 +1994,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Start hand summary timer for all players to respond
         startHandSummaryTimer(game);
         
-        // --- Game over check ---
+        // --- Game over check --- (DUPLICATE - REMOVE THIS)
         // Use the actual game settings - these should always be set when game is created
         const maxPoints = game.maxPoints;
         const minPoints = game.minPoints;
@@ -2282,7 +2323,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Emit game update with new status
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         
-        // --- Game over check ---
+        // --- Game over check --- (DUPLICATE - REMOVE THIS)
         // Use the actual game settings - these should always be set when game is created
         const maxPoints = game.maxPoints;
         const minPoints = game.minPoints;
@@ -3357,6 +3398,130 @@ io.engine.on('upgradeError', (err) => {
 });
 
 // --- Helper functions copied from games.routes.ts ---
+
+// Helper to calculate partners hand score
+
+function calculatePartnersHandScore(game: Game) {
+  if (!game.bidding || !game.play) {
+    throw new Error('Invalid game state for scoring');
+  }
+  const team1 = [0, 2];
+  const team2 = [1, 3];
+  let team1Bid = 0, team2Bid = 0, team1Tricks = 0, team2Tricks = 0;
+  let team1Bags = 0, team2Bags = 0;
+  let team1Score = 0, team2Score = 0;
+  
+  // Use the already updated player trick counts instead of recalculating
+  const tricksPerPlayer = game.players.map(p => p?.tricks || 0);
+  
+  console.log('[SCORING DEBUG] Tricks per player:', tricksPerPlayer);
+  console.log('[SCORING DEBUG] Total tricks:', tricksPerPlayer.reduce((a, b) => a + b, 0));
+  
+  // Calculate team tricks
+  for (const i of team1) {
+    team1Tricks += tricksPerPlayer[i];
+  }
+  for (const i of team2) {
+    team2Tricks += tricksPerPlayer[i];
+  }
+  
+  // Calculate team bids (excluding nil bids)
+  for (const i of team1) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team1Bid += bid;
+    }
+  }
+  for (const i of team2) {
+    const bid = game.bidding.bids[i] ?? 0;
+    if (bid !== 0 && bid !== -1) { // Nil bids don't count toward team bid
+      team2Bid += bid;
+    }
+  }
+  
+  console.log('[SCORING DEBUG] Team 1 bid:', team1Bid, 'tricks:', team1Tricks);
+  console.log('[SCORING DEBUG] Team 2 bid:', team2Bid, 'tricks:', team2Tricks);
+  
+  // Team 1 scoring
+  if (team1Tricks >= team1Bid) {
+    team1Score += team1Bid * 10;
+    team1Bags = team1Tricks - team1Bid;
+    team1Score += team1Bags; // Bags are worth 1 point each
+  } else {
+    team1Score -= team1Bid * 10;
+    team1Bags = 0; // No bags for failed bids
+  }
+  // Team 2 scoring
+  if (team2Tricks >= team2Bid) {
+    team2Score += team2Bid * 10;
+    team2Bags = team2Tricks - team2Bid;
+    team2Score += team2Bags; // Bags are worth 1 point each
+  } else {
+    team2Score -= team2Bid * 10;
+    team2Bags = 0; // No bags for failed bids
+  }
+  
+  // Nil and Blind Nil
+  for (const i of [...team1, ...team2]) {
+    const bid = game.bidding.bids[i];
+    const tricks = tricksPerPlayer[i];
+    if (bid === 0) { // Nil
+      if (tricks === 0) {
+        if (team1.includes(i)) team1Score += 100;
+        else team2Score += 100;
+      } else {
+        if (team1.includes(i)) team1Score -= 100;
+        else team2Score -= 100;
+        // Bags for failed nil go to team AND add bag points to score
+        if (team1.includes(i)) {
+          team1Bags += tricks;
+          team1Score += tricks; // Add bag points to score
+        } else {
+          team2Bags += tricks;
+          team2Score += tricks; // Add bag points to score
+        }
+      }
+    } else if (bid === -1) { // Blind Nil (use -1 for blind nil)
+      if (tricks === 0) {
+        if (team1.includes(i)) team1Score += 200;
+        else team2Score += 200;
+      } else {
+        if (team1.includes(i)) team1Score -= 200;
+        else team2Score -= 200;
+        // Bags for failed blind nil go to team AND add bag points to score
+        if (team1.includes(i)) {
+          team1Bags += tricks;
+          team1Score += tricks; // Add bag points to score
+        } else {
+          team2Bags += tricks;
+          team2Score += tricks; // Add bag points to score
+        }
+      }
+    }
+  }
+  
+  // NOTE: Bag penalty is NOT applied here - it should be applied to running totals in the calling code
+  // This function only calculates the hand score and new bags for this hand
+  
+  // Validate total tricks equals 13
+  const totalTricks = tricksPerPlayer.reduce((a, b) => a + b, 0);
+  if (totalTricks !== 13) {
+    console.error(`[SCORING ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total.`);
+    console.error('[SCORING ERROR] Tricks per player:', tricksPerPlayer);
+    console.error('[SCORING ERROR] Game play tricks:', game.play.tricks);
+  }
+  
+  console.log('[SCORING DEBUG] Final scores - Team 1:', team1Score, 'Team 2:', team2Score);
+  
+  return {
+    team1Score,
+    team2Score,
+    team1Bags,
+    team2Bags,
+    tricksPerPlayer,
+  };
+}
+
 // --- Stats tracking per hand ---
 async function updateHandStats(game: Game) {
   console.log('[UPDATE HAND STATS] Function called for game:', game.id);
