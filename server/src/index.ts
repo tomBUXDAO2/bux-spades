@@ -1994,7 +1994,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Start hand summary timer for all players to respond
         startHandSummaryTimer(game);
         
-        // --- Game over check --- (DUPLICATE - REMOVE THIS)
+        // --- Game over check ---
         // Use the actual game settings - these should always be set when game is created
         const maxPoints = game.maxPoints;
         const minPoints = game.minPoints;
@@ -2323,7 +2323,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Emit game update with new status
         io.to(game.id).emit('game_update', enrichGameForClient(game));
         
-        // --- Game over check --- (DUPLICATE - REMOVE THIS)
+        // --- Game over check ---
         // Use the actual game settings - these should always be set when game is created
         const maxPoints = game.maxPoints;
         const minPoints = game.minPoints;
