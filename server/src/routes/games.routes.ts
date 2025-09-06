@@ -227,7 +227,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
                     gameId: newGame.dbGameId,
                     userId: player.id,
                     position: i,
-                    team: i % 2 === 0 ? 0 : 1, // Even positions = team 0, odd = team 1
+                    team: newGame.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null, // FIXED: Use consistent team numbering 1 and 2
                     bid: null,
                     bags: 0,
                     points: 0,
@@ -2624,7 +2624,7 @@ function getCardValue(rank: string | Rank): number {
 }
 
 // --- Scoring helper ---
-function calculatePartnersHandScore(game: Game) {
+export function calculatePartnersHandScore(game: Game) {
   if (!game.bidding || !game.play) {
     throw new Error('Invalid game state for scoring');
   }
