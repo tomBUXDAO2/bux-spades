@@ -712,7 +712,10 @@ export default function TablePage() {
         )}
         
         console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);
-        <GameTable
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] game prop:", game);
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] game type:", typeof game);
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] game is null:", game === null);
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] game is undefined:", game === undefined);        <GameTable
           game={game}
           joinGame={handleJoinGame}
           onLeaveTable={handleLeaveTable}
