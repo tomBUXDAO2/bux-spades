@@ -203,6 +203,12 @@ async function handleJoinGame(socket: AuthenticatedSocket, gameId: string, userI
     return;
   }
 
+  // Prevent duplicate join
+  if (game.players.some(p => p && p.id === actualUserId)) {
+    console.log(`[JOIN GAME] User ${actualUserId} already in game, ignoring duplicate join`);
+    return;
+  }
+
   if (game.status !== 'WAITING') {
     socket.emit('error', { message: 'Game has already started' });
     return;
@@ -392,6 +398,12 @@ async function handleFillSeatWithBot(socket: AuthenticatedSocket, gameId: string
     return;
   }
 
+  // Prevent duplicate join
+  // Check if seat is already occupied
+  if (game.players[seatIndex]) {
+    console.log(`\[FILL SEAT\] Seat ${seatIndex} is already occupied`);
+  }
+
   if (game.status !== 'WAITING') {
     socket.emit('error', { message: 'Game has already started' });
     return;
@@ -434,6 +446,12 @@ async function handleStartGame(socket: AuthenticatedSocket, gameId: string) {
   const game = games.find(g => g.id === gameId);
   if (!game) {
     socket.emit('error', { message: 'Game not found' });
+    return;
+  }
+
+  // Check if user is in the game
+  if (!game.players.some(p => p && p.id === socket.userId)) {
+    console.log(`\[START GAME\] User ${socket.userId} not in game, cannot start`);
     return;
   }
 

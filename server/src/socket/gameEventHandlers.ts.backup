@@ -5,30 +5,39 @@ import { botMakeMove, botPlayCard, enrichGameForClient, assignDealer, dealCards 
 import { trickLogger } from '../lib/trickLogger';
 import prisma from '../lib/prisma';
 import type { AuthenticatedSocket } from '../server';
-import type { Game, Card, ChatMessage } from '../types/game';
+import type { Game, Card } from '../types/game';
 
-// Export function to register game event handlers on individual sockets
+// ChatMessage interface matching client-side
+interface ChatMessage {
+  id?: string;
+  userId: string;
+  userName: string;
+  message: string;
+  text?: string;
+  user?: string;
+  timestamp: number;
+  isGameMessage?: boolean;
+}
+
 export function registerGameEventHandlers(socket: AuthenticatedSocket) {
-  console.log(`[GAME HANDLERS] Registering game event handlers for socket ${socket.id}`);
-
   // Make bid event
   socket.on('make_bid', async ({ gameId, userId, bid }) => {
     await handleMakeBid(socket, gameId, userId, bid);
   });
 
   // Play card event
-  socket.on('play_card', async ({ gameId, userId, card }) => {
-    await handlePlayCard(socket, gameId, userId, card);
+  socket.on('play_card', async ({ gameId, cardIndex }) => {
+    await handlePlayCard(socket, gameId, cardIndex);
   });
 
   // Join game event
-  socket.on('join_game', async ({ gameId }) => {
-    await handleJoinGame(socket, gameId);
+  socket.on('join_game', async ({ gameId, userId, testPlayer, watchOnly }) => {
+    await handleJoinGame(socket, gameId, userId, testPlayer, watchOnly);
   });
 
   // Leave game event
-  socket.on('leave_game', async ({ gameId }) => {
-    await handleLeaveGame(socket, gameId);
+  socket.on('leave_game', async ({ gameId, userId }) => {
+    await handleLeaveGame(socket, gameId, userId);
   });
 
   // Chat message event
@@ -52,10 +61,209 @@ export function registerGameEventHandlers(socket: AuthenticatedSocket) {
   });
 }
 
-// Backward compatibility - keep the original function name but just export the register function
-export function setupGameEventHandlers(io: any) {
-  // This is now handled by calling registerGameEventHandlers from connectionHandlers
-  console.log('[GAME HANDLERS] setupGameEventHandlers called - handlers will be registered per connection');
+async function handleMakeBid(socket: AuthenticatedSocket, gameId: string, userId: string, bid: number) {
+  console.log(`[BID] User ${userId} making bid ${bid} in game ${gameId}`);
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit('error', { message: 'Game not found' });
+    return;
+  }
+
+  if (game.status !== 'BIDDING') {
+    socket.emit('error', { message: 'Game is not in bidding phase' });
+    return;
+  }
+
+  const playerIndex = game.players.findIndex(p => p && p.id === userId);
+  if (playerIndex === -1) {
+    socket.emit('error', { message: 'Player not found in game' });
+    return;
+  }
+
+  if (game.bidding?.currentBidderIndex !== playerIndex) {
+    socket.emit('error', { message: 'Not your turn to bid' });
+    return;
+  }
+
+  // Record the bid
+  if (game.players[playerIndex]) {
+    game.players[playerIndex]!.bid = bid;
+  }
+  if (game.bidding) {
+    game.bidding.bids[playerIndex] = bid;
+    game.bidding.currentBidderIndex = (game.bidding.currentBidderIndex + 1) % 4;
+  }
+
+  // Check if all players have bid
+  if (game.bidding && game.bidding.currentBidderIndex === game.dealerIndex) {
+    // All players have bid, start playing phase
+    game.status = 'PLAYING';
+    if (game.play) {
+      game.play.currentPlayerIndex = (game.dealerIndex! + 1) % 4;
+    }
+    
+    // Start first turn timeout
+    startTurnTimeout(game, (game.dealerIndex! + 1) % 4, 'playing');
+  } else if (game.bidding) {
+    // Continue bidding
+    startTurnTimeout(game, game.bidding.currentBidderIndex, 'bidding');
+  }
+
+  // Broadcast game update
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+}
+
+async function handlePlayCard(socket: AuthenticatedSocket, gameId: string, cardIndex: number) {
+  console.log(`[PLAY CARD] User playing card ${cardIndex} in game ${gameId}`);
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit('error', { message: 'Game not found' });
+    return;
+  }
+
+  if (game.status !== 'PLAYING') {
+    socket.emit('error', { message: 'Game is not in playing phase' });
+    return;
+  }
+
+  const playerIndex = game.players.findIndex(p => p && p.id === socket.userId);
+  if (playerIndex === -1) {
+    socket.emit('error', { message: 'Player not found in game' });
+    return;
+  }
+
+  if (game.play?.currentPlayerIndex !== playerIndex) {
+    socket.emit('error', { message: 'Not your turn to play' });
+    return;
+  }
+
+  const player = game.players[playerIndex]!;
+  if (!player.hand || cardIndex < 0 || cardIndex >= player.hand.length) {
+    socket.emit('error', { message: 'Invalid card index' });
+    return;
+  }
+
+  const card = player.hand[cardIndex];
+  
+  // Remove card from hand
+  player.hand.splice(cardIndex, 1);
+  
+  // Add card to current trick
+  if (game.play) {
+    game.play.currentTrick.push({
+      ...card,
+      playedBy: player.id,
+      playerIndex
+    });
+  }
+
+  // Check if trick is complete
+  if (game.play && game.play.currentTrick.length === 4) {
+    // Determine trick winner (simplified)
+    const winnerIndex = 0; // Placeholder - implement proper spades logic
+    game.play.tricks.push({
+      cards: game.play.currentTrick,
+      winnerIndex
+    });
+    game.play.currentTrick = [];
+    game.play.currentPlayerIndex = winnerIndex;
+    
+    // Check if round is complete
+    if (game.players.every(p => !p || !p.hand || p.hand.length === 0)) {
+      // Round complete
+      game.status = 'WAITING';
+    } else {
+      // Continue playing
+      startTurnTimeout(game, game.play.currentPlayerIndex, 'playing');
+    }
+  } else if (game.play) {
+    // Move to next player
+    game.play.currentPlayerIndex = (game.play.currentPlayerIndex + 1) % 4;
+    startTurnTimeout(game, game.play.currentPlayerIndex, 'playing');
+  }
+
+  // Broadcast game update
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+}
+
+async function handleJoinGame(socket: AuthenticatedSocket, gameId: string, userId: string, testPlayer?: any, watchOnly?: boolean) {
+  // Use socket userId if parameter is undefined
+  const actualUserId = userId || socket.userId;
+  if (!actualUserId) {
+    socket.emit('error', { message: 'User not authenticated' });
+    return;
+  }
+  console.log(`[JOIN GAME] User ${actualUserId} joining game ${gameId}`);
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit('error', { message: 'Game not found' });
+    return;
+  }
+
+  // Prevent duplicate join
+  if (game.players.some(p => p && p.id === actualUserId)) {
+    console.log(`[JOIN GAME] User ${actualUserId} already in game, ignoring duplicate join`);
+    return;
+  }
+
+  if (game.status !== 'WAITING') {
+    socket.emit('error', { message: 'Game has already started' });
+    return;
+  }
+
+  // Find empty seat
+  const emptySeatIndex = game.players.findIndex(p => p === null);
+  if (emptySeatIndex === -1) {
+    socket.emit('error', { message: 'Game is full' });
+    return;
+  }
+
+  // Add player to seat
+  game.players[emptySeatIndex] = {
+    id: actualUserId,
+    username: testPlayer?.name || socket.auth?.username || 'Player',
+    avatar: testPlayer?.image || socket.auth?.avatar || null,
+    type: 'human',
+    position: emptySeatIndex,
+    hand: [],
+    bid: 0,
+    tricks: 0,
+    team: emptySeatIndex % 2 === 0 ? 1 : 2,
+    isDealer: false,
+    discordId: socket.auth?.discordId
+  };
+
+  // Join socket room
+  socket.join(gameId);
+
+  // Broadcast game update
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+  io.emit('games_updated', games);
+}
+
+async function handleLeaveGame(socket: AuthenticatedSocket, gameId: string, userId: string) {
+  console.log(`[LEAVE GAME] User ${userId} leaving game ${gameId}`);
+  
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    return;
+  }
+
+  // Remove player from seat
+  const playerIndex = game.players.findIndex(p => p && p.id === userId);
+  if (playerIndex !== -1) {
+    game.players[playerIndex] = null;
+  }
+
+  // Leave socket room
+  socket.leave(gameId);
+
+  // Broadcast game update
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+  io.emit('games_updated', games);
 }
 
 async function handleChatMessage(socket: AuthenticatedSocket, gameId: string, message: ChatMessage) {
@@ -83,27 +291,48 @@ async function handleChatMessage(socket: AuthenticatedSocket, gameId: string, me
   const refill = Math.floor(elapsed / 1000) * 2; // 2 tokens/sec
   bucket.tokens = Math.min(20, bucket.tokens + refill);
   bucket.lastRefill = now;
+  console.log(`[CHAT DEBUG] User ${socket.userId} chat bucket state:`, { tokens: bucket.tokens, elapsed, refill });
   if (bucket.tokens <= 0) {
-    console.log("[CHAT RATE LIMIT] Dropping message due to rate limit, tokens:", bucket.tokens);
+    console.log(`[CHAT DEBUG] Message dropped due to rate limit for user ${socket.userId}`);
     return; // drop silently
   }
   bucket.tokens -= 1;
   (socket.data as any).chatBucket = bucket;
 
-  if (typeof message?.message !== "string" || message.message.length === 0 || message.message.length > 500) {
-    console.log("[CHAT VALIDATION] Invalid message format:", message);
+  // Handle both string and ChatMessage object formats
+  let messageText: string;
+  if (typeof message === 'string') {
+    messageText = message;
+  } else if (message && typeof message.message === 'string') {
+    messageText = message.message;
+  } else {
+    console.log(`[CHAT DEBUG] Message dropped due to invalid format for user ${socket.userId}:`, message);
     return;
   }
-  console.log("[CHAT VALIDATION] Message validation passed:", message);
-    console.log("[CHAT VALIDATION] Invalid message format:", message);
+
+  if (messageText.length === 0 || messageText.length > 500) {
+    console.log(`[CHAT DEBUG] Message dropped due to invalid length for user ${socket.userId}:`, messageText);
     return;
   }
+
+  console.log(`[CHAT DEBUG] Message validation passed for user ${socket.userId}:`, messageText);
+
+  // Create proper ChatMessage object for broadcast
+  const chatMessage: ChatMessage = {
+    id: `${socket.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: socket.userId,
+    userName: socket.auth?.username || 'Player',
+    message: messageText,
+    timestamp: Date.now(),
+    isGameMessage: true
+  };
 
   // Broadcast to all players in the game room
-  io.to(gameId).emit("chat_message", { gameId, message });
+  io.to(gameId).emit("chat_message", { gameId, message: chatMessage });
+  console.log(`[CHAT DEBUG] Game chat message broadcast to game ${gameId}`);
 }
 
-async function handleLobbyChatMessage(socket: AuthenticatedSocket, message: ChatMessage) {
+async function handleLobbyChatMessage(socket: AuthenticatedSocket, message: ChatMessage | string) {
   console.log("=== LOBBY CHAT MESSAGE EVENT RECEIVED ===");
   console.log("Lobby chat message received:", { message, socketId: socket.id, userId: socket.userId });
 
@@ -119,216 +348,164 @@ async function handleLobbyChatMessage(socket: AuthenticatedSocket, message: Chat
   const refill = Math.floor(elapsed / 1000) * 2; // 2 tokens/sec
   bucket.tokens = Math.min(20, bucket.tokens + refill);
   bucket.lastRefill = now;
+  console.log(`[CHAT DEBUG] User ${socket.userId} lobby chat bucket state:`, { tokens: bucket.tokens, elapsed, refill });
   if (bucket.tokens <= 0) {
-    console.log("[CHAT RATE LIMIT] Dropping message due to rate limit, tokens:", bucket.tokens);
+    console.log(`[CHAT DEBUG] Lobby message dropped due to rate limit for user ${socket.userId}`);
     return; // drop silently
   }
   bucket.tokens -= 1;
   (socket.data as any).chatBucket = bucket;
 
-  if (typeof message?.message !== "string" || message.message.length === 0 || message.message.length > 500) {
-    console.log("[CHAT VALIDATION] Invalid message format:", message);
-    return;
-  }
-  console.log("[CHAT VALIDATION] Message validation passed:", message);
-    console.log("[CHAT VALIDATION] Invalid message format:", message);
+  // Handle both string and ChatMessage object formats
+  let messageText: string;
+  if (typeof message === 'string') {
+    messageText = message;
+  } else if (message && typeof message.message === 'string') {
+    messageText = message.message;
+  } else {
+    console.log(`[CHAT DEBUG] Lobby message dropped due to invalid format for user ${socket.userId}:`, message);
     return;
   }
 
-  console.log("[CHAT BROADCAST] Broadcasting lobby chat message:", message);
+  if (messageText.length === 0 || messageText.length > 500) {
+    console.log(`[CHAT DEBUG] Lobby message dropped due to invalid length for user ${socket.userId}:`, messageText);
+    return;
+  }
+
+  console.log(`[CHAT DEBUG] Lobby message validation passed for user ${socket.userId}:`, messageText);
+
+  // Create proper ChatMessage object for broadcast
+  const chatMessage: ChatMessage = {
+    id: `${socket.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: socket.userId,
+    userName: socket.auth?.username || 'Player',
+    message: messageText,
+    timestamp: Date.now(),
+    isGameMessage: false
+  };
+
   // Broadcast to all connected users in lobby
-  io.emit("lobby_chat_message", message);
+  io.emit("lobby_chat_message", chatMessage);
+  console.log(`[CHAT DEBUG] Lobby chat message broadcast globally`);
 }
 
 async function handleFillSeatWithBot(socket: AuthenticatedSocket, gameId: string, seatIndex: number) {
-  console.log("[FILL SEAT] Received fill_seat_with_bot event:", { gameId, seatIndex });
-  
-  if (!socket.isAuthenticated || !socket.userId) {
-    console.log("Unauthorized fill_seat_with_bot attempt");
-    socket.emit("error", { message: "Not authorized" });
-    return;
-  }
+  console.log(`[FILL SEAT] Filling seat ${seatIndex} with bot in game ${gameId}`);
   
   const game = games.find(g => g.id === gameId);
   if (!game) {
-    socket.emit("error", { message: "Game not found" });
+    socket.emit('error', { message: 'Game not found' });
     return;
   }
-  
-  // Check if seat is empty
-  if (game.players[seatIndex] !== null) {
-    console.log(`[FILL SEAT] Seat ${seatIndex} is not empty, current player:`, game.players[seatIndex]);
-    // Send current game state to client instead of error
-    const enrichedGame = enrichGameForClient(game);
-    socket.emit("game_update", enrichedGame);
-    return;
-  }
-  
-  // Fill the seat with a bot (manual invitation)
-  addBotToSeat(game, seatIndex);
-}
 
-function addBotToSeat(game: Game, seatIndex: number) {
-  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
-  
-  // Check if seat is empty
-  if (game.players[seatIndex] !== null) {
-    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
+  // Prevent duplicate join
+  if (game.players.some(p => p && p.id === actualUserId)) {
+    console.log(`[JOIN GAME] User ${actualUserId} already in game, ignoring duplicate join`);
     return;
   }
-  
-  // Create bot
-  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const botNumber = Math.floor(Math.random() * 1000);
-  
+
+  if (game.status !== 'WAITING') {
+    socket.emit('error', { message: 'Game has already started' });
+    return;
+  }
+
+  if (seatIndex < 0 || seatIndex >= 4) {
+    socket.emit('error', { message: 'Invalid seat index' });
+    return;
+  }
+
+  if (game.players[seatIndex] !== null) {
+    // Seat is already occupied, send current game state instead of error
+    socket.emit('game_update', enrichGameForClient(game));
+    return;
+  }
+
+  // Add bot to seat
+  const botId = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   game.players[seatIndex] = {
     id: botId,
-    username: `Bot ${botNumber}`,
-    avatar: "/bot-avatar.jpg",
-    type: "bot",
-    position: seatIndex
+    username: `Bot ${seatIndex + 1}`,
+    avatar: null,
+    type: 'bot',
+    position: seatIndex,
+    hand: [],
+    bid: 0,
+    tricks: 0,
+    team: seatIndex % 2 === 0 ? 1 : 2,
+    isDealer: false
   };
-  
-  // Send system message
-  io.to(game.id).emit("system_message", {
-    message: `A bot was invited to seat ${seatIndex + 1}`,
-    type: "info"
-  });
-  
-  // Update all clients
-  const enrichedGame = enrichGameForClient(game);
-  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
-    gameId: game.id,
-    currentPlayerIndex: enrichedGame.play?.currentPlayerIndex,
-    players: enrichedGame.players.map((p, i) => `${i}: ${p ? `${p.username} (${p.type})` : "null"}`),
-    hands: enrichedGame.hands?.map((h, i) => `${i}: ${h?.length || 0} cards`)
-  });
-  io.to(game.id).emit("game_update", enrichedGame);
-  
-  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
+
+  // Broadcast game update
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+  io.emit('games_updated', games);
 }
 
 async function handleStartGame(socket: AuthenticatedSocket, gameId: string) {
-  console.log("[START GAME] Received start_game event:", { gameId });
+  console.log(`[START GAME] Starting game ${gameId}`);
   
-  try {
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      socket.emit('error', { message: 'Game not found' });
-      return;
-    }
-    if (game.status !== 'WAITING') {
-      socket.emit('error', { message: 'Game already started' });
-      return;
-    }
-    
-    // Check if all seats are filled, if not, fill with bots
-    const emptySeats = game.players.filter(p => p === null).length;
-    if (emptySeats > 0) {
-      console.log(`[START GAME] Filling ${emptySeats} empty seats with bots`);
-      for (let i = 0; i < game.players.length; i++) {
-        if (game.players[i] === null) {
-          addBotToSeat(game, i);
-        }
-      }
-    }
-    
-    // Only deduct coins if all 4 players are human
-    const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
-    if (allHuman) {
-      try {
-        for (const player of game.players) {
-          if (player && player.type === 'human') {
-            await prisma.user.update({
-              where: { id: player.id },
-              data: { coins: { decrement: game.buyIn } }
-            });
-          }
-        }
-      } catch (err) {
-        socket.emit('error', { message: 'Failed to debit coins from players' });
-        return;
-      }
-    }
-    
-    game.isBotGame = !allHuman;
-    game.status = 'BIDDING';
-    
-    // Dealer assignment and card dealing
-    const dealerIndex = assignDealer(game.players, game.dealerIndex);
-    game.dealerIndex = dealerIndex;
-    
-    // Assign dealer chip/flag for UI
-    game.players.forEach((p, i) => {
-      if (p) p.isDealer = (i === dealerIndex);
-    });
-    
-    const hands = dealCards(game.players, dealerIndex);
-    game.hands = hands;
-    
-    // Bidding phase state
-    const firstBidder = game.players[(dealerIndex + 1) % 4];
-    if (!firstBidder) {
-      throw new Error('Invalid game state: no first bidder found');
-    }
-    
-    game.bidding = {
-      currentPlayer: firstBidder.id,
-      currentBidderIndex: (dealerIndex + 1) % 4,
-      bids: [null, null, null, null],
-      nilBids: {}
-    };
-    
-    // Emit to all players
-    io.emit('games_updated', games);
-    io.to(game.id).emit('game_started', {
-      dealerIndex,
-      hands: hands.map((hand, i) => ({
-        playerId: game.players[i]?.id,
-        hand
-      })),
-      bidding: game.bidding,
-    });
-    
-    // Emit game_update for client sync
-    console.log('[START GAME] Emitting game_update to all players');
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    
-    // If first bidder is a bot, trigger bot bidding immediately
-    if (firstBidder.type === 'bot') {
-      console.log('[START GAME] About to call botMakeMove for seat', (dealerIndex + 1) % 4, 'bot:', firstBidder.username);
-      botMakeMove(game, (dealerIndex + 1) % 4);
-    } else {
-      // Start turn timeout for human players when bidding phase begins
-      console.log('[START GAME] Starting timeout for first human bidder:', firstBidder.username);
-      startTurnTimeout(game, (dealerIndex + 1) % 4, 'bidding');
-    }
-  } catch (err) {
-    console.error('Error in start_game handler:', err);
-    socket.emit('error', { message: 'Failed to start game' });
+  const game = games.find(g => g.id === gameId);
+  if (!game) {
+    socket.emit('error', { message: 'Game not found' });
+    return;
   }
+
+  // Prevent duplicate join
+  if (game.players.some(p => p && p.id === actualUserId)) {
+    console.log(`[JOIN GAME] User ${actualUserId} already in game, ignoring duplicate join`);
+    return;
+  }
+
+  if (game.status !== 'WAITING') {
+    socket.emit('error', { message: 'Game has already started' });
+    return;
+  }
+
+  // Check if all seats are filled
+  if (game.players.some(p => p === null)) {
+    socket.emit('error', { message: 'All seats must be filled to start the game' });
+    return;
+  }
+
+  // Start the game
+  game.status = 'BIDDING';
+  game.dealerIndex = assignDealer(game.players, game.dealerIndex || 0);
+  
+  // Initialize bidding state
+  game.bidding = {
+    currentPlayer: game.players[(game.dealerIndex + 1) % 4]!.id,
+    currentBidderIndex: (game.dealerIndex + 1) % 4,
+    bids: [null, null, null, null],
+    nilBids: {}
+  };
+  
+  // Deal cards
+  const hands = dealCards(game.players, game.dealerIndex);
+  game.players.forEach((player, index) => {
+    if (player) {
+      player.hand = hands[index];
+    }
+  });
+
+  // Start bidding phase
+  const firstBidder = game.players[game.bidding.currentBidderIndex];
+  if (firstBidder && firstBidder.type === 'bot') {
+    // Bot makes first bid
+    botMakeMove(game, game.bidding.currentBidderIndex);
+  } else {
+    // Human player, start timeout
+    startTurnTimeout(game, game.bidding.currentBidderIndex, 'bidding');
+  }
+
+  // Broadcast game started
+  io.to(gameId).emit('game_started', { gameId, game: enrichGameForClient(game) });
+  io.to(gameId).emit('game_update', enrichGameForClient(game));
+  io.emit('games_updated', games);
 }
 
 function updateGameActivity(gameId: string) {
+  // Update game activity timestamp
   const game = games.find(g => g.id === gameId);
   if (game) {
     game.lastActivity = Date.now();
   }
-}
-
-// Placeholder functions for the original handlers
-async function handleMakeBid(socket: AuthenticatedSocket, gameId: string, userId: string, bid: number) {
-  // TODO: Implement make bid logic
-}
-
-async function handlePlayCard(socket: AuthenticatedSocket, gameId: string, userId: string, card: Card) {
-  // TODO: Implement play card logic
-}
-
-async function handleJoinGame(socket: AuthenticatedSocket, gameId: string) {
-  // TODO: Implement join game logic
-}
-
-async function handleLeaveGame(socket: AuthenticatedSocket, gameId: string) {
-  // TODO: Implement leave game logic
 }

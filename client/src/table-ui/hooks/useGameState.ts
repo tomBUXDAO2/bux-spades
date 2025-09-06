@@ -48,8 +48,8 @@ export function useGameState(
     // }
     
     // Setup event listeners
-    // socket.on('connect', joinGame);
-    // socket.on('game_update', onGameUpdate);
+    socket.on('connect', joinGame);
+    socket.on('game_update', onGameUpdate);
     // socket.on('error', onGameError);
     
     // Cleanup
