@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
 import { games } from '../gamesStore';
-import { startSeatReplacement } from "../index";
+import { startSeatReplacement, startTurnTimeout } from "../index";
 import { playAgainTimers, playAgainResponses, originalPlayers } from '../index';
 import type { AuthenticatedSocket } from '../index';
 import { trickLogger } from '../lib/trickLogger';
@@ -1402,7 +1402,6 @@ export function botMakeMove(game: Game, seatIndex: number) {
           // Start timeout for human players in playing phase using the main timeout system
           console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', firstPlayer.username);
           // Import the timeout function from index.ts
-          const { startTurnTimeout } = require('../game-logic/timeoutHandlers');
           startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
         }
         return;
@@ -1422,7 +1421,6 @@ export function botMakeMove(game: Game, seatIndex: number) {
           // Start timeout for human players using the main timeout system
           console.log('[TIMEOUT DEBUG] Starting timeout for human player in bot bidding logic:', game.players[next].username);
           // Import the timeout function from index.ts
-          const { startTurnTimeout } = require('../game-logic/timeoutHandlers');
           startTurnTimeout(game, next, 'bidding');
         }
       }
@@ -2589,7 +2587,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        const { startTurnTimeout } = require('../game-logic/timeoutHandlers');
         startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
@@ -3600,7 +3597,6 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        const { startTurnTimeout } = require('../game-logic/timeoutHandlers');
         startTurnTimeout(game, winnerIndex, 'playing');
       }
     } else {
@@ -3634,7 +3630,6 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        const { startTurnTimeout } = require('../game-logic/timeoutHandlers');
         startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
