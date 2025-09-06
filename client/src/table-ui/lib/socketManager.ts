@@ -137,7 +137,7 @@ export class SocketManager {
     console.log('SocketManager: Device detection:', { isMobile, isSafari });
     
     this.socket = io(wsUrl, {
-      transports: isMobile ? ['polling', 'websocket'] : ['websocket', 'polling'], // Prefer polling on mobile
+      transports: ['websocket', 'polling'], // Stable transport order
       auth: {
         token,
         userId,
@@ -145,17 +145,15 @@ export class SocketManager {
         avatar
       },
       reconnection: true,
-      reconnectionAttempts: isMobile ? 10 : 8, // Reduced attempts to prevent connection spam
-      reconnectionDelay: isMobile ? 3000 : 2000, // Slower initial reconnection
-      reconnectionDelayMax: isMobile ? 10000 : 8000, // Shorter max delay
-      timeout: isMobile ? 30000 : 20000, // Shorter timeout for faster failure detection
+      reconnectionAttempts: 5, // Less aggressive
+      reconnectionDelay: 1000, // Faster initial reconnection
+      reconnectionDelayMax: 5000, // Reasonable max delay
+      timeout: 20000, // Standard timeout
       autoConnect: true,
-      forceNew: true, // Force new connection
-      upgrade: true, // Allow transport upgrade
+      forceNew: false, // Don't force new connection - this was causing issues
+      upgrade: true,
       rememberUpgrade: true,
-      // Add more robust settings for page refresh scenarios
-      closeOnBeforeunload: false, // Don't close on page unload
-      // Mobile-specific optimizations - removed User-Agent header to fix CORS
+      closeOnBeforeunload: false,
       extraHeaders: undefined
     });
 
