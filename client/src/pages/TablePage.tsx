@@ -712,7 +712,7 @@ export default function TablePage() {
         )}
         
         <GameTable
-          game={game}
+        console.log("🚨🚨🚨 [CRITICAL DEBUG] About to render GameTable with game:", game);          game={game}
           joinGame={handleJoinGame}
           onLeaveTable={handleLeaveTable}
           startGame={handleStartGame}
