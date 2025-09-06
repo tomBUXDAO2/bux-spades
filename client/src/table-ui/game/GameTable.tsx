@@ -501,12 +501,15 @@ export default function GameTable({
     };
     
     socket.on('countdown_start', handleCountdownStart);
-    socket.on("game_update", (updatedGame) => {
+    console.log("🔍 [DEBUG] Setting up game_update event listener");
     socket.onAny((eventName, ...args) => {
       console.log("🔍 [SOCKET DEBUG] Received event:", eventName, args);
-    });    console.log("🔍 [DEBUG] Setting up game_update event listener");      console.log("SOCKET EVENT: game_update", updatedGame);
+    });
+    socket.on("game_update", (updatedGame) => {
+      console.log("SOCKET EVENT: game_update", updatedGame);
       setGameState(updatedGame);
-    });    socket.on('bidding_ready', handlePlayerActed);
+    });
+    socket.on('bidding_ready', handlePlayerActed);
     socket.on('bidding_complete', handlePlayerActed);
     socket.on('play_start', handlePlayerActed);
     socket.on('trick_completed', handlePlayerActed);
