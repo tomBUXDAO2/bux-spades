@@ -501,7 +501,10 @@ export default function GameTable({
     };
     
     socket.on('countdown_start', handleCountdownStart);
-    socket.on('bidding_ready', handlePlayerActed);
+    socket.on("game_update", (updatedGame) => {
+      console.log("SOCKET EVENT: game_update", updatedGame);
+      setGameState(updatedGame);
+    });    socket.on('bidding_ready', handlePlayerActed);
     socket.on('bidding_complete', handlePlayerActed);
     socket.on('play_start', handlePlayerActed);
     socket.on('trick_completed', handlePlayerActed);
@@ -566,7 +569,7 @@ export default function GameTable({
       socket.off('bidding_complete', handlePlayerActed);
       socket.off('play_start', handlePlayerActed);
       socket.off('trick_completed', handlePlayerActed);
-      socket.off('emoji_reaction', handleEmojiReactionReceived);
+      socket.off("game_update");      socket.off('emoji_reaction', handleEmojiReactionReceived);
       socket.off('send_emoji', handleSendEmojiReceived);
     };
   }, [socket]);
