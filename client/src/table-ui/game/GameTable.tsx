@@ -1,5 +1,5 @@
 "use client";
-console.log("🚨🚨🚨 [CRITICAL DEBUG] GameTable component loaded at:", new Date().toISOString());
+console.log("🚨🚨🚨 [CRITICAL DEBUG] GameTable component loaded at:", new Date().toISOString());console.log("🚨🚨🚨 [CRITICAL DEBUG] GameTable component loaded at:", new Date().toISOString());
 import { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Suit, Player, Bot } from '../../types/game';
 import type { ChatMessage } from '../Chat';
