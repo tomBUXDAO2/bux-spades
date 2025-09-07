@@ -49,6 +49,8 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
+  const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
+
   // Fetch stats when mode changes or player changes
   useEffect(() => {
     if (!isOpen || !player || !player.id) return;
@@ -219,7 +221,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                         {stats.nilsBid > 0 ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%
                       </td>
                       <td className="text-center py-3 text-lg">
-                        +{(stats.nilsMade * 100) + ((stats.nilsBid - stats.nilsMade) * -100)}
+                        {formatSigned((stats.nilsMade * 100) + ((stats.nilsBid - stats.nilsMade) * -100))}
                       </td>
                     </tr>
                     <tr>
@@ -230,7 +232,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                         {stats.blindNilsBid > 0 ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%
                       </td>
                       <td className="text-center py-3 text-lg">
-                        +{(stats.blindNilsMade * 100) + ((stats.blindNilsBid - stats.blindNilsMade) * -100)}
+                        {formatSigned((stats.blindNilsMade * 100) + ((stats.blindNilsBid - stats.blindNilsMade) * -100))}
                       </td>
                     </tr>
                   </tbody>
