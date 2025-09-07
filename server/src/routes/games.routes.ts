@@ -3242,13 +3242,23 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 							totalBags: { increment: bags }
 						}
 					});
+					// Recompute bagsPerGame = totalBags / gamesPlayed
+					try {
+						const s = await prisma.userStats.findUnique({ where: { userId }, select: { totalBags: true, gamesPlayed: true } });
+						if (s && (s.gamesPlayed || 0) > 0) {
+							await prisma.userStats.update({ where: { userId }, data: { bagsPerGame: (s.totalBags || 0) / (s.gamesPlayed || 1) } });
+						}
+					} catch (bpgErr) {
+						console.warn('[STATS] Failed to recompute bagsPerGame for', userId, bpgErr);
+					}
 				} catch (error) {
 					await prisma.userStats.create({
 						data: {
 							userId,
 							gamesPlayed: 1,
 							gamesWon: isWinner ? 1 : 0,
-							totalBags: bags
+							totalBags: bags,
+							bagsPerGame: bags
 						} as any
 					});
 				}
