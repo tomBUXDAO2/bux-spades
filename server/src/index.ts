@@ -1983,9 +1983,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         });
         
         // Update stats for this hand
-        updateHandStats(game).catch(err => {
-          console.error('Failed to update hand stats:', err);
-        });
+        // DISABLED: updateHandStats(game).catch(err => {
+          // console.error('Failed to update hand stats:', err);
+        // });
         }
         
         // Emit game update with new status

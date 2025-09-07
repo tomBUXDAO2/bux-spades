@@ -2299,9 +2299,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
         });
         
         // Update stats for this hand
-        updateHandStats(game).catch(err => {
-          console.error('Failed to update hand stats:', err);
-        });
+        // DISABLED: updateHandStats(game).catch(err => {
+          // console.error('Failed to update hand stats:', err);
+        // });
         }
         
         // Emit game update with new status
@@ -3175,7 +3175,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 			});
 			
 			const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
-			if (false) { // DISABLED: Always allow coin updates
+			if (alreadyApplied) { // ENABLED: Prevent duplicate coin updates
 				console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
 				return; // Skip this update
 			}
