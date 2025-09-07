@@ -222,8 +222,13 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       }
     }
     
+    // Fetch current coin balance
+    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { coins: true } });
+    const currentCoins = userRecord?.coins ?? 0;
+    
     res.json({
       ...responseStats,
+      coins: currentCoins,
       // mode breakdown (always show filtered results)
       partnersGamesPlayed,
       partnersGamesWon,

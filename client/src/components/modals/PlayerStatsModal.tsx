@@ -81,8 +81,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     nilsMade: 0,
     blindNilsBid: 0,
     blindNilsMade: 0,
-  };
+  } as any;
 
+  const displayCoins = (stats as any)?.coins ?? player.coins ?? 0;
 
   // Calculate game mode breakdown
   const gameModeBreakdown = {
@@ -171,7 +172,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                     <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-2xl font-bold text-yellow-400">{player.coins?.toLocaleString() || '0'}</span>
+                    <span className="text-2xl font-bold text-yellow-400">{Number(displayCoins).toLocaleString()}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
