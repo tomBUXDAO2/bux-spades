@@ -3175,7 +3175,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 			});
 			
 			const alreadyApplied = Boolean((gameRecord as any)?.gameState?.statsApplied);
-			if (alreadyApplied) { // ENABLED: Prevent duplicate coin updates
+			if (false) { // DISABLED: Allow coin updates
 				console.log('[STATS SKIP] Stats/coins already applied for game', game.dbGameId);
 				return; // Skip this update
 			}
