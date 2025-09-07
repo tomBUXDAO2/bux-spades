@@ -2084,55 +2084,55 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             completeGame(game, winningTeam).catch(err => {
               console.error('Failed to complete game:', err);
             });
-          } else {
-            // Game is not over, start next hand immediately
-            console.log("[HAND TRANSITION] Starting next hand immediately");
-            setTimeout(() => {
-              // Move dealer to the left (next position)
-              game.dealerIndex = (game.dealerIndex + 1) % 4;
-              
-              // Reset game state for new hand
-              game.status = "BIDDING";
-              game.bidding = {
-                currentPlayer: game.players[game.dealerIndex]?.id || "",
-                currentBidderIndex: game.dealerIndex,
-                bids: [null, null, null, null],
-                nilBids: {}
-              };
-              game.play = undefined;
-              
-              // Reset player states
-              game.players.forEach(player => {
-                if (player) {
-                  player.hand = [];
-                  player.bid = undefined;
-                  player.tricks = 0;
-                }
-              });
-              
-              // Deal new cards
-              const hands = dealCards(game.players, game.dealerIndex);
-              game.hands = hands;
-              
-              // Assign hands to players
-              game.players.forEach((player, index) => {
-                if (player) {
-                  player.hand = hands[index] || [];
-                }
-              });
-              
-              console.log("[HAND TRANSITION] New hand started for game:", game.id);
-              
-              // Emit events
-              io.to(game.id).emit("new_hand_started", {
-                dealerIndex: game.dealerIndex,
-                hands: game.players.map(p => p?.hand || [])
-              });
-              io.to(game.id).emit("bidding_ready", {
-                currentBidder: game.dealerIndex
-              });
-              io.to(game.id).emit("game_update", enrichGameForClient(game));
-            }, 3000); // 3 second delay to show hand summary
+        // DISABLED:           } else {
+        // DISABLED:             // Game is not over, start next hand immediately
+        // DISABLED:             console.log("[HAND TRANSITION] Starting next hand immediately");
+        // DISABLED:             setTimeout(() => {
+        // DISABLED:               // Move dealer to the left (next position)
+        // DISABLED:               game.dealerIndex = (game.dealerIndex + 1) % 4;
+        // DISABLED:               
+        // DISABLED:               // Reset game state for new hand
+        // DISABLED:               game.status = "BIDDING";
+        // DISABLED:               game.bidding = {
+        // DISABLED:                 currentPlayer: game.players[game.dealerIndex]?.id || "",
+        // DISABLED:                 currentBidderIndex: game.dealerIndex,
+        // DISABLED:                 bids: [null, null, null, null],
+        // DISABLED:                 nilBids: {}
+        // DISABLED:               };
+        // DISABLED:               game.play = undefined;
+        // DISABLED:               
+        // DISABLED:               // Reset player states
+        // DISABLED:               game.players.forEach(player => {
+        // DISABLED:                 if (player) {
+        // DISABLED:                   player.hand = [];
+        // DISABLED:                   player.bid = undefined;
+        // DISABLED:                   player.tricks = 0;
+        // DISABLED:                 }
+        // DISABLED:               });
+        // DISABLED:               
+        // DISABLED:               // Deal new cards
+        // DISABLED:               const hands = dealCards(game.players, game.dealerIndex);
+        // DISABLED:               game.hands = hands;
+        // DISABLED:               
+        // DISABLED:               // Assign hands to players
+        // DISABLED:               game.players.forEach((player, index) => {
+        // DISABLED:                 if (player) {
+        // DISABLED:                   player.hand = hands[index] || [];
+        // DISABLED:                 }
+        // DISABLED:               });
+        // DISABLED:               
+        // DISABLED:               console.log("[HAND TRANSITION] New hand started for game:", game.id);
+        // DISABLED:               
+        // DISABLED:               // Emit events
+        // DISABLED:               io.to(game.id).emit("new_hand_started", {
+        // DISABLED:                 dealerIndex: game.dealerIndex,
+        // DISABLED:                 hands: game.players.map(p => p?.hand || [])
+        // DISABLED:               });
+        // DISABLED:               io.to(game.id).emit("bidding_ready", {
+        // DISABLED:                 currentBidder: game.dealerIndex
+        // DISABLED:               });
+        // DISABLED:               io.to(game.id).emit("game_update", enrichGameForClient(game));
+        // DISABLED:             }, 3000); // 3 second delay to show hand summary
           }
         }
       }
