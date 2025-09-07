@@ -3253,6 +3253,38 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 					});
 				}
 
+				// Compute nil stats for this user in this game: bid=0; made if won zero tricks in that round
+				try {
+					const roundIds = (await prisma.round.findMany({ where: { gameId: (game as any).dbGameId }, select: { id: true } }))
+						.map(r => r.id);
+					if (roundIds.length > 0) {
+						const userNilBids = await prisma.roundBid.findMany({
+							where: { roundId: { in: roundIds }, playerId: userId, bid: 0 },
+							select: { roundId: true }
+						});
+						let nilsBidInc = userNilBids.length;
+						let nilsMadeInc = 0;
+						if (nilsBidInc > 0) {
+							for (const nb of userNilBids) {
+								const anyTrickWon = await prisma.trick.findFirst({ where: { roundId: nb.roundId, winningPlayerId: userId }, select: { id: true } });
+								if (!anyTrickWon) nilsMadeInc++;
+							}
+						}
+						if (nilsBidInc > 0) {
+							await prisma.userStats.update({
+								where: { userId },
+								data: {
+									nilsBid: { increment: nilsBidInc },
+									nilsMade: { increment: nilsMadeInc }
+								}
+							});
+							console.log(`[NIL STATS] user=${userId} bid=${nilsBidInc} made=${nilsMadeInc} in game ${(game as any).dbGameId}`);
+						}
+					}
+				} catch (nilErr) {
+					console.error('[NIL STATS] Failed to compute nil stats for', userId, nilErr);
+				}
+				
 				// Handle coin prizes (buy-in was already deducted at game start)
 				const buyIn = game.buyIn || 0;
 				if (buyIn > 0 && isWinner) {
