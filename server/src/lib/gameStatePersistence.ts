@@ -5,6 +5,12 @@ import type { Game } from '../types/game';
  * Save current game state to database
  */
 export async function saveGameState(game: Game): Promise<void> {
+  // Check if game exists in database before trying to update
+  const existingGame = await prisma.game.findUnique({ where: { id: game.id } });
+  if (!existingGame) {
+    console.log(`[GAME STATE] ⚠️ Game ${game.id} not found in database, skipping save`);
+    return;
+  }
   try {
     // Extract current game state with COMPLETE information
     const gameState = {

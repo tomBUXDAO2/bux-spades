@@ -1216,11 +1216,12 @@ export default function GameTable({
       const currentPlayerIndex = game.bidding?.currentBidderIndex || game.play?.currentPlayerIndex || 0;
 
       // Check if this player is on countdown overlay
-      const isPlayerOnCountdown = countdownPlayer && countdownPlayer.playerId === player?.id;
+      const isPlayerOnCountdown = !!countdownPlayer && countdownPlayer.playerId === player?.id;
       
       // Check if this specific player is the current player (timing out)
       const isCurrentPlayer = player && player.id === gameState.currentPlayer;
-      const shouldShowTimerOnPlayer = isPlayerOnCountdown && isCurrentPlayer; // Only overlay on current player's PFP when server sends countdown
+      // Only show overlay when it's the current player's turn AND their countdown has fully elapsed
+      const shouldShowTimerOnPlayer = Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0);
     
 
     
@@ -1551,10 +1552,10 @@ export default function GameTable({
                         </div>
                       )}
                       
-                      {/* Countdown overlay for timed out player */}
-                      {isPlayerOnCountdown && (
+                      {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
+                      {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0) && (
                         <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                          <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
+                          <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
                         </div>
                       )}
                     </div>
@@ -1602,10 +1603,10 @@ export default function GameTable({
                     </div>
                   )}
                   
-                  {/* Countdown overlay for timed out player */}
-                  {isPlayerOnCountdown && (
+                  {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
+                  {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0) && (
                     <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{countdownPlayer.timeLeft}</span>
+                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
                     </div>
                   )}
                 </div>

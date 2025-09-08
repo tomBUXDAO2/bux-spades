@@ -2096,15 +2096,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Store the completed trick for animation before clearing
         const completedTrick = [...game.play.currentTrick];
         
-        // Clear the trick immediately for proper game state
-        game.play!.currentTrick = [];
-        
-        // Emit immediate game update with cleared trick and updated trick counts
-        console.log('[BOT TRICK DEBUG] Emitting game_update with currentPlayer:', game.play?.currentPlayer, 'currentPlayerIndex:', game.play?.currentPlayerIndex);
-        
-        // Send game update to all players in the room
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
-        
         // Emit trick complete with the stored trick data for animation
         io.to(game.id).emit('trick_complete', {
           trick: {
@@ -2114,10 +2105,17 @@ export function botPlayCard(game: Game, seatIndex: number) {
           trickNumber: game.play.trickNumber,
         });
         
-        // Emit clear trick event after animation delay
+        // Defer clearing the trick until after clients have started the animation
         setTimeout(() => {
+          // Clear the trick for proper game state
+          game.play!.currentTrick = [];
+          
+          // Send game update to all players in the room AFTER clearing
+          io.to(game.id).emit('game_update', enrichGameForClient(game));
+          
+          // Emit clear trick event to allow clients to clear any residual UI
           io.to(game.id).emit('clear_trick');
-        }, 1200); // Reduced delay for faster animation
+        }, 1200); // Keep animation delay consistent
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
@@ -3550,32 +3548,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       // Store the completed trick for animation before clearing
       const completedTrick = [...game.play.currentTrick];
       
-      // Clear the trick immediately for proper game state
-      game.play.currentTrick = [];
-      
-      // Check if hand is complete
-      if (game.play.trickNumber === 13) {
-        console.log('[HUMAN TIMEOUT HAND COMPLETION] Hand complete, calculating scores');
-        // Calculate scores and determine winner
-        try {
-          if (game.rules?.gameType === 'SOLO') {
-            calculateSoloHandScore(game);
-          } else {
-            calculatePartnersHandScore(game);
-          }
-        } catch (error) {
-          console.error('[HUMAN TIMEOUT HAND COMPLETION ERROR] Error calculating scores:', error);
-        }
-        return;
-      }
-      
-      // Emit immediate game update with cleared trick and updated trick counts
-      console.log('[HUMAN TIMEOUT TRICK DEBUG] Emitting game_update with currentPlayer:', game.play?.currentPlayer, 'currentPlayerIndex:', game.play?.currentPlayerIndex);
-      
-      // Send game update to all players in the room
-      io.to(game.id).emit('game_update', enrichGameForClient(game));
-      
-      // Emit trick complete with the stored trick data for animation
+      // Emit trick complete with the stored trick data for animation FIRST
       io.to(game.id).emit('trick_complete', {
         trick: {
           cards: completedTrick,
@@ -3584,10 +3557,17 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         trickNumber: game.play.trickNumber,
       });
       
-      // Emit clear trick event after animation delay
+      // Defer clearing the trick until after clients have started the animation
       setTimeout(() => {
+        // Clear the trick for proper game state
+        game.play.currentTrick = [];
+        
+        // Send game update to all players in the room AFTER clearing
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
+        
+        // Emit clear trick event to allow clients to clear any residual UI
         io.to(game.id).emit('clear_trick');
-      }, 2000);
+      }, 1200);
       
       // If the next player is a bot, trigger their move with a delay
       const nextPlayer = game.players[winnerIndex];
