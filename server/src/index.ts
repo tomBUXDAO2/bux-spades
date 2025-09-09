@@ -292,6 +292,23 @@ io.use(async (socket: AuthenticatedSocket, next) => {
   }
 });
 
+async function wasPlayerInGame(game: Game, userId: string): Promise<boolean> {
+  try {
+    if (game.dbGameId) {
+      const gamePlayer = await prisma.gamePlayer.findFirst({
+        where: {
+          gameId: game.dbGameId,
+          userId: userId
+        }
+      });
+      return !!gamePlayer;
+    }
+  } catch (error) {
+    console.error("[RECONNECT DEBUG] Error checking if player was in game:", error);
+  }
+  return false;
+}
+
 io.on('connection', (socket: AuthenticatedSocket) => {
   console.log('Client connected:', {
     socketId: socket.id,
@@ -603,7 +620,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Check if this user is the current player (they were removed but game state wasn't updated)
         const isCurrentPlayer = game.currentPlayer === socket.userId;
         
-        if (isCurrentPlayer) {
+        if (isCurrentPlayer || game.players.some(p => p if (isCurrentPlayer || await wasPlayerInGame(game, socket.userId)) {if (isCurrentPlayer) { p.id === socket.userId)) {
           // User is the current player but not in a seat - find their original seat
           console.log(`[RECONNECT] Restoring current player ${socket.userId} to their original seat`);
           
