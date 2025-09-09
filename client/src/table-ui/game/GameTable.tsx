@@ -927,14 +927,13 @@ export default function GameTable({
   const [gameState, setGameState] = useState(game);
   
   // Add debug logs for hand mapping
+  const currentPlayerId = user?.id;
   const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
   const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands.find((h: any) => h.playerId === currentPlayerId)?.hand || [] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
   console.log('myHand:', myHand);
   
-  // Find the current player's ID
-  const currentPlayerId = user?.id;
   
   // After getting the players array:
   const sanitizedPlayers = (gameState.players || []);
