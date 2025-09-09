@@ -3401,6 +3401,10 @@ export function enrichGameForClient(game: Game, userId?: string): Game {
     playerBags: game.playerBags,     // Added for Solo mode
     winningPlayer: game.winningPlayer, // Added for Solo mode
     forcedBid: game.forcedBid, // Added for Suicide games
+    hands: hands.map((hand, i) => ({
+      playerId: game.players[i]?.id,
+      hand: hand || []
+    })),
     players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {
