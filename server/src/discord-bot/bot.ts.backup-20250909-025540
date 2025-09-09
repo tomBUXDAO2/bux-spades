@@ -1474,28 +1474,13 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
       .setColor(0x00ff00)
       .setTimestamp();
 
-    // Add final scores - show individual player scores for solo games
-    if (gameData.gameMode === 'SOLO' && gameData.playerScores && gameData.players) {
-      // Create array of players with their scores and usernames
-      const playersWithScores = gameData.playerScores.map((score, index) => ({
-        score,
-        position: index,
-        username: gameData.players[index]?.username || `Player ${index + 1}`
-      }));
-      
-      // Sort by score (highest first)
-      playersWithScores.sort((a, b) => b.score - a.score);
-      
-      // Format as "Player: Score" in descending order
-      const scoreText = playersWithScores.map(p => `${p.username}: ${p.score}`).join(' | ');
-      resultsEmbed.addFields(
-        { name: '📊 Final Score', value: scoreText, inline: false }
-      );
-    } else if (gameData.team1Score !== undefined && gameData.team2Score !== undefined) {
+    // Add final scores if available
+    if (gameData.team1Score !== undefined && gameData.team2Score !== undefined) {
       resultsEmbed.addFields(
         { name: '📊 Final Score', value: `Team 1: ${gameData.team1Score} | Team 2: ${gameData.team2Score}`, inline: false }
       );
-    }    
+    }
+    
     await channel.send({ embeds: [resultsEmbed] });
     console.log('Sent league game results to Discord');
   } catch (error) {

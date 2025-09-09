@@ -319,11 +319,6 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				if (!isProduction) {
 					console.log('[DISCORD RESULTS] Posting results for game', game.id, 'line:', gameLine, 'data:', gameData);
 				}
-				// Add individual player scores for solo games
-				if (game.gameMode === 'SOLO' && game.playerScores) {
-					gameData.playerScores = game.playerScores;
-					gameData.gameMode = game.gameMode;
-				}
 				await sendLeagueGameResults(gameData, gameLine);
 				(game as any).discordResultsSent = true;
 				
