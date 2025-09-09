@@ -45,7 +45,7 @@ export interface Game {
 	};
 	players: (GamePlayer | null)[];
 	spectators: GamePlayer[];
-	status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'HAND_COMPLETED' | 'COMPLETED' | 'FINISHED';
+	status: 'WAITING' | 'BIDDING' | 'PLAYING' | 'FINISHED' | 'CANCELLED';
 	completedTricks: Card[][];
 	rules: {
 		gameType: GameMode;

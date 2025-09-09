@@ -92,7 +92,7 @@ export class GameValidator {
    */
   public static shouldRemoveFromLobby(game: Game): boolean {
     // Remove finished games
-    if (game.status === 'FINISHED' || game.status === 'COMPLETED') {
+    if (game.status === 'FINISHED' || game.status === 'FINISHED') {
       return true;
     }
 
