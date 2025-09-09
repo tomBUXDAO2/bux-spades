@@ -13,9 +13,6 @@ import prisma from './lib/prisma';
 import { games, seatReplacements, disconnectTimeouts, turnTimeouts } from './gamesStore';
 import { syncDiscordUserData } from './lib/discordSync';
 import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from './lib/gameStatePersistence';
-import { gameCleanupManager } from './lib/gameCleanup';
-import { GameValidator } from './lib/gameValidator';
-import { GameErrorHandler } from './lib/gameErrorHandler';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
@@ -844,7 +841,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       io.to(game.id).emit('game_update', enrichedGame);
       
       // Update lobby for all clients
-      io.emit('games_updated', getValidatedGames());
+      io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game:', error);
       socket.emit('error', { message: 'Internal server error' });
@@ -907,7 +904,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       socket.emit('game_update', enrichGameForClient(game, socket.userId));
       
       // Only emit games_updated to notify lobby of spectator change
-      io.emit('games_updated', getValidatedGames());
+      io.emit('games_updated', games);
     } catch (error) {
       console.error('Error in join_game_as_spectator:', error);
       socket.emit('error', { message: 'Internal server error' });
@@ -1003,7 +1000,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           games.splice(gameIndex, 1);
         }
         io.to(gameId).emit('game_closed', { reason: 'original_player_left_during_play_again' });
-        io.emit('games_updated', getValidatedGames());
+        io.emit('games_updated', games);
         return;
       }
       
@@ -1024,7 +1021,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         // Emit game_update to the game room for real-time sync
         io.to(gameId).emit('game_update', enrichGameForClient(game));
-        io.emit('games_updated', getValidatedGames());
+        io.emit('games_updated', games);
         console.log(`User ${userId} left game ${gameId}`);
       }
 
@@ -1125,7 +1122,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         nilBids: {}
       };
       // Emit to all players
-      io.emit('games_updated', getValidatedGames());
+      io.emit('games_updated', games);
       io.to(game.id).emit('game_started', {
         dealerIndex,
         hands: hands.map((hand, i) => ({
@@ -3050,7 +3047,7 @@ async function fillSeatWithBot(game: Game, seatIndex: number) {
     // Notify all clients that game is closed
     io.to(game.id).emit('game_closed', { reason: 'no_humans_remaining' });
     // Update lobby for all clients
-    io.emit('games_updated', getValidatedGames());
+    io.emit('games_updated', games);
     return;
   }
 }
@@ -3226,7 +3223,7 @@ function resetGameForNewRound(game: Game) {
   
   // Update all clients
   io.to(game.id).emit('game_update', enrichGameForClient(game));
-  io.emit('games_updated', getValidatedGames());
+  io.emit('games_updated', games);
   
   console.log(`[PLAY AGAIN] Game ${game.id} reset successfully`);
 }
@@ -3343,7 +3340,7 @@ function closeInactiveTable(gameId: string) {
   });
   
   // Update lobby for all clients
-  io.emit('games_updated', getValidatedGames());
+  io.emit('games_updated', games);
   
   console.log(`[INACTIVITY] Table ${gameId} closed due to inactivity`);
 }
@@ -3821,17 +3818,7 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
       checkForStuckGames();
     }, 60000); // Check every minute
     console.log('🔍 Stuck game checker enabled (every minute)');
-  
-  // Start comprehensive game cleanup system
-  gameCleanupManager.startCleanup(games);
-  console.log('🧹 Game cleanup system enabled (every 30 seconds)');
 });
-
-// Helper function to get validated games for lobby
-function getValidatedGames(): Game[] {
-  const { validGames } = GameValidator.validateAllGames(games);
-  return validGames.filter(game => !GameValidator.shouldRemoveFromLobby(game));
-}
 
 // Add helper to ensure leagueReady array exists
 function ensureLeagueReady(game: any) {
