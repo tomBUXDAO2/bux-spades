@@ -1907,6 +1907,16 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             game.playerBags[i] += handSummary.playerBags[i];
           }
           
+          // Apply bag penalty to running totals if needed
+          for (let i = 0; i < 4; i++) {
+            if (game.playerBags[i] >= 10) {
+              const penaltyApplied = Math.floor(game.playerBags[i] / 10) * 100;
+              const bagsRemoved = Math.floor(game.playerBags[i] / 10) * 10;
+              game.playerScores[i] -= penaltyApplied;
+              game.playerBags[i] -= bagsRemoved;
+              console.log(`[SOLO BAG PENALTY] Player ${i} hit 10+ bags, applied -${penaltyApplied} penalty. New score: ${game.playerScores[i]}, New bags: ${game.playerBags[i]}`);
+            }
+          }          
           // Set game status to indicate hand is completed
           game.status = 'HAND_COMPLETED';
           
