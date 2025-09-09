@@ -2013,38 +2013,37 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           const playerScores = game.playerScores || [0, 0, 0, 0];
           console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
           
-          // DISABLED: Game over check moved to proper location
-          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          const isGameOver = false; // DISABLED: Game over check moved to proper location
           
-// DISABLED:           if (isGameOver) {
-// DISABLED:             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-// DISABLED:             
-// DISABLED:             let winningPlayer = 0;
-// DISABLED:             let highestScore = playerScores[0];
-// DISABLED:             for (let i = 1; i < playerScores.length; i++) {
-// DISABLED:               if (playerScores[i] > highestScore) {
-// DISABLED:                 highestScore = playerScores[i];
-// DISABLED:                 winningPlayer = i;
-// DISABLED:               }
-// DISABLED:             }
-// DISABLED:             game.winningPlayer = winningPlayer;
-// DISABLED:             
-// DISABLED:             // First log the game to database, then complete it
-// DISABLED:             try {
-// DISABLED:               const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-// DISABLED:               await logCompletedGameToDbAndDiscord(game, winningPlayer);
-// DISABLED:               console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-// DISABLED:               
-// DISABLED:               // Now call completeGame with the logged game
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game:', err);
-// DISABLED:               });
-// DISABLED:             } catch (error) {
-// DISABLED:               console.error('Failed to log game to database:', error);
-// DISABLED:               // Fallback: try to complete without logging
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game (fallback):', err);
-// DISABLED:               });
+          if (isGameOver) {
+            console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
+            
+            let winningPlayer = 0;
+            let highestScore = playerScores[0];
+            for (let i = 1; i < playerScores.length; i++) {
+              if (playerScores[i] > highestScore) {
+                highestScore = playerScores[i];
+                winningPlayer = i;
+              }
+            }
+            game.winningPlayer = winningPlayer;
+            
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningPlayer);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (fallback):', err);
+              });
             }
           }
         } else {
@@ -2148,38 +2147,37 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          // DISABLED: Game over check moved to proper location
-          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          const isGameOver = false; // DISABLED: Game over check moved to proper location
           
-// DISABLED:           if (isGameOver) {
-// DISABLED:             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-// DISABLED:             
-// DISABLED:             let winningPlayer = 0;
-// DISABLED:             let highestScore = playerScores[0];
-// DISABLED:             for (let i = 1; i < playerScores.length; i++) {
-// DISABLED:               if (playerScores[i] > highestScore) {
-// DISABLED:                 highestScore = playerScores[i];
-// DISABLED:                 winningPlayer = i;
-// DISABLED:               }
-// DISABLED:             }
-// DISABLED:             
-// DISABLED:             // First log the game to database, then complete it
-// DISABLED:             try {
-// DISABLED:               const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-// DISABLED:               await logCompletedGameToDbAndDiscord(game, winningPlayer);
-// DISABLED:               console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-// DISABLED:               
-// DISABLED:               // Now call completeGame with the logged game
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game:', err);
-// DISABLED:               });
-// DISABLED:             } catch (error) {
-// DISABLED:               console.error('Failed to log game to database:', error);
-// DISABLED:               // Fallback: try to complete without logging
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game (fallback):', err);
-// DISABLED:               });
-// DISABLED:             }
+          if (isGameOver) {
+            console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
+            
+            let winningPlayer = 0;
+            let highestScore = playerScores[0];
+            for (let i = 1; i < playerScores.length; i++) {
+              if (playerScores[i] > highestScore) {
+                highestScore = playerScores[i];
+                winningPlayer = i;
+              }
+            }
+            
+            // First log the game to database, then complete it
+            try {
+              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+              await logCompletedGameToDbAndDiscord(game, winningPlayer);
+              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (fallback):', err);
+              });
+            }
           }
         } else {
           // Partners mode
@@ -3854,32 +3852,31 @@ setInterval(() => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          // DISABLED: Game over check moved to proper location
-          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          const isGameOver = false; // DISABLED: Game over check moved to proper location
           
-// DISABLED: // DISABLED:           if (isGameOver) {
-// DISABLED:             console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
-// DISABLED:             game.status = 'FINISHED';
-// DISABLED:             
-// DISABLED:             let winningPlayer = 0;
-// DISABLED:             let highestScore = playerScores[0];
-// DISABLED:             for (let i = 1; i < playerScores.length; i++) {
-// DISABLED:               if (playerScores[i] > highestScore) {
-// DISABLED:                 highestScore = playerScores[i];
-// DISABLED:                 winningPlayer = i;
-// DISABLED:               }
-// DISABLED:             }
-// DISABLED:             
-// DISABLED:             io.to(game.id).emit('game_over', {
-// DISABLED:               playerScores: game.playerScores,
-// DISABLED:               winningPlayer: winningPlayer,
-// DISABLED:             });
-// DISABLED:             
-// DISABLED:             // Log completed game to DB and Discord
-// DISABLED:             void import('./lib/gameLogger')
-// DISABLED:               .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
-// DISABLED:               .catch((e) => console.error('Failed to log completed game (periodic check):', e));
-// DISABLED:           }
+          if (isGameOver) {
+            console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
+            game.status = 'FINISHED';
+            
+            let winningPlayer = 0;
+            let highestScore = playerScores[0];
+            for (let i = 1; i < playerScores.length; i++) {
+              if (playerScores[i] > highestScore) {
+                highestScore = playerScores[i];
+                winningPlayer = i;
+              }
+            }
+            
+            io.to(game.id).emit('game_over', {
+              playerScores: game.playerScores,
+              winningPlayer: winningPlayer,
+            });
+            
+            // Log completed game to DB and Discord
+            void import('./lib/gameLogger')
+              .then(({ logCompletedGameToDbAndDiscord }) => logCompletedGameToDbAndDiscord(game, winningPlayer))
+              .catch((e) => console.error('Failed to log completed game (periodic check):', e));
+          }
         } else {
           // Partners mode game over check
           let shouldEndGame = false;
@@ -3996,37 +3993,36 @@ setInterval(() => {
         if (maxPoints !== undefined && minPoints !== undefined) {
           if (game.gameMode === 'SOLO') {
             const playerScores = game.playerScores || [0, 0, 0, 0];
-            // DISABLED: Game over check moved to proper location
-          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+            const isGameOver = false; // DISABLED: Game over check moved to proper location
             
-// DISABLED: // DISABLED:             if (isGameOver) {
-// DISABLED:               console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
-// DISABLED:               
-// DISABLED:               let winningPlayer = 0;
-// DISABLED:               let highestScore = playerScores[0];
-// DISABLED:               for (let i = 1; i < playerScores.length; i++) {
-// DISABLED:                 if (playerScores[i] > highestScore) {
-// DISABLED:                   highestScore = playerScores[i];
-// DISABLED:                   winningPlayer = i;
-// DISABLED:                 }
-// DISABLED:               }
-// DISABLED:               
-// DISABLED:               // First log the game to database, then complete it
-// DISABLED:               try {
-// DISABLED:                 const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-// DISABLED:                 await logCompletedGameToDbAndDiscord(game, winningPlayer);
-// DISABLED:                 console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-// DISABLED:                 
-// DISABLED:                 // Now call completeGame with the logged game
-// DISABLED:                 completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                   console.error('Failed to complete solo game (periodic check):', err);
-// DISABLED:                 });
-// DISABLED:               } catch (error) {
-// DISABLED:                 console.error('Failed to log game to database:', error);
-// DISABLED:                 // Fallback: try to complete without logging
-// DISABLED:                 completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                   console.error('Failed to complete solo game (periodic check):', err);
-// DISABLED:                 });
+            if (isGameOver) {
+              console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
+              
+              let winningPlayer = 0;
+              let highestScore = playerScores[0];
+              for (let i = 1; i < playerScores.length; i++) {
+                if (playerScores[i] > highestScore) {
+                  highestScore = playerScores[i];
+                  winningPlayer = i;
+                }
+              }
+              
+              // First log the game to database, then complete it
+              try {
+                const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
+                await logCompletedGameToDbAndDiscord(game, winningPlayer);
+                console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
+                
+                // Now call completeGame with the logged game
+                completeGame(game, winningPlayer).catch(err => {
+                  console.error('Failed to complete solo game (periodic check):', err);
+                });
+              } catch (error) {
+                console.error('Failed to log game to database:', error);
+                // Fallback: try to complete without logging
+                completeGame(game, winningPlayer).catch(err => {
+                  console.error('Failed to complete solo game (periodic check):', err);
+                });
               }
             }
           } else {
