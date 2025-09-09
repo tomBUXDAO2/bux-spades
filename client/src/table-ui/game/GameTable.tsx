@@ -2889,22 +2889,9 @@ export default function GameTable({
       socket.on("trick_complete", handleTrickComplete);
       
       // Listen for clear_trick event to immediately clear table cards
-      const handleClearTrick = () => {
-        // console.log('[DEBUG] Received clear_trick event, clearing table cards immediately');
-        setAnimatedTrickCards([]);
-        setTrickWinner(null);
-        setAnimatingTrick(false);
-        setTrickCompleted(false); // Reset trick completed state
-            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation        setLastNonEmptyTrick([]); // Clear the last non-empty trick as well
-        
-        // Don't clear currentTrick here - let the server handle it after animation
-        // This allows the animation to complete while keeping cards visible
-      };
-      socket.on("clear_trick", handleClearTrick);
       
       return () => {
         socket.off("trick_complete", handleTrickComplete);
-        socket.off("clear_trick", handleClearTrick);
         if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
       };
     }
@@ -2912,10 +2899,8 @@ export default function GameTable({
 
   // Play win.mp3 when trick winner is announced
   useEffect(() => {
-    if (animatingTrick && trickWinner !== null) {
-      // console.log('[DEBUG] Playing win.mp3 for trick winner:', trickWinner);
-      playWinSound();
-    }
+    if (animatingTrick && trickWinner !== null) {      playWinSound();
+      }
   }, [animatingTrick, trickWinner]);
 
   // Play win.mp3 when trick winner is announced
