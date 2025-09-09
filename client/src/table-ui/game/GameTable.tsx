@@ -2882,7 +2882,8 @@ export default function GameTable({
             setTrickWinner(null);
             setAnimatedTrickCards([]);
             setTrickCompleted(false); // Reset trick completed state
-            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation          }, 1000);
+            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation
+          }, 1000);
         }
       };
       socket.on("trick_complete", handleTrickComplete);

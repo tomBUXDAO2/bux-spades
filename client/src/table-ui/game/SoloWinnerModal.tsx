@@ -101,7 +101,11 @@ export default function SoloWinnerModal({
     
     const totalPot = buyIn * 4;
     const rake = Math.floor(totalPot * 0.1); // 10% rake
-    const prizePool = totalPot - rake;
+    const prizePool = totalPot - rake; // Available for future use
+    console.log("Solo game prize pool:", prizePool);
+    
+    // Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
+    // Note: These are fixed amounts, not based on prizePool    
     
     // Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
     const firstPlacePrize = Math.floor(buyIn * 2.6); // 1st place gets 2.6x buy-in
