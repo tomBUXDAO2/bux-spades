@@ -2013,7 +2013,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           const playerScores = game.playerScores || [0, 0, 0, 0];
           console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
           
-          const isGameOver = playerScores.some(score => score >= maxPoints); // Only check max points, not min points
+          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
@@ -2147,7 +2147,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          const isGameOver = playerScores.some(score => score >= maxPoints); // Only check max points, not min points
+          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
@@ -3852,7 +3852,7 @@ setInterval(() => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          const isGameOver = playerScores.some(score => score >= maxPoints); // Only check max points, not min points
+          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
           if (isGameOver) {
             console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
@@ -3993,7 +3993,7 @@ setInterval(() => {
         if (maxPoints !== undefined && minPoints !== undefined) {
           if (game.gameMode === 'SOLO') {
             const playerScores = game.playerScores || [0, 0, 0, 0];
-            const isGameOver = playerScores.some(score => score >= maxPoints); // Only check max points, not min points
+            const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
             
             if (isGameOver) {
               console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
