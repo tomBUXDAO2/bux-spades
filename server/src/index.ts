@@ -16,9 +16,7 @@ import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } fro
 import { gameCleanupManager } from './lib/gameCleanup';
 import { GameValidator } from './lib/gameValidator';
 import { GameErrorHandler } from './lib/gameErrorHandler';
-import { CrashPrevention } from './lib/crashPrevention';
-import { GameOperationWrapper } from './lib/gameOperationWrapper';
-import { GameStateMonitor } from './lib/gameStateMonitor';import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
+import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
 import gamesRoutes, { assignDealer, dealCards, botMakeMove, botPlayCard, determineTrickWinner, calculateSoloHandScore } from './routes/games.routes';
@@ -1042,10 +1040,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         
         console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
         return;
-      }        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
       }      }
         
         // Emit game_update to the game room for real-time sync
@@ -1055,31 +1049,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
 
       // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
-      
-      // If game is over and any player leaves, close the table completely
-      if ((game.status === 'FINISHED' || game.status === 'FINISHED') && playerIdx !== -1) {
-        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
-        
-        // Remove the game from the games array
-        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-        if (gameIdx !== -1) {
-          games.splice(gameIdx, 1);
-          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
-        }
-        
-        // Emit game_closed event to all players
-        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
-        
-        // Update games list
-        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
-      }        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
-      }      console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
+      console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
     } catch (error) {
       console.error('Error in leave_game:', error);
       socket.emit('error', { message: 'Internal server error' });
@@ -1910,14 +1880,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Store the completed trick for animation before clearing
       const completedTrick = [...game.play.currentTrick];
       
-      // Defer clearing the trick until after clients have started the animation
-      setTimeout(() => {
-        // Clear the trick for proper game state
-        game.play!.currentTrick = [];
-        
-        // Send game update to all players in the room AFTER clearing
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
-      }, 1200);
+      // Clear the trick immediately for proper game state
+      game.play!.currentTrick = [];
       
       // Save game state after each trick completion
       try {
@@ -2541,34 +2505,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
   const handSummaryTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
 
-  // Helper: determine if the game is over based on scores and settings
-  function isGameOverNow(game: Game): boolean {
-    const maxPoints = game.maxPoints;
-    const minPoints = game.minPoints;
-    if (maxPoints === undefined || minPoints === undefined) return false;
-
-    if (game.gameMode === 'SOLO') {
-      const playerScores = game.playerScores || [0, 0, 0, 0];
-      return playerScores.some(score => score >= maxPoints || score <= minPoints);
-    } else {
-      const t1 = game.team1TotalScore || 0;
-      const t2 = game.team2TotalScore || 0;
-      if (t1 <= minPoints || t2 <= minPoints) return true;
-      if (t1 >= maxPoints && t1 > t2) return true;
-      if (t2 >= maxPoints && t2 > t1) return true;
-      return false;
-    }
-  }
-
   // Function to start hand summary timer
   function startHandSummaryTimer(game: Game) {
     console.log('[HAND SUMMARY] Starting 10-second timer for game:', game.id);
-
-    // Do not start timer if game is already over
-    if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'FINISHED') {
-      console.log('[HAND SUMMARY] Game is over; not starting new hand timer');
-      return;
-    }
     
     // Clear any existing timer for this game
     const existingTimer = handSummaryTimers.get(game.id);
@@ -2579,14 +2518,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Start 10-second timer
     const timer = setTimeout(() => {
       console.log('[HAND SUMMARY] Timer expired for game:', game.id);
-
-      // If game became over during the timer, do not start a new hand
-      if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'FINISHED') {
-        console.log('[HAND SUMMARY] Game is over on timer expiry; not starting new hand');
-        handSummaryResponses.delete(game.id);
-        handSummaryTimers.delete(game.id);
-        return;
-      }
       
       // Clear responses and timer
       handSummaryResponses.delete(game.id);
@@ -2603,7 +2534,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   // Hand summary continue event
   socket.on('hand_summary_continue', ({ gameId }) => {
     console.log('[SERVER] hand_summary_continue event received:', { gameId, socketId: socket.id, userId: socket.userId });
-
+    
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized hand_summary_continue attempt');
       socket.emit('error', { message: 'Not authorized' });
@@ -2615,13 +2546,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (!game) {
         console.log(`Game ${gameId} not found`);
         socket.emit('error', { message: 'Game not found' });
-        return;
-      }
-
-      // If game is over, ignore continue and do not start a new hand
-      if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'FINISHED') {
-        console.log('[HAND SUMMARY] Game is over; ignoring continue');
-        socket.emit('hand_summary_continue_confirmed');
         return;
       }
 
@@ -2651,18 +2575,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
       if (allHumanPlayersResponded) {
         console.log('[HAND SUMMARY] All players responded, starting new hand');
-
-        // Before starting a new hand, double-check game is not over
-        if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'FINISHED') {
-          console.log('[HAND SUMMARY] Game became over before starting new hand; aborting');
-          const timer = handSummaryTimers.get(gameId);
-          if (timer) {
-            clearTimeout(timer.timer);
-            handSummaryTimers.delete(gameId);
-          }
-          handSummaryResponses.delete(gameId);
-          return;
-        }
         
         // Clear the timer and responses
         const timer = handSummaryTimers.get(gameId);
@@ -2689,12 +2601,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   // Start new hand event (now only called internally)
   async function startNewHand(game: Game) {
     console.log('[START NEW HAND] Starting new hand for game:', game.id);
-
-    // Do not start new hand if the game is already over
-    if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'FINISHED') {
-      console.log('[START NEW HAND] Game is over; not starting new hand');
-      return;
-    }
 
     // Check if all seats are filled
     const filledSeats = game.players.filter(p => p !== null).length;
@@ -2732,12 +2638,39 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
         await trickLogger.startRound(game.dbGameId!, roundNumber);
       } catch (err) {
-        console.error('[START NEW HAND] Failed to start round in DB:', err);
+        console.error('Failed to start round logging for new hand:', err);
       }
     }
 
-    // Emit updates
+    // Emit new hand started event with dealing phase
+    console.log('[START NEW HAND] Emitting new_hand_started event');
+    io.to(game.id).emit('new_hand_started', {
+      dealerIndex: newDealerIndex,
+      hands: game.hands,
+      currentBidderIndex: game.bidding.currentBidderIndex
+    });
+
+    // Emit game update
     io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+    // Add delay before starting bidding phase
+    setTimeout(() => {
+      console.log('[START NEW HAND] Starting bidding phase after delay');
+      
+      // Emit bidding ready event
+      io.to(game.id).emit('bidding_ready', {
+        currentBidderIndex: game.bidding.currentBidderIndex,
+        currentPlayer: game.bidding.currentPlayer
+      });
+
+      // If first bidder is a bot, trigger their bid
+      const firstBidder = game.players[game.bidding.currentBidderIndex];
+      if (firstBidder && firstBidder.type === 'bot') {
+        setTimeout(() => {
+          botMakeMove(game, game.bidding.currentBidderIndex);
+        }, 600); // Reduced delay for faster bot bidding
+      }
+    }, 1200); // Reduced delay after dealing
   }
 
   // Legacy start_new_hand event (for backward compatibility, but now just calls hand_summary_continue)
@@ -2803,31 +2736,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
         
         // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
-      
-      // If game is over and any player leaves, close the table completely
-      if ((game.status === 'FINISHED' || game.status === 'FINISHED') && playerIdx !== -1) {
-        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
-        
-        // Remove the game from the games array
-        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-        if (gameIdx !== -1) {
-          games.splice(gameIdx, 1);
-          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
-        }
-        
-        // Emit game_closed event to all players
-        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
-        
-        // Update games list
-        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
-      }        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
-      }        console.log('[DISCONNECT] EMERGENCY: Keeping ALL games alive:', game.id, 'status:', game.status);
+        console.log('[DISCONNECT] EMERGENCY: Keeping ALL games alive:', game.id, 'status:', game.status);
       }
     });
   });
@@ -3924,10 +3833,7 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   // Start auto-saving game state
       // Start auto-saving game state
     startGameStateAutoSave(games);
-  
-  // Start crash prevention monitoring for rated/league games
-  GameStateMonitor.startMonitoring(games);
-  console.log('[CRASH PREVENTION] Started continuous monitoring of rated/league games');    console.log('💾 Game state auto-save enabled (every 30 seconds)');
+    console.log('💾 Game state auto-save enabled (every 30 seconds)');
   
   // Start stuck game checker
       // Start stuck game checker
@@ -4190,115 +4096,150 @@ setInterval(() => {
 }, 10000); // Check every 10 seconds
 
 // Single function to handle game completion
-// Single function to handle game completion with crash protection
 async function completeGame(game: Game, winningTeamOrPlayer: number) {
-  console.log('[GAME COMPLETION] Starting crash-protected completion for game:', game.id, 'Winner:', winningTeamOrPlayer);
-  
-  // CRASH PREVENTION: Protect rated/league games from losing coins
-  if (game.rated || (game as any).league) {
-    console.log('[CRASH PREVENTION] Protecting rated/league game completion:', game.id);
-    return await GameOperationWrapper.executeWithProtection(game, async () => {
-      await completeGameInternal(game, winningTeamOrPlayer);
-    }, 'Game Completion');
-  } else {
-    // Regular game - proceed normally
-    return await completeGameInternal(game, winningTeamOrPlayer);
-  }
-}
-
-async function completeGameInternal(game: Game, winningTeamOrPlayer: number) {
   console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
   
   try {
-    // Set game status to FINISHED
-    game.status = 'FINISHED';
-    
-    // Update database status to FINISHED
-    if (game.dbGameId) {
-      await GameOperationWrapper.executeDbOperation(
-        async () => {
-          await prisma.game.update({
-            where: { id: game.dbGameId },
-            data: { 
-              status: 'FINISHED',
-              completed: true,
-              finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
-              winner: winningTeamOrPlayer
-            }
-          });
-        },
-        `Update game status to FINISHED for ${game.id}`
-      );
-    }
-    
-    // Update game result with winner information
-    if (game.dbGameId) {
-      await GameOperationWrapper.executeDbOperation(
-        async () => {
-          await prisma.gameResult.upsert({
-            where: { gameId: game.dbGameId },
-            update: {
-              winner: game.gameMode === 'SOLO' ? winningTeamOrPlayer : (winningTeamOrPlayer === 1 ? 1 : 2),
-              team1Score: game.team1TotalScore || 0,
-              team2Score: game.team2TotalScore || 0,
-              finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
-              winningPlayer: game.winningPlayer, // Added for Solo mode
-              completedAt: new Date()
-            },
-            create: {
-              gameId: game.dbGameId,
-              winner: game.gameMode === 'SOLO' ? winningTeamOrPlayer : (winningTeamOrPlayer === 1 ? 1 : 2),
-              team1Score: game.team1TotalScore || 0,
-              team2Score: game.team2TotalScore || 0,
-              finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
-              winningPlayer: game.winningPlayer, // Added for Solo mode
-              completedAt: new Date()
-            }
-          });
-        },
-        `Create/update game result for ${game.id}`
-      );
-    }
-    
-    // Update stats and coins with crash protection
-    console.log('[GAME COMPLETION] Updating stats and coins with crash protection');
-    await GameOperationWrapper.executeWithProtection(
-      game,
-      async () => {
-        await updateStatsAndCoins(game, winningTeamOrPlayer);
-      },
-      'Stats and Coins Update'
-    );
-    
-    // Emit game completion to all players
-    io.to(game.id).emit('game_completed', {
-      gameId: game.id,
-      winner: winningTeamOrPlayer,
-      finalScores: {
-        team1: game.team1TotalScore || 0,
-        team2: game.team2TotalScore || 0,
-        playerScores: game.playerScores || [0, 0, 0, 0]
-      }
+  // Set game status to FINISHED
+  game.status = 'FINISHED';
+  
+  // Update database status to FINISHED
+  if (game.dbGameId) {
+      await prisma.game.update({
+        where: { id: game.dbGameId },
+        data: { 
+          status: 'FINISHED',
+          completed: true,
+          finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
+          winner: winningTeamOrPlayer
+        }
+      });
+      console.log('[GAME COMPLETION] Updated database status to FINISHED for game:', game.dbGameId);
+  }
+  
+  // Emit game over event
+  if (game.gameMode === 'SOLO') {
+    io.to(game.id).emit('game_over', {
+      playerScores: game.playerScores,
+      winningPlayer: winningTeamOrPlayer,
     });
+  } else {
+    io.to(game.id).emit('game_over', {
+      team1Score: game.team1TotalScore,
+      team2Score: game.team2TotalScore,
+      winningTeam: winningTeamOrPlayer,
+    });
+  }
+  
+  // Start play again timer
+  startPlayAgainTimer(game);
+  
+    // For partners games, calculate actual totals from database and update GamePlayer records
+    if (game.gameMode === 'PARTNERS' && game.dbGameId) {
+      console.log('[GAME COMPLETION] Calculating actual totals from database for partners game');
+      
+      // Get all GamePlayer records for this game to get the userIds
+      const gamePlayers = await prisma.gamePlayer.findMany({
+        where: { gameId: game.dbGameId },
+        orderBy: { position: 'asc' }
+      });
+      
+      console.log('[GAME COMPLETION] Found GamePlayer records:', gamePlayers.length);
+      
+      // Get all rounds for this game
+      const rounds = await prisma.round.findMany({
+        where: { gameId: game.dbGameId },
+        include: { bids: true }
+      });
+      
+      console.log('[GAME COMPLETION] Found rounds:', rounds.length);
+      
+      // Calculate totals for each player position
+      for (let playerIndex = 0; playerIndex < 4; playerIndex++) {
+        // Get player from GamePlayer records instead of game state
+        const gamePlayer = gamePlayers.find(gp => gp.position === playerIndex);
+        if (!gamePlayer || !gamePlayer.userId) {
+          console.log('[GAME COMPLETION] No GamePlayer record found for position', playerIndex);
+          continue;
+        }
+        
+        // Sum all bids for this player across all rounds
+        let totalBid = 0;
+        let totalTricksWon = 0;
+        
+        for (const round of rounds) {
+          // Find this player's bid in this round
+          const roundBid = round.bids.find((rb: any) => rb.playerId === gamePlayer.userId);
+          if (roundBid) {
+            totalBid += roundBid.bid;
+          }
+        
+          // Count tricks won by this player in this round
+          const tricks = await prisma.trick.findMany({
+            where: { 
+              roundId: round.id,
+              winningPlayerId: gamePlayer.userId
+            }
+          });
+          totalTricksWon += tricks.length;
+        }
+        
+        // Calculate bags
+        const totalBags = Math.max(0, totalTricksWon - totalBid);
+        
+        // Determine if this player won
+        const isWinner = (winningTeamOrPlayer === 1 && (playerIndex === 0 || playerIndex === 2)) ||
+                     (winningTeamOrPlayer === 2 && (playerIndex === 1 || playerIndex === 3));
+        
+        // Calculate final score based on team result
+        const finalScore = isWinner ? 
+          Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0) : 
+          Math.min(game.team1TotalScore || 0, game.team2TotalScore || 0);
+        
+        // Update GamePlayer record with actual calculated data
+        await prisma.gamePlayer.update({
+          where: { id: gamePlayer.id },
+            data: {
+              bid: totalBid,
+              tricksMade: totalTricksWon,
+            bags: totalBags,
+            finalBags: totalBags,
+              finalScore: finalScore,
+            finalPoints: finalScore,
+              won: isWinner,
+              updatedAt: new Date()
+            }
+          });
+          
+        console.log('[GAME COMPLETION] Updated player', playerIndex, 'bid:', totalBid, 'tricks:', totalTricksWon, 'bags:', totalBags, 'won:', isWinner);
+      }
+    }
     
-    console.log('[GAME COMPLETION] Game completed successfully:', game.id);
+    // Update stats and coins
+    try {
+      const { updateStatsAndCoins } = await import('./routes/games.routes');
+      await updateStatsAndCoins(game, winningTeamOrPlayer);
+      console.log('[GAME COMPLETION] Stats and coins updated successfully');
+    } catch (err) {
+    console.error('Failed to update stats/coins:', err);
+    }
+  
+    // Clean up trick logger memory
+  try {
+    const { trickLogger } = await import('./lib/trickLogger');
+    trickLogger.cleanupGame(game.id);
+    console.log('[GAME COMPLETION] Cleaned up trick logger memory for game:', game.id);
+  } catch (error) {
+    console.error('[GAME COMPLETION] Failed to cleanup trick logger memory:', error);
+  }
+  
+    console.log('[GAME COMPLETION] Game completion finished successfully');
     
   } catch (error) {
-    console.error('[GAME COMPLETION] Error completing game:', game.id, error);
-    
-    // For rated/league games, this is critical - try emergency recovery
-    if (game.rated || (game as any).league) {
-      console.error('[CRASH PREVENTION] CRITICAL: Rated game completion failed, attempting emergency recovery');
-      try {
-        await CrashPrevention.emergencyRecovery(game);
-      } catch (recoveryError) {
-        console.error('[CRASH PREVENTION] Emergency recovery failed:', recoveryError);
-      }
-    }
-    
-    throw error;
+    console.error('[GAME COMPLETION] Error completing game:', error);
   }
 }
+
 // REMOVED: loadActiveGamesFromDatabase function - was causing duplicate tables and crashed games
 
 // ... existing code ...
