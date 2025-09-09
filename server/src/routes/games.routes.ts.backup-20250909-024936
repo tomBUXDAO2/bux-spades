@@ -3295,54 +3295,28 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				
 				// Handle coin prizes (buy-in was already deducted at game start)
 				const buyIn = game.buyIn || 0;
-				if (buyIn > 0) {
+				if (buyIn > 0 && isWinner) {
 					let prizeAmount = 0;
-					
+					const totalPot = buyIn * 4;
+					const rake = Math.floor(totalPot * 0.1); // 10% rake
+					const prizePool = totalPot - rake; // 90% pot
 					if (game.gameMode === 'SOLO') {
-						// Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
-						const playerScores = game.playerScores || [0, 0, 0, 0];
-						
-						// Create array of players with their scores and positions
-						const playersWithScores = playerScores.map((score, index) => ({ score, position: index }));
-						
-						// Sort by score (highest first)
-						playersWithScores.sort((a, b) => b.score - a.score);
-						
-						// Find this player's rank
-						const playerRank = playersWithScores.findIndex(p => p.position === gp.position) + 1;
-						
-						if (playerRank === 1) {
-							// 1st place gets 2.6x buy-in
-							prizeAmount = Math.floor(buyIn * 2.6);
-						} else if (playerRank === 2) {
-							// 2nd place gets buy-in back
-							prizeAmount = buyIn;
-						}
-						// 3rd and 4th place get nothing
-						
-						console.log(`[SOLO PAYOUT] Player ${gp.position} (${userId}) ranked ${playerRank}, prize: ${prizeAmount}`);
+						const secondPlacePrize = buyIn;
+						prizeAmount = prizePool - secondPlacePrize;
 					} else {
-						// Partners mode: only winners get prizes
-						if (isWinner) {
-							const totalPot = buyIn * 4;
-							const rake = Math.floor(totalPot * 0.1); // 10% rake
-							const prizePool = totalPot - rake; // 90% pot
-							prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
-						}
+						prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
 					}
-					
-					if (prizeAmount > 0) {
-						try {
-							const currentUser = await prisma.user.findUnique({ where: { id: userId } });
-							if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
-							const newBalance = currentUser.coins + prizeAmount;
-							await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
-							console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to player ${userId}. New balance: ${newBalance}`);
-						} catch (coinError) {
-							console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
-						}
+					try {
+						const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+						if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
+						const newBalance = currentUser.coins + prizeAmount;
+						await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
+						console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${userId}. New balance: ${newBalance}`);
+					} catch (coinError) {
+						console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
 					}
 				}
+
 				console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
 			} catch (err) {
 				console.error('Failed to update stats/coins for user', userId, err);

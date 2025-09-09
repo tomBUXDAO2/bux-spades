@@ -103,9 +103,9 @@ export default function SoloWinnerModal({
     const rake = Math.floor(totalPot * 0.1); // 10% rake
     const prizePool = totalPot - rake;
     
-    // Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
-    const firstPlacePrize = Math.floor(buyIn * 2.6); // 1st place gets 2.6x buy-in
-    const secondPlacePrize = buyIn; // 2nd place gets buy-in back
+    // Solo mode: 2nd place gets buy-in back, 1st place gets remainder
+    const secondPlacePrize = buyIn; // Exactly their stake back
+    const firstPlacePrize = prizePool - secondPlacePrize; // Remainder after 2nd place gets their stake
     
     return { firstPlace: firstPlacePrize, secondPlace: secondPlacePrize };
   };
