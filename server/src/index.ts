@@ -2573,7 +2573,56 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           handSummaryTimers.delete(gameId);
         }
         handSummaryResponses.delete(gameId);
-
+        
+        // Check if game should end before starting new hand
+        const maxPoints = game.maxPoints;
+        const minPoints = game.minPoints;
+        
+        if (maxPoints !== undefined && minPoints !== undefined) {
+          let shouldEndGame = false;
+          let winningTeamOrPlayer = null;
+          
+          if (game.gameMode === 'SOLO') {
+            const playerScores = game.playerScores || [0, 0, 0, 0];
+            const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+            if (isGameOver) {
+              shouldEndGame = true;
+              let winningPlayer = 0;
+              let highestScore = playerScores[0];
+              for (let i = 1; i < playerScores.length; i++) {
+                if (playerScores[i] > highestScore) {
+                  highestScore = playerScores[i];
+                  winningPlayer = i;
+                }
+              }
+              winningTeamOrPlayer = winningPlayer;
+            }
+          } else {
+            const team1Score = game.team1TotalScore || 0;
+            const team2Score = game.team2TotalScore || 0;
+            if (team1Score <= minPoints) {
+              shouldEndGame = true;
+              winningTeamOrPlayer = 2;
+            } else if (team2Score <= minPoints) {
+              shouldEndGame = true;
+              winningTeamOrPlayer = 1;
+            } else if (team1Score >= maxPoints && team1Score > team2Score) {
+              shouldEndGame = true;
+              winningTeamOrPlayer = 1;
+            } else if (team2Score >= maxPoints && team2Score > team1Score) {
+              shouldEndGame = true;
+              winningTeamOrPlayer = 2;
+            }
+          }
+          
+          if (shouldEndGame && winningTeamOrPlayer !== null) {
+            console.log('[HAND SUMMARY] Game should end, completing game instead of starting new hand');
+            completeGame(game, winningTeamOrPlayer).catch(err => {
+              console.error('Failed to complete game:', err);
+            });
+            return;
+          }
+        }
         // Start the new hand
         startNewHand(game);
       } else {
