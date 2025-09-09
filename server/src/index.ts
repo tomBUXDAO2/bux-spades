@@ -1020,35 +1020,37 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
       } else if (game.status === 'FINISHED' || game.status === 'FINISHED') {
         console.log(`[LEAVE GAME DEBUG] Game is completed/finished, not starting seat replacement`);
-      
-      // If game is over and any player leaves, close the table completely
-      if ((game.status === 'FINISHED' || game.status === 'FINISHED') && playerIdx !== -1) {
-        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
         
-        // Remove the game from the games array
-        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-        if (gameIdx !== -1) {
-          games.splice(gameIdx, 1);
-          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
+        // If game is over and any player leaves, close the table completely
+        if (playerIdx !== -1) {
+          console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
+          
+          // Remove the game from the games array
+          const gameIdx = games.findIndex((g: Game) => g.id === gameId);
+          if (gameIdx !== -1) {
+            games.splice(gameIdx, 1);
+            console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
+          }
+          
+          // Emit game_closed event to all players
+          io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
+          
+          // Update games list
+          io.emit('games_updated', getValidatedGames());
+          
+          console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+          return;
         }
-        
-        // Emit game_closed event to all players
-        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
-        
-        // Update games list
-        io.emit('games_updated', getValidatedGames());
-        
-        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-        return;
-      }      }
-        
-        // Emit game_update to the game room for real-time sync
-        io.to(gameId).emit('game_update', enrichGameForClient(game));
-        io.emit('games_updated', getValidatedGames());
-        console.log(`User ${userId} left game ${gameId}`);
       }
-
-      // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
+      
+      // Emit game_update to the game room for real-time sync
+      io.to(gameId).emit('game_update', enrichGameForClient(game));
+      io.emit('games_updated', getValidatedGames());
+      console.log(`User ${userId} left game ${gameId}`);
+    }
+    
+    // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
+    console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);      // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
       console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
     } catch (error) {
       console.error('Error in leave_game:', error);
