@@ -1008,7 +1008,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
       
       // Start seat replacement process for the empty seat (only if host wasn't replaced and game is not completed)
-      if (!hostReplaced && game.status !== 'FINISHED' && game.status !== 'FINISHED') {
+      if (!hostReplaced && game.status !== 'COMPLETED' && game.status !== 'FINISHED') {
         console.log(`[LEAVE GAME DEBUG] About to start seat replacement for seat ${playerIdx}`);
         console.log(`[LEAVE GAME DEBUG] Seat ${playerIdx} is now:`, game.players[playerIdx]);
         // Only start seat replacement for non-league games or if game is in progress
@@ -1018,39 +1018,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         } else {
           console.log(`[LEAVE GAME DEBUG] Skipping seat replacement for league game in WAITING state`);
         }
-      } else if (game.status === 'FINISHED' || game.status === 'FINISHED') {
+      } else if (game.status === 'COMPLETED' || game.status === 'FINISHED') {
         console.log(`[LEAVE GAME DEBUG] Game is completed/finished, not starting seat replacement`);
-        
-        // If game is over and any player leaves, close the table completely
-        if (playerIdx !== -1) {
-          console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
-          
-          // Remove the game from the games array
-          const gameIdx = games.findIndex((g: Game) => g.id === gameId);
-          if (gameIdx !== -1) {
-            games.splice(gameIdx, 1);
-            console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
-          }
-          
-          // Emit game_closed event to all players
-          io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
-          
-          // Update games list
-          io.emit('games_updated', getValidatedGames());
-          
-          console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
-          return;
-        }
       }
-      
-      // Emit game_update to the game room for real-time sync
-      io.to(gameId).emit('game_update', enrichGameForClient(game));
-      io.emit('games_updated', getValidatedGames());
-      console.log(`User ${userId} left game ${gameId}`);
-    }
-    
-    // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
-    console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);      // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
+        
+        // Emit game_update to the game room for real-time sync
+        io.to(gameId).emit('game_update', enrichGameForClient(game));
+        io.emit('games_updated', getValidatedGames());
+        console.log(`User ${userId} left game ${gameId}`);
+      }
+
+      // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
       console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
     } catch (error) {
       console.error('Error in leave_game:', error);
@@ -1930,7 +1908,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           }
           
           // Set game status to indicate hand is completed
-          game.status = 'FINISHED';
+          game.status = 'HAND_COMPLETED';
           
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
@@ -1991,7 +1969,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
         
         // Set game status to indicate hand is completed
-        game.status = 'FINISHED';
+        game.status = 'HAND_COMPLETED';
         (game as any).handCompletedTime = Date.now(); // Track when hand was completed
         
         // NEW: Log completed hand to database
@@ -2038,8 +2016,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // DISABLED: Game over check moved to proper location
           // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          // DISABLED: Game over check moved to proper location
-          // if (isGameOver) {
+// DISABLED:           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
             
             let winningPlayer = 0;
@@ -2057,17 +2034,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
               await logCompletedGameToDbAndDiscord(game, winningPlayer);
               console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-// DISABLED:               
-// DISABLED:               // Now call completeGame with the logged game
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game:', err);
-// DISABLED:               });
-// DISABLED:             } catch (error) {
-// DISABLED:               console.error('Failed to log game to database:', error);
-// DISABLED:               // Fallback: try to complete without logging
-// DISABLED:               completeGame(game, winningPlayer).catch(err => {
-// DISABLED:                 console.error('Failed to complete solo game (fallback):', err);
-// DISABLED:               });
+              
+              // Now call completeGame with the logged game
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game:', err);
+              });
+            } catch (error) {
+              console.error('Failed to log game to database:', error);
+              // Fallback: try to complete without logging
+              completeGame(game, winningPlayer).catch(err => {
+                console.error('Failed to complete solo game (fallback):', err);
+              });
             }
           }
         } else {
@@ -2174,8 +2151,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           // DISABLED: Game over check moved to proper location
           // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          // DISABLED: Game over check moved to proper location
-          // if (isGameOver) {
+// DISABLED:           if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
             
             let winningPlayer = 0;
@@ -2273,9 +2249,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           }
           
           // Set game status to indicate hand is completed
-          game.status = 'FINISHED';
+          game.status = 'HAND_COMPLETED';
           
-          console.log('[FORCE HAND FINISHED] Emitting hand_completed event with data:', {
+          console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
             // Current hand scores (for hand summary display)
             team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
             team2Score: handSummary.playerScores[1] + handSummary.playerScores[3], // Blue team (positions 1,3)
@@ -2330,10 +2306,10 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
         
         // Set game status to indicate hand is completed
-        game.status = 'FINISHED';
+        game.status = 'HAND_COMPLETED';
         (game as any).handCompletedTime = Date.now(); // Track when hand was completed
         
-        console.log('[FORCE HAND FINISHED] Emitting hand_completed event with data:', {
+        console.log('[FORCE HAND COMPLETED] Emitting hand_completed event with data:', {
           ...handSummary,
           team1TotalScore: game.team1TotalScore,
           team2TotalScore: game.team2TotalScore,
@@ -2447,7 +2423,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           
           // Force hand completion regardless of trick number
           console.log('[FAILSAFE] Forcing hand completion due to empty hands');
-          game.status = 'FINISHED';
+          game.status = 'HAND_COMPLETED';
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
@@ -2555,9 +2531,9 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         return;
       }
 
-      // Check if game is in FINISHED status
-      if (game.status !== 'FINISHED') {
-        console.log('[HAND SUMMARY] Game is not in FINISHED status');
+      // Check if game is in HAND_COMPLETED status
+      if (game.status !== 'HAND_COMPLETED') {
+        console.log('[HAND SUMMARY] Game is not in HAND_COMPLETED status');
         socket.emit('error', { message: 'Game is not ready for hand summary' });
         return;
       }
@@ -3881,8 +3857,7 @@ setInterval(() => {
           // DISABLED: Game over check moved to proper location
           // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          // DISABLED: Game over check moved to proper location
-          // if (isGameOver) {
+// DISABLED:           if (isGameOver) {
             console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
             game.status = 'FINISHED';
             
@@ -3954,14 +3929,14 @@ setInterval(() => {
           }
         }
       }
-    } else if (game.status === 'FINISHED') {
-      // NEW: Fallback mechanism for games stuck in FINISHED status
-      // Check if game has been in FINISHED status for more than 30 seconds
+    } else if (game.status === 'HAND_COMPLETED') {
+      // NEW: Fallback mechanism for games stuck in HAND_COMPLETED status
+      // Check if game has been in HAND_COMPLETED status for more than 30 seconds
       const handCompletedTime = (game as any).handCompletedTime || 0;
       const timeSinceHandCompleted = Date.now() - handCompletedTime;
       
       if (timeSinceHandCompleted > 30000) { // 30 seconds
-        console.log('[PERIODIC CHECK] Game stuck in FINISHED status for 30+ seconds, auto-starting next hand:', game.id);
+        console.log('[PERIODIC CHECK] Game stuck in HAND_COMPLETED status for 30+ seconds, auto-starting next hand:', game.id);
         
         // Auto-start next hand
         try {
@@ -4014,7 +3989,7 @@ setInterval(() => {
           console.error('[PERIODIC CHECK] Failed to auto-start new hand:', error);
         }
       } else {
-        // Check for game over while in FINISHED status
+        // Check for game over while in HAND_COMPLETED status
         const maxPoints = game.maxPoints;
         const minPoints = game.minPoints;
         
@@ -4024,9 +3999,8 @@ setInterval(() => {
             // DISABLED: Game over check moved to proper location
           // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
             
-            // DISABLED: Game over check moved to proper location
-          // if (isGameOver) {
-              console.log('[PERIODIC CHECK] Solo game ended while in FINISHED! Player scores:', playerScores);
+// DISABLED:             if (isGameOver) {
+              console.log('[PERIODIC CHECK] Solo game ended while in HAND_COMPLETED! Player scores:', playerScores);
               
               let winningPlayer = 0;
               let highestScore = playerScores[0];
@@ -4082,7 +4056,7 @@ setInterval(() => {
             }
             
             if (shouldEndGame && winningTeam) {
-              console.log('[PERIODIC CHECK] Partners game ended while in FINISHED! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
+              console.log('[PERIODIC CHECK] Partners game ended while in HAND_COMPLETED! Team 1:', game.team1TotalScore, 'Team 2:', game.team2TotalScore, 'Winner:', winningTeam);
               game.status = 'FINISHED';
               io.to(game.id).emit('game_over', {
                 team1Score: game.team1TotalScore,
