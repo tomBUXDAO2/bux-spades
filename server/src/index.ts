@@ -2035,9 +2035,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           const playerScores = game.playerScores || [0, 0, 0, 0];
           console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
           
-          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          // DISABLED: Game over check moved to proper location
+          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          if (isGameOver) {
+          // DISABLED: Game over check moved to proper location
+          // if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
             
             let winningPlayer = 0;
@@ -2055,17 +2057,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
               const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
               await logCompletedGameToDbAndDiscord(game, winningPlayer);
               console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-              
-              // Now call completeGame with the logged game
-              completeGame(game, winningPlayer).catch(err => {
-                console.error('Failed to complete solo game:', err);
-              });
-            } catch (error) {
-              console.error('Failed to log game to database:', error);
-              // Fallback: try to complete without logging
-              completeGame(game, winningPlayer).catch(err => {
-                console.error('Failed to complete solo game (fallback):', err);
-              });
+// DISABLED:               
+// DISABLED:               // Now call completeGame with the logged game
+// DISABLED:               completeGame(game, winningPlayer).catch(err => {
+// DISABLED:                 console.error('Failed to complete solo game:', err);
+// DISABLED:               });
+// DISABLED:             } catch (error) {
+// DISABLED:               console.error('Failed to log game to database:', error);
+// DISABLED:               // Fallback: try to complete without logging
+// DISABLED:               completeGame(game, winningPlayer).catch(err => {
+// DISABLED:                 console.error('Failed to complete solo game (fallback):', err);
+// DISABLED:               });
             }
           }
         } else {
@@ -2169,9 +2171,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          // DISABLED: Game over check moved to proper location
+          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          if (isGameOver) {
+          // DISABLED: Game over check moved to proper location
+          // if (isGameOver) {
             console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
             
             let winningPlayer = 0;
@@ -3874,9 +3878,11 @@ setInterval(() => {
       if (maxPoints !== undefined && minPoints !== undefined) {
         if (game.gameMode === 'SOLO') {
           const playerScores = game.playerScores || [0, 0, 0, 0];
-          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+          // DISABLED: Game over check moved to proper location
+          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
           
-          if (isGameOver) {
+          // DISABLED: Game over check moved to proper location
+          // if (isGameOver) {
             console.log('[PERIODIC CHECK] Solo game ended! Player scores:', playerScores);
             game.status = 'FINISHED';
             
@@ -4015,9 +4021,11 @@ setInterval(() => {
         if (maxPoints !== undefined && minPoints !== undefined) {
           if (game.gameMode === 'SOLO') {
             const playerScores = game.playerScores || [0, 0, 0, 0];
-            const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+            // DISABLED: Game over check moved to proper location
+          // const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
             
-            if (isGameOver) {
+            // DISABLED: Game over check moved to proper location
+          // if (isGameOver) {
               console.log('[PERIODIC CHECK] Solo game ended while in FINISHED! Player scores:', playerScores);
               
               let winningPlayer = 0;
