@@ -96,7 +96,7 @@ export class GameCleanupManager {
       const stuckGames = await (prisma.game.findMany as any)({
         where: {
           status: {
-            in: ['PLAYING', 'BIDDING'] as any
+            in: ['PLAYING'] as any
           },
           lastActionAt: {
             lt: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
@@ -134,7 +134,7 @@ export class GameCleanupManager {
       const orphanedGames = await (prisma.game.findMany as any)({
         where: {
           status: {
-            in: ['PLAYING', 'BIDDING'] as any
+            in: ['PLAYING'] as any
           },
           lastActionAt: {
             lt: new Date(Date.now() - 15 * 60 * 1000) // 15 minutes ago
