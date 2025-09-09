@@ -620,7 +620,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // Check if this user is the current player (they were removed but game state wasn't updated)
         const isCurrentPlayer = game.currentPlayer === socket.userId;
         
-        if (isCurrentPlayer || game.players.some(p => p if (isCurrentPlayer || await wasPlayerInGame(game, socket.userId)) {if (isCurrentPlayer) { p.id === socket.userId)) {
+        if (isCurrentPlayer || await wasPlayerInGame(game, socket.userId)) {
           // User is the current player but not in a seat - find their original seat
           console.log(`[RECONNECT] Restoring current player ${socket.userId} to their original seat`);
           
