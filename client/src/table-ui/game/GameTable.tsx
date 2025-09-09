@@ -2882,7 +2882,7 @@ export default function GameTable({
             setTrickWinner(null);
             setAnimatedTrickCards([]);
             setTrickCompleted(false); // Reset trick completed state
-          }, 2000);
+            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation          }, 1000);
         }
       };
       socket.on("trick_complete", handleTrickComplete);
@@ -2894,7 +2894,7 @@ export default function GameTable({
         setTrickWinner(null);
         setAnimatingTrick(false);
         setTrickCompleted(false); // Reset trick completed state
-        setLastNonEmptyTrick([]); // Clear the last non-empty trick as well
+            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation        setLastNonEmptyTrick([]); // Clear the last non-empty trick as well
         
         // Don't clear currentTrick here - let the server handle it after animation
         // This allows the animation to complete while keeping cards visible

@@ -1022,7 +1022,31 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
       } else if (game.status === 'COMPLETED' || game.status === 'FINISHED') {
         console.log(`[LEAVE GAME DEBUG] Game is completed/finished, not starting seat replacement`);
-      }
+      
+      // If game is over and any player leaves, close the table completely
+      if ((game.status === 'FINISHED' || game.status === 'COMPLETED') && playerIdx !== -1) {
+        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
+        
+        // Remove the game from the games array
+        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
+        if (gameIdx !== -1) {
+          games.splice(gameIdx, 1);
+          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
+        }
+        
+        // Emit game_closed event to all players
+        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
+        
+        // Update games list
+        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }      }
         
         // Emit game_update to the game room for real-time sync
         io.to(gameId).emit('game_update', enrichGameForClient(game));
@@ -1031,7 +1055,31 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
 
       // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
-      console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
+      
+      // If game is over and any player leaves, close the table completely
+      if ((game.status === 'FINISHED' || game.status === 'COMPLETED') && playerIdx !== -1) {
+        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
+        
+        // Remove the game from the games array
+        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
+        if (gameIdx !== -1) {
+          games.splice(gameIdx, 1);
+          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
+        }
+        
+        // Emit game_closed event to all players
+        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
+        
+        // Update games list
+        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }      console.log(`[LEAVE GAME] EMERGENCY: Keeping ALL games alive: ${gameId}, status: ${game.status}`);
     } catch (error) {
       console.error('Error in leave_game:', error);
       socket.emit('error', { message: 'Internal server error' });
@@ -1862,8 +1910,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Store the completed trick for animation before clearing
       const completedTrick = [...game.play.currentTrick];
       
-      // Clear the trick immediately for proper game state
-      game.play!.currentTrick = [];
+      // Defer clearing the trick until after clients have started the animation
+      setTimeout(() => {
+        // Clear the trick for proper game state
+        game.play!.currentTrick = [];
+        
+        // Send game update to all players in the room AFTER clearing
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
+      }, 1200);
       
       // Save game state after each trick completion
       try {
@@ -2487,9 +2541,34 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
   const handSummaryTimers = new Map<string, { gameId: string, timer: NodeJS.Timeout, expiresAt: number }>();
 
+  // Helper: determine if the game is over based on scores and settings
+  function isGameOverNow(game: Game): boolean {
+    const maxPoints = game.maxPoints;
+    const minPoints = game.minPoints;
+    if (maxPoints === undefined || minPoints === undefined) return false;
+
+    if (game.gameMode === 'SOLO') {
+      const playerScores = game.playerScores || [0, 0, 0, 0];
+      return playerScores.some(score => score >= maxPoints || score <= minPoints);
+    } else {
+      const t1 = game.team1TotalScore || 0;
+      const t2 = game.team2TotalScore || 0;
+      if (t1 <= minPoints || t2 <= minPoints) return true;
+      if (t1 >= maxPoints && t1 > t2) return true;
+      if (t2 >= maxPoints && t2 > t1) return true;
+      return false;
+    }
+  }
+
   // Function to start hand summary timer
   function startHandSummaryTimer(game: Game) {
     console.log('[HAND SUMMARY] Starting 10-second timer for game:', game.id);
+
+    // Do not start timer if game is already over
+    if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'COMPLETED') {
+      console.log('[HAND SUMMARY] Game is over; not starting new hand timer');
+      return;
+    }
     
     // Clear any existing timer for this game
     const existingTimer = handSummaryTimers.get(game.id);
@@ -2500,6 +2579,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Start 10-second timer
     const timer = setTimeout(() => {
       console.log('[HAND SUMMARY] Timer expired for game:', game.id);
+
+      // If game became over during the timer, do not start a new hand
+      if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'COMPLETED') {
+        console.log('[HAND SUMMARY] Game is over on timer expiry; not starting new hand');
+        handSummaryResponses.delete(game.id);
+        handSummaryTimers.delete(game.id);
+        return;
+      }
       
       // Clear responses and timer
       handSummaryResponses.delete(game.id);
@@ -2516,7 +2603,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   // Hand summary continue event
   socket.on('hand_summary_continue', ({ gameId }) => {
     console.log('[SERVER] hand_summary_continue event received:', { gameId, socketId: socket.id, userId: socket.userId });
-    
+
     if (!socket.isAuthenticated || !socket.userId) {
       console.log('Unauthorized hand_summary_continue attempt');
       socket.emit('error', { message: 'Not authorized' });
@@ -2528,6 +2615,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (!game) {
         console.log(`Game ${gameId} not found`);
         socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      // If game is over, ignore continue and do not start a new hand
+      if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'COMPLETED') {
+        console.log('[HAND SUMMARY] Game is over; ignoring continue');
+        socket.emit('hand_summary_continue_confirmed');
         return;
       }
 
@@ -2557,6 +2651,18 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
       if (allHumanPlayersResponded) {
         console.log('[HAND SUMMARY] All players responded, starting new hand');
+
+        // Before starting a new hand, double-check game is not over
+        if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'COMPLETED') {
+          console.log('[HAND SUMMARY] Game became over before starting new hand; aborting');
+          const timer = handSummaryTimers.get(gameId);
+          if (timer) {
+            clearTimeout(timer.timer);
+            handSummaryTimers.delete(gameId);
+          }
+          handSummaryResponses.delete(gameId);
+          return;
+        }
         
         // Clear the timer and responses
         const timer = handSummaryTimers.get(gameId);
@@ -2583,6 +2689,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   // Start new hand event (now only called internally)
   async function startNewHand(game: Game) {
     console.log('[START NEW HAND] Starting new hand for game:', game.id);
+
+    // Do not start new hand if the game is already over
+    if (isGameOverNow(game) || game.status === 'FINISHED' || game.status === 'COMPLETED') {
+      console.log('[START NEW HAND] Game is over; not starting new hand');
+      return;
+    }
 
     // Check if all seats are filled
     const filledSeats = game.players.filter(p => p !== null).length;
@@ -2620,39 +2732,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
         await trickLogger.startRound(game.dbGameId!, roundNumber);
       } catch (err) {
-        console.error('Failed to start round logging for new hand:', err);
+        console.error('[START NEW HAND] Failed to start round in DB:', err);
       }
     }
 
-    // Emit new hand started event with dealing phase
-    console.log('[START NEW HAND] Emitting new_hand_started event');
-    io.to(game.id).emit('new_hand_started', {
-      dealerIndex: newDealerIndex,
-      hands: game.hands,
-      currentBidderIndex: game.bidding.currentBidderIndex
-    });
-
-    // Emit game update
+    // Emit updates
     io.to(game.id).emit('game_update', enrichGameForClient(game));
-
-    // Add delay before starting bidding phase
-    setTimeout(() => {
-      console.log('[START NEW HAND] Starting bidding phase after delay');
-      
-      // Emit bidding ready event
-      io.to(game.id).emit('bidding_ready', {
-        currentBidderIndex: game.bidding.currentBidderIndex,
-        currentPlayer: game.bidding.currentPlayer
-      });
-
-      // If first bidder is a bot, trigger their bid
-      const firstBidder = game.players[game.bidding.currentBidderIndex];
-      if (firstBidder && firstBidder.type === 'bot') {
-        setTimeout(() => {
-          botMakeMove(game, game.bidding.currentBidderIndex);
-        }, 600); // Reduced delay for faster bot bidding
-      }
-    }, 1200); // Reduced delay after dealing
   }
 
   // Legacy start_new_hand event (for backward compatibility, but now just calls hand_summary_continue)
@@ -2718,7 +2803,31 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         }
         
         // EMERGENCY FIX: NEVER delete ANY games - keep them all alive
-        console.log('[DISCONNECT] EMERGENCY: Keeping ALL games alive:', game.id, 'status:', game.status);
+      
+      // If game is over and any player leaves, close the table completely
+      if ((game.status === 'FINISHED' || game.status === 'COMPLETED') && playerIdx !== -1) {
+        console.log(`[GAME OVER LEAVE] Game is over, closing table completely when player leaves`);
+        
+        // Remove the game from the games array
+        const gameIdx = games.findIndex((g: Game) => g.id === gameId);
+        if (gameIdx !== -1) {
+          games.splice(gameIdx, 1);
+          console.log(`[GAME OVER LEAVE] Removed completed game ${gameId} from games array`);
+        }
+        
+        // Emit game_closed event to all players
+        io.to(gameId).emit('game_closed', { reason: 'game_completed_player_left' });
+        
+        // Update games list
+        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }        io.emit('games_updated', getValidatedGames());
+        
+        console.log(`[GAME OVER LEAVE] Table closed for completed game ${gameId}`);
+        return;
+      }        console.log('[DISCONNECT] EMERGENCY: Keeping ALL games alive:', game.id, 'status:', game.status);
       }
     });
   });
