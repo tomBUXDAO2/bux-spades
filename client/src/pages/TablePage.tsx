@@ -1,3 +1,4 @@
+import { playCardSound } from '@/utils/soundUtils';
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -470,22 +471,6 @@ export default function TablePage() {
     };
   }, [socket]);
 
-  const playCardSound = () => {
-    try {
-      // Try to use preloaded audio first
-      if ((window as any).cardAudio) {
-        (window as any).cardAudio.currentTime = 0;
-        (window as any).cardAudio.play().catch((err: any) => console.log('Card audio play failed:', err));
-      } else {
-        // Fallback to creating new audio
-        const audio = new Audio('/sounds/card.wav');
-        audio.volume = 0.3;
-        audio.play().catch((err: any) => console.log('Card audio play failed:', err));
-      }
-    } catch (error) {
-      console.log('Card audio not supported or failed to load:', error);
-    }
-  };
 
   const lastTrickLengthRef = useRef(0);
 

@@ -1,3 +1,4 @@
+import { playCardSound, playBidSound, playWinSound } from '@/utils/soundUtils';
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -79,56 +80,8 @@ const initializeAudio = () => {
   }
 };
 
-// Sound utility for dealing cards
-const playCardSound = () => {
-  try {
-    if (cardAudio) {
-      cardAudio.currentTime = 0;
-      cardAudio.play().catch(err => console.log('Card audio play failed:', err));
-    } else {
-      // Fallback if preloaded audio is not available
-      const audio = new Audio('/sounds/card.wav');
-      audio.volume = 0.3;
-      audio.play().catch(err => console.log('Card audio play failed:', err));
-    }
-  } catch (error) {
-    console.log('Card audio not supported or failed to load:', error);
-  }
-};
 
-// Sound utility for bid
-const playBidSound = () => {
-  try {
-    if (bidAudio) {
-      bidAudio.currentTime = 0;
-      bidAudio.play().catch(err => console.log('Bid audio play failed:', err));
-    } else {
-      // Fallback if preloaded audio is not available
-      const audio = new Audio('/sounds/bid.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(err => console.log('Bid audio play failed:', err));
-    }
-  } catch (error) {
-    console.log('Bid audio not supported or failed to load:', error);
-  }
-};
 
-// Sound utility for win
-const playWinSound = () => {
-  try {
-    if (winAudio) {
-      winAudio.currentTime = 0;
-      winAudio.play().catch(err => console.log('Win audio play failed:', err));
-    } else {
-      // Fallback if preloaded audio is not available
-      const audio = new Audio('/sounds/win.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(err => console.log('Win audio play failed:', err));
-    }
-  } catch (error) {
-    console.log('Win audio not supported or failed to load:', error);
-  }
-};
 
 interface GameTableProps {
   game: GameState;

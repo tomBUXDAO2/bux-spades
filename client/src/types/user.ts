@@ -5,4 +5,4 @@ export interface User {
   avatar?: string;
   sessionToken?: string;
   coins?: number;
-} 
+  soundEnabled?: boolean;} 

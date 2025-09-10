@@ -52,7 +52,6 @@ interface User {
   coins: number;
   isAuthenticated?: boolean;
   stats?: {
-  soundEnabled?: boolean;
     gamesPlayed: number;
     gamesWon: number;
     nilsBid: number;
@@ -71,7 +70,6 @@ interface AuthContextType {
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateProfile: (username: string, avatar: string) => Promise<void>;
-  updateSoundPreference: (soundEnabled: boolean) => void;
   showSessionInvalidatedModal: boolean;
   setShowSessionInvalidatedModal: (show: boolean) => void;
 }
@@ -322,25 +320,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateSoundPreference = (soundEnabled: boolean) => {
-    if (user) {
-      const updatedUser = { ...user, soundEnabled };
-      setUser(updatedUser);
-      
-      // Update localStorage immediately for instant feedback
-      try {
-        const userData = localStorage.getItem("userData");
-        if (userData) {
-          const parsedUserData = JSON.parse(userData);
-          const updatedUserData = { ...parsedUserData, soundEnabled };
-          localStorage.setItem("userData", JSON.stringify(updatedUserData));
-        }
-      } catch (error) {
-        console.error("Failed to update sound preference in localStorage:", error);
-      }
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -352,7 +331,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         updateProfile,
-        updateSoundPreference,
         showSessionInvalidatedModal,
         setShowSessionInvalidatedModal,
       }}
