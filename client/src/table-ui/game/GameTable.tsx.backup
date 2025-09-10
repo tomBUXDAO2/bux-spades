@@ -3403,7 +3403,7 @@ export default function GameTable({
                       });
                       // Get the current player's hand from gameState.hands array
                       const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
-                      const currentPlayerHand = (gameState as any).hands && (gameState as any).hands.find((h: any) => h.playerId === currentPlayerId)?.hand;
+                      const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
                       
                       // Debug logging to see what's in the hand
                       console.log('[WHIZ DEBUG] Hand data:', {
