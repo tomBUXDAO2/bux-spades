@@ -2471,29 +2471,57 @@ export default function GameTable({
     return displayTrick.map((card: Card, i: number) => {
       const seatIndex = (card as any).playerIndex;
       const displayPosition = orderedPlayers.findIndex(p => p && p.position === seatIndex);
-      if (displayPosition === -1 || displayPosition === undefined) return null;
+      
+      // Better error handling - don't return null, use a fallback position
+      if (displayPosition === -1 || displayPosition === undefined) {
+        console.warn('[TRICK CARD DEBUG] Invalid display position for card:', {
+          card,
+          seatIndex,
+          orderedPlayers,
+          displayPosition
+        });
+        // Use the card index as a fallback position
+        const fallbackPosition = i % 4;
+        return (
+          <div
+            key={`trick-card-${Date.now()}-${i}-${card.suit}-${card.rank}-${seatIndex}`}
+            className={`${positions[fallbackPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div 
+              className={`transition-all duration-300`}
+              style={{ 
+                width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
+                height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
+              }}
+            >
+              <div style={{ opacity: 1 }}>
+                <CardImage
+                  card={card}
+                  width={isMobile ? 50 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50)}
+                  height={isMobile ? 69 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)}
+                  className="rounded-lg transition-all duration-300"
+                  alt={`${card.rank} of ${card.suit}`}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
       
       // Check if this card is the winning card
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
       
-      // Debug logging
-      console.log('[TRICK CARD DEBUG]', {
-        windowHeight: window.innerHeight,
-        isMobile,
-        cardWidth: isMobile ? 50 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 25 : window.innerHeight >= 400 && window.innerHeight < 500 ? 43 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 64 : window.innerHeight > 550 && window.innerHeight < 600 ? 57 : window.innerHeight >= 600 && window.innerHeight < 650 ? 64 : window.innerHeight >= 650 && window.innerHeight < 700 ? 71 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160),
-        cardHeight: isMobile ? 69 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 35 : window.innerHeight >= 400 && window.innerHeight < 500 ? 60 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 120 : window.innerHeight > 550 && window.innerHeight <= 600 ? 130 : window.innerHeight > 600 && window.innerHeight < 650 ? 90 : window.innerHeight >= 650 && window.innerHeight < 700 ? 100 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160)
-      });
-      
       return (
         <div
-          key={`${card.suit}-${card.rank}-${i}`}
+          key={`trick-card-${Date.now()}-${i}-${card.suit}-${card.rank}-${seatIndex}`}
           className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
           style={{ pointerEvents: 'none' }}
         >
           <div 
             className={`transition-all duration-300`}
             style={{ 
-                            width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
+              width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
               height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
             }}
           >
