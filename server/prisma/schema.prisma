@@ -158,7 +158,8 @@ model User {
   avatar                                  String?         @default("/default-pfp.jpg")
   coins                                   Int             @default(5000000)
   createdAt                               DateTime        @default(now())
-  soundEnabled                            Boolean         @default(true)  updatedAt                               DateTime
+  soundEnabled                            Boolean         @default(true)
+  updatedAt                               DateTime
   BlockedUser_BlockedUser_blockedIdToUser BlockedUser[]   @relation("BlockedUser_blockedIdToUser")
   BlockedUser_BlockedUser_userIdToUser    BlockedUser[]   @relation("BlockedUser_userIdToUser")
   Friend_Friend_friendIdToUser            Friend[]        @relation("Friend_friendIdToUser")
