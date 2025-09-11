@@ -1477,17 +1477,17 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
     // Add final scores - show individual player scores for solo games
     if (gameData.gameMode === 'SOLO' && gameData.playerScores && gameData.players) {
       // Create array of players with their scores and usernames
-      const playersWithScores = gameData.playerScores.map((score, index) => ({
+      const playersWithScores = gameData.playerScores.map((score: number, index: number) => ({
         score,
         position: index,
         username: gameData.players[index]?.username || `Player ${index + 1}`
       }));
       
       // Sort by score (highest first)
-      playersWithScores.sort((a, b) => b.score - a.score);
+      playersWithScores.sort((a: any, b: any) => b.score - a.score);
       
       // Format as "Player: Score" in descending order
-      const scoreText = playersWithScores.map(p => `${p.username}: ${p.score}`).join(' | ');
+      const scoreText = playersWithScores.map((p: any) => `${p.username}: ${p.score}`).join(' | ');
       resultsEmbed.addFields(
         { name: '📊 Final Score', value: scoreText, inline: false }
       );
