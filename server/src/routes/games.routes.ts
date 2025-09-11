@@ -3383,7 +3383,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 // Helper to enrich game object for client
 export function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
-  const hands = game.hands || [];
+  const hands = Array.isArray(game.hands) ? game.hands : [];
   const dealerIndex = game.dealerIndex;
 
   // Patch: Always set top-level currentPlayer for frontend
