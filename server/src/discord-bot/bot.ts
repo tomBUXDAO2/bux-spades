@@ -677,7 +677,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor(0x0099ff)
         .setTitle('🎮 GAME LINE')
-        .setDescription(`**${gameLineTitle}**${specialRulesText}`)
+        .setDescription(`<@&1403953667501195284>
+
+**${gameLineTitle}**${specialRulesText}`)
         .addFields(
           { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
           { name: '👥 Players', value: '1/4', inline: true },
@@ -1195,7 +1197,9 @@ async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     const embed = new EmbedBuilder()
       .setColor(0x00ff00) // Green color
       .setTitle('🎮 GAME LINE')
-      .setDescription(`**${gameLineTitle}**${specialRulesText}`)
+      .setDescription(`<@&1403953667501195284>
+
+**${gameLineTitle}**${specialRulesText}`)
       .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },
@@ -1370,7 +1374,15 @@ async function createGameAndNotifyPlayers(message: any, gameLine: GameLine) {
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('🎮 Table Up!')
-        .setDescription(`**${gameLineFormat}**\n\n${teamInfo}\n\n**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**\n\n**GOOD LUCK! 🍀**`)
+        .setDescription(`<@&1403953667501195284>
+
+**${gameLineFormat}**
+
+${teamInfo}
+
+**Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...**
+
+**GOOD LUCK! 🍀**`)
         .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .setTimestamp();
       
@@ -1464,7 +1476,9 @@ async function sendLeagueGameResults(gameData: any, gameLine: string) {
     
     const resultsEmbed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
-      .setDescription(`**${gameLine}**`)
+      .setDescription(`<@&1403953667501195284>
+
+**${gameLine}**`)
       .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .addFields(
         { name: '🥇 Winners', value: winners.join(', '), inline: true },
