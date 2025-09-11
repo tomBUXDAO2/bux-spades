@@ -69,19 +69,20 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
       // Transform current game tricks to the expected format
       const transformedTricks = currentTricks.map((trick: any, index: number) => ({
         trickNumber: index + 1,
-        leadPlayerId: trick.cards[0]?.playedBy || players[0]?.id || '',
+        leadPlayerId: trick.cards?.[0]?.playedBy || players[0]?.id || '',
         winningPlayerId: players[trick.winnerIndex]?.id || '',
-        cards: trick.cards.map((card: any, cardIndex: number) => ({
-          suit: card.suit,
+        cards: (trick.cards || []).map((card: any, cardIndex: number) => ({
+          suit: normalizeSuit(card.suit),
           value: getCardValue(card.rank),
           position: cardIndex,
           playerId: card.playedBy || players[card.playerIndex || 0]?.id || ''
         }))
       }));
       
-      // Create a single round with current hand tricks
+      // Create a single round with the actual current round number from game state
+      const currentRoundNumber = (gameState.round ?? gameState.play?.roundNumber ?? 1) as number;
       const currentRound = {
-        roundNumber: 1, // Current hand
+        roundNumber: Math.max(1, Number(currentRoundNumber) || 1),
         tricks: transformedTricks
       };
       
@@ -109,30 +110,69 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
     return values[rank] || 0;
   };
 
-  const getCardDisplay = (card: Card) => {
-    const suitMap: { [key: string]: string } = {
-      'SPADES': '♠',
-      'HEARTS': '♥',
-      'DIAMONDS': '♦',
-      'CLUBS': '♣'
-    };
+  // Normalize suit variants coming from server into one of: '♠', '♥', '♦', '♣'
+  const normalizeSuit = (raw: string): '♠' | '♥' | '♦' | '♣' => {
+    if (!raw) return '♠';
+    const s = String(raw).toUpperCase();
+    if (s === 'S' || s.includes('SPADE') || raw === '♠') return '♠';
+    if (s === 'H' || s.includes('HEART') || raw === '♥') return '♥';
+    if (s === 'D' || s.includes('DIAMOND') || raw === '♦') return '♦';
+    if (s === 'C' || s.includes('CLUB') || raw === '♣') return '♣';
+    return '♠';
+  };
 
+  // Small-card CSS renderer (mirrors table small card styling)
+  const SmallCssCard = ({ rank, suit, highlight = false }: { rank: string; suit: '♠'|'♥'|'♦'|'♣'; highlight?: boolean }) => {
+    const suitSymbol = suit;
+    const suitColor = suit === '♥' || suit === '♦' ? 'text-red-600' : 'text-black';
+    const width = 80;
+    const height = 120;
+    const isVerySmall = height <= 65;
+    const cornerRankSize = isVerySmall ? 'text-xs' : 'text-sm';
+    const cornerSuitSize = isVerySmall ? 'text-xs' : 'text-xs';
+    const centerSuitSize = isVerySmall ? 'text-base' : 'text-2xl';
+
+    return (
+      <div
+        className={`bg-white rounded-lg relative overflow-hidden border-2 ${highlight ? 'border-yellow-400' : 'border-gray-300'} shadow-lg`}
+        style={{ width, height }}
+        title={`${rank}${suit}`}
+      >
+        <div className={`absolute top-0.5 left-0.5 font-bold w-5 text-center`}>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: isVerySmall ? '0.6rem' : '0.8rem' }}>{rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: isVerySmall ? '0.4rem' : '0.6rem' }}>{suitSymbol}</div>
+        </div>
+        <div className={`absolute inset-0 flex items-center justify-center ${suitColor}`}>
+          <div className={`${centerSuitSize} font-bold`}>{suitSymbol}</div>
+        </div>
+        <div className={`absolute bottom-0.5 right-0.5 font-bold w-5 text-center transform rotate-180`}>
+          <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: isVerySmall ? '0.6rem' : '0.8rem' }}>{rank}</div>
+          <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: isVerySmall ? '0.4rem' : '0.6rem' }}>{suitSymbol}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const getCardDisplay = (card: Card) => {
     const valueMap: { [key: number]: string } = {
       2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
       10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A'
     };
 
-    const suitColor = card.suit === 'HEARTS' || card.suit === 'DIAMONDS' ? 'text-red-600' : 'text-black';
+    const rank = valueMap[card.value] || '';
+    const suit = normalizeSuit(card.suit);
+    const suitColor = suit === '♥' || suit === '♦' ? 'text-red-600' : 'text-black';
     
     return {
-      display: `${valueMap[card.value]}${suitMap[card.suit]}`,
+      rank,
+      suit,
       suitColor
     };
   };
 
   const getPlayerName = (playerId: string) => {
-    const player = players.find(p => p.id === playerId);
-    return player ? player.username : 'Unknown';
+    const player = players.find(p => p?.id === playerId);
+    return player ? (player.username || player.name || 'Unknown') : 'Unknown';
   };
 
   const currentRound = trickHistory[currentRoundIndex];
@@ -206,30 +246,17 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
             </div>
 
             {/* Cards Display */}
-            <div className="flex justify-center items-center gap-4 mb-6">
+            <div className="flex justify-center items-start flex-wrap gap-4 mb-6">
               {currentTrick?.cards.map((card, index) => {
-                const { display, suitColor } = getCardDisplay(card);
+                const { rank, suit } = getCardDisplay(card);
                 const isWinningCard = card.playerId === currentTrick.winningPlayerId;
                 
                 return (
-                  <div
-                    key={index}
-                    className={`relative bg-white rounded-lg p-4 shadow-lg border-2 ${
-                      isWinningCard ? 'border-yellow-400' : 'border-gray-300'
-                    }`}
-                    style={{ minWidth: '80px', minHeight: '120px' }}
-                  >
-                    <div className={`text-center ${suitColor} font-bold text-lg`}>
-                      {display}
-                    </div>
-                    <div className="text-center text-xs text-gray-600 mt-2">
+                  <div key={index} className="flex flex-col items-center gap-2">
+                    <SmallCssCard rank={rank} suit={suit as any} highlight={isWinningCard} />
+                    <div className="text-center text-xs text-gray-300 max-w-[80px] truncate" title={getPlayerName(card.playerId)}>
                       {getPlayerName(card.playerId)}
                     </div>
-                    {isWinningCard && (
-                      <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                        ✓
-                      </div>
-                    )}
                   </div>
                 );
               })}
