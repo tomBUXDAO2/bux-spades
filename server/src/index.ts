@@ -1851,7 +1851,17 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       
       // Update player trick counts
       if (game.players[winnerIndex]) {
-        game.players[winnerIndex].tricks = (game.players[winnerIndex].tricks || 0) + 1;
+        const oldTrickCount = game.players[winnerIndex].tricks || 0;
+        game.players[winnerIndex].tricks = oldTrickCount + 1;
+        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'from', oldTrickCount, 'to', game.players[winnerIndex].tricks);
+        
+        // CRITICAL: Validate trick count integrity
+        const totalTricks = game.players.reduce((sum, p) => sum + (p?.tricks || 0), 0);
+        console.log('[TRICK COUNT VALIDATION] Total tricks after update:', totalTricks, 'Expected:', game.play.trickNumber);
+        if (totalTricks !== game.play.trickNumber) {
+          console.error('[TRICK COUNT ERROR] MISMATCH! Total tricks:', totalTricks, 'but trickNumber:', game.play.trickNumber);
+          console.error('[TRICK COUNT ERROR] Individual counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
+        }
         console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex].tricks);
         
         // Update GamePlayer record in DB
