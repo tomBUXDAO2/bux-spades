@@ -80,7 +80,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
       }));
       
       // Create a single round with the actual current round number from game state
-      const currentRoundNumber = (gameState.round ?? gameState.play?.roundNumber ?? 1) as number;
+      const currentRoundNumber = (gameState.round ?? gameState.currentRound ?? gameState.play?.roundNumber ?? 1) as number;
       const currentRound = {
         roundNumber: Math.max(1, Number(currentRoundNumber) || 1),
         tricks: transformedTricks
@@ -279,7 +279,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
 
               <div className="text-gray-400 text-sm">
                 {trickHistory.length > 0 && currentRound && (
-                  `${currentRoundIndex + 1} of ${trickHistory.length} rounds, ${currentTrickIndex + 1} of ${currentRound.tricks.length} tricks`
+                  `Hand ${currentRound.roundNumber} — ${currentTrickIndex + 1} of ${currentRound.tricks.length} tricks`
                 )}
               </div>
 
