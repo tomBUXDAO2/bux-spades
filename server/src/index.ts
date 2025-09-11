@@ -3290,7 +3290,11 @@ function resetGameForNewRound(game: Game) {
   game.winningPlayer = undefined;
   game.playerScores = undefined;
   game.dealerIndex = undefined;
-  game.isBotGame = game.players.filter(p => p && p.type === 'bot').length > 0;
+  // Reset league ready state for subsequent games
+  if ((game as any).league) {
+    (game as any).leagueReady = [false, false, false, false];
+    console.log(`[PLAY AGAIN] Reset leagueReady array for game ${game.id}`);
+  }  game.isBotGame = game.players.filter(p => p && p.type === 'bot').length > 0;
   
   // Remove any bots that were added during the game and reset player trick counts
   game.players = game.players.map(p => {
