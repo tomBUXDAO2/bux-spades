@@ -30,6 +30,8 @@ export default function TablePage() {
   const [emptySeats, setEmptySeats] = useState(0);
   const [botCount, setBotCount] = useState(0);
   const [showInactivityModal, setShowInactivityModal] = useState(false);
+  // Animation state to prevent currentTrick updates during trick animation
+  const [isAnimatingTrick, setIsAnimatingTrick] = useState(false);
 
   // Detect spectate intent
   const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
@@ -379,7 +381,7 @@ export default function TablePage() {
       socket.off('game_update', handleGameUpdate);
       socket.off('table_inactive', handleTableInactive);
     };
-  }, [socket]);
+  }, [socket, isAnimatingTrick]);
 
   // Listen for bidding_update events and update only the bidding part of the game state
   useEffect(() => {
@@ -445,7 +447,7 @@ export default function TablePage() {
         play: {
           currentPlayer: currentPlayer?.id ?? '',
           currentPlayerIndex: data.currentPlayerIndex,
-          currentTrick: data.currentTrick,
+          currentTrick: isAnimatingTrick ? prev.play.currentTrick : data.currentTrick,
           trickNumber: data.trickNumber,
           spadesBroken: false
         }
@@ -469,7 +471,7 @@ export default function TablePage() {
       socket.off('bidding_complete', handleBiddingComplete);
       socket.off('play_start', handlePlayStart);
     };
-  }, [socket]);
+  }, [socket, isAnimatingTrick]);
 
 
   const lastTrickLengthRef = useRef(0);
@@ -489,7 +491,7 @@ export default function TablePage() {
         ...prev,
         play: {
           ...prev.play,
-          currentTrick: data.currentTrick,
+          currentTrick: isAnimatingTrick ? prev.play.currentTrick : data.currentTrick,
         },
         hands: Array.isArray(prev.hands) ? prev.hands.map((h: any) => {
           // Optionally update hand counts if needed
@@ -506,7 +508,7 @@ export default function TablePage() {
     return () => {
       socket.off('play_update', handlePlayUpdate);
     };
-  }, [socket]);
+  }, [socket, isAnimatingTrick]);
 
   // Ensure player always (re)joins the game room on socket connect or refresh
   useEffect(() => {
@@ -529,6 +531,27 @@ export default function TablePage() {
     }
   }, [socket, user, gameId, isSpectator]);
 
+
+  // Listen for trick animation events to control animation state
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleTrickComplete = () => {
+      setIsAnimatingTrick(true);
+    };
+    
+    const handleClearTrick = () => {
+      setIsAnimatingTrick(false);
+    };
+    
+    socket.on('trick_complete', handleTrickComplete);
+    socket.on('clear_trick', handleClearTrick);
+    
+    return () => {
+      socket.off('trick_complete', handleTrickComplete);
+      socket.off('clear_trick', handleClearTrick);
+    };
+  }, [socket]);
   // Only join as a player if not spectating
   const handleJoinGame = async () => {
     if (!user || !gameId || isSpectator) return;
@@ -810,4 +833,4 @@ export default function TablePage() {
       />
     </>
   );
-} 
+}
