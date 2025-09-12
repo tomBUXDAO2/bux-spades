@@ -9,6 +9,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [discordError, setDiscordError] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
@@ -47,10 +48,26 @@ const Login: React.FC = () => {
   };
 
   const handleDiscordLogin = () => {
+    setDiscordError(false);
     const apiUrl = import.meta.env.PROD
       ? "https://bux-spades-server.fly.dev"
       : "http://localhost:3000"; // Always use backend port in dev
-    window.location.href = `${apiUrl}/api/auth/discord`;
+    
+    // Add error handling for the redirect
+    try {
+      // Add a timeout to detect if Discord OAuth is failing
+      const timeout = setTimeout(() => {
+        setDiscordError(true);
+      }, 10000); // 10 second timeout
+      
+      window.location.href = `${apiUrl}/api/auth/discord`;
+      
+      // Clear timeout if page changes (successful redirect)
+      window.addEventListener('beforeunload', () => clearTimeout(timeout));
+    } catch (error) {
+      console.error('Discord login redirect failed:', error);
+      setError('Failed to redirect to Discord login. Please try again.');
+    }
   };
 
   const toggleMode = () => {
@@ -167,6 +184,21 @@ const Login: React.FC = () => {
             >
               <span>Continue with Discord</span>
             </button>
+            
+            {/* Discord Error Message */}
+            {discordError && (
+              <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 rounded">
+                <p className="text-yellow-800 font-medium">
+                  Discord login seems to be having issues. You can:
+                </p>
+                <ul className="mt-2 text-sm text-yellow-700 space-y-1">
+                  <li>• Try again in a few minutes</li>
+                  <li>• Use a different browser</li>
+                  <li>• Try from a different network</li>
+                  <li>• Contact support if the issue persists</li>
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="text-center">

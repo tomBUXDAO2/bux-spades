@@ -1,0 +1,11 @@
+      const specialRulesText = rules.length > 0 ? `\n${rules.join(' ')}` : '';
+      
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle('🎮 GAME LINE')
+        .setDescription(`<@&1403953667501195284>\n\n**${gameLineTitle}**${specialRulesText}`)
+        .addFields(
+          { name: '👤 Host', value: `<@${interaction.user.id}>`, inline: true },
+          { name: '�� Players', value: '1/4', inline: true },
+          { name: '⏰ Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+        )
