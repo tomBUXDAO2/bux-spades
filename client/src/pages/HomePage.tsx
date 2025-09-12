@@ -590,7 +590,7 @@ const HomePage: React.FC = () => {
       .then(res => res.json())
       .then(setOnlinePlayers)
       .catch(() => setOnlinePlayers([]));
-  }, [user.id]);
+  }, [user?.id]);
 
   // Fetch games as a fallback for loading spinner
   useEffect(() => {
