@@ -494,7 +494,7 @@ export default function TablePage() {
         hands: Array.isArray(prev.hands) ? prev.hands.map((h: any) => {
           // Optionally update hand counts if needed
           return h;
-        }) ?? prev.hands,
+        }) : prev.hands,
         // Don't update currentPlayer from play_update - let game_update handle that
       }) : prev);
     };
