@@ -1910,7 +1910,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       // Emit clear trick event after animation delay
       setTimeout(() => {
         io.to(game.id).emit('clear_trick');
-      }, 2000); // 2 second delay to match frontend animation
+      }, 1000); // 1 second delay to match frontend animation
       
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION DEBUG] Checking hand completion - trickNumber:', game.play.trickNumber);

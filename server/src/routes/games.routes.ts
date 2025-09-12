@@ -2115,7 +2115,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
           
           // Emit clear trick event to allow clients to clear any residual UI
           io.to(game.id).emit('clear_trick');
-        }, 100); // Reduced delay for faster gameplay
+        }, 1000); // 1 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
@@ -3597,7 +3597,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         
         // Emit clear trick event to allow clients to clear any residual UI
         io.to(game.id).emit('clear_trick');
-      }, 100); // Reduced delay for faster gameplay
+      }, 1000); // 1 second delay to match frontend animation
       
       // If the next player is a bot, trigger their move with a delay
       const nextPlayer = game.players[winnerIndex];

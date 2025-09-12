@@ -2855,23 +2855,28 @@ export default function GameTable({
           // Store the completed trick for fallback display
           setLastNonEmptyTrick(data.trick.cards || []);
           
-          // Wait 2 seconds before clearing trick animation
-          if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
-          trickTimeoutRef.current = setTimeout(() => {
-            setAnimatingTrick(false);
-            setTrickWinner(null);
-            setAnimatedTrickCards([]);
-            setTrickCompleted(false); // Reset trick completed state
-            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation
-          }, 1000);
+          // Do not clear locally via timeout; wait for server clear_trick event to sync across clients
+          if (trickTimeoutRef.current) {
+            clearTimeout(trickTimeoutRef.current);
+            trickTimeoutRef.current = null;
+          }
         }
       };
       socket.on("trick_complete", handleTrickComplete);
       
-      // Listen for clear_trick event to immediately clear table cards
+      // Listen for clear_trick event to immediately clear table cards and end animation in sync with server
+      const handleClearTrick = () => {
+        setAnimatingTrick(false);
+        setTrickWinner(null);
+        setAnimatedTrickCards([]);
+        setTrickCompleted(false);
+        setLastNonEmptyTrick([]);
+      };
+      socket.on("clear_trick", handleClearTrick);
       
       return () => {
         socket.off("trick_complete", handleTrickComplete);
+        socket.off("clear_trick", handleClearTrick);
         if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
       };
     }
