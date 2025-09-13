@@ -2178,20 +2178,20 @@ export default function GameTable({
       // The game_update event will be emitted after hand_completed with the updated scores
     };
     
+    const handCompletedHandler = (data: any) => {
+      console.log('[CLIENT] hand_completed event received:', data);
+      handleHandCompleted(data);
+    };
     // Register event listener for hand completion
     if (socket && socket.connected) {
-      console.log('[SOCKET] Registering hand_completed event listener (socket connected)');
-      socket.on('hand_completed', (data) => {
-        console.log('[CLIENT] hand_completed event received:', data);
-        handleHandCompleted(data);
-      });
+      socket.on('hand_completed', handCompletedHandler);
     } else {
       console.log('[SOCKET] Cannot register hand_completed listener - socket not ready:', { socket: !!socket, connected: socket?.connected });
     }
     
     return () => {
       if (socket) {
-        socket.off('hand_completed', handleHandCompleted);
+        socket.off('hand_completed', handCompletedHandler);
       }
     };
   }, [socket, gameState.id]);
