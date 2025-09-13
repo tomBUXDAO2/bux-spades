@@ -2179,7 +2179,7 @@ export default function GameTable({
       // Don't show hand summary immediately - wait for game state update
       // The game_update event will be emitted after hand_completed with the updated scores
     };
-    
+      setShowHandSummary(true);    
     const handCompletedHandler = (data: any) => {
       console.log('[CLIENT] hand_completed event received - SOCKET CONNECTED:', socket?.connected);
       console.log('[CLIENT] hand_completed event received:', data);
