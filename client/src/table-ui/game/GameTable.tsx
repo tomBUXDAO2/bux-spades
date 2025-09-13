@@ -1128,8 +1128,8 @@ export default function GameTable({
     setIsBlindNil(true);
     setShowBlindNilModal(false);
     setBlindNilDismissed(true);
-    // Blind nil is always bid 0 - no need to reveal cards or show bidding interface
-    handleBid(0);
+    // Blind nil is always bid -1 - no need to reveal cards or show bidding interface
+    handleBid(-1);
   };
 
   const handleRegularBid = () => {
