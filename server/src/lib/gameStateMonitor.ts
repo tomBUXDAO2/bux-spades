@@ -123,7 +123,7 @@ export class GameStateMonitor {
       if (game.status === 'PLAYING' && !game.currentPlayer) {
         const firstPlayer = game.players.find(p => p !== null);
         if (firstPlayer) {
-          game.currentPlayer = firstPlayer;
+          game.currentPlayer = firstPlayer.id;
           console.log(`[GAME MONITOR] Fixed missing current player for ${game.id}`);
         }
       }
@@ -132,8 +132,8 @@ export class GameStateMonitor {
       if (game.status === 'BIDDING' && !game.bidding) {
         game.bidding = {
           bids: [null, null, null, null],
-          currentBidderIndex: 0,
-          passCount: 0
+          currentPlayer: "0", currentBidderIndex: 0,
+          nilBids: {}
         };
         console.log(`[GAME MONITOR] Fixed missing bidding data for ${game.id}`);
       }

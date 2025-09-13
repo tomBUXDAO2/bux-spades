@@ -15,7 +15,7 @@ export class GameErrorHandler {
       
       // Check if it's a recently finished game that might still be in localStorage
       const recentFinishedGames = games.filter(g => 
-        (g.status === 'FINISHED' || g.status === 'FINISHED') && 
+        (g.status === 'FINISHED') && 
         g.id === gameId
       );
       

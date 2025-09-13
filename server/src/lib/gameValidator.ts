@@ -32,7 +32,7 @@ export class GameValidator {
       fixes.push('Game in PLAYING state but no current player - setting to first active player');
       const firstPlayer = game.players.find(p => p !== null);
       if (firstPlayer) {
-        game.currentPlayer = firstPlayer;
+        game.currentPlayer = firstPlayer.id;
       } else {
         game.status = 'FINISHED';
         fixes.push('No active players found - marking as FINISHED');
@@ -45,8 +45,8 @@ export class GameValidator {
       fixes.push('Game in BIDDING state but no current bidder - setting to first active player');
       const firstPlayer = game.players.find(p => p !== null);
       if (firstPlayer) {
-        if (!game.bidding) game.bidding = { currentPlayer: 0, bids: [null, null, null, null] };
-        game.bidding.currentPlayer = firstPlayer.position || 0;
+        if (!game.bidding) game.bidding = { currentPlayer: "0", currentBidderIndex: 0, nilBids: {}, bids: [null, null, null, null] };
+        game.bidding.currentPlayer = String(firstPlayer.position || 0);
       } else {
         game.status = 'FINISHED';
         fixes.push('No active players found - marking as FINISHED');
@@ -92,7 +92,7 @@ export class GameValidator {
    */
   public static shouldRemoveFromLobby(game: Game): boolean {
     // Remove finished games
-    if (game.status === 'FINISHED' || game.status === 'FINISHED') {
+    if (game.status === 'FINISHED') {
       return true;
     }
 

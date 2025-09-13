@@ -73,7 +73,7 @@ export class GameCleanupManager {
       const game = games[i];
       
       // Remove games that have been finished for more than 5 minutes
-      if (game.status === 'FINISHED' || game.status === 'FINISHED') {
+      if (game.status === 'FINISHED') {
         const finishedTime = (game as any).finishedAt || now;
         if (now - finishedTime > 300000) { // 5 minutes
           console.log(`[GAME CLEANUP] Removing finished game from memory: ${game.id}`);

@@ -321,8 +321,8 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
 				}
 				// Add individual player scores for solo games
 				if (game.gameMode === 'SOLO' && game.playerScores) {
-					gameData.playerScores = game.playerScores;
-					gameData.gameMode = game.gameMode;
+					(gameData as any).playerScores = game.playerScores;
+					(gameData as any).gameMode = game.gameMode;
 				}
 				await sendLeagueGameResults(gameData, gameLine);
 				(game as any).discordResultsSent = true;

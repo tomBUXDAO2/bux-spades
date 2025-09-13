@@ -238,7 +238,7 @@ export class CrashPrevention {
       if (!game.currentPlayer && game.status === 'PLAYING') {
         const firstPlayer = game.players.find(p => p !== null);
         if (firstPlayer) {
-          game.currentPlayer = firstPlayer;
+          game.currentPlayer = firstPlayer.id;
           console.log(`[CRASH PREVENTION] Fixed missing current player for ${game.id}`);
         }
       }
@@ -246,8 +246,8 @@ export class CrashPrevention {
       if (!game.bidding && game.status === 'BIDDING') {
         game.bidding = {
           bids: [null, null, null, null],
-          currentBidderIndex: 0,
-          passCount: 0
+          currentPlayer: "0", currentBidderIndex: 0,
+          nilBids: {}
         };
         console.log(`[CRASH PREVENTION] Fixed missing bidding data for ${game.id}`);
       }
