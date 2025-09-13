@@ -2162,11 +2162,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:               game.hands = hands;
         // DISABLED:               
         // DISABLED:               // Assign hands to players
-        // DISABLED:               game.players.forEach((player, index) => {
-        // DISABLED:                 if (player) {
-        // DISABLED:                 }
-        // DISABLED:               });
-        // DISABLED:               
+          // Assign hands to players
+          game.players.forEach((player, index) => {
+            if (player) {
+              // Hands are stored in game.hands array, not player.hand
+              // The enrichGameForClient function will use game.hands[index]
+            }
+          });        // DISABLED:               
         // DISABLED:               console.log("[HAND TRANSITION] New hand started for game:", game.id);
         // DISABLED:               
         // DISABLED:               // Emit events
@@ -4060,11 +4062,13 @@ setInterval(() => {
           game.hands = hands;
           
           // Assign hands to players
+          // Assign hands to players
           game.players.forEach((player, index) => {
             if (player) {
+              // Hands are stored in game.hands array, not player.hand
+              // The enrichGameForClient function will use game.hands[index]
             }
-          });
-          
+          });          
           console.log('[PERIODIC CHECK] Auto-started new hand for game:', game.id);
           
           // Emit events
