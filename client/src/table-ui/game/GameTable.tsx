@@ -204,7 +204,7 @@ function hasSpadeBeenPlayed(game: GameState): boolean {
   
   // Also check if current trick has spades (for immediate feedback)
   const currentTrick = (game as any).play?.currentTrick || [];
-  const currentTrickHasSpades = currentTrick.some((card: Card) => isSpade(card));
+  const currentTrickHasSpades = Array.isArray(currentTrick) ? currentTrick.some((card: Card) => isSpade(card)) : false;
   
   const result = spadesBroken || currentTrickHasSpades;
   
@@ -780,7 +780,7 @@ export default function GameTable({
           return;
         }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
-        const hasAceSpades = myHand.some((c: Card) => isSpade(c) && c.rank === 'A');
+        const hasAceSpades = Array.isArray(myHand) ? myHand.some((c: Card) => isSpade(c) && c.rank === 'A') : false;
         if (spadesCount === 0) {
           bid = 0; // Must nil if no spades
         } else if (hasAceSpades) {
@@ -1960,7 +1960,7 @@ export default function GameTable({
     if (isMyTurn && Array.isArray(myHand)) {
       const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
       const spadesBroken = (gameState as any).play?.spadesBroken;
-      if (isLeading && !spadesBroken && myHand.some(c => c.suit !== 'S')) {
+      if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => c.suit !== 'S')) {
         effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => c.suit !== 'S') : [];
         if (effectivePlayableCards.length === 0) {
           effectivePlayableCards = myHand; // Only spades left
@@ -2031,7 +2031,7 @@ export default function GameTable({
           {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
             const isPlayable = (gameState.status === "PLAYING" &&
               gameState.currentPlayer === currentPlayerId &&
-              effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
+              Array.isArray(effectivePlayableCards) && effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
               (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
             const isVisible = index < visibleCount;
             
@@ -2663,7 +2663,7 @@ export default function GameTable({
     if (!pendingPlayedCard) return;
     const currentTrick = (gameState as any)?.play?.currentTrick || [];
     const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-    if (currentTrick.some((c: Card & { playerIndex: number }) => c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank && c.playerIndex === myPlayerIndex)) {
+    if (Array.isArray(currentTrick) && currentTrick.some((c: Card & { playerIndex: number }) => c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank && c.playerIndex === myPlayerIndex)) {
       setPendingPlayedCard(null);
     }
   }, [gameState, pendingPlayedCard, user]);
@@ -3415,7 +3415,7 @@ export default function GameTable({
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
-                      const hasAceSpades = currentPlayerHand?.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') || false;
+                      const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') : false;
                       
                       // Calculate number of hearts for BID HEARTS games
                       const countHearts = (hand: Card[] | undefined): number => {
