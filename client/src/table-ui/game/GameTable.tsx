@@ -1346,8 +1346,9 @@ export default function GameTable({
     const bidCount = rawBid !== undefined ? rawBid : 0;
     const hasBid = rawBid !== undefined;    let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
-    const formatBid = (bid: number) => {
-      console.log("[BID FORMAT DEBUG] bid:", bid, "formatted:", bid === -1 ? "bn" : bid === 0 ? "n" : bid.toString());
+    const formatBid = (bid: number | null) => {
+      console.log("[BID FORMAT DEBUG] bid:", bid, "formatted:", bid === -1 ? "bn" : bid === 0 ? "n" : bid === null ? "null" : bid.toString());
+      if (bid === null || bid === undefined) return "0";
       if (bid === -1) return "bn";
       if (bid === 0) return "n";
       return bid.toString();
