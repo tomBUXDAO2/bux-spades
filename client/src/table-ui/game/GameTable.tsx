@@ -245,9 +245,9 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
       const nonSpades = hand.filter(card => !isSpade(card));
       
       console.log('[ASSASSIN DEBUG] Leading in Assassin mode:', {
-        hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : [],
-        spades: Array.isArray(spades) ? spades.map(card => `${card.rank}${card.suit}`) : [],
-        nonSpades: Array.isArray(nonSpades) ? nonSpades.map(card => `${card.rank}${card.suit}`) : [],
+        hand: hand.map(card => `${card.rank}${card.suit}`),
+        spades: spades.map(card => `${card.rank}${card.suit}`),
+        nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
         spadesBroken: hasSpadeBeenPlayed(game),
         spadesCount: spades.length,
         nonSpadesCount: nonSpades.length
@@ -316,7 +316,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     assassin: game.specialRules?.assassin,
     screamer: game.specialRules?.screamer,
     leadSuit,
-    hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : []
+    hand: hand.map(card => `${card.rank}${card.suit}`)
   });
   
   if (game.specialRules?.assassin) {
@@ -333,11 +333,11 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     // Screamer: cannot cut with spades unless only spades left (even after spades are broken)
     const nonSpades = hand.filter(card => !isSpade(card));
     console.log('[SCREAMER DEBUG] Void in lead suit, Screamer active:', {
-      hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : [],
-      nonSpades: Array.isArray(nonSpades) ? nonSpades.map(card => `${card.rank}${card.suit}`) : [],
+      hand: hand.map(card => `${card.rank}${card.suit}`),
+      nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
       nonSpadesCount: nonSpades.length,
       leadSuit,
-      cardSuits: Array.isArray(hand) ? hand.map(card => card.suit) : []
+      cardSuits: hand.map(card => card.suit)
     });
     if (nonSpades.length > 0) {
       console.log('[SCREAMER DEBUG] Returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
@@ -2117,7 +2117,7 @@ export default function GameTable({
         }}
       >
         <div className="flex">
-          {bottomPlayerHand.map((card: Card, index: number) => (
+          {Array.isArray(bottomPlayerHand) && bottomPlayerHand.map((card: Card, index: number) => (
             <div
               key={`${card.suit}${card.rank}`}
               className="relative"
@@ -2461,14 +2461,14 @@ export default function GameTable({
     };
 
     // Always build seat order by player.position
-    const seatOrderedPlayers = [...(gameState.players || [])].sort((a, b) => (a && b ? a.position - b.position : 0));
+    const seatOrderedPlayers = [...gameState.players].sort((a, b) => (a && b ? a.position - b.position : 0));
     const myPlayerId = user?.id;
     const mySeatIndex = seatOrderedPlayers.findIndex(p => p && p.id === myPlayerId);
     // For spectators, use seat 0 as the reference point
     const referenceSeatIndex = mySeatIndex >= 0 ? mySeatIndex : 0;
     const orderedPlayers = [0,1,2,3].map(i => seatOrderedPlayers[(referenceSeatIndex + i) % 4]);
 
-    return displayTrick.map((card: Card, i: number) => {
+    return Array.isArray(displayTrick) && displayTrick.map((card: Card, i: number) => {
       const seatIndex = (card as any).playerIndex;
       const displayPosition = orderedPlayers.findIndex(p => p && p.position === seatIndex);
       if (displayPosition === -1 || displayPosition === undefined) return null;
@@ -3411,7 +3411,7 @@ export default function GameTable({
                         currentPlayerHand,
                         handLength: currentPlayerHand?.length,
                         spadesInHand: currentPlayerHand?.filter((card: any) => card.suit === '♠'),
-                        allCards: Array.isArray(currentPlayerHand) ? currentPlayerHand.map((card: any) => `${card.suit}${card.rank}`) : []
+                        allCards: currentPlayerHand?.map((card: any) => `${card.suit}${card.rank}`)
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
