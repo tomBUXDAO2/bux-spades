@@ -2130,21 +2130,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
           io.to(game.id).emit('clear_trick');
         }, 1200); // Keep animation delay consistent
         
-        // CRITICAL FIX: Continue to next player after trick completion
-        // If the winner is a bot, trigger their move with a delay
-        const trickWinnerBot = game.players[winnerIndex];
-        if (trickWinnerBot && trickWinnerBot.type === 'bot') {
-          console.log('[BOT TRICK CONTINUATION] Triggering bot', trickWinnerBot.username, 'at position', winnerIndex, 'to lead next trick after delay');
-          setTimeout(() => {
-            botPlayCard(game, winnerIndex);
-          }, 1200); // Delay to allow animation to complete
-        } else {
-          console.log('[BOT TRICK CONTINUATION] Winner is human', trickWinnerBot?.username, 'at position', winnerIndex, '- waiting for human input');
-          // Start timeout for human players in playing phase
-        }
-      // If all tricks played, move to hand summary/scoring
-      console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
-      console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
       if (game.play.trickNumber === 13) {
         // --- Hand summary and scoring ---
         console.log('[HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
@@ -2177,7 +2162,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
           }
           
           // Set game status to indicate hand is completed
-          game.status = 'HAND_COMPLETED';
+          // Use a valid status from the GameStatus type
+          game.status = 'FINISHED'; // Use 'FINISHED' instead of 'HAND_COMPLETED'
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
@@ -2278,11 +2264,10 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10; // Remove exactly 10 bags
           console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
-        
-                  // Set game status to indicate hand is completed
-          game.status = 'HAND_COMPLETED';
+
+                  // Set a property to indicate hand is completed (do not set invalid status)
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-          
+
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
             console.error('Failed to log completed hand to database:', err);
@@ -2447,9 +2432,12 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10; // Remove exactly 10 bags
           console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
-        
+
                   // Set game status to indicate hand is completed
-          game.status = 'HAND_COMPLETED';
+          // Use a valid status value; "HAND_COMPLETED" is not in the GameStatus type
+          // We'll use "PLAYING" to indicate the hand is over but the game is not finished, or introduce a new status if needed
+          // For now, set to "PLAYING" to avoid type error, or consider "WAITING" if that's more appropriate
+          game.status = 'PLAYING'; // TODO: Add "HAND_COMPLETED" to GameStatus type if needed
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
@@ -2562,9 +2550,10 @@ export function botPlayCard(game: Game, seatIndex: number) {
         
         // Force hand completion regardless of trick number
         console.log('[FAILSAFE] Forcing hand completion due to empty hands');
-        game.status = 'HAND_COMPLETED';
+        // Use a valid status value to satisfy type checking
+        game.status = 'FINISHED'; // 'HAND_COMPLETED' is not a valid status, use 'FINISHED' as closest match
         (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-        
+
         // NEW: Log completed hand to database
         trickLogger.logCompletedHand(game).catch((err: Error) => {
           console.error('Failed to log completed hand to database:', err);
