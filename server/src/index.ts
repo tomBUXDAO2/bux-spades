@@ -757,6 +757,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             return;
           }
           
+          // CRITICAL FIX: Prevent player from being in multiple games
+          const playerInOtherGame = games.find(g => g.id !== gameId && g.players.some(p => p && p.id === socket.userId));
+          if (playerInOtherGame) {
+            console.log(`[MULTIPLE GAME PREVENTION] Player ${socket.userId} is already in game ${playerInOtherGame.id}, cannot join game ${gameId}`);
+            socket.emit("error", { message: "You are already in another game. Please leave that game first." });
+            return;
+          }          
           // Try to find an empty seat
           const emptySeatIndex = game.players.findIndex((player: GamePlayer | null) => player === null);
           if (emptySeatIndex === -1) {

@@ -324,6 +324,12 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
     return res.status(400).json({ error: 'Player already joined' });
   }
 
+  // CRITICAL FIX: Prevent player from being in multiple games
+  const playerInOtherGame = games.find(g => g.id !== game.id && g.players.some(p => p && p.id === playerId));
+  if (playerInOtherGame) {
+    console.log(`[MULTIPLE GAME PREVENTION] Player ${playerId} is already in game ${playerInOtherGame.id}, cannot join game ${game.id}`);
+    return res.status(400).json({ error: "You are already in another game. Please leave that game first." });
+  }
   // Check coin balance before seating
   try {
     const user = await prisma.user.findUnique({ where: { id: playerId } });
@@ -2060,8 +2066,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
       game.play.spadesBroken = true;
     }
     
-    // If trick is complete (4 cards) AND the current player is a bot
-    if (game.play.currentTrick.length === 4 && game.players[seatIndex]?.type === 'bot') {
+    // If trick is complete (4 cards)
+    if (game.play.currentTrick.length === 4) {
       console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
       const winnerIndex = determineTrickWinner(game.play.currentTrick);
       console.log('[BOT TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
@@ -2093,20 +2099,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         }
         console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
       }
-        // CRITICAL FIX: Continue to next player after trick completion
-        // If the winner is a bot, trigger their move with a delay
-        const trickWinnerBot = game.players[winnerIndex];
-        if (trickWinnerBot && trickWinnerBot.type === 'bot') {
-          console.log('[BOT TRICK CONTINUATION] Triggering bot', trickWinnerBot.username, 'at position', winnerIndex, 'to lead next trick after delay');
-          setTimeout(() => {
-            botPlayCard(game, winnerIndex);
-          }, 1200); // Delay to allow animation to complete
-        } else {
-          console.log('[BOT TRICK CONTINUATION] Winner is human', trickWinnerBot?.username, 'at position', winnerIndex, '- waiting for human input');
-          // Start timeout for human players in playing phase
-          const { startTurnTimeout } = require('../index');
-          startTurnTimeout(game, winnerIndex, 'playing');
-        }        // Store the completed trick for animation before clearing
+        // Store the completed trick for animation before clearing
         const completedTrick = [...game.play.currentTrick];
         
         // Emit trick complete with the stored trick data for animation
@@ -2129,7 +2122,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
           // Emit clear trick event to allow clients to clear any residual UI
           io.to(game.id).emit('clear_trick');
         }, 1200); // Keep animation delay consistent
-        
+      // If all tricks played, move to hand summary/scoring
+      console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
+      console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
       if (game.play.trickNumber === 13) {
         // --- Hand summary and scoring ---
         console.log('[HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
@@ -2162,8 +2157,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
           }
           
           // Set game status to indicate hand is completed
-          // Use a valid status from the GameStatus type
-          game.status = 'FINISHED'; // Use 'FINISHED' instead of 'HAND_COMPLETED'
+          game.status = 'HAND_COMPLETED';
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
@@ -2264,10 +2258,11 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10; // Remove exactly 10 bags
           console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
-
-                  // Set a property to indicate hand is completed (do not set invalid status)
+        
+                  // Set game status to indicate hand is completed
+          game.status = 'HAND_COMPLETED';
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-
+          
           // NEW: Log completed hand to database
           trickLogger.logCompletedHand(game).catch((err: Error) => {
             console.error('Failed to log completed hand to database:', err);
@@ -2432,12 +2427,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
           game.team2Bags -= 10; // Remove exactly 10 bags
           console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
         }
-
+        
                   // Set game status to indicate hand is completed
-          // Use a valid status value; "HAND_COMPLETED" is not in the GameStatus type
-          // We'll use "PLAYING" to indicate the hand is over but the game is not finished, or introduce a new status if needed
-          // For now, set to "PLAYING" to avoid type error, or consider "WAITING" if that's more appropriate
-          game.status = 'PLAYING'; // TODO: Add "HAND_COMPLETED" to GameStatus type if needed
+          game.status = 'HAND_COMPLETED';
           (game as any).handCompletedTime = Date.now(); // Track when hand was completed
           
           // NEW: Log completed hand to database
@@ -2517,9 +2509,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
         return;
       }
       // If the winner is a bot, trigger their move for the next trick
-      const trickWinningPlayer = game.players[winnerIndex];
-      if (trickWinningPlayer && trickWinningPlayer.type === 'bot') {
-        console.log('[BOT TURN] Winner is bot, triggering next turn for:', trickWinningPlayer.username, 'at index:', winnerIndex);
+      const winnerPlayer = game.players[winnerIndex];
+      if (winnerPlayer && winnerPlayer.type === 'bot') {
+        console.log('[BOT TURN] Winner is bot, triggering next turn for:', winnerPlayer.username, 'at index:', winnerIndex);
         // Add a small delay to allow the trick completion animation
         setTimeout(() => {
           // Double-check that it's still this bot's turn before playing
@@ -2550,10 +2542,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
         
         // Force hand completion regardless of trick number
         console.log('[FAILSAFE] Forcing hand completion due to empty hands');
-        // Use a valid status value to satisfy type checking
-        game.status = 'FINISHED'; // 'HAND_COMPLETED' is not a valid status, use 'FINISHED' as closest match
+        game.status = 'HAND_COMPLETED';
         (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-
+        
         // NEW: Log completed hand to database
         trickLogger.logCompletedHand(game).catch((err: Error) => {
           console.error('Failed to log completed hand to database:', err);
