@@ -1783,7 +1783,7 @@ export default function GameTable({
     }
           setHandImagesLoaded(true);
     setDealtCardCount(0);
-  }, [currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
+  }, [currentPlayer && currentPlayer.hand && Array.isArray(currentPlayer.hand) && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
 
   // Animate dealing cards after images are loaded
   useEffect(() => {
@@ -3397,7 +3397,7 @@ export default function GameTable({
                         currentPlayerHand,
                         handLength: currentPlayerHand?.length,
                         spadesInHand: currentPlayerHand?.filter((card: any) => card.suit === '♠'),
-                        allCards: currentPlayerHand?.map((card: any) => `${card.suit}${card.rank}`)
+                        allCards: Array.isArray(currentPlayerHand) ? currentPlayerHand.map((card: any) => `${card.suit}${card.rank}`) : []
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
