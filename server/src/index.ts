@@ -4029,6 +4029,11 @@ setInterval(() => {
       const handCompletedTime = (game as any).handCompletedTime || 0;
       const timeSinceHandCompleted = Date.now() - handCompletedTime;
       
+      // Skip if game is in BIDDING status
+      if (game.status === 'BIDDING') {
+        return;
+      }
+      
       if (timeSinceHandCompleted > 30000) { // 30 seconds
         console.log('[PERIODIC CHECK] Game stuck in PLAYING status for 30+ seconds, auto-starting next hand:', game.id);
         
