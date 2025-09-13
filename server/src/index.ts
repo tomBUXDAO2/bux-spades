@@ -4034,7 +4034,7 @@ setInterval(() => {
         return;
       }
       
-      if (timeSinceHandCompleted > 30000) { // 30 seconds
+      if (false) { // DISABLED: Periodic check causing issues
         console.log('[PERIODIC CHECK] Game stuck in PLAYING status for 30+ seconds, auto-starting next hand:', game.id);
         
         // Auto-start next hand
