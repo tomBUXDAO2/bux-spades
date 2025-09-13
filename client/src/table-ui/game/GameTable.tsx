@@ -1345,6 +1345,11 @@ export default function GameTable({
     const bidCount = (gameState as any).bidding?.bids?.[actualSeatIndex] ?? 0;
     let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
+    const formatBid = (bid: number) => {
+      if (bid === -1) return "bn";
+      if (bid === 0) return "n";
+      return bid.toString();
+    };
     
     if (isPartnerGame) {
       // Partner game logic - use original positions for partner calculation
@@ -1639,7 +1644,7 @@ export default function GameTable({
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), color: 'black' }}>/</span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
-                  {gameState.status === "WAITING" ? "0" : bidCount}
+                  {gameState.status === "WAITING" ? "0" : formatBid(bidCount)}
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), minWidth: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), textAlign: 'center' }}>
                   {madeStatus}
