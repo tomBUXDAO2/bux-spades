@@ -929,7 +929,7 @@ export default function GameTable({
   // Add debug logs for hand mapping
   const currentPlayerId = user?.id;
   const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-  const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands.find((h: any) => h.playerId === currentPlayerId)?.hand || [] : [];
+  const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands[myPlayerIndex] || [] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
   console.log('myHand:', myHand);
