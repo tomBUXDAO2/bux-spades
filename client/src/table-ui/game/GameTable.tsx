@@ -1228,7 +1228,7 @@ export default function GameTable({
       // Check if this specific player is the current player (timing out)
       const isCurrentPlayer = player && player.id === gameState.currentPlayer;
       // Only show overlay when it's the current player's turn AND their countdown has fully elapsed
-      const shouldShowTimerOnPlayer = Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0);
+      const shouldShowTimerOnPlayer = Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0);
     
 
     
@@ -1568,7 +1568,7 @@ export default function GameTable({
                       )}
                       
                       {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
-                      {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0) && (
+                      {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0) && (
                         <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
                           <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
                         </div>
@@ -1619,7 +1619,7 @@ export default function GameTable({
                   )}
                   
                   {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
-                  {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) <= 0) && (
+                  {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0) && (
                     <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
                     </div>
