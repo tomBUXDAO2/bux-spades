@@ -91,7 +91,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
         if (!user) {
           // Create user with Discord ID
           user = await prisma.user.create({
-            data: {
+      data: {
               id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               username: playerData.username,
               // Don't set a placeholder email; will be filled on first OAuth login
@@ -104,7 +104,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           
           // Create user stats
           await prisma.userStats.create({
-            data: {
+      data: {
               id: `stats_${user.id}_${Date.now()}`,
               userId: user.id,
               updatedAt: new Date()
@@ -194,7 +194,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           });
           
           const dbGame = await prisma.game.create({
-            data: {
+      data: {
               id: newGame.id, // Use the game's ID as the database ID
               creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
               gameMode: newGame.gameMode,
@@ -222,7 +222,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
             if (player) {
               try {
                 await prisma.gamePlayer.create({
-                  data: {
+      data: {
                     id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
                     gameId: newGame.dbGameId,
                     userId: player.id,
@@ -437,7 +437,7 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
       });
       
       await prisma.gamePlayer.create({
-        data: {
+      data: {
           id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
           gameId: game.dbGameId,
           userId: player.id,
@@ -739,7 +739,8 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
         }
         // Debit all
         for (const p of humanPlayers) {
-          await tx.user.update({ where: { id: p.id }, data: { coins: { decrement: game.buyIn } } });
+          await tx.user.update({ where: { id: p.id },
+      data: { coins: { decrement: game.buyIn } } });
         }
       });
     } catch (err) {
@@ -2172,7 +2173,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
               const winningPlayerIndex = (game.playerScores || []).indexOf(maxScore);
                           prisma.game.update({
               where: { id: game.dbGameId },
-              data: {
+      data: {
                 status: 'PLAYING',
                 // winner: winningPlayerIndex, // Field doesn't exist in schema
                 // winner: winningPlayerIndex, // Field doesn't exist in schema
@@ -2273,7 +2274,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
             try {
               prisma.game.update({
                 where: { id: game.dbGameId },
-                data: {
+      data: {
                   // Keep status PLAYING between hands
                   status: 'PLAYING',
                   // Store cumulative totals into auxiliary fields
@@ -2890,7 +2891,7 @@ async function updateHandStats(game: Game) {
       // Update stats for this hand
       await prisma.userStats.update({
         where: { userId },
-        data: {
+      data: {
           totalBags: newTotalBags,
           bagsPerGame: newBagsPerGame,
           nilsBid: { increment: nilBidIncrement },
@@ -2970,7 +2971,8 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     }
     
     // Create game record in database with new fields
-    const dbGame = await (prisma.game.create as any)({
+    const dbGame = await prisma.game.update({
+      where: { id: game.dbGameId },
       data: {
         creatorId: game.players[0]?.id || 'unknown', // Use first player as creator
         status: 'FINISHED',
@@ -3036,7 +3038,8 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
       }
       
       await (prisma.gamePlayer.create as any)({
-        data: {
+        where: { id: game.dbGameId },
+      data: {
           gameId: dbGame.id,
           userId,
           position: i,
@@ -3081,6 +3084,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     };
     
     await (prisma.gameResult.create as any)({
+      where: { id: game.dbGameId },
       data: {
         gameId: dbGame.id,
         winner,
@@ -3240,7 +3244,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				try {
 					await prisma.userStats.update({
 						where: { userId },
-						data: {
+      data: {
 							gamesPlayed: { increment: 1 },
 							gamesWon: { increment: isWinner ? 1 : 0 },
 							totalBags: { increment: bags }
@@ -3250,14 +3254,15 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 					try {
 						const s = await prisma.userStats.findUnique({ where: { userId }, select: { totalBags: true, gamesPlayed: true } });
 						if (s && (s.gamesPlayed || 0) > 0) {
-							await prisma.userStats.update({ where: { userId }, data: { bagsPerGame: (s.totalBags || 0) / (s.gamesPlayed || 1) } });
+							await prisma.userStats.update({ where: { userId },
+      data: { bagsPerGame: (s.totalBags || 0) / (s.gamesPlayed || 1) } });
 						}
 					} catch (bpgErr) {
 						console.warn('[STATS] Failed to recompute bagsPerGame for', userId, bpgErr);
 					}
 				} catch (error) {
 					await prisma.userStats.create({
-						data: {
+      data: {
 							userId,
 							gamesPlayed: 1,
 							gamesWon: isWinner ? 1 : 0,
@@ -3287,7 +3292,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 						if (nilsBidInc > 0) {
 							await prisma.userStats.update({
 								where: { userId },
-								data: {
+      data: {
 									nilsBid: { increment: nilsBidInc },
 									nilsMade: { increment: nilsMadeInc }
 								}
@@ -3316,7 +3321,8 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 						const currentUser = await prisma.user.findUnique({ where: { id: userId } });
 						if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
 						const newBalance = currentUser.coins + prizeAmount;
-						await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
+						await prisma.user.update({ where: { id: userId },
+      data: { coins: newBalance } });
 						console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${userId}. New balance: ${newBalance}`);
 					} catch (coinError) {
 						console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
@@ -3340,7 +3346,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 		try {
 			await prisma.game.update({
 				where: { id: game.dbGameId },
-				data: {
+      data: {
 					gameState: { ...((game as any).gameState || {}), statsApplied: true } as any
 				}
 			});
@@ -3660,7 +3666,8 @@ export async function logGameStart(game: Game) {
     }
     
     // Create initial game record in database
-    const dbGame = await (prisma.game.create as any)({
+    const dbGame = await prisma.game.update({
+      where: { id: game.dbGameId },
       data: {
         creatorId,
         status: 'PLAYING', // Game is now in progress
@@ -3670,7 +3677,6 @@ export async function logGameStart(game: Game) {
         minPoints: game.rules?.minPoints || 0,
         maxPoints: game.rules?.maxPoints || 0,
         buyIn: game.buyIn || 0,
-        solo,
         whiz,
         mirror,
         gimmick,
@@ -3708,7 +3714,8 @@ export async function logGameStart(game: Game) {
       }
       
       await (prisma.gamePlayer.create as any)({
-        data: {
+        where: { id: game.dbGameId },
+      data: {
           gameId: dbGame.id,
           userId, // Use 'bot' as placeholder for bot players
           position: i,
@@ -3753,7 +3760,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
     if (game.dbGameId) {
       await (prisma.game.update as any)({
         where: { id: game.dbGameId },
-        data: {
+      data: {
           status: 'FINISHED',
           completed: true,
           finalScore: Math.max(team1Score, team2Score),
@@ -3763,7 +3770,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
       
       // Create GameResult record
       await (prisma.gameResult.create as any)({
-        data: {
+      data: {
           gameId: game.dbGameId,
           winner: winningTeam,
           finalScore: Math.max(team1Score, team2Score),
@@ -3794,7 +3801,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
         
         await (prisma.gamePlayer.update as any)({
           where: { id: player.id },
-          data: {
+      data: {
             bid: playerBid,
             bags: playerBags,
             points: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
