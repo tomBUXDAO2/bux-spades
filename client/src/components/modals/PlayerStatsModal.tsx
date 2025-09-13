@@ -232,7 +232,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                         {stats.blindNilsBid > 0 ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%
                       </td>
                       <td className="text-center py-3 text-lg">
-                        {formatSigned((stats.blindNilsMade * 100) + ((stats.blindNilsBid - stats.blindNilsMade) * -100))}
+                        {formatSigned((stats.blindNilsMade * 200) + ((stats.blindNilsBid - stats.blindNilsMade) * -200))}
                       </td>
                     </tr>
                   </tbody>
