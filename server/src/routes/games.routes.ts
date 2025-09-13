@@ -708,7 +708,7 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   // Only log rated games (4 human players, no bots)
   const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
   const isRated = humanPlayers === 4;
-  
+  game.rated = isRated;  
   if (isRated && !game.dbGameId) {
     console.log('[GAME START DEBUG] Creating rated game in database:', {
       id: game.id,
@@ -3301,7 +3301,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				
 				// Handle coin prizes (buy-in was already deducted at game start)
 				const buyIn = game.buyIn || 0;
-				if (buyIn > 0 && isWinner) {
+				if (buyIn > 0 && isWinner && game.rated) {
 					let prizeAmount = 0;
 					const totalPot = buyIn * 4;
 					const rake = Math.floor(totalPot * 0.1); // 10% rake
