@@ -1,4 +1,3 @@
-import { playCardSound, playBidSound, playWinSound } from '@/utils/soundUtils';
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -80,8 +79,56 @@ const initializeAudio = () => {
   }
 };
 
+// Sound utility for dealing cards
+const playCardSound = () => {
+  try {
+    if (cardAudio) {
+      cardAudio.currentTime = 0;
+      cardAudio.play().catch(err => console.log('Card audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/card.wav');
+      audio.volume = 0.3;
+      audio.play().catch(err => console.log('Card audio play failed:', err));
+    }
+  } catch (error) {
+    console.log('Card audio not supported or failed to load:', error);
+  }
+};
 
+// Sound utility for bid
+const playBidSound = () => {
+  try {
+    if (bidAudio) {
+      bidAudio.currentTime = 0;
+      bidAudio.play().catch(err => console.log('Bid audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/bid.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Bid audio play failed:', err));
+    }
+  } catch (error) {
+    console.log('Bid audio not supported or failed to load:', error);
+  }
+};
 
+// Sound utility for win
+const playWinSound = () => {
+  try {
+    if (winAudio) {
+      winAudio.currentTime = 0;
+      winAudio.play().catch(err => console.log('Win audio play failed:', err));
+    } else {
+      // Fallback if preloaded audio is not available
+      const audio = new Audio('/sounds/win.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Win audio play failed:', err));
+    }
+  } catch (error) {
+    console.log('Win audio not supported or failed to load:', error);
+  }
+};
 
 interface GameTableProps {
   game: GameState;
@@ -1783,7 +1830,7 @@ export default function GameTable({
     }
           setHandImagesLoaded(true);
     setDealtCardCount(0);
-  }, [currentPlayer && currentPlayer.hand && Array.isArray(currentPlayer.hand) && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
+  }, [currentPlayer && currentPlayer.hand && currentPlayer.hand.map(c => `${c.suit}${c.rank}`).join(",")]);
 
   // Animate dealing cards after images are loaded
   useEffect(() => {
@@ -2414,7 +2461,7 @@ export default function GameTable({
     };
 
     // Always build seat order by player.position
-    const seatOrderedPlayers = [...(gameState.players || [])].sort((a, b) => (a && b ? a.position - b.position : 0));
+    const seatOrderedPlayers = [...gameState.players].sort((a, b) => (a && b ? a.position - b.position : 0));
     const myPlayerId = user?.id;
     const mySeatIndex = seatOrderedPlayers.findIndex(p => p && p.id === myPlayerId);
     // For spectators, use seat 0 as the reference point
@@ -2424,57 +2471,29 @@ export default function GameTable({
     return displayTrick.map((card: Card, i: number) => {
       const seatIndex = (card as any).playerIndex;
       const displayPosition = orderedPlayers.findIndex(p => p && p.position === seatIndex);
-      
-      // Better error handling - don't return null, use a fallback position
-      if (displayPosition === -1 || displayPosition === undefined) {
-        console.warn('[TRICK CARD DEBUG] Invalid display position for card:', {
-          card,
-          seatIndex,
-          orderedPlayers,
-          displayPosition
-        });
-        // Use the card index as a fallback position
-        const fallbackPosition = i % 4;
-        return (
-          <div
-            key={`trick-card-${Date.now()}-${i}-${card.suit}-${card.rank}-${seatIndex}`}
-            className={`${positions[fallbackPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
-            style={{ pointerEvents: 'none' }}
-          >
-            <div 
-              className={`transition-all duration-300`}
-              style={{ 
-                width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
-                height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
-              }}
-            >
-              <div style={{ opacity: 1 }}>
-                <CardImage
-                  card={card}
-                  width={isMobile ? 50 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50)}
-                  height={isMobile ? 69 : (window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)}
-                  className="rounded-lg transition-all duration-300"
-                  alt={`${card.rank} of ${card.suit}`}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      }
+      if (displayPosition === -1 || displayPosition === undefined) return null;
       
       // Check if this card is the winning card
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
       
+      // Debug logging
+      console.log('[TRICK CARD DEBUG]', {
+        windowHeight: window.innerHeight,
+        isMobile,
+        cardWidth: isMobile ? 50 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 25 : window.innerHeight >= 400 && window.innerHeight < 500 ? 43 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 64 : window.innerHeight > 550 && window.innerHeight < 600 ? 57 : window.innerHeight >= 600 && window.innerHeight < 650 ? 64 : window.innerHeight >= 650 && window.innerHeight < 700 ? 71 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160),
+        cardHeight: isMobile ? 69 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 35 : window.innerHeight >= 400 && window.innerHeight < 500 ? 60 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 120 : window.innerHeight > 550 && window.innerHeight <= 600 ? 130 : window.innerHeight > 600 && window.innerHeight < 650 ? 90 : window.innerHeight >= 650 && window.innerHeight < 700 ? 100 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160)
+      });
+      
       return (
         <div
-          key={`trick-card-${Date.now()}-${i}-${card.suit}-${card.rank}-${seatIndex}`}
+          key={`${card.suit}-${card.rank}-${i}`}
           className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
           style={{ pointerEvents: 'none' }}
         >
           <div 
             className={`transition-all duration-300`}
             style={{ 
-              width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
+                            width: isMobile ? 50 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 46 : window.innerHeight >= 400 && window.innerHeight < 450 ? 54 : window.innerHeight >= 450 && window.innerHeight < 500 ? 57 : window.innerHeight >= 500 && window.innerHeight < 550 ? 64 : window.innerHeight >= 550 && window.innerHeight < 600 ? 71 : window.innerHeight >= 600 && window.innerHeight < 650 ? 79 : window.innerHeight >= 650 && window.innerHeight < 700 ? 86 : window.innerHeight >= 700 && window.innerHeight < 750 ? 100 : window.innerHeight >= 750 && window.innerHeight < 800 ? 107 : window.innerHeight >= 800 && window.innerHeight < 840 ? 114 : window.innerHeight >= 840 ? 129 : 50),
               height: isMobile ? 69 : (window.innerHeight >= 350 && window.innerHeight < 400 ? 65 : window.innerHeight >= 400 && window.innerHeight < 450 ? 75 : window.innerHeight >= 450 && window.innerHeight < 500 ? 80 : window.innerHeight >= 500 && window.innerHeight < 550 ? 90 : window.innerHeight >= 550 && window.innerHeight < 600 ? 100 : window.innerHeight >= 600 && window.innerHeight < 650 ? 110 : window.innerHeight >= 650 && window.innerHeight < 700 ? 120 : window.innerHeight >= 700 && window.innerHeight < 750 ? 140 : window.innerHeight >= 750 && window.innerHeight < 800 ? 150 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : window.innerHeight >= 840 ? 180 : 69)
             }}
           >
@@ -2855,28 +2874,23 @@ export default function GameTable({
           // Store the completed trick for fallback display
           setLastNonEmptyTrick(data.trick.cards || []);
           
-          // Do not clear locally via timeout; wait for server clear_trick event to sync across clients
-          if (trickTimeoutRef.current) {
-            clearTimeout(trickTimeoutRef.current);
-            trickTimeoutRef.current = null;
-          }
+          // Wait 2 seconds before clearing trick animation
+          if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
+          trickTimeoutRef.current = setTimeout(() => {
+            setAnimatingTrick(false);
+            setTrickWinner(null);
+            setAnimatedTrickCards([]);
+            setTrickCompleted(false); // Reset trick completed state
+            setLastNonEmptyTrick([]); // Clear the last non-empty trick after animation
+          }, 1000);
         }
       };
       socket.on("trick_complete", handleTrickComplete);
       
-      // Listen for clear_trick event to immediately clear table cards and end animation in sync with server
-      const handleClearTrick = () => {
-        setAnimatingTrick(false);
-        setTrickWinner(null);
-        setAnimatedTrickCards([]);
-        setTrickCompleted(false);
-        setLastNonEmptyTrick([]);
-      };
-      socket.on("clear_trick", handleClearTrick);
+      // Listen for clear_trick event to immediately clear table cards
       
       return () => {
         socket.off("trick_complete", handleTrickComplete);
-        socket.off("clear_trick", handleClearTrick);
         if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
       };
     }
@@ -3389,7 +3403,7 @@ export default function GameTable({
                       });
                       // Get the current player's hand from gameState.hands array
                       const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
-                      const currentPlayerHand = (gameState as any).hands && (gameState as any).hands.find((h: any) => h.playerId === currentPlayerId)?.hand;
+                      const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
                       
                       // Debug logging to see what's in the hand
                       console.log('[WHIZ DEBUG] Hand data:', {
@@ -3397,7 +3411,7 @@ export default function GameTable({
                         currentPlayerHand,
                         handLength: currentPlayerHand?.length,
                         spadesInHand: currentPlayerHand?.filter((card: any) => card.suit === '♠'),
-                        allCards: Array.isArray(currentPlayerHand) ? currentPlayerHand.map((card: any) => `${card.suit}${card.rank}`) : []
+                        allCards: currentPlayerHand?.map((card: any) => `${card.suit}${card.rank}`)
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
