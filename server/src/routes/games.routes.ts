@@ -2079,19 +2079,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       });
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
-      // CRITICAL FIX: Continue to next player after trick completion
-      // If next player is a bot, trigger their move with a delay
-      if (game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-        console.log('[BOT TURN] Triggering bot turn for:', game.players[game.play.currentPlayerIndex]!.username, 'at index:', game.play.currentPlayerIndex);
-        setTimeout(() => {
-          // Double-check that it is still this bot's turn before playing
-          if (game.play && game.play.currentPlayerIndex === game.play.currentPlayerIndex && 
-              game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-            botPlayCard(game, game.play.currentPlayerIndex);
-          }
-        }, 1200); // Delay to allow animation to complete
-      }
-      // If the next player is a human, DO NOT trigger any bot moves - wait for human input      console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
+      console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
@@ -2127,7 +2115,22 @@ export function botPlayCard(game: Game, seatIndex: number) {
           
           // Emit clear trick event to allow clients to clear any residual UI
           io.to(game.id).emit('clear_trick');
-        }, 1000); // 1 second delay to match frontend animation
+        }, 1200); // Keep animation delay consistent
+        
+        // CRITICAL FIX: Continue to next player after trick completion
+        // If the winner is a bot, trigger their move with a delay
+        const trickWinnerBot = game.players[winnerIndex];
+        if (trickWinnerBot && trickWinnerBot.type === 'bot') {
+          console.log('[BOT TRICK CONTINUATION] Triggering bot', trickWinnerBot.username, 'at position', winnerIndex, 'to lead next trick after delay');
+          setTimeout(() => {
+            botPlayCard(game, winnerIndex);
+          }, 1200); // Delay to allow animation to complete
+        } else {
+          console.log('[BOT TRICK CONTINUATION] Winner is human', trickWinnerBot?.username, 'at position', winnerIndex, '- waiting for human input');
+          // Start timeout for human players in playing phase
+          const { startTurnTimeout } = require('../index');
+          startTurnTimeout(game, winnerIndex, 'playing');
+        }
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
@@ -2515,9 +2518,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
         return;
       }
       // If the winner is a bot, trigger their move for the next trick
-      const winnerPlayer = game.players[winnerIndex];
-      if (winnerPlayer && winnerPlayer.type === 'bot') {
-        console.log('[BOT TURN] Winner is bot, triggering next turn for:', winnerPlayer.username, 'at index:', winnerIndex);
+      const trickWinningPlayer = game.players[winnerIndex];
+      if (trickWinningPlayer && trickWinningPlayer.type === 'bot') {
+        console.log('[BOT TURN] Winner is bot, triggering next turn for:', trickWinningPlayer.username, 'at index:', winnerIndex);
         // Add a small delay to allow the trick completion animation
         setTimeout(() => {
           // Double-check that it's still this bot's turn before playing
@@ -2525,7 +2528,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
               game.players[winnerIndex] && game.players[winnerIndex]!.type === 'bot') {
             botPlayCard(game, winnerIndex);
           }
-        }, 100); // Reduced delay for faster gameplay
+        }, 1200); // 1.2 second delay to allow trick completion animation
       }
       
       // Failsafe: If all hands are empty but we haven't reached 13 tricks, force completion
@@ -3307,54 +3310,28 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				
 				// Handle coin prizes (buy-in was already deducted at game start)
 				const buyIn = game.buyIn || 0;
-				if (buyIn > 0) {
+				if (buyIn > 0 && isWinner) {
 					let prizeAmount = 0;
-					
+					const totalPot = buyIn * 4;
+					const rake = Math.floor(totalPot * 0.1); // 10% rake
+					const prizePool = totalPot - rake; // 90% pot
 					if (game.gameMode === 'SOLO') {
-						// Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
-						const playerScores = game.playerScores || [0, 0, 0, 0];
-						
-						// Create array of players with their scores and positions
-						const playersWithScores = playerScores.map((score, index) => ({ score, position: index }));
-						
-						// Sort by score (highest first)
-						playersWithScores.sort((a, b) => b.score - a.score);
-						
-						// Find this player's rank
-						const playerRank = playersWithScores.findIndex(p => p.position === gp.position) + 1;
-						
-						if (playerRank === 1) {
-							// 1st place gets 2.6x buy-in
-							prizeAmount = Math.floor(buyIn * 2.6);
-						} else if (playerRank === 2) {
-							// 2nd place gets buy-in back
-							prizeAmount = buyIn;
-						}
-						// 3rd and 4th place get nothing
-						
-						console.log(`[SOLO PAYOUT] Player ${gp.position} (${userId}) ranked ${playerRank}, prize: ${prizeAmount}`);
+						const secondPlacePrize = buyIn;
+						prizeAmount = prizePool - secondPlacePrize;
 					} else {
-						// Partners mode: only winners get prizes
-						if (isWinner) {
-							const totalPot = buyIn * 4;
-							const rake = Math.floor(totalPot * 0.1); // 10% rake
-							const prizePool = totalPot - rake; // 90% pot
-							prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
-						}
+						prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
 					}
-					
-					if (prizeAmount > 0) {
-						try {
-							const currentUser = await prisma.user.findUnique({ where: { id: userId } });
-							if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
-							const newBalance = currentUser.coins + prizeAmount;
-							await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
-							console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to player ${userId}. New balance: ${newBalance}`);
-						} catch (coinError) {
-							console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
-						}
+					try {
+						const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+						if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
+						const newBalance = currentUser.coins + prizeAmount;
+						await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
+						console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${userId}. New balance: ${newBalance}`);
+					} catch (coinError) {
+						console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
 					}
 				}
+
 				console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
 			} catch (err) {
 				console.error('Failed to update stats/coins for user', userId, err);
@@ -3395,7 +3372,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 // Helper to enrich game object for client
 export function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
-  const hands = Array.isArray(game.hands) ? game.hands : [];
+  const hands = game.hands || [];
   const dealerIndex = game.dealerIndex;
 
   // Patch: Always set top-level currentPlayer for frontend
@@ -3413,10 +3390,6 @@ export function enrichGameForClient(game: Game, userId?: string): Game {
     playerBags: game.playerBags,     // Added for Solo mode
     winningPlayer: game.winningPlayer, // Added for Solo mode
     forcedBid: game.forcedBid, // Added for Suicide games
-    hands: hands.map((hand, i) => ({
-      playerId: game.players[i]?.id,
-      hand: hand || []
-    })),
     players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {
@@ -3609,7 +3582,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         
         // Emit clear trick event to allow clients to clear any residual UI
         io.to(game.id).emit('clear_trick');
-      }, 1000); // 1 second delay to match frontend animation
+      }, 1200);
       
       // If the next player is a bot, trigger their move with a delay
       const nextPlayer = game.players[winnerIndex];
