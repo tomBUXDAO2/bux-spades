@@ -2183,10 +2183,10 @@ export default function GameTable({
       handleHandCompleted(data);
     };
     // Register event listener for hand completion
-    if (socket && socket.connected) {
+    if (socket) {
       socket.on('hand_completed', handCompletedHandler);
     } else {
-      console.log('[SOCKET] Cannot register hand_completed listener - socket not ready:', { socket: !!socket, connected: socket?.connected });
+      console.log('[SOCKET] Cannot register hand_completed listener - no socket');
     }
     
     return () => {
