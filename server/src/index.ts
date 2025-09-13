@@ -2136,13 +2136,13 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:             console.log("[HAND TRANSITION] Starting next hand immediately");
         // DISABLED:             setTimeout(() => {
         // DISABLED:               // Move dealer to the left (next position)
-        // DISABLED:               game.dealerIndex = (game.dealerIndex + 1) % 4;
+        // DISABLED:               game.dealerIndex = ((game.dealerIndex || 0) + 1) % 4;
         // DISABLED:               
         // DISABLED:               // Reset game state for new hand
         // DISABLED:               game.status = "BIDDING";
         // DISABLED:               game.bidding = {
         // DISABLED:                 currentPlayer: game.players[game.dealerIndex]?.id || "",
-        // DISABLED:                 currentBidderIndex: game.dealerIndex,
+        // DISABLED:                 currentBidderIndex: game.dealerIndex || 0,
         // DISABLED:                 bids: [null, null, null, null],
         // DISABLED:                 nilBids: {}
         // DISABLED:               };
@@ -2158,7 +2158,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:               });
         // DISABLED:               
         // DISABLED:               // Deal new cards
-        // DISABLED:               const hands = dealCards(game.players, game.dealerIndex);
+        // DISABLED:               const hands = dealCards(game.players, game.dealerIndex || 0);
         // DISABLED:               game.hands = hands;
         // DISABLED:               
         // DISABLED:               // Assign hands to players
@@ -4035,13 +4035,13 @@ setInterval(() => {
         // Auto-start next hand
         try {
           // Move dealer to the left (next position)
-          game.dealerIndex = (game.dealerIndex + 1) % 4;
+          game.dealerIndex = ((game.dealerIndex || 0) + 1) % 4;
           
           // Reset game state for new hand
           game.status = 'BIDDING';
           game.bidding = {
             currentPlayer: game.players[game.dealerIndex]?.id || '',
-            currentBidderIndex: game.dealerIndex,
+            currentBidderIndex: game.dealerIndex || 0,
             bids: [null, null, null, null],
             nilBids: {}
           };
@@ -4057,7 +4057,7 @@ setInterval(() => {
           });
           
           // Deal new cards
-          const hands = dealCards(game.players, game.dealerIndex);
+          const hands = dealCards(game.players, game.dealerIndex || 0);
           game.hands = hands;
           
           // Assign hands to players
