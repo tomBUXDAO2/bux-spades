@@ -2943,7 +2943,7 @@ export default function GameTable({
 
   // Fallback: Show hand summary when game status is HAND_COMPLETED but no hand summary is shown
   useEffect(() => {
-    if (true && !showHandSummary && !handSummaryData) {
+    if (false) { // DISABLED - if (true if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !showHandSummary if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !handSummaryData) {
       console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
       
       // Calculate scores manually from game state
