@@ -2164,7 +2164,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:               // Assign hands to players
         // DISABLED:               game.players.forEach((player, index) => {
         // DISABLED:                 if (player) {
-        // DISABLED:                   player.hand = hands[index] || [];
         // DISABLED:                 }
         // DISABLED:               });
         // DISABLED:               
@@ -4063,7 +4062,6 @@ setInterval(() => {
           // Assign hands to players
           game.players.forEach((player, index) => {
             if (player) {
-              player.hand = hands[index] || [];
             }
           });
           
