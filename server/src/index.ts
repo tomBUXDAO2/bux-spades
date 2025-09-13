@@ -2151,7 +2151,6 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:               // Reset player states
         // DISABLED:               game.players.forEach(player => {
         // DISABLED:                 if (player) {
-        // DISABLED:                   player.hand = [];
         // DISABLED:                   player.bid = undefined;
         // DISABLED:                   player.tricks = 0;
         // DISABLED:                 }
@@ -2174,7 +2173,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         // DISABLED:               // Emit events
         // DISABLED:               io.to(game.id).emit("new_hand_started", {
         // DISABLED:                 dealerIndex: game.dealerIndex,
-        // DISABLED:                 hands: game.players.map(p => p?.hand || [])
+        // DISABLED:                 hands: game.hands || []
         // DISABLED:               });
         // DISABLED:               io.to(game.id).emit("bidding_ready", {
         // DISABLED:                 currentBidder: game.dealerIndex
@@ -4051,7 +4050,6 @@ setInterval(() => {
           // Reset player states
           game.players.forEach(player => {
             if (player) {
-              player.hand = [];
               player.bid = undefined;
               player.tricks = 0;
             }
@@ -4074,7 +4072,7 @@ setInterval(() => {
           // Emit events
           io.to(game.id).emit('new_hand_started', {
             dealerIndex: game.dealerIndex,
-            hands: game.players.map(p => p?.hand || [])
+            hands: game.hands || []
           });
           io.to(game.id).emit('bidding_ready', {
             currentPlayer: game.bidding.currentPlayer
