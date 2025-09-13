@@ -2995,7 +2995,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         cancelled: false,
         finalScore,
         winner,
-        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === '4 OR NIL' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
         league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true).map(key => {
           if (key === 'screamer') return 'SCREAMER';
