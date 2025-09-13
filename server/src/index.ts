@@ -3807,6 +3807,21 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
       
       console.log(`[TURN TIMEOUT] Player ${player.username} consecutive timeouts: ${consecutiveTimeouts}`);
       
+      // Handle timeout based on game type
+      if (!game.rated && consecutiveTimeouts >= 3) {
+        // Unrated game: Remove player after 3 consecutive timeouts
+        console.log(`[TURN TIMEOUT] Removing player ${player.username} from unrated game after 3 timeouts`);
+        game.players[playerIndex] = null;
+        // Check if any human players remain
+        const remainingHumans = game.players.filter(p => p && p.type === 'human').length;
+        if (remainingHumans === 0) {
+          console.log(`[TURN TIMEOUT] No human players remaining - closing unrated game`);
+          game.status = 'CANCELLED';
+          io.to(game.id).emit('game_cancelled', { reason: 'No human players remaining' });
+          return; // Exit early, don't let bot act
+        }
+      }
+      
       // Bot acts for player (NEVER remove player - they can refresh and rejoin)
       console.log(`[TURN TIMEOUT] Bot acting for player ${player.username} (${consecutiveTimeouts} consecutive timeouts)`);
       
