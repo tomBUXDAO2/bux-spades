@@ -2202,7 +2202,7 @@ export default function GameTable({
   // Effect to show hand summary when game state is updated with final scores
   useEffect(() => {
     // Only show hand summary if we have hand summary data and the game state has been updated
-    if (handSummaryData && gameState.status === 'HAND_COMPLETED' && !showHandSummary) {
+    if (handSummaryData && true && !showHandSummary) {
       console.log('[HAND SUMMARY TRIGGER] Game state updated, showing hand summary with final scores:', {
         team1TotalScore: gameState.team1TotalScore,
         team2TotalScore: gameState.team2TotalScore,
@@ -2943,7 +2943,7 @@ export default function GameTable({
 
   // Fallback: Show hand summary when game status is HAND_COMPLETED but no hand summary is shown
   useEffect(() => {
-    if (gameState.status === 'HAND_COMPLETED' && !showHandSummary && !handSummaryData) {
+    if (true && !showHandSummary && !handSummaryData) {
       console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
       
       // Calculate scores manually from game state
