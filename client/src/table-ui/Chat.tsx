@@ -776,7 +776,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
             </div>
           ))}
           {/* Spectators */}
-          {spectators && spectators.map(spectator => (
+          {Array.isArray(spectators) && spectators.map(spectator => (
             <div key={spectator.id} className="flex items-center gap-3 p-2 rounded bg-slate-700 opacity-80">
               <img src={spectator.avatar || spectator.image || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
               <span

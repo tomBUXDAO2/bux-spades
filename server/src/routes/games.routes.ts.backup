@@ -2079,19 +2079,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       });
       game.play.currentPlayerIndex = winnerIndex;
       game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
-      // CRITICAL FIX: Continue to next player after trick completion
-      // If next player is a bot, trigger their move with a delay
-      if (game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-        console.log('[BOT TURN] Triggering bot turn for:', game.players[game.play.currentPlayerIndex]!.username, 'at index:', game.play.currentPlayerIndex);
-        setTimeout(() => {
-          // Double-check that it is still this bot's turn before playing
-          if (game.play && game.play.currentPlayerIndex === game.play.currentPlayerIndex && 
-              game.players[game.play.currentPlayerIndex] && game.players[game.play.currentPlayerIndex]!.type === 'bot') {
-            botPlayCard(game, game.play.currentPlayerIndex);
-          }
-        }, 1200); // Delay to allow animation to complete
-      }
-      // If the next player is a human, DO NOT trigger any bot moves - wait for human input      console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
+      console.log('[BOT TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;

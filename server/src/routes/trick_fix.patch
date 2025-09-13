@@ -1,0 +1,59 @@
+--- games.routes.ts.backup	2025-09-12 22:15:00.000000000 -0400
++++ games.routes.ts	2025-09-12 22:15:00.000000000 -0400
+@@ -2115,6 +2115,45 @@
+           // Emit clear trick event to allow clients to clear any residual UI
+           io.to(game.id).emit('clear_trick');
+         }, 1000); // 1 second delay to match frontend animation
++        
++        // CRITICAL FIX: Continue to next player after trick completion
++        // If the next player is a bot, trigger their move with a delay
++        const nextPlayer = game.players[winnerIndex];
++        if (nextPlayer && nextPlayer.type === 'bot') {
++          console.log('[BOT TRICK CONTINUATION] Triggering bot', nextPlayer.username, 'at position', winnerIndex, 'to play after delay');
++          setTimeout(() => {
++            botPlayCard(game, winnerIndex);
++          }, 1200); // Delay to allow animation to complete
++        } else {
++          console.log('[BOT TRICK CONTINUATION] Next player is human', nextPlayer?.username, 'at position', winnerIndex, '- waiting for human input');
++          // Start timeout for human players in playing phase
++          const { startTurnTimeout } = require('../index');
++          startTurnTimeout(game, winnerIndex, 'playing');
++        }
++      } else {
++        // Trick is not complete, advance to next player
++        let nextPlayerIndex = (seatIndex + 1) % 4;
++        game.play.currentPlayerIndex = nextPlayerIndex;
++        game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
++        
++        // Emit play_update to notify frontend about the card being played
++        io.to(game.id).emit('play_update', {
++          currentPlayerIndex: nextPlayerIndex,
++          currentTrick: game.play.currentTrick,
++          hands: game.hands.map((h, i) => ({
++            playerId: game.players[i]?.id,
++            handCount: h.length,
++          })),
++        });
++        
++        // Emit game update to ensure frontend has latest state
++        io.to(game.id).emit('game_update', enrichGameForClient(game));
++        
++        // If the next player is a bot, trigger their move with a delay
++        const nextPlayer = game.players[nextPlayerIndex];
++        if (nextPlayer && nextPlayer.type === 'bot') {
++          console.log('[BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
++          setTimeout(() => {
++            botPlayCard(game, nextPlayerIndex);
++          }, 800); // Reduced delay for faster bot play
++        } else {
++          console.log('[BOT TURN DEBUG] Next player is human', nextPlayer?.username, 'at position', nextPlayerIndex, '- waiting for human input');
++          // Start timeout for human players in playing phase using the main timeout system
++          console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
++          // Import the timeout function from index.ts
++          const { startTurnTimeout } = require('../index');
++          startTurnTimeout(game, nextPlayerIndex, 'playing');
++        }
++      }
+       // If all tricks played, move to hand summary/scoring
+       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
+       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);

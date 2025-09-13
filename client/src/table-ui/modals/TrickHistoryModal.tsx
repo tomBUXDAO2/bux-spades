@@ -247,7 +247,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
 
             {/* Cards Display */}
             <div className="flex justify-center items-start flex-wrap gap-4 mb-6">
-              {currentTrick?.cards.map((card, index) => {
+              {currentTrick?.cards && Array.isArray(currentTrick.cards) && currentTrick.cards.map((card, index) => {
                 const { rank, suit } = getCardDisplay(card);
                 const isWinningCard = card.playerId === currentTrick.winningPlayerId;
                 

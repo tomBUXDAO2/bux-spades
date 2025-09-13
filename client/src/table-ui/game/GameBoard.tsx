@@ -80,11 +80,11 @@ export default function GameBoard({ gameId }: GameBoardProps) {
       </div>
 
       {/* Current trick */}
-      {game.currentTrick.length > 0 && (
+      {game.currentTrick && game.currentTrick.length > 0 && (
         <div className="p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium mb-2">Current Trick</h3>
           <div className="flex gap-4">
-            {game.currentTrick.map((card: Card, index: number) => (
+            {Array.isArray(game.currentTrick) && game.currentTrick.map((card: Card, index: number) => (
               <div
                 key={index}
                 className="p-2 bg-white rounded border text-center min-w-[60px]"
@@ -115,11 +115,11 @@ export default function GameBoard({ gameId }: GameBoardProps) {
       )}
 
       {/* Player's hand */}
-      {currentPlayer && currentPlayer.hand.length > 0 && (
+      {currentPlayer && currentPlayer.hand && currentPlayer.hand.length > 0 && (
         <div className="p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium mb-2">Your Hand</h3>
           <div className="flex flex-wrap gap-2">
-            {currentPlayer.hand.map((card: Card, index: number) => (
+            {Array.isArray(currentPlayer.hand) && currentPlayer.hand.map((card: Card, index: number) => (
               <button
                 key={index}
                 onClick={() => handlePlayCard()}
