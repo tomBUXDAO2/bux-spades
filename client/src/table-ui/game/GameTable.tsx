@@ -245,9 +245,9 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
       const nonSpades = hand.filter(card => !isSpade(card));
       
       console.log('[ASSASSIN DEBUG] Leading in Assassin mode:', {
-        hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : [],
-        spades: Array.isArray(spades) ? spades.map(card => `${card.rank}${card.suit}`) : [],
-        nonSpades: Array.isArray(nonSpades) ? nonSpades.map(card => `${card.rank}${card.suit}`) : [],
+        hand: hand.map(card => `${card.rank}${card.suit}`),
+        spades: spades.map(card => `${card.rank}${card.suit}`),
+        nonSpades: nonSpades.map(card => `${card.rank}${card.suit}`),
         spadesBroken: hasSpadeBeenPlayed(game),
         spadesCount: spades.length,
         nonSpadesCount: nonSpades.length
