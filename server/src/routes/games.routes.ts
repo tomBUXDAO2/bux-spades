@@ -2093,7 +2093,20 @@ export function botPlayCard(game: Game, seatIndex: number) {
         }
         console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
       }
-        // Store the completed trick for animation before clearing
+        // CRITICAL FIX: Continue to next player after trick completion
+        // If the winner is a bot, trigger their move with a delay
+        const trickWinnerBot = game.players[winnerIndex];
+        if (trickWinnerBot && trickWinnerBot.type === 'bot') {
+          console.log('[BOT TRICK CONTINUATION] Triggering bot', trickWinnerBot.username, 'at position', winnerIndex, 'to lead next trick after delay');
+          setTimeout(() => {
+            botPlayCard(game, winnerIndex);
+          }, 1200); // Delay to allow animation to complete
+        } else {
+          console.log('[BOT TRICK CONTINUATION] Winner is human', trickWinnerBot?.username, 'at position', winnerIndex, '- waiting for human input');
+          // Start timeout for human players in playing phase
+          const { startTurnTimeout } = require('../index');
+          startTurnTimeout(game, winnerIndex, 'playing');
+        }        // Store the completed trick for animation before clearing
         const completedTrick = [...game.play.currentTrick];
         
         // Emit trick complete with the stored trick data for animation
@@ -2128,8 +2141,6 @@ export function botPlayCard(game: Game, seatIndex: number) {
         } else {
           console.log('[BOT TRICK CONTINUATION] Winner is human', trickWinnerBot?.username, 'at position', winnerIndex, '- waiting for human input');
           // Start timeout for human players in playing phase
-          const { startTurnTimeout } = require('../index');
-          startTurnTimeout(game, winnerIndex, 'playing');
         }
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
