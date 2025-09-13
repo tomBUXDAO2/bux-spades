@@ -591,7 +591,15 @@ export default function GameTable({
   useEffect(() => {
     if (!socket) return;
     
-    const handleGameStarted = () => {
+    const handleGameStarted = (data: any) => {
+      // Process hands data
+      if (data.hands) {
+        const handsArray = data.hands.map((h: any) => h.hand);
+        setGameState(prev => ({
+          ...prev,
+          hands: handsArray
+        }));
+      }
       // Show coin debit animation for 4-human player games
       const humanPlayers = game.players.filter(p => p && !isBot(p));
       if (humanPlayers.length === 4 && game.buyIn) {
