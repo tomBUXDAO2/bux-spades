@@ -2060,8 +2060,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
       game.play.spadesBroken = true;
     }
     
-    // If trick is complete (4 cards)
-    if (game.play.currentTrick.length === 4) {
+    // If trick is complete (4 cards) AND the current player is a bot
+    if (game.play.currentTrick.length === 4 && game.players[seatIndex]?.type === 'bot') {
       console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
       const winnerIndex = determineTrickWinner(game.play.currentTrick);
       console.log('[BOT TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
