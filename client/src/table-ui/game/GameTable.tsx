@@ -1342,8 +1342,9 @@ export default function GameTable({
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
     const actualSeatIndex = player.position; // Use actual seat position
-    const bidCount = (gameState as any).bidding?.bids?.[actualSeatIndex] ?? 0;
-    let madeStatus = null;
+    const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    const bidCount = rawBid !== undefined ? rawBid : 0;
+    const hasBid = rawBid !== undefined;    let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
     const formatBid = (bid: number) => {
       console.log("[BID FORMAT DEBUG] bid:", bid, "formatted:", bid === -1 ? "bn" : bid === 0 ? "n" : bid.toString());
@@ -1645,7 +1646,7 @@ export default function GameTable({
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), color: 'black' }}>/</span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
-                  {gameState.status === "WAITING" ? "0" : formatBid(bidCount)}
+                  {gameState.status === "WAITING" ? "0" : (hasBid ? formatBid(bidCount) : "0")}
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), minWidth: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), textAlign: 'center' }}>
                   {madeStatus}
@@ -2179,6 +2180,7 @@ export default function GameTable({
     };
     
     const handCompletedHandler = (data: any) => {
+      console.log('[CLIENT] hand_completed event received - SOCKET CONNECTED:', socket?.connected);
       console.log('[CLIENT] hand_completed event received:', data);
       handleHandCompleted(data);
     };
