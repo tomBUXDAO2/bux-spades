@@ -27,6 +27,7 @@ import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
 import { trickLogger } from './lib/trickLogger';
 import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from './lib/databaseScoring';
+import { handleHandCompletion } from './lib/handCompletion';
 
 // EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
 process.on('uncaughtException', (error) => {

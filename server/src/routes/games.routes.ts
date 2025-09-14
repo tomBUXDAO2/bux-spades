@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { rateLimit } from '../middleware/rateLimit.middleware';
 
 import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from '../lib/databaseScoring';
+import { handleHandCompletion } from '../lib/handCompletion';
 const router = Router();
 
 // Helper function to filter out null values
