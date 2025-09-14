@@ -2064,6 +2064,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
       // Use shared trick completion function
+      handleTrickCompletion(game);
+      return; // Skip old logic      // Use shared trick completion function
       handleTrickCompletion(game);      console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
       const winnerIndex = determineTrickWinner(game.play.currentTrick);
       console.log('[BOT TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);

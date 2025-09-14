@@ -1827,6 +1827,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
       // Use shared trick completion function
+      handleTrickCompletion(game);
+      return; // Skip old logic      // Use shared trick completion function
       handleTrickCompletion(game);      // Determine winner of the trick
       console.log('[TRICK DEBUG] Determining winner for trick:', game.play.currentTrick);
       console.log('[TRICK DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
