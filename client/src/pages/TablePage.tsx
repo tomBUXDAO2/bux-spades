@@ -195,7 +195,7 @@ export default function TablePage() {
             });
             if (joinResponse.ok) {
               const updatedGame = await joinResponse.json();
-              setGame(updatedGame);
+              setGame(prevGame => ({ ...prevGame, ...updatedGame }));
               updateModalState(updatedGame);
               console.log('[LEAGUE GAME] Successfully auto-joined user to game');
             } else {
@@ -222,7 +222,7 @@ export default function TablePage() {
             });
             if (joinResponse.ok) {
               const updatedGame = await joinResponse.json();
-              setGame(updatedGame);
+              setGame(prevGame => ({ ...prevGame, ...updatedGame }));
               updateModalState(updatedGame);
               console.log('[AUTO-JOIN FALLBACK] Successfully auto-joined user to game');
             } else {
@@ -250,7 +250,7 @@ export default function TablePage() {
               });
               if (joinResponse.ok) {
                 const updatedGame = await joinResponse.json();
-                setGame(updatedGame);
+                setGame(prevGame => ({ ...prevGame, ...updatedGame }));
                 updateModalState(updatedGame);
                 console.log('[ROBUSTNESS CHECK] Successfully added user to game');
               } else {
@@ -358,7 +358,7 @@ export default function TablePage() {
         updatedGame.currentPlayer = updatedGame.play.currentPlayer;
       }
       
-      setGame(updatedGame);
+      setGame(prevGame => ({ ...prevGame, ...updatedGame }));
       
       // Update modal state when game state changes
       updateModalState(updatedGame);
@@ -570,7 +570,7 @@ export default function TablePage() {
       const joinResponse = await response.json(); const updatedGame = joinResponse.game;
       console.log('[HTTP JOIN] Successfully joined game:', updatedGame);
       console.log('[HTTP JOIN] Game players after join:', updatedGame.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
-      setGame(updatedGame);
+      setGame(prevGame => ({ ...prevGame, ...updatedGame }));
       // Update modal state when joining game
       updateModalState(updatedGame);
       
@@ -654,7 +654,7 @@ export default function TablePage() {
           } else {
             const updatedGame = await res.json();
             console.log('Bot invited successfully:', updatedGame);
-            setGame(updatedGame);
+            setGame(prevGame => ({ ...prevGame, ...updatedGame }));
           }
         } catch (err) {
           console.error('Error inviting bot to seat', seatIndex, ':', err);

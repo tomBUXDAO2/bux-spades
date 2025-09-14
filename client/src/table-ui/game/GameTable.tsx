@@ -634,7 +634,7 @@ export default function GameTable({
 
   // Helper function to determine user's team
   const getUserTeam = () => {
-    const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+    const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
     if (myPlayerIndex === -1) return 1; // Default to team 1
     
     // In partners mode: positions 0,2 = Red Team (1), positions 1,3 = Blue Team (2)
@@ -933,10 +933,20 @@ export default function GameTable({
   
   // Use gameState for all game data
   const [gameState, setGameState] = useState(game);
+  // Ensure gameState has required properties
+  const safeGameState = {
+    ...gameState,
+    players: gameState.players || [],
+    hands: gameState.hands || []
+  };
+  // Safety check to ensure gameState.players is always an array
+  if (!gameState.players) {
+    gameState.players = [];
+  }
   
   // Add debug logs for hand mapping
   const currentPlayerId = user?.id;
-  const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+  const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
   const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands[myPlayerIndex] || [] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
@@ -2639,6 +2649,16 @@ export default function GameTable({
   };
 
   // After: const [gameState, setGameState] = useState(game);
+  // Ensure gameState has required properties
+  const safeGameState = {
+    ...gameState,
+    players: gameState.players || [],
+    hands: gameState.hands || []
+  };
+  // Safety check to ensure gameState.players is always an array
+  if (!gameState.players) {
+    gameState.players = [];
+  }
   useEffect(() => {
     // console.log('[DEBUG] GameTable received new game prop:', game);
     setGameState(game);
@@ -2679,7 +2699,7 @@ export default function GameTable({
   useEffect(() => {
     if (!pendingPlayedCard) return;
     const currentTrick = (gameState as any)?.play?.currentTrick || [];
-    const myPlayerIndex = gameState.players.findIndex(p => p && p.id === user?.id);
+    const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
     if (Array.isArray(currentTrick) && currentTrick.some((c: Card & { playerIndex: number }) => c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank && c.playerIndex === myPlayerIndex)) {
       setPendingPlayedCard(null);
     }
