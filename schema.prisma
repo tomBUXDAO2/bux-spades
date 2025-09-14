@@ -45,6 +45,18 @@ model Game {
   allowNil     Boolean       @default(true)
   allowBlindNil Boolean      @default(false)
   league       Boolean       @default(false)
+  whiz         Boolean       @default(false)
+  mirror       Boolean       @default(false)
+  gimmick      Boolean       @default(false)
+  screamer     Boolean       @default(false)
+  assassin     Boolean       @default(false)
+  completed    Boolean       @default(false)
+  cancelled    Boolean       @default(false)
+  finalScore   Int?
+  winner       Int?
+  gameType     String?
+  specialRulesApplied String[]
+  solo         Boolean       @default(false)
   // Game state persistence for crash recovery
   currentRound Int           @default(1)
   currentTrick Int           @default(1)
@@ -58,6 +70,8 @@ model Game {
   GamePlayer   GamePlayer[]
   Round        Round[]
   GameResult   GameResult?
+  GameScore    GameScore[]
+  PlayerTrickCount PlayerTrickCount[]
 }
 
 model GamePlayer {
@@ -77,6 +91,9 @@ model GamePlayer {
   won         Boolean?
   discordId   String?
   username    String?
+  tricksMade  Int?
+  nilBid      Boolean       @default(false)
+  blindNilBid Boolean       @default(false)
   Game        Game     @relation(fields: [gameId], references: [id])
   User        User     @relation(fields: [userId], references: [id])
 
@@ -91,6 +108,8 @@ model Round {
   updatedAt   DateTime
   Game        Game     @relation(fields: [gameId], references: [id])
   Trick       Trick[]
+  PlayerTrickCount PlayerTrickCount[]
+  RoundBid     RoundBid[]
 
   @@unique([gameId, roundNumber])
 }
@@ -131,6 +150,7 @@ model User {
   coins                                   Int           @default(5000000)
   createdAt                               DateTime      @default(now())
   updatedAt                               DateTime
+  soundEnabled                            Boolean       @default(true)
   BlockedUser_BlockedUser_blockedIdToUser BlockedUser[] @relation("BlockedUser_blockedIdToUser")
   BlockedUser_BlockedUser_userIdToUser    BlockedUser[] @relation("BlockedUser_userIdToUser")
   Friend_Friend_friendIdToUser            Friend[]      @relation("Friend_friendIdToUser")
@@ -139,6 +159,7 @@ model User {
   GamePlayer                              GamePlayer[]
   UserStats                               UserStats?
   UserGameStats                           UserGameStats[]
+  RoundBid                                 RoundBid[]
 }
 
 model UserStats {
@@ -162,7 +183,11 @@ model UserStats {
   soloBagsPerGame     Float?   @default(0)
   totalCoinsWon       Int?     @default(0)
   totalCoinsLost      Int?     @default(0)
-  netCoins            Int?     @default(0)
+  netCoins            Int?
+  totalTricksBid      Int?
+  totalTricksMade     Int?
+  totalNilBids        Int?
+  totalBlindNilBids   Int?     @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime
   User                User     @relation(fields: [userId], references: [id])
@@ -240,4 +265,47 @@ model UserGameStats {
   User        User        @relation(fields: [userId], references: [id])
 
   @@unique([userId, gameMode, bidType, gimmickType, screamer, assassin])
+}
+
+model GameScore {
+  id                String   @id @default(uuid())
+  gameId            String
+  roundNumber       Int
+  team1Score        Int
+  team2Score        Int
+  team1Bags         Int
+  team2Bags         Int
+  team1RunningTotal Int
+  team2RunningTotal Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  Game              Game     @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, roundNumber])
+}
+
+model PlayerTrickCount {
+  id          String   @id @default(uuid())
+  gameId      String
+  roundId     String
+  playerId    String
+  tricksWon   Int
+  lastUpdated DateTime @default(now())
+  Game        Game     @relation(fields: [gameId], references: [id])
+  Round       Round    @relation(fields: [roundId], references: [id])
+
+  @@unique([gameId, roundId, playerId])
+}
+
+model RoundBid {
+  id        String   @id
+  roundId   String
+  playerId  String
+  bid       Int
+  createdAt DateTime @default(now())
+  isBlindNil Boolean  @default(false)
+  Round     Round    @relation(fields: [roundId], references: [id])
+  User      User     @relation(fields: [playerId], references: [id])
+
+  @@unique([roundId, playerId])
 }

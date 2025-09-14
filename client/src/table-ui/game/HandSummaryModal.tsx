@@ -136,9 +136,9 @@ export default function HandSummaryModal({
   const blueTeamNilBonus = calculateNilBonus([1, 3]);
 
   // Calculate hand totals
-  const redTeamHandTotal = redTeamTrickScore + redTeamBagScore + redTeamNilBonus;
-  const blueTeamHandTotal = blueTeamTrickScore + blueTeamBagScore + blueTeamNilBonus;
-
+  // Calculate hand totals - USE BACKEND SCORES when available
+  const redTeamHandTotal = handSummaryData?.team1Score || (redTeamTrickScore + redTeamBagScore + redTeamNilBonus);
+  const blueTeamHandTotal = handSummaryData?.team2Score || (blueTeamTrickScore + blueTeamBagScore + blueTeamNilBonus);
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>

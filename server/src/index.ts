@@ -4246,7 +4246,7 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
       // Get all rounds for this game
       const rounds = await prisma.round.findMany({
         where: { gameId: game.dbGameId },
-        include: { bids: true }
+        include: { RoundBid: true }
       });
       
       console.log('[GAME COMPLETION] Found rounds:', rounds.length);
@@ -4266,7 +4266,7 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
         
         for (const round of rounds) {
           // Find this player's bid in this round
-          const roundBid = round.bids.find((rb: any) => rb.playerId === gamePlayer.userId);
+          const roundBid = round.RoundBid.find((rb: any) => rb.playerId === gamePlayer.userId);
           if (roundBid) {
             totalBid += roundBid.bid;
           }
