@@ -1,4 +1,5 @@
 import { Socket } from 'socket.io';
+import type { AuthenticatedSocket } from '../../index';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -26,7 +27,7 @@ export interface LobbyChatMessage extends ChatMessage {
  * Distinguishes between system messages and user messages
  */
 export async function handleGameChatMessage(
-  socket: Socket,
+  socket: AuthenticatedSocket,
   gameId: string,
   message: any
 ): Promise<void> {
@@ -89,7 +90,7 @@ export async function handleGameChatMessage(
  * Handles lobby chat messages
  */
 export async function handleLobbyChatMessage(
-  socket: Socket,
+  socket: AuthenticatedSocket,
   message: any
 ): Promise<void> {
   if (!socket.isAuthenticated || !socket.userId) {
