@@ -71,11 +71,64 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     const completionCheck = await checkGameCompletion(game.dbGameId, game.maxPoints, game.minPoints);
     if (completionCheck.isGameOver) {
       console.log('[GAME COMPLETION] Game is over, winning team:', completionCheck.winningTeam);
-      // Handle game completion here
+      
+      // ACTUALLY COMPLETE THE GAME
+      await completeGame(game, completionCheck.winningTeam);
     }
     
   } catch (error) {
     console.error('[HAND COMPLETION ERROR] Failed to complete hand:', error);
+    throw error;
+  }
+}
+
+// Import and use the completeGame function from index.ts
+async function completeGame(game: Game, winningTeamOrPlayer: number) {
+  console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
+  
+  try {
+    // Set game status to FINISHED
+    game.status = 'FINISHED';
+    
+    // Update database status to FINISHED
+    if (game.dbGameId) {
+      const { prisma } = await import('./prisma');
+      await prisma.game.update({
+        where: { id: game.dbGameId },
+        data: { 
+          status: 'FINISHED',
+          completed: true,
+          finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0),
+          winner: winningTeamOrPlayer
+        }
+      });
+      console.log('[GAME COMPLETION] Updated database status to FINISHED for game:', game.dbGameId);
+    }
+    
+    // Emit game over event
+    if (game.gameMode === 'SOLO') {
+      io.to(game.id).emit('game_over', {
+        playerScores: game.playerScores,
+        winningPlayer: winningTeamOrPlayer,
+      });
+    } else {
+      io.to(game.id).emit('game_over', {
+        team1Score: game.team1TotalScore,
+        team2Score: game.team2TotalScore,
+        winningTeam: winningTeamOrPlayer,
+      });
+    }
+    
+    // Start play again timer
+    // startPlayAgainTimer will be called from the original context
+    // startPlayAgainTimer(game); // Will be called from original context
+    
+    // Update stats and coins
+    const { updateStatsAndCoins } = await import('../routes/games.routes');
+    await updateStatsAndCoins(game, winningTeamOrPlayer);
+    
+  } catch (error) {
+    console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
     throw error;
   }
 }
