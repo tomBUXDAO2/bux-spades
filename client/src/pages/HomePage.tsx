@@ -323,7 +323,7 @@ const HomePage: React.FC = () => {
         creatorImage: user.avatar // or user.image if that's the field
       });
       if (!res.ok) throw new Error('Failed to create game');
-      const game: GameState = await res.json();
+      const response = await res.json(); const game: GameState = response.game;
       navigate(`/table/${game.id}`);
     } catch (err) {
       alert('Failed to create game');

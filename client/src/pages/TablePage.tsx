@@ -14,7 +14,7 @@ import TableInactivityModal from '../components/modals/TableInactivityModal';
 
 export default function TablePage() {
   console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
-  const { gameId } = useParams<{ gameId: string }>();
+  const { gameId } = useParams<{ gameId: string }>(); console.log('[TABLE PAGE DEBUG] gameId from useParams:', gameId);
   const { user } = useAuth();
   const { socket } = useSocket();
   const navigate = useNavigate();
