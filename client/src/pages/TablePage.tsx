@@ -131,7 +131,7 @@ export default function TablePage() {
     console.log('[INIT] Starting initialization sequence for game:', gameId);
     
     // Persist active game id immediately for reconnect logic
-    try { localStorage.setItem('activeGameId', String(gameId)); } catch {}
+    if (gameId && gameId !== 'undefined') { try { localStorage.setItem('activeGameId', String(gameId)); } catch {} }
     
     // Socket is now managed by SocketContext
 
@@ -271,8 +271,8 @@ export default function TablePage() {
         }
 
         // After fetching game, store activeGameId and ensure we join the socket room if socket is ready
-        try { localStorage.setItem('activeGameId', String(gameId)); } catch {}
-        if (socket && socket.connected && !isSpectator) {
+        if (gameId && gameId !== 'undefined') { try { localStorage.setItem('activeGameId', String(gameId)); } catch {} }
+        if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
           setTimeout(() => {
             if (socket && socket.connected) {
               socket.emit('join_game', { gameId });
@@ -302,7 +302,7 @@ export default function TablePage() {
 
     // Add a fallback mechanism to ensure join_game is sent
     const fallbackJoinGame = () => {
-      if (socket && socket.connected && !isSpectator) {
+      if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
         console.log('SENDING JOIN_GAME EVENT');
         socket.emit('join_game', { gameId });
       } else {
