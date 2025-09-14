@@ -1139,6 +1139,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       });
       const hands = dealCards(game.players, dealerIndex);
       game.hands = hands;
+      // CRITICAL FIX: Assign dealt hands to individual players
+      console.log(`[HAND ASSIGNMENT DEBUG] Assigning hands to players:`);
+      hands.forEach((hand, index) => {
+        console.log(`[HAND ASSIGNMENT DEBUG] Player ${index}: ${game.players[index]?.username} getting ${hand.length} cards`);
+        if (game.players[index]) {
+          game.players[index]!.hand = hand;
+        }
+      });
+      console.log(`[HAND ASSIGNMENT DEBUG] After assignment - Player hands:`, game.players.map((p, i) => `${i}: ${p?.username} = ${p?.hand?.length || 0} cards`));
       // Bidding phase state
       const firstBidder = game.players[(dealerIndex + 1) % 4];
       if (!firstBidder) {
@@ -1714,19 +1723,15 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       return;
     }
     
-    // Validate card is in player's hand
-    if (!game.hands || !Array.isArray(game.hands)) {
-      socket.emit('error', { message: 'Invalid hand state - hands not initialized' });
+    // Validate card is in player's hand - USE INDIVIDUAL PLAYER HANDS
+    const player = game.players[playerIndex];
+    if (!player || !player.hand || !Array.isArray(player.hand)) {
+      socket.emit('error', { message: 'Invalid hand state - player hand not initialized' });
       return;
     }
-    const hands = game.hands.filter((h): h is Card[] => h !== null && h !== undefined);
-    if (hands.length !== 4) {
-      socket.emit('error', { message: 'Invalid hand state - hands array incomplete' });
-      return;
-    }
-    const hand = hands[playerIndex]!;
-    if (!hand || hand.length === 0) {
-      socket.emit('error', { message: 'Invalid hand state' });
+    const hand = player.hand;
+    if (hand.length === 0) {
+      socket.emit('error', { message: 'Invalid hand state - player has no cards' });
       return;
     }
     
@@ -1824,243 +1829,11 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       startTurnTimeout(game, nextPlayerIndex, 'playing');
     }
 
-    // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
       // Use shared trick completion function
       handleTrickCompletion(game);
-      return; // Skip old logic      // Use shared trick completion function
-      handleTrickCompletion(game);      // Determine winner of the trick
-      console.log('[TRICK DEBUG] Determining winner for trick:', game.play.currentTrick);
-      console.log('[TRICK DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
-      const winnerIndex = determineTrickWinner(game.play.currentTrick);
-      console.log('[TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
-      if (winnerIndex === undefined) {
-        socket.emit('error', { message: 'Invalid trick state' });
-        return;
-      }
-      game.play.tricks.push({
-        cards: game.play.currentTrick,
-        winnerIndex,
-      });
-      game.play.trickNumber += 1;
-      
-      // NEW: Log the completed trick to database
-      console.log('[TRICK LOGGING] Attempting to log trick', game.play.trickNumber, 'for game', game.id, 'dbGameId:', game.dbGameId);
-      trickLogger.logTrickFromGame(game, game.play.trickNumber).catch((err: Error) => {
-        console.error('[TRICK LOGGING ERROR] Failed to log trick to database:', err);
-        console.error('[TRICK LOGGING ERROR] Game state:', {
-          id: game.id,
-          dbGameId: game.dbGameId,
-          trickNumber: game.play.trickNumber,
-          hasPlay: !!game.play,
-          hasTricks: !!game.play?.tricks,
-          tricksLength: game.play?.tricks?.length
-        });
-      });
-      // Set current player to the winner of the trick
-      game.play.currentPlayerIndex = winnerIndex;
-      game.play.currentPlayer = game.players[winnerIndex]?.id ?? '';
-      console.log('[TRICK DEBUG] Set current player to winner:', winnerIndex, game.players[winnerIndex]?.username);
-      
-      // Start turn timeout for human players when trick is complete
-      const winnerPlayer = game.players[winnerIndex];
-      if (winnerPlayer && winnerPlayer.type === 'human') {
-        startTurnTimeout(game, winnerIndex, 'playing');
-      }
-      
-      // Update player trick counts
-      if (game.players[winnerIndex]) {
-        const oldTrickCount = game.players[winnerIndex].tricks || 0;
-        game.players[winnerIndex].tricks = oldTrickCount + 1;
-      
-      // Update database trick count
-      if (game.dbGameId) {
-        // Get the actual roundId from database
-        const round = await prisma.round.findFirst({
-          where: { gameId: game.dbGameId, roundNumber: game.currentRound }
-        });
-        if (!round) {
-          console.error('[DB TRICK COUNT ERROR] Round not found for game', game.dbGameId, 'round', game.currentRound);
-          return;
-        }
-        const actualRoundId = round.id;
-        updatePlayerTrickCount(game.dbGameId, game.currentRound, game.players[winnerIndex].id, game.players[winnerIndex].tricks).catch((err: Error) => {
-          console.error('[DB TRICK COUNT ERROR] Failed to update trick count:', err);
-        });
-      }        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'from', oldTrickCount, 'to', game.players[winnerIndex].tricks);
-        
-        // CRITICAL: Validate trick count integrity
-        const totalTricks = game.players.reduce((sum, p) => sum + (p?.tricks || 0), 0);
-        console.log('[TRICK COUNT VALIDATION] Total tricks after update:', totalTricks, 'Expected:', game.play.trickNumber);
-        if (totalTricks !== game.play.trickNumber) {
-          console.error('[TRICK COUNT ERROR] MISMATCH! Total tricks:', totalTricks, 'but trickNumber:', game.play.trickNumber);
-          console.error('[TRICK COUNT ERROR] Individual counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
-        }
-        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex].tricks);
-        
-        // Update GamePlayer record in DB
-        if (game.dbGameId && game.players[winnerIndex]?.type === 'human') {
-          import('./routes/games.routes').then(({ updateGamePlayerRecord }) => {
-            updateGamePlayerRecord(game, winnerIndex).catch((err: Error) => {
-              console.error('Failed to update GamePlayer record after trick win:', err);
-            });
-          });
-        }
-        console.log('[TRICK COUNT DEBUG] All player trick counts:', game.players.map((p, i) => `${i}: ${p?.username || 'null'} = ${p?.tricks || 0}`));
-      }
-      
-      // Emit trick complete with the current trick before clearing it
-      io.to(game.id).emit('trick_complete', {
-        trick: {
-          cards: game.play.currentTrick,
-          winnerIndex: winnerIndex,
-        },
-        trickNumber: game.play.trickNumber,
-      });
-      
-      // Store the completed trick for animation before clearing
-      const completedTrick = [...game.play.currentTrick];
-      
-      // Clear the trick immediately for proper game state
-      game.play!.currentTrick = [];
-      
-      // Save game state after each trick completion
-      try {
-                        // Save game state after each trick completion
-                try {
-                  await import('./lib/gameStatePersistence').then(({ saveGameState }) => saveGameState(game));
-                } catch (err) {
-                  console.error('Failed to save game state after trick:', err);
-                }
-      } catch (err) {
-        console.error('Failed to save game state after trick:', err);
-      }
-      
-      // Emit immediate game update with cleared trick and updated trick counts
-      const enrichedGame = enrichGameForClient(game);
-      console.log('[TRICK DEBUG] Emitting game_update with currentPlayer:', enrichedGame.play?.currentPlayer, 'currentPlayerIndex:', enrichedGame.play?.currentPlayerIndex);
-      io.to(game.id).emit('game_update', enrichedGame);
-      
-      // Emit clear trick event after animation delay
-      setTimeout(() => {
-        io.to(game.id).emit('clear_trick');
-      }, 1000); // 1 second delay to match frontend animation
-      
-      // If all tricks played, move to hand summary/scoring
-      console.log('[HAND COMPLETION DEBUG] Checking hand completion - trickNumber:', game.play.trickNumber);
-      if (game.play.trickNumber === 13) {
-        console.log('[HAND COMPLETION DEBUG] Hand completion triggered! Emitting hand_completed event');
-        console.log('[HAND COMPLETION DEBUG] Game mode check:', game.gameMode, 'Type:', typeof game.gameMode);
-        console.log('[HAND COMPLETION DEBUG] Full game object keys:', Object.keys(game));
-        console.log('[HAND COMPLETION DEBUG] Game rules:', game.rules);
-        // --- Hand summary and scoring ---
-        
-        if (game.gameMode === 'SOLO') {
-          // Solo mode scoring
-          const handSummary = calculateSoloHandScore(game);
-          
-          // Update running totals for individual players
-          game.playerScores = game.playerScores || [0, 0, 0, 0];
-          game.playerBags = game.playerBags || [0, 0, 0, 0];
-          
-          for (let i = 0; i < 4; i++) {
-            game.playerScores[i] += handSummary.playerScores[i];
-            game.playerBags[i] += handSummary.playerBags[i];
-          }
-          
-          // Apply bag penalty to running totals if needed
-          for (let i = 0; i < 4; i++) {
-            if (game.playerBags[i] >= 10) {
-              const penaltyApplied = Math.floor(game.playerBags[i] / 10) * 100;
-              const bagsRemoved = Math.floor(game.playerBags[i] / 10) * 10;
-              game.playerScores[i] -= penaltyApplied;
-              game.playerBags[i] -= bagsRemoved;
-              console.log(`[SOLO BAG PENALTY] Player ${i} hit 10+ bags, applied -${penaltyApplied} penalty. New score: ${game.playerScores[i]}, New bags: ${game.playerBags[i]}`);
-            }
-          }          
-          // Set game status to indicate hand is completed
-          game.status = 'PLAYING';
-          
-          // NEW: Log completed hand to database
-          trickLogger.logCompletedHand(game).catch((err: Error) => {
-            console.error('Failed to log completed hand to database:', err);
-          });
-          
-                  io.to(game.id).emit('hand_completed', {
-          // Current hand scores (for hand summary display)
-          team1Score: handSummary.playerScores[0] + handSummary.playerScores[2], // Red team (positions 0,2)
-          team2Score: handSummary.playerScores[1] + handSummary.playerScores[3], // Blue team (positions 1,3)
-          team1Bags: handSummary.playerBags[0] + handSummary.playerBags[2],
-          team2Bags: handSummary.playerBags[1] + handSummary.playerBags[3],
-          tricksPerPlayer: handSummary.tricksPerPlayer,
-          // Running totals (for overall game state)
-          playerScores: game.playerScores,
-          playerBags: game.playerBags,
-          team1TotalScore: game.team1TotalScore,
-          team2TotalScore: game.team2TotalScore,
-          team1TotalBags: game.team1Bags,
-          team2TotalBags: game.team2Bags,
-        });
-        
-        // Update stats for this hand
-        updateHandStats(game).catch(err => {
-          console.error('Failed to update hand stats:', err);
-        });
-        } else {
-          // Partners mode - USE SHARED HAND COMPLETION FUNCTION
-          await handleHandCompletion(game);        // });
-        }
-        
-        // Emit game update with new status
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
-        
-        // Start hand summary timer for all players to respond
-        startHandSummaryTimer(game);
-        
-        // --- Game over check ---
-        // Use the actual game settings - these should always be set when game is created
-        const maxPoints = game.maxPoints;
-        const minPoints = game.minPoints;
-        
-        // Validate that we have the required game settings
-        if (maxPoints === undefined || minPoints === undefined) {
-          console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
-          return;
-        }
-        
-        if (game.gameMode === 'SOLO') {
-          // Solo mode game over check
-          const playerScores = game.playerScores || [0, 0, 0, 0];
-          console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
-          
-          const isGameOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
-          
-          if (isGameOver) {
-            console.log('[GAME OVER] Solo game ended! Player scores:', playerScores);
-            
-            let winningPlayer = 0;
-            let highestScore = playerScores[0];
-            for (let i = 1; i < playerScores.length; i++) {
-              if (playerScores[i] > highestScore) {
-                highestScore = playerScores[i];
-                winningPlayer = i;
-              }
-            }
-            game.winningPlayer = winningPlayer;
-            
-            // First log the game to database, then complete it
-            try {
-              const { logCompletedGameToDbAndDiscord } = await import('./lib/gameLogger');
-              await logCompletedGameToDbAndDiscord(game, winningPlayer);
-              console.log('[GAME COMPLETION] Successfully logged game to database, now calling completeGame');
-              
-              // Now call completeGame with the logged game
-              completeGame(game, winningPlayer).catch(err => {
-                console.error('Failed to complete solo game:', err);
-              });
-            } catch (error) {
-              console.error('Failed to log game to database:', error);
-              // Fallback: try to complete without logging
+      return; // Skip old logic
+    }      handleTrickCompletion(game);      // Determine winner of the trick
               completeGame(game, winningPlayer).catch(err => {
                 console.error('Failed to complete solo game (fallback):', err);
               });

@@ -75,7 +75,7 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
     let team1Tricks = 0, team2Tricks = 0;
     
     // Get player positions from game
-    const game = games.find(g => g.id === gameId);
+    const game = games.find(g => g.dbGameId === gameId);
     if (!game) {
       console.error(`[DB SCORING ERROR] Game ${gameId} not found in memory`);
       return null;
