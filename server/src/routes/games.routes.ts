@@ -750,8 +750,11 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   const hands = dealCards(game.players, dealerIndex);
   // Assign hands to individual players
   hands.forEach((hand, index) => {
-    if (game.players[index]) {
-      game.players[index]!.hand = hand;
+  console.log(`[HAND ASSIGNMENT DEBUG] Assigning hands to players:`);
+  hands.forEach((hand, index) => {
+    console.log(`[HAND ASSIGNMENT DEBUG] Player ${index}: ${game.players[index]?.username} getting ${hand.length} cards`);
+  });    if (game.players[index]) {
+  console.log(`[HAND ASSIGNMENT DEBUG] After assignment - Player hands:`, game.players.map((p, i) => `${i}: ${p?.username} = ${p?.hand?.length || 0} cards`));      game.players[index]!.hand = hand;
     }
   });  game.hands = hands;
   

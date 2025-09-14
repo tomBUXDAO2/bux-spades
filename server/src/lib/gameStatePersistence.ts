@@ -74,7 +74,7 @@ export async function saveGameState(game: Game): Promise<void> {
 
     console.log(`[GAME STATE] ✅ Saved COMPLETE state for game ${game.id} - Round ${game.currentRound || 1}, Trick ${game.currentTrick || 1}`);
     console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${(gameState as any).trickHistory?.length || 0} tricks`);
-  } catch (error) {
+    console.log(`[GAME STATE DEBUG] Player hands:`, game.players.map((p, i) => `${i}: ${p?.username} = ${p?.hand?.length || 0} cards`));  } catch (error) {
     console.error(`[GAME STATE] ❌ Failed to save state for game ${game.id}:`, error);
   }
 }
