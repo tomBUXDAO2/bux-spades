@@ -6,6 +6,7 @@ export * from './socket-handlers';
 export * from './timeout-management';
 export * from './hand-completion';
 export * from './game-formats';
+export * from './chat';
 
 // Re-export commonly used functions for convenience
 export { 
