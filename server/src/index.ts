@@ -31,7 +31,9 @@ import {
   handlePlayCard,
   startTurnTimeout,
   clearTurnTimeout,
-  clearAllTimeoutsForGame,|  handleGameChatMessage,|  handleLobbyChatMessage
+  clearAllTimeoutsForGame,
+  handleGameChatMessage,
+  handleLobbyChatMessage
 } from './modules';
 
 // EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
@@ -246,60 +248,14 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
   // Chat handlers using modular functions
   socket.on('chat_message', async ({ gameId, message }) => {
-    if (!socket.isAuthenticated || !socket.userId) {
-      socket.emit('error', { message: 'Not authenticated' });
-      return;
-    }
-
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: socket.userId },
-        select: { username: true, avatar: true }
-      });
-
-      if (!user) {
-        socket.emit('error', { message: 'User not found' });
-        return;
-      }
-
-      const chatMessage = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: socket.userId,
-        username: user.username,
-        avatar: user.avatar,
-        message: typeof message === "string" ? message.trim() : message.message?.trim() || "",
-        timestamp: new Date().toISOString()
-      };
-
-      io.to(gameId).emit('chat_message', { gameId, message: chatMessage });
-    } catch (error) {
-      console.error('Error handling chat message:', error);
-      socket.emit('error', { message: 'Failed to send message' });
-    }
+    await handleGameChatMessage(socket, gameId, message);
   });
 
   // Disconnect handling
 
   // Lobby chat handler
-  socket.on("lobby_chat_message", (message) => {
-    if (!socket.isAuthenticated || !socket.userId) {
-      socket.emit("error", { message: "Not authenticated" });
-      return;
-    }
-
-    if (!message || !message.message) {
-      return;
-    }
-
-    const enrichedMessage = {
-      ...message,
-      id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: message.timestamp || Date.now(),
-      userName: message.userName || socket.auth?.user?.username || "Unknown"
-    };
-
-    console.log("Broadcasting lobby message:", enrichedMessage);
-    io.emit("lobby_chat_message", enrichedMessage);
+  socket.on("lobby_chat_message", async (message) => {
+    await handleLobbyChatMessage(socket, message);
   });
   socket.on('disconnect', (reason) => {
     console.log('[DISCONNECT] User disconnected:', {
