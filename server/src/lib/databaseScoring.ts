@@ -4,13 +4,23 @@ import { games } from '../gamesStore';
 import type { Game } from '../types/game';
 
 // Update PlayerTrickCount after every trick
-export async function updatePlayerTrickCount(gameId: string, roundId: string, playerId: string, tricksWon: number) {
+export async function updatePlayerTrickCount(gameId: string, roundNumber: number, playerId: string, tricksWon: number) {
   try {
+    // Find the actual roundId from database
+    const round = await prisma.round.findFirst({
+      where: { gameId, roundNumber }
+    });
+    
+    if (!round) {
+      console.error(`[DB SCORING ERROR] Round ${roundNumber} not found for game ${gameId}`);
+      return;
+    }
+    
     await prisma.playerTrickCount.upsert({
       where: {
         gameId_roundId_playerId: {
           gameId,
-          roundId,
+          roundId: round.id,
           playerId
         }
       },
@@ -21,12 +31,12 @@ export async function updatePlayerTrickCount(gameId: string, roundId: string, pl
       create: {
         id: uuidv4(),
         gameId,
-        roundId,
+        roundId: round.id,
         playerId,
         tricksWon
       }
     });
-    console.log(`[DB SCORING] Updated PlayerTrickCount: ${playerId} has ${tricksWon} tricks in round ${roundId}`);
+    console.log(`[DB SCORING] Updated PlayerTrickCount: ${playerId} has ${tricksWon} tricks in round ${round.id}`);
   } catch (error) {
     console.error(`[DB SCORING ERROR] Failed to update PlayerTrickCount:`, error);
   }
@@ -99,27 +109,7 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
     let team1Score = 0, team2Score = 0;
     let team1Bags = 0, team2Bags = 0;
     
-    // Team 1 scoring
-    if (team1Tricks >= team1Bid) {
-      team1Score += team1Bid * 10;
-      team1Bags = team1Tricks - team1Bid;
-      team1Score += team1Bags; // Bags are worth 1 point each
-    } else {
-      team1Score -= team1Bid * 10;
-      team1Bags = 0; // No bags for failed bids
-    }
-    
-    // Team 2 scoring
-    if (team2Tricks >= team2Bid) {
-      team2Score += team2Bid * 10;
-      team2Bags = team2Tricks - team2Bid;
-      team2Score += team2Bags; // Bags are worth 1 point each
-    } else {
-      team2Score -= team2Bid * 10;
-      team2Bags = 0; // No bags for failed bids
-    }
-    
-    // Handle nil and blind nil bids
+    // Handle nil and blind nil scoring
     for (const roundBid of round.RoundBid) {
       const playerIndex = game.players.findIndex(p => p?.id === roundBid.playerId);
       if (playerIndex === -1) continue;
@@ -128,82 +118,68 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       const tricks = trickCount?.tricksWon || 0;
       
       if (roundBid.bid === 0) { // Nil bid
-        if (tricks === 0) {
-          // Successful nil
-          if (team1.includes(playerIndex)) team1Score += 100;
-          else team2Score += 100;
-        } else {
-          // Failed nil (set)
+        if (tricks === 0) { // Successful nil
+          if (team1.includes(playerIndex)) {
+            team1Score += 100;
+          } else {
+            team2Score += 100;
+          }
+        } else { // Failed nil
           if (team1.includes(playerIndex)) {
             team1Score -= 100;
-            // If team already made their bid, failed nil tricks become bags
-            if (team1Tricks >= team1Bid) {
-              team1Bags += tricks;
-              team1Score += tricks;
-            }
           } else {
             team2Score -= 100;
-            // If team already made their bid, failed nil tricks become bags
-            if (team2Tricks >= team2Bid) {
-              team2Bags += tricks;
-              team2Score += tricks;
-            }
           }
         }
-      } else if (roundBid.bid === -1) { // Blind nil bid
-        if (tricks === 0) {
-          // Successful blind nil
-          if (team1.includes(playerIndex)) team1Score += 200;
-          else team2Score += 200;
-        } else {
-          // Failed blind nil (set)
+      } else if (roundBid.isBlindNil) { // Blind nil
+        if (tricks === 0) { // Successful blind nil
+          if (team1.includes(playerIndex)) {
+            team1Score += 200;
+          } else {
+            team2Score += 200;
+          }
+        } else { // Failed blind nil
           if (team1.includes(playerIndex)) {
             team1Score -= 200;
-            // If team already made their bid, failed blind nil tricks become bags
-            if (team1Tricks >= team1Bid) {
-              team1Bags += tricks;
-              team1Score += tricks;
-            }
           } else {
             team2Score -= 200;
-            // If team already made their bid, failed blind nil tricks become bags
-            if (team2Tricks >= team2Bid) {
-              team2Bags += tricks;
-              team2Score += tricks;
-            }
           }
         }
       }
     }
     
-    // Calculate running totals
-    const team1RunningTotal = (previousScore?.team1RunningTotal || 0) + team1Score;
-    const team2RunningTotal = (previousScore?.team2RunningTotal || 0) + team2Score;
-    
-    // Apply bag penalty to running totals if needed
-    let finalTeam1RunningTotal = team1RunningTotal;
-    let finalTeam2RunningTotal = team2RunningTotal;
-    let finalTeam1Bags = (previousScore?.team1Bags || 0) + team1Bags;
-    let finalTeam2Bags = (previousScore?.team2Bags || 0) + team2Bags;
-    
-    // Apply 10-bag penalty
-    if (finalTeam1Bags >= 10) {
-      const penaltyApplied = Math.floor(finalTeam1Bags / 10) * 100;
-      const bagsRemoved = Math.floor(finalTeam1Bags / 10) * 10;
-      finalTeam1RunningTotal -= penaltyApplied;
-      finalTeam1Bags -= bagsRemoved;
-      console.log(`[DB SCORING] Team 1 bag penalty: -${penaltyApplied}, new total: ${finalTeam1RunningTotal}`);
+    // Calculate regular team scoring
+    if (team1Tricks >= team1Bid) {
+      team1Score += team1Bid * 10;
+      team1Bags = team1Tricks - team1Bid;
+      team1Score += team1Bags;
+    } else {
+      team1Score -= team1Bid * 10;
     }
     
-    if (finalTeam2Bags >= 10) {
-      const penaltyApplied = Math.floor(finalTeam2Bags / 10) * 100;
-      const bagsRemoved = Math.floor(finalTeam2Bags / 10) * 10;
-      finalTeam2RunningTotal -= penaltyApplied;
-      finalTeam2Bags -= bagsRemoved;
-      console.log(`[DB SCORING] Team 2 bag penalty: -${penaltyApplied}, new total: ${finalTeam2RunningTotal}`);
+    if (team2Tricks >= team2Bid) {
+      team2Score += team2Bid * 10;
+      team2Bags = team2Tricks - team2Bid;
+      team2Score += team2Bags;
+    } else {
+      team2Score -= team2Bid * 10;
     }
     
-    // Store the score in database
+    // Apply bag penalties to running totals
+    let team1RunningTotal = (previousScore?.team1RunningTotal || 0) + team1Score;
+    let team2RunningTotal = (previousScore?.team2RunningTotal || 0) + team2Score;
+    let currentTeam1Bags = (previousScore?.team1Bags || 0) + team1Bags;
+    let currentTeam2Bags = (previousScore?.team2Bags || 0) + team2Bags;
+    
+    if (currentTeam1Bags >= 10) {
+      team1RunningTotal -= 100;
+      currentTeam1Bags -= 10;
+    }
+    if (currentTeam2Bags >= 10) {
+      team2RunningTotal -= 100;
+      currentTeam2Bags -= 10;
+    }
+    
     const gameScore = await prisma.gameScore.create({
       data: {
         id: uuidv4(),
@@ -211,26 +187,23 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
         roundNumber,
         team1Score,
         team2Score,
-        team1Bags: finalTeam1Bags,
-        team2Bags: finalTeam2Bags,
-        team1RunningTotal: finalTeam1RunningTotal,
-        team2RunningTotal: finalTeam2RunningTotal
+        team1Bags: currentTeam1Bags,
+        team2Bags: currentTeam2Bags,
+        team1RunningTotal,
+        team2RunningTotal
       }
     });
     
-    console.log(`[DB SCORING] Stored GameScore for round ${roundNumber}:`);
-    console.log(`  Team 1: ${team1Score} (total: ${finalTeam1RunningTotal}, bags: ${finalTeam1Bags})`);
-    console.log(`  Team 2: ${team2Score} (total: ${finalTeam2RunningTotal}, bags: ${finalTeam2Bags})`);
-    
+    console.log(`[DB SCORING] Game ${gameId} Round ${roundNumber} scores stored: Team 1: ${team1Score} (${team1RunningTotal}), Team 2: ${team2Score} (${team2RunningTotal})`);
     return gameScore;
   } catch (error) {
-    console.error(`[DB SCORING ERROR] Failed to calculate and store game score:`, error);
-    return null;
+    console.error(`[DB SCORING ERROR] Failed to calculate and store game score for game ${gameId} round ${roundNumber}:`, error);
+    throw error;
   }
 }
 
-// Check if game should end based on database scores
-export async function checkGameCompletion(gameId: string): Promise<{ shouldEnd: boolean; winner?: number; reason?: string }> {
+// Check if game is complete based on running totals
+export async function checkGameCompletion(gameId: string, maxPoints: number, minPoints: number) {
   try {
     const latestScore = await prisma.gameScore.findFirst({
       where: { gameId },
@@ -238,35 +211,32 @@ export async function checkGameCompletion(gameId: string): Promise<{ shouldEnd: 
     });
     
     if (!latestScore) {
-      return { shouldEnd: false };
+      return { isGameOver: false, winningTeam: null };
     }
     
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      return { shouldEnd: false };
+    const team1Total = latestScore.team1RunningTotal;
+    const team2Total = latestScore.team2RunningTotal;
+    
+    let isGameOver = false;
+    let winningTeam: 1 | 2 | null = null;
+    
+    if (team1Total >= maxPoints && team1Total > team2Total) {
+      isGameOver = true;
+      winningTeam = 1;
+    } else if (team2Total >= maxPoints && team2Total > team1Total) {
+      isGameOver = true;
+      winningTeam = 2;
+    } else if (team1Total <= minPoints) {
+      isGameOver = true;
+      winningTeam = 2; // Team 1 lost, so Team 2 wins
+    } else if (team2Total <= minPoints) {
+      isGameOver = true;
+      winningTeam = 1; // Team 2 lost, so Team 1 wins
     }
     
-    // Check if either team reached max points
-    if (latestScore.team1RunningTotal >= game.maxPoints) {
-      return { shouldEnd: true, winner: 1, reason: `Team 1 reached ${game.maxPoints} points` };
-    }
-    
-    if (latestScore.team2RunningTotal >= game.maxPoints) {
-      return { shouldEnd: true, winner: 2, reason: `Team 2 reached ${game.maxPoints} points` };
-    }
-    
-    // Check if either team reached min points (negative threshold)
-    if (latestScore.team1RunningTotal <= game.minPoints) {
-      return { shouldEnd: true, winner: 2, reason: `Team 1 reached ${game.minPoints} points` };
-    }
-    
-    if (latestScore.team2RunningTotal <= game.minPoints) {
-      return { shouldEnd: true, winner: 1, reason: `Team 2 reached ${game.minPoints} points` };
-    }
-    
-    return { shouldEnd: false };
+    return { isGameOver, winningTeam };
   } catch (error) {
-    console.error(`[DB SCORING ERROR] Failed to check game completion:`, error);
-    return { shouldEnd: false };
+    console.error(`[DB GAME COMPLETION ERROR] Failed to check game completion for game ${gameId}:`, error);
+    throw error;
   }
 }

@@ -13,7 +13,7 @@ import { validate } from '../middleware/validate.middleware';
 import { z } from 'zod';
 import { rateLimit } from '../middleware/rateLimit.middleware';
 
-import { calculateAndStoreGameScore, checkGameCompletion } from '../lib/databaseScoring';
+import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from '../lib/databaseScoring';
 const router = Router();
 
 // Helper function to filter out null values
@@ -2083,7 +2083,13 @@ export function botPlayCard(game: Game, seatIndex: number) {
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
-        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
+        
+        // Update database trick count
+        if (game.dbGameId) {
+          updatePlayerTrickCount(game.dbGameId, game.currentRound, game.players[winnerIndex].id, game.players[winnerIndex].tricks).catch((err: Error) => {
+            console.error('[DB TRICK COUNT ERROR] Failed to update trick count:', err);
+          });
+        }        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
         
         // Update GamePlayer record in DB
         if (game.dbGameId && game.players[winnerIndex]?.type === 'human') {
@@ -3585,7 +3591,13 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       // Update player trick counts
       if (game.players[winnerIndex]) {
         game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
-        console.log('[HUMAN TIMEOUT TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
+        
+        // Update database trick count
+        if (game.dbGameId) {
+          updatePlayerTrickCount(game.dbGameId, game.currentRound, game.players[winnerIndex].id, game.players[winnerIndex].tricks).catch((err: Error) => {
+            console.error('[DB TRICK COUNT ERROR] Failed to update trick count:', err);
+          });
+        }        console.log('[HUMAN TIMEOUT TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'to', game.players[winnerIndex]!.tricks);
       }
       
       // Log all player trick counts

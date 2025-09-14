@@ -26,6 +26,7 @@ import './config/passport';
 import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
 import { trickLogger } from './lib/trickLogger';
+import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from './lib/databaseScoring';
 
 // EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
 process.on('uncaughtException', (error) => {
@@ -1867,7 +1868,22 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       if (game.players[winnerIndex]) {
         const oldTrickCount = game.players[winnerIndex].tricks || 0;
         game.players[winnerIndex].tricks = oldTrickCount + 1;
-        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'from', oldTrickCount, 'to', game.players[winnerIndex].tricks);
+      
+      // Update database trick count
+      if (game.dbGameId) {
+        // Get the actual roundId from database
+        const round = await prisma.round.findFirst({
+          where: { gameId: game.dbGameId, roundNumber: game.currentRound }
+        });
+        if (!round) {
+          console.error('[DB TRICK COUNT ERROR] Round not found for game', game.dbGameId, 'round', game.currentRound);
+          return;
+        }
+        const actualRoundId = round.id;
+        updatePlayerTrickCount(game.dbGameId, game.currentRound, game.players[winnerIndex].id, game.players[winnerIndex].tricks).catch((err: Error) => {
+          console.error('[DB TRICK COUNT ERROR] Failed to update trick count:', err);
+        });
+      }        console.log('[TRICK COUNT DEBUG] Updated trick count for player', winnerIndex, game.players[winnerIndex]?.username, 'from', oldTrickCount, 'to', game.players[winnerIndex].tricks);
         
         // CRITICAL: Validate trick count integrity
         const totalTricks = game.players.reduce((sum, p) => sum + (p?.tricks || 0), 0);
