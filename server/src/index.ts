@@ -1438,19 +1438,26 @@ io.on('connection', (socket: AuthenticatedSocket) => {
             }
           });
         }
-        // Upsert-like behavior: delete any existing for (roundId, playerId) then insert
-        await prisma.roundBid.deleteMany({
-          where: { roundId: roundRecord.id, playerId: game.players[playerIndex]!.id }
-        });
-        await prisma.roundBid.create({
-          data: {
+        // Use upsert to prevent duplicates with proper unique constraint
+        await prisma.roundBid.upsert({
+          where: {
+            roundId_playerId: {
+              roundId: roundRecord.id,
+              playerId: game.players[playerIndex]!.id
+            }
+          },
+          update: {
+            bid: finalBid,
+            isBlindNil: finalBid === -1
+          },
+          create: {
             id: `bid_${roundRecord.id}_${playerIndex}_${Date.now()}`,
             roundId: roundRecord.id,
             playerId: game.players[playerIndex]!.id,
-            bid: finalBid
+            bid: finalBid,
+            isBlindNil: finalBid === -1
           }
-        });
-      } catch (err) {
+        });      } catch (err) {
         console.error('Failed to log bid to RoundBid table:', err);
       }
     }

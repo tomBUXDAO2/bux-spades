@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer, Card, Suit, Rank, BiddingOption, GamePlayOption } from '../types/game';
 import { io } from '../index';
 import { games } from '../gamesStore';
-import { startSeatReplacement, startTurnTimeout } from "../index";
+import { startSeatReplacement } from "../index";
 import { playAgainTimers, playAgainResponses, originalPlayers } from '../index';
 import type { AuthenticatedSocket } from '../index';
 import { trickLogger } from '../lib/trickLogger';
@@ -13,7 +13,7 @@ import { validate } from '../middleware/validate.middleware';
 import { z } from 'zod';
 import { rateLimit } from '../middleware/rateLimit.middleware';
 
-
+import { calculateAndStoreGameScore, checkGameCompletion } from '../lib/databaseScoring';
 const router = Router();
 
 // Helper function to filter out null values
@@ -91,7 +91,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
         if (!user) {
           // Create user with Discord ID
           user = await prisma.user.create({
-      data: {
+            data: {
               id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               username: playerData.username,
               // Don't set a placeholder email; will be filled on first OAuth login
@@ -104,7 +104,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           
           // Create user stats
           await prisma.userStats.create({
-      data: {
+            data: {
               id: `stats_${user.id}_${Date.now()}`,
               userId: user.id,
               updatedAt: new Date()
@@ -194,7 +194,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
           });
           
           const dbGame = await prisma.game.create({
-      data: {
+            data: {
               id: newGame.id, // Use the game's ID as the database ID
               creatorId: newGame.players.find(p => p && p.type === 'human')?.id || 'unknown',
               gameMode: newGame.gameMode,
@@ -222,7 +222,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
             if (player) {
               try {
                 await prisma.gamePlayer.create({
-      data: {
+                  data: {
                     id: `player_${newGame.dbGameId}_${i}_${Date.now()}`,
                     gameId: newGame.dbGameId,
                     userId: player.id,
@@ -324,12 +324,6 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
     return res.status(400).json({ error: 'Player already joined' });
   }
 
-  // CRITICAL FIX: Prevent player from being in multiple games
-  const playerInOtherGame = games.find(g => g.id !== game.id && g.players.some(p => p && p.id === playerId));
-  if (playerInOtherGame) {
-    console.log(`[MULTIPLE GAME PREVENTION] Player ${playerId} is already in game ${playerInOtherGame.id}, cannot join game ${game.id}`);
-    return res.status(400).json({ error: "You are already in another game. Please leave that game first." });
-  }
   // Check coin balance before seating
   try {
     const user = await prisma.user.findUnique({ where: { id: playerId } });
@@ -437,7 +431,7 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 10_000, max: 10
       });
       
       await prisma.gamePlayer.create({
-      data: {
+        data: {
           id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
           gameId: game.dbGameId,
           userId: player.id,
@@ -708,7 +702,7 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   // Only log rated games (4 human players, no bots)
   const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
   const isRated = humanPlayers === 4;
-  game.rated = isRated;  
+  
   if (isRated && !game.dbGameId) {
     console.log('[GAME START DEBUG] Creating rated game in database:', {
       id: game.id,
@@ -739,8 +733,7 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
         }
         // Debit all
         for (const p of humanPlayers) {
-          await tx.user.update({ where: { id: p.id },
-      data: { coins: { decrement: game.buyIn } } });
+          await tx.user.update({ where: { id: p.id }, data: { coins: { decrement: game.buyIn } } });
         }
       });
     } catch (err) {
@@ -1409,7 +1402,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
           // Start timeout for human players in playing phase using the main timeout system
           console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', firstPlayer.username);
           // Import the timeout function from index.ts
-          
+          const { startTurnTimeout } = require('../index');
           startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
         }
         return;
@@ -1429,7 +1422,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
           // Start timeout for human players using the main timeout system
           console.log('[TIMEOUT DEBUG] Starting timeout for human player in bot bidding logic:', game.players[next].username);
           // Import the timeout function from index.ts
-          
+          const { startTurnTimeout } = require('../index');
           startTurnTimeout(game, next, 'bidding');
         }
       }
@@ -2122,7 +2115,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
           
           // Emit clear trick event to allow clients to clear any residual UI
           io.to(game.id).emit('clear_trick');
-        }, 1200); // Keep animation delay consistent
+        }, 1000); // 1 second delay to match frontend animation
       // If all tricks played, move to hand summary/scoring
       console.log('[HAND COMPLETION CHECK] trickNumber:', game.play.trickNumber, 'checking if === 13');
       console.log('[HAND COMPLETION DEBUG] Current trick cards:', game.play.currentTrick.length, 'cards:', game.play.currentTrick);
@@ -2173,7 +2166,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
               const winningPlayerIndex = (game.playerScores || []).indexOf(maxScore);
                           prisma.game.update({
               where: { id: game.dbGameId },
-      data: {
+              data: {
                 status: 'PLAYING',
                 // winner: winningPlayerIndex, // Field doesn't exist in schema
                 // winner: winningPlayerIndex, // Field doesn't exist in schema
@@ -2220,88 +2213,109 @@ export function botPlayCard(game: Game, seatIndex: number) {
             console.error('Failed to update hand stats:', err);
           });
         } else {
-          // Partners mode scoring
-        const handSummary = calculatePartnersHandScore(game);
-        
-        // Validate that we have exactly 13 tricks before proceeding
-        const totalTricks = handSummary.tricksPerPlayer.reduce((a, b) => a + b, 0);
-        if (totalTricks !== 13) {
-          console.error(`[HAND COMPLETION ERROR] Invalid trick count: ${totalTricks}. Expected 13 tricks total. Cannot complete hand.`);
-          console.error('[HAND COMPLETION ERROR] Tricks per player:', handSummary.tricksPerPlayer);
-          console.error('[HAND COMPLETION ERROR] Game play tricks:', game.play.tricks);
+          // Partners mode scoring - USE DATABASE AS SOURCE OF TRUTH
+          console.log('[HAND COMPLETION] Using database scoring for partners mode');
           
-          // Force a game update to show current state but don't complete the hand
-          io.to(game.id).emit('game_update', enrichGameForClient(game));
-          return;
-        }
-        
-        // Update running totals
-        game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
-        game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
-        
-        // Add new bags to running total
-        const oldTeam1Bags = game.team1Bags || 0;
-        const oldTeam2Bags = game.team2Bags || 0;
-        game.team1Bags = oldTeam1Bags + handSummary.team1Bags;
-        game.team2Bags = oldTeam2Bags + handSummary.team2Bags;
-        
-        console.log('[BAG DEBUG] Before penalty - Team 1 bags:', oldTeam1Bags, '+', handSummary.team1Bags, '=', game.team1Bags);
-        console.log('[BAG DEBUG] Before penalty - Team 2 bags:', oldTeam2Bags, '+', handSummary.team2Bags, '=', game.team2Bags);
-        
-        // Apply bag penalty to running total if needed
-        if (game.team1Bags >= 10) {
-          game.team1TotalScore -= 100; // -100 penalty for reaching 10+ bags
-          game.team1Bags -= 10; // Remove exactly 10 bags
-          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
-        }
-        if (game.team2Bags >= 10) {
-          game.team2TotalScore -= 100; // -100 penalty for reaching 10+ bags
-          game.team2Bags -= 10; // Remove exactly 10 bags
-          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
-        }
-        
-                  // Set game status to indicate hand is completed
-          game.status = 'PLAYING';
-          (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-          
-          // NEW: Log completed hand to database
-          trickLogger.logCompletedHand(game).catch((err: Error) => {
-            console.error('Failed to log completed hand to database:', err);
-          });
-          
-          // Persist cumulative scores to DB after each hand (partners)
-          if (game.dbGameId) {
+          // Create async helper function for database scoring
+          const handlePartnersHandCompletion = async () => {
             try {
-              prisma.game.update({
-                where: { id: game.dbGameId },
-      data: {
-                  // Keep status PLAYING between hands
-                  status: 'PLAYING',
-                  // Store cumulative totals into auxiliary fields
-                  // Using finalScore as latest leading score allows recovery
-                  // finalScore: Math.max(game.team1TotalScore || 0, game.team2TotalScore || 0), // Field doesn't exist in schema
-                  // winner field removed from schema - using GameResult table instead
-                }
-              }).catch((e) => console.error('[ROUND PERSIST] prisma update failed:', e));
-            } catch (e) {
-              console.error('[ROUND PERSIST] Failed to persist cumulative round scores:', e);
+              // Calculate and store scores in database
+              const gameScore = await calculateAndStoreGameScore(game.dbGameId, game.currentRound);
+              console.log('[DATABASE SCORING] Calculated and stored game score:', gameScore);
+              
+              // Get the latest database scores for this game
+              const latestScore = await prisma.gameScore.findFirst({
+                where: { gameId: game.dbGameId },
+                orderBy: { roundNumber: 'desc' }
+              });
+              
+              if (!latestScore) {
+                throw new Error('No game score found in database');
+              }
+              
+              // Update in-memory game state with database scores
+              game.team1TotalScore = latestScore.team1RunningTotal;
+              game.team2TotalScore = latestScore.team2RunningTotal;
+              game.team1Bags = latestScore.team1Bags;
+              game.team2Bags = latestScore.team2Bags;
+              
+              console.log('[DATABASE SCORING] Updated game state with database scores:', {
+                team1TotalScore: game.team1TotalScore,
+                team2TotalScore: game.team2TotalScore,
+                team1Bags: game.team1Bags,
+                team2Bags: game.team2Bags
+              });
+              
+              // Create hand summary data for frontend using database scores
+              const handSummary = {
+                team1Score: latestScore.team1Score, // Current round score
+                team2Score: latestScore.team2Score, // Current round score
+                team1Bags: latestScore.team1Bags - (game.team1Bags || 0) + (latestScore.team1Bags || 0), // Bags from this round
+                team2Bags: latestScore.team2Bags - (game.team2Bags || 0) + (latestScore.team2Bags || 0), // Bags from this round
+                tricksPerPlayer: game.players.map(p => p?.tricks || 0), // Current trick counts
+                playerScores: [0, 0, 0, 0], // Not used in partners mode
+                playerBags: [0, 0, 0, 0]   // Not used in partners mode
+              };
+              
+              // Set game status to indicate hand is completed
+              game.status = 'PLAYING';
+              (game as any).handCompletedTime = Date.now();
+              
+              // Log completed hand to database
+              trickLogger.logCompletedHand(game).catch((err: Error) => {
+                console.error('Failed to log completed hand to database:', err);
+              });
+              
+              console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with DATABASE scores:', {
+                ...handSummary,
+                team1TotalScore: game.team1TotalScore,
+                team2TotalScore: game.team2TotalScore,
+                team1Bags: game.team1Bags,
+                team2Bags: game.team2Bags,
+              });
+              
+              io.to(game.id).emit('hand_completed', {
+                ...handSummary,
+                team1TotalScore: game.team1TotalScore,
+                team2TotalScore: game.team2TotalScore,
+                team1Bags: game.team1Bags,
+                team2Bags: game.team2Bags,
+              });
+              
+            } catch (dbError) {
+              console.error('[DATABASE SCORING ERROR] Failed to calculate database scores:', dbError);
+              // Fallback to old in-memory scoring if database fails
+              console.log('[FALLBACK] Using in-memory scoring as fallback');
+              const handSummary = calculatePartnersHandScore(game);
+              
+              // Update running totals (fallback)
+              game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
+              game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
+              game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
+              game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
+              
+              // Apply bag penalty (fallback)
+              if (game.team1Bags >= 10) {
+                game.team1TotalScore -= 100;
+                game.team1Bags -= 10;
+              }
+              if (game.team2Bags >= 10) {
+                game.team2TotalScore -= 100;
+                game.team2Bags -= 10;
+              }
+              
+              io.to(game.id).emit('hand_completed', {
+                ...handSummary,
+                team1TotalScore: game.team1TotalScore,
+                team2TotalScore: game.team2TotalScore,
+                team1Bags: game.team1Bags,
+                team2Bags: game.team2Bags,
+              });
             }
-          }
+          };
           
-          console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with data:', {
-          ...handSummary,
-          team1TotalScore: game.team1TotalScore,
-          team2TotalScore: game.team2TotalScore,
-          team1Bags: game.team1Bags,
-          team2Bags: game.team2Bags,
-        });
-        io.to(game.id).emit('hand_completed', {
-          ...handSummary,
-          team1TotalScore: game.team1TotalScore,
-          team2TotalScore: game.team2TotalScore,
-          team1Bags: game.team1Bags,
-          team2Bags: game.team2Bags,
-        });
+          // Call the async helper function
+          handlePartnersHandCompletion();
         
         // Update stats for this hand
         // DISABLED: updateHandStats(game).catch(err => {
@@ -2520,7 +2534,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
               game.players[winnerIndex] && game.players[winnerIndex]!.type === 'bot') {
             botPlayCard(game, winnerIndex);
           }
-        }, 1200); // 1.2 second delay to allow trick completion animation
+        }, 100); // Reduced delay for faster gameplay
       }
       
       // Failsafe: If all hands are empty but we haven't reached 13 tricks, force completion
@@ -2594,7 +2608,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        
+        const { startTurnTimeout } = require('../index');
         startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
@@ -2891,7 +2905,7 @@ async function updateHandStats(game: Game) {
       // Update stats for this hand
       await prisma.userStats.update({
         where: { userId },
-      data: {
+        data: {
           totalBags: newTotalBags,
           bagsPerGame: newBagsPerGame,
           nilsBid: { increment: nilBidIncrement },
@@ -2971,8 +2985,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     }
     
     // Create game record in database with new fields
-    const dbGame = await prisma.game.update({
-      where: { id: game.dbGameId },
+    const dbGame = await (prisma.game.create as any)({
       data: {
         creatorId: game.players[0]?.id || 'unknown', // Use first player as creator
         status: 'FINISHED',
@@ -2997,7 +3010,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         cancelled: false,
         finalScore,
         winner,
-        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === '4 OR NIL' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : bidType === 'SUICIDE' || bidType === 'BID 3' || bidType === 'BID HEARTS' || bidType === 'CRAZY ACES' ? 'GIMMICK' : 'REGULAR',
         league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true).map(key => {
           if (key === 'screamer') return 'SCREAMER';
@@ -3038,8 +3051,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
       }
       
       await (prisma.gamePlayer.create as any)({
-        where: { id: game.dbGameId },
-      data: {
+        data: {
           gameId: dbGame.id,
           userId,
           position: i,
@@ -3084,7 +3096,6 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
     };
     
     await (prisma.gameResult.create as any)({
-      where: { id: game.dbGameId },
       data: {
         gameId: dbGame.id,
         winner,
@@ -3244,7 +3255,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				try {
 					await prisma.userStats.update({
 						where: { userId },
-      data: {
+						data: {
 							gamesPlayed: { increment: 1 },
 							gamesWon: { increment: isWinner ? 1 : 0 },
 							totalBags: { increment: bags }
@@ -3254,15 +3265,14 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 					try {
 						const s = await prisma.userStats.findUnique({ where: { userId }, select: { totalBags: true, gamesPlayed: true } });
 						if (s && (s.gamesPlayed || 0) > 0) {
-							await prisma.userStats.update({ where: { userId },
-      data: { bagsPerGame: (s.totalBags || 0) / (s.gamesPlayed || 1) } });
+							await prisma.userStats.update({ where: { userId }, data: { bagsPerGame: (s.totalBags || 0) / (s.gamesPlayed || 1) } });
 						}
 					} catch (bpgErr) {
 						console.warn('[STATS] Failed to recompute bagsPerGame for', userId, bpgErr);
 					}
 				} catch (error) {
 					await prisma.userStats.create({
-      data: {
+						data: {
 							userId,
 							gamesPlayed: 1,
 							gamesWon: isWinner ? 1 : 0,
@@ -3292,7 +3302,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 						if (nilsBidInc > 0) {
 							await prisma.userStats.update({
 								where: { userId },
-      data: {
+								data: {
 									nilsBid: { increment: nilsBidInc },
 									nilsMade: { increment: nilsMadeInc }
 								}
@@ -3306,29 +3316,54 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 				
 				// Handle coin prizes (buy-in was already deducted at game start)
 				const buyIn = game.buyIn || 0;
-				if (buyIn > 0 && isWinner && game.rated) {
+				if (buyIn > 0) {
 					let prizeAmount = 0;
-					const totalPot = buyIn * 4;
-					const rake = Math.floor(totalPot * 0.1); // 10% rake
-					const prizePool = totalPot - rake; // 90% pot
+					
 					if (game.gameMode === 'SOLO') {
-						const secondPlacePrize = buyIn;
-						prizeAmount = prizePool - secondPlacePrize;
+						// Solo mode: 1st place gets 2.6x buy-in, 2nd place gets buy-in back
+						const playerScores = game.playerScores || [0, 0, 0, 0];
+						
+						// Create array of players with their scores and positions
+						const playersWithScores = playerScores.map((score, index) => ({ score, position: index }));
+						
+						// Sort by score (highest first)
+						playersWithScores.sort((a, b) => b.score - a.score);
+						
+						// Find this player's rank
+						const playerRank = playersWithScores.findIndex(p => p.position === gp.position) + 1;
+						
+						if (playerRank === 1) {
+							// 1st place gets 2.6x buy-in
+							prizeAmount = Math.floor(buyIn * 2.6);
+						} else if (playerRank === 2) {
+							// 2nd place gets buy-in back
+							prizeAmount = buyIn;
+						}
+						// 3rd and 4th place get nothing
+						
+						console.log(`[SOLO PAYOUT] Player ${gp.position} (${userId}) ranked ${playerRank}, prize: ${prizeAmount}`);
 					} else {
-						prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
+						// Partners mode: only winners get prizes
+						if (isWinner) {
+							const totalPot = buyIn * 4;
+							const rake = Math.floor(totalPot * 0.1); // 10% rake
+							const prizePool = totalPot - rake; // 90% pot
+							prizeAmount = Math.floor(prizePool / 2); // Each winner gets 45% of pot
+						}
 					}
-					try {
-						const currentUser = await prisma.user.findUnique({ where: { id: userId } });
-						if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
-						const newBalance = currentUser.coins + prizeAmount;
-						await prisma.user.update({ where: { id: userId },
-      data: { coins: newBalance } });
-						console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to winner ${userId}. New balance: ${newBalance}`);
-					} catch (coinError) {
-						console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
+					
+					if (prizeAmount > 0) {
+						try {
+							const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+							if (!currentUser) { console.error(`[COIN ERROR] User ${userId} not found`); continue; }
+							const newBalance = currentUser.coins + prizeAmount;
+							await prisma.user.update({ where: { id: userId }, data: { coins: newBalance } });
+							console.log(`[COIN SUCCESS] Awarded ${prizeAmount} coins to player ${userId}. New balance: ${newBalance}`);
+						} catch (coinError) {
+							console.error(`[COIN ERROR] Failed to award coins to ${userId}:`, coinError);
+						}
 					}
 				}
-
 				console.log(`Updated stats for user ${userId}: gamesPlayed+1, gamesWon+${isWinner ? 1 : 0}, bags+${bags}`);
 			} catch (err) {
 				console.error('Failed to update stats/coins for user', userId, err);
@@ -3346,7 +3381,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 		try {
 			await prisma.game.update({
 				where: { id: game.dbGameId },
-      data: {
+				data: {
 					gameState: { ...((game as any).gameState || {}), statsApplied: true } as any
 				}
 			});
@@ -3369,7 +3404,7 @@ export async function updateStatsAndCoins(game: Game, winningTeamOrPlayer: numbe
 // Helper to enrich game object for client
 export function enrichGameForClient(game: Game, userId?: string): Game {
   if (!game) return game;
-  const hands = game.hands || [];
+  const hands = Array.isArray(game.hands) ? game.hands : [];
   const dealerIndex = game.dealerIndex;
 
   // Patch: Always set top-level currentPlayer for frontend
@@ -3387,7 +3422,7 @@ export function enrichGameForClient(game: Game, userId?: string): Game {
     playerBags: game.playerBags,     // Added for Solo mode
     winningPlayer: game.winningPlayer, // Added for Solo mode
     forcedBid: game.forcedBid, // Added for Suicide games
-    players: (game.players || []).map((p: GamePlayer | null, i: number) => {
+    hands: hands.map((hand, i) => hand || []),    players: (game.players || []).map((p: GamePlayer | null, i: number) => {
       if (!p) return null;
       return {
         ...p,
@@ -3579,7 +3614,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         
         // Emit clear trick event to allow clients to clear any residual UI
         io.to(game.id).emit('clear_trick');
-      }, 1200);
+      }, 1000); // 1 second delay to match frontend animation
       
       // If the next player is a bot, trigger their move with a delay
       const nextPlayer = game.players[winnerIndex];
@@ -3593,7 +3628,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        
+        const { startTurnTimeout } = require('../index');
         startTurnTimeout(game, winnerIndex, 'playing');
       }
     } else {
@@ -3627,7 +3662,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
         // Start timeout for human players in playing phase using the main timeout system
         console.log('[HUMAN TIMEOUT TIMEOUT DEBUG] Starting timeout for human player in playing phase:', nextPlayer?.username);
         // Import the timeout function from index.ts
-        
+        const { startTurnTimeout } = require('../index');
         startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
@@ -3666,8 +3701,7 @@ export async function logGameStart(game: Game) {
     }
     
     // Create initial game record in database
-    const dbGame = await prisma.game.update({
-      where: { id: game.dbGameId },
+    const dbGame = await (prisma.game.create as any)({
       data: {
         creatorId,
         status: 'PLAYING', // Game is now in progress
@@ -3677,6 +3711,7 @@ export async function logGameStart(game: Game) {
         minPoints: game.rules?.minPoints || 0,
         maxPoints: game.rules?.maxPoints || 0,
         buyIn: game.buyIn || 0,
+        solo,
         whiz,
         mirror,
         gimmick,
@@ -3714,8 +3749,7 @@ export async function logGameStart(game: Game) {
       }
       
       await (prisma.gamePlayer.create as any)({
-        where: { id: game.dbGameId },
-      data: {
+        data: {
           gameId: dbGame.id,
           userId, // Use 'bot' as placeholder for bot players
           position: i,
@@ -3760,7 +3794,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
     if (game.dbGameId) {
       await (prisma.game.update as any)({
         where: { id: game.dbGameId },
-      data: {
+        data: {
           status: 'FINISHED',
           completed: true,
           finalScore: Math.max(team1Score, team2Score),
@@ -3770,7 +3804,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
       
       // Create GameResult record
       await (prisma.gameResult.create as any)({
-      data: {
+        data: {
           gameId: game.dbGameId,
           winner: winningTeam,
           finalScore: Math.max(team1Score, team2Score),
@@ -3801,7 +3835,7 @@ router.post('/:id/complete', requireAuth, async (req, res) => {
         
         await (prisma.gamePlayer.update as any)({
           where: { id: player.id },
-      data: {
+          data: {
             bid: playerBid,
             bags: playerBags,
             points: isWinner ? Math.max(team1Score, team2Score) : Math.min(team1Score, team2Score),
