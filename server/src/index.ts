@@ -279,6 +279,28 @@ io.on('connection', (socket: AuthenticatedSocket) => {
   });
 
   // Disconnect handling
+
+  // Lobby chat handler
+  socket.on("lobby_chat_message", (message) => {
+    if (!socket.isAuthenticated || !socket.userId) {
+      socket.emit("error", { message: "Not authenticated" });
+      return;
+    }
+
+    if (!message || !message.message) {
+      return;
+    }
+
+    const enrichedMessage = {
+      ...message,
+      id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: message.timestamp || Date.now(),
+      userName: message.userName || socket.auth?.user?.username || "Unknown"
+    };
+
+    console.log("Broadcasting lobby message:", enrichedMessage);
+    io.emit("lobby_chat_message", enrichedMessage);
+  });
   socket.on('disconnect', (reason) => {
     console.log('[DISCONNECT] User disconnected:', {
       userId: socket.userId,
