@@ -19,7 +19,7 @@ import { GameErrorHandler } from './lib/gameErrorHandler';
 import type { Game, GamePlayer, Card, Suit, Rank } from './types/game';
 import authRoutes from './routes/auth.routes';
 import discordRoutes from './routes/discord.routes';
-import gamesRoutes from './routes/games.routes';
+import gamesRoutes, { enrichGameForClient } from './routes/games.routes';
 import usersRoutes from './routes/users.routes';
 import socialRoutes from './routes/social.routes';
 import './config/passport';
@@ -187,90 +187,6 @@ io.use(async (socket: Socket, next) => {
 });
 
 // Socket.IO connection handling
-io.on('connection', (socket: AuthenticatedSocket) => {
-  console.log('[CONNECTION] New socket connection:', {
-    socketId: socket.id,
-    userId: socket.userId,
-    isAuthenticated: socket.isAuthenticated,
-    auth: socket.auth
-  });
-
-  if (socket.userId) {
-    // Check if there's an existing socket for this user and disconnect it
-    const existingSocket = authenticatedSockets.get(socket.userId);
-    if (existingSocket && existingSocket.id !== socket.id) {
-      console.log(`[CONNECTION] Disconnecting existing socket for user ${socket.userId}:`, {
-        oldSocketId: existingSocket.id,
-        newSocketId: socket.id
-      });
-      existingSocket.emit('session_invalidated', {
-        reason: 'new_connection',
-        message: 'You have connected from another location'
-      });
-      existingSocket.disconnect();
-    }
-    
-    // Create new session for this user
-    const sessionId = createUserSession(socket.userId);
-    
-    authenticatedSockets.set(socket.userId, socket);
-    onlineUsers.add(socket.userId);
-    io.emit('online_users', Array.from(onlineUsers));
-    
-    console.log('User connected:', {
-      userId: socket.userId,
-      sessionId,
-      socketId: socket.id,
-      onlineUsers: Array.from(onlineUsers)
-    });
-    
-    socket.emit('authenticated', { 
-      success: true, 
-      userId: socket.userId,
-      sessionId,
-      games: Array.from(socket.rooms).filter(room => room !== socket.id)
-    });
-
-    // Auto-join any rooms for games this user is already part of
-    games.forEach(game => {
-      const isPlayerInGame = game.players.some(player => player && player.id === socket.userId);
-      if (isPlayerInGame) {
-        socket.join(game.id);
-        console.log(`[CONNECTION] Auto-joined game room ${game.id} for user ${socket.userId}`);
-      }
-    });
-  }
-
-  // Socket event handlers using our modular functions
-  socket.on('join_game', (data) => handleJoinGame(socket, data));
-  socket.on('make_bid', (data) => handleMakeBid(socket, data));
-  socket.on('play_card', (data) => handlePlayCard(socket, data));
-
-  // Chat handlers using modular functions
-  socket.on('chat_message', async ({ gameId, message }) => {
-    await handleGameChatMessage(socket, gameId, message);
-  });
-
-  // Disconnect handling
-
-  // Lobby chat handler
-  socket.on("lobby_chat_message", async (message) => {
-    await handleLobbyChatMessage(socket, message);
-  });
-  socket.on('disconnect', (reason) => {
-    console.log('[DISCONNECT] User disconnected:', {
-      userId: socket.userId,
-      socketId: socket.id,
-      reason
-    });
-
-    if (socket.userId) {
-      authenticatedSockets.delete(socket.userId);
-      onlineUsers.delete(socket.userId);
-      io.emit('online_users', Array.from(onlineUsers));
-    }
-  });
-});
 
 // Helper functions
 function createUserSession(userId: string): string {
@@ -347,3 +263,162 @@ function getValidatedGames(): Game[] {
   const { validGames } = GameValidator.validateAllGames(games);
   return validGames;
 }
+
+// Bot invitation functionality
+function addBotToSeat(game: Game, seatIndex: number) {
+  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
+  
+  // Check if seat is empty
+  if (game.players[seatIndex] !== null) {
+    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
+    return;
+  }
+  
+  // Create bot
+  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const botNumber = Math.floor(Math.random() * 1000);
+  
+  game.players[seatIndex] = {
+    id: botId,
+    username: `Bot ${botNumber}`,
+    avatar: '/bot-avatar.jpg',
+    type: 'bot',
+    position: seatIndex,
+    team: seatIndex % 2,
+    bid: undefined,
+    tricks: 0,
+    points: 0,
+
+  };
+  
+  // Set isBotGame flag
+  game.isBotGame = game.players.some(p => p && p.type === 'bot');
+  
+  // Send system message via chat
+  const systemMessage = {
+    id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: 'system',
+    userName: 'System',
+    message: `A bot was invited to seat ${seatIndex + 1}.`,
+    timestamp: Date.now(),
+    isGameMessage: true
+  };
+  
+  // Emit chat message
+  io.to(game.id).emit('chat_message', { gameId: game.id, message: systemMessage });
+  
+  // Update all clients
+  const enrichedGame = enrichGameForClient(game);
+  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
+    gameId: game.id,
+    players: enrichedGame.players.map((p: any, i: number) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`)
+  });
+  io.to(game.id).emit('game_update', enrichedGame);
+  
+  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
+}
+
+// Socket event handlers
+
+// Socket connection handler
+io.on('connection', (socket: AuthenticatedSocket) => {
+  console.log('[CONNECTION] New socket connection:', {
+    socketId: socket.id,
+    userId: socket.userId,
+    isAuthenticated: socket.isAuthenticated,
+    auth: socket.auth
+  });
+
+  if (socket.userId) {
+    // Check if there's an existing socket for this user and disconnect it
+    const existingSocket = authenticatedSockets.get(socket.userId);
+    if (existingSocket && existingSocket.id !== socket.id) {
+      console.log(`[CONNECTION] Disconnecting existing socket for user ${socket.userId}:`, {
+        oldSocketId: existingSocket.id,
+        newSocketId: socket.id
+      });
+      existingSocket.emit('session_invalidated', {
+        reason: 'new_connection',
+        message: 'You have connected from another location'
+      });
+      existingSocket.disconnect();
+    }
+    
+    // Create new session for this user
+    const sessionId = createUserSession(socket.userId);
+    
+    authenticatedSockets.set(socket.userId, socket);
+    onlineUsers.add(socket.userId);
+    io.emit('online_users', Array.from(onlineUsers));
+    
+    console.log('User connected:', {
+      userId: socket.userId,
+      sessionId,
+      socketId: socket.id,
+      onlineUsers: Array.from(onlineUsers)
+    });
+
+    // Auto-join user to any games they're already in
+    games.forEach(game => {
+      const isPlayerInGame = game.players.some(player => player && player.id === socket.userId);
+      if (isPlayerInGame) {
+        socket.join(game.id);
+        console.log(`[CONNECTION] Auto-joined game room ${game.id} for user ${socket.userId}`);
+      }
+    });
+  }
+
+  // Socket event handlers
+  socket.on('join_game', (data) => handleJoinGame(socket, data));
+  socket.on('make_bid', (data) => handleMakeBid(socket, data));
+  socket.on('play_card', (data) => handlePlayCard(socket, data));
+
+  // Chat handlers
+  socket.on('chat_message', async ({ gameId, message }) => {
+    await handleGameChatMessage(socket, gameId, message);
+  });
+
+  socket.on("lobby_chat_message", async (message) => {
+    await handleLobbyChatMessage(socket, message);
+  });
+
+  // Fill seat with bot event (manual replacement)
+  socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
+    console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
+    
+    if (!socket.isAuthenticated || !socket.userId) {
+      console.log('Unauthorized fill_seat_with_bot attempt');
+      socket.emit('error', { message: 'Not authorized' });
+      return;
+    }
+    
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    // Check if seat is empty
+    if (game.players[seatIndex] !== null) {
+      socket.emit('error', { message: 'Seat is not empty' });
+      return;
+    }
+    
+    // Fill the seat with a bot (manual invitation)
+    addBotToSeat(game, seatIndex);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('[DISCONNECT] User disconnected:', {
+      userId: socket.userId,
+      socketId: socket.id,
+      reason
+    });
+
+    if (socket.userId) {
+      authenticatedSockets.delete(socket.userId);
+      onlineUsers.delete(socket.userId);
+      io.emit('online_users', Array.from(onlineUsers));
+    }
+  });
+});
