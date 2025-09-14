@@ -212,7 +212,7 @@ export default function TablePage() {
         }
         
         // ADDITIONAL: Auto-join any user who is assigned to a seat in a WAITING game (fallback for non-league games)
-        if (isUserInGame && !isSpectator && data.status === 'WAITING') {
+        if (!isUserInGame && !isSpectator && data.status === 'WAITING') {
           console.log('[AUTO-JOIN FALLBACK] User is assigned to seat in WAITING game, auto-joining...');
           try {
             const joinResponse = await api.post(`/api/games/${gameId}/join`, {

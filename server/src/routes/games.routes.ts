@@ -308,6 +308,16 @@ router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 5_000, max: 10 
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Check if user is already in the game
+    const existingPlayerIndex = game.players.findIndex(p => p && p.id === userId);
+    if (existingPlayerIndex !== -1) {
+      console.log(`[JOIN GAME] User ${userId} is already in game at seat ${existingPlayerIndex}`);
+      return res.json({
+        success: true,
+        game: enrichGameForClient(game),
+        message: "Already in game"
+      });
+    }
     // Find first available seat
     const availableSeat = game.players.findIndex(p => p === null);
     if (availableSeat === -1) {
