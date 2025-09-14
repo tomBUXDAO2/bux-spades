@@ -933,16 +933,6 @@ export default function GameTable({
   
   // Use gameState for all game data
   const [gameState, setGameState] = useState(game);
-  // Ensure gameState has required properties
-  const safeGameState = {
-    ...gameState,
-    players: gameState.players || [],
-    hands: gameState.hands || []
-  };
-  // Safety check to ensure gameState.players is always an array
-  if (!gameState.players) {
-    gameState.players = [];
-  }
   
   // Add debug logs for hand mapping
   const currentPlayerId = user?.id;
@@ -2649,16 +2639,6 @@ export default function GameTable({
   };
 
   // After: const [gameState, setGameState] = useState(game);
-  // Ensure gameState has required properties
-  const safeGameState = {
-    ...gameState,
-    players: gameState.players || [],
-    hands: gameState.hands || []
-  };
-  // Safety check to ensure gameState.players is always an array
-  if (!gameState.players) {
-    gameState.players = [];
-  }
   useEffect(() => {
     // console.log('[DEBUG] GameTable received new game prop:', game);
     setGameState(game);
