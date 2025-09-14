@@ -2665,7 +2665,12 @@ io.on('connection', (socket: AuthenticatedSocket) => {
     // Reset game state for new hand
     game.status = 'BIDDING';
     game.hands = dealCards(game.players, newDealerIndex);
-    game.bidding = {
+    // Assign hands to individual players
+    game.hands.forEach((hand, index) => {
+      if (game.players[index]) {
+        game.players[index]!.hand = hand;
+      }
+    });    game.bidding = {
       currentBidderIndex: (newDealerIndex + 1) % 4,
       currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
       bids: [null, null, null, null],

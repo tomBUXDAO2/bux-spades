@@ -748,7 +748,12 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
   const dealerIndex = assignDealer(game.players, game.dealerIndex);
   game.dealerIndex = dealerIndex;
   const hands = dealCards(game.players, dealerIndex);
-  game.hands = hands;
+  // Assign hands to individual players
+  hands.forEach((hand, index) => {
+    if (game.players[index]) {
+      game.players[index]!.hand = hand;
+    }
+  });  game.hands = hands;
   
   // --- Bidding phase state ---
   const firstBidderIndex = (dealerIndex + 1) % 4;
