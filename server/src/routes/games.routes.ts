@@ -717,7 +717,7 @@ router.post('/:id/start', rateLimit({ key: 'start_game', windowMs: 10_000, max: 
     console.log('[GAME START DEBUG] Unrated game (has bots) - not logging to database. Human players:', humanPlayers);
   }
   
-  if (!game.isBotGame) {
+  if (false) { // DISABLED: Coins deducted at game completion
     // Debit buy-in from each human player's coin balance
     try {
       await prisma.$transaction(async (tx) => {

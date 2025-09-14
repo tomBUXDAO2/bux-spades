@@ -1113,7 +1113,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
       }
       // Only deduct coins if all 4 players are human
       const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
-      if (allHuman) {
+      if (false) { // DISABLED: Coins deducted at game completion
         try {
           for (const player of game.players) {
             if (player && player.type === 'human') {
