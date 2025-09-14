@@ -1,5 +1,6 @@
 import { Socket } from 'socket.io';
 import type { AuthenticatedSocket } from '../../index';
+import { io } from '../../index';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -31,6 +32,7 @@ export async function handleGameChatMessage(
   gameId: string,
   message: any
 ): Promise<void> {
+  console.log('[CHAT DEBUG] handleGameChatMessage called with:', { gameId, message });
   if (!socket.isAuthenticated || !socket.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     return;
@@ -52,7 +54,7 @@ export async function handleGameChatMessage(
       };
 
       // Broadcast system message to game room
-      socket.to(gameId).emit('chat_message', { gameId, message: systemMessage });
+      io.to(gameId).emit('chat_message', { gameId, message: systemMessage });
       return;
     }
 
@@ -79,7 +81,7 @@ export async function handleGameChatMessage(
     };
 
     // Broadcast user message to game room
-    socket.to(gameId).emit('chat_message', { gameId, message: chatMessage });
+    io.to(gameId).emit('chat_message', { gameId, message: chatMessage });
   } catch (error) {
     console.error('Error handling game chat message:', error);
     socket.emit('error', { message: 'Failed to send message' });
@@ -93,6 +95,7 @@ export async function handleLobbyChatMessage(
   socket: AuthenticatedSocket,
   message: any
 ): Promise<void> {
+  console.log('[CHAT DEBUG] handleLobbyChatMessage called with:', { message });
   if (!socket.isAuthenticated || !socket.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     return;
@@ -126,7 +129,7 @@ export async function handleLobbyChatMessage(
     console.log("Broadcasting lobby message:", lobbyMessage);
     
     // Broadcast to all connected clients (lobby is global)
-    socket.broadcast.emit("lobby_chat_message", lobbyMessage);
+    io.emit("lobby_chat_message", lobbyMessage);
   } catch (error) {
     console.error('Error handling lobby chat message:', error);
     socket.emit('error', { message: 'Failed to send lobby message' });
