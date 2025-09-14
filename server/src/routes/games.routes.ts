@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { rateLimit } from '../middleware/rateLimit.middleware';
 
 import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from '../lib/databaseScoring';
-import { handleHandCompletion } from '../lib/handCompletion';
+import { handleHandCompletion, handleTrickCompletion } from '../lib/handCompletion';
 const router = Router();
 
 // Helper function to filter out null values
@@ -2063,7 +2063,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
     
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
-      console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
+      // Use shared trick completion function
+      handleTrickCompletion(game);      console.log('[BOT TRICK DEBUG] Determining winner for bot trick:', game.play.currentTrick);
       const winnerIndex = determineTrickWinner(game.play.currentTrick);
       console.log('[BOT TRICK DEBUG] Winner determined:', winnerIndex, 'Winner player:', game.players[winnerIndex]?.username);
       if (winnerIndex === undefined) return;

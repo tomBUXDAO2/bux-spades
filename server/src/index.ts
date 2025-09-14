@@ -27,7 +27,7 @@ import { enrichGameForClient } from './routes/games.routes';
 import { logGameStart } from './routes/games.routes';
 import { trickLogger } from './lib/trickLogger';
 import { updatePlayerTrickCount, calculateAndStoreGameScore, checkGameCompletion } from './lib/databaseScoring';
-import { handleHandCompletion } from './lib/handCompletion';
+import { handleHandCompletion, handleTrickCompletion } from './lib/handCompletion';
 
 // EMERGENCY GLOBAL ERROR HANDLER - Prevent games from being lost
 process.on('uncaughtException', (error) => {
@@ -1826,7 +1826,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
 
     // If trick is complete (4 cards)
     if (game.play.currentTrick.length === 4) {
-      // Determine winner of the trick
+      // Use shared trick completion function
+      handleTrickCompletion(game);      // Determine winner of the trick
       console.log('[TRICK DEBUG] Determining winner for trick:', game.play.currentTrick);
       console.log('[TRICK DEBUG] Current trick length:', game.play.currentTrick.length, 'trickNumber:', game.play.trickNumber);
       const winnerIndex = determineTrickWinner(game.play.currentTrick);

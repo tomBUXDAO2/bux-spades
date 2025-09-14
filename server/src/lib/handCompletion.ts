@@ -82,6 +82,112 @@ export async function handleHandCompletion(game: Game): Promise<void> {
   }
 }
 
+// TRICK COMPLETION FUNCTION - FIXES TRICK LEADER ASSIGNMENT
+export function handleTrickCompletion(game: Game): void {
+  try {
+    console.log('[TRICK COMPLETION] Starting trick completion for game:', game.id);
+    
+    if (!game.play || !game.play.currentTrick || game.play.currentTrick.length !== 4) {
+      console.log('[TRICK COMPLETION] Invalid trick state, skipping');
+      return;
+    }
+    
+    // Determine trick winner
+    const winnerIndex = determineTrickWinner(game.play.currentTrick);
+    console.log('[TRICK COMPLETION] Trick winner determined:', winnerIndex);
+    
+    // Award trick to winner
+    if (game.players[winnerIndex]) {
+      game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
+      console.log('[TRICK COMPLETION] Awarded trick to player', winnerIndex, 'new count:', game.players[winnerIndex]!.tricks);
+    }
+    
+    // Store completed trick
+    game.play.tricks.push({
+      cards: [...game.play.currentTrick],
+      winnerIndex: winnerIndex,
+      
+    });
+    
+    // Clear current trick
+    game.play.currentTrick = [];
+    
+    // CRITICAL: Set winner as next trick leader
+    game.play.currentPlayerIndex = winnerIndex;
+    console.log('[TRICK COMPLETION] Set currentPlayerIndex to winner:', winnerIndex);
+    
+    // Check if hand is complete (13 tricks)
+    if (game.play.tricks.length >= 13) {
+      console.log('[TRICK COMPLETION] Hand complete, triggering hand completion');
+      // Hand completion will be handled by the calling code
+    } else {
+      // Continue to next trick - trigger bot play if winner is bot
+      const winnerPlayer = game.players[winnerIndex];
+      if (winnerPlayer && winnerPlayer.type === 'bot') {
+        console.log('[TRICK COMPLETION] Winner is bot, triggering next turn for:', winnerPlayer.username);
+        setTimeout(() => {
+          if (game.play && game.play.currentPlayerIndex === winnerIndex && 
+              game.players[winnerIndex] && game.players[winnerIndex]!.type === 'bot') {
+            // Import botPlayCard dynamically to avoid circular imports
+            import('../routes/games.routes').then(({ botPlayCard }) => {
+              botPlayCard(game, winnerIndex);
+            });
+          }
+        }, 100);
+      }
+    }
+    
+  } catch (error) {
+    console.error('[TRICK COMPLETION ERROR] Failed to complete trick:', error);
+    throw error;
+  }
+}
+
+// Helper function to determine trick winner
+function determineTrickWinner(trick: any[]): number {
+  if (!trick || trick.length !== 4) return 0;
+  
+  const leadSuit = trick[0]?.suit;
+  let winningCard = trick[0];
+  let winnerIndex = 0;
+  
+  for (let i = 1; i < trick.length; i++) {
+    const card = trick[i];
+    if (!card) continue;
+    
+    // Spades always win
+    if (card.suit === 'S' && winningCard.suit !== 'S') {
+      winningCard = card;
+      winnerIndex = i;
+    }
+    // If both are spades, higher rank wins
+    else if (card.suit === 'S' && winningCard.suit === 'S') {
+      if (getCardValue(card) > getCardValue(winningCard)) {
+        winningCard = card;
+        winnerIndex = i;
+      }
+    }
+    // If neither is spades, follow suit and higher rank wins
+    else if (card.suit === leadSuit && winningCard.suit === leadSuit) {
+      if (getCardValue(card) > getCardValue(winningCard)) {
+        winningCard = card;
+        winnerIndex = i;
+      }
+    }
+  }
+  
+  return winnerIndex;
+}
+
+// Helper function to get card value for comparison
+function getCardValue(card: any): number {
+  const values: { [key: string]: number } = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+  };
+  return values[card.rank] || 0;
+}
+
 // Import and use the completeGame function from index.ts
 async function completeGame(game: Game, winningTeamOrPlayer: number) {
   console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
@@ -118,10 +224,6 @@ async function completeGame(game: Game, winningTeamOrPlayer: number) {
         winningTeam: winningTeamOrPlayer,
       });
     }
-    
-    // Start play again timer
-    // startPlayAgainTimer will be called from the original context
-    // startPlayAgainTimer(game); // Will be called from original context
     
     // Update stats and coins
     const { updateStatsAndCoins } = await import('../routes/games.routes');
