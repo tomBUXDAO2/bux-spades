@@ -2321,7 +2321,9 @@ export function botPlayCard(game: Game, seatIndex: number) {
           };
           
           // Call the async helper function
-          handlePartnersHandCompletion();
+          handlePartnersHandCompletion().catch((err: Error) => {
+            console.error('[HAND COMPLETION ERROR] Database scoring failed:', err);
+          });
         
         // Update stats for this hand
         // DISABLED: updateHandStats(game).catch(err => {
