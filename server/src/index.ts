@@ -271,7 +271,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         timestamp: new Date().toISOString()
       };
 
-      io.to(gameId).emit('chat_message', chatMessage);
+      io.to(gameId).emit('chat_message', { gameId, message: chatMessage });
     } catch (error) {
       console.error('Error handling chat message:', error);
       socket.emit('error', { message: 'Failed to send message' });
