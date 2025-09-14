@@ -2004,59 +2004,8 @@ io.on('connection', (socket: AuthenticatedSocket) => {
           console.error('Failed to update hand stats:', err);
         });
         } else {
-          // Partners mode scoring
-        const handSummary = calculatePartnersHandScore(game);
-          
-        // Update running totals
-        game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
-        game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
-        
-        // Add new bags to running total
-        const oldTeam1Bags = game.team1Bags || 0;
-        const oldTeam2Bags = game.team2Bags || 0;
-        game.team1Bags = oldTeam1Bags + handSummary.team1Bags;
-        game.team2Bags = oldTeam2Bags + handSummary.team2Bags;
-        
-        console.log('[BAG DEBUG] Before penalty - Team 1 bags:', oldTeam1Bags, '+', handSummary.team1Bags, '=', game.team1Bags);
-        console.log('[BAG DEBUG] Before penalty - Team 2 bags:', oldTeam2Bags, '+', handSummary.team2Bags, '=', game.team2Bags);
-        
-        // Apply bag penalty to running total if needed
-        if (game.team1Bags >= 10) {
-          const penaltyApplied = Math.floor(game.team1Bags / 10) * 100;
-          const bagsRemoved = Math.floor(game.team1Bags / 10) * 10;
-          game.team1TotalScore -= penaltyApplied;
-          game.team1Bags -= bagsRemoved;
-          console.log('[BAG PENALTY] Team 1 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team1TotalScore, 'New bags:', game.team1Bags);
-        }
-        if (game.team2Bags >= 10) {
-          const penaltyApplied = Math.floor(game.team2Bags / 10) * 100;
-          const bagsRemoved = Math.floor(game.team2Bags / 10) * 10;
-          game.team2TotalScore -= penaltyApplied;
-          game.team2Bags -= bagsRemoved;
-          console.log('[BAG PENALTY] Team 2 hit 10+ bags, applied -' + penaltyApplied + ' penalty. New score:', game.team2TotalScore, 'New bags:', game.team2Bags);
-        }
-        
-        // Set game status to indicate hand is completed
-        game.status = 'PLAYING';
-        (game as any).handCompletedTime = Date.now(); // Track when hand was completed
-        
-        // NEW: Log completed hand to database
-        trickLogger.logCompletedHand(game).catch((err: Error) => {
-          console.error('Failed to log completed hand to database:', err);
-        });
-        
-        io.to(game.id).emit('hand_completed', {
-          ...handSummary,
-          team1TotalScore: game.team1TotalScore,
-          team2TotalScore: game.team2TotalScore,
-          team1Bags: game.team1Bags,
-          team2Bags: game.team2Bags,
-        });
-        
-        // Update stats for this hand
-        // DISABLED: updateHandStats(game).catch(err => {
-          // console.error('Failed to update hand stats:', err);
-        // });
+          // Partners mode - USE SHARED HAND COMPLETION FUNCTION
+          await handleHandCompletion(game);        // });
         }
         
         // Emit game update with new status

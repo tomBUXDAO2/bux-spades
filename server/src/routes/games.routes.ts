@@ -1294,7 +1294,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
   
   // Only act if it's the bot's turn to bid
       if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!game.bidding || !game.bidding.bids) return; // Guard for undefined
       console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
       // Calculate bid based on game type - always use intelligent bidding
@@ -1396,7 +1396,7 @@ export function botMakeMove(game: Game, seatIndex: number) {
         // If first player is a bot, trigger bot card play
         if (firstPlayer.type === 'bot') {
           console.log('[BOT DEBUG] (ROUTES) About to call botPlayCard for seat', (game.dealerIndex + 1) % 4, 'bot:', firstPlayer.username);
-          setTimeout(() => {
+          setTimeout(async () => {
             botPlayCard(game, (game.dealerIndex + 1) % 4);
           }, 500);
         } else if (firstPlayer.type === 'human') {
@@ -2047,7 +2047,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
   console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} selected card is spade:`, card.suit === 'S');
   console.log(`[BOT SCREAMER DEBUG] Bot ${bot.username} has non-spades:`, hand.filter(c => c.suit !== 'S').map(c => `${c.rank}${c.suit}`));
   
-  setTimeout(() => {
+  setTimeout(async () => {
     if (!game.play) return; // Guard for undefined
     console.log(`[BOT DEBUG] Bot ${bot.username} is playing card:`, card);
     // Simulate play_card event
@@ -2113,7 +2113,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
         });
         
         // Defer clearing the trick until after clients have started the animation
-        setTimeout(() => {
+        setTimeout(async () => {
           // Clear the trick for proper game state
           game.play!.currentTrick = [];
           
@@ -2220,114 +2220,8 @@ export function botPlayCard(game: Game, seatIndex: number) {
             console.error('Failed to update hand stats:', err);
           });
         } else {
-          // Partners mode scoring - USE DATABASE AS SOURCE OF TRUTH
-          console.log('[HAND COMPLETION] Using database scoring for partners mode');
-          
-          // Create async helper function for database scoring
-          const handlePartnersHandCompletion = async () => {
-            try {
-              // Calculate and store scores in database
-              const gameScore = await calculateAndStoreGameScore(game.dbGameId, game.currentRound);
-              console.log('[DATABASE SCORING] Calculated and stored game score:', gameScore);
-              
-              // Get the latest database scores for this game
-              const latestScore = await prisma.gameScore.findFirst({
-                where: { gameId: game.dbGameId },
-                orderBy: { roundNumber: 'desc' }
-              });
-              
-              if (!latestScore) {
-                throw new Error('No game score found in database');
-              }
-              
-              // Update in-memory game state with database scores
-              game.team1TotalScore = latestScore.team1RunningTotal;
-              game.team2TotalScore = latestScore.team2RunningTotal;
-              game.team1Bags = latestScore.team1Bags;
-              game.team2Bags = latestScore.team2Bags;
-              
-              console.log('[DATABASE SCORING] Updated game state with database scores:', {
-                team1TotalScore: game.team1TotalScore,
-                team2TotalScore: game.team2TotalScore,
-                team1Bags: game.team1Bags,
-                team2Bags: game.team2Bags
-              });
-              
-              // Create hand summary data for frontend using database scores
-              const handSummary = {
-                team1Score: latestScore.team1Score, // Current round score
-                team2Score: latestScore.team2Score, // Current round score
-                team1Bags: latestScore.team1Bags - (game.team1Bags || 0) + (latestScore.team1Bags || 0), // Bags from this round
-                team2Bags: latestScore.team2Bags - (game.team2Bags || 0) + (latestScore.team2Bags || 0), // Bags from this round
-                tricksPerPlayer: game.players.map(p => p?.tricks || 0), // Current trick counts
-                playerScores: [0, 0, 0, 0], // Not used in partners mode
-                playerBags: [0, 0, 0, 0]   // Not used in partners mode
-              };
-              
-              // Set game status to indicate hand is completed
-              game.status = 'PLAYING';
-              (game as any).handCompletedTime = Date.now();
-              
-              // Log completed hand to database
-              trickLogger.logCompletedHand(game).catch((err: Error) => {
-                console.error('Failed to log completed hand to database:', err);
-              });
-              
-              console.log('[HAND COMPLETED] Partners mode - Emitting hand_completed event with DATABASE scores:', {
-                ...handSummary,
-                team1TotalScore: game.team1TotalScore,
-                team2TotalScore: game.team2TotalScore,
-                team1Bags: game.team1Bags,
-                team2Bags: game.team2Bags,
-              });
-              
-              io.to(game.id).emit('hand_completed', {
-                ...handSummary,
-                team1TotalScore: game.team1TotalScore,
-                team2TotalScore: game.team2TotalScore,
-                team1Bags: game.team1Bags,
-                team2Bags: game.team2Bags,
-              });
-              
-            } catch (dbError) {
-              console.error('[DATABASE SCORING ERROR] Failed to calculate database scores:', dbError);
-              // Fallback to old in-memory scoring if database fails
-              console.log('[FALLBACK] Using in-memory scoring as fallback');
-              const handSummary = calculatePartnersHandScore(game);
-              
-              // Update running totals (fallback)
-              game.team1TotalScore = (game.team1TotalScore || 0) + handSummary.team1Score;
-              game.team2TotalScore = (game.team2TotalScore || 0) + handSummary.team2Score;
-              game.team1Bags = (game.team1Bags || 0) + handSummary.team1Bags;
-              game.team2Bags = (game.team2Bags || 0) + handSummary.team2Bags;
-              
-              // Apply bag penalty (fallback)
-              if (game.team1Bags >= 10) {
-                game.team1TotalScore -= 100;
-                game.team1Bags -= 10;
-              }
-              if (game.team2Bags >= 10) {
-                game.team2TotalScore -= 100;
-                game.team2Bags -= 10;
-              }
-              
-              io.to(game.id).emit('hand_completed', {
-                ...handSummary,
-                team1TotalScore: game.team1TotalScore,
-                team2TotalScore: game.team2TotalScore,
-                team1Bags: game.team1Bags,
-                team2Bags: game.team2Bags,
-              });
-            }
-          };
-          
-          // Call the async helper function
-          handlePartnersHandCompletion().catch((err: Error) => {
-            console.error('[HAND COMPLETION ERROR] Database scoring failed:', err);
-          });
-        
-        // Update stats for this hand
-        // DISABLED: updateHandStats(game).catch(err => {
+          // Partners mode - USE SHARED HAND COMPLETION FUNCTION
+          await handleHandCompletion(game);        // DISABLED: updateHandStats(game).catch(err => {
           // console.error('Failed to update hand stats:', err);
         // });
         }
@@ -2537,7 +2431,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       if (winnerPlayer && winnerPlayer.type === 'bot') {
         console.log('[BOT TURN] Winner is bot, triggering next turn for:', winnerPlayer.username, 'at index:', winnerIndex);
         // Add a small delay to allow the trick completion animation
-        setTimeout(() => {
+        setTimeout(async () => {
           // Double-check that it's still this bot's turn before playing
           if (game.play && game.play.currentPlayerIndex === winnerIndex && 
               game.players[winnerIndex] && game.players[winnerIndex]!.type === 'bot') {
@@ -2609,7 +2503,7 @@ export function botPlayCard(game: Game, seatIndex: number) {
       const nextPlayer = game.players[nextPlayerIndex];
       if (nextPlayer && nextPlayer.type === 'bot') {
         console.log('[BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
-        setTimeout(() => {
+        setTimeout(async () => {
           botPlayCard(game, nextPlayerIndex);
         }, 800); // Reduced delay for faster bot play
       } else {
@@ -3554,7 +3448,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
   console.log(`[HUMAN TIMEOUT DEBUG] Player ${player.username} selected card:`, `${card.rank}${card.suit}`);
   
   // Simulate playing the card
-  setTimeout(() => {
+  setTimeout(async () => {
     if (!game.play) return; // Guard for undefined
     console.log(`[HUMAN TIMEOUT] Player ${player.username} is playing card:`, card);
     
@@ -3620,7 +3514,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       });
       
       // Defer clearing the trick until after clients have started the animation
-      setTimeout(() => {
+      setTimeout(async () => {
         // Clear the trick for proper game state
         game.play.currentTrick = [];
         
@@ -3635,7 +3529,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       const nextPlayer = game.players[winnerIndex];
       if (nextPlayer && nextPlayer.type === 'bot') {
         console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', winnerIndex, 'to play after delay');
-        setTimeout(() => {
+        setTimeout(async () => {
           botPlayCard(game, winnerIndex);
         }, 800); // Reduced delay for faster bot play
       } else {
@@ -3669,7 +3563,7 @@ export function handleHumanTimeout(game: Game, seatIndex: number) {
       const nextPlayer = game.players[nextPlayerIndex];
       if (nextPlayer && nextPlayer.type === 'bot') {
         console.log('[HUMAN TIMEOUT BOT TURN DEBUG] Triggering bot', nextPlayer.username, 'at position', nextPlayerIndex, 'to play after delay');
-        setTimeout(() => {
+        setTimeout(async () => {
           botPlayCard(game, nextPlayerIndex);
         }, 800); // Reduced delay for faster bot play
       } else {
