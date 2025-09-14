@@ -155,7 +155,7 @@ export default function TablePage() {
         if (!response.ok) {
           throw new Error(`Failed to fetch game: ${response.status}`);
         }
-        const data = await response.json();
+        const responseData = await response.json(); const data = responseData.game;
         
         // Ensure currentPlayer is set correctly
         if (data.status === 'BIDDING' && data.bidding?.currentPlayer) {
@@ -567,7 +567,7 @@ export default function TablePage() {
         console.error('[HTTP JOIN] Failed to join game:', errorData);
         throw new Error(`Failed to join game: ${errorData.error || 'Unknown error'}`);
       }
-      const updatedGame = await response.json();
+      const joinResponse = await response.json(); const updatedGame = joinResponse.game;
       console.log('[HTTP JOIN] Successfully joined game:', updatedGame);
       console.log('[HTTP JOIN] Game players after join:', updatedGame.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
       setGame(updatedGame);
