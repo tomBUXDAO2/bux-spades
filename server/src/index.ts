@@ -267,7 +267,7 @@ io.on('connection', (socket: AuthenticatedSocket) => {
         userId: socket.userId,
         username: user.username,
         avatar: user.avatar,
-        message: message.trim(),
+        message: typeof message === "string" ? message.trim() : message.message?.trim() || "",
         timestamp: new Date().toISOString()
       };
 
