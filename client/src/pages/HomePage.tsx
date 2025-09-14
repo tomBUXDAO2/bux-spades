@@ -98,7 +98,7 @@ const HomePage: React.FC = () => {
         // Get all games from the server
         const response = await api.get('/api/games');
         if (response.ok) {
-          const allGames = await response.json();
+          const responseData = await response.json(); const allGames = responseData.games || [];
           console.log('[LEAGUE GAME CHECK] All games:', allGames.map((g: any) => ({ 
             id: g.id, 
             status: g.status, 
@@ -145,7 +145,7 @@ const HomePage: React.FC = () => {
         console.log('[PERIODIC LEAGUE CHECK] Running periodic check...');
         const response = await api.get('/api/games');
         if (response.ok) {
-          const allGames = await response.json();
+          const responseData = await response.json(); const allGames = responseData.games || [];
           
           const userLeagueGame = allGames.find((game: any) => {
             const isLeagueGame = game.league;

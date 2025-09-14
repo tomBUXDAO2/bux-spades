@@ -1,4 +1,4 @@
-import type { Game, GamePlayer } from '../../types/game';
+import type { Game, GamePlayer, Card, Suit, Rank } from '../../types/game';
 
 /**
  * Game format types
@@ -24,12 +24,23 @@ export function createGameFormatConfig(settings: any): GameFormatConfig {
   const format = determineGameFormat(settings.biddingOption);
   const gimmickType = determineGimmickType(settings.biddingOption);
   
+  // Handle specialRules - it can be an object or array
+  let specialRules: string[] = [];
+  if (settings.specialRules) {
+    if (Array.isArray(settings.specialRules)) {
+      specialRules = settings.specialRules;
+    } else if (typeof settings.specialRules === 'object') {
+      // Convert object to array of rule names
+      specialRules = Object.keys(settings.specialRules).filter(key => settings.specialRules[key] === true);
+    }
+  }
+  
   return {
     format,
     gimmickType,
     allowNil: settings.allowNil !== false,
     allowBlindNil: settings.allowBlindNil === true,
-    specialRules: settings.specialRules || []
+    specialRules
   };
 }
 
@@ -252,6 +263,7 @@ export function applyGameFormatRules(game: Game, format: GameFormatConfig): void
   console.log('[GAME FORMAT] Applied format rules:', {
     format: format.format,
     gimmickType: format.gimmickType,
+    specialRules: format.specialRules,
     rules: game.rules
   });
 }
