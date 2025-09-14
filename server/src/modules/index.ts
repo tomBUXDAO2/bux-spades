@@ -4,6 +4,8 @@ export * from './bot-play';
 export * from './game-rules';
 export * from './socket-handlers';
 export * from './timeout-management';
+export * from './hand-completion';
+export * from './game-formats';
 
 // Re-export commonly used functions for convenience
 export { 
@@ -37,3 +39,15 @@ export {
   clearTurnTimeout, 
   clearAllTimeoutsForGame 
 } from './timeout-management';
+
+export {
+  handleHandCompletion,
+  calculateHandStats
+} from './hand-completion';
+
+export {
+  createGameFormatConfig,
+  validateBid,
+  getGameFormatDescription,
+  applyGameFormatRules
+} from './game-formats';
