@@ -28,7 +28,7 @@ export const SUIT_HIERARCHY: { [key in Suit]: number } = {
   'SPADES': 4,    // Trump
   'HEARTS': 3,
   'DIAMONDS': 2,
-  'CLUBS': 1
+  'CLUBS': 1,
 };
 
 /**
@@ -77,11 +77,11 @@ export function canPlayCard(card: Card, hand: Card[], currentTrick: Card[], game
   }
   
   // Special rules
-  if (game.rules?.screamer) {
+  if (game.rules?.specialRules?.screamer) {
     return canPlayCardScreamer(card, hand, currentTrick, game);
   }
   
-  if (game.rules?.assassin) {
+  if (game.rules?.specialRules?.assassin) {
     return canPlayCardAssassin(card, hand, currentTrick, game);
   }
   

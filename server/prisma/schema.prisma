@@ -213,7 +213,7 @@ model GameResult {
 enum BidType {
   REGULAR
   WHIZ
-  MIRRORS
+  MIRROR
   GIMMICK
 }
 
@@ -223,6 +223,7 @@ enum GameMode {
 }
 
 enum GameStatus {
+  BIDDING
   WAITING
   PLAYING
   FINISHED

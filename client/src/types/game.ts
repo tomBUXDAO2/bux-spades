@@ -1,9 +1,9 @@
 export type GameType = 'REGULAR' | 'SOLO' | 'WHIZ' | 'MIRROR';
 export type GameMode = 'PARTNERS' | 'SOLO';
-export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
-export type GamePlayOption = 'REG' | 'WHIZ' | 'MIRROR';
+export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
+export type GamePlayOption = 'REGULAR' | 'WHIZ' | 'MIRROR';
 
-export type Suit = '♠' | '♥' | '♦' | '♣';
+export type Suit = 'SPADES' | 'HEARTS' | 'DIAMONDS' | 'CLUBS';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
 export interface Card {

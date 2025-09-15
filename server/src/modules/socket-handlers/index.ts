@@ -1,1 +1,1 @@
-export * from './gameSocketHandlers';
+export * from './socketHandlers';

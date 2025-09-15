@@ -1,7 +1,7 @@
 export type GameMode = 'PARTNERS' | 'SOLO';
-export type BiddingOption = 'REG' | 'WHIZ' | 'MIRROR' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
-export type GamePlayOption = 'REG' | 'WHIZ' | 'MIRROR';
-export type Suit = 'S' | 'H' | 'D' | 'C';
+export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+export type GamePlayOption = 'REGULAR' | 'SCREAMER' | 'ASSASSIN' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
+export type Suit = 'SPADES' | 'HEARTS' | 'DIAMONDS' | 'CLUBS';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
 export interface Card {
@@ -28,17 +28,32 @@ export interface GamePlayer {
 	nil?: boolean;
 	blindNil?: boolean;
 	connected?: boolean;
+	bags?: number;
 	lastAction?: string;
 	lastActionTime?: number;
 }
 
+export interface GameRules {
+  gameType: GameMode;
+  allowNil: boolean;
+  allowBlindNil: boolean;
+  minPoints: number;
+  maxPoints: number;
+  coinAmount: number;
+  bidType: BiddingOption;
+  specialRules?: {
+    screamer: boolean;
+    assassin: boolean;
+  };
+  gimmickType: GamePlayOption;
+}
 export interface Game {
 	id: string;
 	gameMode: GameMode;
 	maxPoints: number;
 	minPoints: number;
 	buyIn: number;
-	forcedBid: 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES' | 'NONE';
+	forcedBid: GamePlayOption;
 	specialRules: {
 		screamer?: boolean;
 		assassin?: boolean;
@@ -56,8 +71,8 @@ export interface Game {
 		minPoints: number;
 		bidType: BiddingOption;
 		specialRules?: {
-			screamer: boolean;
-			assassin: boolean;
+			screamer?: boolean;
+			assassin?: boolean;
 		};
 		gimmickType: GamePlayOption;
 	};
@@ -82,8 +97,6 @@ export interface Game {
 		trickNumber: number;
 		spadesBroken?: boolean;
 	};
-	team1TotalScore?: number;
-	team2TotalScore?: number;
 	team1Bags?: number;
 	team2Bags?: number;
 	// Solo mode properties
@@ -112,4 +125,14 @@ export interface Game {
 	lastAction?: string;
 	lastActionTime?: number;
 	updatedAt?: number;
+	// Additional properties
+	completed?: boolean;
+	winner?: number;
+	finalScore?: number;
+	solo?: boolean;
+	creatorId?: string;
+	allowNil?: boolean;
+	allowBlindNil?: boolean;
+	team1TotalScore?: number;
+	team2TotalScore?: number;
 } 

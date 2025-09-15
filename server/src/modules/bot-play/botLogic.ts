@@ -1,6 +1,6 @@
 import type { Game, GamePlayer, Card, Suit, Rank } from '../../types/game';
 import { io } from '../../index';
-import { enrichGameForClient } from '../../routes/games.routes';
+import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 
 /**
  * Main bot move handler - determines if bot should bid or play card
@@ -138,9 +138,9 @@ function calculateBotBid(hand: Card[], game: Game, seatIndex: number): number {
   // Adjust based on game rules
   if (game.rules?.bidType === 'MIRROR') {
     bid = spades; // Mirror: bid number of spades
-  } else if (game.forcedBid === 'BID3') {
+  } else if (game.forcedBid === 'BID 3') {
     bid = 3; // Must bid 3
-  } else if (game.forcedBid === 'BIDHEARTS') {
+  } else if (game.forcedBid === 'BID HEARTS') {
     bid = hand.filter(c => c.suit === 'HEARTS').length; // Bid number of hearts
   }
   

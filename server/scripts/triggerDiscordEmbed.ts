@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { logCompletedGameToDbAndDiscord } from '../src/lib/gameLogger';
+import { logCompletedGameToDbAndDiscord } from '../src/lib/logging';
 
 const prisma = new PrismaClient();
 
