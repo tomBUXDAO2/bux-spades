@@ -2841,9 +2841,10 @@ export default function GameTable({
     const emptySeatIndexes = (gameState.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
     for (const seatIndex of emptySeatIndexes) {
       await handleInviteBot(seatIndex);
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     onCloseStartWarning?.();
-    // Call socket API directly to start the game
+    await new Promise(resolve => setTimeout(resolve, 2000));
     if (socket && gameState?.id) {
       socket.emit('start_game', { gameId: gameState.id });
     }
