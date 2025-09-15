@@ -1,5 +1,4 @@
 import { SlashCommandBuilder } from 'discord.js';
-
 export const gameCommands = [
   new SlashCommandBuilder()
     .setName('game')
@@ -8,7 +7,7 @@ export const gameCommands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .setAutocomplete(true))
+        )
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -70,7 +69,6 @@ export const gameCommands = [
           { name: 'Screamer', value: 'screamer' },
           { name: 'Assassin', value: 'assassin' }
         )),
-
   new SlashCommandBuilder()
     .setName('whiz')
     .setDescription('Create a Whiz game line')
@@ -78,7 +76,7 @@ export const gameCommands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .setAutocomplete(true))
+        )
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -124,7 +122,6 @@ export const gameCommands = [
           { name: 'Screamer', value: 'screamer' },
           { name: 'Assassin', value: 'assassin' }
         )),
-
   new SlashCommandBuilder()
     .setName('mirror')
     .setDescription('Create a Mirror game line')
@@ -132,7 +129,7 @@ export const gameCommands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .setAutocomplete(true))
+        )
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -178,7 +175,6 @@ export const gameCommands = [
           { name: 'Screamer', value: 'screamer' },
           { name: 'Assassin', value: 'assassin' }
         )),
-
   new SlashCommandBuilder()
     .setName('gimmick')
     .setDescription('Create a Gimmick game line')
@@ -186,7 +182,7 @@ export const gameCommands = [
       option.setName('coins')
         .setDescription('Coins (buy-in amount)')
         .setRequired(true)
-        .setAutocomplete(true))
+        )
     .addStringOption(option =>
       option.setName('gamemode')
         .setDescription('Partners or Solo game')
@@ -199,7 +195,6 @@ export const gameCommands = [
       option.setName('gimmicktype')
         .setDescription('Type of gimmick game')
         .setRequired(true)
-        .setAutocomplete(true)
         .addChoices(
           { name: '4 or Nil', value: '4 OR NIL' },
           { name: 'Bid 3', value: 'BID 3' },

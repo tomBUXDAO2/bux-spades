@@ -8,8 +8,7 @@ import {
   handleGameChatMessage,
   handleLobbyChatMessage,
   addBotToSeat,
-  createUserSession,
-  handleStartGame
+  createUserSession
 } from '../index';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
@@ -49,19 +48,25 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         socketId: socket.id,
         onlineUsers: Array.from(onlineUsers)
       });
+
+      // Auto-join user to any games they're already in
+      games.forEach(game => {
+        const isPlayerInGame = game.players.some(player => player && player.id === socket.userId);
+        if (isPlayerInGame) {
+          socket.join(game.id);
+          console.log(`[CONNECTION] Auto-joined game room ${game.id} for user ${socket.userId}`);
+        }
+      });
     }
 
-    // Join game event
+    // Socket event handlers
     socket.on('join_game', (data) => handleJoinGame(socket, data));
-
-    // Game play events
     socket.on('make_bid', (data) => handleMakeBid(socket, data));
     socket.on('play_card', (data) => handlePlayCard(socket, data));
-    socket.on('start_game', (data) => handleStartGame(socket, data));
 
-    // Chat events
-    socket.on("game_chat_message", async (message) => {
-      await handleGameChatMessage(socket, message);
+    // Chat handlers
+    socket.on('chat_message', async ({ gameId, message }) => {
+      await handleGameChatMessage(socket, gameId, message);
     });
 
     socket.on("lobby_chat_message", async (message) => {
@@ -69,7 +74,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     });
 
     // Fill seat with bot event (manual replacement)
-    socket.on('fill_seat_with_bot', async ({ gameId, seatIndex }) => {
+    socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
       console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
       
       if (!socket.isAuthenticated || !socket.userId) {
@@ -90,18 +95,21 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         return;
       }
       
-      // Fill the seat with a bot (manual invitation) - now properly awaited
-      await addBotToSeat(game, seatIndex);
+      // Fill the seat with a bot (manual invitation)
+      addBotToSeat(game, seatIndex);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log(`[CONNECTION] Socket ${socket.id} disconnected:`, reason);
-      
+      console.log('[DISCONNECT] User disconnected:', {
+        userId: socket.userId,
+        socketId: socket.id,
+        reason
+      });
+
       if (socket.userId) {
         authenticatedSockets.delete(socket.userId);
         onlineUsers.delete(socket.userId);
         io.emit('online_users', Array.from(onlineUsers));
-        console.log(`[CONNECTION] User ${socket.userId} disconnected. Online users:`, Array.from(onlineUsers));
       }
     });
   });

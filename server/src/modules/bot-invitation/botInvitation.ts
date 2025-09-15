@@ -1,11 +1,37 @@
 import type { Game } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
+import prisma from '../../lib/prisma';
+
+// Single bot user ID for all bots
+const BOT_USER_ID = 'bot-user-universal';
+
+/**
+ * Ensures the universal bot user exists in the database
+ */
+async function ensureBotUserExists(): Promise<void> {
+  try {
+    await prisma.user.upsert({
+      where: { id: BOT_USER_ID },
+      update: {},
+      create: {
+        id: BOT_USER_ID,
+        username: 'Bot Player',
+        avatar: '/bot-avatar.jpg',
+        discordId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('[BOT INVITATION] Failed to ensure bot user exists:', error);
+  }
+}
 
 /**
  * Adds a bot to a specific seat in a game
  */
-export function addBotToSeat(game: Game, seatIndex: number): void {
+export async function addBotToSeat(game: Game, seatIndex: number): Promise<void> {
   console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
   
   // Check if seat is empty
@@ -14,12 +40,15 @@ export function addBotToSeat(game: Game, seatIndex: number): void {
     return;
   }
   
-  // Create bot
-  const botId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Ensure bot user exists in database
+  await ensureBotUserExists();
+  
+  // Create bot with unique display name but same user ID
   const botNumber = Math.floor(Math.random() * 1000);
+  const botDisplayId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   game.players[seatIndex] = {
-    id: botId,
+    id: botDisplayId, // Unique display ID for game logic
     username: `Bot ${botNumber}`,
     avatar: '/bot-avatar.jpg',
     type: 'bot',
@@ -28,6 +57,7 @@ export function addBotToSeat(game: Game, seatIndex: number): void {
     bid: undefined,
     tricks: 0,
     points: 0,
+    dbUserId: BOT_USER_ID, // Same DB user ID for all bots
   };
   
   // Set isBotGame flag

@@ -1,14 +1,24 @@
 import type { AuthenticatedSocket } from '../../../socket-auth';
-import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { games } from '../../../../gamesStore';
+import prisma from '../../../../lib/prisma';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
-import { handleBiddingComplete } from '../../game-state/gameStateHandler';
+import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
+
+// Single bot user ID for all bots
+const BOT_USER_ID = 'bot-user-universal';
 
 /**
- * Handles make_bid socket event
+ * Get the database user ID for a player (human or bot)
  */
+function getPlayerDbUserId(player: any): string {
+  if (player.type === 'bot') {
+    return player.dbUserId || BOT_USER_ID;
+  }
+  return player.id;
+}
+
 export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userId, bid }: { gameId: string; userId: string; bid: number }): Promise<void> {
   console.log('[MAKE BID DEBUG] Received bid:', { gameId, userId, bid, socketId: socket.id });
   
@@ -46,22 +56,58 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       return;
     }
 
-    // Record the bid
+    // Record the bid in memory
     game.bidding.bids[playerIndex] = bid;
     game.players[playerIndex]!.bid = bid;
-    
-    console.log('[MAKE BID DEBUG] Bid recorded:', { playerIndex, bid, totalBids: game.bidding.bids.filter(b => b !== undefined).length });
+    console.log('[MAKE BID DEBUG] Bid recorded:', { playerIndex, bid, totalBids: game.bidding.bids.filter(b => b !== null).length });
 
-    // Emit bid made event
-    io.to(gameId).emit('bid_made', {
-      gameId,
-      playerId: userId,
-      bid,
-      playerIndex
-    });
+    // Persist the bid to database (RoundBid upsert) before proceeding
+    try {
+      if (game.dbGameId) {
+        // Determine current roundNumber
+        let roundNumber = game.currentRound || 1;
+        // Find/create Round record
+        let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
+        if (!roundRecord) {
+          roundRecord = await prisma.round.create({
+            data: {
+              id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
+              gameId: game.dbGameId,
+              roundNumber,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          });
+        }
+        // Upsert RoundBid using correct player ID
+        await prisma.roundBid.upsert({
+          where: {
+            roundId_playerId: {
+              roundId: roundRecord.id,
+              playerId: getPlayerDbUserId(game.players[playerIndex]!) // Use correct ID for human/bot
+            }
+          },
+          update: {
+            bid,
+            isBlindNil: bid === -1
+          },
+          create: {
+            id: `bid_${roundRecord.id}_${playerIndex}_${Date.now()}`,
+            roundId: roundRecord.id,
+            playerId: getPlayerDbUserId(game.players[playerIndex]!), // Use correct ID for human/bot
+            bid,
+            isBlindNil: bid === -1,
+            createdAt: new Date()
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[MAKE BID DEBUG] Failed to persist RoundBid:', err);
+      // Continue gameplay even if DB logging failed
+    }
 
-    // Check if all players have bid
-    const bidsComplete = game.bidding.bids.every(bid => bid !== undefined);
+    // Check if all players have bid (null means not yet bid)
+    const bidsComplete = game.bidding.bids.every(b => b !== null);
     
     if (bidsComplete) {
       console.log('[MAKE BID DEBUG] All bids complete, moving to play phase');
@@ -71,10 +117,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       const nextPlayerIndex = (playerIndex + 1) % 4;
       game.bidding.currentBidderIndex = nextPlayerIndex;
       game.bidding.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-      
       io.to(gameId).emit('game_update', enrichGameForClient(game));
-      
-      // If next player is bot, trigger their move
       if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
         setTimeout(() => {
           botMakeMove(game, nextPlayerIndex);
@@ -84,6 +127,6 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
 
   } catch (error) {
     console.error('Error in make_bid:', error);
-    socket.emit('error', { message: 'Internal server error' });
+    socket.emit('error', { message: 'Failed to process bid' });
   }
 }

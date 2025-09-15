@@ -5,7 +5,7 @@ let verifyFacebookConnection: any = null;
 let markOAuth2Verified: any = null;
 
 try {
-  const botModule = require('../../../discord-bot/bot');
+  const botModule = require('../../../../discord-bot/bot');
   verifyFacebookConnection = botModule.verifyFacebookConnection;
   markOAuth2Verified = botModule.markOAuth2Verified;
 } catch (error) {

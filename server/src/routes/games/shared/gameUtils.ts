@@ -4,6 +4,14 @@ import type { Game } from '../../../types/game';
  * Enrich game data for client consumption
  */
 export function enrichGameForClient(game: Game): any {
+  // Derive a top-level currentPlayer to keep frontend logic consistent
+  let currentPlayer: string | undefined = undefined;
+  if (game.status === 'BIDDING' && game.bidding) {
+    currentPlayer = game.bidding.currentPlayer as unknown as string;
+  } else if (game.status === 'PLAYING' && game.play) {
+    currentPlayer = game.play.currentPlayer as unknown as string;
+  }
+
   return {
     id: game.id,
     status: game.status,
@@ -19,7 +27,8 @@ export function enrichGameForClient(game: Game): any {
     dealerIndex: game.dealerIndex,
     lastActivity: game.lastActivity,
     createdAt: game.createdAt,
-    players: game.players.map(p => p ? {
+    currentPlayer,
+    players: game.players.map((p, i) => p ? {
       id: p.id,
       username: p.username,
       avatar: p.avatar,
@@ -29,7 +38,8 @@ export function enrichGameForClient(game: Game): any {
       bid: p.bid,
       tricks: p.tricks,
       points: p.points,
-      bags: p.bags
+      bags: p.bags,
+      isDealer: typeof game.dealerIndex === 'number' ? game.dealerIndex === i : Boolean((p as any).isDealer)
     } : null),
     hands: game.hands,
     bidding: game.bidding,

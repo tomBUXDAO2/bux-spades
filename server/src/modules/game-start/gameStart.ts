@@ -5,6 +5,8 @@ import { games } from '../../gamesStore';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
 import { assignDealer, dealCards } from '../dealing/cardDealing';
+import { logGameStart } from '../../routes/games/database/gameDatabase';
+import prisma from '../../lib/prisma';
 
 /**
  * Handles start_game socket event
@@ -20,20 +22,50 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
   try {
     const game = games.find(g => g.id === gameId);
     if (!game) {
+      console.log('[GAME START] Game not found:', gameId);
       socket.emit('error', { message: 'Game not found' });
       return;
     }
 
     if (game.status !== 'WAITING') {
+      console.log('[GAME START] Game already started:', { gameId, status: game.status });
       socket.emit('error', { message: 'Game already started' });
       return;
     }
 
     // Check if all seats are filled
     const filledSeats = game.players.filter(p => p !== null).length;
+    console.log('[GAME START] Checking seats:', { gameId, filledSeats, totalSeats: 4 });
+    
     if (filledSeats < 4) {
+      console.log('[GAME START] Not all seats filled:', { gameId, filledSeats });
       socket.emit('error', { message: 'All seats must be filled to start the game' });
       return;
+    }
+
+    // Ensure game is logged in DB and Round 1 exists
+    try {
+      if (!game.dbGameId) {
+        console.log('[GAME START] Creating game in database...');
+        await logGameStart(game);
+      }
+      // Create Round 1 if missing
+      const existingRound = await prisma.round.findFirst({ where: { gameId: game.dbGameId! , roundNumber: 1 } });
+      if (!existingRound) {
+        console.log('[GAME START] Creating Round 1 in database...');
+        await prisma.round.create({
+          data: {
+            id: `round_${game.dbGameId}_1_${Date.now()}`,
+            gameId: game.dbGameId!,
+            roundNumber: 1,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[GAME START] Failed to ensure DB game/round records:', err);
+      // Continue anyway; bid logging will skip if dbGameId missing
     }
 
     // Set bot game flag
@@ -78,7 +110,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     game.bidding = {
       currentPlayer: firstBidder.id,
       currentBidderIndex: (dealerIndex + 1) % 4,
-      bids: [null, null, null, null],
+      bids: [null, null, null, null], // null = not yet bid
       nilBids: {}
     };
 
@@ -112,7 +144,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     }
 
   } catch (err) {
-    console.error('Error in handleStartGame:', err);
+    console.error('[GAME START] Error in handleStartGame:', err);
     socket.emit('error', { message: 'Failed to start game' });
   }
 }

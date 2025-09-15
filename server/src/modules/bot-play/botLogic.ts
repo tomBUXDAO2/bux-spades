@@ -1,244 +1,183 @@
-import type { Game, GamePlayer, Card, Suit, Rank } from '../../types/game';
-import { io } from '../../index';
-import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
+import type { Game } from "../../types/game";
+import { io } from "../../index";
+import { enrichGameForClient } from "../../routes/games/shared/gameUtils";
+import prisma from "../../lib/prisma";
+
+const BOT_USER_ID = 'bot-user-universal';
 
 /**
- * Main bot move handler - determines if bot should bid or play card
+ * Get the database user ID for a bot player
  */
-export function botMakeMove(game: Game, seatIndex: number): void {
+function getBotDbUserId(player: any): string {
+  return player.dbUserId || BOT_USER_ID;
+}
+
+/**
+ * Makes a move for a bot player (bid or play card)
+ */
+export async function botMakeMove(game: Game, seatIndex: number): Promise<void> {
   const bot = game.players[seatIndex];
-  console.log('[BOT DEBUG] botMakeMove called for seat', seatIndex, 'bot:', bot && bot.username, 'game.status:', game.status);
-  
-  if (!bot) {
-    console.log('[BOT DEBUG] No player at seat', seatIndex);
+  if (!bot || bot.type !== 'bot') {
+    console.log('[BOT DEBUG] botMakeMove called for non-bot or empty seat:', seatIndex);
     return;
   }
-  
-  // Handle both bot moves and human timeout moves
-  if (bot.type !== 'bot') {
-    console.log('[BOT DEBUG] Player is human, acting for timeout:', bot.username);
-  }
-  
-  // Only act if it's the bot's turn to bid
-  if (game.status === 'BIDDING' && game.bidding && game.bidding.currentBidderIndex === seatIndex && game.bidding.bids && game.bidding.bids[seatIndex] === null) {
-    setTimeout(async () => {
-      if (!game.bidding || !game.bidding.bids) return;
+
+  console.log(`[BOT DEBUG] botMakeMove called for seat ${seatIndex} bot: ${bot.username} game.status: ${game.status}`);
+
+  if (game.status === 'BIDDING') {
+    // Bot bidding logic
+    if (game.bidding && (game.bidding.bids[seatIndex] === null || typeof game.bidding.bids[seatIndex] === 'undefined')) {
+      console.log(`[BOT DEBUG] Bot ${bot.username} is making a bid...`);
       
-      console.log('[BOT DEBUG] Bot', bot.username, 'is making a bid...');
-      
-      // Calculate bid based on game type
-      let bid = 1;
-      if (game.rules && game.hands && game.hands[seatIndex]) {
-        bid = calculateBotBid(game.hands[seatIndex], game, seatIndex);
+      // Simple bot bidding: random bid between 0-4
+      const bid = Math.floor(Math.random() * 5);
+      game.bidding.bids[seatIndex] = bid;
+      console.log(`[BOT DEBUG] Bot ${bot.username} bid ${bid}`);
+
+      // Persist RoundBid using universal bot user ID
+      try {
+        if (game.dbGameId) {
+          let roundNumber = game.currentRound || 1;
+          let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
+          if (!roundRecord) {
+            roundRecord = await prisma.round.create({
+              data: {
+                id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
+                gameId: game.dbGameId,
+                roundNumber,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }
+            });
+          }
+          await prisma.roundBid.upsert({
+            where: {
+              roundId_playerId: {
+                roundId: roundRecord.id,
+                playerId: getBotDbUserId(bot) // Use universal bot user ID
+              }
+            },
+            update: { bid, isBlindNil: bid === -1 },
+            create: {
+              id: `bid_${roundRecord.id}_${seatIndex}_${Date.now()}`,
+              roundId: roundRecord.id,
+              playerId: getBotDbUserId(bot), // Use universal bot user ID
+              bid,
+              isBlindNil: bid === -1,
+              createdAt: new Date()
+            }
+          });
+        }
+      } catch (err) {
+        console.error('[BOT DEBUG] Failed to persist RoundBid for bot:', err);
       }
       
-      // Simulate bot making a bid
-      game.bidding.bids[seatIndex] = bid;
-      console.log('[BOT DEBUG] Bot', bot.username, 'bid', bid);
-      
+      // Emit game update to frontend
+      io.to(game.id).emit("game_update", enrichGameForClient(game));      
       // Find next player who hasn't bid
       let next = (seatIndex + 1) % 4;
-      while (game.bidding.bids[next] !== null && next !== seatIndex) {
+      while (next !== seatIndex && game.bidding.bids[next] !== null && game.bidding.bids[next] !== undefined) {
         next = (next + 1) % 4;
       }
       
-      if (game.bidding.bids.every(b => b !== null)) {
-        // All bids in, move to play phase
-        handleBiddingComplete(game);
-        return;
-      } else {
-        // Continue bidding
-        game.bidding.currentBidderIndex = next;
-        game.bidding.currentPlayer = game.players[next]?.id ?? '';
-        io.to(game.id).emit('bidding_update', {
-          currentBidderIndex: next,
-          bids: game.bidding.bids,
-        });
+      if (next === seatIndex) {
+        // All players have bid, move to play phase
+        console.log('[BIDDING COMPLETE - BOT] Moving to play phase, first player:', game.players[0]?.username);
+        game.status = 'PLAYING';
+        game.play = {
+          currentPlayer: game.players[0]?.id || '',
+          currentPlayerIndex: 0,
+          tricks: [],
+          trickNumber: 0,
+          currentTrick: [],
+          spadesBroken: false
+        };
         
-        // If next is a bot, trigger their move
-        if (game.players[next] && game.players[next].type === 'bot') {
-          botMakeMove(game, next);
+        
+        // Emit game update when bidding completes
+        io.to(game.id).emit("game_update", enrichGameForClient(game));        // Start first trick
+        if (game.players[0] && game.players[0].type === 'bot') {
+          setTimeout(() => botMakeMove(game, 0), 1000);
         }
-      }
-    }, 600);
-  } else {
-    console.log('[BOT DEBUG] Conditions not met for bot to bid. Status:', game.status, 'currentBidderIndex:', game.bidding?.currentBidderIndex, 'seatIndex:', seatIndex);
-  }
-}
-
-/**
- * Handles bot card playing during the play phase
- */
-export function botPlayCard(game: Game, seatIndex: number): void {
-  const bot = game.players[seatIndex];
-  if (!bot || !game.play || !game.hands || !game.hands[seatIndex]) {
-    console.log('[BOT DEBUG] Cannot play card - missing data');
-    return;
-  }
-  
-  console.log('[BOT DEBUG] Bot', bot.username, 'is playing a card...');
-  
-  setTimeout(() => {
-    const hand = game.hands[seatIndex];
-    const currentTrick = game.play.currentTrick || [];
-    
-    // Select best card to play
-    const cardToPlay = selectBestCard(hand, currentTrick, game, seatIndex);
-    
-    if (cardToPlay) {
-      // Remove card from hand
-      const cardIndex = hand.findIndex(c => c.suit === cardToPlay.suit && c.rank === cardToPlay.rank);
-      if (cardIndex !== -1) {
-        hand.splice(cardIndex, 1);
-      }
-      
-      // Add to current trick
-      game.play.currentTrick.push(cardToPlay);
-      
-      console.log('[BOT DEBUG] Bot', bot.username, 'played', cardToPlay.suit, cardToPlay.rank);
-      
-      // Emit card played event
-      io.to(game.id).emit('card_played', {
-        gameId: game.id,
-        playerId: bot.id,
-        card: cardToPlay,
-        trickNumber: game.play.trickNumber
-      });
-      
-      // Check if trick is complete
-      if (game.play.currentTrick.length === 4) {
-        handleTrickComplete(game);
       } else {
         // Move to next player
-        const nextPlayerIndex = (seatIndex + 1) % 4;
-        game.play.currentPlayerIndex = nextPlayerIndex;
-        game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
+        game.bidding.currentBidderIndex = next;
+        game.bidding.currentPlayer = game.players[next]?.id || '';
         
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
-        
-        // If next player is bot, trigger their move
-        if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-          botPlayCard(game, nextPlayerIndex);
+        // Emit game update when moving to next bidder
+        io.to(game.id).emit("game_update", enrichGameForClient(game));        
+        if (game.players[next] && game.players[next].type === 'bot') {
+          setTimeout(() => botMakeMove(game, next), 1000);
         }
       }
     }
-  }, 500);
-}
-
-/**
- * Calculates bot bid based on hand and game rules
- */
-function calculateBotBid(hand: Card[], game: Game, seatIndex: number): number {
-  // Basic bidding logic - can be enhanced
-  const spades = hand.filter(c => c.suit === 'SPADES').length;
-  const highCards = hand.filter(c => getCardValue(c.rank) >= 10).length;
-  
-  let bid = Math.max(1, Math.min(13, spades + Math.floor(highCards / 2)));
-  
-  // Adjust based on game rules
-  if (game.rules?.bidType === 'MIRROR') {
-    bid = spades; // Mirror: bid number of spades
-  } else if (game.forcedBid === 'BID 3') {
-    bid = 3; // Must bid 3
-  } else if (game.forcedBid === 'BID HEARTS') {
-    bid = hand.filter(c => c.suit === 'HEARTS').length; // Bid number of hearts
-  }
-  
-  return bid;
-}
-
-/**
- * Selects the best card for bot to play
- */
-function selectBestCard(hand: Card[], currentTrick: Card[], game: Game, seatIndex: number): Card | null {
-  if (hand.length === 0) return null;
-  
-  // If no cards played yet, play lowest card
-  if (currentTrick.length === 0) {
-    return hand.reduce((lowest, card) => 
-      getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
-    );
-  }
-  
-  // Follow suit if possible
-  const leadSuit = currentTrick[0].suit;
-  const followSuitCards = hand.filter(c => c.suit === leadSuit);
-  
-  if (followSuitCards.length > 0) {
-    // Play lowest card of lead suit
-    return followSuitCards.reduce((lowest, card) => 
-      getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
-    );
-  }
-  
-  // Can't follow suit, play lowest card
-  return hand.reduce((lowest, card) => 
-    getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
-  );
-}
-
-/**
- * Gets numeric value of card rank
- */
-function getCardValue(rank: Rank): number {
-  const values: { [key in Rank]: number } = {
-    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-    'J': 11, 'Q': 12, 'K': 13, 'A': 14
-  };
-  return values[rank];
-}
-
-/**
- * Handles bidding completion and transition to play phase
- */
-function handleBiddingComplete(game: Game): void {
-  if (typeof game.dealerIndex !== 'number') {
-    io.to(game.id).emit('error', { message: 'Invalid game state: no dealer assigned' });
-    return;
-  }
-  
-  const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
-  if (!firstPlayer) {
-    io.to(game.id).emit('error', { message: 'Invalid game state' });
-    return;
-  }
-  
-  // Update game status
-  game.status = 'PLAYING';
-  game.play = {
-    currentPlayer: firstPlayer.id ?? '',
-    currentPlayerIndex: (game.dealerIndex + 1) % 4,
-    currentTrick: [],
-    tricks: [],
-    trickNumber: 0,
-    spadesBroken: false
-  };
-  
-  console.log('[BIDDING COMPLETE - BOT] Moving to play phase, first player:', firstPlayer.username);
-  
-  // Emit events
-  io.to(game.id).emit('game_update', enrichGameForClient(game));
-  io.to(game.id).emit('bidding_complete', { currentBidderIndex: null, bids: game.bidding.bids });
-  io.to(game.id).emit('play_start', {
-    gameId: game.id,
-    currentPlayerIndex: game.play.currentPlayerIndex,
-    currentTrick: game.play.currentTrick,
-    trickNumber: game.play.trickNumber,
-  });
-  
-  // If first player is a bot, trigger bot card play
-  if (firstPlayer.type === 'bot') {
-    setTimeout(() => {
-      botPlayCard(game, (game.dealerIndex + 1) % 4);
-    }, 500);
+  } else if (game.status === 'PLAYING') {
+    // Bot card playing logic
+    if (game.play && game.play.currentPlayer === bot.id) {
+      console.log(`[BOT DEBUG] Bot ${bot.username} is playing a card...`);
+      
+      if (bot.hand && bot.hand.length > 0) {
+        // Simple bot logic: play first card in hand
+        const cardToPlay = bot.hand[0];
+        bot.hand.splice(0, 1);
+        
+        // Add to current trick
+        if (!game.play.currentTrick) {
+          game.play.currentTrick = [];
+        }
+        game.play.currentTrick.push({
+          ...cardToPlay,
+          playerIndex: seatIndex
+        });
+        
+        console.log(`[BOT DEBUG] Bot ${bot.username} played ${cardToPlay.suit} ${cardToPlay.rank}`);
+        
+        // Check if trick is complete
+        if (game.play.currentTrick.length === 4) {
+          // Trick complete - determine winner and start next trick
+          const winnerIndex = determineTrickWinner(game.play.currentTrick);
+          const winner = game.players[winnerIndex];
+          
+          if (winner) {
+            winner.tricks = (winner.tricks || 0) + 1;
+          }
+          
+          // Add to tricks history
+          game.play.tricks.push({
+            cards: [...game.play.currentTrick],
+            winnerIndex
+          });
+          
+          game.play.trickNumber++;
+          game.play.currentTrick = [];
+          game.play.currentPlayer = winner?.id || '';
+          game.play.currentPlayerIndex = winnerIndex;
+          
+          // Check if round is complete
+          if (game.play.trickNumber >= 13) {
+            console.log('[BOT DEBUG] Round complete, calculating scores...');
+            // Round complete - calculate scores and start next round or end game
+            game.status = 'WAITING';
+          }
+        } else {
+          // Move to next player
+          const nextPlayerIndex = (seatIndex + 1) % 4;
+          game.play.currentPlayer = game.players[nextPlayerIndex]?.id || '';
+          game.play.currentPlayerIndex = nextPlayerIndex;
+          
+          if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
+            setTimeout(() => botMakeMove(game, nextPlayerIndex), 1000);
+          }
+        }
+      }
+    }
   }
 }
 
 /**
- * Handles trick completion
+ * Simple trick winner determination
  */
-function handleTrickComplete(game: Game): void {
-  // This would be implemented with the trick completion logic
-  console.log('[BOT DEBUG] Trick complete, determining winner...');
-  // Implementation would go here
+function determineTrickWinner(trick: any[]): number {
+  // For now, just return the first player (simple logic)
+  return trick[0].playerIndex;
 }
