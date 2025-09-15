@@ -172,8 +172,17 @@ function getCardValue(rank: string | number): number {
 
 // Helper function to sort cards
 function sortCards(cards: Card[]): Card[] {
+  return [...cards].sort((a, b) => {
+    const suitOrder = { "D": 0, "C": 1, "H": 2, "S": 3 };
+    const suitA = a.suit.toString().charAt(0).toUpperCase();
+    const suitB = b.suit.toString().charAt(0).toUpperCase();
+    if (suitOrder[suitA] !== suitOrder[suitB]) {
+      return suitOrder[suitA] - suitOrder[suitB];
+    }
+    return getCardValue(a.rank) - getCardValue(b.rank);
+  });
   // Suit order: Diamonds, Clubs, Hearts, Spades
-  const suitOrder: Record<string, number> = { '♦': 0, 'C': 1, '♣': 1, '♥': 2, 'H': 2, '♠': 3, 'S': 3 };
+  const suitOrder: Record<string, number> = { '♦': 0, '♣': 1, '♥': 2, '♠': 3 };
   return [...cards].sort((a, b) => {
     // Normalize suit to single letter for sorting
     const getSuitKey = (suit: string) => {
