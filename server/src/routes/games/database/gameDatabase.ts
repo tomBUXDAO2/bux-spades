@@ -48,11 +48,18 @@ export async function logGameStart(game: Game): Promise<void> {
       if (player) {
         try {
           const team = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
+          
+          // For bots, use the universal bot user ID instead of the unique bot ID
+          let userId = player.id;
+          if (player.type === 'bot') {
+            userId = 'bot-user-universal';
+          }
+          
           await prisma.gamePlayer.create({
             data: {
               id: `player_${dbGame.id}_${i}_${Date.now()}`,
               gameId: dbGame.id,
-              userId: player.id,
+              userId: userId,
               position: i,
               team: team,
               bid: null,
@@ -64,7 +71,7 @@ export async function logGameStart(game: Game): Promise<void> {
               updatedAt: new Date()
             }
           });
-          console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i}`);
+          console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i} with userId ${userId}`);
         } catch (error) {
           console.error(`[DATABASE] Failed to create GamePlayer record for ${player.username}:`, error);
         }

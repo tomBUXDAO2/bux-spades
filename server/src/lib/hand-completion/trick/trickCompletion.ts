@@ -35,7 +35,12 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
           const { updatePlayerTrickCount } = await import('../../database-scoring/trick-count/trickCountManager');
           const player = game.players[winnerIndex];
           if (player) {
-            await updatePlayerTrickCount(game.dbGameId, game.currentRound, player.id, player.tricks);
+            // For bots, use the universal bot user ID instead of the unique bot ID
+            let userId = player.id;
+            if (player.type === 'bot') {
+              userId = 'bot-user-universal';
+            }
+            await updatePlayerTrickCount(game.dbGameId, game.currentRound, userId, player.tricks);
           }
         } catch (error) {
           console.error('[TRICK COMPLETION] Failed to update PlayerTrickCount:', error);
