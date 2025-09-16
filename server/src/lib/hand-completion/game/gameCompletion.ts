@@ -58,7 +58,8 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         playerResults: playerResults,
         totalRounds: totalRounds,
         totalTricks: totalTricks,
-        specialEvents: game.rules?.specialRules || {}
+        specialEvents: game.rules?.specialRules || {},
+        updatedAt: new Date()
       }
     });
     
