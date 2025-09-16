@@ -10,7 +10,7 @@ interface BiddingProps {
   numHearts?: number; // Number of hearts in player's hand for BID HEARTS games
   allowNil?: boolean; // Add allowNil prop
   hasAceSpades?: boolean; // Add hasAceSpades prop for Whiz games
-  forcedBid?: string; // Add forcedBid prop for Suicide games
+  gimmickType?: string; // Add gimmickType prop for Gimmick games
   partnerBid?: number; // Add partnerBid prop for Suicide games
   partnerBidValue?: number; // Add partnerBidValue prop to show partner's bid
   currentPlayerHand?: Card[]; // Add currentPlayerHand prop for CRAZY ACES
@@ -31,7 +31,7 @@ export default function BiddingInterface({
   numHearts = 0, // Default to 0 for backward compatibility
   allowNil = true, // Default to true for backward compatibility
   hasAceSpades = false, // Default to false for backward compatibility
-  forcedBid = 'NONE', // Default to NONE for backward compatibility
+  gimmickType = undefined, // Default to undefined for backward compatibility
   partnerBid = undefined, // Default to undefined for backward compatibility
   partnerBidValue = undefined, // Default to undefined for backward compatibility
   currentPlayerHand = undefined // Default to undefined for backward compatibility
@@ -71,7 +71,7 @@ export default function BiddingInterface({
   }
 
   // For SUICIDE games, implement suicide bidding logic
-  if (forcedBid === "SUICIDE") {
+  if (gimmickType === "SUICIDE") {
     const isFirstPartner = partnerBid === undefined;
     const partnerBidSomething = partnerBid !== undefined && partnerBid > 0;
     
@@ -88,7 +88,7 @@ export default function BiddingInterface({
   }
 
   // For 4 OR NIL games, players must bid 4 or nil
-  if (forcedBid === "BID4NIL") {
+  if (gimmickType === "BID4NIL") {
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
@@ -123,7 +123,7 @@ export default function BiddingInterface({
   }
 
   // For BID 3 games, auto-bid 3 and show message on table
-  if (forcedBid === "BID3") {
+  if (gimmickType === "BID3") {
     console.log('[BID 3 DEBUG] Auto-bidding 3 for all players');
     setIsSubmitting(true);
     onBid(3);
@@ -131,7 +131,7 @@ export default function BiddingInterface({
   }
 
   // For BID HEARTS games, auto-bid hearts count and show message on table
-  if (forcedBid === "BIDHEARTS") {
+  if (gimmickType === "BIDHEARTS") {
     console.log('[BID HEARTS DEBUG] Auto-bidding hearts count:', numHearts);
     setIsSubmitting(true);
     onBid(numHearts);
@@ -139,7 +139,7 @@ export default function BiddingInterface({
   }
 
   // For CRAZY ACES games, auto-bid 3 for each ace and show message on table
-  if (forcedBid === "CRAZY ACES") {
+  if (gimmickType === "CRAZY ACES") {
     // Count aces in the player's hand
     const acesCount = currentPlayerHand ? currentPlayerHand.filter(card => card.rank === 'A').length : 0;
     const bidAmount = acesCount * 3;

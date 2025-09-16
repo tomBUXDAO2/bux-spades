@@ -3425,7 +3425,7 @@ const [isStarting, setIsStarting] = useState(false);
                                 currentPlayerTurn={gameState.currentPlayer}
                                 allowNil={gameState.rules?.allowNil}
                                 hasAceSpades={hasAceSpades}
-                                forcedBid={(gameState as any).forcedBid}
+                                gimmickType={(gameState as any).rules?.gimmickType}
                                 partnerBid={partnerBid}
                                 partnerBidValue={partnerBid}
                                 currentPlayerHand={currentPlayerHand}
@@ -3704,13 +3704,13 @@ const [isStarting, setIsStarting] = useState(false);
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
                 label = 'MIRRORS';
-              } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
+              } else if (type === 'GIMMICK' } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {} else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') { (gameState as any).rules?.gimmickType) {
                 color = 'bg-orange-500';
-                if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
-                else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
-                else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
-                else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
-                else if ((gameState as any).forcedBid === 'CRAZY ACES') label = 'CRAZY As';
+                if ((gameState as any).rules?.gimmickType === 'BID4NIL') label = '4 OR NIL';
+                else if ((gameState as any).rules?.gimmickType === 'BID3') label = 'BID 3';
+                else if ((gameState as any).rules?.gimmickType === 'BIDHEARTS') label = 'BID ♥s';
+                else if ((gameState as any).rules?.gimmickType === 'SUICIDE') label = 'SUICIDE';
+                else if ((gameState as any).rules?.gimmickType === 'CRAZY ACES') label = 'CRAZY As';
                 else label = 'GIMMICK';
               }
               return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;

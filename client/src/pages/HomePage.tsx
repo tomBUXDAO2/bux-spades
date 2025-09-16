@@ -373,13 +373,13 @@ const HomePage: React.FC = () => {
     } else if (type === 'MIRROR') {
       color = 'bg-red-600';
       label = 'MIRRORS';
-    } else if (game.forcedBid && type === 'REGULAR' && game.forcedBid !== 'NONE') {
+    } else if (type === 'GIMMICK' } else if (game.forcedBid && type === 'REGULAR' && game.forcedBid !== 'NONE') {} else if (game.forcedBid && type === 'REGULAR' && game.forcedBid !== 'NONE') { game.rules?.gimmickType) {
       color = 'bg-orange-500';
-              if (game.forcedBid === 'BID4NIL') label = '4 OR NIL';
-      else if (game.forcedBid === 'BID3') label = 'BID 3';
-      else if (game.forcedBid === 'BIDHEARTS') label = 'BID ♥s';
-      else if (game.forcedBid === 'SUICIDE') label = 'SUICIDE';
-      else if (game.forcedBid === 'CRAZY ACES') label = 'CRAZY As';
+              if (game.rules?.gimmickType === 'BID4NIL') label = '4 OR NIL';
+      else if (game.rules?.gimmickType === 'BID3') label = 'BID 3';
+      else if (game.rules?.gimmickType === 'BIDHEARTS') label = 'BID ♥s';
+      else if (game.rules?.gimmickType === 'SUICIDE') label = 'SUICIDE';
+      else if (game.rules?.gimmickType === 'CRAZY ACES') label = 'CRAZY As';
       else label = 'GIMMICK';
     }
     return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;

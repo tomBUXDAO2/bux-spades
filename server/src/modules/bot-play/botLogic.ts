@@ -6,6 +6,7 @@ import { getCardValue } from "../../lib/hand-completion/utils/cardUtils";
 import { getRegularBid } from "../bot-bidding/regular";
 import { getWhizBid } from "../bot-bidding/whiz";
 import { getMirrorBid } from "../bot-bidding/mirror";
+import { getSuicideBid } from "../bot-bidding/suicide";
 
 const BOT_USER_ID = 'bot-user-universal';
 
@@ -47,6 +48,8 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
         const result = getMirrorBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
+      } else if (bidType === 'GIMMICK' && (game as any).rules?.gimmickType === 'SUICIDE') {
+        const result = getSuicideBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
       } else {
