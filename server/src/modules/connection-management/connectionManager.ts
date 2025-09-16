@@ -65,8 +65,8 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     socket.on('start_game', (data) => handleStartGame(socket, data));
 
     // Chat events
-    socket.on("game_chat_message", async (message) => {
-      await handleGameChatMessage(socket, message);
+    socket.on("game_chat_message", async (data) => {
+      await handleGameChatMessage(socket, data.gameId, data.message);
     });
 
     socket.on("lobby_chat_message", async (message) => {

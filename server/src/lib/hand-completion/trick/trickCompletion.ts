@@ -36,8 +36,12 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
       winnerIndex: winnerIndex,
     });
     
+    // Check if this was the last trick BEFORE incrementing
+    const currentTrickNumber = game.play.trickNumber || 0;
+    const isLastTrick = currentTrickNumber >= 12; // 0-based, so trick 12 is the 13th trick
+    
     // Increment trick number
-    game.play.trickNumber = (game.play.trickNumber || 0) + 1;
+    game.play.trickNumber = currentTrickNumber + 1;
     
     // Emit trick complete with the stored trick data for animation
     io.to(game.id).emit('trick_complete', {
@@ -61,7 +65,8 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
       io.to(game.id).emit('game_update', enrichGameForClient(game));
       
       // If all tricks played, move to hand summary/scoring
-      if (game.play.trickNumber === 13) {
+      if (isLastTrick) {
+        console.log('[TRICK COMPLETION] Last trick completed, triggering hand completion');
         await handleHandCompletion(game);
       } else {
         // If the winner is a bot, trigger their move for the next trick

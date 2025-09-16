@@ -14,42 +14,28 @@ export class TrickLogger {
   }
 
   /**
-   * Clean up memory for completed games
-   */
-  cleanupGame(gameId: string): void {
-  /**
    * Set the current round ID for a game
    */
   setCurrentRoundId(gameId: string, roundId: string): void {
     this.gameIntegration.setCurrentRoundId(gameId, roundId);
-  }    this.roundManager.cleanupGame(gameId);
+  }
+
+  /**
+   * Clean up memory for completed games
+   */
+  cleanupGame(gameId: string): void {
+    this.roundManager.cleanupGame(gameId);
   }
 
   /**
    * Get current round number for a game
    */
-  getCurrentRoundNumber(gameId: string): number | undefined {
+  getCurrentRoundNumber(gameId: string): number {
     return this.roundManager.getCurrentRoundNumber(gameId);
   }
 
   /**
-   * Start a new round/hand for a game
-   */
-  async startRound(gameId: string, roundNumber: number): Promise<string> {
-    const roundId = await this.roundManager.startRound(gameId, roundNumber);
-    this.gameIntegration.setCurrentRoundId(gameId, roundId);
-    return roundId;
-  }
-
-  /**
-   * Log a completed trick to the database
-   */
-  async logTrick(trickData: any): Promise<string> {
-    return this.trickLogger.logTrick(trickData);
-  }
-
-  /**
-   * Log a trick from the game state
+   * Log a trick from game state
    */
   async logTrickFromGame(game: any, trickNumber: number): Promise<void> {
     return this.gameIntegration.logTrickFromGame(game, trickNumber);
@@ -63,16 +49,26 @@ export class TrickLogger {
   }
 
   /**
-   * Get the current round ID for a game
+   * Get trick statistics for a game
    */
-  getCurrentRoundId(gameId: string): string | undefined {
-    return this.gameIntegration.getCurrentRoundId(gameId);
+  getTrickStats(gameId: string): any {
+    return this.roundManager.getTrickStats(gameId);
   }
 
   /**
-   * Clean up round tracking for a game
+   * Get round statistics for a game
    */
-  clearGameRounds(gameId: string): void {
-    this.roundManager.clearGameRounds(gameId);
+  getRoundStats(gameId: string): any {
+    return this.roundManager.getRoundStats(gameId);
+  }
+
+  /**
+   * Get game statistics
+   */
+  getGameStats(gameId: string): any {
+    return {
+      rounds: this.getRoundStats(gameId),
+      tricks: this.getTrickStats(gameId)
+    };
   }
 }

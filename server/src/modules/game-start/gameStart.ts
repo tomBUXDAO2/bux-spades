@@ -53,18 +53,19 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       const existingRound = await prisma.round.findFirst({ where: { gameId: game.dbGameId! , roundNumber: 1 } });
       if (!existingRound) {
         console.log('[GAME START] Creating Round 1 in database...');
-        const roundId = `round_${game.dbGameId}_1_${Date.now()}`;        await prisma.round.create({
+        const roundId = `round_${game.dbGameId}_1_${Date.now()}`;
+        await prisma.round.create({
           data: {
             id: roundId,
             gameId: game.dbGameId!,
             roundNumber: 1,
             createdAt: new Date(),
             updatedAt: new Date()
+          }
         });
         // Set the round ID for trick logging
         const { trickLogger } = await import('../../lib/trickLogger');
-        trickLogger.setCurrentRoundId(game.id, roundId);          }
-        });
+        trickLogger.setCurrentRoundId(game.id, roundId);
       }
     } catch (err) {
       console.error('[GAME START] Failed to ensure DB game/round records:', err);
