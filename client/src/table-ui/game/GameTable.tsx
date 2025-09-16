@@ -2821,6 +2821,7 @@ export default function GameTable({
 
   // Modified start game handler
   const handleStartGame = async () => {
+    setIsStarting(true);
     // Always call the parent's start game function - it will handle modal logic
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
@@ -2829,6 +2830,7 @@ export default function GameTable({
 
   // Handle starting game with bots (from bot warning modal)
   const handleStartWithBots = async () => {
+    setIsStarting(true);
     onCloseBotWarning?.();
     // Call socket API directly to start the game
     if (socket && gameState?.id) {
@@ -2838,6 +2840,7 @@ export default function GameTable({
 
   // Invite bots to all empty seats, then start game
   const handlePlayWithBots = async () => {
+    setIsStarting(true);
     const emptySeatIndexes = (gameState.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
     for (const seatIndex of emptySeatIndexes) {
       await handleInviteBot(seatIndex);
@@ -2868,6 +2871,7 @@ export default function GameTable({
   
   // New state for player profile features
   const [showPlayerStats, setShowPlayerStats] = useState(false);
+const [isStarting, setIsStarting] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [emojiReactions, setEmojiReactions] = useState<Record<string, { emoji: string; timestamp: number }>>({});
   const [emojiTravels, setEmojiTravels] = useState<Array<{
@@ -3319,7 +3323,7 @@ export default function GameTable({
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                {!isLeague && gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
+                {!isLeague && gameState.status === "WAITING" && !isStarting && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[99999]"
@@ -3681,12 +3685,14 @@ export default function GameTable({
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleStartWithBots}
-                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                >
-                  Start Game
-                </button>
+                {!isStarting && (
+                  <button
+                    onClick={handleStartWithBots}
+                    className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                  >
+                    Start Game
+                  </button>
+                )}
               </div>
             </div>
           </div>
