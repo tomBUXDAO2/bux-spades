@@ -38,7 +38,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
             // For bots, use the universal bot user ID instead of the unique bot ID
             let userId = player.id;
             if (player.type === 'bot') {
-              userId = 'bot-user-universal';
+              userId = player.id;
             }
             console.log('[TRICK COMPLETION DEBUG] About to call updatePlayerTrickCount with:', {
               gameId: game.dbGameId,
