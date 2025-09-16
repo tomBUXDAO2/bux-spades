@@ -35,14 +35,16 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
       const hand = game.hands[seatIndex] || [];
       const existingBids = game.bidding.bids.slice();
       const { bid, reason } = getRegularBid({ hand, seatIndex, existingBids });
-      console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}`);
-      game.bidding.bids[seatIndex] = bid;
-      console.log(`[BOT DEBUG] Bot ${bot.username} bid ${bid}`);
+      const allowNil = Boolean((game as any).rules?.allowNil);
+      const finalBid = (!allowNil && bid === 0) ? 1 : bid;
+      console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}${!allowNil && bid === 0 ? ' -> adjusted to 1 (nil disabled)' : ''}`);
+      game.bidding.bids[seatIndex] = finalBid;
+      console.log(`[BOT DEBUG] Bot ${bot.username} bid ${finalBid}`);
 
       // Persist RoundBid using universal bot user ID - FIXED VERSION
       if (game.dbGameId) {
         try {
-          console.log('[BOT BIDDING] Bot', bot.username, 'logging bid', bid, 'to database');
+          console.log('[BOT BIDDING] Bot', bot.username, 'logging bid', finalBid, 'to database');
           let roundNumber = game.currentRound || 1;
           let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
           if (!roundRecord) {
@@ -68,17 +70,17 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
                 playerId: botUserId
               }
             },
-            update: { bid, isBlindNil: bid === -1 },
+            update: { bid: finalBid, isBlindNil: finalBid === -1 },
             create: {
               id: `bid_${roundRecord.id}_${seatIndex}_${Date.now()}`,
               roundId: roundRecord.id,
               playerId: botUserId,
-              bid,
-              isBlindNil: bid === -1,
+              bid: finalBid,
+              isBlindNil: finalBid === -1,
               createdAt: new Date()
             }
           });
-          console.log('[BOT BIDDING] SUCCESS: Logged bid for bot', bot.username, 'bid:', bid, 'result:', result.id);
+          console.log('[BOT BIDDING] SUCCESS: Logged bid for bot', bot.username, 'bid:', finalBid, 'result:', result.id);
         } catch (err) {
           console.error('[BOT BIDDING ERROR] Failed to persist RoundBid for bot', bot.username, ':', err);
           // Don't throw - continue with game flow

@@ -56,6 +56,12 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       return;
     }
 
+    // Enforce no-nil option for regular/whiz/mirror when disabled
+    if (bid === 0 && !(game.rules.allowNil)) {
+      socket.emit('error', { message: 'Nil is not allowed in this game' });
+      return;
+    }
+
     // Record the bid in memory
     game.bidding.bids[playerIndex] = bid;
     game.players[playerIndex]!.bid = bid;
