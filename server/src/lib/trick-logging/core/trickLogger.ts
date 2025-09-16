@@ -17,7 +17,12 @@ export class TrickLogger {
    * Clean up memory for completed games
    */
   cleanupGame(gameId: string): void {
-    this.roundManager.cleanupGame(gameId);
+  /**
+   * Set the current round ID for a game
+   */
+  setCurrentRoundId(gameId: string, roundId: string): void {
+    this.gameIntegration.setCurrentRoundId(gameId, roundId);
+  }    this.roundManager.cleanupGame(gameId);
   }
 
   /**

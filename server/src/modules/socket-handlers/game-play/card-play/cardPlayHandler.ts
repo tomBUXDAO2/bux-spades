@@ -52,7 +52,7 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
     hand.splice(cardIndex, 1);
 
     // Add to current trick
-    game.play.currentTrick.push(card);
+    game.play.currentTrick.push({ ...card, playerIndex });
     
     console.log('[PLAY CARD DEBUG] Card played:', { playerIndex, card, trickLength: game.play.currentTrick.length });
 

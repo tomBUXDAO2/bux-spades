@@ -45,7 +45,7 @@ export async function handleTrickComplete(game: Game): Promise<void> {
     }
   }
   
-  const winnerPlayerIndex = (game.play.currentPlayerIndex - game.play.currentTrick.length + winnerIndex + 4) % 4;
+  const winnerPlayerIndex = trick[winnerIndex].playerIndex;
   const winnerPlayer = game.players[winnerPlayerIndex];
   
   console.log('[TRICK COMPLETE] Winner:', winnerPlayer?.username, 'at index:', winnerPlayerIndex);
