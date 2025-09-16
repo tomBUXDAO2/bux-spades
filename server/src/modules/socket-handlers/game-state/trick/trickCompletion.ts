@@ -53,6 +53,21 @@ export async function handleTrickComplete(game: Game): Promise<void> {
   // Update player trick count
   if (winnerPlayer) {
     winnerPlayer.tricks = (winnerPlayer.tricks || 0) + 1;
+    
+    // Update PlayerTrickCount in database
+    if (game.dbGameId) {
+      try {
+        const { updatePlayerTrickCount } = await import('../../../../lib/database-scoring/trick-count/trickCountManager');
+        let userId = winnerPlayer.id;
+        if (winnerPlayer.type === 'bot') {
+          userId = winnerPlayer.id;
+        }
+        await updatePlayerTrickCount(game.dbGameId, game.currentRound, userId, winnerPlayer.tricks);
+        console.log('[TRICK COMPLETE] Updated PlayerTrickCount for', winnerPlayer.username, ':', winnerPlayer.tricks);
+      } catch (error) {
+        console.error('[TRICK COMPLETE] Failed to update PlayerTrickCount:', error);
+      }
+    }
   }
   
   // Store trick
@@ -72,8 +87,9 @@ export async function handleTrickComplete(game: Game): Promise<void> {
   
   // Check if hand is complete
   if (game.play.trickNumber >= 12) {
-    const { handleHandComplete } = await import('../hand/handCompletion');
-    await handleHandComplete(game);
+    console.log('[TRICK COMPLETE] Hand complete, triggering hand completion');
+    const { handleHandCompletion } = await import('../../../../lib/hand-completion/hand/handCompletion');
+    await handleHandCompletion(game);
   } else {
     // Start next trick
     game.play.trickNumber++;

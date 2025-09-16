@@ -52,7 +52,7 @@ export async function logGameStart(game: Game): Promise<void> {
           // For bots, use the universal bot user ID instead of the unique bot ID
           let userId = player.id;
           if (player.type === 'bot') {
-            userId = 'bot-user-universal';
+            userId = player.id;
           }
           
           await prisma.gamePlayer.create({

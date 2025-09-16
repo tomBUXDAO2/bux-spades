@@ -14,7 +14,7 @@ const BOT_USER_ID = 'bot-user-universal';
  */
 function getPlayerDbUserId(player: any): string {
   if (player.type === 'bot') {
-    return player.dbUserId || BOT_USER_ID;
+    return player.id;
   }
   return player.id;
 }

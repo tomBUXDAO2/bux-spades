@@ -10,7 +10,7 @@ const BOT_USER_ID = 'bot-user-universal';
  * Get the database user ID for a bot player
  */
 function getBotDbUserId(player: any): string {
-  return player.dbUserId || BOT_USER_ID;
+  return player.id;
 }
 
 /**
