@@ -17,8 +17,8 @@ const formatCoins = (value: number) => {
 const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCreateGame }) => {
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
-  const [gameType, setGameType] = useState<'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REGULAR');
-  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES'>('SUICIDE');
+  const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
+  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS'>('SUICIDE');
 
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
@@ -36,7 +36,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   };
 
   // Handle game type changes
-  const handleGameTypeChange = (type: 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK') => {
+  const handleGameTypeChange = (type: 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK') => {
     setGameType(type);
     
     // Mirror game type logic: nil always allowed, blind nil never allowed
@@ -46,7 +46,23 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     }
   };
 
+  // Handle nil toggle changes
+  const handleNilToggle = (enabled: boolean) => {
+    setAllowNil(enabled);
+    // If nil is disabled, blind nil should also be disabled
+    if (!enabled) {
+      setAllowBlindNil(false);
+    }
+  };
 
+  // Handle blind nil toggle changes
+  const handleBlindNilToggle = (enabled: boolean) => {
+    setAllowBlindNil(enabled);
+    // If blind nil is enabled, nil should also be enabled
+    if (enabled) {
+      setAllowNil(true);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -77,7 +93,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onCreateGame({
       gameMode: mode,
       biddingOption: getBiddingOption(),
-      gamePlayOption: 'REGULAR',
+      gamePlayOption: 'REG',
       minPoints,
       maxPoints,
       buyIn,
@@ -91,50 +107,46 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onClose();
   };
 
-
+  // Get available gimmick options based on game mode
+  const getGimmickOptions = () => {
+    const options = ['4 OR NIL', 'BID 3', 'BID HEARTS'];
+    if (mode === 'PARTNERS') {
+      options.unshift('SUICIDE'); // Add SUICIDE at the beginning for partners mode
+    }
+    return options;
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center border border-white/20 max-h-[95vh] overflow-y-auto sm:p-4 sm:gap-4">
-        <h2 className="text-xl font-bold text-slate-200 mb-4 text-center sm:text-2xl">Create Game</h2>
-        <div className="space-y-2 w-full flex flex-col items-center justify-center sm:space-y-3">
-          {/* Left Column */}
-          <div className="w-full flex flex-col items-center space-y-2 sm:space-y-3">
-            {/* Partners/Solo Toggle with text outside */}
-            <div className="flex items-center justify-center w-full gap-2 my-2">
-              <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Partners</span>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20">
+        <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center">Create Game</h2>
+        <div className="space-y-3 w-full flex flex-col items-center justify-center">
+          {/* Partners/Solo Toggle with text outside */}
+          <div className="flex items-center justify-center w-full gap-2 my-2">
+            <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
+            <div
+              className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
+              onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
+              style={{ userSelect: 'none' }}
+            >
+              <input
+                type="checkbox"
+                id="mode-toggle"
+                className="sr-only peer"
+                checked={mode === 'SOLO'}
+                readOnly
+              />
               <div
-                className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
-                onClick={() => {
-                  const newMode = mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS';
-                  setMode(newMode);
-                  
-                  // Reset gimmickType when switching modes to prevent invalid selections
-                  if (newMode === 'SOLO' && gimmickType === 'SUICIDE') {
-                    setGimmickType('4 OR NIL');
-                  }
-                }}
-                style={{ userSelect: 'none' }}
-              >
-                <input
-                  type="checkbox"
-                  id="mode-toggle"
-                  className="sr-only peer"
-                  checked={mode === 'SOLO'}
-                  readOnly
-                />
-                <div
-                  className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
-                  style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
-                ></div>
-              </div>
-              <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Solo</span>
+                className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
+                style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
+              ></div>
             </div>
+            <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-base`}>Solo</span>
           </div>
 
           {/* Coins with coin icon and prize display - moved above bidding options */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-lg font-bold text-yellow-500 mb-2 text-center sm:text-2xl">Coins</label>
+            <label className="block text-2xl font-bold text-yellow-500 mb-2 text-center">Coins</label>
             <div className="flex items-center gap-4 justify-center">
               <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">-</button>
               <span className="w-20 text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold">
@@ -146,7 +158,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               <button onClick={() => handleBuyInChange(1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">+</button>
             </div>
             {/* Prize display */}
-            <div className="mt-2 text-xs font-medium text-indigo-300 text-center sm:text-sm">
+            <div className="mt-2 text-sm font-medium text-indigo-300 text-center">
               {(() => {
                 const prizePot = buyIn * 4 * 0.9;
                 if (mode === 'PARTNERS') {
@@ -165,7 +177,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           <div className="w-full flex flex-col items-center my-2">
             <div className="flex gap-8 items-center justify-center w-full">
               <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Min Points</label>
+                <label className="block text-slate-300 mb-2 text-center">Min Points</label>
                 <div className="flex gap-2 items-center justify-center">
                   <button onClick={() => handlePointsChange('min', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={minPoints <= -250}>-</button>
                   <input
@@ -178,7 +190,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 </div>
               </div>
               <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Max Points</label>
+                <label className="block text-slate-300 mb-2 text-center">Max Points</label>
                 <div className="flex gap-2 items-center justify-center">
                   <button onClick={() => handlePointsChange('max', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={maxPoints <= 100}>-</button>
                   <input
@@ -193,60 +205,121 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             </div>
           </div>
 
-          {/* Game type options */}
+          {/* Game Type Radio Buttons */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Game Type</label>
-            <div className="grid grid-cols-2 gap-2 w-full">
-              {['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
-                <label key={opt} className="flex items-center gap-2 bg-slate-700 rounded-md p-2 cursor-pointer">
+            <div className="flex flex-wrap gap-4 justify-center mb-2">
+              {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
+                <label key={opt} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     name="gameType"
+                    value={opt}
                     checked={gameType === opt}
-                    onChange={() => handleGameTypeChange(opt as 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
+                    onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
                   />
                   <span className="text-slate-200">{opt}</span>
                 </label>
               ))}
             </div>
-          </div>
 
-          {/* Gimmick type options (only visible when gameType is GIMMICK) */}
-          {gameType === 'GIMMICK' && (
-            <div className="w-full flex flex-col items-center my-2">
-              <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Gimmick Type</label>
-              <div className="grid grid-cols-2 gap-2 w-full">
-                {['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'].map((opt) => (
-                  <label key={opt} className="flex items-center gap-2 bg-slate-700 rounded-md p-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="gimmickType"
-                      checked={gimmickType === opt}
-                      onChange={() => setGimmickType(opt as typeof gimmickType)}
-                    />
-                    <span className="text-slate-200">{opt}</span>
-                  </label>
+            {/* Gimmick Dropdown */}
+            <div className="w-full flex justify-center mb-2">
+              <select
+                value={gimmickType}
+                onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS')}
+                disabled={gameType !== 'GIMMICK'}
+                className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
+                  gameType === 'GIMMICK' 
+                    ? 'bg-slate-100 cursor-pointer' 
+                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {getGimmickOptions().map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Nil and Blind Nil toggles */}
+            <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 text-sm">Nil:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
+                  <div
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType === 'MIRROR' ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(gameType === 'MIRROR') && handleNilToggle(!allowNil)}
+                    style={{ userSelect: 'none' }}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-6' : ''}`}
+                      style={{ transform: allowNil ? 'translateX(24px)' : 'translateX(0)' }}
+                    ></div>
+                  </div>
+                  <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-200 text-sm">Blind Nil:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
+                  <div
+                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType === 'MIRROR' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={() => !(gameType === 'MIRROR' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
+                    style={{ userSelect: 'none' }}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-6' : ''}`}
+                      style={{ transform: allowBlindNil ? 'translateX(24px)' : 'translateX(0)' }}
+                    ></div>
+                  </div>
+                  <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Special Rules */}
+          {/* Special Rules with emojis, mutually exclusive */}
           <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-slate-300 mb-2 text-center text-sm sm:text-base">Special Rules</label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={specialRule === 'screamer'} onChange={(e) => setSpecialRule(e.target.checked ? 'screamer' : '')} />
-                <span className="text-slate-200">Screamer</span>
+            <label className="block text-2xl font-bold text-pink-400 mb-2 text-center">Special Rules</label>
+            <div className="flex flex-row gap-6 justify-center">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={specialRule === 'screamer'}
+                  onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
+                  className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                />
+                <span className="text-slate-300">🎭 Screamer</span>
               </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={specialRule === 'assassin'} onChange={(e) => setSpecialRule(e.target.checked ? 'assassin' : '')} />
-                <span className="text-slate-200">Assassin</span>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={specialRule === 'assassin'}
+                  onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
+                  className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                />
+                <span className="text-slate-300">⚔️ Assassin</span>
               </label>
             </div>
           </div>
+        </div>
 
-          <button onClick={handleCreate} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Create</button>
+        <div className="flex justify-center gap-4 mt-4 w-full">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
+          >
+            Create Game
+          </button>
         </div>
       </div>
     </div>
