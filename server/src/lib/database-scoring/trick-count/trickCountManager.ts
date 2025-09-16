@@ -3,26 +3,28 @@ import prisma from '../../prisma';
 
 // Update PlayerTrickCount after every trick
 export async function updatePlayerTrickCount(gameId: string, roundNumber: number, playerId: string, tricksWon: number) {
-  console.log('[TRICK COUNT MANAGER DEBUG] updatePlayerTrickCount called with:', {
+  console.log('[TRICK COUNT MANAGER] updatePlayerTrickCount called with:', {
     gameId,
     roundNumber,
     playerId,
     tricksWon
   });
+  
   try {
     // Find the actual roundId from database
-    console.log('[TRICK COUNT MANAGER DEBUG] Looking for round with gameId:', gameId, 'roundNumber:', roundNumber);
+    console.log('[TRICK COUNT MANAGER] Looking for round with gameId:', gameId, 'roundNumber:', roundNumber);
     const round = await prisma.round.findFirst({
       where: { gameId, roundNumber }
     });
-    console.log('[TRICK COUNT MANAGER DEBUG] Found round:', round ? round.id : 'NOT FOUND');
     
     if (!round) {
-      console.error(`[DB SCORING ERROR] Round ${roundNumber} not found for game ${gameId}`);
+      console.error(`[TRICK COUNT MANAGER ERROR] Round ${roundNumber} not found for game ${gameId}`);
       return;
     }
     
-    await prisma.playerTrickCount.upsert({
+    console.log('[TRICK COUNT MANAGER] Found round:', round.id);
+    
+    const result = await prisma.playerTrickCount.upsert({
       where: {
         gameId_roundId_playerId: {
           gameId,
@@ -42,8 +44,10 @@ export async function updatePlayerTrickCount(gameId: string, roundNumber: number
         tricksWon
       }
     });
-    console.log(`[DB SCORING] Updated PlayerTrickCount: ${playerId} has ${tricksWon} tricks in round ${round.id}`);
+    
+    console.log(`[TRICK COUNT MANAGER] SUCCESS: Updated PlayerTrickCount: ${playerId} has ${tricksWon} tricks in round ${round.id}, result ID: ${result.id}`);
   } catch (error) {
-    console.error(`[DB SCORING ERROR] Failed to update PlayerTrickCount:`, error);
+    console.error(`[TRICK COUNT MANAGER ERROR] Failed to update PlayerTrickCount:`, error);
+    throw error; // Re-throw to ensure the error is not silently ignored
   }
 }

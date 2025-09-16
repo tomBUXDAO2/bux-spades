@@ -35,13 +35,14 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
       game.bidding.bids[seatIndex] = bid;
       console.log(`[BOT DEBUG] Bot ${bot.username} bid ${bid}`);
 
-      // Persist RoundBid using universal bot user ID
-      try {
-        console.log('[BOT BIDDING DEBUG] Bot', bot.username, 'attempting to log bid', bid, 'to database');
-        if (game.dbGameId) {
+      // Persist RoundBid using universal bot user ID - FIXED VERSION
+      if (game.dbGameId) {
+        try {
+          console.log('[BOT BIDDING] Bot', bot.username, 'logging bid', bid, 'to database');
           let roundNumber = game.currentRound || 1;
           let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
           if (!roundRecord) {
+            console.log('[BOT BIDDING] Creating new round record for game', game.dbGameId, 'round', roundNumber);
             roundRecord = await prisma.round.create({
               data: {
                 id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
@@ -52,29 +53,34 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
               }
             });
           }
-          await prisma.roundBid.upsert({
+          
+          const botUserId = getBotDbUserId(bot);
+          console.log('[BOT BIDDING] Upserting bid for bot', bot.username, 'with userId', botUserId);
+          
+          const result = await prisma.roundBid.upsert({
             where: {
               roundId_playerId: {
                 roundId: roundRecord.id,
-                playerId: getBotDbUserId(bot)
+                playerId: botUserId
               }
             },
             update: { bid, isBlindNil: bid === -1 },
             create: {
               id: `bid_${roundRecord.id}_${seatIndex}_${Date.now()}`,
               roundId: roundRecord.id,
-              playerId: getBotDbUserId(bot),
+              playerId: botUserId,
               bid,
               isBlindNil: bid === -1,
               createdAt: new Date()
             }
           });
-          console.log('[BOT BIDDING DEBUG] Successfully logged bid for bot', bot.username, 'bid:', bid);
-        } else {
-          console.log('[BOT BIDDING DEBUG] No dbGameId for bot', bot.username);
+          console.log('[BOT BIDDING] SUCCESS: Logged bid for bot', bot.username, 'bid:', bid, 'result:', result.id);
+        } catch (err) {
+          console.error('[BOT BIDDING ERROR] Failed to persist RoundBid for bot', bot.username, ':', err);
+          // Don't throw - continue with game flow
         }
-      } catch (err) {
-        console.error('[BOT DEBUG] Failed to persist RoundBid for bot', bot.username, ':', err);
+      } else {
+        console.log('[BOT BIDDING ERROR] No dbGameId for bot', bot.username);
       }
       
       // Emit game update to frontend
