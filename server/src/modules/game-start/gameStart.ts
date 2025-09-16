@@ -78,15 +78,9 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       // Continue anyway; bid logging will skip if dbGameId missing
     }
 
-    // Set bot game flag
-    const allHuman = game.players.length === 4 && game.players.every(p => p && p.type === 'human');
-    game.isBotGame = !allHuman;
-
-    console.log('[GAME START] Starting game:', {
-      gameId: game.id,
-      isBotGame: game.isBotGame,
-      players: game.players.map(p => p ? `${p.username} (${p.type})` : 'null')
-    });
+    // Dealer assignment and card dealing
+    const dealerIndex = assignDealer(game.players, game.dealerIndex);
+    game.dealerIndex = dealerIndex;
 
     // Assign dealer flag for UI
     game.players.forEach((p, i) => {
@@ -140,10 +134,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
 
     // If first bidder is a bot, trigger bot bidding
     if (firstBidder.type === 'bot') {
-      console.log('[GAME START] First bidder is bot, triggering bot move');
-      setTimeout(() => {
-        botMakeMove(game, (dealerIndex + 1) % 4);
-      }, 1000);
+      setTimeout(() => botMakeMove(game, (dealerIndex + 1) % 4), 500);
     }
 
   } catch (err) {

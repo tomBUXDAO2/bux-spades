@@ -2,6 +2,7 @@ import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
+import prisma from '../../../../lib/prisma';
 
 /**
  * Handles bidding completion
@@ -12,6 +13,44 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
   if (typeof game.dealerIndex !== 'number') {
     io.to(game.id).emit('error', { message: 'Invalid game state: no dealer assigned' });
     return;
+  }
+
+  // Ensure 4 RoundBid rows exist for this round in DB
+  try {
+    if (game.dbGameId) {
+      const roundNumber = game.currentRound || 1;
+      let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
+      if (!roundRecord) {
+        roundRecord = await prisma.round.create({
+          data: {
+            id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
+            gameId: game.dbGameId,
+            roundNumber,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+      }
+      for (let i = 0; i < 4; i++) {
+        const p = game.players[i];
+        if (!p) continue;
+        const bid = game.bidding.bids[i] ?? 0;
+        await prisma.roundBid.upsert({
+          where: { roundId_playerId: { roundId: roundRecord.id, playerId: p.id } },
+          update: { bid, isBlindNil: bid === -1 },
+          create: {
+            id: `bid_${roundRecord.id}_${i}_${Date.now()}`,
+            roundId: roundRecord.id,
+            playerId: p.id,
+            bid,
+            isBlindNil: bid === -1,
+            createdAt: new Date()
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[BIDDING COMPLETE] Failed to ensure 4 RoundBid rows:', err);
   }
   
   console.log("[BIDDING COMPLETE DEBUG] dealerIndex:", game.dealerIndex, "firstPlayerIndex:", (game.dealerIndex + 1) % 4);

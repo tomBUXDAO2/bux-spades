@@ -40,25 +40,32 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       console.error(`[DB SCORING ERROR] Game ${gameId} not found in memory`);
       return null;
     }
-    
-    // Calculate team bids and tricks
+
+    // Build a map of playerId -> tricksWon from trickCounts
+    const playerIdToTricks: Record<string, number> = {};
+    for (const tc of trickCounts) {
+      playerIdToTricks[tc.playerId] = tc.tricksWon;
+    }
+
+    // Sum tricks per team from all four seats using in-memory seating
+    for (let idx = 0; idx < game.players.length; idx++) {
+      const player = game.players[idx];
+      if (!player) continue;
+      const tricks = playerIdToTricks[player.id] || 0;
+      if (team1.includes(idx)) {
+        team1Tricks += tricks;
+      } else if (team2.includes(idx)) {
+        team2Tricks += tricks;
+      }
+    }
+
+    // Sum bids per team from RoundBid rows (missing rows imply bid 0)
     for (const roundBid of round.RoundBid) {
       const playerIndex = game.players.findIndex(p => p?.id === roundBid.playerId);
       if (playerIndex === -1) continue;
-      
-      const trickCount = trickCounts.find(tc => tc.playerId === roundBid.playerId);
-      const tricks = trickCount?.tricksWon || 0;
-      
-      if (team1.includes(playerIndex)) {
-        team1Tricks += tricks;
-        if (roundBid.bid > 0) { // Regular bid (not nil/blind nil)
-          team1Bid += roundBid.bid;
-        }
-      } else if (team2.includes(playerIndex)) {
-        team2Tricks += tricks;
-        if (roundBid.bid > 0) { // Regular bid (not nil/blind nil)
-          team2Bid += roundBid.bid;
-        }
+      if (roundBid.bid > 0) {
+        if (team1.includes(playerIndex)) team1Bid += roundBid.bid;
+        else if (team2.includes(playerIndex)) team2Bid += roundBid.bid;
       }
     }
     

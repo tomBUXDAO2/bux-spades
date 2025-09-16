@@ -59,6 +59,36 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
     points: 0,
     dbUserId: BOT_USER_ID, // Same DB user ID for all bots
   };
+
+  // If game is already in DB, upsert GamePlayer row for this bot
+  try {
+    if (game.dbGameId) {
+      await prisma.gamePlayer.upsert({
+        where: { gameId_position: { gameId: game.dbGameId, position: seatIndex } as any },
+        update: {
+          userId: botDisplayId,
+          team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+          username: `Bot ${botNumber}`,
+          updatedAt: new Date()
+        },
+        create: {
+          id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
+          gameId: game.dbGameId,
+          userId: botDisplayId,
+          position: seatIndex,
+          team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+          bid: null,
+          bags: 0,
+          points: 0,
+          username: `Bot ${botNumber}`,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    }
+  } catch (err) {
+    console.error('[BOT INVITATION] Failed to upsert GamePlayer for bot seat:', err);
+  }
   
   // Set isBotGame flag
   game.isBotGame = game.players.some(p => p && p.type === 'bot');

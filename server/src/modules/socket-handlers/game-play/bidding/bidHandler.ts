@@ -51,7 +51,9 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
     }
 
     // Validate bid
-    if (bid < 0 || bid > 13) {
+    const isBlindNilBid = bid === -1;
+    const blindNilAllowed = Boolean(game.rules?.allowBlindNil);
+    if ((bid < 0 || bid > 13) && !(isBlindNilBid && blindNilAllowed)) {
       socket.emit('error', { message: 'Invalid bid amount' });
       return;
     }
