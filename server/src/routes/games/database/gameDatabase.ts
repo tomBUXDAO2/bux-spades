@@ -19,8 +19,8 @@ export async function logGameStart(game: Game): Promise<void> {
         maxPoints: game.maxPoints,
         buyIn: game.buyIn,
         rated: game.rated,
-        allowNil: game.allowNil,
-        allowBlindNil: game.allowBlindNil,
+        allowNil: game.rules?.allowNil ?? game.allowNil,
+        allowBlindNil: game.rules?.allowBlindNil ?? game.allowBlindNil,
         league: game.league,
         whiz: game.rules?.bidType === 'WHIZ',
         mirror: game.rules?.bidType === 'MIRROR',
@@ -46,6 +46,7 @@ export async function logGameStart(game: Game): Promise<void> {
     console.log('[DATABASE] Creating bot users...');
     for (let i = 0; i < 4; i++) {
       const player = game.players[i];
+      if (!player) continue;
       if (player && player.type === 'bot') {
         try {
           await prisma.user.upsert({
@@ -70,6 +71,7 @@ export async function logGameStart(game: Game): Promise<void> {
     console.log('[DATABASE] Creating GamePlayer records...');
     for (let i = 0; i < 4; i++) {
       const player = game.players[i];
+      if (!player) continue;
       if (player) {
         try {
           const team = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
@@ -103,7 +105,7 @@ export async function logGameStart(game: Game): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('[DATABASE] Failed to log game:', error);
+    console.error('[DATABASE] Failed to log game start:', error);
     throw error;
   }
 }

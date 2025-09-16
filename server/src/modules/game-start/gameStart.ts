@@ -44,6 +44,9 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       return;
     }
 
+    // Move to bidding before persisting so DB status is correct
+    game.status = 'BIDDING';
+
     // Ensure game is logged in DB and Round 1 exists
     try {
       if (!game.dbGameId) {
@@ -84,13 +87,6 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       isBotGame: game.isBotGame,
       players: game.players.map(p => p ? `${p.username} (${p.type})` : 'null')
     });
-
-    // Start the game
-    game.status = 'BIDDING';
-
-    // Dealer assignment and card dealing
-    const dealerIndex = assignDealer(game.players, game.dealerIndex);
-    game.dealerIndex = dealerIndex;
 
     // Assign dealer flag for UI
     game.players.forEach((p, i) => {
