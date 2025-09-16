@@ -20,7 +20,7 @@ export function createGameFormatConfig(settings: any): GameFormatConfig {
   
   return {
     format,
-    gimmickType,
+    gimmickType: format === 'GIMMICK' ? gimmickType : undefined,
     allowNil: settings.allowNil !== false,
     allowBlindNil: settings.allowBlindNil === true,
     specialRules

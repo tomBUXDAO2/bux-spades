@@ -1,5 +1,5 @@
 import type { Game } from '../../../types/game';
-import { GameFormatConfig, GimmickType, mapGimmickTypeToGamePlayOption } from '../config/gameFormatTypes';
+import { GameFormatConfig, GimmickType, mapGimmickTypeToCode } from '../config/gameFormatTypes';
 
 /**
  * Gets game format description
@@ -49,7 +49,7 @@ export function applyGameFormatRules(game: Game, format: GameFormatConfig): void
     minPoints: game.minPoints,
     maxPoints: game.maxPoints,
     coinAmount: game.buyIn,
-    gimmickType: format.format === 'GIMMICK' && format.gimmickType ? mapGimmickTypeToGamePlayOption(format.gimmickType) : 'REGULAR',
+    gimmickType: format.format === 'GIMMICK' && format.gimmickType ? (format.gimmickType as any) : undefined,
     bidType: format.format === 'GIMMICK' ? 'GIMMICK' : 'REGULAR',
     allowNil: format.allowNil,
     allowBlindNil: format.allowBlindNil,
@@ -57,9 +57,7 @@ export function applyGameFormatRules(game: Game, format: GameFormatConfig): void
   };
   
   // Set forced bid for gimmick games
-  if (format.format === 'GIMMICK' && format.gimmickType) {
-    game.forcedBid = mapGimmickTypeToGamePlayOption(format.gimmickType);
-  }
+  game.forcedBid = format.format === 'GIMMICK' && format.gimmickType ? (format.gimmickType as any) : undefined;
   
   console.log('[GAME FORMAT] Applied format rules:', {
     format: format.format,

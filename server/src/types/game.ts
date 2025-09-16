@@ -1,6 +1,7 @@
 export type GameMode = 'PARTNERS' | 'SOLO';
 export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
-export type GamePlayOption = 'REGULAR' | 'SCREAMER' | 'ASSASSIN' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
+export type GamePlayOption = 'NONE' | 'SCREAMER' | 'ASSASSIN';
+export type GimmickType = 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES';
 export type Suit = 'SPADES' | 'HEARTS' | 'DIAMONDS' | 'CLUBS';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
@@ -45,7 +46,7 @@ export interface GameRules {
     screamer: boolean;
     assassin: boolean;
   };
-  gimmickType: GamePlayOption;
+  gimmickType?: GimmickType;
 }
 export interface Game {
 	id: string;
@@ -53,7 +54,7 @@ export interface Game {
 	maxPoints: number;
 	minPoints: number;
 	buyIn: number;
-	forcedBid: GamePlayOption;
+	forcedBid?: GimmickType;
 	specialRules: {
 		screamer?: boolean;
 		assassin?: boolean;
@@ -74,7 +75,7 @@ export interface Game {
 			screamer?: boolean;
 			assassin?: boolean;
 		};
-		gimmickType: GamePlayOption;
+		gimmickType?: GimmickType;
 	};
 	isBotGame: boolean;
 	dealerIndex?: number;

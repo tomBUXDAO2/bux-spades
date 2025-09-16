@@ -121,7 +121,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       team2TotalScore: 0,
       team1Bags: 0,
       team2Bags: 0,
-      forcedBid: 'REGULAR',
+      forcedBid: undefined as any,
       specialRules: {},
       spectators: [],
       completedTricks: [],
@@ -133,7 +133,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
         maxPoints: settings.maxPoints,
         minPoints: settings.minPoints,
         bidType: 'REGULAR',
-        gimmickType: 'REGULAR'
+        gimmickType: undefined as any
       },
       isBotGame: false
     };

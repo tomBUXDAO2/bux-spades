@@ -68,7 +68,7 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       // trickHistory: gameState.trickHistory || [],
       // roundScores: gameState.roundScores || [],
       // Add missing properties with defaults
-      forcedBid: 'REGULAR' as any,
+      forcedBid: undefined as any,
       specialRules: { screamer: false, assassin: false },
       spectators: [],
       completedTricks: [],

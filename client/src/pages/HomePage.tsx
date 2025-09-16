@@ -373,7 +373,7 @@ const HomePage: React.FC = () => {
     } else if (type === 'MIRROR') {
       color = 'bg-red-600';
       label = 'MIRRORS';
-    } else if (game.forcedBid && type === 'REGULAR') {
+    } else if (game.forcedBid && type === 'REGULAR' && game.forcedBid !== 'NONE') {
       color = 'bg-orange-500';
               if (game.forcedBid === 'BID4NIL') label = '4 OR NIL';
       else if (game.forcedBid === 'BID3') label = 'BID 3';
