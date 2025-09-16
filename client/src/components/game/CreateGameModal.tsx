@@ -46,23 +46,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     }
   };
 
-  // Handle nil toggle changes
-  const handleNilToggle = (enabled: boolean) => {
-    setAllowNil(enabled);
-    // If nil is disabled, blind nil should also be disabled
-    if (!enabled) {
-      setAllowBlindNil(false);
-    }
-  };
 
-  // Handle blind nil toggle changes
-  const handleBlindNilToggle = (enabled: boolean) => {
-    setAllowBlindNil(enabled);
-    // If blind nil is enabled, nil should also be enabled
-    if (enabled) {
-      setAllowNil(true);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -146,6 +130,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </div>
               <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-sm sm:text-base`}>Solo</span>
             </div>
+          </div>
 
           {/* Coins with coin icon and prize display - moved above bidding options */}
           <div className="w-full flex flex-col items-center my-2">
