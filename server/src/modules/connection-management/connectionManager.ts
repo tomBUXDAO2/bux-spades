@@ -11,6 +11,7 @@ import {
   createUserSession,
   handleStartGame
 } from '../index';
+import { handleHandSummaryContinue } from '../socket-handlers/game-state/hand/handSummaryContinue';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
   io.on('connection', (socket: AuthenticatedSocket) => {
@@ -18,43 +19,21 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       socketId: socket.id,
       userId: socket.userId,
       isAuthenticated: socket.isAuthenticated,
-      auth: socket.auth
+      connectedAt: new Date().toISOString()
     });
 
-    if (socket.userId) {
-      // Check if there's an existing socket for this user and disconnect it
-      const existingSocket = authenticatedSockets.get(socket.userId);
-      if (existingSocket && existingSocket.id !== socket.id) {
-        console.log(`[CONNECTION] Disconnecting existing socket for user ${socket.userId}:`, {
-          oldSocketId: existingSocket.id,
-          newSocketId: socket.id
-        });
-        existingSocket.emit('session_invalidated', {
-          reason: 'new_connection',
-          message: 'You have connected from another location'
-        });
-        existingSocket.disconnect();
-      }
-      
-      // Create new session for this user
-      const sessionId = createUserSession(socket.userId);
-      
+    // Store authenticated socket
+    if (socket.isAuthenticated && socket.userId) {
       authenticatedSockets.set(socket.userId, socket);
       onlineUsers.add(socket.userId);
       io.emit('online_users', Array.from(onlineUsers));
-      
-      console.log('User connected:', {
-        userId: socket.userId,
-        sessionId,
-        socketId: socket.id,
-        onlineUsers: Array.from(onlineUsers)
-      });
-      socket.emit('authenticated', { 
-        success: true, 
-        userId: socket.userId, 
-        sessionId, 
-        games: Array.from(socket.rooms).filter(room => room !== socket.id) 
-      });    }
+      console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
+    }
+
+    // Authentication event
+    socket.on('authenticate', (data) => {
+      createUserSession(socket, data);
+    });
 
     // Join game event
     socket.on('join_game', (data) => handleJoinGame(socket, data));
@@ -63,6 +42,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     socket.on('make_bid', (data) => handleMakeBid(socket, data));
     socket.on('play_card', (data) => handlePlayCard(socket, data));
     socket.on('start_game', (data) => handleStartGame(socket, data));
+    socket.on('hand_summary_continue', (data) => handleHandSummaryContinue(socket, data));
 
     // Chat events
     socket.on("game_chat_message", async (data) => {

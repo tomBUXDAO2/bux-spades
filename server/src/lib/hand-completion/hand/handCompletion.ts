@@ -71,6 +71,12 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     };
     
     // Emit hand completed event with database scores
+    
+    // Clear the last trick cards from the table before showing hand summary
+    if (game.play && game.play.currentTrick) {
+      console.log('[HAND COMPLETION] Clearing last trick cards from table');
+      game.play.currentTrick = [];
+    }
     io.to(game.id).emit('hand_completed', handSummary);
     
     console.log('[HAND COMPLETED] Partners mode - Emitted hand_completed with DATABASE scores:', {
