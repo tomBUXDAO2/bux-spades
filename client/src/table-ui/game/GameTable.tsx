@@ -3344,7 +3344,7 @@ const [isStarting, setIsStarting] = useState(false);
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       // Determine game type, including all gimmick games
-                      let gameType = (gameState as any).rules.gameType;
+                      let gameType = (gameState as any).rules.bidType || (gameState as any).rules.gameType;
                       const forcedBid = (gameState as any).forcedBid;
                       if (forcedBid === 'SUICIDE') {
                         gameType = 'SUICIDE';
@@ -3472,7 +3472,7 @@ const [isStarting, setIsStarting] = useState(false);
                   // Show forced bid messages on table during bidding
                   (() => {
                     const forcedBid = (gameState as any).forcedBid;
-                    const gameType = (gameState as any).gameType;
+                    const gameType = (gameState as any).rules.bidType || (gameState as any).gameType;
                     
                     if (forcedBid === "BIDHEARTS") {
                       return (
@@ -3695,7 +3695,7 @@ const [isStarting, setIsStarting] = useState(false);
           <div className="flex items-center gap-2 text-sm mb-2">
             {/* Game type brick */}
             {(() => {
-              const type = (gameState as any).rules?.gameType || 'REGULAR';
+              const type = (gameState as any).rules?.bidType || (gameState as any).rules?.gameType || 'REGULAR';
               let color = 'bg-green-600';
               let label = 'REGULAR';
               if (type === 'WHIZ') {
