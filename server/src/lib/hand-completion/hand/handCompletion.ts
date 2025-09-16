@@ -12,6 +12,11 @@ declare function startTurnTimeout(game: Game, playerIndex: number, phase: string
  * SINGLE HAND COMPLETION FUNCTION - NO MORE DUPLICATION
  */
 export async function handleHandCompletion(game: Game): Promise<void> {
+  console.log('[HAND COMPLETION DEBUG] ===== HAND COMPLETION STARTED =====');
+  console.log('[HAND COMPLETION DEBUG] Game ID:', game.id);
+  console.log('[HAND COMPLETION DEBUG] Game status:', game.status);
+  console.log('[HAND COMPLETION DEBUG] Current round:', game.currentRound);
+  console.log('[HAND COMPLETION DEBUG] DB Game ID:', game.dbGameId);
   try {
     console.log('[HAND COMPLETION] Starting hand completion for game:', game.id);
     
@@ -79,7 +84,13 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     io.to(game.id).emit('game_update', enrichGameForClient(game));
     
     // Check if game is complete
+    console.log('[HAND COMPLETION DEBUG] Checking game completion with:', {
+      gameId: game.dbGameId,
+      maxPoints: game.maxPoints,
+      minPoints: game.minPoints
+    });
     const completionCheck = await checkGameCompletion(game.dbGameId, game.maxPoints, game.minPoints);
+    console.log('[HAND COMPLETION DEBUG] Game completion check result:', completionCheck);
     if (completionCheck.isGameOver) {
       console.log('[GAME COMPLETION] Game is over, winning team:', completionCheck.winningTeam);
       

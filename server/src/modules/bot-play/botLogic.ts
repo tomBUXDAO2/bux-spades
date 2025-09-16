@@ -37,6 +37,7 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
 
       // Persist RoundBid using universal bot user ID
       try {
+        console.log('[BOT BIDDING DEBUG] Bot', bot.username, 'attempting to log bid', bid, 'to database');
         if (game.dbGameId) {
           let roundNumber = game.currentRound || 1;
           let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber } });
@@ -68,9 +69,12 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
               createdAt: new Date()
             }
           });
+          console.log('[BOT BIDDING DEBUG] Successfully logged bid for bot', bot.username, 'bid:', bid);
+        } else {
+          console.log('[BOT BIDDING DEBUG] No dbGameId for bot', bot.username);
         }
       } catch (err) {
-        console.error('[BOT DEBUG] Failed to persist RoundBid for bot:', err);
+        console.error('[BOT DEBUG] Failed to persist RoundBid for bot', bot.username, ':', err);
       }
       
       // Emit game update to frontend
