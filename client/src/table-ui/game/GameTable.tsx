@@ -3704,7 +3704,7 @@ const [isStarting, setIsStarting] = useState(false);
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
                 label = 'MIRRORS';
-              } else if (type === 'GIMMICK' } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {} else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') { (gameState as any).rules?.gimmickType) {
+              } else if (type === 'GIMMICK' && (gameState as any).rules?.gimmickType) {
                 color = 'bg-orange-500';
                 if ((gameState as any).rules?.gimmickType === 'BID4NIL') label = '4 OR NIL';
                 else if ((gameState as any).rules?.gimmickType === 'BID3') label = 'BID 3';
