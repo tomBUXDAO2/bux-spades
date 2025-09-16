@@ -40,7 +40,14 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
             if (player.type === 'bot') {
               userId = 'bot-user-universal';
             }
+            console.log('[TRICK COMPLETION DEBUG] About to call updatePlayerTrickCount with:', {
+              gameId: game.dbGameId,
+              roundNumber: game.currentRound,
+              userId: userId,
+              tricks: player.tricks
+            });
             await updatePlayerTrickCount(game.dbGameId, game.currentRound, userId, player.tricks);
+            console.log('[TRICK COMPLETION DEBUG] updatePlayerTrickCount completed');
           }
         } catch (error) {
           console.error('[TRICK COMPLETION] Failed to update PlayerTrickCount:', error);

@@ -26,7 +26,12 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     console.log('[HAND COMPLETION] Partners mode - using database scoring');
     
     // Calculate and store scores in database
+    console.log('[HAND COMPLETION DEBUG] About to call calculateAndStoreGameScore with:', {
+      gameId: game.dbGameId,
+      roundNumber: game.currentRound
+    });
     const gameScore = await calculateAndStoreGameScore(game.dbGameId, game.currentRound);
+    console.log('[HAND COMPLETION DEBUG] calculateAndStoreGameScore returned:', gameScore);
     
     if (!gameScore) {
       throw new Error('Failed to calculate game score');
