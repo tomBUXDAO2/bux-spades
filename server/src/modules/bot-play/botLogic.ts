@@ -5,6 +5,7 @@ import prisma from "../../lib/prisma";
 import { getCardValue } from "../../lib/hand-completion/utils/cardUtils";
 import { getRegularBid } from "../bot-bidding/regular";
 import { getWhizBid } from "../bot-bidding/whiz";
+import { getMirrorBid } from "../bot-bidding/mirror";
 
 const BOT_USER_ID = 'bot-user-universal';
 
@@ -40,6 +41,12 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
       let bid, reason;
       if (bidType === 'WHIZ') {
         const result = getWhizBid({ hand, seatIndex, existingBids, game });
+        bid = result.bid;
+        reason = result.reason;
+      } else if (bidType === 'MIRROR') {
+        const result = getMirrorBid({ hand, seatIndex, existingBids });
+        bid = result.bid;
+        reason = result.reason;
         bid = result.bid;
         reason = result.reason;
       } else {
