@@ -3,11 +3,19 @@ import prisma from '../../prisma';
 
 // Update PlayerTrickCount after every trick
 export async function updatePlayerTrickCount(gameId: string, roundNumber: number, playerId: string, tricksWon: number) {
+  console.log('[TRICK COUNT MANAGER DEBUG] updatePlayerTrickCount called with:', {
+    gameId,
+    roundNumber,
+    playerId,
+    tricksWon
+  });
   try {
     // Find the actual roundId from database
+    console.log('[TRICK COUNT MANAGER DEBUG] Looking for round with gameId:', gameId, 'roundNumber:', roundNumber);
     const round = await prisma.round.findFirst({
       where: { gameId, roundNumber }
     });
+    console.log('[TRICK COUNT MANAGER DEBUG] Found round:', round ? round.id : 'NOT FOUND');
     
     if (!round) {
       console.error(`[DB SCORING ERROR] Round ${roundNumber} not found for game ${gameId}`);
