@@ -192,24 +192,9 @@ function getLeadSuit(trick: Card[] | undefined): Suit | null {
 }
 
 function hasSpadeBeenPlayed(game: GameState): boolean {
-  // Check the server's spadesBroken flag (this is what the server uses)
+  // Use only the server's spadesBroken flag
   const spadesBroken = (game as any).play?.spadesBroken || false;
-  
-  // Also check if current trick has spades (for immediate feedback)
-  const currentTrick = (game as any).play?.currentTrick || [];
-  const currentTrickHasSpades = Array.isArray(currentTrick) ? currentTrick.some((card: Card) => isSpade(card)) : false;
-  
-  const result = spadesBroken || currentTrickHasSpades;
-  
-  console.log('[SPADE BREAKING DEBUG] hasSpadeBeenPlayed check:', {
-    spadesBroken,
-    currentTrick,
-    currentTrickHasSpades,
-    result,
-    playObject: (game as any).play
-  });
-  
-  return result;
+  return spadesBroken;
 }
 
 function canLeadSpades(game: GameState, hand: Card[]): boolean {
@@ -1976,8 +1961,8 @@ export default function GameTable({
     if (isMyTurn && Array.isArray(myHand)) {
       const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
       const spadesBroken = (gameState as any).play?.spadesBroken;
-      if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => c.suit !== 'S')) {
-        effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => c.suit !== 'S') : [];
+      if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
+        effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠') : [];
         if (effectivePlayableCards.length === 0) {
           effectivePlayableCards = myHand; // Only spades left
         }
@@ -3322,7 +3307,7 @@ const [isStarting, setIsStarting] = useState(false);
 
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 {!isLeague && gameState.status === "WAITING" && !isStarting && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}

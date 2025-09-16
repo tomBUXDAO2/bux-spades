@@ -103,7 +103,7 @@ async function startNewHand(game: Game): Promise<void> {
   const { assignDealer, dealCards } = require('../../../dealing/cardDealing');
   const hands = dealCards(game.players, newDealerIndex);
   game.hands = hands;
-  hands.forEach((hand: string[], index: number) => {
+  hands.forEach((hand: import('../../../../types/game').Card[], index: number) => {
     if (game.players[index]) {
       game.players[index]!.hand = hand;
     }

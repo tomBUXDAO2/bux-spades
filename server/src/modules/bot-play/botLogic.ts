@@ -3,6 +3,7 @@ import { io } from "../../index";
 import { enrichGameForClient } from "../../routes/games/shared/gameUtils";
 import prisma from "../../lib/prisma";
 import { getCardValue } from "../../lib/hand-completion/utils/cardUtils";
+import { getRegularBid } from "../bot-bidding/regular";
 
 const BOT_USER_ID = 'bot-user-universal';
 
@@ -30,8 +31,11 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
     if (game.bidding && (game.bidding.bids[seatIndex] === null || typeof game.bidding.bids[seatIndex] === 'undefined')) {
       console.log(`[BOT DEBUG] Bot ${bot.username} is making a bid...`);
       
-      // Simple bot bidding: random bid between 0-4
-      const bid = Math.floor(Math.random() * 5);
+      // Heuristic bidding (regular mode for now)
+      const hand = game.hands[seatIndex] || [];
+      const existingBids = game.bidding.bids.slice();
+      const { bid, reason } = getRegularBid({ hand, seatIndex, existingBids });
+      console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}`);
       game.bidding.bids[seatIndex] = bid;
       console.log(`[BOT DEBUG] Bot ${bot.username} bid ${bid}`);
 

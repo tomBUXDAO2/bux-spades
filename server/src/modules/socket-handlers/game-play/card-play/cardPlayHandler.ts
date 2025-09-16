@@ -47,6 +47,16 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
       return;
     }
 
+    // Enforce leading spades rule: cannot lead spades until broken unless only spades remain
+    const isLeading = game.play.currentTrick.length === 0;
+    if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
+      const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
+      if (!onlySpadesLeft) {
+        socket.emit('error', { message: 'Cannot lead spades until spades are broken (unless you only have spades).' });
+        return;
+      }
+    }
+
     // Remove card from hand
     const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
     hand.splice(cardIndex, 1);
@@ -55,6 +65,15 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
     game.play.currentTrick.push({ ...card, playerIndex });
     
     console.log('[PLAY CARD DEBUG] Card played:', { playerIndex, card, trickLength: game.play.currentTrick.length });
+
+    // Break spades if a spade is played on a non-spade lead
+    if (game.play.currentTrick.length > 0) {
+      const leadSuit = game.play.currentTrick[0].suit;
+      if (!game.play.spadesBroken && card.suit === 'SPADES' && leadSuit !== 'SPADES') {
+        game.play.spadesBroken = true;
+        console.log('[RULES] Spades are now broken');
+      }
+    }
 
     // Emit card played event
     io.to(gameId).emit('card_played', {
