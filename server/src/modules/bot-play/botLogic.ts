@@ -4,6 +4,7 @@ import { enrichGameForClient } from "../../routes/games/shared/gameUtils";
 import prisma from "../../lib/prisma";
 import { getCardValue } from "../../lib/hand-completion/utils/cardUtils";
 import { getRegularBid } from "../bot-bidding/regular";
+import { getWhizBid } from "../bot-bidding/whiz";
 
 const BOT_USER_ID = 'bot-user-universal';
 
@@ -31,10 +32,21 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
     if (game.bidding && (game.bidding.bids[seatIndex] === null || typeof game.bidding.bids[seatIndex] === 'undefined')) {
       console.log(`[BOT DEBUG] Bot ${bot.username} is making a bid...`);
       
-      // Heuristic bidding (regular mode for now)
+      // Choose bidding strategy based on game type
       const hand = game.hands[seatIndex] || [];
       const existingBids = game.bidding.bids.slice();
-      const { bid, reason } = getRegularBid({ hand, seatIndex, existingBids });
+      const bidType = (game as any).rules?.bidType;
+      
+      let bid, reason;
+      if (bidType === 'WHIZ') {
+        const result = getWhizBid({ hand, seatIndex, existingBids, game });
+        bid = result.bid;
+        reason = result.reason;
+      } else {
+        const result = getRegularBid({ hand, seatIndex, existingBids });
+        bid = result.bid;
+        reason = result.reason;
+      }
       const allowNil = Boolean((game as any).rules?.allowNil);
       const finalBid = (!allowNil && bid === 0) ? 1 : bid;
       console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}${!allowNil && bid === 0 ? ' -> adjusted to 1 (nil disabled)' : ''}`);
