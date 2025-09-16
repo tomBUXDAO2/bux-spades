@@ -120,5 +120,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
   } catch (error) {
     console.error('[TRICK COMPLETION ERROR] Failed to complete trick:', error);
     throw error;
+  } catch (error) {
+    console.error('[TRICK COMPLETION ERROR]', error);
   }
 }
