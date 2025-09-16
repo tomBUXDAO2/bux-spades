@@ -759,14 +759,14 @@ export default function GameTable({
         }
         const acesCount = myHand.filter((c: Card) => c.rank === 'A').length;
         bid = acesCount * 3;
-      } else if (game.rules?.gameType === 'MIRROR') {
+      } else if (game.rules?.bidType === 'MIRROR') {
         // Mirror: bid number of spades
         if (!myHand || !Array.isArray(myHand)) {
           console.log('[TIMER] No hand available for MIRROR, skipping auto-bid');
           return;
         }
         bid = myHand.filter((c: Card) => isSpade(c)).length;
-      } else if (game.rules?.gameType === 'WHIZ') {
+      } else if (game.rules?.bidType === 'WHIZ') {
         // Whiz: bid number of spades, or nil if no spades
         if (!myHand || !Array.isArray(myHand)) {
           console.log('[TIMER] No hand available for WHIZ, skipping auto-bid');
@@ -799,7 +799,7 @@ export default function GameTable({
         }
       }
       
-      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.gameType, 'forced bid:', game.forcedBid);
+      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.bidType, 'forced bid:', game.forcedBid);
       
       if (socket) {
         socket.emit('make_bid', { 

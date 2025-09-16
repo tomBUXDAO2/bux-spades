@@ -50,7 +50,7 @@ export function applyGameFormatRules(game: Game, format: GameFormatConfig): void
     maxPoints: game.maxPoints,
     coinAmount: game.buyIn,
     gimmickType: format.format === 'GIMMICK' && format.gimmickType ? (format.gimmickType as any) : undefined,
-    bidType: format.format === 'GIMMICK' ? 'GIMMICK' : 'REGULAR',
+    bidType: format.format === 'GIMMICK' ? 'GIMMICK' : format.format,
     allowNil: format.allowNil,
     allowBlindNil: format.allowBlindNil,
     specialRules: { screamer: format.specialRules.includes('SCREAMER'), assassin: format.specialRules.includes('ASSASSIN') },

@@ -43,6 +43,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     if (type === 'MIRROR') {
       setAllowNil(true); // Nil is always allowed in Mirror
       setAllowBlindNil(false); // Blind nil is never allowed in Mirror
+    }
     } else if (type === 'WHIZ') {
       // WHIZ: nil always allowed (players can bid nil or number of spades), blind nil never allowed
       setAllowNil(true);
@@ -51,7 +52,6 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
       // GIMMICK: nil/blind nil depend on specific gimmick type, but disable toggles
       setAllowNil(true);
       setAllowBlindNil(false);
-    }
   };
 
   // Handle nil toggle changes
@@ -262,7 +262,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                   <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                   <div
                     className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={() => gameType === 'REG' && handleNilToggle(!allowNil)}
+                    onClick={() => !(gameType !== 'REG') && handleNilToggle(!allowNil)}
                     style={{ userSelect: 'none' }}
                   >
                     <div
