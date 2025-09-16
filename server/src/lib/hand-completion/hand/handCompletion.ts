@@ -4,6 +4,7 @@ import { trickLogger } from "../../trick-logging";
 import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 import type { Game } from '../../../types/game';
 import { completeGame } from '../game/gameCompletion';
+import prisma from '../../prisma';
 
 // Import startTurnTimeout function
 declare function startTurnTimeout(game: Game, playerIndex: number, phase: string): void;
@@ -49,6 +50,37 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     game.team2TotalScore = gameScore.team2RunningTotal;
     game.team1Bags = gameScore.team1Bags;
     game.team2Bags = gameScore.team2Bags;
+
+    // Update per-player bags for stats: bags = max(0, total tricks won to date - total bids to date)
+    try {
+      if (game.dbGameId) {
+        // Fetch all rounds up to current, their bids, and trick counts
+        const rounds = await prisma.round.findMany({
+          where: { gameId: game.dbGameId, roundNumber: { lte: game.currentRound } },
+          include: { RoundBid: true, PlayerTrickCount: true }
+        });
+        for (let i = 0; i < 4; i++) {
+          const player = game.players[i];
+          if (!player) continue;
+          const playerId = player.id;
+          let totalBid = 0;
+          let totalTricks = 0;
+          for (const r of rounds) {
+            const rb = r.RoundBid.find(b => b.playerId === playerId);
+            if (rb && rb.bid > 0) totalBid += rb.bid; // nil/blind nil (<=0) do not add to personal bid
+            const tc = r.PlayerTrickCount.find(t => t.playerId === playerId);
+            if (tc) totalTricks += tc.tricksWon;
+          }
+          const personalBags = Math.max(0, totalTricks - totalBid);
+          await prisma.gamePlayer.updateMany({
+            where: { gameId: game.dbGameId, position: i },
+            data: { bags: personalBags, updatedAt: new Date() }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[HAND COMPLETION] Failed to update per-player bags:', err);
+    }
     
     // Set game status to indicate hand is completed
     game.status = 'PLAYING';
