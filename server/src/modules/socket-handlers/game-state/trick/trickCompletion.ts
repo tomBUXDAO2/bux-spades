@@ -65,7 +65,7 @@ export async function handleTrickComplete(game: Game): Promise<void> {
   
   // Log trick to database
   try {
-    await trickLogger.logTrickFromGame(game, game.play.trickNumber);
+    await trickLogger.logTrickFromGame(game, game.play.trickNumber + 1);
   } catch (err) {
     console.error('Failed to log trick to database:', err);
   }

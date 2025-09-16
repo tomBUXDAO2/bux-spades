@@ -2,6 +2,7 @@ import type { Game } from "../../types/game";
 import { io } from "../../index";
 import { enrichGameForClient } from "../../routes/games/shared/gameUtils";
 import prisma from "../../lib/prisma";
+import { getCardValue } from "../../lib/hand-completion/utils/cardUtils";
 
 const BOT_USER_ID = 'bot-user-universal';
 
@@ -54,14 +55,14 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
             where: {
               roundId_playerId: {
                 roundId: roundRecord.id,
-                playerId: getBotDbUserId(bot) // Use universal bot user ID
+                playerId: getBotDbUserId(bot)
               }
             },
             update: { bid, isBlindNil: bid === -1 },
             create: {
               id: `bid_${roundRecord.id}_${seatIndex}_${Date.now()}`,
               roundId: roundRecord.id,
-              playerId: getBotDbUserId(bot), // Use universal bot user ID
+              playerId: getBotDbUserId(bot),
               bid,
               isBlindNil: bid === -1,
               createdAt: new Date()
@@ -81,24 +82,9 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
       }
       
       if (next === seatIndex) {
-        // All players have bid, move to play phase
-        console.log('[BIDDING COMPLETE - BOT] Moving to play phase, first player:', game.players[0]?.username);
-        game.status = 'PLAYING';
-        game.play = {
-          currentPlayer: game.players[0]?.id || '',
-          currentPlayerIndex: 0,
-          tricks: [],
-          trickNumber: 0,
-          currentTrick: [],
-          spadesBroken: false
-        };
-        
-        
-        // Emit game update when bidding completes
-        io.to(game.id).emit("game_update", enrichGameForClient(game));        // Start first trick
-        if (game.players[0] && game.players[0].type === 'bot') {
-          setTimeout(() => botMakeMove(game, 0), 1000);
-        }
+        // All players have bid, use the centralized bidding completion handler
+        const { handleBiddingComplete } = await import("../socket-handlers/game-state/bidding/biddingCompletion");
+        await handleBiddingComplete(game);
       } else {
         // Move to next player
         game.bidding.currentBidderIndex = next;
@@ -112,72 +98,238 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
       }
     }
   } else if (game.status === 'PLAYING') {
-    // Bot card playing logic
-    if (game.play && game.play.currentPlayer === bot.id) {
-      console.log(`[BOT DEBUG] Bot ${bot.username} is playing a card...`);
-      
-      if (bot.hand && bot.hand.length > 0) {
-        // Simple bot logic: play first card in hand
-        const cardToPlay = bot.hand[0];
-        bot.hand.splice(0, 1);
-        
-        // Add to current trick
-        if (!game.play.currentTrick) {
-          game.play.currentTrick = [];
-        }
-        game.play.currentTrick.push({
-          ...cardToPlay,
-          playerIndex: seatIndex
-        });
-        
-        console.log(`[BOT DEBUG] Bot ${bot.username} played ${cardToPlay.suit} ${cardToPlay.rank}`);
-        
-        // Check if trick is complete
-        if (game.play.currentTrick.length === 4) {
-          // Trick complete - determine winner and start next trick
-          const winnerIndex = determineTrickWinner(game.play.currentTrick);
-          const winner = game.players[winnerIndex];
-          
-          if (winner) {
-            winner.tricks = (winner.tricks || 0) + 1;
-          }
-          
-          // Add to tricks history
-          game.play.tricks.push({
-            cards: [...game.play.currentTrick],
-            winnerIndex
-          });
-          
-          game.play.trickNumber++;
-          game.play.currentTrick = [];
-          game.play.currentPlayer = winner?.id || '';
-          game.play.currentPlayerIndex = winnerIndex;
-          
-          // Check if round is complete
-          if (game.play.trickNumber >= 13) {
-            console.log('[BOT DEBUG] Round complete, calculating scores...');
-            // Round complete - calculate scores and start next round or end game
-            game.status = 'WAITING';
-          }
-        } else {
-          // Move to next player
-          const nextPlayerIndex = (seatIndex + 1) % 4;
-          game.play.currentPlayer = game.players[nextPlayerIndex]?.id || '';
-          game.play.currentPlayerIndex = nextPlayerIndex;
-          
-          if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-            setTimeout(() => botMakeMove(game, nextPlayerIndex), 1000);
-          }
-        }
+    // Bot card playing logic - use sophisticated logic
+    await botPlayCard(game, seatIndex);
+  }
+}
+
+/**
+ * Sophisticated bot card playing logic
+ */
+export async function botPlayCard(game: Game, seatIndex: number): Promise<void> {
+  const bot = game.players[seatIndex];
+  if (!bot || bot.type !== 'bot' || !game.hands || !game.play) return;
+  
+  // Guard: Make sure it's actually this bot's turn
+  if (game.play.currentPlayerIndex !== seatIndex) {
+    console.log('[BOT GUARD] Bot', bot.username, 'at seat', seatIndex, 'tried to play but current player is', game.play.currentPlayerIndex);
+    return;
+  }
+  
+  const hand = game.hands[seatIndex]!;
+  if (!hand || hand.length === 0) return;
+  
+  // Determine lead suit for this trick
+  const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
+  
+  // Find playable cards with special rules consideration
+  let playableCards: any[] = [];
+  const specialRules = game.rules?.specialRules;
+  
+  console.log(`[BOT CARD DEBUG] Bot ${bot.username} at seat ${seatIndex} - leadSuit:`, leadSuit);
+  console.log(`[BOT CARD DEBUG] Bot ${bot.username} hand:`, hand.map(c => `${c.rank}${c.suit}`));
+  
+  if (leadSuit) {
+    // Following suit - must follow lead suit if possible
+    playableCards = hand.filter(c => c.suit === leadSuit);
+    if (playableCards.length === 0) {
+      // Void in lead suit - can play any card
+      playableCards = hand;
+      console.log(`[BOT CARD DEBUG] Bot ${bot.username} - void in lead suit, can play anything:`, playableCards.map(c => `${c.rank}${c.suit}`));
+    } else {
+      console.log(`[BOT CARD DEBUG] Bot ${bot.username} - must follow suit:`, playableCards.map(c => `${c.rank}${c.suit}`));
+    }
+  } else {
+    // Bot is leading - cannot lead spades unless spades broken or only spades left
+    if (game.play.spadesBroken || hand.every(c => c.suit === 'SPADES')) {
+      playableCards = hand; // Can lead any card
+      console.log(`[BOT CARD DEBUG] Bot ${bot.username} - leading: spades broken or only spades, can lead anything:`, playableCards.map(c => `${c.rank}${c.suit}`));
+    } else {
+      // Cannot lead spades unless only spades left
+      playableCards = hand.filter(c => c.suit !== 'SPADES');
+      if (playableCards.length === 0) {
+        playableCards = hand; // Only spades left, must lead spades
       }
+      console.log(`[BOT CARD DEBUG] Bot ${bot.username} - leading: cannot lead spades, using non-spades:`, playableCards.map(c => `${c.rank}${c.suit}`));
+    }
+  }
+  
+  console.log(`[BOT CARD DEBUG] Bot ${bot.username} final playableCards:`, playableCards.map(c => `${c.rank}${c.suit}`));
+  
+  // Smart bot card selection
+  let card: any;
+  
+  // Get bot's bid and partner's bid to determine strategy
+  const botBid = game.bidding?.bids[seatIndex];
+  const partnerIndex = (seatIndex + 2) % 4; // Partner is 2 seats away
+  const partnerBid = game.bidding?.bids[partnerIndex];
+  
+  if (botBid === 0) {
+    // Bot is nil - try to avoid winning tricks
+    card = selectCardForNil(playableCards, game.play.currentTrick, hand);
+  } else if (partnerBid === 0) {
+    // Partner is nil - try to cover partner
+    card = selectCardToCoverPartner(playableCards, game.play.currentTrick, hand, game.hands[partnerIndex] || [], game, seatIndex);
+  } else {
+    // Normal bidding - play to win
+    card = selectCardToWin(playableCards, game.play.currentTrick, hand, game, seatIndex);
+  }
+  
+  if (!card) {
+    console.log(`[BOT CARD DEBUG] Bot ${bot.username} - no card selected, using first playable card`);
+    card = playableCards[0];
+  }
+  
+  console.log(`[BOT CARD DEBUG] Bot ${bot.username} selected card:`, `${card.rank}${card.suit}`);
+  
+  // Play the card
+  const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
+  if (cardIndex === -1) {
+    console.log(`[BOT CARD DEBUG] Bot ${bot.username} - selected card not found in hand`);
+    return;
+  }
+  
+  hand.splice(cardIndex, 1);
+  game.play.currentTrick.push({ ...card, playerIndex: seatIndex });
+  
+  // Set spadesBroken if a spade is played
+  if (card.suit === 'SPADES') {
+    game.play.spadesBroken = true;
+  }
+  
+  console.log(`[BOT DEBUG] Bot ${bot.username} played ${card.suit} ${card.rank}`);
+  
+  // Emit game update after playing card
+  io.to(game.id).emit("game_update", enrichGameForClient(game));
+  
+  // Check if trick is complete
+  if (game.play.currentTrick.length === 4) {
+    // Use the centralized trick completion handler
+    const { handleTrickComplete } = await import("../socket-handlers/game-state/trick/trickCompletion");
+    await handleTrickComplete(game);
+  } else {
+    // Move to next player
+    const nextPlayerIndex = (seatIndex + 1) % 4;
+    game.play.currentPlayer = game.players[nextPlayerIndex]?.id || '';
+    game.play.currentPlayerIndex = nextPlayerIndex;
+    
+    // Emit game update after turn advancement
+    io.to(game.id).emit("game_update", enrichGameForClient(game));
+    
+    if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
+      setTimeout(() => botPlayCard(game, nextPlayerIndex), 1000);
     }
   }
 }
 
 /**
- * Simple trick winner determination
+ * Select card for nil players (try to avoid winning tricks)
  */
-function determineTrickWinner(trick: any[]): number {
-  // For now, just return the first player (simple logic)
-  return trick[0].playerIndex;
+function selectCardForNil(playableCards: any[], currentTrick: any[], hand: any[]): any {
+  if (currentTrick.length === 0) {
+    // Leading - play lowest card possible
+    return playableCards.reduce((lowest, card) => 
+      getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+    );
+  }
+  
+  // Following - try to play highest card under the current highest
+  const leadSuit = currentTrick[0].suit;
+  const highestOnTable = currentTrick.reduce((highest, card) => 
+    getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+  );
+  
+  const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
+  if (cardsOfLeadSuit.length > 0) {
+    // Must follow suit - play highest card under the highest on table
+    const cardsUnderHighest = cardsOfLeadSuit.filter(c => 
+      getCardValue(c.rank) < getCardValue(highestOnTable.rank)
+    );
+    
+    if (cardsUnderHighest.length > 0) {
+      // Play highest card under the highest on table
+      return cardsUnderHighest.reduce((highest, card) => 
+        getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+      );
+    } else {
+      // All cards are higher - play the lowest
+      return cardsOfLeadSuit.reduce((lowest, card) => 
+        getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+      );
+    }
+  } else {
+    // Void in lead suit - discard highest cards in other suits (not spades)
+    const nonSpades = playableCards.filter(c => c.suit !== 'SPADES');
+    if (nonSpades.length > 0) {
+      // Discard highest non-spade
+      return nonSpades.reduce((highest, card) => 
+        getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+      );
+    } else {
+      // Only spades left - play lowest spade
+      return playableCards.reduce((lowest, card) => 
+        getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+      );
+    }
+  }
+}
+
+/**
+ * Select card to cover partner (when partner is nil)
+ */
+function selectCardToCoverPartner(playableCards: any[], currentTrick: any[], hand: any[], partnerHand: any[], game: Game, seatIndex: number): any {
+  // Simplified logic - play to win if partner might lose
+  return selectCardToWin(playableCards, currentTrick, hand, game, seatIndex);
+}
+
+/**
+ * Select card to win (normal bidding strategy)
+ */
+function selectCardToWin(playableCards: any[], currentTrick: any[], hand: any[], game: Game, seatIndex: number): any {
+  if (currentTrick.length === 0) {
+    // Leading - play highest card
+    return playableCards.reduce((highest, card) => 
+      getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+    );
+  } else {
+    // Following
+    const leadSuit = currentTrick[0].suit;
+    const highestOnTable = currentTrick.reduce((highest, card) => 
+      getCardValue(card.rank) > getCardValue(highest.rank) ? card : highest
+    );
+    
+    const cardsOfLeadSuit = playableCards.filter(c => c.suit === leadSuit);
+    
+    if (cardsOfLeadSuit.length > 0) {
+      // Must follow suit
+      const winningCards = cardsOfLeadSuit.filter(c => 
+        getCardValue(c.rank) > getCardValue(highestOnTable.rank)
+      );
+      
+      if (winningCards.length > 0) {
+        // Can win - play lowest winning card
+        return winningCards.reduce((lowest, card) => 
+          getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+        );
+      } else {
+        // Can't win - play lowest card
+        return cardsOfLeadSuit.reduce((lowest, card) => 
+          getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+        );
+      }
+    } else {
+      // Void in lead suit - can play any card
+      // Play lowest spade if available, otherwise lowest card
+      const spades = playableCards.filter(c => c.suit === 'SPADES');
+      if (spades.length > 0) {
+        return spades.reduce((lowest, card) => 
+          getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+        );
+      } else {
+        return playableCards.reduce((lowest, card) => 
+          getCardValue(card.rank) < getCardValue(lowest.rank) ? card : lowest
+        );
+      }
+    }
+  }
 }
