@@ -173,29 +173,13 @@ function getCardValue(rank: string | number): number {
 // Helper function to sort cards
 function sortCards(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
-    const suitOrder = { "D": 0, "C": 1, "H": 2, "S": 3 };
-    const suitA = a.suit.toString().charAt(0).toUpperCase();
-    const suitB = b.suit.toString().charAt(0).toUpperCase();
-    if (suitOrder[suitA] !== suitOrder[suitB]) {
-      return suitOrder[suitA] - suitOrder[suitB];
-    }
-    return getCardValue(a.rank) - getCardValue(b.rank);
-  });
-  // Suit order: Diamonds, Clubs, Hearts, Spades
-  const suitOrder: Record<string, number> = { '♦': 0, '♣': 1, '♥': 2, '♠': 3 };
-  return [...cards].sort((a, b) => {
-    // Normalize suit to single letter for sorting
-    const getSuitKey = (suit: string) => {
-      if (suit === '♦' || suit === 'Diamonds' || suit === 'D') return '♦';
-      if (suit === '♣' || suit === 'Clubs' || suit === 'C') return '♣';
-      if (suit === '♥' || suit === 'Hearts' || suit === 'H') return '♥';
-      if (suit === '♠' || suit === 'Spades' || suit === 'S') return '♠';
-      return suit;
-    };
-    const suitA = getSuitKey(a.suit);
-    const suitB = getSuitKey(b.suit);
-    if (suitOrder[suitA] !== suitOrder[suitB]) {
-      return suitOrder[suitA] - suitOrder[suitB];
+    const suitOrder = { "DIAMONDS": 0, "CLUBS": 1, "HEARTS": 2, "SPADES": 3 } as const;
+    const suitA = (typeof a.suit === 'string' ? a.suit.toString().toUpperCase() : a.suit) as any;
+    const suitB = (typeof b.suit === 'string' ? b.suit.toString().toUpperCase() : b.suit) as any;
+    const keyA = suitA.startsWith('D') ? 'DIAMONDS' : suitA.startsWith('C') ? 'CLUBS' : suitA.startsWith('H') ? 'HEARTS' : 'SPADES';
+    const keyB = suitB.startsWith('D') ? 'DIAMONDS' : suitB.startsWith('C') ? 'CLUBS' : suitB.startsWith('H') ? 'HEARTS' : 'SPADES';
+    if (suitOrder[keyA] !== suitOrder[keyB]) {
+      return suitOrder[keyA] - suitOrder[keyB];
     }
     return getCardValue(a.rank) - getCardValue(b.rank);
   });
@@ -296,7 +280,10 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     
     // Normal rules: If spades haven't been broken, filter out spades unless only spades remain
     if (!canLeadSpades(game, hand)) {
-      const nonSpades = hand.filter(card => card.suit !== '♠');
+      const nonSpades = hand.filter(card => {
+        const s = (card.suit as unknown as string).toUpperCase();
+        return !(s === 'SPADES' || s === 'S' || s === '♠');
+      });
       return nonSpades.length > 0 ? nonSpades : hand;
     }
     return hand;
@@ -374,7 +361,8 @@ declare global {
 
 // Helper function to check if a card is a spade
 const isSpade = (card: Card): boolean => {
-  return card.suit === '♠' || (card as any).suit === 'S';
+  const suit = (card.suit as unknown as string).toUpperCase();
+  return suit === 'SPADES' || suit === 'S' || suit === '♠';
 };
 
 // Helper function to count spades in a hand
@@ -774,7 +762,10 @@ export default function GameTable({
           console.log('[TIMER] No hand available for BIDHEARTS, skipping auto-bid');
           return;
         }
-        bid = myHand.filter((c: Card) => c.suit === '♥').length;
+        bid = myHand.filter((c: Card) => {
+            const s = (c.suit as unknown as string).toUpperCase();
+            return s === 'HEARTS' || s === 'H' || s === '♥';
+          }).length;
       } else if (game.forcedBid === 'CRAZY ACES') {
         // CRAZY ACES: bid 3 for each ace
         if (!myHand || !Array.isArray(myHand)) {
@@ -3414,7 +3405,7 @@ export default function GameTable({
                       // Calculate number of hearts for BID HEARTS games
                       const countHearts = (hand: Card[] | undefined): number => {
                         if (!hand || !Array.isArray(hand)) return 0;
-                        return Array.isArray(hand) ? hand.filter(card => card.suit === '♥' || (card as any).suit === 'H').length : 0;
+                        return Array.isArray(hand) ? hand.filter(card => { const s = (card.suit as unknown as string).toUpperCase(); return s === 'HEARTS' || s === 'H' || s === '♥'; }).length : 0;
                       };
                       const numHearts = currentPlayerHand ? countHearts(currentPlayerHand) : 0;
                       
