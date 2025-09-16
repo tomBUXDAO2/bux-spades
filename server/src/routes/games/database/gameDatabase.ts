@@ -42,6 +42,31 @@ export async function logGameStart(game: Game): Promise<void> {
     console.log('[DATABASE] Game logged with ID:', dbGame.id);
     
     // Create GamePlayer records for all players
+    // Create bot users in User table first if they don't exist
+    console.log('[DATABASE] Creating bot users...');
+    for (let i = 0; i < 4; i++) {
+      const player = game.players[i];
+      if (player && player.type === 'bot') {
+        try {
+          await prisma.user.upsert({
+            where: { id: player.id },
+            update: {},
+            create: {
+              id: player.id,
+              username: player.username,
+              avatar: player.avatar || '/bot-avatar.jpg',
+              discordId: null,
+              coins: 0,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          });
+          console.log(`[DATABASE] Created/updated bot user: ${player.username} (${player.id})`);
+        } catch (error) {
+          console.error(`[DATABASE] Failed to create bot user ${player.username}:`, error);
+        }
+      }
+    }
     console.log('[DATABASE] Creating GamePlayer records...');
     for (let i = 0; i < 4; i++) {
       const player = game.players[i];
