@@ -3016,10 +3016,10 @@ export default function GameTable({
     const rank = card.rank;
     // Convert Unicode suit symbols to single letters for PNG filenames
     const suitMap: Record<string, string> = {
-      '♠': 'S',
-      '♥': 'H', 
-      '♦': 'D',
-      '♣': 'C'
+      "♠": "S", "SPADES": "S", "Spades": "S", "spades": "S", "S": "S",
+      "♥": "H", "HEARTS": "H", "Hearts": "H", "hearts": "H", "H": "H", 
+      "♦": "D", "DIAMONDS": "D", "Diamonds": "D", "diamonds": "D", "D": "D",
+      "♣": "C", "CLUBS": "C", "Clubs": "C", "clubs": "C", "C": "C"
     };
     const suit = suitMap[card.suit] || card.suit;
     return `${rank}${suit}.png`;
@@ -3070,10 +3070,10 @@ export default function GameTable({
     // CSS-based cards for small screens
     const getSuitSymbol = (suit: string) => {
       const suitMap: Record<string, string> = {
-        '♠': '♠️', 'Spades': '♠️', 'S': '♠️',
-        '♥': '♥️', 'Hearts': '♥️', 'H': '♥️',
-        '♦': '♦️', 'Diamonds': '♦️', 'D': '♦️',
-        '♣': '♣️', 'Clubs': '♣️', 'C': '♣️',
+        "♠": "♠️", "Spades": "♠️", "spades": "♠️", "SPADES": "♠️", "Spade": "♠️", "spade": "♠️", "SPADE": "♠️", "S": "♠️",
+        "♥": "♥️", "Hearts": "♥️", "hearts": "♥️", "HEARTS": "♥️", "Heart": "♥️", "heart": "♥️", "HEART": "♥️", "H": "♥️",
+        "♦": "♦️", "Diamonds": "♦️", "diamonds": "♦️", "DIAMONDS": "♦️", "Diamond": "♦️", "diamond": "♦️", "DIAMOND": "♦️", "D": "♦️",
+        "♣": "♣️", "Clubs": "♣️", "clubs": "♣️", "CLUBS": "♣️", "Club": "♣️", "club": "♣️", "CLUB": "♣️", "C": "♣️",
       };
       return suitMap[suit] || suit;
     };

@@ -14,6 +14,9 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
     return;
   }
   
+  console.log("[BIDDING COMPLETE DEBUG] dealerIndex:", game.dealerIndex, "firstPlayerIndex:", (game.dealerIndex + 1) % 4);
+  console.log("[BIDDING COMPLETE DEBUG] players array:", game.players.map((p, i) => `${i}: ${p?.username || "null"}`));
+  console.log("[BIDDING COMPLETE DEBUG] selected player:", game.players[(game.dealerIndex + 1) % 4]?.username);
   const firstPlayer = game.players[(game.dealerIndex + 1) % 4];
   if (!firstPlayer) {
     io.to(game.id).emit('error', { message: 'Invalid game state' });
