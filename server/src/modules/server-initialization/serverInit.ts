@@ -1,6 +1,6 @@
 import { games } from '../../gamesStore';
 import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from '../../lib/gameStatePersistence';
-import { gameCleanupManager } from '../../lib/gameCleanup';
+import { gameCleanupManager } from "../../lib/game-cleanup";
 
 export function initializeServer(httpServer: any, PORT: number) {
   httpServer.listen(PORT, '0.0.0.0', async () => {

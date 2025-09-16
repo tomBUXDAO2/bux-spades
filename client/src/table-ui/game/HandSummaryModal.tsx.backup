@@ -42,12 +42,6 @@ export default function HandSummaryModal({
     return null;
   }
 
-  // Require handSummaryData to be present - no fallback calculations
-  if (!handSummaryData) {
-    console.error('[HandSummaryModal] handSummaryData is required but not provided');
-    return null;
-  }
-
   // Timer effect for auto-advancing to next hand
   useEffect(() => {
     if (!isOpen || gameIsOver) {
@@ -96,18 +90,55 @@ export default function HandSummaryModal({
     return player.avatar || (player as any).image || '/default-pfp.jpg';
   };
 
-  // Get team data from backend scores - no manual calculations
+  // Calculate team data - use same logic as GameTable
+  // Team 1 (positions 0,2) = Red Team
+  // Team 2 (positions 1,3) = Blue Team
   const redTeamBid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
   const blueTeamBid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
   
-  const tricksPerPlayer = handSummaryData.tricksPerPlayer;
+  const tricksPerPlayer = handSummaryData?.tricksPerPlayer || [
+    gameState.players?.[0]?.tricks || 0,
+    gameState.players?.[1]?.tricks || 0,
+    gameState.players?.[2]?.tricks || 0,
+    gameState.players?.[3]?.tricks || 0
+  ];
+  
   const redTeamTricks = tricksPerPlayer[0] + tricksPerPlayer[2];
   const blueTeamTricks = tricksPerPlayer[1] + tricksPerPlayer[3];
 
-  // Use backend scores directly - no manual calculations
-  const redTeamHandTotal = handSummaryData.team1Score;
-  const blueTeamHandTotal = handSummaryData.team2Score;
+  // Calculate scores
+  const redTeamTrickScore = redTeamTricks >= redTeamBid ? redTeamBid * 10 : -redTeamBid * 10;
+  const blueTeamTrickScore = blueTeamTricks >= blueTeamBid ? blueTeamBid * 10 : -blueTeamBid * 10;
+  const redTeamBagScore = Math.max(0, redTeamTricks - redTeamBid);
+  const blueTeamBagScore = Math.max(0, blueTeamTricks - blueTeamBid);
 
+  // Calculate nil bonuses
+  const calculateNilBonus = (team: number[]) => {
+    let bonus = 0;
+    for (const playerIndex of team) {
+      const bid = gameState.bidding?.bids?.[playerIndex] || 0;
+      const tricks = gameState.players?.[playerIndex]?.tricks || 0;
+      
+      if (bid === 0 && tricks === 0) {
+        bonus += 100; // Successful nil
+      } else if (bid === 0 && tricks > 0) {
+        bonus -= 100; // Failed nil
+      } else if (bid === -1 && tricks === 0) {
+        bonus += 200; // Successful blind nil
+      } else if (bid === -1 && tricks > 0) {
+        bonus -= 200; // Failed blind nil
+      }
+    }
+    return bonus;
+  };
+
+  const redTeamNilBonus = calculateNilBonus([0, 2]);
+  const blueTeamNilBonus = calculateNilBonus([1, 3]);
+
+  // Calculate hand totals
+  // Calculate hand totals - USE BACKEND SCORES when available
+  const redTeamHandTotal = handSummaryData?.team1Score || (redTeamTrickScore + redTeamBagScore + redTeamNilBonus);
+  const blueTeamHandTotal = handSummaryData?.team2Score || (blueTeamTrickScore + blueTeamBagScore + blueTeamNilBonus);
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -143,15 +174,16 @@ export default function HandSummaryModal({
                 </Dialog.Title>
                 
                 {gameState.gameMode === 'SOLO' ? (
-                  // Solo mode - use backend player scores
+                  // Solo mode - compact layout
                   <div className="space-y-3">
                     {[0, 1, 2, 3].map((playerIndex) => {
                       const playerName = getPlayerName(playerIndex);
                       const playerAvatar = getPlayerAvatar(playerIndex);
                       const playerBid = gameState.bidding?.bids?.[playerIndex] || 0;
-                      const playerTricks = tricksPerPlayer[playerIndex];
-                      // Use backend player scores if available, otherwise show 0
-                      const handTotal = handSummaryData.playerScores?.[playerIndex] || 0;
+                      const playerTricks = gameState.players?.[playerIndex]?.tricks || 0;
+                      const trickScore = playerTricks >= playerBid ? playerBid * 10 : -playerBid * 10;
+                      const bagScore = Math.max(0, playerTricks - playerBid);
+                      const handTotal = trickScore + bagScore;
                       
                       return (
                         <div key={playerIndex} className="flex items-center justify-between bg-gray-700 rounded-lg p-3">
@@ -174,7 +206,7 @@ export default function HandSummaryModal({
                     })}
                   </div>
                 ) : (
-                  // Partners mode - use backend team scores
+                  // Partners mode - compact team layout
                   <div className="space-y-4">
                     {/* Red Team */}
                     <div className="bg-red-900/30 border border-red-500 rounded-lg p-3">

@@ -1,7 +1,7 @@
 import { Game } from '../../../../types/game';
 import { TrickLogData } from '../../types/trickLogTypes';
 import { getCardValue, getFullSuitName } from '../../utils/cardUtils';
-import { TrickLogger } from '../trick/trickLogger';
+import { TrickLogger } from "../../../../lib/trick-logging";
 
 export class GameIntegration {
   private trickLogger: TrickLogger;

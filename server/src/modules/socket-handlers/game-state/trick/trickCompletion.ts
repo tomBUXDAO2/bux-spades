@@ -2,7 +2,7 @@ import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
-import { trickLogger } from '../../../../lib/trickLogger';
+import { trickLogger } from "../../../../lib/trick-logging";
 import { getCardValue } from '../utils/cardUtils';
 
 /**

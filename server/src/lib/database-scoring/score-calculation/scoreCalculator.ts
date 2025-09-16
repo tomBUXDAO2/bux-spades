@@ -140,8 +140,18 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       currentTeam2Bags -= 10;
     }
     
-    const gameScore = await prisma.gameScore.create({
-      data: {
+    const gameScore = await prisma.gameScore.upsert({
+      where: { gameId_roundNumber: { gameId, roundNumber } as any },
+      update: {
+        team1Score,
+        team2Score,
+        team1Bags: currentTeam1Bags,
+        team2Bags: currentTeam2Bags,
+        team1RunningTotal,
+        team2RunningTotal,
+        updatedAt: new Date()
+      },
+      create: {
         id: uuidv4(),
         gameId,
         roundNumber,

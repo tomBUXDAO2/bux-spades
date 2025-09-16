@@ -17,5 +17,4 @@ export * from './hooks/useResizeObserver';
 // Export utilities
 export * from './lib/socket';
 export * from './lib/socketApi';
-export * from './lib/scoring';
 // export * from './lib/gameRules'; 

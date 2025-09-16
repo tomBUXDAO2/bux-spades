@@ -1,5 +1,5 @@
 import { RoundManager } from './round/roundManager';
-import { TrickLogger as TrickLoggerCore } from './trick/trickLogger';
+import { TrickLogger as TrickLoggerCore } from "./trick/trickLogger";
 import { GameIntegration } from './game/gameIntegration';
 
 export class TrickLogger {

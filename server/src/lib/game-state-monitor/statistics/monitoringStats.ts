@@ -1,5 +1,5 @@
 import type { Game } from '../../../types/game';
-import { CrashPrevention } from '../../crashPrevention';
+import { CrashPrevention } from "../../../../lib/crash-prevention";
 
 /**
  * Get monitoring statistics

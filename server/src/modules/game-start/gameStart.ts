@@ -7,6 +7,7 @@ import { botMakeMove } from '../bot-play/botLogic';
 import { assignDealer, dealCards } from '../dealing/cardDealing';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
 import prisma from '../../lib/prisma';
+import { trickLogger } from '../../lib/trick-logging';
 
 /**
  * Handles start_game socket event
@@ -64,8 +65,10 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
           }
         });
         // Set the round ID for trick logging
-        const { trickLogger } = await import('../../lib/trickLogger');
         trickLogger.setCurrentRoundId(game.id, roundId);
+      } else {
+        // Round exists: still set round ID so trick logging works
+        trickLogger.setCurrentRoundId(game.id, existingRound.id);
       }
     } catch (err) {
       console.error('[GAME START] Failed to ensure DB game/round records:', err);

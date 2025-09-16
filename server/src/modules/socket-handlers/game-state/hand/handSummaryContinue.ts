@@ -2,9 +2,9 @@ import type { AuthenticatedSocket } from '../../../socket-auth';
 import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
-import { dealCards, assignDealer } from '../../../dealing/cardDealing';
+import prisma from '../../../../lib/prisma';
+import { trickLogger } from '../../../../lib/trick-logging';
 import { games } from '../../../../gamesStore';
-import { trickLogger } from '../../../../lib/trickLogger';
 
 // Hand summary continue tracking
 const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
@@ -86,21 +86,32 @@ async function startNewHand(game: Game): Promise<void> {
     return;
   }
 
-  // Move dealer to the left (next position)
+  // Assign new dealer
   const newDealerIndex = (game.dealerIndex + 1) % 4;
   game.dealerIndex = newDealerIndex;
-
-  // Reset game state for new hand
-  game.status = 'BIDDING';
-  game.hands = dealCards(game.players, newDealerIndex);
   
-  // Assign hands to individual players
-  game.hands.forEach((hand, index) => {
+  // Assign dealer flag for UI
+  game.players.forEach((p, i) => {
+    if (p) p.isDealer = (i === newDealerIndex);
+  });
+  
+  // Reset hands and dealing
+  game.hands = [];
+  game.players.forEach(p => { if (p) p.hand = []; });
+  
+  // Deal cards (reuse existing dealing util)
+  const { assignDealer, dealCards } = require('../../../dealing/cardDealing');
+  const hands = dealCards(game.players, newDealerIndex);
+  game.hands = hands;
+  hands.forEach((hand: string[], index: number) => {
     if (game.players[index]) {
       game.players[index]!.hand = hand;
     }
   });
-
+  
+  // Move game into bidding phase for the new hand
+  game.status = 'BIDDING';
+  
   // Reset bidding state
   game.bidding = {
     currentBidderIndex: (newDealerIndex + 1) % 4,
@@ -111,25 +122,42 @@ async function startNewHand(game: Game): Promise<void> {
   
   // Clear play state
   game.play = undefined;
-
+  
   // Reset player trick counts for new hand
   game.players.forEach(player => {
     if (player) {
       player.tricks = 0;
     }
   });
-
-  // Start a new round in DB for this hand
+  
+  // Start a new round in DB for this hand (DB-driven next round number)
   if (game.dbGameId) {
     try {
-      const roundNumber = ((trickLogger.getCurrentRoundNumber(game.dbGameId) || 0) + 1);
-      await trickLogger.startRound(game.dbGameId!, roundNumber);
-      game.currentRound = roundNumber;
+      const existingMax = await prisma.round.findFirst({
+        where: { gameId: game.dbGameId },
+        orderBy: { roundNumber: 'desc' },
+        select: { roundNumber: true }
+      });
+      const nextRoundNumber = (existingMax?.roundNumber || 0) + 1;
+      let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber: nextRoundNumber } });
+      if (!roundRecord) {
+        roundRecord = await prisma.round.create({
+          data: {
+            id: `round_${game.dbGameId}_${nextRoundNumber}_${Date.now()}`,
+            gameId: game.dbGameId,
+            roundNumber: nextRoundNumber,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+      }
+      trickLogger.setCurrentRoundId(game.id, roundRecord.id);
+      game.currentRound = nextRoundNumber;
     } catch (err) {
       console.error('Failed to start round logging for new hand:', err);
     }
   }
-
+  
   // Emit new hand started event with dealing phase
   console.log('[START NEW HAND] Emitting new_hand_started event');
   io.to(game.id).emit('new_hand_started', {
@@ -137,10 +165,10 @@ async function startNewHand(game: Game): Promise<void> {
     hands: game.hands,
     currentBidderIndex: game.bidding.currentBidderIndex
   });
-
+  
   // Emit game update
   io.to(game.id).emit('game_update', enrichGameForClient(game));
-
+  
   // Add delay before starting bidding phase
   setTimeout(() => {
     // If first bidder is a bot, trigger bot bidding

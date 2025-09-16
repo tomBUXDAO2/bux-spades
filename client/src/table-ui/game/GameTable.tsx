@@ -2951,39 +2951,6 @@ export default function GameTable({
     }
   }, [gameState.status]);
 
-  // Fallback: Show hand summary when game status is HAND_COMPLETED but no hand summary is shown
-  useEffect(() => {
-    if (false) { // DISABLED - if (true if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !showHandSummary if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !handSummaryData) {
-      console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
-      
-      // Calculate scores manually from game state
-      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
-      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
-      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
-      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-      
-      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
-      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
-      
-      const fallbackData = {
-        team1Score,
-        team2Score,
-        team1Bags: Math.max(0, team1Tricks - team1Bid),
-        team2Bags: Math.max(0, team2Tricks - team2Bid),
-        team1TotalScore: gameState.team1TotalScore || team1Score,
-        team2TotalScore: gameState.team2TotalScore || team2Score,
-        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
-      };
-      
-      console.log('[FALLBACK] Calculated fallback data for HAND_COMPLETED:', fallbackData);
-      
-      // Store the hand summary data
-      setHandSummaryData(fallbackData);
-      
-      // Show hand summary immediately
-      setShowHandSummary(true);
-    }
-  }, [gameState.status, showHandSummary, handSummaryData, gameState.players, gameState.bidding, gameState.team1TotalScore, gameState.team2TotalScore]);
 
 
 

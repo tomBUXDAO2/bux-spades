@@ -28,6 +28,13 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       onlineUsers.add(socket.userId);
       io.emit('online_users', Array.from(onlineUsers));
       console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
+
+    // Send authenticated event to client
+    socket.emit("authenticated", {
+      success: true,
+      userId: socket.userId,
+      games: [] // TODO: Load user games if needed
+    });
     }
 
     // Authentication event
@@ -45,7 +52,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     socket.on('hand_summary_continue', (data) => handleHandSummaryContinue(socket, data));
 
     // Chat events
-    socket.on("game_chat_message", async (data) => {
+    socket.on("chat_message", async (data) => {
       await handleGameChatMessage(socket, data.gameId, data.message);
     });
 
@@ -87,7 +94,13 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         onlineUsers.delete(socket.userId);
         io.emit('online_users', Array.from(onlineUsers));
         console.log(`[CONNECTION] User ${socket.userId} disconnected. Online users:`, Array.from(onlineUsers));
-      }
+
+    // Send authenticated event to client
+    socket.emit("authenticated", {
+      success: true,
+      userId: socket.userId,
+      games: [] // TODO: Load user games if needed
+    });      }
     });
   });
 }

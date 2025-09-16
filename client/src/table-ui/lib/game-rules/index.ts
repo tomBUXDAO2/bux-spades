@@ -1,8 +1,6 @@
 // Bidding Rules
 export { canBidNil, getValidBidRange, isValidBid } from './bidding/biddingRules';
 
-// Scoring Rules
-export { calculateGameTypeScore } from './scoring/scoringRules';
 
 // Gameplay Rules
 export { isPlayableCard, isHandComplete, isGameOver } from './gameplay/gameplayRules';

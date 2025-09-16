@@ -1,4 +1,4 @@
-import { TrickLogger } from './core/trickLogger';
+import { TrickLogger } from "./core/trickLogger";
 import { TrickStatsService } from './stats/trickStats';
 
 // Export types
@@ -8,7 +8,7 @@ export * from './types/trickLogTypes';
 export * from './utils/cardUtils';
 
 // Export core logger
-export { TrickLogger } from './core/trickLogger';
+export { TrickLogger } from "./core/trickLogger";
 
 // Export stats service
 export { TrickStatsService } from './stats/trickStats';

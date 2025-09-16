@@ -1,5 +1,5 @@
 // Core Game Cleanup Manager
-export { GameCleanupManager } from './core/gameCleanupManager';
+export { GameCleanupManager } from "./core/gameCleanupManager";
 
 // Memory Cleanup
 export { cleanupFinishedGamesInMemory } from './memory/memoryCleanup';
@@ -11,5 +11,5 @@ export { cleanupStuckDatabaseGames, cleanupOrphanedGames, forceCleanupGame } fro
 export { cleanupAbandonedGames } from './abandoned/abandonedGameCleanup';
 
 // Singleton instance
-import { GameCleanupManager } from './core/gameCleanupManager';
+import { GameCleanupManager } from "./core/gameCleanupManager";
 export const gameCleanupManager = GameCleanupManager.getInstance();
