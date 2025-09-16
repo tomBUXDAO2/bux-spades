@@ -49,7 +49,12 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         socketId: socket.id,
         onlineUsers: Array.from(onlineUsers)
       });
-    }
+      socket.emit('authenticated', { 
+        success: true, 
+        userId: socket.userId, 
+        sessionId, 
+        games: Array.from(socket.rooms).filter(room => room !== socket.id) 
+      });    }
 
     // Join game event
     socket.on('join_game', (data) => handleJoinGame(socket, data));
