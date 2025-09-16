@@ -40,6 +40,36 @@ export async function logGameStart(game: Game): Promise<void> {
 
     game.dbGameId = dbGame.id;
     console.log('[DATABASE] Game logged with ID:', dbGame.id);
+    
+    // Create GamePlayer records for all players
+    console.log('[DATABASE] Creating GamePlayer records...');
+    for (let i = 0; i < 4; i++) {
+      const player = game.players[i];
+      if (player) {
+        try {
+          const team = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
+          await prisma.gamePlayer.create({
+            data: {
+              id: `player_${dbGame.id}_${i}_${Date.now()}`,
+              gameId: dbGame.id,
+              userId: player.id,
+              position: i,
+              team: team,
+              bid: null,
+              bags: 0,
+              points: 0,
+              username: player.username,
+              discordId: player.discordId || null,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          });
+          console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i}`);
+        } catch (error) {
+          console.error(`[DATABASE] Failed to create GamePlayer record for ${player.username}:`, error);
+        }
+      }
+    }
   } catch (error) {
     console.error('[DATABASE] Failed to log game:', error);
     throw error;

@@ -28,6 +28,19 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
     if (game.players[winnerIndex]) {
       game.players[winnerIndex]!.tricks = (game.players[winnerIndex]!.tricks || 0) + 1;
       console.log('[TRICK COMPLETION] Awarded trick to player', winnerIndex, 'new count:', game.players[winnerIndex]!.tricks);
+      
+      // Update PlayerTrickCount in database
+      if (game.dbGameId) {
+        try {
+          const { updatePlayerTrickCount } = await import('../../database-scoring/trick-count/trickCountManager');
+          const player = game.players[winnerIndex];
+          if (player) {
+            await updatePlayerTrickCount(game.dbGameId, game.currentRound, player.id, player.tricks);
+          }
+        } catch (error) {
+          console.error('[TRICK COMPLETION] Failed to update PlayerTrickCount:', error);
+        }
+      }
     }
     
     // Store completed trick
