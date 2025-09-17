@@ -2,7 +2,7 @@ import type { Game, Card, Suit } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { handleTrickComplete } from '../socket-handlers/game-state/trick/trickCompletion';
-import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBidHearts, getBid3, getBid4OrNil, getCrazyAces } from '../bot-bidding/index';
+import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
 import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
 import { getAssassinPlay, getAssassinPlayableCards } from './assassin';
@@ -40,80 +40,10 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
         const result = getMirrorBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
-      } else if (bidType === 'GIMMICK') {
-        const gimmickType = (game as any).rules?.gimmickType;
-        if (gimmickType === 'SUICIDE') {
-          const result = getSuicideBid({ hand, seatIndex, existingBids, dealerIndex: game.dealerIndex });
-          bid = result.bid;
-          reason = result.reason;
-        } else if (gimmickType === 'BID_HEARTS') {
-          const result = getBidHearts({ hand, seatIndex, existingBids });
-          bid = result.bid;
-          reason = result.reason;
-        } else if (gimmickType === 'BID_3') {
-          const result = getBid3({ hand, seatIndex, existingBids });
-          bid = result.bid;
-          reason = result.reason;
-        } else if (gimmickType === 'BID_4_OR_NIL') {
-          const result = getBid4OrNil({ hand, seatIndex, existingBids });
-          bid = result.bid;
-          reason = result.reason;
-        } else if (gimmickType === 'CRAZY_ACES') {
-          const result = getCrazyAces({ hand, seatIndex, existingBids });
-          bid = result.bid;
-          reason = result.reason;
-        } else if (game.specialRules?.screamer) {
-    // Screamer mode - use screamer logic
-    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
-    const screamerResult = getScreamerPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = screamerResult.card;
-    reason = screamerResult.reason;
-  } else if (game.specialRules?.assassin) {
-    // Assassin mode - use assassin logic
-    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
-    const assassinResult = getAssassinPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = assassinResult.card;
-    reason = assassinResult.reason;
-  } else {
-          const result = getRegularBid({ hand, seatIndex, existingBids });
-          bid = result.bid;
-          reason = result.reason;
-        }      } else if (game.specialRules?.screamer) {
-    // Screamer mode - use screamer logic
-    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
-    const screamerResult = getScreamerPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = screamerResult.card;
-    reason = screamerResult.reason;
-  } else if (game.specialRules?.assassin) {
-    // Assassin mode - use assassin logic
-    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
-    const assassinResult = getAssassinPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = assassinResult.card;
-    reason = assassinResult.reason;
+      } else if (bidType === 'GIMMICK' && (game as any).rules?.gimmickType === 'SUICIDE') {
+        const result = getSuicideBid({ hand, seatIndex, existingBids, dealerIndex: game.dealerIndex });
+        bid = result.bid;
+        reason = result.reason;
   } else {
         const result = getRegularBid({ hand, seatIndex, existingBids });
         bid = result.bid;
@@ -244,9 +174,44 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
   }
 
   console.log(`[BOT CARD DEBUG] Bot ${bot.username} selected card: ${card.rank}${card.suit} - ${reason}`);
-  // Use bot-specific card play logic
-  await botPlayCardDirect(game, seatIndex, card!);
-  return;}
+
+  // Play the card
+  const cardIndex = hand.findIndex(c => c.suit === card!.suit && c.rank === card!.rank);
+  if (cardIndex === -1) {
+    console.log(`[BOT CARD DEBUG] Bot ${bot.username} - selected card not found in hand`);
+    return;
+  }
+
+  hand.splice(cardIndex, 1);
+  game.play.currentTrick.push({ ...card!, playerIndex: seatIndex });
+
+  // Set spadesBroken if a spade is played
+  if (card!.suit === 'SPADES') {
+    game.play.spadesBroken = true;
+  }
+
+  console.log(`[BOT DEBUG] Bot ${bot.username} played ${card!.suit} ${card!.rank}`);
+
+  // Emit game update after playing card
+  io.to(game.id).emit("game_update", enrichGameForClient(game));
+
+  // Check if trick is complete
+  if (game.play.currentTrick.length === 4) {
+    await handleTrickComplete(game);
+  } else {
+    // Move to next player
+    const nextPlayerIndex = (seatIndex + 1) % 4;
+    game.play.currentPlayer = game.players[nextPlayerIndex]?.id || '';
+    game.play.currentPlayerIndex = nextPlayerIndex;
+    
+    // Emit game update after turn advancement
+    io.to(game.id).emit("game_update", enrichGameForClient(game));
+    
+    if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
+      setTimeout(() => botPlayCard(game, nextPlayerIndex), 1000);
+    }
+  }
+}
 
 function getPlayableCards(hand: Card[], leadSuit: Suit | null, spadesBroken: boolean): Card[] {
   if (!leadSuit) {
@@ -273,104 +238,4 @@ function selectCardToWin(playableCards: Card[], currentTrick: Card[], hand: Card
   // For now, just play the first playable card
   // TODO: Implement more sophisticated card selection
   return playableCards[0];
-}
-
-/**
- * Direct card play for bots (without socket dependency)
- */
-async function botPlayCardDirect(game: Game, playerIndex: number, card: Card): Promise<void> {
-  const bot = game.players[playerIndex];
-  if (!bot || bot.type !== 'bot') {
-    console.log('[BOT CARD DEBUG] botPlayCardDirect called for non-bot player');
-    return;
-  }
-
-  console.log(`[BOT CARD DEBUG] Bot ${bot.username} playing card: ${card.rank}${card.suit}`);
-
-  // Validate card can be played
-  const hand = game.hands[playerIndex];
-  if (!hand || !hand.some(c => c.suit === card.suit && c.rank === card.rank)) {
-    console.log(`[BOT CARD DEBUG] Card ${card.rank}${card.suit} not in bot's hand`);
-    return;
-  }
-
-  // Enforce leading spades rule
-  const isLeading = game.play.currentTrick.length === 0;
-  if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
-    const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
-    if (!onlySpadesLeft) {
-      console.log(`[BOT CARD DEBUG] Bot cannot lead spades, selecting different card`);
-      // Select a non-spade card
-      const nonSpadeCard = hand.find(c => c.suit !== 'SPADES');
-      if (nonSpadeCard) {
-        return botPlayCardDirect(game, playerIndex, nonSpadeCard);
-      }
-    }
-  }
-
-  // Remove card from hand
-  const cardIndex = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
-  hand.splice(cardIndex, 1);
-
-  // Add to current trick
-  game.play.currentTrick.push({ ...card, playerIndex });
-  
-  console.log(`[BOT CARD DEBUG] Card played: ${card.rank}${card.suit}, trick length: ${game.play.currentTrick.length}`);
-
-  // Break spades if a spade is played on a non-spade lead
-  if (game.play.currentTrick.length > 0) {
-    const leadSuit = game.play.currentTrick[0].suit;
-    if (!game.play.spadesBroken && card.suit === 'SPADES' && leadSuit !== 'SPADES') {
-      game.play.spadesBroken = true;
-      console.log('[RULES] Spades are now broken');
-    }
-  }
-
-  // Emit card played event
-  io.to(game.id).emit('card_played', {
-    gameId: game.id,
-    playerId: bot.id,
-    card: card,
-  });
-
-  // Check if trick is complete
-  if (game.play.currentTrick.length === 4) {
-    await handleTrickComplete(game);
-  } else if (game.specialRules?.screamer) {
-    // Screamer mode - use screamer logic
-    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
-    const screamerResult = getScreamerPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = screamerResult.card;
-    reason = screamerResult.reason;
-  } else if (game.specialRules?.assassin) {
-    // Assassin mode - use assassin logic
-    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
-    const assassinResult = getAssassinPlay({
-      game,
-      hand: playableCards,
-      seatIndex,
-      currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
-    });
-    card = assassinResult.card;
-    reason = assassinResult.reason;
-  } else {
-    // Move to next player
-    const nextPlayerIndex = (playerIndex + 1) % 4;
-    game.play.currentPlayerIndex = nextPlayerIndex;
-    game.play.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-    
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    
-    // If next player is bot, trigger their move
-    if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-      setTimeout(() => botMakeMove(game, nextPlayerIndex), 1000);
-    }
-  }
 }
