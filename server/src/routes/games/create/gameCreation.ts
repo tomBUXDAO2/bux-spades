@@ -125,7 +125,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       team1Bags: 0,
       team2Bags: 0,
       forcedBid: undefined as any,
-      specialRules: {},
+      specialRules: settings.specialRules || {},
       spectators: [],
       completedTricks: [],
       rules: {

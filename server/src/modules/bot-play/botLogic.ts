@@ -4,6 +4,8 @@ import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { handleTrickComplete } from '../socket-handlers/game-state/trick/trickCompletion';
 import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBidHearts, getBid3, getBid4OrNil, getCrazyAces } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
+import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
+import { getAssassinPlay, getAssassinPlayableCards } from './assassin';
 import { getNilCoverPlay, NilCoverPlayInput } from './nil-cover';
 import { getCardValue } from '../../lib/hand-completion/utils/cardUtils';
 
@@ -60,11 +62,59 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
           const result = getCrazyAces({ hand, seatIndex, existingBids });
           bid = result.bid;
           reason = result.reason;
-        } else {
+        } else if (game.specialRules?.screamer) {
+    // Screamer mode - use screamer logic
+    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
+    const screamerResult = getScreamerPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = screamerResult.card;
+    reason = screamerResult.reason;
+  } else if (game.specialRules?.assassin) {
+    // Assassin mode - use assassin logic
+    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
+    const assassinResult = getAssassinPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = assassinResult.card;
+    reason = assassinResult.reason;
+  } else {
           const result = getRegularBid({ hand, seatIndex, existingBids });
           bid = result.bid;
           reason = result.reason;
-        }      } else {
+        }      } else if (game.specialRules?.screamer) {
+    // Screamer mode - use screamer logic
+    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
+    const screamerResult = getScreamerPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = screamerResult.card;
+    reason = screamerResult.reason;
+  } else if (game.specialRules?.assassin) {
+    // Assassin mode - use assassin logic
+    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
+    const assassinResult = getAssassinPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = assassinResult.card;
+    reason = assassinResult.reason;
+  } else {
         const result = getRegularBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
@@ -100,7 +150,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
 
   const hand = game.hands[seatIndex] || [];
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
-  const playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken);
+  const playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken, game, seatIndex);
 
   if (playableCards.length === 0) {
     console.log(`[BOT CARD DEBUG] Bot ${bot.username} has no playable cards!`);
@@ -156,6 +206,30 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     card = nilCoverResult.selectedCard;
     reason = nilCoverResult.reason;
 
+  } else if (game.specialRules?.screamer) {
+    // Screamer mode - use screamer logic
+    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
+    const screamerResult = getScreamerPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = screamerResult.card;
+    reason = screamerResult.reason;
+  } else if (game.specialRules?.assassin) {
+    // Assassin mode - use assassin logic
+    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
+    const assassinResult = getAssassinPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = assassinResult.card;
+    reason = assassinResult.reason;
   } else {
     // Normal bidding - use existing strategy
     console.log(`[BOT NORMAL] Bot ${bot.username} using normal strategy`);
@@ -262,6 +336,30 @@ async function botPlayCardDirect(game: Game, playerIndex: number, card: Card): P
   // Check if trick is complete
   if (game.play.currentTrick.length === 4) {
     await handleTrickComplete(game);
+  } else if (game.specialRules?.screamer) {
+    // Screamer mode - use screamer logic
+    console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
+    const screamerResult = getScreamerPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = screamerResult.card;
+    reason = screamerResult.reason;
+  } else if (game.specialRules?.assassin) {
+    // Assassin mode - use assassin logic
+    console.log(`[BOT ASSASSIN] Bot ${bot.username} using assassin strategy`);
+    const assassinResult = getAssassinPlay({
+      game,
+      hand: playableCards,
+      seatIndex,
+      currentTrick: game.play.currentTrick,
+      isLeading: leadSuit === null
+    });
+    card = assassinResult.card;
+    reason = assassinResult.reason;
   } else {
     // Move to next player
     const nextPlayerIndex = (playerIndex + 1) % 4;
