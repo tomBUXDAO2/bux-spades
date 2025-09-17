@@ -44,6 +44,12 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       return;
     }
 
+    // If any seated player is a bot at start time, mark game as unrated
+    const hasBotAtStart = game.players.some(p => p && (p.type === 'bot' || (p.username && p.username.startsWith('Bot '))));
+    if (hasBotAtStart) {
+      game.rated = false;
+    }
+
     // Move to bidding before persisting so DB status is correct
     game.status = 'BIDDING';
 
@@ -118,34 +124,19 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       nilBids: {}
     };
 
-    console.log('[GAME START] Game started successfully:', {
-      gameId: game.id,
-      dealerIndex,
-      firstBidder: firstBidder.username,
-      isBotGame: game.isBotGame
-    });
-
-    // Emit to all players
-    io.emit('games_updated', games.filter(g => g.status === 'WAITING'));
-    io.to(game.id).emit('game_started', {
-      dealerIndex,
-      hands: hands.map((hand, i) => ({
-        playerId: game.players[i]?.id,
-        hand
-      })),
-      bidding: game.bidding,
-    });
-
-    // Emit game_update for client sync
+    // Emit game update to all clients
     io.to(game.id).emit('game_update', enrichGameForClient(game));
 
-    // If first bidder is a bot, trigger bot bidding
-    if (firstBidder.type === 'bot') {
-      setTimeout(() => botMakeMove(game, (dealerIndex + 1) % 4), 500);
+    // If first to bid is a bot, trigger bot move
+    const firstBidderIndex = (dealerIndex + 1) % 4;
+    const firstBidderPlayer = game.players[firstBidderIndex];
+    if (firstBidderPlayer && firstBidderPlayer.type === 'bot') {
+      console.log('[GAME START] First bidder is a bot; triggering bot bid');
+      setTimeout(() => botMakeMove(game, firstBidderIndex), 500);
     }
 
-  } catch (err) {
-    console.error('[GAME START] Error in handleStartGame:', err);
+  } catch (error) {
+    console.error('[GAME START] Error starting game:', error);
     socket.emit('error', { message: 'Failed to start game' });
   }
 }

@@ -92,6 +92,9 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       };
     }
 
+    // Determine rating at creation time ONLY: unrated if any initial player is a bot
+    const hasBotAtCreation = players.filter(isNonNull).some(p => p.type === 'bot' || (p.username && p.username.startsWith('Bot ')));
+
     // Create the game
     const game: Game = {
       id: uuidv4(),
@@ -101,7 +104,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints,
       buyIn: settings.buyIn,
-      rated: !settings.league,
+      rated: !settings.league && !hasBotAtCreation,
       allowNil: true,
       allowBlindNil: false,
       league: settings.league || false,
