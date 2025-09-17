@@ -364,7 +364,7 @@ const HomePage: React.FC = () => {
   };
 
   const getGameTypeBrick = (game: GameState) => {
-    const type = game.rules?.bidType || 'REGULAR';
+    const type = (game as any).rules?.bidType || 'REGULAR';
     let color = 'bg-green-600';
     let label = 'REGULAR';
     if (type === 'WHIZ') {
@@ -375,7 +375,7 @@ const HomePage: React.FC = () => {
       label = 'MIRRORS';
     } else if (type === 'GIMMICK') {
       color = 'bg-orange-500';
-      const rawGt = game.rules?.gimmickType || '';
+      const rawGt = (game as any).rules?.gimmickType || '';
       const gt = String(rawGt).toUpperCase().replace(/\s+/g, '_');
       if (gt === 'BID_4_OR_NIL') label = '4 OR NIL';
       else if (gt === 'BID_3') label = 'BID 3';
@@ -421,7 +421,7 @@ const HomePage: React.FC = () => {
           <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
           </svg>
-          <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (game.rules?.bidType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+          <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (((game as any).rules?.bidType) === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
           {/* Special bricks moved here */}
           {getSpecialBricks(game)}
         </div>
@@ -590,7 +590,16 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     api.get('/api/users')
       .then(res => res.json())
-      .then(setOnlinePlayers)
+      .then((users) => {
+        const filtered = Array.isArray(users)
+          ? users.filter((u: any) => !(
+              (u && typeof u === 'object' && 'type' in u && u.type === 'bot') ||
+              (typeof u?.username === 'string' && u.username.startsWith('Bot ')) ||
+              (typeof u?.id === 'string' && u.id.startsWith('bot-'))
+            ))
+          : [];
+        setOnlinePlayers(filtered);
+      })
       .catch(() => setOnlinePlayers([]));
   }, [user?.id]);
 
@@ -946,9 +955,11 @@ const HomePage: React.FC = () => {
                 <div className="flex-1 overflow-y-auto space-y-2 mb-4">
                   {Array.isArray(onlinePlayers) ? onlinePlayers
                     .filter(player =>
-                      playerFilter === 'all' ? true :
-                      playerFilter === 'friends' ? player.status === 'friend' :
-                      player.status !== 'blocked'
+                      ((!("type" in player)) || player.type !== 'bot') && (
+                        playerFilter === 'all' ? true :
+                        playerFilter === 'friends' ? player.status === 'friend' :
+                        player.status !== 'blocked'
+                      )
                     )
                     .sort((a, b) => {
                       // First priority: friends come first
