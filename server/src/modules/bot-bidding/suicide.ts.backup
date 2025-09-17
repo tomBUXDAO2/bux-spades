@@ -87,26 +87,31 @@ export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
   const isFirstPartnerToBid = isFirstPartner(seatIndex, dealerIndex);
   const partnerHasBid = partnerBid !== null;
 
-  // Get regular bid for reference - this includes proper nil safety checks
+  // Get regular bid for reference
   const regularResult = getRegularBid({ hand, seatIndex, existingBids });
   const regularBid = regularResult.bid;
 
-  console.log(`[SUICIDE BOT] Regular bid result:`, regularResult);
+  // Check if nil is forbidden for this hand
+  const nilCheck = isNilForbidden(hand);
 
   if (isFirstPartnerToBid) {
     // FIRST PARTNER LOGIC
     console.log(`[SUICIDE BOT] First partner (seat ${seatIndex}) bidding...`);
     
-    // NEVER override regular bidding's nil safety - if regular bid is not nil, respect it
-    if (regularBid > 0) {
-      // Regular bidding already determined this hand is not safe for nil
-      const adjustedBid = Math.min(6, regularBid + 1);
-      return { bid: adjustedBid, reason: `First partner: regular bid ${regularBid} (not nil-safe), adding 1` };
+    // If regular bid would be less than 3 and nil is not forbidden, bid nil
+    if (regularBid < 3 && !nilCheck.forbidden) {
+      return { bid: 0, reason: `First partner: regular bid ${regularBid} < 3, nil safe` };
     }
     
-    // If regular bid is 0 (nil), we can consider suicide logic
-    // But still add 1 to the nil bid for suicide
-    return { bid: 1, reason: `First partner: regular says nil safe, but suicide adds 1` };
+    // If nil is forbidden, must bid regular + 1
+    if (nilCheck.forbidden) {
+      const adjustedBid = Math.min(6, regularBid + 1);
+      return { bid: adjustedBid, reason: `First partner: nil forbidden (${nilCheck.reason}), regular ${regularBid} + 1` };
+    }
+    
+    // If regular bid >= 3, add 1 to regular bid
+    const adjustedBid = Math.min(6, regularBid + 1);
+    return { bid: adjustedBid, reason: `First partner: regular bid ${regularBid} >= 3, adding 1` };
     
   } else {
     // SECOND PARTNER LOGIC
@@ -124,15 +129,12 @@ export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
       return { bid: adjustedBid, reason: `Second partner: partner bid nil, CANNOT bid nil, regular ${regularBid} + 1` };
     } else {
       // Partner did NOT bid nil, we are FORCED to bid nil
-      // But ONLY if regular bidding would allow nil (respects nil safety)
-      if (regularBid === 0) {
-        // Regular bidding says nil is safe
-        return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil (regular says safe)` };
-      } else {
-        // Regular bidding says nil is NOT safe, so we cannot bid nil even if forced
-        // Bid 1 as a fallback
-        return { bid: 1, reason: `Second partner: partner bid ${partnerBid}, FORCED nil but regular says unsafe, fallback to 1` };
+      if (nilCheck.forbidden) {
+        // This is a problem - we're forced to nil but it's forbidden
+        // In this case, bid 1 as a fallback
+        return { bid: 1, reason: `Second partner: FORCED nil but forbidden (${nilCheck.reason}), fallback to 1` };
       }
+      return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil` };
     }
   }
 }

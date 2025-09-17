@@ -35,7 +35,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     }
 
     // Check if all seats are filled
-    const filledSeats = game.players.filter(p => p !== null).length;
+    const filledSeats = game.players.filter((p: any) => p !== null).length;
     console.log('[GAME START] Checking seats:', { gameId, filledSeats, totalSeats: 4 });
     
     if (filledSeats < 4) {
@@ -69,6 +69,13 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
         });
         // Set the round ID for trick logging
         trickLogger.setCurrentRoundId(game.id, roundId);
+        // Initialize PlayerTrickCount entries for all players with 0 tricks
+        const { updatePlayerTrickCount } = await import('../../lib/database-scoring/trick-count/trickCountManager');
+        for (const player of game.players) {
+          if (player) {
+            await updatePlayerTrickCount(game.dbGameId, 1, player.id, 0);
+          }
+        }
       } else {
         // Round exists: still set round ID so trick logging works
         trickLogger.setCurrentRoundId(game.id, existingRound.id);
@@ -83,7 +90,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     game.dealerIndex = dealerIndex;
 
     // Assign dealer flag for UI
-    game.players.forEach((p, i) => {
+    game.players.forEach((p: any, i: number) => {
       if (p) p.isDealer = (i === dealerIndex);
     });
 

@@ -1,50 +1,66 @@
 import { Router } from 'express';
-import { z } from 'zod';
-import { requireAuth, AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validate } from '../../middleware/validate.middleware';
-import { rateLimit } from '../../middleware/rateLimit.middleware';
+import { Request, Response } from 'express';
 import { games } from '../../gamesStore';
 import { io } from '../../index';
-import { enrichGameForClient } from './shared/gameUtils';
+import { requireAuth } from '../../middleware/auth.middleware';
+import { createGame } from './create/gameCreation';
+import { joinGame } from './join/gameJoining';
 
-// Import modular route handlers
-import { createGame } from './create';
-import { joinGame } from './join';
-import { getAllGames, getGameById } from './status';
-import { logGameStart } from './database';
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    username: string;
+    avatar?: string;
+  };
+}
 
 const router = Router();
 
-// Validation schemas
-const createGameSchema = z.object({
-  gameMode: z.enum(['SOLO', 'PARTNERS']),
-  maxPoints: z.number().int().min(-1000).max(10000),
-  minPoints: z.number().int().min(-10000).max(1000),
-  buyIn: z.number().int().min(0).max(100000000),
-  biddingOption: z.string().optional(),
-  specialRules: z.any().optional(),
-  league: z.boolean().optional(),
-  creatorId: z.string().optional(),
-  creatorName: z.string().optional(),
-  creatorImage: z.string().nullable().optional(),
-  gameType: z.string().optional(),
-  players: z.array(z.object({
-    userId: z.string().optional(),
-    discordId: z.string().optional(),
-    username: z.string(),
-    avatar: z.string().nullable().optional(),
-    seat: z.number().int().min(0).max(3)
-  })).optional()
+// Create a new game
+router.post('/', requireAuth, createGame);
+
+// Join a game
+router.post('/:id/join', requireAuth, joinGame);
+
+// Get all games
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const allGames = games;
+    res.json({
+      success: true,
+      games: allGames
+    });
+  } catch (error) {
+    console.error('Error fetching games:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch games'
+    });
+  }
 });
 
-// Routes
-router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), requireAuth, validate(createGameSchema), createGame);
-router.get('/', getAllGames);
-router.get('/:id', getGameById);
-router.post('/:id/join', rateLimit({ key: 'join_game', windowMs: 5_000, max: 10 }), requireAuth, joinGame);
+// Get a specific game
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const game = games.find(g => g.id === req.params.id);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    res.json({
+      success: true,
+      game
+    });
+  } catch (error) {
+    console.error('Error fetching game:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch game'
+    });
+  }
+});
 
-// Leave table route (used by client leave button)
-router.post('/:id/leave', requireAuth, (req, res) => {
+// Leave a game
+router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
@@ -73,26 +89,17 @@ router.post('/:id/leave', requireAuth, (req, res) => {
     const isLeague = Boolean((game as any).league);
 
     if (!hasHumanPlayers && !isLeague) {
-      const idx = games.findIndex(g => g.id === gameId);
-      if (idx !== -1) {
-        games.splice(idx, 1);
-      }
+      const index = games.findIndex(g => g.id === gameId); if (index !== -1) games.splice(index, 1);
       io.emit('games_updated', games);
-      return res.json({ success: true, removed: true });
+    } else {
+      io.emit('games_updated', games);
     }
 
-    // Emit updates
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    io.emit('games_updated', games);
-
-    return res.json({ success: true, game: enrichGameForClient(game) });
+    res.json({ success: true });
   } catch (error) {
-    console.error('[LEAVE TABLE] Error:', error);
-    return res.status(500).json({ error: 'Failed to leave table' });
+    console.error('Error leaving game:', error);
+    res.status(500).json({ error: 'Failed to leave game' });
   }
 });
-
-// Export the logGameStart function for use in other modules
-export { logGameStart };
 
 export default router;

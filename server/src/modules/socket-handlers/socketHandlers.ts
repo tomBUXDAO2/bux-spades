@@ -4,6 +4,9 @@
 // Game joining handlers
 export { handleJoinGame } from './game-join';
 
+// Game completion handlers
+export { handlePlayAgainSocket } from './game-completion';
+
 // Game play handlers (bidding and card playing)
 export { handleMakeBid, handlePlayCard } from './game-play';
 

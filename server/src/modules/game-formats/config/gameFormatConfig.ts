@@ -17,7 +17,7 @@ export function createGameFormatConfig(settings: any): GameFormatConfig {
       specialRules = Object.keys(settings.specialRules).filter(key => settings.specialRules[key] === true);
     }
   }
-
+  
   // Determine allowNil / allowBlindNil from either top-level or specialRules object
   const allowNilFlag = typeof settings.allowNil === 'boolean'
     ? settings.allowNil

@@ -24,7 +24,7 @@ export async function logGameStart(game: Game): Promise<void> {
         league: game.league,
         whiz: game.rules?.bidType === 'WHIZ',
         mirror: game.rules?.bidType === 'MIRROR',
-        gimmick: ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'].includes(game.rules?.bidType || ''),
+        gimmick: game.rules?.bidType === 'GIMMICK',
         screamer: game.rules?.specialRules?.screamer || false,
         assassin: game.rules?.specialRules?.assassin || false,
         solo: game.solo,

@@ -25,6 +25,11 @@ This directory contains the modularized game logic, organized by functionality f
 - Functions: `handleJoinGame()`, `handleMakeBid()`, `handlePlayCard()`, `handleBiddingComplete()`
 
 ### ⏰ `timeout-management/`
+
+### 🔄 `play-again/`
+**Play again functionality for completed games**
+- `playAgainManager.ts` - Handles play again logic for league and non-league games
+- Functions: `handlePlayAgain()`, `resetGameState()`, `handlePlayerLeaveDuringPlayAgain()`
 **Player timeout handling and automation**
 - `timeoutManager.ts` - Timeout tracking, auto-moves, consecutive timeout handling
 - Functions: `startTurnTimeout()`, `clearTurnTimeout()`, `handlePlayerTimeout()`
@@ -69,6 +74,7 @@ import { botMakeMove } from './modules/bot-play';
 - ⏳ **Hand Completion Module** - Planned
 - ⏳ **Game Completion Module** - Planned
 - ⏳ **Database Logging Module** - Planned
+- ✅ **Play Again Module** - Complete
 - ⏳ **Game Formats Module** - Planned
 
 ## Next Steps

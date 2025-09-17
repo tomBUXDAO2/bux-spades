@@ -42,7 +42,7 @@ export async function cleanupStuckDatabaseGames(): Promise<void> {
  */
 export async function cleanupOrphanedGames(games: Game[]): Promise<void> {
   try {
-    const memoryGameIds = new Set(Array.from(games.keys()));
+    const memoryGameIds = new Set(games.map(g => g.id));
     
     const orphanedGames = await (prisma.game.findMany as any)({
       where: {

@@ -40,7 +40,7 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       console.error(`[DB SCORING ERROR] Game ${gameId} not found in memory`);
       return null;
     }
-
+    
     // Build a map of playerId -> tricksWon from trickCounts
     const playerIdToTricks: Record<string, number> = {};
     for (const tc of trickCounts) {

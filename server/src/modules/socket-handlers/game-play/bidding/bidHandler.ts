@@ -125,6 +125,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       const nextPlayerIndex = (playerIndex + 1) % 4;
       game.bidding.currentBidderIndex = nextPlayerIndex;
       game.bidding.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
+      game.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
       io.to(gameId).emit('game_update', enrichGameForClient(game));
       if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
         setTimeout(() => {

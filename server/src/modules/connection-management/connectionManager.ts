@@ -12,6 +12,8 @@ import {
   handleStartGame
 } from '../index';
 import { handleHandSummaryContinue } from '../socket-handlers/game-state/hand/handSummaryContinue';
+import { handlePlayAgainSocket } from '../socket-handlers/game-completion/playAgainHandler';
+import { handlePlayerLeaveDuringPlayAgain } from '../play-again/playAgainManager';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
   io.on('connection', (socket: AuthenticatedSocket) => {
@@ -29,17 +31,17 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       io.emit('online_users', Array.from(onlineUsers));
       console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
 
-    // Send authenticated event to client
-    socket.emit("authenticated", {
-      success: true,
-      userId: socket.userId,
-      games: [] // TODO: Load user games if needed
-    });
+      // Send authenticated event to client
+      socket.emit("authenticated", {
+        success: true,
+        userId: socket.userId,
+        games: [] // TODO: Load user games if needed
+      });
     }
 
     // Authentication event
     socket.on('authenticate', (data) => {
-      createUserSession(socket, data);
+      createUserSession(data.userId);
     });
 
     // Join game event
@@ -50,9 +52,10 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     socket.on('play_card', (data) => handlePlayCard(socket, data));
     socket.on('start_game', (data) => handleStartGame(socket, data));
     socket.on('hand_summary_continue', (data) => handleHandSummaryContinue(socket, data));
+    socket.on('play_again', (data) => handlePlayAgainSocket(socket, data));
 
     // Chat events
-    socket.on("chat_message", async (data) => {
+    socket.on("game_chat_message", async (data) => {
       await handleGameChatMessage(socket, data.gameId, data.message);
     });
 
@@ -90,17 +93,18 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       console.log(`[CONNECTION] Socket ${socket.id} disconnected:`, reason);
       
       if (socket.userId) {
+        // Handle play again cleanup if player was in a finished game
+        games.forEach(game => {
+          if (game.status === 'FINISHED' && game.players.some(p => p && p.id === socket.userId)) {
+            handlePlayerLeaveDuringPlayAgain(game.id, socket.userId);
+          }
+        });
+        
         authenticatedSockets.delete(socket.userId);
         onlineUsers.delete(socket.userId);
         io.emit('online_users', Array.from(onlineUsers));
         console.log(`[CONNECTION] User ${socket.userId} disconnected. Online users:`, Array.from(onlineUsers));
-
-    // Send authenticated event to client
-    socket.emit("authenticated", {
-      success: true,
-      userId: socket.userId,
-      games: [] // TODO: Load user games if needed
-    });      }
+      }
     });
   });
 }

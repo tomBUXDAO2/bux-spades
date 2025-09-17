@@ -57,9 +57,8 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
     bid: undefined,
     tricks: 0,
     points: 0,
-    dbUserId: BOT_USER_ID, // Same DB user ID for all bots
   };
-
+  
   // If game is already in DB, upsert GamePlayer row for this bot
   try {
     if (game.dbGameId) {

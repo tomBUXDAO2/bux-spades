@@ -22,7 +22,7 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
   }
 
   try {
-    const game = games.find((g: Game) => g.id === gameId);
+    const game = games.find(g => g.id === gameId);
     if (!game) {
       console.log(`Game ${gameId} not found`);
       socket.emit('error', { message: 'Game not found' });
@@ -89,7 +89,7 @@ async function startNewHand(game: Game): Promise<void> {
   // Assign new dealer
   const newDealerIndex = (game.dealerIndex + 1) % 4;
   game.dealerIndex = newDealerIndex;
-  
+
   // Assign dealer flag for UI
   game.players.forEach((p, i) => {
     if (p) p.isDealer = (i === newDealerIndex);
@@ -111,7 +111,7 @@ async function startNewHand(game: Game): Promise<void> {
   
   // Move game into bidding phase for the new hand
   game.status = 'BIDDING';
-  
+
   // Reset bidding state
   game.bidding = {
     currentBidderIndex: (newDealerIndex + 1) % 4,
@@ -122,14 +122,14 @@ async function startNewHand(game: Game): Promise<void> {
   
   // Clear play state
   game.play = undefined;
-  
+
   // Reset player trick counts for new hand
   game.players.forEach(player => {
     if (player) {
       player.tricks = 0;
     }
   });
-  
+
   // Start a new round in DB for this hand (DB-driven next round number)
   if (game.dbGameId) {
     try {
@@ -152,12 +152,19 @@ async function startNewHand(game: Game): Promise<void> {
         });
       }
       trickLogger.setCurrentRoundId(game.id, roundRecord.id);
+      // Initialize PlayerTrickCount entries for all players with 0 tricks
+      const { updatePlayerTrickCount } = await import('../../../../lib/database-scoring/trick-count/trickCountManager');
+      for (const player of game.players) {
+        if (player) {
+          await updatePlayerTrickCount(game.dbGameId, nextRoundNumber, player.id, 0);
+        }
+      }
       game.currentRound = nextRoundNumber;
     } catch (err) {
       console.error('Failed to start round logging for new hand:', err);
     }
   }
-  
+
   // Emit new hand started event with dealing phase
   console.log('[START NEW HAND] Emitting new_hand_started event');
   io.to(game.id).emit('new_hand_started', {
@@ -165,10 +172,10 @@ async function startNewHand(game: Game): Promise<void> {
     hands: game.hands,
     currentBidderIndex: game.bidding.currentBidderIndex
   });
-  
+
   // Emit game update
   io.to(game.id).emit('game_update', enrichGameForClient(game));
-  
+
   // Add delay before starting bidding phase
   setTimeout(() => {
     // If first bidder is a bot, trigger bot bidding
