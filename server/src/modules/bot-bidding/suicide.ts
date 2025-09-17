@@ -123,16 +123,8 @@ export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
       const adjustedBid = Math.min(6, regularBid + 1);
       return { bid: adjustedBid, reason: `Second partner: partner bid nil, CANNOT bid nil, regular ${regularBid} + 1` };
     } else {
-      // Partner did NOT bid nil, we are FORCED to bid nil
-      // But ONLY if regular bidding would allow nil (respects nil safety)
-      if (regularBid === 0) {
-        // Regular bidding says nil is safe
-        return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil (regular says safe)` };
-      } else {
-        // Regular bidding says nil is NOT safe, so we cannot bid nil even if forced
-        // Bid 1 as a fallback
-        return { bid: 1, reason: `Second partner: partner bid ${partnerBid}, FORCED nil but regular says unsafe, fallback to 1` };
-      }
+      // Partner did NOT bid nil, we are FORCED to bid nil regardless of safety
+      return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil (suicide rule)` };
     }
   }
 }
