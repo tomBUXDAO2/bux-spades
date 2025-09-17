@@ -4,7 +4,7 @@ import type { GamePlayOption } from '../../../types/game';
  * Game format types
  */
 export type GameFormat = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
-export type GimmickType = 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES';
+export type GimmickType = 'SUICIDE' | 'BID_4_OR_NIL' | 'BID_3' | 'BID_HEARTS' | 'CRAZY_ACES';
 
 /**
  * Game format configuration
@@ -23,16 +23,16 @@ export interface GameFormatConfig {
 export function mapGimmickTypeToCode(gimmickType: 'BID_4_OR_NIL' | 'BID_3' | 'BID_HEARTS' | 'CRAZY_ACES' | 'SUICIDE'): GimmickType {
   switch (gimmickType) {
     case 'BID_4_OR_NIL':
-      return 'BID4NIL';
+      return 'BID_4_OR_NIL';
     case 'BID_3':
-      return 'BID3';
+      return 'BID_3';
     case 'BID_HEARTS':
-      return 'BIDHEARTS';
+      return 'BID_HEARTS';
     case 'CRAZY_ACES':
-      return 'CRAZY ACES';
+      return 'CRAZY_ACES';
     case 'SUICIDE':
       return 'SUICIDE';
     default:
-      return 'BID3'; // default unused path; shouldn't happen
+      return 'BID_3'; // default unused path; shouldn't happen
   }
 }

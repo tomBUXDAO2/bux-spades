@@ -2,7 +2,7 @@ import type { Game, Card, Suit } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { handleTrickComplete } from '../socket-handlers/game-state/trick/trickCompletion';
-import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid } from '../bot-bidding/index';
+import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBidHearts, getBid3, getBid4OrNil, getCrazyAces } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
 import { getNilCoverPlay, NilCoverPlayInput } from './nil-cover';
 import { getCardValue } from '../../lib/hand-completion/utils/cardUtils';
@@ -38,11 +38,33 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
         const result = getMirrorBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
-      } else if (bidType === 'GIMMICK' && (game as any).rules?.gimmickType === 'SUICIDE') {
-        const result = getSuicideBid({ hand, seatIndex, existingBids, dealerIndex: game.dealerIndex });
-        bid = result.bid;
-        reason = result.reason;
-      } else {
+      } else if (bidType === 'GIMMICK') {
+        const gimmickType = (game as any).rules?.gimmickType;
+        if (gimmickType === 'SUICIDE') {
+          const result = getSuicideBid({ hand, seatIndex, existingBids, dealerIndex: game.dealerIndex });
+          bid = result.bid;
+          reason = result.reason;
+        } else if (gimmickType === 'BID_HEARTS') {
+          const result = getBidHearts({ hand, seatIndex, existingBids });
+          bid = result.bid;
+          reason = result.reason;
+        } else if (gimmickType === 'BID_3') {
+          const result = getBid3({ hand, seatIndex, existingBids });
+          bid = result.bid;
+          reason = result.reason;
+        } else if (gimmickType === 'BID_4_OR_NIL') {
+          const result = getBid4OrNil({ hand, seatIndex, existingBids });
+          bid = result.bid;
+          reason = result.reason;
+        } else if (gimmickType === 'CRAZY_ACES') {
+          const result = getCrazyAces({ hand, seatIndex, existingBids });
+          bid = result.bid;
+          reason = result.reason;
+        } else {
+          const result = getRegularBid({ hand, seatIndex, existingBids });
+          bid = result.bid;
+          reason = result.reason;
+        }      } else {
         const result = getRegularBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;

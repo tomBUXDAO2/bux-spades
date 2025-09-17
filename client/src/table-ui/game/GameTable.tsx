@@ -3704,13 +3704,15 @@ const [isStarting, setIsStarting] = useState(false);
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
                 label = 'MIRRORS';
-              } else if (type === 'GIMMICK' && (gameState as any).rules?.gimmickType) {
+              } else if (type === 'GIMMICK') {
                 color = 'bg-orange-500';
-                if ((gameState as any).rules?.gimmickType === 'BID4NIL') label = '4 OR NIL';
-                else if ((gameState as any).rules?.gimmickType === 'BID3') label = 'BID 3';
-                else if ((gameState as any).rules?.gimmickType === 'BIDHEARTS') label = 'BID ♥s';
-                else if ((gameState as any).rules?.gimmickType === 'SUICIDE') label = 'SUICIDE';
-                else if ((gameState as any).rules?.gimmickType === 'CRAZY ACES') label = 'CRAZY As';
+                const rawGt = (gameState as any).rules?.gimmickType || (gameState as any).forcedBid || '';
+                const gt = String(rawGt).toUpperCase().replace(/\s+/g, '_');
+                if (gt === 'BID_4_OR_NIL') label = '4 OR NIL';
+                else if (gt === 'BID_3') label = 'BID 3';
+                else if (gt === 'BID_HEARTS') label = 'BID ♡s';
+                else if (gt === 'SUICIDE') label = 'SUICIDE';
+                else if (gt === 'CRAZY_ACES') label = 'CRAZY As';
                 else label = 'GIMMICK';
               }
               return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;

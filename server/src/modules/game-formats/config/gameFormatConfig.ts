@@ -50,7 +50,7 @@ function determineGameFormat(biddingOption: string): GameFormat {
     return 'WHIZ';
   } else if (option === 'MIRROR' || option === 'MIRRORS') {
     return 'MIRROR';
-  } else if ([ 'SUICIDE', 'BID_4_OR_NIL', 'BID_3', 'BID_HEARTS', 'CRAZY_ACES' ].includes(option)) {
+  } else if ([ 'SUICIDE', 'BID_4_OR_NIL', 'BID_3', 'BID_HEARTS', 'CRAZY_ACES', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES' ].includes(option)) {
     return 'GIMMICK';
   } else {
     return 'REGULAR';
@@ -66,10 +66,18 @@ function determineGimmickType(biddingOption: string): GimmickType | undefined {
   
   switch (option) {
     case 'SUICIDE': return 'SUICIDE';
-    case 'BID_4_OR_NIL': return 'BID4NIL';
-    case 'BID_3': return 'BID3';
-    case 'BID_HEARTS': return 'BIDHEARTS';
-    case 'CRAZY_ACES': return 'CRAZY ACES';
+    case 'BID_4_OR_NIL':
+    case '4 OR NIL':
+      return 'BID_4_OR_NIL';
+    case 'BID_3':
+    case 'BID 3':
+      return 'BID_3';
+    case 'BID_HEARTS':
+    case 'BID HEARTS':
+      return 'BID_HEARTS';
+    case 'CRAZY_ACES':
+    case 'CRAZY ACES':
+      return 'CRAZY_ACES';
     default: return undefined;
   }
 }

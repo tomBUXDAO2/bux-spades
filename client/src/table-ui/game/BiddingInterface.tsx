@@ -60,13 +60,43 @@ export default function BiddingInterface({
     }
   }, [gameType, numSpades, onBid]);
 
+  // For BID HEARTS games, automatically bid the number of hearts
+  useEffect(() => {
+    if (gimmickType === "BID HEARTS") {
+      console.log("Auto-bidding in BID HEARTS game:", numHearts);
+      setIsSubmitting(true);
+      const heartsBid = numHearts > 0 ? numHearts : 0;
+      console.log("[BID HEARTS DEBUG] Making bid:", heartsBid);
+      onBid(heartsBid);
+    }
+  }, [gimmickType, numHearts, onBid]);
+
+  // For BID 3 games, automatically bid 3
+  useEffect(() => {
+    if (gimmickType === "BID 3") {
+      console.log("Auto-bidding in BID 3 game: 3");
+      setIsSubmitting(true);
+      onBid(3);
+    }
+  }, [gimmickType, onBid]);
+
+  // For CRAZY ACES games, automatically bid 3 per ace
+  useEffect(() => {
+    if (gimmickType === "CRAZY ACES") {
+      const aceCount = currentPlayerHand ? currentPlayerHand.filter(card => card.rank === "A").length : 0;
+      const acesBid = aceCount > 0 ? aceCount * 3 : 0;
+      console.log("Auto-bidding in CRAZY ACES game:", acesBid, "aces:", aceCount);
+      setIsSubmitting(true);
+      onBid(acesBid);
+    }
+  }, [gimmickType, currentPlayerHand, onBid]);
   const handleSubmit = (bid: number) => {
     setIsSubmitting(true);
     onBid(bid);
   };
 
   // Extra safeguard - hide if not my turn, if we're submitting, or if it's a MIRROR game
-  if (!isMyTurn || isSubmitting || gameType === "MIRROR") {
+  if (!isMyTurn || isSubmitting || gameType === "MIRROR" || gimmickType === "BID HEARTS" || gimmickType === "BID 3" || gimmickType === "CRAZY ACES") {
     return null;
   }
 
@@ -88,13 +118,15 @@ export default function BiddingInterface({
   }
 
   // For 4 OR NIL games, players must bid 4 or nil
-  if (gimmickType === "BID4NIL") {
+  if (gimmickType === "BID_4_OR_NIL") {
+    const hasAceSpades = currentPlayerHand ? currentPlayerHand.some(card => card.suit === "SPADES" && card.rank === "A") : false;
+    
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
-            <p className="text-sm max-sm:text-xs text-gray-300">4 OR NIL: You must bid 4 or nil</p>
+            <p className="text-sm max-sm:text-xs text-gray-300">4 OR NIL: You must bid 4 or nil{hasAceSpades ? " (Nil disabled - you have Ace of Spades)" : ""}</p>
           </div>
           <div className="flex flex-col gap-3">
             <button
@@ -104,11 +136,11 @@ export default function BiddingInterface({
               Bid 4
             </button>
             <button
-              onClick={() => setSelectedBid(0)}
-              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+              onClick={() => !hasAceSpades && setSelectedBid(0)}
+              disabled={hasAceSpades}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
-              Nil
-            </button>
+              Nil {hasAceSpades ? "(Disabled)" : ""}            </button>
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
               disabled={selectedBid === null}
@@ -123,7 +155,7 @@ export default function BiddingInterface({
   }
 
   // For BID 3 games, auto-bid 3 and show message on table
-  if (gimmickType === "BID3") {
+  if (gimmickType === "BID_3" || gimmickType === "BID 3" || gimmickType === "BID3") {
     console.log('[BID 3 DEBUG] Auto-bidding 3 for all players');
     setIsSubmitting(true);
     onBid(3);
@@ -131,7 +163,7 @@ export default function BiddingInterface({
   }
 
   // For BID HEARTS games, auto-bid hearts count and show message on table
-  if (gimmickType === "BIDHEARTS") {
+  if (gimmickType === "BID_HEARTS" || gimmickType === "BID HEARTS" || gimmickType === "BIDHEARTS") {
     console.log('[BID HEARTS DEBUG] Auto-bidding hearts count:', numHearts);
     setIsSubmitting(true);
     onBid(numHearts);
@@ -139,7 +171,7 @@ export default function BiddingInterface({
   }
 
   // For CRAZY ACES games, auto-bid 3 for each ace and show message on table
-  if (gimmickType === "CRAZY ACES") {
+  if (gimmickType === "CRAZY_ACES" || gimmickType === "CRAZY ACES") {
     // Count aces in the player's hand
     const acesCount = currentPlayerHand ? currentPlayerHand.filter(card => card.rank === 'A').length : 0;
     const bidAmount = acesCount * 3;
@@ -178,19 +210,19 @@ export default function BiddingInterface({
             )}
             {canBidNil && (
               <button
-                onClick={() => setSelectedBid(0)}
-                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-              >
-                Nil
-              </button>
+              onClick={() => !hasAceSpades && setSelectedBid(0)}
+              disabled={hasAceSpades}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+            >
+              Nil {hasAceSpades ? "(Disabled)" : ""}              </button>
             )}
             {isForcedNil && (
               <button
-                onClick={() => setSelectedBid(0)}
-                className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-              >
-                Bid Nil (Forced)
-              </button>
+              onClick={() => !hasAceSpades && setSelectedBid(0)}
+              disabled={hasAceSpades}
+              className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+            >
+              Nil {hasAceSpades ? "(Disabled)" : ""}              </button>
             )}
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
@@ -222,11 +254,11 @@ export default function BiddingInterface({
             <div className="flex justify-center gap-2 max-sm:gap-1">
               {allowNil && (
                 <button
-                  onClick={() => setSelectedBid(0)}
-                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === 0 ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
-                >
-                  Nil
-                </button>
+              onClick={() => !hasAceSpades && setSelectedBid(0)}
+              disabled={hasAceSpades}
+              className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+            >
+              Nil {hasAceSpades ? "(Disabled)" : ""}                </button>
               )}
               {[1, 2, 3, 4, 5, 6].map((bid) => (
                 <button
