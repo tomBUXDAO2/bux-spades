@@ -27,56 +27,33 @@ function countBySuit(hand: Card[]) {
   return bySuit;
 }
 
-function hasRank(hand: Card[], suit: Suit, ranks: Rank[]): boolean {
-  return hand.some(c => c.suit === suit && ranks.includes(c.rank));
-}
-
-function isNilForbidden(hand: Card[]): { forbidden: boolean; reason: string } {
-  const bySuit = countBySuit(hand);
-  const spRanks = bySuit.SPADES.map(c => c.rank);
-  const spLen = bySuit.SPADES.length;
-
-  // Never nil with Ace of Spades
-  if (spRanks.includes('A')) {
-    return { forbidden: true, reason: 'Holds Ace of Spades' };
-  }
-
-  // Never nil with both K and Q of Spades
-  if (spRanks.includes('K') && spRanks.includes('Q')) {
-    return { forbidden: true, reason: 'Holds K and Q of Spades' };
-  }
-
-  // Never nil with 5 or more spades
-  if (spLen >= 5) {
-    return { forbidden: true, reason: 'Holds 5 or more spades' };
-  }
-
-  return { forbidden: false, reason: 'Nil allowed' };
+function hasRank(hand: Card[], rank: Rank): boolean {
+  return hand.some(c => c.rank === rank);
 }
 
 function getPartnerSeatIndex(seatIndex: number): number {
   return (seatIndex + 2) % 4;
 }
 
-function getBiddingOrder(dealerIndex: number): number[] {
-  // Bidding order: dealer + 1, dealer + 2, dealer + 3, dealer
-  const order = [];
-  for (let i = 1; i <= 4; i++) {
-    order.push((dealerIndex + i) % 4);
-  }
-  return order;
-}
-
 function isFirstPartner(seatIndex: number, dealerIndex: number): boolean {
   const partnerSeatIndex = getPartnerSeatIndex(seatIndex);
-  const biddingOrder = getBiddingOrder(dealerIndex);
+  // First partner is the one who bids first in the rotation
+  // Dealer + 1 goes first, then dealer + 2, etc.
+  const firstBidder = (dealerIndex + 1) % 4;
+  const secondBidder = (dealerIndex + 2) % 4;
+  const thirdBidder = (dealerIndex + 3) % 4;
+  const fourthBidder = dealerIndex;
   
-  // Find positions of both partners in bidding order
-  const myPosition = biddingOrder.indexOf(seatIndex);
-  const partnerPosition = biddingOrder.indexOf(partnerSeatIndex);
-  
-  // First partner is the one who bids first (lower position in bidding order)
-  return myPosition < partnerPosition;
+  // Check if this seat is the first partner to bid
+  if (seatIndex === firstBidder) {
+    return partnerSeatIndex === thirdBidder; // Partner bids third
+  } else if (seatIndex === secondBidder) {
+    return partnerSeatIndex === fourthBidder; // Partner bids fourth
+  } else if (seatIndex === thirdBidder) {
+    return partnerSeatIndex === firstBidder; // Partner bids first
+  } else { // seatIndex === fourthBidder
+    return partnerSeatIndex === secondBidder; // Partner bids second
+  }
 }
 
 export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
@@ -93,7 +70,7 @@ export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
 
   console.log(`[SUICIDE BOT] Regular bid result:`, regularResult);
 
-  if (isFirstPartnerToBid) {
+  if (!partnerHasBid) {
     // FIRST PARTNER LOGIC
     console.log(`[SUICIDE BOT] First partner (seat ${seatIndex}) bidding...`);
     
@@ -123,16 +100,8 @@ export function getSuicideBid(input: SuicideBidInput): SuicideBidResult {
       const adjustedBid = Math.min(6, regularBid + 1);
       return { bid: adjustedBid, reason: `Second partner: partner bid nil, CANNOT bid nil, regular ${regularBid} + 1` };
     } else {
-      // Partner did NOT bid nil, we are FORCED to bid nil
-      // But ONLY if regular bidding would allow nil (respects nil safety)
-      if (regularBid === 0) {
-        // Regular bidding says nil is safe
-        return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil (regular says safe)` };
-      } else {
-        // Regular bidding says nil is NOT safe, so we cannot bid nil even if forced
-        // Bid 1 as a fallback
-        return { bid: 1, reason: `Second partner: partner bid ${partnerBid}, FORCED nil but regular says unsafe, fallback to 1` };
-      }
+      // Partner did NOT bid nil, we are FORCED to bid nil regardless of safety (suicide rule)
+      return { bid: 0, reason: `Second partner: partner bid ${partnerBid}, FORCED to nil (suicide rule)` };
     }
   }
 }
