@@ -23,17 +23,30 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
     
     const totalRounds = rounds.length;
     const totalTricks = rounds.reduce((sum, round) => sum + round._count.Trick, 0);
+
+    // Preload per-player bids across rounds for accurate bags
+    const roundIds = rounds.map(r => r.id);
+    const roundBids = roundIds.length > 0 ? await prisma.roundBid.findMany({
+      where: { roundId: { in: roundIds } }
+    }) : [];
     
     // Create player results
     const playerResults = game.players.map((player, index) => {
       if (!player) return null;
-      const playerRounds = rounds.filter(r => 
-        r.PlayerTrickCount.some(ptc => ptc.playerId === player.id)
-      );
-      const totalTricksWon = playerRounds.reduce((sum, round) => {
+
+      // Total tricks made across all rounds from PlayerTrickCount
+      const totalTricksWon = rounds.reduce((sum, round) => {
         const ptc = round.PlayerTrickCount.find(p => p.playerId === player.id);
         return sum + (ptc?.tricksWon || 0);
       }, 0);
+
+      // Total bid across all rounds from RoundBid
+      const totalTricksBid = roundBids
+        .filter(rb => rb.playerId === player.id)
+        .reduce((sum, rb) => sum + (rb.bid || 0), 0);
+
+      // Individual bags cannot be negative
+      const individualBags = Math.max(0, totalTricksWon - totalTricksBid);
       
       return {
         playerId: player.id,
@@ -41,8 +54,9 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         position: index,
         team: player.team,
         tricksWon: totalTricksWon,
+        tricksBid: totalTricksBid,
         points: player.points || 0,
-        bags: player.bags || 0
+        bags: individualBags
       };
     }).filter(Boolean);
     
@@ -55,7 +69,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         finalScore: finalScore,
         team1Score: team1Score,
         team2Score: team2Score,
-        playerResults: playerResults,
+        playerResults: playerResults as any,
         totalRounds: totalRounds,
         totalTricks: totalTricks,
         specialEvents: game.rules?.specialRules || {},
