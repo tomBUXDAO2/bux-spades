@@ -30,6 +30,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     }
     
     // Calculate and store scores in database    
+    console.log('[HAND COMPLETION DEBUG] About to call calculateAndStoreGameScore with:', {
       gameId: game.dbGameId,
       roundNumber: game.currentRound
     });
