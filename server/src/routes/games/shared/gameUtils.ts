@@ -50,6 +50,7 @@ export function enrichGameForClient(game: Game): any {
     team2Bags: game.team2Bags,
     isBotGame: game.isBotGame,
     rules: game.rules,
-    forcedBid: game.forcedBid
+    playerScores: game.playerScores,
+    playerBags: game.playerBags,    forcedBid: game.forcedBid
   };
 }
