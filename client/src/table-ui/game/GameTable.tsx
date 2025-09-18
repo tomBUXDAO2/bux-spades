@@ -2227,10 +2227,15 @@ export default function GameTable({
       setIsBlindNil(false);
       setShowBlindNilModal(false);
 
+      // Convert hands from { playerId, hand }[] format to Card[][] format
+      const handsArray = Array.isArray(data.hands) 
+        ? data.hands.map((handData: any) => handData.hand || [])
+        : [];
+
       // Directly update the game state with the new hand data
       setGameState(prev => ({
         ...prev,
-        hands: data.hands,
+        hands: handsArray,
         dealerIndex: data.dealerIndex,
         bidding: {
           ...prev.bidding,

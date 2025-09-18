@@ -1,4 +1,4 @@
-import type { AuthenticatedSocket } from '../../socket-auth';
+import type { AuthenticatedSocket } from '../socket-auth';
 import { io } from '../../index';
 import { games } from '../../gamesStore';
 import prisma from '../../lib/prisma';
@@ -23,6 +23,10 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       socket.emit('error', { message: 'Not enough players to start the game' });
       return;
     }
+
+    // Check if we have 4 human players and set rated accordingly
+    const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
+    game.rated = humanPlayers === 4;
 
     // Set initial status
     game.status = 'BIDDING';

@@ -104,7 +104,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints,
       buyIn: settings.buyIn,
-      rated: !settings.league && !hasBotAtCreation,
+      rated: false,
       allowNil: true,
       allowBlindNil: false,
       league: settings.league || false,
