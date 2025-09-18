@@ -283,6 +283,10 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
         }
       }
       
+      // Add bag points (1 point per bag) to this round's team scores
+      team1Score += team1Bags;
+      team2Score += team2Bags;
+      
       // Get previous running totals
       let team1RunningTotal = previousScore?.team1RunningTotal || 0;
       let team2RunningTotal = previousScore?.team2RunningTotal || 0;
