@@ -48,28 +48,37 @@ export async function logGameStart(game: Game): Promise<void> {
       const player = game.players[i];
       if (!player) continue;
       if (player && player.type === 'bot') {
-        try {
-          await prisma.user.upsert({
-            where: { id: player.id },
-            update: {},
-            create: {
-              id: player.id,
-              username: player.username,
-              avatar: player.avatar || '/bot-avatar.jpg',
-              discordId: null,
-              coins: 0,
-              createdAt: new Date(),
-              updatedAt: new Date()
+        let retries = 3;
+        let success = false;
+        while (retries > 0 && !success) {
+          try {
+            await prisma.user.upsert({
+              where: { id: player.id },
+              update: {},
+              create: {
+                id: player.id,
+                username: player.username,
+                avatar: player.avatar || '/bot-avatar.jpg',
+                discordId: null,
+                coins: 0,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }
+            });
+            console.log(`[DATABASE] Created/updated bot user: ${player.username} (${player.id})`);
+            success = true;
+          } catch (error) {
+            retries--;
+            console.error(`[DATABASE] Failed to create bot user ${player.username} (${retries} retries left):`, error);
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+              throw new Error(`Failed to create bot user ${player.username} after 3 attempts`);
             }
-          });
-          console.log(`[DATABASE] Created/updated bot user: ${player.username} (${player.id})`);
-        } catch (error) {
-          console.error(`[DATABASE] Failed to create bot user ${player.username}:`, error);
+          }
         }
       }
-    }
-    console.log('[DATABASE] Creating GamePlayer records...');
-    for (let i = 0; i < 4; i++) {
+    }    for (let i = 0; i < 4; i++) {
       const player = game.players[i];
       if (!player) continue;
       if (player) {
