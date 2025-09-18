@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { GameSettings, GameMode, BiddingOption } from '../../types/game';
+import { useWindowSize } from '../../hooks/useWindowSize';
 
 interface CreateGameModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ const formatCoins = (value: number) => {
 };
 
 const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCreateGame }) => {
+  const { isMobile, isLandscape } = useWindowSize();
+  
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
@@ -128,211 +131,480 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     return options;
   };
 
+  // Determine if we should use landscape layout
+  const useLandscapeLayout = isMobile && isLandscape;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-4 w-full max-w-md flex flex-col items-center justify-center border border-white/20">
-        <h2 className="text-2xl font-bold text-slate-200 mb-4 text-center">Create Game</h2>
-        <div className="space-y-3 w-full flex flex-col items-center justify-center">
-          {/* Partners/Solo Toggle with text outside */}
-          <div className="flex items-center justify-center w-full gap-2 my-2">
-            <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-base`}>Partners</span>
-            <div
-              className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
-              onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
-              style={{ userSelect: 'none' }}
-            >
-              <input
-                type="checkbox"
-                id="mode-toggle"
-                className="sr-only peer"
-                checked={mode === 'SOLO'}
-                readOnly
-              />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className={`bg-slate-800 rounded-lg border border-white/20 flex flex-col items-center justify-center w-full ${
+        useLandscapeLayout
+          ? 'max-w-4xl max-h-[95vh] overflow-y-auto p-4'
+          : isMobile 
+            ? 'max-w-sm max-h-[90vh] overflow-y-auto p-3' 
+            : 'max-w-md p-4'
+      }`}>
+        <h2 className={`font-bold text-slate-200 mb-4 text-center ${
+          useLandscapeLayout ? 'text-lg' : isMobile ? 'text-xl' : 'text-2xl'
+        }`}>Create Game</h2>
+        
+        {useLandscapeLayout ? (
+          // Landscape layout - two column arrangement
+          <div className="w-full flex gap-8">
+            {/* Left Column */}
+            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+              {/* Partners/Solo Toggle */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="text-slate-300 text-sm font-medium">Game Mode</label>
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-sm`}>Partners</span>
+                  <div
+                    className="relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer"
+                    onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
+                    style={{ userSelect: 'none' }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="mode-toggle"
+                      className="sr-only peer"
+                      checked={mode === 'SOLO'}
+                      readOnly
+                    />
+                    <div
+                      className={`absolute top-1 left-1 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-6' : ''}`}
+                      style={{ transform: mode === 'SOLO' ? 'translateX(24px)' : 'translateX(0)' }}
+                    ></div>
+                  </div>
+                  <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-sm`}>Solo</span>
+                </div>
+              </div>
+
+              {/* Coins */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="font-bold text-yellow-500 text-sm">Coins</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-sm">-</button>
+                  <span className="text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded px-2 py-1 font-semibold text-sm w-16">
+                    <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formatCoins(buyIn)}
+                  </span>
+                  <button onClick={() => handleBuyInChange(1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-sm">+</button>
+                </div>
+                {/* Prize display */}
+                <div className="text-xs font-medium text-indigo-300 text-center">
+                  {(() => {
+                    const prizePot = buyIn * 4 * 0.9;
+                    if (mode === 'PARTNERS') {
+                      return `Prize = ${formatCoins(prizePot / 2)} each`;
+                    } else {
+                      const secondPlacePrize = buyIn;
+                      const firstPlacePrize = prizePot - secondPlacePrize;
+                      return `1st = ${formatCoins(firstPlacePrize)}, 2nd = ${formatCoins(secondPlacePrize)}`;
+                    }
+                  })()}
+                </div>
+              </div>
+
+              {/* Special Rules */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="font-bold text-pink-400 text-sm">Special Rules</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={specialRule === 'screamer'}
+                      onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
+                      className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                    />
+                    <span className="text-slate-300 text-sm">🎭 Screamer</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={specialRule === 'assassin'}
+                      onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
+                      className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                    />
+                    <span className="text-slate-300 text-sm">⚔️ Assassin</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+              {/* Game Type Radio Buttons */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="text-slate-300 text-sm font-medium">Game Type</label>
+                <div className="flex gap-2">
+                  {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="gameType"
+                        value={opt}
+                        checked={gameType === opt}
+                        onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
+                      />
+                      <span className="text-slate-200 text-sm">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gimmick Dropdown */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="text-slate-300 text-sm font-medium">Gimmick</label>
+                <select
+                  value={gimmickType}
+                  onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
+                  disabled={gameType !== 'GIMMICK'}
+                  className={`px-3 py-1 rounded text-slate-800 font-semibold text-sm ${
+                    gameType === 'GIMMICK' 
+                      ? 'bg-slate-100 cursor-pointer' 
+                      : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  {getGimmickOptions().map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nil and Blind Nil toggles */}
+              <div className="flex flex-col items-center space-y-2">
+                <label className="text-slate-300 text-sm font-medium">Nil Options</label>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-200 text-sm">Nil:</span>
+                    <div
+                      className={`relative inline-flex items-center w-10 h-5 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
+                      onClick={() => gameType === 'REG' && handleNilToggle(!allowNil)}
+                      style={{ userSelect: 'none' }}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-5' : ''}`}
+                        style={{ transform: allowNil ? 'translateX(20px)' : 'translateX(0)' }}
+                      ></div>
+                    </div>
+                    <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>{allowNil ? 'On' : 'Off'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-200 text-sm">Blind Nil:</span>
+                    <div
+                      className={`relative inline-flex items-center w-10 h-5 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                      onClick={() => !(gameType !== 'REG' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
+                      style={{ userSelect: 'none' }}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-5' : ''}`}
+                        style={{ transform: allowBlindNil ? 'translateX(20px)' : 'translateX(0)' }}
+                      ></div>
+                    </div>
+                    <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>{allowBlindNil ? 'On' : 'Off'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col items-center space-y-2">
+                <div className="flex gap-3">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreate}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors text-sm"
+                  >
+                    Create Game
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Portrait layout - vertical arrangement (existing code)
+          <div className={`w-full flex flex-col items-center justify-center ${
+            isMobile ? 'space-y-2' : 'space-y-3'
+          }`}>
+            {/* Partners/Solo Toggle with text outside */}
+            <div className={`flex items-center justify-center w-full gap-2 ${
+              isMobile ? 'my-1' : 'my-2'
+            }`}>
+              <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} ${
+                isMobile ? 'text-sm' : 'text-base'
+              }`}>Partners</span>
               <div
-                className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
-                style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
-              ></div>
-            </div>
-            <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-base`}>Solo</span>
-          </div>
-
-          {/* Coins with coin icon and prize display - moved above bidding options */}
-          <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-yellow-500 mb-2 text-center">Coins</label>
-            <div className="flex items-center gap-4 justify-center">
-              <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">-</button>
-              <span className="w-20 text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold">
-                <svg className="w-5 h-5 text-yellow-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-                {formatCoins(buyIn)}
-              </span>
-              <button onClick={() => handleBuyInChange(1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full">+</button>
-            </div>
-            {/* Prize display */}
-            <div className="mt-2 text-sm font-medium text-indigo-300 text-center">
-              {(() => {
-                const prizePot = buyIn * 4 * 0.9;
-                if (mode === 'PARTNERS') {
-                  return ` (Prize = ${formatCoins(prizePot / 2)} each)`;
-                } else {
-                  // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
-                  const secondPlacePrize = buyIn; // Exactly their stake back
-                  const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
-                  return ` (1st = ${formatCoins(firstPlacePrize)}, 2nd = ${formatCoins(secondPlacePrize)})`;
-                }
-              })()}
-            </div>
-          </div>
-
-          {/* Min and Max Points inline */}
-          <div className="w-full flex flex-col items-center my-2">
-            <div className="flex gap-8 items-center justify-center w-full">
-              <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center">Min Points</label>
-                <div className="flex gap-2 items-center justify-center">
-                  <button onClick={() => handlePointsChange('min', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={minPoints <= -250}>-</button>
-                  <input
-                    type="text"
-                    value={minPoints}
-                    readOnly
-                    className="w-16 text-center bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold"
-                  />
-                  <button onClick={() => handlePointsChange('min', 50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={minPoints >= -100}>+</button>
-                </div>
-              </div>
-              <div className="flex flex-col items-center w-1/2">
-                <label className="block text-slate-300 mb-2 text-center">Max Points</label>
-                <div className="flex gap-2 items-center justify-center">
-                  <button onClick={() => handlePointsChange('max', -50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={maxPoints <= 100}>-</button>
-                  <input
-                    type="text"
-                    value={maxPoints}
-                    readOnly
-                    className="w-16 text-center bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold"
-                  />
-                  <button onClick={() => handlePointsChange('max', 50)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" disabled={maxPoints >= 650}>+</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Game Type Radio Buttons */}
-          <div className="w-full flex flex-col items-center my-2">
-            <div className="flex flex-wrap gap-4 justify-center mb-2">
-              {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="gameType"
-                    value={opt}
-                    checked={gameType === opt}
-                    onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
-                  />
-                  <span className="text-slate-200">{opt}</span>
-                </label>
-              ))}
-            </div>
-
-            {/* Gimmick Dropdown */}
-            <div className="w-full flex justify-center mb-2">
-              <select
-                value={gimmickType}
-                onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
-                disabled={gameType !== 'GIMMICK'}
-                className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
-                  gameType === 'GIMMICK' 
-                    ? 'bg-slate-100 cursor-pointer' 
-                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                }`}
+                className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
+                onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
+                style={{ userSelect: 'none' }}
               >
-                {getGimmickOptions().map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                <input
+                  type="checkbox"
+                  id="mode-toggle"
+                  className="sr-only peer"
+                  checked={mode === 'SOLO'}
+                  readOnly
+                />
+                <div
+                  className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-8' : ''}`}
+                  style={{ transform: mode === 'SOLO' ? 'translateX(32px)' : 'translateX(0)' }}
+                ></div>
+              </div>
+              <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} ${
+                isMobile ? 'text-sm' : 'text-base'
+              }`}>Solo</span>
+            </div>
+
+            {/* Coins with coin icon and prize display - moved above bidding options */}
+            <div className={`w-full flex flex-col items-center ${
+              isMobile ? 'my-1' : 'my-2'
+            }`}>
+              <label className={`font-bold text-yellow-500 mb-2 text-center ${
+                isMobile ? 'text-lg' : 'text-2xl'
+              }`}>Coins</label>
+              <div className="flex items-center gap-4 justify-center">
+                <button onClick={() => handleBuyInChange(-1)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                  isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                }`}>-</button>
+                <span className={`text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold ${
+                  isMobile ? 'w-16 text-sm' : 'w-20'
+                }`}>
+                  <svg className={`text-yellow-500 mr-1 ${
+                    isMobile ? 'w-4 h-4' : 'w-5 h-5'
+                  }`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                  {formatCoins(buyIn)}
+                </span>
+                <button onClick={() => handleBuyInChange(1)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                  isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                }`}>+</button>
+              </div>
+              {/* Prize display */}
+              <div className={`mt-2 font-medium text-indigo-300 text-center ${
+                isMobile ? 'text-xs' : 'text-sm'
+              }`}>
+                {(() => {
+                  const prizePot = buyIn * 4 * 0.9;
+                  if (mode === 'PARTNERS') {
+                    return ` (Prize = ${formatCoins(prizePot / 2)} each)`;
+                  } else {
+                    // Solo mode: 2nd place gets their stake back, 1st place gets the remainder
+                    const secondPlacePrize = buyIn; // Exactly their stake back
+                    const firstPlacePrize = prizePot - secondPlacePrize; // Remainder after 2nd place gets their stake
+                    return ` (1st = ${formatCoins(firstPlacePrize)}, 2nd = ${formatCoins(secondPlacePrize)})`;
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Min and Max Points inline */}
+            <div className={`w-full flex flex-col items-center ${
+              isMobile ? 'my-1' : 'my-2'
+            }`}>
+              <div className={`flex items-center justify-center w-full ${
+                isMobile ? 'gap-4' : 'gap-8'
+              }`}>
+                <div className="flex flex-col items-center w-1/2">
+                  <label className={`block text-slate-300 mb-2 text-center ${
+                    isMobile ? 'text-sm' : ''
+                  }`}>Min Points</label>
+                  <div className="flex gap-2 items-center justify-center">
+                    <button onClick={() => handlePointsChange('min', -50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                    }`} disabled={minPoints <= -250}>-</button>
+                    <input
+                      type="text"
+                      value={minPoints}
+                      readOnly
+                      className={`text-center bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold ${
+                        isMobile ? 'w-12 text-sm' : 'w-16'
+                      }`}
+                    />
+                    <button onClick={() => handlePointsChange('min', 50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                    }`} disabled={minPoints >= -100}>+</button>
+                  </div>
+                </div>
+                <div className="flex flex-col items-center w-1/2">
+                  <label className={`block text-slate-300 mb-2 text-center ${
+                    isMobile ? 'text-sm' : ''
+                  }`}>Max Points</label>
+                  <div className="flex gap-2 items-center justify-center">
+                    <button onClick={() => handlePointsChange('max', -50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                    }`} disabled={maxPoints <= 100}>-</button>
+                    <input
+                      type="text"
+                      value={maxPoints}
+                      readOnly
+                      className={`text-center bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold ${
+                        isMobile ? 'w-12 text-sm' : 'w-16'
+                      }`}
+                    />
+                    <button onClick={() => handlePointsChange('max', 50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
+                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
+                    }`} disabled={maxPoints >= 650}>+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Game Type Radio Buttons */}
+            <div className={`w-full flex flex-col items-center ${
+              isMobile ? 'my-1' : 'my-2'
+            }`}>
+              <div className={`flex flex-wrap justify-center mb-2 ${
+                isMobile ? 'gap-2' : 'gap-4'
+              }`}>
+                {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gameType"
+                      value={opt}
+                      checked={gameType === opt}
+                      onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
+                    />
+                    <span className={`text-slate-200 ${
+                      isMobile ? 'text-sm' : ''
+                    }`}>{opt}</span>
+                  </label>
                 ))}
-              </select>
-            </div>
+              </div>
 
-            {/* Nil and Blind Nil toggles */}
-            <div className="flex flex-row gap-6 justify-center items-center my-2" style={{ minHeight: '2.2rem' }}>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-200 text-sm">Nil:</span>
+              {/* Gimmick Dropdown */}
+              <div className="w-full flex justify-center mb-2">
+                <select
+                  value={gimmickType}
+                  onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
+                  disabled={gameType !== 'GIMMICK'}
+                  className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
+                    gameType === 'GIMMICK' 
+                      ? 'bg-slate-100 cursor-pointer' 
+                      : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                  } ${isMobile ? 'text-sm' : ''}`}
+                >
+                  {getGimmickOptions().map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nil and Blind Nil toggles */}
+              <div className={`flex flex-row justify-center items-center ${
+                isMobile ? 'gap-4 my-1' : 'gap-6 my-2'
+              }`} style={{ minHeight: '2.2rem' }}>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
-                  <div
-                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={() => gameType === 'REG' && handleNilToggle(!allowNil)}
-                    style={{ userSelect: 'none' }}
-                  >
+                  <span className={`text-slate-200 ${
+                    isMobile ? 'text-xs' : 'text-sm'
+                  }`}>Nil:</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${!allowNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
                     <div
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-6' : ''}`}
-                      style={{ transform: allowNil ? 'translateX(24px)' : 'translateX(0)' }}
-                    ></div>
+                      className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
+                      onClick={() => gameType === 'REG' && handleNilToggle(!allowNil)}
+                      style={{ userSelect: 'none' }}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-6' : ''}`}
+                        style={{ transform: allowNil ? 'translateX(24px)' : 'translateX(0)' }}
+                      ></div>
+                    </div>
+                    <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>On</span>
                   </div>
-                  <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-slate-200 ${
+                    isMobile ? 'text-xs' : 'text-sm'
+                  }`}>Blind Nil:</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
+                    <div
+                      className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                      onClick={() => !(gameType !== 'REG' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
+                      style={{ userSelect: 'none' }}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-6' : ''}`}
+                        style={{ transform: allowBlindNil ? 'translateX(24px)' : 'translateX(0)' }}
+                      ></div>
+                    </div>
+                    <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>On</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-200 text-sm">Blind Nil:</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs ${!allowBlindNil ? 'text-white' : 'text-slate-400'}`}>Off</span>
-                  <div
-                    className={`relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={() => !(gameType !== 'REG' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
-                    style={{ userSelect: 'none' }}
-                  >
-                    <div
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-6' : ''}`}
-                      style={{ transform: allowBlindNil ? 'translateX(24px)' : 'translateX(0)' }}
-                    ></div>
-                  </div>
-                  <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>On</span>
-                </div>
+            </div>
+
+            {/* Special Rules with emojis, mutually exclusive */}
+            <div className={`w-full flex flex-col items-center ${
+              isMobile ? 'my-1' : 'my-2'
+            }`}>
+              <label className={`font-bold text-pink-400 mb-2 text-center ${
+                isMobile ? 'text-lg' : 'text-2xl'
+              }`}>Special Rules</label>
+              <div className={`flex flex-row justify-center ${
+                isMobile ? 'gap-4' : 'gap-6'
+              }`}>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={specialRule === 'screamer'}
+                    onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
+                    className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                  />
+                  <span className={`text-slate-300 ${
+                    isMobile ? 'text-sm' : ''
+                  }`}>🎭 Screamer</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={specialRule === 'assassin'}
+                    onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
+                    className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                  />
+                  <span className={`text-slate-300 ${
+                    isMobile ? 'text-sm' : ''
+                  }`}>⚔️ Assassin</span>
+                </label>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Special Rules with emojis, mutually exclusive */}
-          <div className="w-full flex flex-col items-center my-2">
-            <label className="block text-2xl font-bold text-pink-400 mb-2 text-center">Special Rules</label>
-            <div className="flex flex-row gap-6 justify-center">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={specialRule === 'screamer'}
-                  onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
-                  className="form-checkbox bg-slate-700 text-indigo-600 rounded"
-                />
-                <span className="text-slate-300">🎭 Screamer</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={specialRule === 'assassin'}
-                  onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
-                  className="form-checkbox bg-slate-700 text-indigo-600 rounded"
-                />
-                <span className="text-slate-300">⚔️ Assassin</span>
-              </label>
-            </div>
+        {/* Action buttons for portrait mode only */}
+        {!useLandscapeLayout && (
+          <div className={`flex justify-center gap-4 mt-4 w-full ${
+            isMobile ? 'mt-3' : 'mt-4'
+          }`}>
+            <button
+              onClick={onClose}
+              className={`text-slate-300 hover:text-slate-100 transition-colors ${
+                isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'
+              }`}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              className={`bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors ${
+                isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'
+              }`}
+            >
+              Create Game
+            </button>
           </div>
-        </div>
-
-        <div className="flex justify-center gap-4 mt-4 w-full">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors"
-          >
-            Create Game
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
