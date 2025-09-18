@@ -20,13 +20,16 @@ export async function handleHandCompletion(game: Game): Promise<void> {
   console.log('[HAND COMPLETION DEBUG] DB Game ID:', game.dbGameId);
   try {
     console.log('[HAND COMPLETION] Starting hand completion for game:', game.id);
+    console.log('[HAND COMPLETION DEBUG] Game mode:', game.gameMode);
+    console.log('[HAND COMPLETION DEBUG] Solo flag:', game.solo);
     
+    if (game.gameMode === 'SOLO' || game.solo) {
+      console.log('[HAND COMPLETION] Solo mode - using database scoring');
+    } else {
+      console.log('[HAND COMPLETION] Partners mode - using database scoring');
+    }
     
-    // Partners mode - USE DATABASE AS SOURCE OF TRUTH
-    console.log('[HAND COMPLETION] Partners mode - using database scoring');
-    
-    // Calculate and store scores in database
-    console.log('[HAND COMPLETION DEBUG] About to call calculateAndStoreGameScore with:', {
+    // Calculate and store scores in database    
       gameId: game.dbGameId,
       roundNumber: game.currentRound
     });
