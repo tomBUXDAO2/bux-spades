@@ -57,7 +57,7 @@ export interface GameState {
     allowBlindNil: boolean;
     numHands: number;
     coinAmount: number;
-  };
+    bidType?: string;  };
   round: number;
   maxPoints: number;
   minPoints: number;
@@ -70,7 +70,7 @@ export interface GameState {
   forcedBid?: string;
   specialRules?: { screamer?: boolean; assassin?: boolean };
   buyIn?: number;
-  creatorId: string;
+  rated?: boolean;  creatorId: string;
   bidding?: any;
   play?: any;
   hands?: any[];
@@ -107,7 +107,7 @@ export interface GameRules {
   minPoints: number;
   maxPoints: number;
   coinAmount: number;
-  numHands?: number;
+    bidType?: string;  numHands?: number;
   specialRules?: {
     screamer: boolean;
     assassin: boolean;

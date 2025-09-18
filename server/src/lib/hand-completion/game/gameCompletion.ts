@@ -130,11 +130,132 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     // Process coins (buy-in deductions and prize payouts)
     // This only happens when the game is FINISHED to avoid losing coins on crashes
     await CoinManager.processGameCoins(game, winningTeamOrPlayer);
+
+    // Delete unrated games from database completely
+    if (!game.rated) {
+      await deleteUnratedGameFromDatabase(game);
+    }
+
     // const { updateStatsAndCoins } = await import('../routes/games.routes');
     
     
   } catch (error) {
     console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
     throw error;
+  }
+}
+
+/**
+ * Delete unrated game and all related data from database
+ */
+async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
+  if (!game.dbGameId || game.rated) {
+    return; // Only delete unrated games
+  }
+  
+  console.log('[GAME DELETION] Deleting unrated game from database:', game.dbGameId);
+  
+  try {
+    const { prisma } = await import('../../prisma');
+    
+    // Get all bot user IDs from this game
+    const gamePlayersWithBots = await prisma.gamePlayer.findMany({
+      where: { gameId: game.dbGameId },
+      include: { User: true }
+    });
+    
+    const botUserIds = gamePlayersWithBots
+      .filter(gp => gp.User.username.startsWith('Bot '))
+      .map(gp => gp.userId);
+    
+    // Delete in correct order to avoid foreign key violations
+    await prisma.$transaction(async (tx) => {
+      // Delete Cards
+      await tx.card.deleteMany({
+        where: {
+          trickId: {
+            in: await tx.trick.findMany({
+              where: {
+                roundId: {
+                  in: await tx.round.findMany({
+                    where: { gameId: game.dbGameId },
+                    select: { id: true }
+                  }).then(rounds => rounds.map(r => r.id))
+                }
+              },
+              select: { id: true }
+            }).then(tricks => tricks.map(t => t.id))
+          }
+        }
+      });
+      
+      // Delete Tricks
+      await tx.trick.deleteMany({
+        where: {
+          roundId: {
+            in: await tx.round.findMany({
+              where: { gameId: game.dbGameId },
+              select: { id: true }
+            }).then(rounds => rounds.map(r => r.id))
+          }
+        }
+      });
+      
+      // Delete RoundBids
+      await tx.roundBid.deleteMany({
+        where: {
+          roundId: {
+            in: await tx.round.findMany({
+              where: { gameId: game.dbGameId },
+              select: { id: true }
+            }).then(rounds => rounds.map(r => r.id))
+          }
+        }
+      });
+      
+      // Delete PlayerTrickCount
+      await tx.playerTrickCount.deleteMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      // Delete GameScore
+      await tx.gameScore.deleteMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      // Delete GameResult
+      await tx.gameResult.deleteMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      // Delete GamePlayer
+      await tx.gamePlayer.deleteMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      // Delete Rounds
+      await tx.round.deleteMany({
+        where: { gameId: game.dbGameId }
+      });
+      
+      // Delete the Game itself
+      await tx.game.delete({
+        where: { id: game.dbGameId }
+      });
+      
+      // Delete bot users that were created for this game
+      if (botUserIds.length > 0) {
+        await tx.user.deleteMany({
+          where: {
+            id: { in: botUserIds },
+            username: { startsWith: 'Bot ' }
+          }
+        });
+      }
+    });
+    
+    console.log('[GAME DELETION] Successfully deleted unrated game:', game.dbGameId);
+  } catch (error) {
+    console.error('[GAME DELETION ERROR] Failed to delete unrated game:', game.dbGameId, error);
   }
 }

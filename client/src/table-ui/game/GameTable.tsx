@@ -589,7 +589,7 @@ export default function GameTable({
       setCardsRevealed(false);
       
       // Show coin debit animation for any buy-in game
-      if ((game.buyIn ?? 0) > 0) {
+      if ((game.buyIn ?? 0) > 0 && game.rated) {
         setCoinDebitAmount(game.buyIn || 0);
         setShowCoinDebit(true);
         // Hide animation after 1.5 seconds

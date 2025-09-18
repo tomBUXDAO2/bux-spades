@@ -25,11 +25,11 @@ export class CoinManager {
       return;
     }
 
-    // Only process rated games (for now, we'll make it process all games for testing)
-    // if (!game.rated) {
-    //   console.log('[COIN MANAGER] Game not rated, skipping coin processing');
-    //   return;
-    // }
+    // Only process rated games
+    if (!game.rated) {
+      console.log('[COIN MANAGER] Game not rated, skipping coin processing');
+      return;
+    }
 
     if (!game.buyIn || game.buyIn <= 0) {
       console.log('[COIN MANAGER] No buy-in amount, skipping coin processing');
