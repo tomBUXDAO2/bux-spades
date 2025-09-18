@@ -12,6 +12,12 @@ export function enrichGameForClient(game: Game): any {
     currentPlayer = game.play.currentPlayer as unknown as string;
   }
 
+  console.log(`[ENRICH GAME] Enriching game for client - Team scores:`, {
+    team1TotalScore: game.team1TotalScore,
+    team2TotalScore: game.team2TotalScore,
+    team1Bags: game.team1Bags,
+    team2Bags: game.team2Bags
+  });
   return {
     id: game.id,
     status: game.status,

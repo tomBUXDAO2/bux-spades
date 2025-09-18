@@ -104,8 +104,16 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       game.team1TotalScore = gameScore.team1RunningTotal;
       game.team2TotalScore = gameScore.team2RunningTotal;
       game.team1Bags = gameScore.team1Bags;
-      game.team2Bags = gameScore.team2Bags;
-    }    console.log(`[HAND COMPLETED] ${game.gameMode === 'SOLO' || game.solo ? 'Solo' : 'Partners'} mode - Emitted hand_completed with scores:`, handSummary);
+    }
+    
+    console.log(`[HAND COMPLETION] Updated team scores in game object:`, {
+      team1TotalScore: game.team1TotalScore,
+      team2TotalScore: game.team2TotalScore,
+      team1Bags: game.team1Bags,
+      team2Bags: game.team2Bags
+    });
+    
+    console.log(`[HAND COMPLETED] ${game.gameMode === "SOLO" || game.solo ? "Solo" : "Partners"} mode - Emitted hand_completed with scores:`, handSummary);
     
     // Clear the last trick cards from the table before showing hand summary
     if (game.play && game.play.currentTrick) {
