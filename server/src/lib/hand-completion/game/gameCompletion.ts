@@ -1,6 +1,7 @@
 import { io } from '../../../index';
 import type { Game } from '../../../types/game';
 import prisma from '../../prisma';
+import { CoinManager } from '../../coin-management/coinManager';
 
 /**
  * Create GameResult entry for completed game
@@ -126,9 +127,11 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
       });
     }
     
-    // Update stats and coins
+    // Process coins (buy-in deductions and prize payouts)
+    // This only happens when the game is FINISHED to avoid losing coins on crashes
+    await CoinManager.processGameCoins(game, winningTeamOrPlayer);
     // const { updateStatsAndCoins } = await import('../routes/games.routes');
-    // await updateStatsAndCoins(game, winningTeamOrPlayer); // TODO: Implement this function
+    
     
   } catch (error) {
     console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
