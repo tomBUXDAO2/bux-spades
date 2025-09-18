@@ -41,7 +41,6 @@ export async function logGameStart(game: Game): Promise<void> {
     game.dbGameId = dbGame.id;
     console.log('[DATABASE] Game logged with ID:', dbGame.id);
     
-    // Create GamePlayer records for all players
     // Create bot users in User table first if they don't exist
     console.log('[DATABASE] Creating bot users...');
     for (let i = 0; i < 4; i++) {
@@ -78,7 +77,10 @@ export async function logGameStart(game: Game): Promise<void> {
           }
         }
       }
-    }    for (let i = 0; i < 4; i++) {
+    }
+    
+    // Create GamePlayer records for all players
+    for (let i = 0; i < 4; i++) {
       const player = game.players[i];
       if (!player) continue;
       if (player) {
