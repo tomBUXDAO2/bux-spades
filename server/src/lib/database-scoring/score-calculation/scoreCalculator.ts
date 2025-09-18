@@ -85,35 +85,44 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       const tricks = trickCount?.tricksWon || 0;
       
       if (roundBid.bid === 0) { // Nil bid
+        const nilValue = (game.gameMode === 'SOLO' || game.solo) ? 50 : 100;
         if (tricks === 0) { // Successful nil
           if (team1.includes(playerIndex)) {
-            team1Score += 100;
+            team1Score += nilValue;
+            console.log(`[NIL SCORING] Player ${playerIndex} successful nil: +${nilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           } else {
-            team2Score += 100;
+            team2Score += nilValue;
+            console.log(`[NIL SCORING] Player ${playerIndex} successful nil: +${nilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           }
         } else { // Failed nil
           if (team1.includes(playerIndex)) {
-            team1Score -= 100;
+            team1Score -= nilValue;
+            console.log(`[NIL SCORING] Player ${playerIndex} failed nil: -${nilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           } else {
-            team2Score -= 100;
+            team2Score -= nilValue;
+            console.log(`[NIL SCORING] Player ${playerIndex} failed nil: -${nilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           }
         }
       } else if (roundBid.isBlindNil) { // Blind nil
+        const blindNilValue = (game.gameMode === 'SOLO' || game.solo) ? 100 : 200;
         if (tricks === 0) { // Successful blind nil
           if (team1.includes(playerIndex)) {
-            team1Score += 200;
+            team1Score += blindNilValue;
+            console.log(`[BLIND NIL SCORING] Player ${playerIndex} successful blind nil: +${blindNilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           } else {
-            team2Score += 200;
+            team2Score += blindNilValue;
+            console.log(`[BLIND NIL SCORING] Player ${playerIndex} successful blind nil: +${blindNilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           }
         } else { // Failed blind nil
           if (team1.includes(playerIndex)) {
-            team1Score -= 200;
+            team1Score -= blindNilValue;
+            console.log(`[BLIND NIL SCORING] Player ${playerIndex} failed blind nil: -${blindNilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           } else {
-            team2Score -= 200;
+            team2Score -= blindNilValue;
+            console.log(`[BLIND NIL SCORING] Player ${playerIndex} failed blind nil: -${blindNilValue} (${game.gameMode === 'SOLO' || game.solo ? 'solo' : 'partners'})`);
           }
         }
-      }
-    }
+      }    }
     
     // Calculate regular team scoring
     if (team1Tricks >= team1Bid) {
