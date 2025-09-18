@@ -138,15 +138,32 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
     let currentTeam1Bags = (previousScore?.team1Bags || 0) + team1Bags;
     let currentTeam2Bags = (previousScore?.team2Bags || 0) + team2Bags;
     
-    if (currentTeam1Bags >= 10) {
-      team1RunningTotal -= 100;
-      currentTeam1Bags -= 10;
-    }
-    if (currentTeam2Bags >= 10) {
-      team2RunningTotal -= 100;
-      currentTeam2Bags -= 10;
-    }
-    
+    // Apply bag penalties based on game mode
+    if (game.gameMode === 'SOLO') {
+      // Solo mode: reset bags at 5, penalty -50 points per player
+      if (currentTeam1Bags >= 5) {
+        team1RunningTotal -= 50;
+        currentTeam1Bags -= 5;
+        console.log(`[SOLO BAG PENALTY] Team 1 hit 5+ bags, applied -50 penalty. New score: ${team1RunningTotal}, New bags: ${currentTeam1Bags}`);
+      }
+      if (currentTeam2Bags >= 5) {
+        team2RunningTotal -= 50;
+        currentTeam2Bags -= 5;
+        console.log(`[SOLO BAG PENALTY] Team 2 hit 5+ bags, applied -50 penalty. New score: ${team2RunningTotal}, New bags: ${currentTeam2Bags}`);
+      }
+    } else {
+      // Partners mode: reset bags at 10, penalty -100 points per team
+      if (currentTeam1Bags >= 10) {
+        team1RunningTotal -= 100;
+        currentTeam1Bags -= 10;
+        console.log(`[PARTNERS BAG PENALTY] Team 1 hit 10+ bags, applied -100 penalty. New score: ${team1RunningTotal}, New bags: ${currentTeam1Bags}`);
+      }
+      if (currentTeam2Bags >= 10) {
+        team2RunningTotal -= 100;
+        currentTeam2Bags -= 10;
+        console.log(`[PARTNERS BAG PENALTY] Team 2 hit 10+ bags, applied -100 penalty. New score: ${team2RunningTotal}, New bags: ${currentTeam2Bags}`);
+      }
+    }    
     const gameScore = await prisma.gameScore.upsert({
       where: { gameId_roundNumber: { gameId, roundNumber } as any },
       update: {

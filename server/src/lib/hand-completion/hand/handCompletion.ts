@@ -21,12 +21,6 @@ export async function handleHandCompletion(game: Game): Promise<void> {
   try {
     console.log('[HAND COMPLETION] Starting hand completion for game:', game.id);
     
-    if (game.gameMode === 'SOLO') {
-      // Solo mode - use existing solo logic
-      console.log('[HAND COMPLETION] Solo mode - using existing solo scoring');
-      // Keep existing solo logic for now
-      return;
-    }
     
     // Partners mode - USE DATABASE AS SOURCE OF TRUTH
     console.log('[HAND COMPLETION] Partners mode - using database scoring');
