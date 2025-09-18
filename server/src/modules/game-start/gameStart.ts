@@ -4,6 +4,7 @@ import { games } from '../../gamesStore';
 import prisma from '../../lib/prisma';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
+import { logGameStart } from '../../routes/games/database/gameDatabase';
 
 /**
  * Handles start_game socket event
@@ -27,6 +28,12 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     // Check if we have 4 human players and set rated accordingly
     const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
     game.rated = humanPlayers === 4;
+
+    // Create game in database if not already created
+    if (!game.dbGameId) {
+      console.log('[GAME START] Creating game in database...');
+      await logGameStart(game);
+    }
 
     // Set initial status
     game.status = 'BIDDING';
