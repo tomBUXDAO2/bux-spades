@@ -39,23 +39,24 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     
     // Create hand summary data for frontend using database scores
     let handSummary;
+    let playerScores = [0, 0, 0, 0];
+    let playerBags = [0, 0, 0, 0];
+    
     if (game.gameMode === 'SOLO' || game.solo) {
       // For solo games, get individual player scores from database
-      const playerScores = [0, 0, 0, 0];
-      const playerBags = [0, 0, 0, 0];
       
-      // Get current round scores from database
+      // Get running total scores from database (not current round scores)
       if (game.dbGameId && gameScore) {
-        playerScores[0] = gameScore.player0Score || 0;
-        playerScores[1] = gameScore.player1Score || 0;
-        playerScores[2] = gameScore.player2Score || 0;
-        playerScores[3] = gameScore.player3Score || 0;
+        playerScores[0] = gameScore.player0RunningTotal || 0;
+        playerScores[1] = gameScore.player1RunningTotal || 0;
+        playerScores[2] = gameScore.player2RunningTotal || 0;
+        playerScores[3] = gameScore.player3RunningTotal || 0;
         playerBags[0] = gameScore.player0Bags || 0;
         playerBags[1] = gameScore.player1Bags || 0;
         playerBags[2] = gameScore.player2Bags || 0;
         playerBags[3] = gameScore.player3Bags || 0;
         
-        console.log('[HAND COMPLETION] Solo game - using database scores:', {
+        console.log('[HAND COMPLETION] Solo game - using database running totals:', {
           player0: playerScores[0],
           player1: playerScores[1], 
           player2: playerScores[2],

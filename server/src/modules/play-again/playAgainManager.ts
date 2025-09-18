@@ -201,24 +201,11 @@ async function resetGameState(game: Game): Promise<void> {
   game.forcedBid = undefined;
   game.completedTricks = [];
 
-  // Reset database game status
+  // IMPORTANT: Clear dbGameId so that when the game starts again, it creates a NEW database record
+  // This preserves the finished game record in the database
   if (game.dbGameId) {
-    try {
-      const { prisma } = await import('../../lib/prisma');
-      await prisma.game.update({
-        where: { id: game.dbGameId },
-        data: { 
-          status: 'WAITING',
-          completed: false,
-          currentRound: 1,
-          currentTrick: 1,
-          dealer: 0
-        }
-      });
-      console.log('[PLAY AGAIN] Updated database status to WAITING for game:', game.dbGameId);
-    } catch (error) {
-      console.error('[PLAY AGAIN] Failed to update database status:', error);
-    }
+    console.log('[PLAY AGAIN] Clearing dbGameId to preserve finished game record:', game.dbGameId);
+    game.dbGameId = undefined;
   }
 
   // Clear trick logger for this game
