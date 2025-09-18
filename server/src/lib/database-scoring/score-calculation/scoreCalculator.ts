@@ -72,11 +72,6 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
           if (tricks === 0) {
             playerScores[playerIndex] = nilValue;
             console.log(`[SOLO NIL] Player ${playerIndex} successful nil: +${nilValue}`);
-          } else {
-            playerScores[playerIndex] = -nilValue;
-            playerBags[playerIndex] = tricks;
-            console.log(`[SOLO NIL] Player ${playerIndex} failed nil: -${nilValue}, bags=${tricks}`);
-          }
         } else if (roundBid.isBlindNil) { // Blind nil
           const blindNilValue = 100; // Solo blind nil value
           if (tricks === 0) {
@@ -86,24 +81,17 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
             playerScores[playerIndex] = -blindNilValue;
             playerBags[playerIndex] = tricks;
             console.log(`[SOLO BLIND NIL] Player ${playerIndex} failed blind nil: -${blindNilValue}, bags=${tricks}`);
+          }
         } else { // Regular bid
           if (tricks >= bidAmount) {
             playerScores[playerIndex] = bidAmount * 10 + Math.max(0, tricks - bidAmount);
             playerBags[playerIndex] = Math.max(0, tricks - bidAmount);
-            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}, total=${playerScores[playerIndex]}`);
-          } else {            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}`);
+            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10 + Math.max(0, tricks - bidAmount)}, bags=${playerBags[playerIndex]}`);
           } else {
             playerScores[playerIndex] = -bidAmount * 10;
             console.log(`[SOLO REGULAR] Player ${playerIndex} failed bid: -${bidAmount * 10}`);
           }
-        }
-      }
-      
-      // Apply bag penalties for solo (reset at 5, -50 penalty per player)
-      for (let i = 0; i < 4; i++) {
-        const currentBags = (previousScore ? (previousScore[`player${i}Bags` as keyof typeof previousScore] as number) || 0 : 0) + playerBags[i];
-        let remainingBags = currentBags;
-        
+        }        
         while (remainingBags >= 5) {
           playerScores[i] -= 50;
           remainingBags -= 5;
@@ -169,7 +157,7 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       
       console.log(`[DB SCORING] Solo game ${gameId} Round ${roundNumber} scores stored:`, {
         player0: `${playerScores[0]} (${playerRunningTotals[0]})`,
-        player1: `${playerScores[1]} (${playerRunningTotals[1]})`,
+    }        player1: `${playerScores[1]} (${playerRunningTotals[1]})`,
         player2: `${playerScores[2]} (${playerRunningTotals[2]})`,
         player3: `${playerScores[3]} (${playerRunningTotals[3]})`
       });
