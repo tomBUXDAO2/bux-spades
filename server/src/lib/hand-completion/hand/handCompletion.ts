@@ -174,7 +174,6 @@ export async function handleHandCompletion(game: Game): Promise<void> {
         team1TotalScore: gameScore.team1RunningTotal,
         team2TotalScore: gameScore.team2RunningTotal
       };
-    }    };
     
     // Emit hand completed event with database scores
     
@@ -208,7 +207,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       
       // ACTUALLY COMPLETE THE GAME
       await completeGame(game, completionCheck.winningTeam);
-    }
+    }    }
     
   } catch (error) {
     console.error('[HAND COMPLETION ERROR] Failed to complete hand:', error);
