@@ -205,6 +205,15 @@ model GameResult {
   totalRounds   Int      // Number of rounds/hands played
   totalTricks   Int      // Total tricks across all rounds
   specialEvents Json?    // Special events like nils, blind nils, etc.
+  // Individual player final scores for solo games
+  player0FinalScore Int?
+  player1FinalScore Int?
+  player2FinalScore Int?
+  player3FinalScore Int?
+  player0FinalBags  Int?
+  player1FinalBags  Int?
+  player2FinalBags  Int?
+  player3FinalBags  Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   Game          Game     @relation(fields: [gameId], references: [id])
@@ -277,6 +286,19 @@ model GameScore {
   team1Bags         Int
   team2Bags         Int
   team1RunningTotal Int
+  // Individual player scores for solo games
+  player0Score        Int?
+  player1Score        Int?
+  player2Score        Int?
+  player3Score        Int?
+  player0Bags         Int?
+  player1Bags         Int?
+  player2Bags         Int?
+  player3Bags         Int?
+  player0RunningTotal Int?
+  player1RunningTotal Int?
+  player2RunningTotal Int?
+  player3RunningTotal Int?
   team2RunningTotal Int
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
