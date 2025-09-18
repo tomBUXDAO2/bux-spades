@@ -4,7 +4,7 @@ import { games } from '../../../gamesStore';
 import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 
 export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
-  console.log('[SERVER DEBUG] join_game event received:', {
+  console.log('[JOIN GAME DEBUG] Socket join request:', {
     gameId,
     socketId: socket.id,
     userId: socket.userId,
@@ -53,7 +53,10 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
       socket.join(gameId);
       socket.emit('game_joined', { gameId });
       socket.emit('game_update', enrichGameForClient(game));
-      return;
+      
+      // IMPORTANT: Also emit to all players in the room to sync the UI
+      io.to(gameId).emit('game_update', enrichGameForClient(game));
+      return; // Exit early since user is already in game
     }
 
     // Check if user is in another game
