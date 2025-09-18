@@ -6,8 +6,7 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
   try {
     const gameId = req.params.id;
     const userId = req.user!.id;
-    const username = req.user!.username;
-    const avatar = req.user!.avatar;
+    const { username, avatar, seat } = req.body; // Get from request body
 
     const game = games.find(g => g.id === gameId);
     if (!game) {
@@ -30,21 +29,32 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
       }
     }
 
-    // Find an empty seat
-    const emptySeatIndex = game.players.findIndex(p => p === null);
-    if (emptySeatIndex === -1) {
-      res.status(400).json({ error: 'Game is full' });
+    // Use specific seat if provided, otherwise find empty seat
+    let targetSeatIndex = seat;
+    if (targetSeatIndex === undefined || targetSeatIndex === null) {
+      targetSeatIndex = game.players.findIndex(p => p === null);
+    }
+    
+    // Validate seat index
+    if (targetSeatIndex < 0 || targetSeatIndex > 3) {
+      res.status(400).json({ error: 'Invalid seat number' });
+      return;
+    }
+    
+    // Check if the specific seat is available
+    if (game.players[targetSeatIndex] !== null) {
+      res.status(400).json({ error: 'Seat is already occupied' });
       return;
     }
 
     // Add player to game
-    game.players[emptySeatIndex] = {
+    game.players[targetSeatIndex] = {
       id: userId,
       username: username || 'Unknown Player',
       avatar: avatar || '/default-avatar.jpg',
       type: 'human',
-      position: emptySeatIndex,
-      team: emptySeatIndex % 2,
+      position: targetSeatIndex,
+      team: targetSeatIndex % 2,
       bid: undefined,
       tricks: 0,
       points: 0,

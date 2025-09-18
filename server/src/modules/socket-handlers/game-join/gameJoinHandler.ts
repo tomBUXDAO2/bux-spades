@@ -57,25 +57,33 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
     }
 
     // Check if user is in another game
-    for (const [otherGameId, otherGame] of games.entries()) {
+    for (let i = 0; i < games.length; i++) {
+      const otherGame = games[i];
+      const otherGameId = otherGame.id;
       if (otherGameId !== gameId && otherGame.players.some(p => p && p.id === socket.userId)) {
         socket.emit('error', { message: 'You are already in another game' });
         return;
       }
     }
 
-    // Find an empty seat
+    // For socket joins, we don't have a specific seat request, so find empty seat
     const emptySeatIndex = game.players.findIndex(p => p === null);
     if (emptySeatIndex === -1) {
       socket.emit('error', { message: 'Game is full' });
       return;
     }
 
-    // Add player to game
+    // Add player to game - fetch user data from database
+    const { prisma } = await import('../../../lib/prisma');
+    const userData = await prisma.user.findUnique({
+      where: { id: socket.userId },
+      select: { username: true, avatar: true }
+    });
+    
     game.players[emptySeatIndex] = {
       id: socket.userId,
-      username: socket.username || 'Unknown Player',
-      avatar: socket.avatar || '/default-avatar.jpg',
+      username: userData?.username || 'Unknown Player',
+      avatar: userData?.avatar || '/default-avatar.jpg',
       type: 'human',
       position: emptySeatIndex,
       team: emptySeatIndex % 2,
@@ -94,6 +102,18 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
 
     // Emit game update to all players
     io.to(gameId).emit('game_update', enrichGameForClient(game));
+
+    // Update lobby for all clients
+    const lobbyGames = games.filter(g => {
+      if ((g as any).league && g.status === 'WAITING') {
+        return false;
+      }
+      return true;
+    });
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
+    
+    // Also emit all games (including league games) for real-time league game detection
+    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
 
   } catch (error) {
     console.error('[JOIN GAME ERROR]', error);

@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Game, GamePlayer } from '../../../types/game';
 import { games } from '../../../gamesStore';
+import { io } from '../../../index';
 import prisma from '../../../lib/prisma';
 import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
 import { 
@@ -154,6 +155,19 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       gimmickType: gameFormat.gimmickType,
       players: game.players.map(p => p ? p.username : 'empty')
     });
+
+    // Emit socket events to notify clients about the new game
+    // Filter out league games in waiting status for lobby
+    const lobbyGames = games.filter(game => {
+      if ((game as any).league && game.status === 'WAITING') {
+        return false;
+      }
+      return true;
+    });
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
+    
+    // Also emit all games (including league games) for real-time league game detection
+    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
 
     res.json({
       success: true,
