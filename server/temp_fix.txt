@@ -1,0 +1,6 @@
+        } else { // Regular bid
+          if (tricks >= bidAmount) {
+            playerScores[playerIndex] = bidAmount * 10 + Math.max(0, tricks - bidAmount);
+            playerBags[playerIndex] = Math.max(0, tricks - bidAmount);
+            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}, total=${playerScores[playerIndex]}`);
+          } else {

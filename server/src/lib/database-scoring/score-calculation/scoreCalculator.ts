@@ -86,12 +86,12 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
             playerScores[playerIndex] = -blindNilValue;
             playerBags[playerIndex] = tricks;
             console.log(`[SOLO BLIND NIL] Player ${playerIndex} failed blind nil: -${blindNilValue}, bags=${tricks}`);
-          }
         } else { // Regular bid
           if (tricks >= bidAmount) {
-            playerScores[playerIndex] = bidAmount * 10;
+            playerScores[playerIndex] = bidAmount * 10 + Math.max(0, tricks - bidAmount);
             playerBags[playerIndex] = Math.max(0, tricks - bidAmount);
-            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}`);
+            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}, total=${playerScores[playerIndex]}`);
+          } else {            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}`);
           } else {
             playerScores[playerIndex] = -bidAmount * 10;
             console.log(`[SOLO REGULAR] Player ${playerIndex} failed bid: -${bidAmount * 10}`);
