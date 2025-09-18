@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
 
 const Login: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState(false);
 
