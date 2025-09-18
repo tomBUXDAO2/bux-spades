@@ -3389,7 +3389,7 @@ const [isStarting, setIsStarting] = useState(false);
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
-                      const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') : false;
+                      const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === 'SPADES') && card.rank === 'A') : false;
                       
                       // Calculate number of hearts for BID HEARTS games
                       const countHearts = (hand: Card[] | undefined): number => {

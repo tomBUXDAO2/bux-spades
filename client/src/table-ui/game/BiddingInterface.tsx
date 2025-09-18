@@ -140,7 +140,7 @@ export default function BiddingInterface({
               disabled={hasAceSpades}
               className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
-              Nil {hasAceSpades ? "(Disabled)" : ""}            </button>
+              Nil            </button>
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
               disabled={selectedBid === null}
@@ -214,7 +214,7 @@ export default function BiddingInterface({
               disabled={hasAceSpades}
               className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
-              Nil {hasAceSpades ? "(Disabled)" : ""}              </button>
+              Nil              </button>
             )}
             {isForcedNil && (
               <button
@@ -222,7 +222,7 @@ export default function BiddingInterface({
               disabled={hasAceSpades}
               className={`${numberButtonClass} px-6 h-12 md:h-10 sm:h-9 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
-              Nil {hasAceSpades ? "(Disabled)" : ""}              </button>
+              Nil              </button>
             )}
             <button
               onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
@@ -258,7 +258,7 @@ export default function BiddingInterface({
               disabled={hasAceSpades}
               className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
-              Nil {hasAceSpades ? "(Disabled)" : ""}                </button>
+              Nil                </button>
               )}
               {[1, 2, 3, 4, 5, 6].map((bid) => (
                 <button

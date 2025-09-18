@@ -13,8 +13,8 @@ export async function logGameStart(game: Game): Promise<void> {
         status: game.status,
         gameMode: game.gameMode,
         bidType: game.rules?.bidType || 'REGULAR',
-        specialRules: game.rules?.specialRules?.screamer || game.rules?.specialRules?.assassin ? 
-          (game.rules?.specialRules?.screamer ? ['SCREAMER'] : []) : [],
+        specialRules: game.specialRules?.screamer || game.specialRules?.assassin ? 
+          (game.specialRules?.screamer ? ['SCREAMER'] : []) : [],
         minPoints: game.minPoints,
         maxPoints: game.maxPoints,
         buyIn: game.buyIn,
@@ -25,8 +25,8 @@ export async function logGameStart(game: Game): Promise<void> {
         whiz: game.rules?.bidType === 'WHIZ',
         mirror: game.rules?.bidType === 'MIRROR',
         gimmick: game.rules?.bidType === 'GIMMICK',
-        screamer: game.rules?.specialRules?.screamer || false,
-        assassin: game.rules?.specialRules?.assassin || false,
+        screamer: game.specialRules?.screamer || false,
+        assassin: game.specialRules?.assassin || false,
         solo: game.solo,
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,

@@ -215,6 +215,14 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
 
 function getPlayableCards(hand: Card[], leadSuit: Suit | null, spadesBroken: boolean): Card[] {
   if (!leadSuit) {
+    // Leading - cannot lead spades until spades are broken
+    if (!spadesBroken) {
+      const nonSpades = hand.filter(card => card.suit !== "SPADES");
+      if (nonSpades.length > 0) {
+        return nonSpades;
+      }
+    }
+    // Spades are broken or only spades left - can play any card
     // Leading - can play any card
     return hand.slice();
   }

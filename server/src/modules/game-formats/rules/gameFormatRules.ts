@@ -53,7 +53,7 @@ export function applyGameFormatRules(game: Game, format: GameFormatConfig): void
     bidType: format.format === 'GIMMICK' ? 'GIMMICK' : format.format,
     allowNil: format.allowNil,
     allowBlindNil: format.allowBlindNil,
-    specialRules: { screamer: format.specialRules.includes('SCREAMER'), assassin: format.specialRules.includes('ASSASSIN') },
+    specialRules: { screamer: format.specialRules.includes('SCREAMER') || format.specialRules.includes('screamer'), assassin: format.specialRules.includes('ASSASSIN') || format.specialRules.includes('assassin') },
   };
   
   // Set forced bid for gimmick games

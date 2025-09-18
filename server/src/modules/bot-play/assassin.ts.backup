@@ -73,20 +73,12 @@ export function getAssassinPlay({ game, hand, seatIndex, currentTrick, isLeading
         };
       }
     } else {
-      // Spades are broken - PREFER to lead spades if available
-      if (spades.length > 0) {
-        const card = spades[Math.floor(Math.random() * spades.length)];
-        return {
-          card,
-          reason: `Assassin: Spades broken, leading spades ${card.rank}${card.suit}`
-        };
-      } else {
-        const card = hand[Math.floor(Math.random() * hand.length)];
-        return {
-          card,
-          reason: `Assassin: Spades broken, no spades available, leading ${card.rank}${card.suit}`
-        };
-      }
+      // Spades are broken - can lead anything
+      const card = hand[Math.floor(Math.random() * hand.length)];
+      return {
+        card,
+        reason: `Assassin: Spades broken, leading ${card.rank}${card.suit}`
+      };
     }
   } else {
     // Following: Must follow suit if possible
