@@ -104,6 +104,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       game.team1TotalScore = gameScore.team1RunningTotal;
       game.team2TotalScore = gameScore.team2RunningTotal;
       game.team1Bags = gameScore.team1Bags;
+      game.team2Bags = gameScore.team2Bags;
     }
     
     console.log(`[HAND COMPLETION] Updated team scores in game object:`, {

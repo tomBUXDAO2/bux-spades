@@ -1,107 +1,37 @@
-import type { AuthenticatedSocket } from '../socket-auth';
-import type { Game } from '../../types/game';
+import type { AuthenticatedSocket } from '../../socket-auth';
 import { io } from '../../index';
 import { games } from '../../gamesStore';
+import prisma from '../../lib/prisma';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
-import { assignDealer, dealCards } from '../dealing/cardDealing';
-import { logGameStart } from '../../routes/games/database/gameDatabase';
-import prisma from '../../lib/prisma';
-import { trickLogger } from '../../lib/trick-logging';
 
 /**
  * Handles start_game socket event
  */
 export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
-  console.log('[GAME START] Received start_game event:', { gameId, userId: socket.userId });
   
-  if (!socket.isAuthenticated || !socket.userId) {
-    socket.emit('error', { message: 'Not authenticated' });
-    return;
-  }
-
   try {
     const game = games.find(g => g.id === gameId);
     if (!game) {
-      console.log('[GAME START] Game not found:', gameId);
       socket.emit('error', { message: 'Game not found' });
       return;
     }
 
-    if (game.status !== 'WAITING') {
-      console.log('[GAME START] Game already started:', { gameId, status: game.status });
-      socket.emit('error', { message: 'Game already started' });
-      return;
-    }
-
-    // Check if all seats are filled
-    const filledSeats = game.players.filter((p: any) => p !== null).length;
-    console.log('[GAME START] Checking seats:', { gameId, filledSeats, totalSeats: 4 });
-    
+    // Ensure 4 seats are filled
+    const filledSeats = game.players.filter(p => p !== null).length;
     if (filledSeats < 4) {
-      console.log('[GAME START] Not all seats filled:', { gameId, filledSeats });
-      socket.emit('error', { message: 'All seats must be filled to start the game' });
+      socket.emit('error', { message: 'Not enough players to start the game' });
       return;
     }
 
-    // If any seated player is a bot at start time, mark game as unrated
-    const hasBotAtStart = game.players.some(p => p && (p.type === 'bot' || (p.username && p.username.startsWith('Bot '))));
-    if (hasBotAtStart) {
-      game.rated = false;
-    }
-
-    // Move to bidding before persisting so DB status is correct
+    // Set initial status
     game.status = 'BIDDING';
 
-    // Ensure game is logged in DB and Round 1 exists
-    try {
-      if (!game.dbGameId) {
-        console.log('[GAME START] Creating game in database...');
-        await logGameStart(game);
-      }
-      // Create Round 1 if missing
-      const existingRound = await prisma.round.findFirst({ where: { gameId: game.dbGameId! , roundNumber: 1 } });
-      if (!existingRound) {
-        console.log('[GAME START] Creating Round 1 in database...');
-        const roundId = `round_${game.dbGameId}_1_${Date.now()}`;
-        await prisma.round.create({
-          data: {
-            id: roundId,
-            gameId: game.dbGameId!,
-            roundNumber: 1,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }
-        });
-        // Set the round ID for trick logging
-        trickLogger.setCurrentRoundId(game.id, roundId);
-        // Initialize PlayerTrickCount entries for all players with 0 tricks
-        const { updatePlayerTrickCount } = await import('../../lib/database-scoring/trick-count/trickCountManager');
-        for (const player of game.players) {
-          if (player) {
-            await updatePlayerTrickCount(game.dbGameId, 1, player.id, 0);
-          }
-        }
-      } else {
-        // Round exists: still set round ID so trick logging works
-        trickLogger.setCurrentRoundId(game.id, existingRound.id);
-      }
-    } catch (err) {
-      console.error('[GAME START] Failed to ensure DB game/round records:', err);
-      // Continue anyway; bid logging will skip if dbGameId missing
-    }
-
     // Dealer assignment and card dealing
-    const dealerIndex = assignDealer(game.players, game.dealerIndex);
-    game.dealerIndex = dealerIndex;
-
-    // Assign dealer flag for UI
-    game.players.forEach((p: any, i: number) => {
-      if (p) p.isDealer = (i === dealerIndex);
-    });
-
-    // Deal cards
+    const dealerIndex = typeof game.dealerIndex === 'number' ? game.dealerIndex : 0;
+    const { dealCards } = await import('../dealing/cardDealing');
     const hands = dealCards(game.players, dealerIndex);
+
     game.hands = hands;
 
     // Assign hands to individual players
@@ -124,15 +54,22 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
       nilBids: {}
     };
 
+    // Emit a dedicated game_started event for UI dealing/buy-in animation
+    io.to(game.id).emit('game_started', {
+      dealerIndex,
+      hands: hands.map((hand, i) => ({ playerId: game.players[i]?.id, hand })),
+      currentBidderIndex: game.bidding.currentBidderIndex
+    });
+
     // Emit game update to all clients
     io.to(game.id).emit('game_update', enrichGameForClient(game));
 
-    // If first to bid is a bot, trigger bot move
+    // If first to bid is a bot, trigger bot move shortly after so UI can render dealing/animation
     const firstBidderIndex = (dealerIndex + 1) % 4;
     const firstBidderPlayer = game.players[firstBidderIndex];
     if (firstBidderPlayer && firstBidderPlayer.type === 'bot') {
       console.log('[GAME START] First bidder is a bot; triggering bot bid');
-      setTimeout(() => botMakeMove(game, firstBidderIndex), 500);
+      setTimeout(() => botMakeMove(game, firstBidderIndex), 150);
     }
 
   } catch (error) {

@@ -75,7 +75,9 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
           } else {
             playerScores[playerIndex] = -nilValue;
             playerBags[playerIndex] = tricks;
-            console.log(`[SOLO NIL] Player ${playerIndex} failed nil: -${nilValue}, bags=${tricks}`);
+            // Bags always score +1 regardless of bid
+            playerScores[playerIndex] += playerBags[playerIndex];
+            console.log(`[SOLO NIL] Player ${playerIndex} failed nil: -${nilValue}, bags=${tricks}, +${playerBags[playerIndex]} bag points`);
           }
         } else if (roundBid.isBlindNil) { // Blind nil
           const blindNilValue = 100; // Solo blind nil value
@@ -85,7 +87,9 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
           } else {
             playerScores[playerIndex] = -blindNilValue;
             playerBags[playerIndex] = tricks;
-            console.log(`[SOLO BLIND NIL] Player ${playerIndex} failed blind nil: -${blindNilValue}, bags=${tricks}`);
+            // Bags always score +1 regardless of bid
+            playerScores[playerIndex] += playerBags[playerIndex];
+            console.log(`[SOLO BLIND NIL] Player ${playerIndex} failed blind nil: -${blindNilValue}, bags=${tricks}, +${playerBags[playerIndex]} bag points`);
           }
         } else { // Regular bid
           if (tricks >= bidAmount) {
@@ -99,15 +103,22 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
         }
       }
       
-      // Apply bag penalties for solo mode
+      // Apply cumulative bag penalties for solo mode and update cumulative bags
       for (let i = 0; i < playerBags.length; i++) {
-        let remainingBags = playerBags[i];
-        while (remainingBags >= 5) {
-          playerScores[i] -= 50;
-          remainingBags -= 5;
-          console.log(`[SOLO BAG PENALTY] Player ${i} hit 5+ bags, applied -50 penalty. Remaining bags: ${remainingBags}`);
+        const prevBags = previousScore ? [
+          previousScore.player0Bags || 0,
+          previousScore.player1Bags || 0,
+          previousScore.player2Bags || 0,
+          previousScore.player3Bags || 0,
+        ][i] : 0;
+        let cumulativeBags = prevBags + playerBags[i];
+        while (cumulativeBags >= 5) {
+          // Apply the -50 penalty for 5 cumulative bags; bag points remain earned
+          playerRunningTotals[i] -= 50;
+          cumulativeBags -= 5;
+          console.log(`[SOLO BAG PENALTY] Player ${i} hit 5+ cumulative bags, applied -50 penalty. Remaining cumulative bags: ${cumulativeBags}`);
         }
-        playerBags[i] = remainingBags;
+        playerBags[i] = cumulativeBags;
         playerRunningTotals[i] += playerScores[i];
       }
       
@@ -207,13 +218,13 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
       }
       
       console.log(`[DB SCORING] Round ${roundNumber} - Team 1: bid ${team1Bid}, tricks ${team1Tricks}`);
-      console.log(`[DB SCORING] Round ${roundNumber} - Team 2: bid ${team2Bid}, tricks ${team2Tricks}`);
+      console.log(`[DB SCORING] Round ${roundNumber} - Team 2: bid ${team2Tricks}`);
       
       // Calculate team scores using correct nil logic
       let team1Score = 0, team2Score = 0;
       let team1Bags = 0, team2Bags = 0;
       
-      // Handle nil and blind nil scoring
+      // Handle nil and blind nil scoring ONLY (team base score handled separately)
       for (const roundBid of round.RoundBid) {
         const playerIndex = game.players.findIndex(p => p?.id === roundBid.playerId);
         if (playerIndex === -1) continue;
@@ -259,33 +270,31 @@ export async function calculateAndStoreGameScore(gameId: string, roundNumber: nu
               console.log(`[BLIND NIL SCORING] Player ${playerIndex} failed blind nil: -${blindNilValue} (partners)`);
             }
           }
-        } else { // Regular bid
-          if (tricks >= roundBid.bid) {
-            const score = roundBid.bid * 10;
-            const bags = tricks - roundBid.bid;
-            if (team1.includes(playerIndex)) {
-              team1Score += score;
-              team1Bags += bags;
-            } else {
-              team2Score += score;
-              team2Bags += bags;
-            }
-            console.log(`[REGULAR SCORING] Player ${playerIndex} made bid ${roundBid.bid}: +${score}, bags=${bags}`);
-          } else {
-            const score = -(roundBid.bid * 10);
-            if (team1.includes(playerIndex)) {
-              team1Score += score;
-            } else {
-              team2Score += score;
-            }
-            console.log(`[REGULAR SCORING] Player ${playerIndex} failed bid ${roundBid.bid}: ${score}`);
-          }
+        } else {
+          // Regular bids are scored at TEAM level below
         }
       }
       
-      // Add bag points (1 point per bag) to this round's team scores
-      team1Score += team1Bags;
-      team2Score += team2Bags;
+      // Team-level base scoring (partners): made >= bid => bid*10 + bags; else -bid*10
+      const team1MetBid = team1Tricks >= team1Bid;
+      const team2MetBid = team2Tricks >= team2Bid;
+      const team1RoundBags = Math.max(0, team1Tricks - team1Bid);
+      const team2RoundBags = Math.max(0, team2Tricks - team2Bid);
+      
+      if (team1MetBid) {
+        team1Score += team1Bid * 10 + team1RoundBags;
+      } else {
+        team1Score += -(team1Bid * 10);
+      }
+      if (team2MetBid) {
+        team2Score += team2Bid * 10 + team2RoundBags;
+      } else {
+        team2Score += -(team2Bid * 10);
+      }
+      
+      // Set team bags from team calculation
+      team1Bags = team1RoundBags;
+      team2Bags = team2RoundBags;
       
       // Get previous running totals
       let team1RunningTotal = previousScore?.team1RunningTotal || 0;

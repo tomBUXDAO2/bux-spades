@@ -208,7 +208,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     io.to(game.id).emit("game_update", enrichGameForClient(game));
     
     if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-      setTimeout(() => botPlayCard(game, nextPlayerIndex), 1000);
+      setTimeout(() => botPlayCard(game, nextPlayerIndex), 300);
     }
   }
 }

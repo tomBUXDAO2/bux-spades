@@ -49,14 +49,16 @@ export async function logGameStart(game: Game): Promise<void> {
       if (player && player.type === 'bot') {
         let retries = 3;
         let success = false;
+        // Start with the provided username, but allow fallback if it collides
+        let createUsername = player.username;
         while (retries > 0 && !success) {
           try {
             await prisma.user.upsert({
               where: { id: player.id },
-              update: {},
+              update: { updatedAt: new Date() },
               create: {
                 id: player.id,
-                username: player.username,
+                username: createUsername,
                 avatar: player.avatar || '/bot-avatar.jpg',
                 discordId: null,
                 coins: 0,
@@ -64,11 +66,18 @@ export async function logGameStart(game: Game): Promise<void> {
                 updatedAt: new Date()
               }
             });
-            console.log(`[DATABASE] Created/updated bot user: ${player.username} (${player.id})`);
+            console.log(`[DATABASE] Created/updated bot user: ${createUsername} (${player.id})`);
             success = true;
-          } catch (error) {
+          } catch (error: any) {
             retries--;
-            console.error(`[DATABASE] Failed to create bot user ${player.username} (${retries} retries left):`, error);
+            // If username unique constraint fails, try a suffixed variant to ensure uniqueness
+            if (error?.code === 'P2002') {
+              const suffix = player.id.slice(-6);
+              createUsername = `${player.username}-${suffix}`;
+              console.warn(`[DATABASE] Username collision for ${player.username}. Retrying with '${createUsername}' (${retries} retries left).`);
+            } else {
+              console.error(`[DATABASE] Failed to create bot user ${player.username} (${retries} retries left):`, error);
+            }
             if (retries > 0) {
               await new Promise(resolve => setTimeout(resolve, 100));
             } else {

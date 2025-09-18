@@ -44,18 +44,13 @@ export class CoinManager {
 
       // Get all human players
       const humanPlayers = game.players.filter(p => p && p.type === 'human');
-      
-      if (humanPlayers.length === 0) {
-        console.log('[COIN MANAGER] No human players, skipping coin processing');
-        return;
-      }
 
       // Process coins in a transaction
       await prisma.$transaction(async (tx) => {
         // First, deduct buy-ins from all human players
         await this.deductBuyIns(tx, humanPlayers, game.buyIn);
         
-        // Then, distribute prizes to winners
+        // Then, distribute prizes to winners (prizes are based on full 4x buy-in pot regardless of human count)
         await this.distributePrizes(tx, game, winningTeamOrPlayer, humanPlayers);
       });
 
@@ -123,7 +118,7 @@ export class CoinManager {
     console.log('[COIN MANAGER] Distributing prizes for', game.gameMode, 'game');
     
     const buyIn = game.buyIn;
-    const totalPot = buyIn * 4; // Total pot from all 4 players
+    const totalPot = buyIn * 4; // Total pot from all 4 players (fixed regardless of human count)
     const rake = Math.floor(totalPot * 0.1); // 10% rake
     const prizePool = totalPot - rake; // 90% of pot goes to prizes
 
@@ -183,10 +178,12 @@ export class CoinManager {
    * Winners split the prize pool (90% of total pot after rake)
    */
   private static async distributePartnersPrizes(tx: any, game: Game, winningTeam: number, humanPlayers: any[], prizePool: number): Promise<void> {
-    console.log('[COIN MANAGER] Distributing partners prizes, winning team:', winningTeam);
+    // Map winningTeam (1 | 2) to player.team (0 | 1)
+    const winningTeamIndex = winningTeam === 1 ? 0 : 1;
+    console.log('[COIN MANAGER] Distributing partners prizes, winning team:', winningTeam, 'mapped index:', winningTeamIndex);
     
     // Find all human players on the winning team
-    const winningPlayers = humanPlayers.filter(player => player.team === winningTeam);
+    const winningPlayers = humanPlayers.filter(player => player.team === winningTeamIndex);
     
     if (winningPlayers.length === 0) {
       console.log('[COIN MANAGER] No human players on winning team');

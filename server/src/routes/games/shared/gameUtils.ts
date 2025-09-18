@@ -12,13 +12,22 @@ export function enrichGameForClient(game: Game): any {
     currentPlayer = game.play.currentPlayer as unknown as string;
   }
 
-  console.log(`[ENRICH GAME] Enriching game for client - Team scores:`, {
-    team1TotalScore: game.team1TotalScore,
-    team2TotalScore: game.team2TotalScore,
-    team1Bags: game.team1Bags,
-    team2Bags: game.team2Bags
-  });
-  return {
+  // Log scores appropriately based on game mode
+  if (!game.solo) {
+    console.log(`[ENRICH GAME] Enriching game for client - Team scores:`, {
+      team1TotalScore: game.team1TotalScore,
+      team2TotalScore: game.team2TotalScore,
+      team1Bags: game.team1Bags,
+      team2Bags: game.team2Bags
+    });
+  } else {
+    console.log(`[ENRICH GAME] Enriching game for client - SOLO scores:`, {
+      playerScores: game.playerScores,
+      playerBags: game.playerBags
+    });
+  }
+
+  const base = {
     id: game.id,
     status: game.status,
     gameMode: game.gameMode,
@@ -50,13 +59,20 @@ export function enrichGameForClient(game: Game): any {
     hands: game.hands,
     bidding: game.bidding,
     play: game.play,
-    team1TotalScore: game.team1TotalScore,
-    team2TotalScore: game.team2TotalScore,
-    team1Bags: game.team1Bags,
-    team2Bags: game.team2Bags,
     isBotGame: game.isBotGame,
     rules: game.rules,
     playerScores: game.playerScores,
-    playerBags: game.playerBags,    forcedBid: game.forcedBid
-  };
+    playerBags: game.playerBags,
+    forcedBid: game.forcedBid
+  } as any;
+
+  // Only include team fields for non-solo games
+  if (!game.solo) {
+    base.team1TotalScore = game.team1TotalScore;
+    base.team2TotalScore = game.team2TotalScore;
+    base.team1Bags = game.team1Bags;
+    base.team2Bags = game.team2Bags;
+  }
+
+  return base;
 }

@@ -582,16 +582,20 @@ export default function GameTable({
           hands: handsArray
         }));
       }
-      // Show coin debit animation for 4-human player games
-      const humanPlayers = game.players.filter(p => p && !isBot(p));
-      if (humanPlayers.length === 4 && game.buyIn) {
-        setCoinDebitAmount(game.buyIn);
+      
+      // Mark dealing as complete (cards dealt face down) and keep cards hidden until player's turn
+      setDealingComplete(true);
+      setBiddingReady(false);
+      setCardsRevealed(false);
+      
+      // Show coin debit animation for any buy-in game
+      if ((game.buyIn ?? 0) > 0) {
+        setCoinDebitAmount(game.buyIn || 0);
         setShowCoinDebit(true);
-        
-        // Hide animation after 3 seconds
+        // Hide animation after 1.5 seconds
         setTimeout(() => {
           setShowCoinDebit(false);
-        }, 3000);
+        }, 1500);
       }
     };
     
@@ -600,7 +604,7 @@ export default function GameTable({
     return () => {
       socket.off('game_started', handleGameStarted);
     };
-  }, [game.players, game.buyIn]);
+  }, [game.buyIn, socket]);
   
 
   
@@ -1652,7 +1656,7 @@ export default function GameTable({
         </div>
         
         {/* Coin debit animation */}
-        {showCoinDebit && isPlayer(player) && (
+        {showCoinDebit && (
           <CoinDebitAnimation 
             amount={coinDebitAmount} 
             isVisible={showCoinDebit} 
@@ -3436,12 +3440,15 @@ const [isStarting, setIsStarting] = useState(false);
                     })()}
                   </div>
                 ) : gameState.status === "BIDDING" && !dealingComplete ? (
-                  <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
-                       style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
-                    <div className="font-bold">Dealing Cards...</div>
-                    <div className="text-sm mt-1">Please wait while cards are being dealt</div>
-                  </div>
-                ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
+                  // Only show dealing banner if no bids yet
+                  ((gameState as any).bidding?.bids?.every((b: any) => b == null)) ? (
+                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                     <div className="font-bold">Dealing Cards...</div>
+                     <div className="text-sm mt-1">Please wait while cards are being dealt</div>
+                   </div>
+                  ) : null
+                 ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {gameState.currentPlayer

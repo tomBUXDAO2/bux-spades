@@ -6,17 +6,11 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
 
-// Single bot user ID for all bots
-const BOT_USER_ID = 'bot-user-universal';
-
 /**
  * Get the database user ID for a player (human or bot)
  */
 function getPlayerDbUserId(player: any): string {
-  if (player.type === 'bot') {
-    return player.id;
-  }
-  return player.id;
+  return player?.id;
 }
 
 export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userId, bid }: { gameId: string; userId: string; bid: number }): Promise<void> {
@@ -69,6 +63,9 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
     game.players[playerIndex]!.bid = bid;
     console.log('[MAKE BID DEBUG] Bid recorded:', { playerIndex, bid, totalBids: game.bidding.bids.filter(b => b !== null).length });
 
+    // Emit an immediate update so UI reflects the bid
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+
     // Persist the bid to database (RoundBid upsert) before proceeding
     try {
       if (game.dbGameId) {
@@ -87,12 +84,15 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
             }
           });
         }
+
+        const dbPlayerId = getPlayerDbUserId(game.players[playerIndex]!);
+
         // Upsert RoundBid using correct player ID
         await prisma.roundBid.upsert({
           where: {
             roundId_playerId: {
               roundId: roundRecord.id,
-              playerId: getPlayerDbUserId(game.players[playerIndex]!) // Use correct ID for human/bot
+              playerId: dbPlayerId
             }
           },
           update: {
@@ -102,7 +102,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
           create: {
             id: `bid_${roundRecord.id}_${playerIndex}_${Date.now()}`,
             roundId: roundRecord.id,
-            playerId: getPlayerDbUserId(game.players[playerIndex]!), // Use correct ID for human/bot
+            playerId: dbPlayerId,
             bid,
             isBlindNil: bid === -1,
             createdAt: new Date()
@@ -118,24 +118,21 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
     const bidsComplete = game.bidding.bids.every(b => b !== null);
     
     if (bidsComplete) {
-      console.log('[MAKE BID DEBUG] All bids complete, moving to play phase');
       await handleBiddingComplete(game);
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
     } else {
-      // Move to next player
-      const nextPlayerIndex = (playerIndex + 1) % 4;
-      game.bidding.currentBidderIndex = nextPlayerIndex;
-      game.bidding.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-      game.currentPlayer = game.players[nextPlayerIndex]?.id ?? '';
-      io.to(gameId).emit('game_update', enrichGameForClient(game));
-      if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-        setTimeout(() => {
-          botMakeMove(game, nextPlayerIndex);
-        }, 500);
+      // Advance turn to next player and notify UI
+      const nextIndex = (playerIndex + 1) % 4;
+      const nextPlayer = game.players[nextIndex];
+      game.bidding.currentPlayer = nextPlayer?.id ?? '';
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+      if (nextPlayer?.type === 'bot') {
+        await botMakeMove(game, nextIndex);
       }
     }
-
   } catch (error) {
-    console.error('Error in make_bid:', error);
+    console.error('[MAKE BID ERROR]', error);
     socket.emit('error', { message: 'Failed to process bid' });
   }
 }
