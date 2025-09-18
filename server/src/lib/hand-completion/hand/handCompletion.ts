@@ -86,19 +86,95 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     
     // Log completed hand to database
     await trickLogger.logCompletedHand(game);
-    
     // Create hand summary data for frontend using database scores
-    const handSummary = {
-      team1Score: gameScore.team1Score, // Current round score
-      team2Score: gameScore.team2Score, // Current round score
-      team1Bags: gameScore.team1Bags - (game.team1Bags || 0) + (gameScore.team1Bags || 0), // Bags from this round
-      team2Bags: gameScore.team2Bags - (game.team2Bags || 0) + (gameScore.team2Bags || 0), // Bags from this round
-      tricksPerPlayer: game.players.map((p: any) => p?.tricks || 0), // Current trick counts
-      playerScores: [0, 0, 0, 0], // Not used in partners mode
-      playerBags: [0, 0, 0, 0],   // Not used in partners mode
-      team1TotalScore: gameScore.team1RunningTotal,
-      team2TotalScore: gameScore.team2RunningTotal
-    };
+    let handSummary;
+    if (game.gameMode === 'SOLO' || game.solo) {
+      // For solo games, calculate individual player scores
+      const playerScores = [0, 0, 0, 0];
+      const playerBags = [0, 0, 0, 0];
+      
+      // Get individual player scores from database
+      if (game.dbGameId) {
+        const rounds = await prisma.round.findMany({
+          where: { gameId: game.dbGameId, roundNumber: { lte: game.currentRound } },
+          include: { RoundBid: true, PlayerTrickCount: true }
+        });
+        
+        for (let i = 0; i < 4; i++) {
+          const player = game.players[i];
+          if (!player) continue;
+          const playerId = player.id;
+          let totalScore = 0;
+          let totalBags = 0;
+          
+          for (const round of rounds) {
+            const bid = round.RoundBid.find(b => b.playerId === playerId);
+            const tricks = round.PlayerTrickCount.find(t => t.playerId === playerId);
+            if (bid && tricks) {
+              const tricksWon = tricks.tricksWon;
+              const bidAmount = bid.bid;
+              
+              if (bidAmount === 0) { // Nil
+                const nilValue = 50; // Solo nil value
+                if (tricksWon === 0) {
+                  totalScore += nilValue;
+                } else {
+                  totalScore -= nilValue;
+                }
+              } else if (bid.isBlindNil) { // Blind nil
+                const blindNilValue = 100; // Solo blind nil value
+                if (tricksWon === 0) {
+                  totalScore += blindNilValue;
+                } else {
+                  totalScore -= blindNilValue;
+                }
+              } else { // Regular bid
+                if (tricksWon >= bidAmount) {
+                  totalScore += bidAmount * 10;
+                  totalBags += Math.max(0, tricksWon - bidAmount);
+                } else {
+                  totalScore -= bidAmount * 10;
+                }
+              }
+            }
+          }
+          
+          // Apply bag penalties for solo (reset at 5, -50 penalty)
+          while (totalBags >= 5) {
+            totalScore -= 50;
+            totalBags -= 5;
+          }
+          
+          playerScores[i] = totalScore;
+          playerBags[i] = totalBags;
+        }
+      }
+      
+      handSummary = {
+        team1Score: 0, // Not used in solo
+        team2Score: 0, // Not used in solo
+        team1Bags: 0,  // Not used in solo
+        team2Bags: 0,  // Not used in solo
+        tricksPerPlayer: game.players.map((p: any) => p?.tricks || 0),
+        playerScores: playerScores,
+        playerBags: playerBags,
+        team1TotalScore: 0, // Not used in solo
+        team2TotalScore: 0  // Not used in solo
+      };
+    } else {
+      // For partners games, use team scores
+      handSummary = {
+        team1Score: gameScore.team1Score,
+        team2Score: gameScore.team2Score,
+        team1Bags: gameScore.team1Bags - (game.team1Bags || 0) + (gameScore.team1Bags || 0),
+        team2Bags: gameScore.team2Bags - (game.team2Bags || 0) + (gameScore.team2Bags || 0),
+        tricksPerPlayer: game.players.map((p: any) => p?.tricks || 0),
+        playerScores: [0, 0, 0, 0],
+        playerBags: [0, 0, 0, 0],
+        team1TotalScore: gameScore.team1RunningTotal,
+        team2TotalScore: gameScore.team2RunningTotal
+      };
+    }    };
     
     // Emit hand completed event with database scores
     
