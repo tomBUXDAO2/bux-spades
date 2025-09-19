@@ -4,7 +4,7 @@ import { io } from '../../../../index';
 import { games } from '../../../../gamesStore';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
-import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
+import { handleTrickCompletion } from '../../../../../lib/hand-completion/trick/trickCompletion';
 
 /**
  * Handles play_card socket event
