@@ -4,6 +4,7 @@ import { games } from '../../gamesStore';
 import { io } from '../../index';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { createGame } from './create/gameCreation';
+import { enrichGameForClient } from './shared/gameUtils';
 import { joinGame } from './join/gameJoining';
 
 interface AuthenticatedRequest extends Request {
@@ -84,16 +85,29 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
       }
     }
 
+    // Emit game update to all players in the room first
+    io.to(gameId).emit('game_update', enrichGameForClient(game));
+    
     // If no human players remain and not a league game, remove game
     const hasHumanPlayers = game.players.some(p => p && p.type === 'human');
     const isLeague = Boolean((game as any).league);
 
     if (!hasHumanPlayers && !isLeague) {
-      const index = games.findIndex(g => g.id === gameId); if (index !== -1) games.splice(index, 1);
-      io.emit('games_updated', games);
-    } else {
-      io.emit('games_updated', games);
+      const index = games.findIndex(g => g.id === gameId);
+      if (index !== -1) games.splice(index, 1);
     }
+    
+    // Update lobby for all clients
+    const lobbyGames = games.filter(g => {
+      if ((g as any).league && g.status === 'WAITING') {
+        return false;
+      }
+      return true;
+    });
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
+    
+    // Also emit all games (including league games) for real-time league game detection
+    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
 
     res.json({ success: true });
   } catch (error) {

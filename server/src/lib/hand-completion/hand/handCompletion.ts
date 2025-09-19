@@ -123,8 +123,6 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     }
     io.to(game.id).emit('hand_completed', handSummary);
     
-    // Emit game update
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
     
     // Check if game is complete
     console.log('[HAND COMPLETION DEBUG] Checking game completion with:', {
@@ -139,6 +137,12 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       
       // ACTUALLY COMPLETE THE GAME
       await completeGame(game, completionCheck.winningTeam);
+    } else {
+      console.log('[HAND COMPLETION] Game continues, starting next round...');
+      
+      // Import and call startNewHand to begin the next round
+      const { startNewHand } = await import('../../../modules/socket-handlers/game-state/hand/handSummaryContinue');
+      await startNewHand(game);
     }
     
   } catch (error) {

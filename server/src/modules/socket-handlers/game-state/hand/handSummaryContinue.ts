@@ -76,7 +76,7 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
 /**
  * Starts a new hand for an existing game
  */
-async function startNewHand(game: Game): Promise<void> {
+export async function startNewHand(game: Game): Promise<void> {
   console.log('[START NEW HAND] Starting new hand for game:', game.id);
 
   // Check if all seats are filled
