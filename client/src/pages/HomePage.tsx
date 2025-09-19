@@ -1167,6 +1167,25 @@ const HomePage: React.FC = () => {
                           )}
                         </span>
                         <div className="flex gap-2 ml-auto items-center">
+                          {/* Watch button when player is at a table */}
+                          {player.activeGameId && (
+                            <button
+                              className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs border border-slate-300 hover:bg-indigo-700"
+                              title="Watch Table"
+                              onClick={() => handleWatchGame(player.activeGameId as string)}
+                            >
+                              Watch
+                            </button>
+                          )}                          {/* Watch button when player is at a table */}
+                          {player.activeGameId && (
+                            <button
+                              className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs border border-slate-300 hover:bg-indigo-700"
+                              title="Watch Table"
+                              onClick={() => handleWatchGame(player.activeGameId as string)}
+                            >
+                              Watch
+                            </button>
+                          )}
                           {/* Hide action buttons for self */}
                           {player.id !== user.id && (
                             player.status === 'blocked' ? (

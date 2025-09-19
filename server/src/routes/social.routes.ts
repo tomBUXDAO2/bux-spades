@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { io } from '../index';
@@ -11,7 +12,7 @@ router.post('/friends/add', requireAuth, async (req, res) => {
   if (currentUserId === friendId) return res.status(400).json({ error: "Cannot add yourself as a friend." });
   try {
     await prisma.friend.create({
-      data: { userId: currentUserId, friendId } as any
+      data: { id: randomUUID(), userId: currentUserId, friendId, updatedAt: new Date() } as any
     });
     // Emit socket event to both users
     io.to(currentUserId).emit('friendAdded', { friendId });
@@ -56,28 +57,38 @@ router.post('/block', requireAuth, async (req, res) => {
   const currentUserId = (req as any).user.id;
   const { blockId } = req.body;
   if (currentUserId === blockId) return res.status(400).json({ error: "Cannot block yourself." });
-  // Remove from friends if currently a friend
-  await prisma.friend.deleteMany({ where: { userId: currentUserId, friendId: blockId } });
-  // Add to BlockedUser table
-  await prisma.blockedUser.create({
-    data: { userId: currentUserId, blockedId: blockId } as any
-  });
-  // Emit socket events for real-time update
-  io.to(currentUserId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh
-  io.to(currentUserId).emit('blockedUser', { blockId });
-  res.json({ success: true });
+  try {
+    // Remove from friends if currently a friend
+    await prisma.friend.deleteMany({ where: { userId: currentUserId, friendId: blockId } });
+    // Add to BlockedUser table
+    await prisma.blockedUser.create({
+      data: { id: randomUUID(), userId: currentUserId, blockedId: blockId, updatedAt: new Date() } as any
+    });
+    // Emit socket events for real-time update
+    io.to(currentUserId).emit('friendAdded', { friendId: blockId }); // triggers UI refresh
+    io.to(currentUserId).emit('blockedUser', { blockId });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    res.status(500).json({ error: "Failed to block user." });
+  }
 });
 
 // Unblock User
 router.post('/unblock', requireAuth, async (req, res) => {
   const currentUserId = (req as any).user.id;
   const { blockId } = req.body;
-  await prisma.blockedUser.deleteMany({
-    where: { userId: currentUserId, blockedId: blockId }
-  });
-  // Emit socket event for real-time update
-  io.to(currentUserId).emit('blockedUser', { blockId });
-  res.json({ success: true });
+  try {
+    await prisma.blockedUser.deleteMany({
+      where: { userId: currentUserId, blockedId: blockId }
+    });
+    // Emit socket event for real-time update
+    io.to(currentUserId).emit('blockedUser', { blockId });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error unblocking user:', error);
+    res.status(500).json({ error: "Failed to unblock user." });
+  }
 });
 
-export default router; 
+export default router;

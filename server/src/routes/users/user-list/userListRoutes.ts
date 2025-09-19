@@ -19,6 +19,22 @@ router.get('/', requireAuth, async (req, res) => {
     blockedUsers = await prisma.blockedUser.findMany({ where: { userId: currentUserId } });
   }
 
+  // For each user, determine their currently active game (WAITING or PLAYING)
+  // We use the GamePlayer relation to locate any active games and surface the Game.id as activeGameId
+  const userIds = users.map(u => u.id);
+  const activeMemberships = await prisma.gamePlayer.findMany({
+    where: {
+      userId: { in: userIds },
+      Game: { status: { in: ['WAITING', 'PLAYING'] } }
+    },
+    select: { userId: true, gameId: true }
+  });
+  const userIdToActiveGameId: Record<string, string> = {};
+  for (const m of activeMemberships) {
+    // Prefer the most recent assignment if multiple (rare); last write wins is fine here
+    userIdToActiveGameId[m.userId] = m.gameId;
+  }
+
   // @ts-ignore
   const usersWithStatus = users.map(u => ({
     ...u,
@@ -27,7 +43,8 @@ router.get('/', requireAuth, async (req, res) => {
       ? 'friend'
       : blockedUsers.some(b => b.blockedId === u.id)
       ? 'blocked'
-      : 'not_friend'
+      : 'not_friend',
+    activeGameId: userIdToActiveGameId[u.id] || null
   }));
 
   res.json(usersWithStatus);

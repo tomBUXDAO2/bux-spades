@@ -22,7 +22,67 @@ const router = Router();
 router.post('/', requireAuth, createGame);
 
 // Join a game
-router.post('/:id/join', requireAuth, joinGame);
+
+// Spectate a game
+router.post('/:id/spectate', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const gameId = req.params.id;
+    const userId = (req as AuthenticatedRequest).user!.id;
+    const { username, avatar } = req.body;
+
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    // Prevent duplicate spectate
+    if ((game as any).spectators?.some((s: any) => s.id === userId)) {
+      return res.status(400).json({ error: 'Already spectating' });
+    }
+
+    // Prevent joining as both player and spectator
+    if (game.players.some(p => p && p.id === userId)) {
+      return res.status(400).json({ error: 'Already joined as player' });
+    }
+
+    // Initialize spectators array if it doesn't exist
+    if (!(game as any).spectators) {
+      (game as any).spectators = [];
+    }
+
+    // Add to spectators
+    (game as any).spectators.push({
+      id: userId,
+      username: username || 'Unknown',
+      avatar: avatar || '/default-pfp.jpg',
+      type: 'human',
+    });
+
+    // Join the socket room for chat
+    const userSocket = [...io.sockets.sockets.values()].find(s => (s as any).userId === userId);
+    if (userSocket) {
+      userSocket.join(gameId);
+      console.log(`[SPECTATE] User ${userId} joined socket room ${gameId} as spectator`);
+    }
+
+    // Emit game update to all players in the room
+    io.to(gameId).emit('game_update', enrichGameForClient(game));
+    
+    // Update lobby for all clients
+    const lobbyGames = games.filter(g => {
+      if ((g as any).league && g.status === 'WAITING') {
+        return false;
+      }
+      return true;
+    });
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
+
+    res.json({ success: true, game: enrichGameForClient(game) });
+  } catch (error) {
+    console.error('Error spectating game:', error);
+    res.status(500).json({ error: 'Failed to spectate game' });
+  }
+});router.post('/:id/join', requireAuth, joinGame);
 
 // Get all games
 router.get('/', async (req: Request, res: Response) => {
@@ -189,11 +249,19 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
     const isLeague = Boolean((game as any).league);
 
     if (!hasHumanPlayers && !isLeague) {
+      // Delete from database if game exists in DB
+      if (game.dbGameId) {
+        try {
+          await prisma.gamePlayer.deleteMany({ where: { gameId: game.dbGameId } });
+          await prisma.game.delete({ where: { id: game.dbGameId } });
+          console.log(`[LEAVE GAME] Deleted game ${game.dbGameId} from database`);
+        } catch (dbError) {
+          console.error(`[LEAVE GAME] Failed to delete game from database:`, dbError);
+        }
+      }
       const index = games.findIndex(g => g.id === gameId);
       if (index !== -1) games.splice(index, 1);
-    }
-    
-    // Update lobby for all clients
+    }    // Update lobby for all clients
     const lobbyGames = games.filter(g => {
       if ((g as any).league && g.status === 'WAITING') {
         return false;

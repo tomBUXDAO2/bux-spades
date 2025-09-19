@@ -1,6 +1,14 @@
-        } else { // Regular bid
-          if (tricks >= bidAmount) {
-            playerScores[playerIndex] = bidAmount * 10 + Math.max(0, tricks - bidAmount);
-            playerBags[playerIndex] = Math.max(0, tricks - bidAmount);
-            console.log(`[SOLO REGULAR] Player ${playerIndex} made bid: +${bidAmount * 10}, bags=${playerBags[playerIndex]}, total=${playerScores[playerIndex]}`);
-          } else {
+    if (!hasHumanPlayers && !isLeague) {
+      // Delete from database if game exists in DB
+      if (game.dbGameId) {
+        try {
+          await prisma.gamePlayer.deleteMany({ where: { gameId: game.dbGameId } });
+          await prisma.game.delete({ where: { id: game.dbGameId } });
+          console.log(`[LEAVE GAME] Deleted game ${game.dbGameId} from database`);
+        } catch (dbError) {
+          console.error(`[LEAVE GAME] Failed to delete game from database:`, dbError);
+        }
+      }
+      const index = games.findIndex(g => g.id === gameId);
+      if (index !== -1) games.splice(index, 1);
+    }
