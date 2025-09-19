@@ -5,6 +5,7 @@ import type { Game, GamePlayer } from '../../../types/game';
 import { games } from '../../../gamesStore';
 import { io } from '../../../index';
 import prisma from '../../../lib/prisma';
+import { logGameStart } from '../database/gameDatabase';
 import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
 import { 
   validateGameSettings,

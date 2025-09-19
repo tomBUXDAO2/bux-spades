@@ -1,5 +1,5 @@
 import type { Game } from '../../../types/game';
-import { CrashPrevention } from "../../../../lib/crash-prevention";
+import { CrashPrevention } from "../../../lib/crash-prevention";
 import { isGameStuck, recoverStuckGame } from '../recovery/stuckGameRecovery';
 
 /**

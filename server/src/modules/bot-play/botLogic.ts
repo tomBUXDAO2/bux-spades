@@ -80,7 +80,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
 
   const hand = game.hands[seatIndex] || [];
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
-  const playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken, game, seatIndex);
+  const playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken);
 
   if (playableCards.length === 0) {
     console.log(`[BOT CARD DEBUG] Bot ${bot.username} has no playable cards!`);

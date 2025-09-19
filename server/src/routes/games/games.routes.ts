@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { prisma } from '../../lib/prisma';
 import { Request, Response } from 'express';
 import { games } from '../../gamesStore';
 import { io } from '../../index';
@@ -26,7 +27,58 @@ router.post('/:id/join', requireAuth, joinGame);
 // Get all games
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const allGames = games;
+    // Query games from database instead of in-memory store
+    const dbGames = await prisma.game.findMany({
+      where: {
+        status: {
+          in: ["WAITING", "PLAYING"]
+        }
+      },
+      include: {
+        GamePlayer: true
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    
+    // Convert database games to client format
+    const clientGames = dbGames.map((dbGame: any) => {
+      const game = games.find(g => g.dbGameId === dbGame.id);
+      if (game) {
+        // Use in-memory game state if available (for active games)
+        return enrichGameForClient(game);
+      } else {
+        // Convert database game to client format
+        return {
+          id: dbGame.id,
+          status: dbGame.status,
+          players: dbGame.GamePlayer.map((p: any) => ({
+            id: p.userId,
+            username: p.username,
+            avatar: p.avatar,
+            type: p.isBot ? "bot" : "human",
+            position: p.position,
+            team: p.team,
+            bid: p.bid,
+            tricks: p.tricks,
+            points: p.points,
+            bags: p.bags
+          })),
+          settings: {
+            maxPoints: dbGame.maxPoints,
+            allowBlindNil: dbGame.allowBlindNil,
+            allowNil: dbGame.allowNil,
+            allowDoubleNil: false
+          },
+          rated: dbGame.rated,
+          league: dbGame.league,
+          createdAt: dbGame.createdAt
+        };
+      }
+    });
+    
+    const allGames = clientGames;
     res.json({
       success: true,
       games: allGames
@@ -43,7 +95,45 @@ router.get('/', async (req: Request, res: Response) => {
 // Get a specific game
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const game = games.find(g => g.id === req.params.id);
+    // First try to find in-memory game
+    let game = games.find(g => g.id === req.params.id);
+    
+    // If not found in memory, query database
+    if (!game) {
+      const dbGame = await prisma.game.findUnique({
+        where: { id: req.params.id },
+        include: { GamePlayer: true }
+      });
+      
+      if (dbGame) {
+        // Convert database game to client format
+        game = {
+          id: dbGame.id,
+          status: dbGame.status,
+          players: dbGame.GamePlayer.map((p: any) => ({
+            id: p.userId,
+            username: p.username,
+            avatar: p.avatar,
+            type: p.isBot ? "bot" : "human",
+            position: p.position,
+            team: p.team,
+            bid: p.bid,
+            tricks: p.tricks,
+            points: p.points,
+            bags: p.bags
+          })),
+          settings: {
+            maxPoints: dbGame.maxPoints,
+            allowBlindNil: dbGame.allowBlindNil,
+            allowNil: dbGame.allowNil,
+            allowDoubleNil: false
+          },
+          rated: dbGame.rated,
+          league: dbGame.league,
+          createdAt: dbGame.createdAt
+        } as any;
+      }
+    }
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
     }

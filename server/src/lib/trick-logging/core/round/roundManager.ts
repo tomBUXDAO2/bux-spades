@@ -63,4 +63,20 @@ export class RoundManager {
     this.gameRounds.delete(gameId);
     this.gameRoundNumbers.delete(gameId);
   }
+
+  /**
+   * Get trick statistics for a game
+   */
+  async getTrickStats(gameId: string): Promise<any> {
+    // Implementation placeholder
+    return {};
+  }
+
+  /**
+   * Get round statistics for a game
+   */
+  async getRoundStats(gameId: string): Promise<any> {
+    // Implementation placeholder
+    return {};
+  }
 }
