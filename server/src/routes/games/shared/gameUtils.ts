@@ -63,7 +63,8 @@ export function enrichGameForClient(game: Game): any {
     rules: game.rules,
     playerScores: game.playerScores,
     playerBags: game.playerBags,
-    forcedBid: game.forcedBid
+    forcedBid: game.forcedBid,
+    spectators: (game as any).spectators || []
   } as any;
 
   // Only include team fields for non-solo games
