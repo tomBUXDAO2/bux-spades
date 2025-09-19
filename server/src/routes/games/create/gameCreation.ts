@@ -164,9 +164,12 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       }
       return true;
     });
+    console.log(`[GAME CREATION] Connected sockets: ${io.sockets.sockets.size}`);
+    console.log(`[GAME CREATION] Emitting games_updated to all clients, ${lobbyGames.length} lobby games`);
     io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
     
     // Also emit all games (including league games) for real-time league game detection
+    console.log(`[GAME CREATION] Emitting all_games_updated to all clients, ${games.length} total games`);
     io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
 
     res.json({

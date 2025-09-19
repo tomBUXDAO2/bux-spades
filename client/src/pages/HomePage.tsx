@@ -191,13 +191,15 @@ const HomePage: React.FC = () => {
     console.log('Setting up socket event handlers');
 
     const handleGamesUpdated = (updatedGames: GameState[]) => {
-      console.log('Games updated:', updatedGames);
+      console.log('[CLIENT] Games updated event received:', updatedGames.length, 'games');
+      console.log('[CLIENT] Games data:', updatedGames.map(g => ({ id: g.id, status: g.status, players: g.players?.map(p => p?.username || 'empty') })));
       setGames(updatedGames);
       setIsLoading(false);
     };
 
     const handleAllGamesUpdated = (allGames: GameState[]) => {
-      console.log('All games updated (including league games):', allGames);
+      console.log('[CLIENT] All games updated event received:', allGames.length, 'games');
+      console.log('[CLIENT] All games data:', allGames.map(g => ({ id: g.id, status: g.status, players: g.players?.map(p => p?.username || 'empty') })));
       
       // Check if any of the updated games is a league game for this user
       if (user) {

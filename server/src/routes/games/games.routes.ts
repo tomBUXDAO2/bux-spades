@@ -72,6 +72,12 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
     }
 
     // Remove from players
+    // Make user leave the socket room
+    const userSocket = [...io.sockets.sockets.values()].find(s => (s as any).userId === userId);
+    if (userSocket) {
+      userSocket.leave(gameId);
+      console.log(`[LEAVE GAME] User ${userId} left socket room ${gameId}`);
+    }
     const playerIdx = game.players.findIndex(p => p && p.id === userId);
     if (playerIdx !== -1) {
       game.players[playerIdx] = null;
@@ -104,9 +110,12 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
       }
       return true;
     });
+    console.log(`[LEAVE GAME] Connected sockets: ${io.sockets.sockets.size}`);
+    console.log(`[LEAVE GAME] Emitting games_updated to all clients, ${lobbyGames.length} games`);
     io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
     
     // Also emit all games (including league games) for real-time league game detection
+    console.log(`[LEAVE GAME] Emitting all_games_updated to all clients, ${games.length} total games`);
     io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
 
     res.json({ success: true });
