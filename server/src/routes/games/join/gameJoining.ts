@@ -9,6 +9,11 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
     const { username, avatar, seat } = req.body; // Get from request body
 
     const game = games.find(g => g.id === gameId);
+    // Check if user is already in another game
+    const existingGame = games.find(g => g.players.some(p => p && p.id === userId));
+    if (existingGame && existingGame.id !== gameId) {
+      return res.status(400).json({ error: `You are already in game ${existingGame.id}. Please leave that game first.` });
+    }
     if (!game) {
       res.status(404).json({ error: 'Game not found' });
       return;

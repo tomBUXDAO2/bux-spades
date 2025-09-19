@@ -147,6 +147,14 @@ export async function createGame(req: Request, res: Response): Promise<void> {
 
     // Add to games array
     games.push(game);
+    // Save game to database immediately when created
+    console.log('[GAME CREATION] Saving game to database...');
+    try {
+      await logGameStart(game);
+      console.log('[GAME CREATION] Game saved to database with ID:', game.dbGameId);
+    } catch (error) {
+      console.error('[GAME CREATION] Failed to save game to database:', error);
+    }
 
     console.log('[GAME CREATION] Created game:', {
       id: game.id,
