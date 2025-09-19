@@ -6,7 +6,6 @@ import { assignDealer, dealCards } from '../dealing/cardDealing';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
 import { trickLogger } from '../../lib/trick-logging';
 import { games } from '../../gamesStore';
-import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 
 // Track play again responses
 const playAgainResponses = new Map<string, Set<string>>();
@@ -152,16 +151,6 @@ async function resetGameForRespondingPlayers(game: Game): Promise<void> {
       games.splice(gameIndex, 1);
     }
     io.to(game.id).emit('game_closed', { gameId: game.id });
-    
-    // Clean up database for unrated games
-    if (!game.rated && game.dbGameId) {
-      console.log('[PLAY AGAIN] Cleaning up unrated game from database:', game.dbGameId);
-      try {
-        await deleteUnratedGameFromDatabase(game);
-      } catch (error) {
-        console.error('[PLAY AGAIN] Failed to clean up unrated game from database:', error);
-      }
-    }
     return;
   }
 

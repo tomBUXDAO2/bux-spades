@@ -148,7 +148,7 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
 /**
  * Delete unrated game and all related data from database
  */
-async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
+export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
   if (!game.dbGameId || game.rated) {
     return; // Only delete unrated games
   }
