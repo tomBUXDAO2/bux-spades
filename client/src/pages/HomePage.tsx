@@ -171,7 +171,6 @@ const HomePage: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('[LEAGUE GAME CHECK] Error checking for league games:', error);
       }
     };
@@ -230,7 +229,6 @@ const HomePage: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('[PERIODIC LEAGUE CHECK] Error checking for league games:', error);
       }
     };
@@ -279,15 +277,13 @@ const HomePage: React.FC = () => {
     console.log('Setting up socket event handlers');
 
     const handleGamesUpdated = (updatedGames: GameState[]) => {
-      console.log('[CLIENT] Games updated event received:', updatedGames.length, 'games');
-      console.log('[CLIENT] Games data:', updatedGames.map(g => ({ id: g.id, status: g.status, players: g.players?.map(p => p?.username || 'empty') })));
+      console.log('Games updated:', updatedGames);
       setGames(updatedGames);
       setIsLoading(false);
     };
 
     const handleAllGamesUpdated = (allGames: GameState[]) => {
-      console.log('[CLIENT] All games updated event received:', allGames.length, 'games');
-      console.log('[CLIENT] All games data:', allGames.map(g => ({ id: g.id, status: g.status, players: g.players?.map(p => p?.username || 'empty') })));
+      console.log('All games updated (including league games):', allGames);
       
       // Check if any of the updated games is a league game for this user
       if (user) {
@@ -821,17 +817,13 @@ const HomePage: React.FC = () => {
     }
 
     if (endpoint) {
-      setConfirmModal({ open: false, player: null, action: '' });
-      try {
       try {
         await api.post(endpoint, body);
       // Refresh player list
         const response = await api.get('/api/users');
         const players = await response.json();
         setOnlinePlayers(players);
-        console.log(`Successfully ${confirmModal.action} for player:`, player.username);
       } catch (error) {
-        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('Error performing social action:', error);
         alert('Failed to perform action. Please try again.');
       }

@@ -71,37 +71,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
-    // Mobile app visibility handling
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('[MOBILE] App became visible, reconnecting socket');
-        if (socket && !socket.connected) {
-          socket.connect();
-        }
-      }
-    };
-    
-    const handleFocus = () => {
-      console.log('[MOBILE] App focused, checking socket connection');
-      if (socket && !socket.connected) {
-        socket.connect();
-      }
-    };
-    
-    const handleOnline = () => {
-      console.log('[MOBILE] Network online, reconnecting socket');
-      if (socket && !socket.connected) {
-        socket.connect();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('online', handleOnline);
-        return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('online', handleOnline);
+    return () => {
       socketManager.disconnect();
     };
   }, [user]);
