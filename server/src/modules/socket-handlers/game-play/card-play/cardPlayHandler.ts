@@ -4,7 +4,7 @@ import { io } from '../../../../index';
 import { games } from '../../../../gamesStore';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
-import { handleTrickComplete } from '../../game-state/gameStateHandler';
+import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
 
 /**
  * Handles play_card socket event
@@ -85,7 +85,7 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
 
     // Check if trick is complete
     if (game.play.currentTrick.length === 4) {
-      await handleTrickComplete(game);
+      await handleTrickCompletion(game);
     } else {
       // Move to next player
       const nextPlayerIndex = (playerIndex + 1) % 4;

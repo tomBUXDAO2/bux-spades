@@ -3,7 +3,6 @@ import { io } from '../../index';
 import { games } from '../../gamesStore';
 import prisma from '../../lib/prisma';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
-import { ensureGamePlayerRecords } from '../../routes/games/database/gameDatabase';
 import { botMakeMove } from '../bot-play/botLogic';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
 
@@ -30,13 +29,10 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
     const humanPlayers = game.players.filter(p => p && p.type === 'human').length;
     game.rated = humanPlayers === 4;
 
-    // Always ensure game and GamePlayer records exist in database
-    console.log('[GAME START] Ensuring game and GamePlayer records exist in database...');
-    try {
+    // Create game in database if not already created
+    if (!game.dbGameId) {
+      console.log('[GAME START] Creating game in database...');
       await logGameStart(game);
-    } catch (error) {
-      console.log('[GAME START] Game already exists, ensuring GamePlayer records exist...');
-      await ensureGamePlayerRecords(game);
     }
 
     // Set initial status

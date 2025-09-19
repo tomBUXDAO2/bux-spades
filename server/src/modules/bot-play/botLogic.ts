@@ -1,7 +1,7 @@
 import type { Game, Card, Suit } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
-import { handleTrickComplete } from '../socket-handlers/game-state/trick/trickCompletion';
+import { handleTrickCompletion } from '../../../lib/hand-completion/trick/trickCompletion';
 import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
 import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
@@ -197,7 +197,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
 
   // Check if trick is complete
   if (game.play.currentTrick.length === 4) {
-    await handleTrickComplete(game);
+    await handleTrickCompletion(game);
   } else {
     // Move to next player
     const nextPlayerIndex = (seatIndex + 1) % 4;
