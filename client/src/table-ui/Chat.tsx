@@ -555,9 +555,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: isMobile ? `${mobileFontSize - 1}px` : `${mobileFontSize + 2}px` }}>
                       {msg.message || msg.text}
                       {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes(s.username || s.name)) && <EyeIcon />}
-                      <EyeIcon />
-                      {msg.message || msg.text}
-                      {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes(s.username || s.name)) && <EyeIcon />}
                     </span>
                   </div>
                 ) : (

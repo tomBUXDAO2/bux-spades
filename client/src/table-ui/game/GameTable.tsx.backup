@@ -172,21 +172,14 @@ function getCardValue(rank: string | number): number {
 
 // Helper function to sort cards
 function sortCards(cards: Card[]): Card[] {
-  // Suit order: Diamonds, Clubs, Hearts, Spades
-  const suitOrder: Record<string, number> = { '♦': 0, 'C': 1, '♣': 1, '♥': 2, 'H': 2, '♠': 3, 'S': 3 };
   return [...cards].sort((a, b) => {
-    // Normalize suit to single letter for sorting
-    const getSuitKey = (suit: string) => {
-      if (suit === '♦' || suit === 'Diamonds' || suit === 'D') return '♦';
-      if (suit === '♣' || suit === 'Clubs' || suit === 'C') return '♣';
-      if (suit === '♥' || suit === 'Hearts' || suit === 'H') return '♥';
-      if (suit === '♠' || suit === 'Spades' || suit === 'S') return '♠';
-      return suit;
-    };
-    const suitA = getSuitKey(a.suit);
-    const suitB = getSuitKey(b.suit);
-    if (suitOrder[suitA] !== suitOrder[suitB]) {
-      return suitOrder[suitA] - suitOrder[suitB];
+    const suitOrder = { "DIAMONDS": 0, "CLUBS": 1, "HEARTS": 2, "SPADES": 3 } as const;
+    const suitA = (typeof a.suit === 'string' ? a.suit.toString().toUpperCase() : a.suit) as any;
+    const suitB = (typeof b.suit === 'string' ? b.suit.toString().toUpperCase() : b.suit) as any;
+    const keyA = suitA.startsWith('D') ? 'DIAMONDS' : suitA.startsWith('C') ? 'CLUBS' : suitA.startsWith('H') ? 'HEARTS' : 'SPADES';
+    const keyB = suitB.startsWith('D') ? 'DIAMONDS' : suitB.startsWith('C') ? 'CLUBS' : suitB.startsWith('H') ? 'HEARTS' : 'SPADES';
+    if (suitOrder[keyA] !== suitOrder[keyB]) {
+      return suitOrder[keyA] - suitOrder[keyB];
     }
     return getCardValue(a.rank) - getCardValue(b.rank);
   });
@@ -199,24 +192,9 @@ function getLeadSuit(trick: Card[] | undefined): Suit | null {
 }
 
 function hasSpadeBeenPlayed(game: GameState): boolean {
-  // Check the server's spadesBroken flag (this is what the server uses)
+  // Use only the server's spadesBroken flag
   const spadesBroken = (game as any).play?.spadesBroken || false;
-  
-  // Also check if current trick has spades (for immediate feedback)
-  const currentTrick = (game as any).play?.currentTrick || [];
-  const currentTrickHasSpades = Array.isArray(currentTrick) ? currentTrick.some((card: Card) => isSpade(card)) : false;
-  
-  const result = spadesBroken || currentTrickHasSpades;
-  
-  console.log('[SPADE BREAKING DEBUG] hasSpadeBeenPlayed check:', {
-    spadesBroken,
-    currentTrick,
-    currentTrickHasSpades,
-    result,
-    playObject: (game as any).play
-  });
-  
-  return result;
+  return spadesBroken;
 }
 
 function canLeadSpades(game: GameState, hand: Card[]): boolean {
@@ -287,7 +265,10 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     
     // Normal rules: If spades haven't been broken, filter out spades unless only spades remain
     if (!canLeadSpades(game, hand)) {
-      const nonSpades = hand.filter(card => card.suit !== '♠');
+      const nonSpades = hand.filter(card => {
+        const s = (card.suit as unknown as string).toUpperCase();
+        return !(s === 'SPADES' || s === 'S' || s === '♠');
+      });
       return nonSpades.length > 0 ? nonSpades : hand;
     }
     return hand;
@@ -365,7 +346,8 @@ declare global {
 
 // Helper function to check if a card is a spade
 const isSpade = (card: Card): boolean => {
-  return card.suit === '♠' || (card as any).suit === 'S';
+  const suit = (card.suit as unknown as string).toUpperCase();
+  return suit === 'SPADES' || suit === 'S' || suit === '♠';
 };
 
 // Helper function to count spades in a hand
@@ -600,16 +582,20 @@ export default function GameTable({
           hands: handsArray
         }));
       }
-      // Show coin debit animation for 4-human player games
-      const humanPlayers = game.players.filter(p => p && !isBot(p));
-      if (humanPlayers.length === 4 && game.buyIn) {
-        setCoinDebitAmount(game.buyIn);
+      
+      // Mark dealing as complete (cards dealt face down) and keep cards hidden until player's turn
+      setDealingComplete(true);
+      setBiddingReady(false);
+      setCardsRevealed(false);
+      
+      // Show coin debit animation for any buy-in game
+      if ((game.buyIn ?? 0) > 0 && game.rated) {
+        setCoinDebitAmount(game.buyIn || 0);
         setShowCoinDebit(true);
-        
-        // Hide animation after 3 seconds
+        // Hide animation after 1.5 seconds
         setTimeout(() => {
           setShowCoinDebit(false);
-        }, 3000);
+        }, 1500);
       }
     };
     
@@ -618,7 +604,7 @@ export default function GameTable({
     return () => {
       socket.off('game_started', handleGameStarted);
     };
-  }, [game.players, game.buyIn]);
+  }, [game.buyIn, socket]);
   
 
   
@@ -765,7 +751,10 @@ export default function GameTable({
           console.log('[TIMER] No hand available for BIDHEARTS, skipping auto-bid');
           return;
         }
-        bid = myHand.filter((c: Card) => c.suit === '♥').length;
+        bid = myHand.filter((c: Card) => {
+            const s = (c.suit as unknown as string).toUpperCase();
+            return s === 'HEARTS' || s === 'H' || s === '♥';
+          }).length;
       } else if (game.forcedBid === 'CRAZY ACES') {
         // CRAZY ACES: bid 3 for each ace
         if (!myHand || !Array.isArray(myHand)) {
@@ -774,14 +763,14 @@ export default function GameTable({
         }
         const acesCount = myHand.filter((c: Card) => c.rank === 'A').length;
         bid = acesCount * 3;
-      } else if (game.rules?.gameType === 'MIRROR') {
+      } else if (game.rules?.bidType === 'MIRROR') {
         // Mirror: bid number of spades
         if (!myHand || !Array.isArray(myHand)) {
           console.log('[TIMER] No hand available for MIRROR, skipping auto-bid');
           return;
         }
         bid = myHand.filter((c: Card) => isSpade(c)).length;
-      } else if (game.rules?.gameType === 'WHIZ') {
+      } else if (game.rules?.bidType === 'WHIZ') {
         // Whiz: bid number of spades, or nil if no spades
         if (!myHand || !Array.isArray(myHand)) {
           console.log('[TIMER] No hand available for WHIZ, skipping auto-bid');
@@ -814,7 +803,7 @@ export default function GameTable({
         }
       }
       
-      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.gameType, 'forced bid:', game.forcedBid);
+      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.bidType, 'forced bid:', game.forcedBid);
       
       if (socket) {
         socket.emit('make_bid', { 
@@ -1667,7 +1656,7 @@ export default function GameTable({
         </div>
         
         {/* Coin debit animation */}
-        {showCoinDebit && isPlayer(player) && (
+        {showCoinDebit && (
           <CoinDebitAnimation 
             amount={coinDebitAmount} 
             isVisible={showCoinDebit} 
@@ -1976,8 +1965,8 @@ export default function GameTable({
     if (isMyTurn && Array.isArray(myHand)) {
       const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
       const spadesBroken = (gameState as any).play?.spadesBroken;
-      if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => c.suit !== 'S')) {
-        effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => c.suit !== 'S') : [];
+      if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
+        effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠') : [];
         if (effectivePlayableCards.length === 0) {
           effectivePlayableCards = myHand; // Only spades left
         }
@@ -2238,10 +2227,15 @@ export default function GameTable({
       setIsBlindNil(false);
       setShowBlindNilModal(false);
 
+      // Convert hands from { playerId, hand }[] format to Card[][] format
+      const handsArray = Array.isArray(data.hands) 
+        ? data.hands.map((handData: any) => handData.hand || [])
+        : [];
+
       // Directly update the game state with the new hand data
       setGameState(prev => ({
         ...prev,
-        hands: data.hands,
+        hands: handsArray,
         dealerIndex: data.dealerIndex,
         bidding: {
           ...prev.bidding,
@@ -2821,6 +2815,7 @@ export default function GameTable({
 
   // Modified start game handler
   const handleStartGame = async () => {
+    setIsStarting(true);
     // Always call the parent's start game function - it will handle modal logic
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
@@ -2829,6 +2824,7 @@ export default function GameTable({
 
   // Handle starting game with bots (from bot warning modal)
   const handleStartWithBots = async () => {
+    setIsStarting(true);
     onCloseBotWarning?.();
     // Call socket API directly to start the game
     if (socket && gameState?.id) {
@@ -2838,12 +2834,14 @@ export default function GameTable({
 
   // Invite bots to all empty seats, then start game
   const handlePlayWithBots = async () => {
+    setIsStarting(true);
     const emptySeatIndexes = (gameState.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
     for (const seatIndex of emptySeatIndexes) {
       await handleInviteBot(seatIndex);
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     onCloseStartWarning?.();
-    // Call socket API directly to start the game
+    await new Promise(resolve => setTimeout(resolve, 2000));
     if (socket && gameState?.id) {
       socket.emit('start_game', { gameId: gameState.id });
     }
@@ -2867,6 +2865,7 @@ export default function GameTable({
   
   // New state for player profile features
   const [showPlayerStats, setShowPlayerStats] = useState(false);
+const [isStarting, setIsStarting] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [emojiReactions, setEmojiReactions] = useState<Record<string, { emoji: string; timestamp: number }>>({});
   const [emojiTravels, setEmojiTravels] = useState<Array<{
@@ -2941,39 +2940,6 @@ export default function GameTable({
     }
   }, [gameState.status]);
 
-  // Fallback: Show hand summary when game status is HAND_COMPLETED but no hand summary is shown
-  useEffect(() => {
-    if (false) { // DISABLED - if (true if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !showHandSummary if (true && !showHandSummary && !handSummaryData) {if (true && !showHandSummary && !handSummaryData) { !handSummaryData) {
-      console.log('[FALLBACK] Game status is HAND_COMPLETED but no hand summary shown, triggering fallback');
-      
-      // Calculate scores manually from game state
-      const team1Tricks = (gameState.players?.[0]?.tricks || 0) + (gameState.players?.[2]?.tricks || 0);
-      const team2Tricks = (gameState.players?.[1]?.tricks || 0) + (gameState.players?.[3]?.tricks || 0);
-      const team1Bid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
-      const team2Bid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-      
-      const team1Score = team1Tricks >= team1Bid ? team1Bid * 10 + (team1Tricks - team1Bid) : -team1Bid * 10;
-      const team2Score = team2Tricks >= team2Bid ? team2Bid * 10 + (team2Tricks - team2Bid) : -team2Bid * 10;
-      
-      const fallbackData = {
-        team1Score,
-        team2Score,
-        team1Bags: Math.max(0, team1Tricks - team1Bid),
-        team2Bags: Math.max(0, team2Tricks - team2Bid),
-        team1TotalScore: gameState.team1TotalScore || team1Score,
-        team2TotalScore: gameState.team2TotalScore || team2Score,
-        tricksPerPlayer: gameState.players?.map(p => p?.tricks || 0) || [0, 0, 0, 0]
-      };
-      
-      console.log('[FALLBACK] Calculated fallback data for HAND_COMPLETED:', fallbackData);
-      
-      // Store the hand summary data
-      setHandSummaryData(fallbackData);
-      
-      // Show hand summary immediately
-      setShowHandSummary(true);
-    }
-  }, [gameState.status, showHandSummary, handSummaryData, gameState.players, gameState.bidding, gameState.team1TotalScore, gameState.team2TotalScore]);
 
 
 
@@ -3350,8 +3316,8 @@ export default function GameTable({
 
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                {!isLeague && gameState.status === "WAITING" && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {!isLeague && gameState.status === "WAITING" && !isStarting && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[99999]"
@@ -3387,7 +3353,7 @@ export default function GameTable({
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       // Determine game type, including all gimmick games
-                      let gameType = (gameState as any).rules.gameType;
+                      let gameType = (gameState as any).rules.bidType || (gameState as any).rules.gameType;
                       const forcedBid = (gameState as any).forcedBid;
                       if (forcedBid === 'SUICIDE') {
                         gameType = 'SUICIDE';
@@ -3432,12 +3398,12 @@ export default function GameTable({
                       });
                       
                       // Calculate if player has Ace of Spades for Whiz games
-                      const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === '♠' || card.suit === 'S') && card.rank === 'A') : false;
+                      const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === 'SPADES') && card.rank === 'A') : false;
                       
                       // Calculate number of hearts for BID HEARTS games
                       const countHearts = (hand: Card[] | undefined): number => {
                         if (!hand || !Array.isArray(hand)) return 0;
-                        return Array.isArray(hand) ? hand.filter(card => card.suit === '♥' || (card as any).suit === 'H').length : 0;
+                        return Array.isArray(hand) ? hand.filter(card => { const s = (card.suit as unknown as string).toUpperCase(); return s === 'HEARTS' || s === 'H' || s === '♥'; }).length : 0;
                       };
                       const numHearts = currentPlayerHand ? countHearts(currentPlayerHand) : 0;
                       
@@ -3466,9 +3432,9 @@ export default function GameTable({
                                 numHearts={numHearts}
                                 playerId={currentPlayerId}
                                 currentPlayerTurn={gameState.currentPlayer}
-                                allowNil={gameState.rules.allowNil}
+                                allowNil={gameState.rules?.allowNil}
                                 hasAceSpades={hasAceSpades}
-                                forcedBid={(gameState as any).forcedBid}
+                                gimmickType={(gameState as any).rules?.gimmickType}
                                 partnerBid={partnerBid}
                                 partnerBidValue={partnerBid}
                                 currentPlayerHand={currentPlayerHand}
@@ -3479,12 +3445,15 @@ export default function GameTable({
                     })()}
                   </div>
                 ) : gameState.status === "BIDDING" && !dealingComplete ? (
-                  <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
-                       style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
-                    <div className="font-bold">Dealing Cards...</div>
-                    <div className="text-sm mt-1">Please wait while cards are being dealt</div>
-                  </div>
-                ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
+                  // Only show dealing banner if no bids yet
+                  ((gameState as any).bidding?.bids?.every((b: any) => b == null)) ? (
+                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
+                     <div className="font-bold">Dealing Cards...</div>
+                     <div className="text-sm mt-1">Please wait while cards are being dealt</div>
+                   </div>
+                  ) : null
+                 ) : gameState.status === "BIDDING" && gameState.currentPlayer !== currentPlayerId && !animatingTrick ? (
                   <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
                        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
                     {gameState.currentPlayer
@@ -3515,7 +3484,7 @@ export default function GameTable({
                   // Show forced bid messages on table during bidding
                   (() => {
                     const forcedBid = (gameState as any).forcedBid;
-                    const gameType = (gameState as any).gameType;
+                    const gameType = (gameState as any).rules.bidType || (gameState as any).gameType;
                     
                     if (forcedBid === "BIDHEARTS") {
                       return (
@@ -3713,12 +3682,14 @@ export default function GameTable({
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleStartWithBots}
-                  className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                >
-                  Start Game
-                </button>
+                {!isStarting && (
+                  <button
+                    onClick={handleStartWithBots}
+                    className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                  >
+                    Start Game
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -3736,7 +3707,7 @@ export default function GameTable({
           <div className="flex items-center gap-2 text-sm mb-2">
             {/* Game type brick */}
             {(() => {
-              const type = (gameState as any).rules?.gameType || 'REGULAR';
+              const type = (gameState as any).rules?.bidType || (gameState as any).rules?.gameType || 'REGULAR';
               let color = 'bg-green-600';
               let label = 'REGULAR';
               if (type === 'WHIZ') {
@@ -3745,13 +3716,15 @@ export default function GameTable({
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
                 label = 'MIRRORS';
-              } else if ((gameState as any).forcedBid && (gameState as any).forcedBid !== 'NONE') {
+              } else if (type === 'GIMMICK') {
                 color = 'bg-orange-500';
-                if ((gameState as any).forcedBid === 'BID4NIL') label = '4 OR NIL';
-                else if ((gameState as any).forcedBid === 'BID3') label = 'BID 3';
-                else if ((gameState as any).forcedBid === 'BIDHEARTS') label = 'BID ♥s';
-                else if ((gameState as any).forcedBid === 'SUICIDE') label = 'SUICIDE';
-                else if ((gameState as any).forcedBid === 'CRAZY ACES') label = 'CRAZY As';
+                const rawGt = (gameState as any).rules?.gimmickType || (gameState as any).forcedBid || '';
+                const gt = String(rawGt).toUpperCase().replace(/\s+/g, '_');
+                if (gt === 'BID_4_OR_NIL') label = '4 OR NIL';
+                else if (gt === 'BID_3') label = 'BID 3';
+                else if (gt === 'BID_HEARTS') label = 'BID ♡s';
+                else if (gt === 'SUICIDE') label = 'SUICIDE';
+                else if (gt === 'CRAZY_ACES') label = 'CRAZY As';
                 else label = 'GIMMICK';
               }
               return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;

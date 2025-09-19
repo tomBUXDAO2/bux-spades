@@ -2903,11 +2903,22 @@ const [isStarting, setIsStarting] = useState(false);
       };
       socket.on("trick_complete", handleTrickComplete);
       
-      // Listen for clear_trick event to immediately clear table cards
+      // Listen for clear_table_cards event to immediately clear table cards
       
+      const handleClearTableCards = () => {
+        console.log('Clear table cards event received');
+        setAnimatedTrickCards([]);
+        setLastNonEmptyTrick([]);
+        setTrickWinner(null);
+        setAnimatingTrick(false);
+        setTrickCompleted(false);
+      };
+
+      socket.on("clear_table_cards", handleClearTableCards);
       return () => {
         socket.off("trick_complete", handleTrickComplete);
         if (trickTimeoutRef.current) clearTimeout(trickTimeoutRef.current);
+        socket.off("clear_table_cards", handleClearTableCards);
       };
     }
   }, [socket]);
