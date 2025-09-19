@@ -229,7 +229,15 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
       console.log(`[LEAVE GAME] User ${userId} left socket room ${gameId}`);
     }
     const playerIdx = game.players.findIndex(p => p && p.id === userId);
-    if (playerIdx !== -1) {
+    // Remove from database if game exists in DB
+    if (game.dbGameId) {
+      try {
+        await prisma.gamePlayer.deleteMany({ where: { gameId: game.dbGameId, userId: userId } });
+        console.log(`[LEAVE GAME] Removed user ${userId} from database game ${game.dbGameId}`);
+      } catch (dbError) {
+        console.error(`[LEAVE GAME] Failed to remove user from database:`, dbError);
+      }
+    }    if (playerIdx !== -1) {
       game.players[playerIdx] = null;
     }
 
