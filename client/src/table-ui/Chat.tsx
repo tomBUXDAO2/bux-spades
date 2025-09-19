@@ -733,7 +733,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     <>
                       <span className="text-slate-400 text-xs mr-2 flex items-center h-8">unblock?</span>
                       <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Unblock"
-                        onClick={async () => { try { await api.post('/api/social/unblock', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error(e); } }}>
+                        onClick={async () => { try { await api.post('/api/social/unblock', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error("Failed to unblock user:", e); alert("Failed to unblock user. Please try again."); } }}>
                         <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                           <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                           <path d="M6 18L18 6" stroke="white" strokeWidth="2.5" />
@@ -744,11 +744,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     playerStatuses[player.id] === 'friend' ? (
                       <>
                         <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
-                          onClick={async () => { try { await api.post('/api/social/friends/remove', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error(e); } }}>
+                          onClick={async () => { try { await api.post('/api/social/friends/remove', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'not_friend' })); } catch (e) { console.error("Failed to unblock user:", e); alert("Failed to unblock user. Please try again."); } }}>
                           <img src="/remove-friend.svg" alt="Remove Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
                         </button>
                         <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
-                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error(e); } }}>
+                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error("Failed to unblock user:", e); alert("Failed to unblock user. Please try again."); } }}>
                           <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                             <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                             <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
@@ -758,11 +758,11 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     ) : (
                       <>
                         <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
-                          onClick={async () => { try { await api.post('/api/social/friends/add', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'friend' })); } catch (e) { console.error(e); } }}>
+                          onClick={async () => { try { await api.post('/api/social/friends/add', { friendId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'friend' })); } catch (e) { console.error("Failed to unblock user:", e); alert("Failed to unblock user. Please try again."); } }}>
                           <img src="/add-friend.svg" alt="Add Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
                         </button>
                         <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
-                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error(e); } }}>
+                          onClick={async () => { try { await api.post('/api/social/block', { blockId: player.id }); setPlayerStatuses(prev => ({ ...prev, [player.id]: 'blocked' })); } catch (e) { console.error("Failed to unblock user:", e); alert("Failed to unblock user. Please try again."); } }}>
                           <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                             <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                             <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />

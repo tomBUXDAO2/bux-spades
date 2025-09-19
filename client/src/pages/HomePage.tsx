@@ -127,6 +127,7 @@ const HomePage: React.FC = () => {
           }
         }
       } catch (error) {
+        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('[LEAGUE GAME CHECK] Error checking for league games:', error);
       }
     };
@@ -163,6 +164,7 @@ const HomePage: React.FC = () => {
           }
         }
       } catch (error) {
+        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('[PERIODIC LEAGUE CHECK] Error checking for league games:', error);
       }
     };
@@ -641,13 +643,17 @@ const HomePage: React.FC = () => {
     }
 
     if (endpoint) {
+      setConfirmModal({ open: false, player: null, action: '' });
+      try {
       try {
         await api.post(endpoint, body);
       // Refresh player list
         const response = await api.get('/api/users');
         const players = await response.json();
         setOnlinePlayers(players);
+        console.log(`Successfully ${confirmModal.action} for player:`, player.username);
       } catch (error) {
+        console.error(`Failed to ${confirmModal.action}:`, error);
         console.error('Error performing social action:', error);
         alert('Failed to perform action. Please try again.');
       }
