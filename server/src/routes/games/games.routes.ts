@@ -7,7 +7,6 @@ import { requireAuth } from '../../middleware/auth.middleware';
 import { createGame } from './create/gameCreation';
 import { enrichGameForClient } from './shared/gameUtils';
 import { joinGame } from './join/gameJoining';
-import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -256,19 +255,17 @@ router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Re
     // If no human players remain and not a league game, remove game
     const hasHumanPlayers = game.players.some(p => p && p.type === 'human');
     const isLeague = Boolean((game as any).league);
+
     if (!hasHumanPlayers && !isLeague) {
-      // Use proper cleanup for unrated games
-      if (!game.rated && game.dbGameId) {
-        console.log(`[LEAVE GAME] Cleaning up unrated game from database:`, game.dbGameId);
+      // Delete from database if game exists in DB
+      if (game.dbGameId) {
         try {
-          await deleteUnratedGameFromDatabase(game);
-        } catch (error) {
-          console.error(`[LEAVE GAME] Failed to clean up unrated game from database:`, error);
+          await prisma.gamePlayer.deleteMany({ where: { gameId: game.dbGameId } });
+          await prisma.game.delete({ where: { id: game.dbGameId } });
+          console.log(`[LEAVE GAME] Deleted game ${game.dbGameId} from database`);
+        } catch (dbError) {
+          console.error(`[LEAVE GAME] Failed to delete game from database:`, dbError);
         }
-      } else if (game.dbGameId) {
-        // For rated games, just remove from memory
-        console.log(`[LEAVE GAME] Removing rated game from memory:`, game.dbGameId);
-      }
       }
       const index = games.findIndex(g => g.id === gameId);
       if (index !== -1) games.splice(index, 1);
