@@ -121,9 +121,6 @@ export async function startNewHand(game: Game): Promise<void> {
   };
   
   // Clear play state
-
-  // Clear table cards from previous hand
-  io.to(game.id).emit('clear_table_cards');
   game.play = undefined;
 
   // Reset player trick counts for new hand
