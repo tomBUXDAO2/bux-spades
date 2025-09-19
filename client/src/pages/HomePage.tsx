@@ -76,6 +76,28 @@ const HomePage: React.FC = () => {
   const onlineIdsRef = useRef<string[]>([]);
 
   // Check if user is new (has 5M coins and 0 games played)
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     if (
       user &&
@@ -88,6 +110,28 @@ const HomePage: React.FC = () => {
   }, [user]);
 
   // Check for league games when homepage loads
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     if (!user || !isAuthenticated) return;
 
@@ -136,6 +180,28 @@ const HomePage: React.FC = () => {
   }, [user, navigate, isAuthenticated]);
 
   // Periodic check for league games (fallback for missed real-time events)
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     if (!user || !isAuthenticated) return;
     
@@ -182,6 +248,28 @@ const HomePage: React.FC = () => {
   }, [user, navigate, isAuthenticated]);
 
   // Socket event handlers
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     if (!socket || !isAuthenticated) {
       console.log('Socket not ready or not authenticated');
@@ -295,6 +383,28 @@ const HomePage: React.FC = () => {
     };
   }, [socket, isAuthenticated, user, navigate]);
 
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -591,6 +701,28 @@ const HomePage: React.FC = () => {
   };
 
   // Fetch real users for the lobby
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     api.get('/api/users')
       .then(res => res.json())
@@ -608,6 +740,28 @@ const HomePage: React.FC = () => {
   }, [user?.id]);
 
   // Fetch games as a fallback for loading spinner
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     api.get('/api/games')
       .then(res => res.json())
@@ -619,6 +773,28 @@ const HomePage: React.FC = () => {
   }, []);
 
   // Timeout fallback for loading spinner
+  // Mobile app periodic refresh for games list
+  useEffect(() => {
+    if (!user || !isAuthenticated) return;
+    
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          setGames(data.games || []);
+          console.log('[MOBILE] Periodic games refresh completed');
+        }
+      } catch (error) {
+        console.error('[MOBILE] Periodic games refresh failed:', error);
+      }
+    };
+    
+    // Refresh every 10 seconds on mobile
+    const interval = setInterval(refreshGames, 10000);
+    
+    return () => clearInterval(interval);
+  }, [user, isAuthenticated]);
   useEffect(() => {
     const timeout = setTimeout(() => setIsLoading(false), 2000);
     return () => clearTimeout(timeout);
