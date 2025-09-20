@@ -48,16 +48,18 @@ export default function HandSummaryModal({
     return null;
   }
 
-  // Timer effect for auto-advancing to next hand
+  // Timer effect
   useEffect(() => {
-    if (!isOpen || gameIsOver) {
-      setTimeRemaining(0);
+    if (!isOpen) {
+      setTimeRemaining(12);
       return;
     }
-    
+
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
+          console.log('[HandSummaryModal] Timer expired, auto-continuing');
+          onNextHand();
           return 0;
         }
         return prev - 1;
@@ -65,52 +67,36 @@ export default function HandSummaryModal({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, gameIsOver]);
+  }, [isOpen, onNextHand]);
 
-  // Effect to handle timer completion
-  useEffect(() => {
-    if (timeRemaining === 0 && !gameIsOver && isOpen) {
-      onNextHand();
-      onClose();
-    }
-  }, [timeRemaining, onNextHand, onClose, gameIsOver, isOpen]);
-
-  // Reset timer when modal opens
-  useEffect(() => {
-    if (isOpen && !gameIsOver) {
-      setTimeRemaining(12);
-    }
-  }, [isOpen, gameIsOver]);
-
-  // Get player names
+  // Get player name helper
   const getPlayerName = (index: number) => {
-    const player = gameState.players?.[index];
-    if (!player) return `Player ${index + 1}`;
-    return player.username || (player as any).name || `Player ${index + 1}`;
+    const player = gameState.players[index];
+    if (!player) return 'Empty';
+    return player.username || 'Unknown';
   };
 
-  // Get player avatar
+  // Get player avatar helper
   const getPlayerAvatar = (index: number) => {
-    const player = gameState.players?.[index];
-    if (!player) return '/default-pfp.jpg';
-    return player.avatar || (player as any).image || '/default-pfp.jpg';
+    const player = gameState.players[index];
+    if (!player || !('avatar' in player)) return '/default-pfp.jpg';
+    return player.avatar || '/default-pfp.jpg';
   };
 
-  // Get team data from backend scores - no manual calculations
+  // Calculate team data
+  const tricksPerPlayer = handSummaryData.tricksPerPlayer || [0, 0, 0, 0];
   const redTeamBid = (gameState.bidding?.bids?.[0] || 0) + (gameState.bidding?.bids?.[2] || 0);
   const blueTeamBid = (gameState.bidding?.bids?.[1] || 0) + (gameState.bidding?.bids?.[3] || 0);
-  
-  const tricksPerPlayer = handSummaryData.tricksPerPlayer;
   const redTeamTricks = tricksPerPlayer[0] + tricksPerPlayer[2];
   const blueTeamTricks = tricksPerPlayer[1] + tricksPerPlayer[3];
+  const redTeamHandTotal = redTeamTricks - redTeamBid;
+  const blueTeamHandTotal = blueTeamTricks - blueTeamBid;
 
-  // Use backend scores directly - no manual calculations
-  const redTeamHandTotal = handSummaryData.team1Score;
-  const blueTeamHandTotal = handSummaryData.team2Score;
+  if (!isOpen) return null;
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={() => {}}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -124,7 +110,7 @@ export default function HandSummaryModal({
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-2 text-center">
+          <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -134,103 +120,131 @@ export default function HandSummaryModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-lg bg-gray-800 p-4 text-left align-middle shadow-xl transition-all border border-white/20">
-                <Dialog.Title
-                  as="h3"
-                  className="text-lg font-bold leading-6 text-white text-center mb-4"
-                >
-                  Hand Summary
-                </Dialog.Title>
-                
+              <Dialog.Panel className="w-full max-w-md sm:max-w-lg backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 sm:p-4 shadow-xl">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <h2 className="text-lg font-bold text-white text-center">Hand Summary</h2>
+                </div>
+
                 {gameState.gameMode === 'SOLO' ? (
-                  // Solo mode - use backend player scores
+                  // Solo mode - individual player scores
                   <div className="space-y-3">
-                    {[0, 1, 2, 3].map((playerIndex) => {
-                      const playerName = getPlayerName(playerIndex);
-                      const playerAvatar = getPlayerAvatar(playerIndex);
-                      const playerBid = gameState.bidding?.bids?.[playerIndex] || 0;
-                      const playerTricks = tricksPerPlayer[playerIndex];
-                      // Use backend player scores if available, otherwise show 0
-                      const handTotal = handSummaryData.playerScores?.[playerIndex] || 0;
+                    {gameState.players.map((player, index) => {
+                      if (!player) return null;
+                      const bid = gameState.bidding?.bids?.[index] || 0;
+                      const tricks = tricksPerPlayer[index] || 0;
+                      const handTotal = tricks - bid;
+                      const totalScore = handSummaryData.playerScores?.[index] || 0;
                       
                       return (
-                        <div key={playerIndex} className="flex items-center justify-between bg-gray-700 rounded-lg p-3">
-                          <div className="flex items-center gap-2">
-                            <img 
-                              src={playerAvatar} 
-                              alt={playerName} 
-                              className="w-6 h-6 rounded-full"
-                            />
-                            <span className="text-white text-sm font-medium">{playerName}</span>
+                        <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-3 border border-white/5">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={getPlayerAvatar(index)} 
+                                alt={getPlayerName(index)} 
+                                className="w-6 h-6 rounded-full object-cover" 
+                              />
+                              <span className="text-white font-semibold text-sm">{getPlayerName(index)}</span>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white text-xs">Bid: {bid} | Made: {tricks}</div>
+                              <div className={`text-sm font-bold ${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {handTotal}
+                              </div>
+                            </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-white text-xs">Bid: {playerBid} | Made: {playerTricks}</div>
-                            <div className={`text-sm font-bold ${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {handTotal}
-                            </div>
+                            <div className="text-gray-400 text-xs">Total Score</div>
+                            <div className="text-white font-bold">{totalScore}</div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  // Partners mode - use backend team scores
-                  <div className="space-y-4">
+                  // Partners mode - side-by-side layout for mobile
+                  <div className="grid grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="bg-red-900/30 border border-red-500 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                          <span className="text-white font-semibold text-sm">Red Team</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white text-xs">Bid: {redTeamBid} | Made: {redTeamTricks}</div>
-                          <div className={`text-sm font-bold ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {redTeamHandTotal}
-                          </div>
-                        </div>
+                    <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                      <div className="flex items-center mb-2">
+                        <div className="bg-red-500 rounded-full w-2 h-2 mr-2"></div>
+                        <h3 className="text-sm font-semibold text-white">Red Team</h3>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
-                        <div>{getPlayerName(0)}: {gameState.bidding?.bids?.[0] || 0} bid, {tricksPerPlayer[0]} made</div>
-                        <div>{getPlayerName(2)}: {gameState.bidding?.bids?.[2] || 0} bid, {tricksPerPlayer[2]} made</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Bid: {redTeamBid}</span>
+                          <span className="text-gray-400">Made: {redTeamTricks}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Hand Total</span>
+                          <span className={`font-medium ${redTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {redTeamHandTotal}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Total Score</span>
+                          <span className="font-medium text-white">{team1TotalScore}</span>
+                        </div>
+                        <div className="space-y-1 mt-2">
+                          {[0, 2].map((idx) => {
+                            const player = gameState.players[idx];
+                            if (!player) return null;
+                            return (
+                              <div key={`team1-${idx}`} className="flex items-center text-xs text-white/90">
+                                <div className="bg-red-500 rounded-full w-1.5 h-1.5 mr-2"></div>
+                                <img src={getPlayerAvatar(idx)} alt={getPlayerName(idx)} className="w-4 h-4 rounded-full mr-2 object-cover" />
+                                <span className="truncate">{getPlayerName(idx)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
                     {/* Blue Team */}
-                    <div className="bg-blue-900/30 border border-blue-500 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                          <span className="text-white font-semibold text-sm">Blue Team</span>
+                    <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                      <div className="flex items-center mb-2">
+                        <div className="bg-blue-500 rounded-full w-2 h-2 mr-2"></div>
+                        <h3 className="text-sm font-semibold text-white">Blue Team</h3>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Bid: {blueTeamBid}</span>
+                          <span className="text-gray-400">Made: {blueTeamTricks}</span>
                         </div>
-                        <div className="text-right">
-                          <div className="text-white text-xs">Bid: {blueTeamBid} | Made: {blueTeamTricks}</div>
-                          <div className={`text-sm font-bold ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Hand Total</span>
+                          <span className={`font-medium ${blueTeamHandTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {blueTeamHandTotal}
-                          </div>
+                          </span>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
-                        <div>{getPlayerName(1)}: {gameState.bidding?.bids?.[1] || 0} bid, {tricksPerPlayer[1]} made</div>
-                        <div>{getPlayerName(3)}: {gameState.bidding?.bids?.[3] || 0} bid, {tricksPerPlayer[3]} made</div>
-                      </div>
-                    </div>
-
-                    {/* Total Scores */}
-                    <div className="flex justify-between items-center bg-gray-700 rounded-lg p-3">
-                      <span className="text-white font-semibold">Total Scores:</span>
-                      <div className="text-right">
-                        <div className="text-red-400 text-sm">Red: {team1TotalScore}</div>
-                        <div className="text-blue-400 text-sm">Blue: {team2TotalScore}</div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Total Score</span>
+                          <span className="font-medium text-white">{team2TotalScore}</span>
+                        </div>
+                        <div className="space-y-1 mt-2">
+                          {[1, 3].map((idx) => {
+                            const player = gameState.players[idx];
+                            if (!player) return null;
+                            return (
+                              <div key={`team2-${idx}`} className="flex items-center text-xs text-white/90">
+                                <div className="bg-blue-500 rounded-full w-1.5 h-1.5 mr-2"></div>
+                                <img src={getPlayerAvatar(idx)} alt={getPlayerName(idx)} className="w-4 h-4 rounded-full mr-2 object-cover" />
+                                <span className="truncate">{getPlayerName(idx)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
 
+                {/* Continue Button - Always visible and accessible */}
                 <div className="mt-4 flex justify-center">
                   <button
                     type="button"
-                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
+                    className="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
                     onClick={onNextHand}
                   >
                     Next Hand ({timeRemaining}s)

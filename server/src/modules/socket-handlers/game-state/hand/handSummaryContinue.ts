@@ -44,7 +44,7 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
       const humanPlayers = game.players.filter(p => p && p.type === 'human');
       console.log('[HAND SUMMARY TIMER] Starting 12-second timer for', humanPlayers.length, 'human players');
       
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         console.log('[HAND SUMMARY TIMER] 12-second timer expired, checking if all players ready');
         const currentResponses = handSummaryResponses.get(gameId);
         if (currentResponses) {
@@ -62,7 +62,7 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
             console.log('[HAND SUMMARY TIMER] All players ready after timer, starting new hand');
             handSummaryResponses.delete(gameId);
             handSummaryTimers.delete(gameId);
-            startNewHand(game);
+            await startNewHand(game);
           }
         }
       }, 12000); // 12 seconds
@@ -96,7 +96,7 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
       handSummaryResponses.delete(gameId);
       
       // Start the new hand
-      await startNewHand(game);
+      await await startNewHand(game);
     } else {
       console.log('[HAND SUMMARY] Not all players responded yet, waiting...');
       // Emit confirmation to this player that their continue was received
