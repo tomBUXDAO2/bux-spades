@@ -594,7 +594,8 @@ export default function TablePage() {
     if (!gameId || !user) return;
     try {
       await api.post(`/api/games/${gameId}/leave`, { id: user.id });
-      window.location.href = '/';
+      localStorage.removeItem('activeGameId');
+      navigate('/');
     } catch (error) {
       console.error('Error leaving game:', error);
     }
