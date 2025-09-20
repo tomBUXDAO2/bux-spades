@@ -844,6 +844,7 @@ export default function GameTable({
     // Close modal locally for this player
     setShowHandSummary(false);
     setHandSummaryData(null);
+      setFinalScores(null);
     
     // Emit hand summary continue event to server
     if (socket && gameState.id) {
@@ -895,6 +896,7 @@ export default function GameTable({
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
+  const [finalScores, setFinalScores] = useState<{ team1Score: number; team2Score: number } | null>(null);
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
@@ -963,7 +965,7 @@ export default function GameTable({
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
-        biddingReady &&
+        
         gameState.rules?.allowBlindNil &&
         !showBlindNilModal &&
         !isBlindNil &&
@@ -990,7 +992,7 @@ export default function GameTable({
     const shouldShowBlindNilFirst = gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
-        biddingReady &&
+        
         gameState.rules?.allowBlindNil &&
         !showBlindNilModal &&
         !isBlindNil &&
@@ -1007,7 +1009,7 @@ export default function GameTable({
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
         dealingComplete && 
-        biddingReady &&
+        
         !cardsRevealed &&
         !showBlindNilModal &&
         !isBlindNil) {
@@ -1015,7 +1017,7 @@ export default function GameTable({
       // For regular games, reveal cards immediately when it's your turn
       setCardsRevealed(true);
     }
-  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, cardsRevealed, showBlindNilModal, isBlindNil, blindNilDismissed, gameState.rules?.allowBlindNil, myPlayerIndex]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, cardsRevealed, showBlindNilModal, isBlindNil, blindNilDismissed, gameState.rules?.allowBlindNil, myPlayerIndex]);
   
   // Track all game state changes that would affect the UI
   useEffect(() => {
@@ -1849,7 +1851,7 @@ export default function GameTable({
       playCardSound();
       
       if (idx + 1 < sortedHand.length) {
-        dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 100);
+        dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 50);
       } else {
         // Dealing animation complete - allow bidding immediately
         setDealingComplete(true);
@@ -1903,7 +1905,7 @@ export default function GameTable({
     if (
       gameState.status === 'BIDDING' &&
       dealingComplete &&
-      biddingReady &&
+      
       currentPlayer &&
       isBot(currentPlayer) &&
       gameState.currentPlayer === currentPlayer.id &&
@@ -1917,7 +1919,7 @@ export default function GameTable({
         bids: (gameState as any).bidding?.bids
       });
       // Add a random delay between 1 and 1.5 seconds
-      const delay = 1000 + Math.random() * 500;
+      const delay = 200 + Math.random() * 300;
       const botBidTimeout = setTimeout(() => {
         console.log('[DEBUG] Bot is making a bid after delay:', { delay, botId: currentPlayer.id });
         // Choose a simple bot bid (random or always 4 for now)
@@ -2219,7 +2221,8 @@ export default function GameTable({
       setBiddingReady(false); // Bidding not ready yet
       setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
-      setHandSummaryData(null); // Clear hand summary data
+      setHandSummaryData(null);
+      setFinalScores(null); // Clear hand summary data
       
       // Reset blind nil state for new hand
       setCardsRevealed(false);
@@ -2346,6 +2349,9 @@ export default function GameTable({
 
     const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
       console.log('[GAME OVER] Socket event received:', data);
+      
+      // Store the final scores from the server
+      setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
       console.log('[GAME OVER] Current game status:', gameState.status);
       console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
@@ -2375,6 +2381,7 @@ export default function GameTable({
       
       setShowHandSummary(false);
       setHandSummaryData(null);
+      setFinalScores(null);
       
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
@@ -2408,6 +2415,7 @@ export default function GameTable({
       
       setShowHandSummary(false);
       setHandSummaryData(null);
+      setFinalScores(null);
       
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
@@ -2430,6 +2438,7 @@ export default function GameTable({
       setShowLoser(false);
       setShowHandSummary(false);
       setHandSummaryData(null);
+      setFinalScores(null);
     }
   }, [gameState.status, gameState.winningTeam, showWinner, showLoser]);
 
@@ -2948,6 +2957,7 @@ const [isStarting, setIsStarting] = useState(false);
     if (gameState.status === 'BIDDING') {
       setShowHandSummary(false);
       setHandSummaryData(null);
+      setFinalScores(null);
     }
   }, [gameState.status]);
 
@@ -3360,7 +3370,7 @@ const [isStarting, setIsStarting] = useState(false);
                     isSpectator: isSpectator,
                   });
                   return null;
-                })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady && myPlayerIndex !== -1 ? (
+                })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete &&  myPlayerIndex !== -1 ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       // Determine game type, including all gimmick games
@@ -3435,7 +3445,7 @@ const [isStarting, setIsStarting] = useState(false);
                             />
                             
                             {/* Bidding Interface */}
-                            {!showBlindNilModal && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && biddingReady)) && (
+                            {!showBlindNilModal && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete)) && (
                               <BiddingInterface
                                 onBid={handleBid}
                                 gameType={gameType}
@@ -3828,9 +3838,9 @@ const [isStarting, setIsStarting] = useState(false);
         <WinnerModal
           isOpen={showWinner}
           onClose={() => setShowWinner(false)}
-          team1Score={gameState.team1TotalScore || 0}
-          team2Score={gameState.team2TotalScore || 0}
-          winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
+          team1Score={finalScores?.team1Score ?? gameState.team1TotalScore ?? 0}
+          team2Score={finalScores?.team2Score ?? gameState.team2TotalScore ?? 0}
+          winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
           onPlayAgain={handlePlayAgain}
           userTeam={getUserTeam()}
           isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
@@ -3852,9 +3862,9 @@ const [isStarting, setIsStarting] = useState(false);
         <WinnerModal
           isOpen={showLoser}
           onClose={() => setShowLoser(false)}
-          team1Score={gameState.team1TotalScore || 0}
-          team2Score={gameState.team2TotalScore || 0}
-          winningTeam={(gameState.team1TotalScore || 0) > (gameState.team2TotalScore || 0) ? 1 : 2}
+          team1Score={finalScores?.team1Score ?? gameState.team1TotalScore ?? 0}
+          team2Score={finalScores?.team2Score ?? gameState.team2TotalScore ?? 0}
+          winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
           onPlayAgain={handlePlayAgain}
           userTeam={getUserTeam()}
           isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}

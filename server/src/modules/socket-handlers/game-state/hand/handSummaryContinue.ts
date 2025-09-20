@@ -7,6 +7,7 @@ import { games } from '../../../../gamesStore';
 
 // Hand summary continue tracking
 const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
+const handSummaryTimers = new Map<string, NodeJS.Timeout>(); // gameId -> timer
 
 /**
  * Handles hand summary continue event from client
@@ -38,6 +39,35 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
     // Initialize response tracking for this game if not exists
     if (!handSummaryResponses.has(gameId)) {
       handSummaryResponses.set(gameId, new Set());
+      
+      // Start a 12-second timer for all human players to be ready
+      const humanPlayers = game.players.filter(p => p && p.type === 'human');
+      console.log('[HAND SUMMARY TIMER] Starting 12-second timer for', humanPlayers.length, 'human players');
+      
+      const timer = setTimeout(() => {
+        console.log('[HAND SUMMARY TIMER] 12-second timer expired, checking if all players ready');
+        const currentResponses = handSummaryResponses.get(gameId);
+        if (currentResponses) {
+          // Add any remaining human players who haven't responded
+          humanPlayers.forEach(player => {
+            if (!currentResponses.has(player.id)) {
+              console.log('[HAND SUMMARY TIMER] Auto-adding player', player.id, 'due to timer expiration');
+              currentResponses.add(player.id);
+            }
+          });
+          
+          // Check if all human players are now ready
+          const allReady = humanPlayers.every(player => currentResponses.has(player.id));
+          if (allReady) {
+            console.log('[HAND SUMMARY TIMER] All players ready after timer, starting new hand');
+            handSummaryResponses.delete(gameId);
+            handSummaryTimers.delete(gameId);
+            startNewHand(game);
+          }
+        }
+      }, 12000); // 12 seconds
+      
+      handSummaryTimers.set(gameId, timer);
     }
 
     // Add this player to the responses
@@ -54,6 +84,13 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
 
     if (allHumanPlayersResponded) {
       console.log('[HAND SUMMARY] All players responded, starting new hand');
+      
+      // Clear the timer if it exists
+      const timer = handSummaryTimers.get(gameId);
+      if (timer) {
+        clearTimeout(timer);
+        handSummaryTimers.delete(gameId);
+      }
       
       // Clear the responses for this game
       handSummaryResponses.delete(gameId);
