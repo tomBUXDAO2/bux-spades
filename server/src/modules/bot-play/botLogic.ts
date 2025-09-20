@@ -2,7 +2,7 @@ import type { Game, Card, Suit } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { handleTrickCompletion } from '../../lib/hand-completion/trick/trickCompletion';
-import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBid4OrNil, getBid3, getBidHearts } from '../bot-bidding/index';
+import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBid4OrNil, getBid3, getBidHearts, getCrazyAces } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
 import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
 import { getAssassinPlay, getAssassinPlayableCards } from './assassin';
@@ -55,7 +55,10 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
         const result = getBidHearts({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
-      } else {
+      } else if (bidType === "GIMMICK" && (game as any).rules?.gimmickType === "CRAZY_ACES") {
+        const result = getCrazyAces({ hand, seatIndex, existingBids });
+        bid = result.bid;
+        reason = result.reason;      } else {
         const result = getRegularBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
