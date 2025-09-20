@@ -280,8 +280,22 @@ const HomePage: React.FC = () => {
       console.log('Games updated:', updatedGames);
       setGames(updatedGames);
       setIsLoading(false);
+      
+      // Also refetch user data to update activeGameId for watch buttons
+      api.get('/api/users')
+        .then(res => res.json())
+        .then((users) => {
+          const filtered = Array.isArray(users)
+            ? users.filter((u: any) => !(
+                (u && typeof u === 'object' && 'type' in u && u.type === 'bot') ||
+                (typeof u?.username === 'string' && u.username.startsWith('Bot ')) ||
+                (typeof u?.id === 'string' && u.id.startsWith('bot-'))
+              ))
+            : [];
+          setOnlinePlayers(filtered);
+        })
+        .catch(err => console.error('Error fetching users:', err));
     };
-
     const handleAllGamesUpdated = (allGames: GameState[]) => {
       console.log('All games updated (including league games):', allGames);
       

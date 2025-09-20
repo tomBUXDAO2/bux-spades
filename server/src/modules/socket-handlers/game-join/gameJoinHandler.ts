@@ -59,16 +59,26 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
       return; // Exit early since user is already in game
     }
 
-    // Check if user is in another game
-    for (let i = 0; i < games.length; i++) {
-      const otherGame = games[i];
-      const otherGameId = otherGame.id;
-      if (otherGameId !== gameId && otherGame.players.some(p => p && p.id === socket.userId)) {
-        socket.emit('error', { message: 'You are already in another game' });
-        return;
+    // Check if user is in another game (using database)
+    const { prisma } = await import('../../../lib/prisma');
+    const existingGamePlayer = await prisma.gamePlayer.findFirst({
+      where: {
+        userId: socket.userId,
+        game: {
+          status: {
+            in: ["WAITING", "BIDDING", "PLAYING"]
+          }
+        }
+      },
+      include: {
+        game: true
       }
+    });
+    
+    if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
+      socket.emit('error', { message: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
+      return;
     }
-
     // For socket joins, we don't have a specific seat request, so find empty seat
     const emptySeatIndex = game.players.findIndex(p => p === null);
     if (emptySeatIndex === -1) {

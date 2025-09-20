@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { games } from '../../../gamesStore';
 import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
-
+import prisma from '../../../lib/prisma';
 export async function joinGame(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const gameId = req.params.id;
@@ -9,12 +9,25 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
     const { username, avatar, seat } = req.body; // Get from request body
 
     const game = games.find(g => g.id === gameId);
-    // Check if user is already in another game
-    const existingGame = games.find(g => g.players.some(p => p && p.id === userId));
-    if (existingGame && existingGame.id !== gameId) {
-      res.status(400).json({ error: `You are already in game ${existingGame.id}. Please leave that game first.` });
-    }
-    if (!game) {
+    // Check if user is already in another game (using database)
+    const existingGamePlayer = await prisma.gamePlayer.findFirst({
+      where: {
+        userId: userId,
+        game: {
+          status: {
+            in: ["WAITING", "BIDDING", "PLAYING"]
+          }
+        }
+      },
+      include: {
+        game: true
+      }
+    });
+    
+    if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
+      res.status(400).json({ error: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
+      return;
+    }    if (!game) {
       res.status(404).json({ error: 'Game not found' });
       return;
     }
@@ -26,13 +39,6 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
       return;
     }
 
-    // Check if user is in another game
-    for (const [otherGameId, otherGame] of games.entries()) {
-      if (otherGameId !== parseInt(gameId) && otherGame.players.some(p => p && p.id === userId)) {
-        res.status(400).json({ error: 'You are already in another game' });
-        return;
-      }
-    }
 
     // Use specific seat if provided, otherwise find empty seat
     let targetSeatIndex = seat;
