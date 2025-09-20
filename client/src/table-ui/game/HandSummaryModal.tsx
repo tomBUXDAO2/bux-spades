@@ -25,7 +25,7 @@ interface HandSummaryModalProps {
 
 export default function HandSummaryModal({
   isOpen,
-  onClose,
+  
   gameState,
   onNextHand,
   handSummaryData
