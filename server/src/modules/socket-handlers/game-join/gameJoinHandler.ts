@@ -87,7 +87,6 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
     }
 
     // Add player to game - fetch user data from database
-    const { prisma } = await import('../../../lib/prisma');
     const userData = await prisma.user.findUnique({
       where: { id: socket.userId },
       select: { username: true, avatar: true }
