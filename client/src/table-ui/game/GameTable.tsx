@@ -844,7 +844,7 @@ export default function GameTable({
     // Close modal locally for this player
     setShowHandSummary(false);
     setHandSummaryData(null);
-      setFinalScores(null);
+      // setFinalScores(null); // Don't clear final scores here
     
     // Emit hand summary continue event to server
     if (socket && gameState.id) {
@@ -2222,7 +2222,7 @@ export default function GameTable({
       setDealtCardCount(13);
       setShowHandSummary(false); // Close hand summary modal
       setHandSummaryData(null);
-      setFinalScores(null); // Clear hand summary data
+      // setFinalScores(null); // Don't clear final scores here // Clear hand summary data
       
       // Reset blind nil state for new hand
       setCardsRevealed(false);
@@ -2381,7 +2381,7 @@ export default function GameTable({
       
       setShowHandSummary(false);
       setHandSummaryData(null);
-      setFinalScores(null);
+      // setFinalScores(null); // Don't clear final scores here
       
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
@@ -2415,7 +2415,7 @@ export default function GameTable({
       
       setShowHandSummary(false);
       setHandSummaryData(null);
-      setFinalScores(null);
+      // setFinalScores(null); // Don't clear final scores here
       
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
@@ -2438,7 +2438,7 @@ export default function GameTable({
       setShowLoser(false);
       setShowHandSummary(false);
       setHandSummaryData(null);
-      setFinalScores(null);
+      // setFinalScores(null); // Don't clear final scores here
     }
   }, [gameState.status, gameState.winningTeam, showWinner, showLoser]);
 
@@ -2957,7 +2957,7 @@ const [isStarting, setIsStarting] = useState(false);
     if (gameState.status === 'BIDDING') {
       setShowHandSummary(false);
       setHandSummaryData(null);
-      setFinalScores(null);
+      // setFinalScores(null); // Don't clear final scores here
     }
   }, [gameState.status]);
 
