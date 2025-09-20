@@ -52,8 +52,11 @@ export async function botMakeMove(game: Game, seatIndex: number): Promise<void> 
         const result = getRegularBid({ hand, seatIndex, existingBids });
         bid = result.bid;
         reason = result.reason;
-      }      const finalBid = (!allowNil && bid === 0) ? 1 : bid;
-      console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}${!allowNil && bid === 0 ? ' -> adjusted to 1 (nil disabled)' : ''}`);
+      }
+      
+      const allowNil = Boolean((game as any).rules?.allowNil);
+      const finalBid = (!allowNil && bid === 0) ? 1 : bid;
+      console.log(`[BOT BIDDING] Heuristic result for ${bot.username}: bid=${bid}, reason=${reason}${!allowNil && bid === 0 ? " -> adjusted to 1 (nil disabled)" : ""}`);
       
       // Call handleMakeBid to use proper turn management
       const { handleMakeBid } = await import('../socket-handlers/game-play/bidding/bidHandler');
