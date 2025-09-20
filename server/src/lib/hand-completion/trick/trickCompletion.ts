@@ -126,7 +126,9 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
     
     // CRITICAL: Set winner as next trick leader BEFORE any delays
     game.play.currentPlayerIndex = winnerIndex;
+    game.play.currentPlayer = game.players[winnerIndex]?.id || '';
     console.log('[TRICK COMPLETION] Set currentPlayerIndex to winner:', winnerIndex);
+    console.log('[TRICK COMPLETION] Set currentPlayer to:', game.play.currentPlayer);
     
     // Defer clearing the trick until after clients have started the animation
     setTimeout(async () => {
