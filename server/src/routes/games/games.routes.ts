@@ -6,6 +6,7 @@ import { io } from '../../index';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { createGame } from './create/gameCreation';
 import { enrichGameForClient } from './shared/gameUtils';
+import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 import { joinGame } from './join/gameJoining';
 
 interface AuthenticatedRequest extends Request {
@@ -257,18 +258,46 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
     const isLeague = Boolean((game as any).league);
 
     if (!hasHumanPlayers && !isLeague) {
-      // Delete from database if game exists in DB
-      if (game.dbGameId) {
+      console.log(`[LEAVE GAME] No human players remaining in game ${gameId}`);
+      
+      // If this is an unrated game, clean it up completely (including bots)
+      if (!game.rated) {
+        console.log(`[LEAVE GAME] Cleaning up unrated game ${gameId} from database`);
+        
         try {
-          await prisma.gamePlayer.deleteMany({ where: { gameId: game.dbGameId } });
-          await prisma.game.delete({ where: { id: game.dbGameId } });
-          console.log(`[LEAVE GAME] Deleted game ${game.dbGameId} from database`);
-        } catch (dbError) {
-          console.error(`[LEAVE GAME] Failed to delete game from database:`, dbError);
+          // Clean up database using the same function as game completion
+          if (game.dbGameId) {
+            await deleteUnratedGameFromDatabase(game);
+          }
+          
+          // Remove game from memory
+          const index = games.findIndex(g => g.id === gameId);
+          if (index !== -1) games.splice(index, 1);
+          
+          // Notify all players that the game is closed
+          io.to(gameId).emit('game_closed', { 
+            gameId, 
+            reason: 'no_human_players_remaining' 
+          });
+          
+          console.log(`[LEAVE GAME] Successfully cleaned up unrated game ${gameId}`);
+        } catch (error) {
+          console.error(`[LEAVE GAME] Failed to clean up unrated game ${gameId}:`, error);
         }
+      } else {
+        // For rated games, just close the game but don't delete from database
+        console.log(`[LEAVE GAME] Closing rated game ${gameId} (keeping in database)`);
+        
+        // Remove game from memory
+        const index = games.findIndex(g => g.id === gameId);
+        if (index !== -1) games.splice(index, 1);
+        
+        // Notify all players that the game is closed
+        io.to(gameId).emit('game_closed', { 
+          gameId, 
+          reason: 'no_human_players_remaining' 
+        });
       }
-      const index = games.findIndex(g => g.id === gameId);
-      if (index !== -1) games.splice(index, 1);
     }    // Update lobby for all clients
     const lobbyGames = games.filter(g => {
       if ((g as any).league && g.status === 'WAITING') {

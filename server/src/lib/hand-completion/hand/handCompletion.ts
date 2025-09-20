@@ -130,6 +130,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       minPoints: game.minPoints
     });
     const completionCheck = await checkGameCompletion(game.dbGameId, game.maxPoints, game.minPoints);
+    console.log("[HAND COMPLETION DEBUG] completionCheck result:", completionCheck);
     console.log('[HAND COMPLETION DEBUG] Game completion check result:', completionCheck);
     if (completionCheck.isGameOver) {
       console.log('[GAME COMPLETION] Game is over, winning team: - SKIPPING hand_completed', completionCheck.winningTeam);

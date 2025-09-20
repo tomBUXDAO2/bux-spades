@@ -110,7 +110,8 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
     
     // Check if this was the last trick BEFORE incrementing
     const currentTrickNumber = game.play.trickNumber || 0;
-    const isLastTrick = currentTrickNumber >= 12; // 0-based, so trick 12 is the 13th trick
+    console.log("[TRICK COMPLETION DEBUG] currentTrickNumber:", currentTrickNumber, "isLastTrick:", currentTrickNumber >= 12);
+    const isLastTrick = currentTrickNumber >= 12; // 0-based: trick 12 is the 13th and final trick
     
     // Increment trick number
     game.play.trickNumber = currentTrickNumber + 1;

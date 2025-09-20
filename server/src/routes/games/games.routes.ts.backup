@@ -24,7 +24,7 @@ router.post('/', requireAuth, createGame);
 // Join a game
 
 // Spectate a game
-router.post('/:id/spectate', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
   try {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
@@ -82,7 +82,7 @@ router.post('/:id/spectate', requireAuth, async (req: AuthenticatedRequest, res:
     console.error('Error spectating game:', error);
     res.status(500).json({ error: 'Failed to spectate game' });
   }
-});router.post('/:id/join', requireAuth, joinGame);
+});router.post('/:id/join', requireAuth as any, joinGame as any);
 
 // Get all games
 router.get('/', async (req: Request, res: Response) => {
@@ -211,7 +211,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Leave a game
-router.post('/:id/leave', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
   try {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
