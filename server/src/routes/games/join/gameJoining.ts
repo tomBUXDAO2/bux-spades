@@ -13,14 +13,14 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
     const existingGamePlayer = await prisma.gamePlayer.findFirst({
       where: {
         userId: userId,
-        game: {
+        Game: {
           status: {
             in: ["WAITING", "BIDDING", "PLAYING"]
           }
         }
       },
       include: {
-        game: true
+        Game: true
       }
     });
     

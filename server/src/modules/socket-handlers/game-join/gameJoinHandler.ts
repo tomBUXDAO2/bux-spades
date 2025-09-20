@@ -64,14 +64,14 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
     const existingGamePlayer = await prisma.gamePlayer.findFirst({
       where: {
         userId: socket.userId,
-        game: {
+        Game: {
           status: {
             in: ["WAITING", "BIDDING", "PLAYING"]
           }
         }
       },
       include: {
-        game: true
+        Game: true
       }
     });
     
