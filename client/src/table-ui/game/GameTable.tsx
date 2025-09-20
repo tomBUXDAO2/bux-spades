@@ -2011,8 +2011,8 @@ export default function GameTable({
        overlapOffset = Math.floor(-55 * scaleFactor);
      }
 
-    // --- FIX: Always show all cards in PLAYING phase or when dealing is complete ---
-    const showAllCards = gameState.status === 'PLAYING' || dealingComplete;
+    // --- FIX: Always show all cards in PLAYING or BIDDING phase or when dealing is complete ---
+    const showAllCards = gameState.status === 'PLAYING' || gameState.status === 'BIDDING' || dealingComplete;
     const visibleCount = showAllCards ? (sortedHand && Array.isArray(sortedHand) ? sortedHand.length : 0) : dealtCardCount;
 
     // console.log('[DEBUG] isMyTurn:', isMyTurn);
