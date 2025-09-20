@@ -92,7 +92,7 @@ router.get('/', async (req: Request, res: Response) => {
     const dbGames = await prisma.game.findMany({
       where: {
         status: {
-          in: ["WAITING", "PLAYING"]
+          in: ["WAITING", "BIDDING", "PLAYING"]
         }
       },
       include: {
@@ -105,38 +105,31 @@ router.get('/', async (req: Request, res: Response) => {
     
     // Convert database games to client format
     const clientGames = dbGames.map((dbGame: any) => {
-      const game = games.find(g => g.dbGameId === dbGame.id);
-      if (game) {
-        // Use in-memory game state if available (for active games)
-        return enrichGameForClient(game);
-      } else {
-        // Convert database game to client format
-        return {
-          id: dbGame.id,
-          status: dbGame.status,
-          players: dbGame.GamePlayer.map((p: any) => ({
-            id: p.userId,
-            username: p.username,
-            avatar: p.avatar,
-            type: p.isBot ? "bot" : "human",
-            position: p.position,
-            team: p.team,
-            bid: p.bid,
-            tricks: p.tricks,
-            points: p.points,
-            bags: p.bags
-          })),
-          settings: {
-            maxPoints: dbGame.maxPoints,
-            allowBlindNil: dbGame.allowBlindNil,
-            allowNil: dbGame.allowNil,
-            allowDoubleNil: false
-          },
-          rated: dbGame.rated,
-          league: dbGame.league,
-          createdAt: dbGame.createdAt
-        };
-      }
+      return {
+        id: dbGame.id,
+        status: dbGame.status,
+        players: dbGame.GamePlayer.map((p: any) => ({
+          id: p.userId,
+          username: p.username,
+          avatar: p.avatar,
+          type: p.isBot ? "bot" : "human",
+          position: p.position,
+          team: p.team,
+          bid: p.bid,
+          tricks: p.tricks,
+          points: p.points,
+          bags: p.bags
+        })),
+        settings: {
+          maxPoints: dbGame.maxPoints,
+          allowBlindNil: dbGame.allowBlindNil,
+          allowNil: dbGame.allowNil,
+          allowDoubleNil: false
+        },
+        rated: dbGame.rated,
+        league: dbGame.league,
+        createdAt: dbGame.createdAt
+      };
     });
     
     const allGames = clientGames;
