@@ -2,8 +2,9 @@ import { io } from '../../../index';
 import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 import type { Game } from '../../../types/game';
 import { botPlayCard } from '../../../modules/bot-play';
-import { determineTrickWinner } from '../utils/cardUtils';
+import { determineTrickWinner, getCardValue } from '../utils/cardUtils';
 import { handleHandCompletion } from '../hand/handCompletion';
+import prisma from '../../../lib/prisma';
 
 /**
  * TRICK COMPLETION FUNCTION - FIXES TRICK LEADER ASSIGNMENT
@@ -51,6 +52,52 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
           }
         } catch (error) {
           console.error('[TRICK COMPLETION] Failed to update PlayerTrickCount:', error);
+        }
+
+        // Log the trick and cards to database
+        try {
+          const roundRecord = await prisma.round.findFirst({
+            where: { gameId: game.dbGameId, roundNumber: game.currentRound }
+          });
+          if (roundRecord) {
+            // Get the lead player ID from the first card
+            const leadPlayerId = game.play.currentTrick[0].playedBy || game.players[game.play.currentTrick[0].playerIndex || 0]?.id;
+            
+            // Create Trick record
+            const trickRecord = await prisma.trick.create({
+              data: {
+                id: `trick_${roundRecord.id}_${game.play.trickNumber || 0 + 1}_${Date.now()}`,
+                roundId: roundRecord.id,
+                trickNumber: (game.play.trickNumber || 0) + 1,
+                leadPlayerId: leadPlayerId || '',
+                winningPlayerId: game.players[winnerIndex]!.id,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }
+            });
+            console.log(`[TRICK COMPLETION] Created Trick record: ${trickRecord.id}`);
+
+            // Create Card records for each card in the trick
+            for (let i = 0; i < game.play.currentTrick.length; i++) {
+              const card = game.play.currentTrick[i];
+              const playerId = card.playedBy || game.players[card.playerIndex || 0]?.id;
+              await prisma.card.create({
+                data: {
+                  id: `card_${trickRecord.id}_${i}_${Date.now()}`,
+                  trickId: trickRecord.id,
+                  playerId: playerId || '',
+                  suit: card.suit,
+                  value: getCardValue(card), // Convert rank to numeric value
+                  position: i,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }
+              });
+            }
+            console.log(`[TRICK COMPLETION] Created ${game.play.currentTrick.length} Card records for trick ${(game.play.trickNumber || 0) + 1}`);
+          }
+        } catch (error) {
+          console.error('[TRICK COMPLETION] Failed to log trick and cards to database:', error);
         }
       }
     }

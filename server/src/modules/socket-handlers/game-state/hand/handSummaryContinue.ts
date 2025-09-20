@@ -3,7 +3,6 @@ import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import prisma from '../../../../lib/prisma';
-import { trickLogger } from '../../../../lib/trick-logging';
 import { games } from '../../../../gamesStore';
 
 // Hand summary continue tracking
@@ -154,7 +153,6 @@ export async function startNewHand(game: Game): Promise<void> {
           }
         });
       }
-      trickLogger.setCurrentRoundId(game.id, roundRecord.id);
       // Initialize PlayerTrickCount entries for all players with 0 tricks
       const { updatePlayerTrickCount } = await import('../../../../lib/database-scoring/trick-count/trickCountManager');
       for (const player of game.players) {

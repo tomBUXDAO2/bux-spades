@@ -4,7 +4,6 @@ import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { addBotToSeat } from '../bot-invitation/botInvitation';
 import { assignDealer, dealCards } from '../dealing/cardDealing';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
-import { trickLogger } from '../../lib/trick-logging';
 import { games } from '../../gamesStore';
 import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 
@@ -220,7 +219,6 @@ async function resetGameState(game: Game): Promise<void> {
   }
 
   // Clear trick logger for this game
-  // trickLogger.clearGame(game.id); // TODO: Implement clearGame method
 
   console.log('[PLAY AGAIN] Game state reset complete:', game.id);
 }

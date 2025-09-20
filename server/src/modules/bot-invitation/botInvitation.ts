@@ -41,12 +41,23 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
   }
   
   // Ensure bot user exists in database
-  await ensureBotUserExists();
-  
-  // Create bot with unique display name but same user ID
+  // Create bot with unique display name and ID
   const botNumber = Math.floor(Math.random() * 1000);
   const botDisplayId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
+  // Create bot user in database with unique ID
+  await prisma.user.upsert({
+    where: { id: botDisplayId },
+    update: {},
+    create: {
+      id: botDisplayId,
+      username: `Bot ${botNumber}`,
+      avatar: '/bot-avatar.jpg',
+      discordId: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  });  
   game.players[seatIndex] = {
     id: botDisplayId, // Unique display ID for game logic
     username: `Bot ${botNumber}`,

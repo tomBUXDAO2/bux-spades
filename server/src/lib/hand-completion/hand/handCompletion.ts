@@ -1,6 +1,5 @@
 import { io } from '../../../index';
 import { calculateAndStoreGameScore, checkGameCompletion } from '../../databaseScoring';
-import { trickLogger } from "../../trick-logging";
 import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 import type { Game } from '../../../types/game';
 import { completeGame } from '../game/gameCompletion';

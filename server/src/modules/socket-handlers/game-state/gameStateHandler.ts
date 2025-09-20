@@ -2,7 +2,7 @@
 export { handleBiddingComplete } from './bidding/biddingCompletion';
 
 // Trick Completion
-export { handleTrickComplete } from './trick/trickCompletion';
+export { handleTrickCompletion as handleTrickComplete } from '../../../lib/hand-completion/trick/trickCompletion';
 
 // Hand Completion
 export { handleHandComplete } from './hand/handCompletion';

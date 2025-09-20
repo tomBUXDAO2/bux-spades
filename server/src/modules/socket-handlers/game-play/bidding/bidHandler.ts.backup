@@ -64,17 +64,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
     console.log('[MAKE BID DEBUG] Bid recorded:', { playerIndex, bid, totalBids: game.bidding.bids.filter(b => b !== null).length });
 
     // Emit an immediate update so UI reflects the bid
-    // Emit an immediate update so UI reflects the bid
     io.to(game.id).emit('game_update', enrichGameForClient(game));
-
-    // Update game status to BIDDING if still WAITING (before first bid)
-    if ((game.status as string) === 'WAITING') {
-      game.status = 'BIDDING';
-      await prisma.game.update({
-        where: { id: game.dbGameId },
-        data: { status: 'BIDDING' }
-      });
-    }
 
     // Persist the bid to database (RoundBid upsert) before proceeding
     try {
@@ -97,6 +87,15 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
 
         const dbPlayerId = getPlayerDbUserId(game.players[playerIndex]!);
 
+        // Update game status to BIDDING if still WAITING (before first bid)
+        if (game.status === 'WAITING') {
+          game.status = 'BIDDING';
+          await prisma.game.update({
+            where: { id: game.dbGameId },
+            data: { status: 'BIDDING' }
+          });
+        }
+        // Upsert RoundBid using correct player ID
         await prisma.roundBid.upsert({
           where: {
             roundId_playerId: {

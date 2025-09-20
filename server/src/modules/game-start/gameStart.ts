@@ -37,6 +37,19 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
 
     // Set initial status
     game.status = 'BIDDING';
+    
+    // Update game status in database
+    if (game.dbGameId) {
+      try {
+        await prisma.game.update({
+          where: { id: game.dbGameId },
+          data: { status: 'BIDDING' }
+        });
+        console.log('[GAME START] Updated game status to BIDDING in database:', game.dbGameId);
+      } catch (err) {
+        console.error('[GAME START] Failed to update game status in database:', err);
+      }
+    }
 
     // Dealer assignment and card dealing
     const dealerIndex = typeof game.dealerIndex === 'number' ? game.dealerIndex : 0;

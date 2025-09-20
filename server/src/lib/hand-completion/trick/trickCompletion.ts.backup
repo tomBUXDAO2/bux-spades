@@ -85,6 +85,9 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
     setTimeout(async () => {
       if (!game.play) return;
       game.play.currentTrick = []; // Clear the trick for proper game state
+
+      // Emit explicit table clear event for clients
+      io.to(game.id).emit('clear_table_cards');
       
       // Emit game update with new status
       io.to(game.id).emit('game_update', enrichGameForClient(game));
@@ -122,7 +125,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
           console.log('[HUMAN TURN] Human player', winnerPlayer.username, 'at index', winnerIndex, 'can now play');
         }
       }
-    }, 1000); // 1 second delay to match frontend animation
+    }, isLastTrick ? 2500 : 1000); // Longer delay for final trick to allow animation + clear table
     
   } catch (error) {
     console.error('[TRICK COMPLETION ERROR] Failed to complete trick:', error);

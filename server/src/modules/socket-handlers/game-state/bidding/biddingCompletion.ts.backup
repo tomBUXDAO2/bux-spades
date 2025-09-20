@@ -73,20 +73,6 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
     spadesBroken: false
   };
   
-  
-  // Update game status in database
-  if (game.dbGameId) {
-    try {
-      await prisma.game.update({
-        where: { id: game.dbGameId },
-        data: { status: 'PLAYING' }
-      });
-      console.log('[BIDDING COMPLETE] Updated game status to PLAYING in database:', game.dbGameId);
-    } catch (err) {
-      console.error('[BIDDING COMPLETE] Failed to update game status in database:', err);
-    }
-  }
-  
   console.log('[BIDDING COMPLETE] Moving to play phase, first player:', firstPlayer.username);
   
   // Emit events

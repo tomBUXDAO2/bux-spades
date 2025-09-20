@@ -12,7 +12,7 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
     // Check if user is already in another game
     const existingGame = games.find(g => g.players.some(p => p && p.id === userId));
     if (existingGame && existingGame.id !== gameId) {
-      return res.status(400).json({ error: `You are already in game ${existingGame.id}. Please leave that game first.` });
+      res.status(400).json({ error: `You are already in game ${existingGame.id}. Please leave that game first.` });
     }
     if (!game) {
       res.status(404).json({ error: 'Game not found' });
@@ -28,7 +28,7 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
 
     // Check if user is in another game
     for (const [otherGameId, otherGame] of games.entries()) {
-      if (otherGameId !== gameId && otherGame.players.some(p => p && p.id === userId)) {
+      if (otherGameId !== parseInt(gameId) && otherGame.players.some(p => p && p.id === userId)) {
         res.status(400).json({ error: 'You are already in another game' });
         return;
       }

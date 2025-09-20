@@ -17,7 +17,7 @@ export function determineTrickWinner(trick: any[]): number {
   
   const leadSuit = trick[0]?.suit;
   let winningCard = trick[0];
-  let winnerIndex = 0;
+  let winnerPlayerIndex = trick[0]?.playerIndex || 0;
   
   for (let i = 1; i < trick.length; i++) {
     const card = trick[i];
@@ -26,23 +26,23 @@ export function determineTrickWinner(trick: any[]): number {
     // Spades always win
     if (card.suit === 'SPADES' && winningCard.suit !== 'SPADES') {
       winningCard = card;
-      winnerIndex = i;
+      winnerPlayerIndex = card.playerIndex;
     }
     // If both are spades, higher rank wins
     else if (card.suit === 'SPADES' && winningCard.suit === 'SPADES') {
       if (getCardValue(card) > getCardValue(winningCard)) {
         winningCard = card;
-        winnerIndex = i;
+        winnerPlayerIndex = card.playerIndex;
       }
     }
     // If neither is spades, follow suit and higher rank wins
     else if (card.suit === leadSuit && winningCard.suit === leadSuit) {
       if (getCardValue(card) > getCardValue(winningCard)) {
         winningCard = card;
-        winnerIndex = i;
+        winnerPlayerIndex = card.playerIndex;
       }
     }
   }
   
-  return winnerIndex;
+  return winnerPlayerIndex;
 }

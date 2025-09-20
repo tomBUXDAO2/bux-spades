@@ -1,7 +1,7 @@
 import type { Game, Card, Suit } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
-import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
+import { handleTrickCompletion } from '../../lib/hand-completion/trick/trickCompletion';
 import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid } from '../bot-bidding/index';
 import { getNilPlay, NilPlayInput } from './nil';
 import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
