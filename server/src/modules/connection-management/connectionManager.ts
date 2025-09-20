@@ -55,6 +55,17 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     socket.on('play_card', (data) => handlePlayCard(socket, data));
     socket.on('start_game', (data) => handleStartGame(socket, data));
     socket.on('hand_summary_continue', (data) => handleHandSummaryContinue(socket, data));
+    
+    // Initialize hand summary tracking when hand_completed is received
+    socket.on('hand_completed', ({ gameId }) => {
+      console.log('[HAND COMPLETED] Initializing hand summary tracking for game:', gameId);
+      const game = games.find(g => g.id === gameId);
+      if (game) {
+        // Import the tracking functions and initialize
+        const { initializeHandSummaryTracking } = require('../socket-handlers/game-state/hand/handSummaryContinue');
+        initializeHandSummaryTracking(game);
+      }
+    });
     socket.on('play_again', (data) => handlePlayAgainSocket(socket, data));
 
     // Leave game event

@@ -145,7 +145,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       
       // Import and call startNewHand to begin the next round
       const { startNewHand } = await import('../../../modules/socket-handlers/game-state/hand/handSummaryContinue');
-      await startNewHand(game);
+      // await startNewHand(game); // Let hand summary continue tracking handle this
     }
     
   } catch (error) {

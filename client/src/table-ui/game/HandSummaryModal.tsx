@@ -33,8 +33,8 @@ export default function HandSummaryModal({
   const [timeRemaining, setTimeRemaining] = useState(12);
   
   // Use gameState as source of truth for scores
-  const team1TotalScore = gameState?.team1TotalScore || 0;
-  const team2TotalScore = gameState?.team2TotalScore || 0;
+  const team1TotalScore = handSummaryData?.team1TotalScore || gameState?.team1TotalScore || 0;
+  const team2TotalScore = handSummaryData?.team2TotalScore || gameState?.team2TotalScore || 0;
 
   // Check if game is over
   const gameIsOver = isGameOver(gameState);
