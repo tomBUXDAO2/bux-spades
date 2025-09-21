@@ -88,7 +88,7 @@ router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
 // Get all games
 router.get('/', async (req: Request, res: Response) => {
   try {
-    // Query games from database instead of in-memory store
+    // Query games from database
     const dbGames = await prisma.game.findMany({
       where: {
         status: {
@@ -103,11 +103,24 @@ router.get('/', async (req: Request, res: Response) => {
       }
     });
     
-    // Convert database games to client format
+    // Convert database games to client format, checking for in-memory games first
     const clientGames = dbGames.map((dbGame: any) => {
+      const game = games.find(g => g.dbGameId === dbGame.id);
+      if (game) {
+        // Use in-memory game state if available (for active games)
+        return enrichGameForClient(game);
+      } else {
+        // Convert database game to client format for waiting games
         return {
           id: dbGame.id,
           status: dbGame.status,
+          gameMode: dbGame.gameMode || 'PARTNERS',
+          maxPoints: dbGame.maxPoints,
+          minPoints: dbGame.minPoints || 0,
+          buyIn: dbGame.buyIn,
+          rated: dbGame.rated,
+          league: dbGame.league,
+          solo: dbGame.solo || false,
           players: dbGame.GamePlayer.map((p: any) => ({
             id: p.userId,
             username: p.username,
@@ -120,22 +133,20 @@ router.get('/', async (req: Request, res: Response) => {
             points: p.points,
             bags: p.bags
           })),
-          settings: {
+          rules: {
             maxPoints: dbGame.maxPoints,
             allowBlindNil: dbGame.allowBlindNil,
             allowNil: dbGame.allowNil,
-            allowDoubleNil: false
+            gimmickType: dbGame.gimmickType
           },
-          rated: dbGame.rated,
-          league: dbGame.league,
           createdAt: dbGame.createdAt
         };
+      }
     });
     
-    const allGames = clientGames;
     res.json({
       success: true,
-      games: allGames
+      games: clientGames
     });
   } catch (error) {
     console.error('Error fetching games:', error);
