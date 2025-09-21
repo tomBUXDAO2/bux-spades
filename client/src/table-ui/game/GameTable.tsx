@@ -897,6 +897,7 @@ export default function GameTable({
   const [showWinner, setShowWinner] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
   const [finalScores, setFinalScores] = useState<{ team1Score: number; team2Score: number } | null>(null);
+  const [finalPlayerScores, setFinalPlayerScores] = useState<number[] | null>(null);
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [dealingComplete, setDealingComplete] = useState(false);
   const [biddingReady, setBiddingReady] = useState(false);
@@ -2347,11 +2348,15 @@ export default function GameTable({
   useEffect(() => {
     if (!socket) return;
 
-    const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2 }) => {
+    const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
       console.log('[GAME OVER] Socket event received:', data);
       
       // Store the final scores from the server
-      setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
+      if (gameState.gameMode === 'SOLO' && data.playerScores) {
+        setFinalPlayerScores(data.playerScores);
+      } else {
+        setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
+      }
       console.log('[GAME OVER] Current game status:', gameState.status);
       console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
@@ -3820,7 +3825,7 @@ const [isStarting, setIsStarting] = useState(false);
             setShowWinner(false);
             setShowLoser(false);
           }}
-          playerScores={gameState.playerScores || [0, 0, 0, 0]}
+          playerScores={finalPlayerScores || gameState.playerScores || [0, 0, 0, 0]}
           winningPlayer={gameState.winningPlayer || 0}
           onPlayAgain={handlePlayAgain}
           userPlayerIndex={gameState.players.findIndex(p => p && p.id === user?.id)}

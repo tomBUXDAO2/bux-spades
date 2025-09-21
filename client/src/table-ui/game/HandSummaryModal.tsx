@@ -133,7 +133,7 @@ export default function HandSummaryModal({
                       const bid = gameState.bidding?.bids?.[index] || 0;
                       const tricks = tricksPerPlayer[index] || 0;
                       const handTotal = tricks - bid;
-                      const totalScore = handSummaryData.playerScores?.[index] || 0;
+                      const totalScore = handSummaryData.playerScores?.[index] || gameState.playerScores?.[index] || 0;
                       
                       return (
                         <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-3 border border-white/5">
