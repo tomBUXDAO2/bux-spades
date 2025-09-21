@@ -1250,8 +1250,8 @@ export default function GameTable({
     };
 
     console.log('Rendering player position', position, player);
-    // If not spectator and seat is empty and user is not in game, show join button
-    if (!isSpectator && !player && myPlayerIndex === -1) {
+    // If seat is empty and user is not in game, show join button (including spectators)
+    if (!player && myPlayerIndex === -1) {
       return (
         <div className={`absolute ${getPositionClasses(position)} z-10`}>
           <button
@@ -3591,7 +3591,7 @@ const [isStarting, setIsStarting] = useState(false);
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : undefined}
+                userAvatar={user.avatar}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
