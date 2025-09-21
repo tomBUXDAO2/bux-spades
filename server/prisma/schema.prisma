@@ -54,7 +54,7 @@ model Game {
   cancelled    Boolean       @default(false)
   finalScore   Int?
   winner       Int?
-  gameType     String?
+  gimmickType   String?
   specialRulesApplied String[]
   solo         Boolean       @default(false)
   // Game state persistence for crash recovery

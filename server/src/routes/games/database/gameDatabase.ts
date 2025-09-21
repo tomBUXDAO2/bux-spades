@@ -31,7 +31,7 @@ export async function logGameStart(game: Game): Promise<void> {
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,
         dealer: game.dealerIndex,
-        gameState: game as any,
+        gimmickType: game.rules?.gimmickType || null,        gameState: game as any,
         lastActionAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date()
