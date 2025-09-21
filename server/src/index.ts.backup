@@ -115,4 +115,4 @@ setupConnectionHandlers(io, authenticatedSockets, onlineUsers);
 const PORT = Number(process.env.PORT) || 3000;
 
 // Initialize server
-initializeServer(httpServer, PORT, io);
+initializeServer(httpServer, PORT);

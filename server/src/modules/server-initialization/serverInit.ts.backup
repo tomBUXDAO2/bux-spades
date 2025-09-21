@@ -1,9 +1,8 @@
 import { games } from '../../gamesStore';
 import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from '../../lib/gameStatePersistence';
 import { gameCleanupManager } from "../../lib/game-cleanup";
-import type { Server } from 'socket.io';
 
-export function initializeServer(httpServer: any, PORT: number, io?: Server) {
+export function initializeServer(httpServer: any, PORT: number) {
   httpServer.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server is running on port ${PORT}`);
     console.log('Server configuration:', {
@@ -23,12 +22,6 @@ export function initializeServer(httpServer: any, PORT: number, io?: Server) {
         transports: ['polling', 'websocket']
       }
     });
-    
-    // Set the io instance in the game cleanup manager
-    if (io) {
-      gameCleanupManager.setIo(io);
-      console.log('🔌 Socket.IO instance set in game cleanup manager');
-    }
     
     // Restore active games from database after server restart
     console.log('🔄 Server restarted - restoring active games from database...');
