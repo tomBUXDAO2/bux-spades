@@ -5,7 +5,7 @@ export function initializeDiscordBot() {
     try {
       const token = process.env.DISCORD_BOT_TOKEN.trim();
       if (token && token.length > 0) {
-        discordBot = require('../../discord-bot/discordBot').default;
+        discordBot = require('../../discord-bot/bot').default;
         console.log('Discord bot loaded successfully');
       } else {
         console.warn('Discord bot token is empty, skipping bot initialization');
