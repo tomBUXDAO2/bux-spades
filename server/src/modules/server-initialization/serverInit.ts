@@ -30,30 +30,14 @@ export function initializeServer(httpServer: any, PORT: number, io?: Server) {
       console.log('🔌 Socket.IO instance set in game cleanup manager');
     }
     
-    // Restore active games from database after server restart
-    console.log('🔄 Server restarted - restoring active games from database...');
-    try {
-      const restoredGames = await restoreAllActiveGames();
-      restoredGames.forEach(game => {
-        games.push(game);
-        console.log(`✅ Restored game ${game.id} - Round ${game.currentRound}, Trick ${game.currentTrick}`);
-      });
-      console.log(`✅ Restored ${restoredGames.length} active games`);
-    } catch (error) {
-      console.error('❌ Failed to restore active games:', error);
-    }
-    
-    // Start auto-saving game state
-    startGameStateAutoSave(games);
-    console.log('💾 Game state auto-save enabled (every 30 seconds)');
-    
-    // Start stuck game checker
+    // REMOVE legacy in-memory restore and auto-save
+    // Stuck game checker (DB-based)
     setInterval(() => {
       checkForStuckGames();
     }, 60000); // Check every minute
     console.log('🔍 Stuck game checker enabled (every minute)');
     
-    // Start comprehensive game cleanup system
+    // Start comprehensive game cleanup system (operates against current in-memory list and DB)
     gameCleanupManager.startCleanup(games);
     console.log('🧹 Game cleanup system enabled (every 30 seconds)');
   });
