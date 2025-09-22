@@ -3,7 +3,7 @@ import { io } from '../../../../index';
 import { botPlayCard } from '../../../bot-play/botLogic';
 import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
-import { startTurnTimeout, clearTurnTimeout } from '../../core/timeoutManager';
+import { startTurnTimeout, clearTurnTimeoutOnly } from '../../core/timeoutManager';
 
 /**
  * Handles playing timeout
@@ -16,8 +16,8 @@ export function handlePlayingTimeout(game: Game, playerIndex: number): void {
 
   console.log(`[TIMEOUT] Handling playing timeout for ${player.username}`);
   
-  // Clear the timeout for this player
-  clearTurnTimeout(game, player.id);
+  // Clear only timers but preserve consecutive count
+  clearTurnTimeoutOnly(game, player.id);
   
   const hand = game.hands[playerIndex];
   if (hand.length === 0) {

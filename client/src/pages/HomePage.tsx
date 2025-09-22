@@ -50,6 +50,24 @@ function isBot(p: any): p is Bot {
   return p && typeof p === 'object' && 'type' in p && p.type === 'bot';
 }
 
+const ClosurePopup = ({ message, onClose }: { message: string; onClose: () => void }) => {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000]">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20 text-center">
+        <h3 className="text-xl font-bold text-white mb-3">Table Closed</h3>
+        <p className="text-gray-200 mb-6">{message}</p>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const { socket, isAuthenticated } = useSocket();
@@ -74,6 +92,18 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: string }>({ open: false, player: null, action: '' });
   const onlineIdsRef = useRef<string[]>([]);
+  const [closureMessage, setClosureMessage] = useState('');
+
+  // Show table closure message if present (set by TablePage before redirect)
+  useEffect(() => {
+    try {
+      const msg = localStorage.getItem('tableClosureMessage');
+      if (msg) {
+        setClosureMessage(msg);
+        localStorage.removeItem('tableClosureMessage');
+      }
+    } catch {}
+  }, []);
 
   // Check if user is new (has 5M coins and 0 games played)
   // Mobile app periodic refresh for games list
@@ -863,6 +893,10 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-900">
       <Header onOpenMyStats={handleOpenMyStats} />
+      <ClosurePopup
+        message={closureMessage}
+        onClose={() => setClosureMessage('')}
+      />
       
       {/* Mobile portrait toggle */}
       <div className="md:hidden flex justify-center items-center py-2 px-4">

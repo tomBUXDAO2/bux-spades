@@ -3,7 +3,7 @@ import { io } from '../../../../index';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
-import { startTurnTimeout, clearTurnTimeout } from '../../core/timeoutManager';
+import { startTurnTimeout, clearTurnTimeoutOnly } from '../../core/timeoutManager';
 import { getRegularBid, getWhizBid, getMirrorBid, getSuicideBid, getBid4OrNil, getBid3, getBidHearts, getCrazyAces } from '../../../bot-bidding';
 
 /**
@@ -17,8 +17,8 @@ export async function handleBiddingTimeout(game: Game, playerIndex: number): Pro
 
   console.log(`[TIMEOUT] Handling bidding timeout for ${player.username}`);
   
-  // Clear the timeout for this player
-  clearTurnTimeout(game, player.id);
+  // Clear only timers but preserve consecutive count
+  clearTurnTimeoutOnly(game, player.id);
   
   // Compute a bid using the same logic as bots, respecting forced bid options
   const hand = game.hands[playerIndex] || [];

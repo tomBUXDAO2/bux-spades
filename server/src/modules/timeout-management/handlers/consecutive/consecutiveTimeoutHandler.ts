@@ -2,11 +2,13 @@ import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { TIMEOUT_CONFIG } from '../../config/timeoutConfig';
 import { clearTurnTimeout } from '../../core/timeoutManager';
+import { deleteUnratedGameFromDatabase } from '../../../../lib/hand-completion/game/gameCompletion';
+import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 
 /**
  * Handles consecutive timeouts
  */
-export function handleConsecutiveTimeouts(game: Game, playerIndex: number): void {
+export async function handleConsecutiveTimeouts(game: Game, playerIndex: number): Promise<void> {
   const player = game.players[playerIndex];
   if (!player) {
     return;
@@ -30,19 +32,22 @@ export function handleConsecutiveTimeouts(game: Game, playerIndex: number): void
     
     // Remove player from game
     game.players[playerIndex] = null;
+
+    // Notify clients of updated game state (empty seat)
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
     
     // Check if any human players remain
     const humanPlayersRemaining = game.players.some(p => p && p.type === 'human');
     
     if (!humanPlayersRemaining) {
       console.log(`[TIMEOUT] No human players remaining in unrated game ${game.id} - deleting game`);
-      
-      // Delete the game and bot users from database
-      // This should integrate with the existing game cleanup logic
       io.to(game.id).emit('game_deleted', { reason: 'no_human_players' });
-      
-      // TODO: Integrate with existing game deletion logic
-      // deleteUnratedGameFromDatabase(game.id);
+      try {
+        await deleteUnratedGameFromDatabase(game);
+        console.log('[TIMEOUT] Successfully deleted unrated game from database via consecutive timeout cleanup');
+      } catch (err) {
+        console.error('[TIMEOUT] Failed to delete unrated game via consecutive timeout cleanup:', err);
+      }
     }
   } else {
     // For rated games, replace with bot or mark as disconnected

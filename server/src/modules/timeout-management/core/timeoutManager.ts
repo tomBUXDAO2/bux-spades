@@ -16,6 +16,10 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
 
   const playerId = player.id;
   const timeoutKey = `${game.id}_${playerId}`;
+
+  // Preserve existing consecutive timeout count across turns (until the player acts)
+  const previousData = turnTimeouts.get(timeoutKey);
+  const previousConsecutive = previousData ? previousData.consecutiveTimeouts : 0;
   
   // Clear existing timeout if any
   clearTurnTimeout(game, playerId);
@@ -38,7 +42,7 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
     });
   }, TIMEOUT_CONFIG.WARNING_TIMEOUT);
   
-  // Store timeout data (including warning timer)
+  // Store timeout data (including warning timer), preserving consecutive count
   turnTimeouts.set(timeoutKey, {
     gameId: game.id,
     playerId,
@@ -46,7 +50,7 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
     phase,
     timer,
     warningTimer,  // NEW: Store warning timer
-    consecutiveTimeouts: 0,
+    consecutiveTimeouts: previousConsecutive,
     startTime: Date.now()
   });
 }

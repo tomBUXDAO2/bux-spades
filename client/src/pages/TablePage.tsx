@@ -30,6 +30,7 @@ export default function TablePage() {
   const [emptySeats, setEmptySeats] = useState(0);
   const [botCount, setBotCount] = useState(0);
   const [showInactivityModal, setShowInactivityModal] = useState(false);
+  // Closure popup now shown on HomePage after redirect
   // Animation state to prevent currentTrick updates during trick animation
   const [isAnimatingTrick, setIsAnimatingTrick] = useState(false);
 
@@ -117,9 +118,47 @@ export default function TablePage() {
     }
   }, [game]);
 
+  // On auto-disconnect (timeouts), waiting-timeout close, or game deletion, set a closure message and redirect home
+  useEffect(() => {
+    if (!socket || !user) return;
 
+    const triggerClosure = (message: string) => {
+      try {
+        localStorage.setItem('tableClosureMessage', message);
+        localStorage.removeItem('activeGameId');
+      } catch {}
+      navigate('/', { replace: true });
+    };
 
+    const handleAutoDisconnect = (data: { playerId: string }) => {
+      if (data.playerId === user.id) {
+        triggerClosure('You were removed from the table after 3 consecutive timeouts.');
+      }
+    };
 
+    const handleGameDeleted = (data: { reason?: string }) => {
+      // Do not show any popup for no-human-players case; just return home
+      try { localStorage.removeItem('activeGameId'); } catch {}
+      navigate('/', { replace: true });
+    };
+
+    const handleGameClosed = (data: { reason?: string }) => {
+      if (data?.reason === 'game_timeout_waiting_too_long') {
+        triggerClosure('The table was closed due to 15 minute inactivity');
+      } else {
+        triggerClosure('The table was closed.');
+      }
+    };
+
+    socket.off('game_closed', handleGameClosed);
+    socket.on('player_auto_disconnect', handleAutoDisconnect);
+    socket.on('game_deleted', handleGameDeleted);
+    socket.on('game_closed', handleGameClosed);
+
+    return () => {
+      socket.off('game_closed', handleGameClosed);
+    };
+  }, [socket, user]);
 
   // Initialize socket and fetch game
   useEffect(() => {
@@ -233,7 +272,7 @@ export default function TablePage() {
             console.error('[AUTO-JOIN FALLBACK] Error auto-joining user to game:', error);
           }
         }
-
+        
         // ROBUSTNESS CHECK: If user is not in game but should be (based on server state), try to add them
         if (!isUserInGame && !isSpectator && data.status === 'WAITING') {
           console.log('[ROBUSTNESS CHECK] User not found in game but game is WAITING, checking if they should be added...');
@@ -310,7 +349,6 @@ export default function TablePage() {
       }
     };
 
-
     // Try to join game after a delay as fallback
     setTimeout(fallbackJoinGame, 2000);
 
@@ -371,7 +409,11 @@ export default function TablePage() {
     // Handle table inactivity
     const handleTableInactive = (data: { reason: string; message: string }) => {
       console.log('[INACTIVITY] Table inactive event received:', data);
-      setShowInactivityModal(true);
+      try {
+        localStorage.setItem('tableClosureMessage', 'The table was closed due to 15 minute inactivity');
+        localStorage.removeItem('activeGameId');
+      } catch {}
+      navigate('/', { replace: true });
     };
 
     socket.off('table_inactive', handleTableInactive);
@@ -473,7 +515,6 @@ export default function TablePage() {
     };
   }, [socket, isAnimatingTrick]);
 
-
   const lastTrickLengthRef = useRef(0);
 
   // Listen for play_update events and update play state
@@ -530,7 +571,6 @@ export default function TablePage() {
       }
     }
   }, [socket, user, gameId, isSpectator]);
-
 
   // Listen for trick animation events to control animation state
   useEffect(() => {
@@ -681,10 +721,6 @@ export default function TablePage() {
     }
   };
 
-
-
-
-
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -824,14 +860,7 @@ export default function TablePage() {
         document.body
       )}
 
-      {/* Inactivity Modal */}
-      <TableInactivityModal
-        isOpen={showInactivityModal}
-        onClose={() => {
-          setShowInactivityModal(false);
-          navigate('/'); // Redirect to lobby after closing modal
-        }}
-      />
+      {/* Inactivity Modal removed; message now shown on HomePage after redirect */}
     </>
   );
 }

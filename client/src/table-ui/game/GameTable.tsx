@@ -2355,7 +2355,7 @@ export default function GameTable({
       if (gameState.gameMode === 'SOLO' && data.playerScores) {
         setFinalPlayerScores(data.playerScores);
       } else {
-        setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
+      setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
       }
       console.log('[GAME OVER] Current game status:', gameState.status);
       console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
