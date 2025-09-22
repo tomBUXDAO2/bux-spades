@@ -10,7 +10,6 @@ import type { GameState } from '../types/game';
 import { socketApi } from '../table-ui/lib/socketApi';
 import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
-import TableInactivityModal from '../components/modals/TableInactivityModal';
 
 export default function TablePage() {
   console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
@@ -29,7 +28,6 @@ export default function TablePage() {
   const [showBotWarning, setShowBotWarning] = useState(false);
   const [emptySeats, setEmptySeats] = useState(0);
   const [botCount, setBotCount] = useState(0);
-  const [showInactivityModal, setShowInactivityModal] = useState(false);
   // Closure popup now shown on HomePage after redirect
   // Animation state to prevent currentTrick updates during trick animation
   const [isAnimatingTrick, setIsAnimatingTrick] = useState(false);
@@ -136,7 +134,7 @@ export default function TablePage() {
       }
     };
 
-    const handleGameDeleted = (data: { reason?: string }) => {
+    const handleGameDeleted = () => {
       // Do not show any popup for no-human-players case; just return home
       try { localStorage.removeItem('activeGameId'); } catch {}
       navigate('/', { replace: true });
