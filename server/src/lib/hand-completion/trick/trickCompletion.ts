@@ -5,6 +5,7 @@ import { botPlayCard } from '../../../modules/bot-play';
 import { determineTrickWinner, getCardValue } from '../utils/cardUtils';
 import { handleHandCompletion } from '../hand/handCompletion';
 import prisma from '../../../lib/prisma';
+import { startTurnTimeout } from '../../../modules/timeout-management/core/timeoutManager';
 
 /**
  * TRICK COMPLETION FUNCTION - FIXES TRICK LEADER ASSIGNMENT
@@ -171,8 +172,9 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
             }
           }, 100); // Reduced delay for faster gameplay
         } else if (winnerPlayer && winnerPlayer.type === 'human') {
-          // Human player's turn - they will play when ready
+          // Human player's turn - start their timeout for the next trick
           console.log('[HUMAN TURN] Human player', winnerPlayer.username, 'at index', winnerIndex, 'can now play');
+          startTurnTimeout(game, winnerIndex, 'playing');
         }
       }
     }, isLastTrick ? 2500 : 1000); // Longer delay for final trick to allow animation + clear table

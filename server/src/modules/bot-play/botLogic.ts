@@ -8,6 +8,7 @@ import { getScreamerPlay, getScreamerPlayableCards } from './screamer';
 import { getAssassinPlay, getAssassinPlayableCards } from './assassin';
 import { getNilCoverPlay, NilCoverPlayInput } from './nil-cover';
 import { getCardValue } from '../../lib/hand-completion/utils/cardUtils';
+import { startTurnTimeout } from '../timeout-management/core/timeoutManager';
 
 /**
  * Makes a move for a bot player (bid or play card)
@@ -150,7 +151,6 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     const nilCoverResult = getNilCoverPlay(nilCoverInput);
     card = nilCoverResult.selectedCard;
     reason = nilCoverResult.reason;
-
   } else if (game.specialRules?.screamer) {
     // Screamer mode - use screamer logic
     console.log(`[BOT SCREAMER] Bot ${bot.username} using screamer strategy`);
@@ -224,6 +224,9 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     
     if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
       setTimeout(() => botPlayCard(game, nextPlayerIndex), 300);
+    } else if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'human') {
+      // Start timeout for the human player's turn
+      startTurnTimeout(game, nextPlayerIndex, 'playing');
     }
   }
 }

@@ -5,6 +5,7 @@ import { games } from '../../../../gamesStore';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
 import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
+import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 
 /**
  * Handles play_card socket event
@@ -83,6 +84,9 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
       // trickNumber: game.play.trickNumber
     });
 
+    // Clear timeout for current player since they acted
+    clearTurnTimeout(game, userId);
+
     // Check if trick is complete
     if (game.play.currentTrick.length === 4) {
       await handleTrickCompletion(game);
@@ -97,6 +101,9 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
       // If next player is bot, trigger their move
       if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
         botPlayCard(game, nextPlayerIndex);
+      } else {
+        // Start timeout for human player's turn
+        startTurnTimeout(game, nextPlayerIndex, 'playing');
       }
     }
 

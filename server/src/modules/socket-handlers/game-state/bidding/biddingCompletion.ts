@@ -3,6 +3,7 @@ import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
 import prisma from '../../../../lib/prisma';
+import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 
 /**
  * Handles bidding completion
@@ -104,5 +105,8 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
     setTimeout(() => {
       botPlayCard(game, (game.dealerIndex + 1) % 4);
     }, 500);
+  } else {
+    // Start timeout for human player's first card play
+    startTurnTimeout(game, (game.dealerIndex + 1) % 4, 'playing');
   }
 }

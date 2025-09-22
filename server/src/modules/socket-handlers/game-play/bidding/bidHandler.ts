@@ -5,6 +5,7 @@ import prisma from '../../../../lib/prisma';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
+import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 
 /**
  * Get the database user ID for a player (human or bot)
@@ -123,6 +124,9 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       // Continue gameplay even if DB logging failed
     }
 
+    // Clear timeout for current player since they acted
+    clearTurnTimeout(game, userId);
+
     // Check if all players have bid (null means not yet bid)
     const bidsComplete = game.bidding.bids.every(b => b !== null);
     
@@ -138,6 +142,9 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
 
       if (nextPlayer?.type === 'bot') {
         await botMakeMove(game, nextIndex);
+      } else {
+        // Start timeout for human player's turn
+        startTurnTimeout(game, nextIndex, 'bidding');
       }
     }
   } catch (error) {

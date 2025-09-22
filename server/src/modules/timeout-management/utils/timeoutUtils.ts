@@ -16,8 +16,13 @@ export function getTimeoutStatus(game: Game, playerId: string): TimeoutData | nu
 export function clearAllTimeoutsForGame(gameId: string): void {
   for (const [key, timeoutData] of turnTimeouts.entries()) {
     if (timeoutData.gameId === gameId) {
+      // Clear main timer
       if (timeoutData.timer) {
         clearTimeout(timeoutData.timer);
+      }
+      // Clear warning timer
+      if (timeoutData.warningTimer) {
+        clearTimeout(timeoutData.warningTimer);
       }
       turnTimeouts.delete(key);
     }
