@@ -18,7 +18,7 @@ interface PlayerProfileDropdownProps {
 }
 
 const EMOJI_OPTIONS = [
-  '❤️', '🤣', '😎', '🥳', '🤪', '🤦', '🥰', '😭', '😬', '🍀', '👍', '🤬', '🤮', '💩', '🖕'
+   '🤣', '😎', '🥳', '🤪', '🥰', '😭', '😬', '🤬', '🤮', '🤦', '❤️', '🍀', '👍', '👎', '🖕', '🐢', '💩', '🛍️', 
 ];
 
 export default function PlayerProfileDropdown({
@@ -202,12 +202,28 @@ export default function PlayerProfileDropdown({
         <div 
           className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2 emoji-picker" 
           style={{ 
-            top: dropdownPosition.top - 100,
-            left: dropdownPosition.left - 32
+            top: Math.max(10, Math.min(dropdownPosition.top - 100, window.innerHeight - 200)),
+            left: (() => {
+              let emojiLeft = dropdownPosition.left - 32;
+              
+              // Adjust emoji picker positioning based on player position
+              if (playerPosition === 1) {
+                // Left player (West) - move emoji picker right
+                emojiLeft += 40;
+              } else if (playerPosition === 3) {
+                // Right player (East) - move emoji picker left more
+                emojiLeft -= 80; // Increased from 40 to 80
+              } else if (playerPosition === 0 || playerPosition === 2) {
+                // Top players (North/South) - move emoji picker down more
+                emojiLeft = dropdownPosition.left - 32; // Keep horizontal centered
+              }
+              
+              return Math.max(10, Math.min(emojiLeft, window.innerWidth - 264));
+            })()
           }}
         >
           <div className="text-xs text-gray-300 mb-2 px-2">Quick React</div>
-          <div className="grid grid-cols-5 gap-1">
+          <div className="grid grid-cols-6 gap-1">
             {EMOJI_OPTIONS.map((emoji, index) => (
               <button
                 key={index}
