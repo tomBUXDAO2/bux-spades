@@ -68,4 +68,22 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 // Event: Handle interactions (commands, buttons, autocomplete)
 client.on(Events.InteractionCreate, handleInteraction);
 
+// Start the bot when this module is loaded
+const token = process.env.DISCORD_BOT_TOKEN;
+console.log('Discord bot startup check:');
+console.log('- Token exists:', !!token);
+console.log('- Token length:', token ? token.length : 0);
+
+if (token && token.trim() !== '') {
+  console.log('Attempting to start Discord bot...');
+  client.login(token).then(async () => {
+    console.log('Discord bot login successful!');
+  }).catch((error) => {
+    console.error('Failed to start Discord bot:', error);
+    console.log('Discord bot will not be available');
+  });
+} else {
+  console.log('Discord bot token not provided, bot will not start');
+}
+
 export default client;
