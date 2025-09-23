@@ -619,8 +619,19 @@ export default function TablePage() {
         const joinResponse = await response.json();
         const updatedGame = joinResponse.game;
         console.log('[HTTP JOIN] Joined seat successfully. Updated game:', updatedGame);
-        setGame(prevGame => ({ ...prevGame, ...updatedGame }));
-        updateModalState(updatedGame);
+
+        // If server did not return game, fetch it
+        let nextGame = updatedGame;
+        if (!nextGame) {
+          const getResp = await api.get(`/api/games/${targetGameId}`);
+          const gameData = await getResp.json();
+          nextGame = gameData.game || gameData; // support either shape
+        }
+
+        if (nextGame) {
+          setGame(prevGame => ({ ...prevGame, ...nextGame }));
+          updateModalState(nextGame);
+        }
 
         // Now join the socket room as a player
         if (socket && socket.connected) {
@@ -649,10 +660,21 @@ export default function TablePage() {
       }
       const joinResponse = await response.json();
       const updatedGame = joinResponse.game;
-      console.log('[HTTP JOIN] Successfully joined game:', updatedGame);
-      console.log('[HTTP JOIN] Game players after join:', updatedGame.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
-      setGame(prevGame => ({ ...prevGame, ...updatedGame }));
-      updateModalState(updatedGame);
+
+      // If server did not return game, fetch it
+      let nextGame = updatedGame;
+      if (!nextGame) {
+        const getResp = await api.get(`/api/games/${targetGameId}`);
+        const gameData = await getResp.json();
+        nextGame = gameData.game || gameData;
+      }
+
+      console.log('[HTTP JOIN] Successfully joined game:', nextGame);
+      console.log('[HTTP JOIN] Game players after join:', nextGame?.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
+      if (nextGame) {
+        setGame(prevGame => ({ ...prevGame, ...nextGame }));
+        updateModalState(nextGame);
+      }
 
       if (socket && socket.connected) {
         console.log('[HTTP JOIN] Emitting socket join after successful HTTP join, socket connected:', socket.connected);
