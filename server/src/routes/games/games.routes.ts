@@ -211,7 +211,7 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       console.log(`[LEAVE GAME] No human players remaining in game ${gameId}`);
       
       // If this is an unrated game, clean it up completely in NEW DB
-      if (!game.rated) {
+      if (false && !game.rated) {
         console.log(`[LEAVE GAME] Cleaning up unrated game ${gameId} from NEW database`);
         try {
           // Collect round and trick ids
