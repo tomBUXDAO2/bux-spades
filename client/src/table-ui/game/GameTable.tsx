@@ -1852,16 +1852,6 @@ export default function GameTable({
       playCardSound();
     
     // Remove card immediately from local hand for instant visual feedback
-    setGameState(prev => ({
-      ...prev,
-      hands: prev.hands?.map((hand, index) => {
-        const myPlayerIndex = prev.players?.findIndex(p => p?.id === user.id);
-        if (index === myPlayerIndex && Array.isArray(hand)) {
-          return hand.filter(c => !(c.suit === card.suit && c.rank === card.rank));
-        }
-        return hand;
-      })
-    }));      
       if (idx + 1 < sortedHand.length) {
         dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 50);
       } else {
