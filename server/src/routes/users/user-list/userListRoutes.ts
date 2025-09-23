@@ -15,26 +15,47 @@ router.get('/', requireAuth, async (req, res) => {
     select: { id: true, username: true, avatarUrl: true, coins: true }
   }) as any[];
 
-  // For now, no friends/blocked functionality in new DB
-  let friends: { friendId: string }[] = [], blockedUsers: { blockedId: string }[] = [];
+  // Get friends and blocked users from NEW DB
+  const [friends, blockedUsers] = await Promise.all([
+    prismaNew.friend.findMany({
+      where: { userId: currentUserId },
+      select: { friendId: true }
+    }),
+    prismaNew.blockedUser.findMany({
+      where: { userId: currentUserId },
+      select: { blockedId: true }
+    })
+  ]);
 
   // For each user, determine their currently active game (WAITING or PLAYING) from NEW DB
   const userIds = users.map(u => u.id);
+  
+  // Get active game memberships
   const activeMemberships = await prismaNew.gamePlayer.findMany({
     where: {
       userId: { in: userIds },
-      leftAt: null, // Still active in game
-      game: { 
-        status: { in: ['WAITING', 'BIDDING', 'PLAYING'] as any }
-      }
+      leftAt: null // Still active in game
     },
     select: { userId: true, gameId: true }
   });
   
+  // Get the game statuses for these games
+  const gameIds = activeMemberships.map(m => m.gameId);
+  const activeGames = await prismaNew.game.findMany({
+    where: {
+      id: { in: gameIds },
+      status: { in: ['WAITING', 'BIDDING', 'PLAYING'] as any }
+    },
+    select: { id: true }
+  });
+  
+  const activeGameIds = new Set(activeGames.map(g => g.id));
+  
   const userIdToActiveGameId: Record<string, string> = {};
   for (const m of activeMemberships) {
-    // Prefer the most recent assignment if multiple (rare); last write wins is fine here
-    userIdToActiveGameId[m.userId] = m.gameId;
+    if (activeGameIds.has(m.gameId)) {
+      userIdToActiveGameId[m.userId] = m.gameId;
+    }
   }
 
   // @ts-ignore

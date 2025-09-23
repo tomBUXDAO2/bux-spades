@@ -67,6 +67,10 @@ model User {
   coins        Int      @default(0)
   soundEnabled Boolean  @default(true)
   createdAt    DateTime @default(now())
+  Friend_Friend_friendIdToUser            Friend[]      @relation("Friend_friendIdToUser")
+  Friend_Friend_userIdToUser              Friend[]      @relation("Friend_userIdToUser")
+  BlockedUser_BlockedUser_blockedIdToUser BlockedUser[] @relation("BlockedUser_blockedIdToUser")
+  BlockedUser_BlockedUser_userIdToUser    BlockedUser[] @relation("BlockedUser_userIdToUser")
 }
 
 model Game {
@@ -257,3 +261,26 @@ model UserStatsBreakdown {
   @@unique([userId, isLeague, mode, format, gimmick])
   @@index([userId])
 } 
+model Friend {
+  id                         String   @id @default(cuid())
+  userId                     String
+  friendId                   String
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  User_Friend_friendIdToUser User     @relation("Friend_friendIdToUser", fields: [friendId], references: [id])
+  User_Friend_userIdToUser   User     @relation("Friend_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, friendId])
+}
+
+model BlockedUser {
+  id                               String   @id @default(cuid())
+  userId                           String
+  blockedId                        String
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+  User_BlockedUser_blockedIdToUser User     @relation("BlockedUser_blockedIdToUser", fields: [blockedId], references: [id])
+  User_BlockedUser_userIdToUser    User     @relation("BlockedUser_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, blockedId])
+}
