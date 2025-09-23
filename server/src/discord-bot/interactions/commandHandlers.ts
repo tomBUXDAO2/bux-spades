@@ -182,14 +182,14 @@ export async function handleStatsCommand(interaction: ChatInputCommandInteractio
   try {
     await interaction.deferReply();
   } catch (error) {
-    console.error('Error deferring stats reply:', error);
+    console.error("Error deferring stats reply:", error);
     return;
   }
   
   try {
-    const targetUser = interaction.options.getUser('user') || interaction.user;
+    const targetUser = interaction.options.getUser("user") || interaction.user;
     
-    // Get user stats from GamePlayer records (same source as app)
+    // Get user stats from UserStats table (same as app)
     const user = await prisma.user.findFirst({
       where: { discordId: targetUser.id }
     });
@@ -199,19 +199,20 @@ export async function handleStatsCommand(interaction: ChatInputCommandInteractio
       return;
     }
     
-    // Get all GamePlayer records for this user (same filtering as app)
-    const gamePlayers = await prisma.gamePlayer.findMany({
-      where: { userId: user.id },
-      include: { Game: true }
+    // Get stats from UserStats table instead of GamePlayer
+    const userStats = await prisma.userStats.findUnique({
+      where: { userId: user.id }
     });
     
-    // Filter to only include FINISHED games (same as app)
-    const finishedGames = gamePlayers.filter(gp => gp.Game?.status === 'FINISHED');
+    if (!userStats) {
+      await interaction.editReply(`❌ No stats found for ${targetUser.username}`);
+      return;
+    }
     
-    // Calculate stats from finished GamePlayer records
-    const totalGames = finishedGames.length;
-    const totalWins = finishedGames.filter(gp => gp.won).length;
-    const totalWinPercentage = totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : '0.0';
+    // Calculate stats from UserStats
+    const totalGames = userStats.gamesPlayed || 0;
+    const totalWins = userStats.gamesWon || 0;
+    const totalWinPercentage = totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : "0.0";
     
     // League games are all finished games (same as app)
     const leagueGames = totalGames;
@@ -221,31 +222,30 @@ export async function handleStatsCommand(interaction: ChatInputCommandInteractio
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
       .setTitle(`📊 Stats for ${targetUser.username}`)
-      .setThumbnail(targetUser.displayAvatarURL({ extension: 'png', size: 128 }))
+      .setThumbnail(targetUser.displayAvatarURL({ extension: "png", size: 128 }))
       .addFields(
-        { name: 'TOTAL GAMES:', value: '\u200b', inline: false },
-        { name: '🎮 Games', value: totalGames.toString(), inline: true },
-        { name: '🏆 Wins', value: totalWins.toString(), inline: true },
-        { name: '📈 Win Rate', value: `${totalWinPercentage}%`, inline: true },
-        { name: '\u200b', value: '\u200b', inline: false },
-        { name: 'LEAGUE GAMES:', value: '\u200b', inline: false },
-        { name: '🎮 Games', value: leagueGames.toString(), inline: true },
-        { name: '🏆 Wins', value: leagueWins.toString(), inline: true },
-        { name: '📈 Win Rate', value: `${leagueWinPct}%`, inline: true },
-        { name: '\u200b', value: '\u200b', inline: false },
-        { name: 'COINS:', value: '\u200b', inline: false },
-        { name: '💰', value: user.coins.toLocaleString(), inline: true }
+        { name: "TOTAL GAMES:", value: "\u200b", inline: false },
+        { name: "🎮 Games", value: totalGames.toString(), inline: true },
+        { name: "🏆 Wins", value: totalWins.toString(), inline: true },
+        { name: "📈 Win Rate", value: `${totalWinPercentage}%`, inline: true },
+        { name: "\u200b", value: "\u200b", inline: false },
+        { name: "LEAGUE GAMES:", value: "\u200b", inline: false },
+        { name: "🎮 Games", value: leagueGames.toString(), inline: true },
+        { name: "🏆 Wins", value: leagueWins.toString(), inline: true },
+        { name: "📈 Win Rate", value: `${leagueWinPct}%`, inline: true },
+        { name: "\u200b", value: "\u200b", inline: false },
+        { name: "COINS:", value: "\u200b", inline: false },
+        { name: "💰", value: user.coins.toLocaleString(), inline: true }
       )
       .setTimestamp();
     
     await interaction.editReply({ embeds: [embed] });
     
   } catch (error) {
-    console.error('Error fetching stats:', error);
-    await interaction.editReply('❌ Error fetching stats. Please try again.');
+    console.error("Error fetching stats:", error);
+    await interaction.editReply("❌ Error fetching stats. Please try again.");
   }
 }
-
 export async function handleHelpCommand(interaction: ChatInputCommandInteraction) {
   try {
     await interaction.deferReply();

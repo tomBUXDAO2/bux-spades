@@ -22,7 +22,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     }
     
     // Use UserStats as primary source instead of GamePlayer
-    const responseStats = {
+    let responseStats = {
       gamesPlayed: stats.gamesPlayed || 0,
       gamesWon: stats.gamesWon || 0,
       nilsBid: stats.nilsBid || 0,
@@ -55,18 +55,37 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       partnersGamesWon = stats.gamesWon || 0;
     }
     
+    // Apply gameMode filter if specified
+    if (gameMode === 'PARTNERS') {
+      responseStats = {
+        ...responseStats,
+        gamesPlayed: partnersGamesPlayed,
+        gamesWon: partnersGamesWon,
+        totalBags: stats.partnersTotalBags || 0,
+        bagsPerGame: stats.partnersBagsPerGame || 0
+      };
+    } else if (gameMode === 'SOLO') {
+      responseStats = {
+        ...responseStats,
+        gamesPlayed: soloGamesPlayed,
+        gamesWon: soloGamesWon,
+        totalBags: stats.soloTotalBags || 0,
+        bagsPerGame: stats.soloBagsPerGame || 0
+      };
+    }
+    
     // Format breakdown - use default values since we don't have per-format breakdown in UserStats
     const fmt = {
-      REGULAR: { played: Math.floor(stats.gamesPlayed * 0.8), won: Math.floor(stats.gamesWon * 0.8) },
-      WHIZ: { played: Math.floor(stats.gamesPlayed * 0.1), won: Math.floor(stats.gamesWon * 0.1) },
-      MIRRORS: { played: Math.floor(stats.gamesPlayed * 0.05), won: Math.floor(stats.gamesWon * 0.05) },
-      GIMMICK: { played: Math.floor(stats.gamesPlayed * 0.05), won: Math.floor(stats.gamesWon * 0.05) }
+      REGULAR: { played: Math.floor(responseStats.gamesPlayed * 0.8), won: Math.floor(responseStats.gamesWon * 0.8) },
+      WHIZ: { played: Math.floor(responseStats.gamesPlayed * 0.1), won: Math.floor(responseStats.gamesWon * 0.1) },
+      MIRRORS: { played: Math.floor(responseStats.gamesPlayed * 0.05), won: Math.floor(responseStats.gamesWon * 0.05) },
+      GIMMICK: { played: Math.floor(responseStats.gamesPlayed * 0.05), won: Math.floor(responseStats.gamesWon * 0.05) }
     };
     
     // Special rules - use default values
     const special = {
-      SCREAMER: { played: Math.floor(stats.gamesPlayed * 0.1), won: Math.floor(stats.gamesWon * 0.1) },
-      ASSASSIN: { played: Math.floor(stats.gamesPlayed * 0.05), won: Math.floor(stats.gamesWon * 0.05) }
+      SCREAMER: { played: Math.floor(responseStats.gamesPlayed * 0.1), won: Math.floor(responseStats.gamesWon * 0.1) },
+      ASSASSIN: { played: Math.floor(responseStats.gamesPlayed * 0.05), won: Math.floor(responseStats.gamesWon * 0.05) }
     };
     
     res.json({
