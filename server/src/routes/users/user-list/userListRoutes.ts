@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Router } from 'express';
-import prisma from '../../../lib/prisma';
+import { prismaNew } from '../../../newdb/client';
 import { onlineUsers } from '../../../index';
 import { requireAuth } from '../../../middleware/auth.middleware';
 
@@ -9,26 +9,28 @@ const router = Router();
 // GET /api/users - return all users with online status and friend/block status
 router.get('/', requireAuth, async (req, res) => {
   const currentUserId = (req as any).user.id;
-  const users = await prisma.user.findMany({
-    select: { id: true, username: true, avatar: true, coins: true }
+  
+  // Get users from NEW DB only
+  const users = await prismaNew.user.findMany({
+    select: { id: true, username: true, avatarUrl: true, coins: true }
   }) as any[];
 
+  // For now, no friends/blocked functionality in new DB
   let friends: { friendId: string }[] = [], blockedUsers: { blockedId: string }[] = [];
-  if (currentUserId) {
-    friends = await prisma.friend.findMany({ where: { userId: currentUserId } });
-    blockedUsers = await prisma.blockedUser.findMany({ where: { userId: currentUserId } });
-  }
 
-  // For each user, determine their currently active game (WAITING or PLAYING)
-  // We use the GamePlayer relation to locate any active games and surface the Game.id as activeGameId
+  // For each user, determine their currently active game (WAITING or PLAYING) from NEW DB
   const userIds = users.map(u => u.id);
-  const activeMemberships = await prisma.gamePlayer.findMany({
+  const activeMemberships = await prismaNew.gamePlayer.findMany({
     where: {
       userId: { in: userIds },
-      Game: { status: { in: ['WAITING', 'PLAYING'] } }
+      leftAt: null, // Still active in game
+      game: { 
+        status: { in: ['WAITING', 'BIDDING', 'PLAYING'] as any }
+      }
     },
     select: { userId: true, gameId: true }
   });
+  
   const userIdToActiveGameId: Record<string, string> = {};
   for (const m of activeMemberships) {
     // Prefer the most recent assignment if multiple (rare); last write wins is fine here
@@ -38,6 +40,7 @@ router.get('/', requireAuth, async (req, res) => {
   // @ts-ignore
   const usersWithStatus = users.map(u => ({
     ...u,
+    avatar: u.avatarUrl, // Map avatarUrl to avatar for compatibility
     online: onlineUsers.has(u.id),
     status: friends.some(f => f.friendId === u.id)
       ? 'friend'
