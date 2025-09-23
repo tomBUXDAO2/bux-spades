@@ -4,6 +4,7 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
 import prisma from '../../../../lib/prisma';
 import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
 
 /**
  * Handles bidding completion
@@ -48,6 +49,19 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
             createdAt: new Date()
           }
         });
+      }
+
+      // NEW DB: ensure round and upsert bids
+      try {
+        const roundIdNew = await newdbEnsureRound({ gameId: game.id, roundNumber, dealerSeatIndex: game.dealerIndex });
+        for (let i = 0; i < 4; i++) {
+          const p = game.players[i];
+          if (!p) continue;
+          const bid = game.bidding.bids[i] ?? 0;
+          await newdbUpsertBid({ roundId: roundIdNew, userId: p.id, seatIndex: i, bid });
+        }
+      } catch (e) {
+        console.warn('[NEWDB] Failed to dual-write bids on completion:', e);
       }
     }
   } catch (err) {

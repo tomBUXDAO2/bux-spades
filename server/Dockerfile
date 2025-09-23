@@ -14,8 +14,11 @@ COPY prisma ./prisma/
 # Install dependencies
 RUN npm install
 
-# Generate Prisma Client
+# Generate Prisma Client (legacy schema)
 RUN npx prisma generate
+
+# Generate Prisma Client for NEW schema (outputs to node_modules/.prisma/new-client)
+RUN npx prisma generate --schema prisma/new-schema.prisma
 
 # Copy source code
 COPY . .

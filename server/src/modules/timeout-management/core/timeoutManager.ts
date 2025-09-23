@@ -14,6 +14,26 @@ export function startTurnTimeout(game: Game, playerIndex: number, phase: 'biddin
     return;
   }
 
+  // Kill-switch: disable all turn timeouts
+  if (TIMEOUT_CONFIG.DISABLED) {
+    const playerId = player.id;
+    const timeoutKey = `${game.id}_${playerId}`;
+    // Ensure any existing timers are cleared and not re-set
+    clearTurnTimeout(game, playerId);
+    turnTimeouts.set(timeoutKey, {
+      gameId: game.id,
+      playerId,
+      playerIndex,
+      phase,
+      timer: null,
+      warningTimer: null,
+      consecutiveTimeouts: 0,
+      startTime: Date.now(),
+    });
+    console.log('[TIMEOUT] Turn timeouts are DISABLED via env; no timers set');
+    return;
+  }
+
   const playerId = player.id;
   const timeoutKey = `${game.id}_${playerId}`;
 

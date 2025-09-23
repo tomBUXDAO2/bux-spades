@@ -2,6 +2,7 @@ import { io } from '../../../index';
 import type { Game } from '../../../types/game';
 import prisma from '../../prisma';
 import { CoinManager } from '../../coin-management/coinManager';
+import { newdbRecordGameFinish } from '../../../newdb/writers';
 
 /**
  * Create GameResult entry for completed game
@@ -77,6 +78,33 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         updatedAt: new Date()
       }
     });
+    
+    // NEW DB: record game finish
+    try {
+      const winnerStr = ((): string => {
+        if (game.gameMode === 'SOLO') {
+          return `SEAT_${winningTeamOrPlayer}`;
+        }
+        return winningTeamOrPlayer === 0 ? 'TEAM0' : 'TEAM1';
+      })();
+      await newdbRecordGameFinish({
+        gameId: game.id,
+        winner: winnerStr,
+        finals: {
+          team0Final: game.team1TotalScore ?? null,
+          team1Final: game.team2TotalScore ?? null,
+          player0Final: game.playerScores?.[0] ?? null,
+          player1Final: game.playerScores?.[1] ?? null,
+          player2Final: game.playerScores?.[2] ?? null,
+          player3Final: game.playerScores?.[3] ?? null,
+        },
+        totalRounds: totalRounds,
+        totalTricks: totalTricks,
+        finishedAt: new Date(),
+      });
+    } catch (e) {
+      console.warn('[NEWDB] Failed to record game finish:', e);
+    }
     
     console.log('[GAME COMPLETION] Created GameResult:', gameResult.id);
   } catch (error) {

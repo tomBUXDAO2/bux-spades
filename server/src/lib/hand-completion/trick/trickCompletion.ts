@@ -6,6 +6,7 @@ import { determineTrickWinner, getCardValue } from '../utils/cardUtils';
 import { handleHandCompletion } from '../hand/handCompletion';
 import prisma from '../../../lib/prisma';
 import { startTurnTimeout } from '../../../modules/timeout-management/core/timeoutManager';
+import { newdbEnsureRound, newdbCreateTrickAndCards } from '../../../newdb/writers';
 
 /**
  * TRICK COMPLETION FUNCTION - FIXES TRICK LEADER ASSIGNMENT
@@ -99,6 +100,22 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
           }
         } catch (error) {
           console.error('[TRICK COMPLETION] Failed to log trick and cards to database:', error);
+        }
+
+        // NEW DB: dual-write trick and cards
+        try {
+          const roundIdNew = await newdbEnsureRound({ gameId: game.id, roundNumber: game.currentRound, dealerSeatIndex: game.dealerIndex ?? 0 });
+          const leadSeatIndex = game.play.currentTrick[0].playerIndex ?? 0;
+          const plays = game.play.currentTrick.map((c, idx) => ({ seatIndex: c.playerIndex ?? 0, suit: c.suit, rank: String(c.rank), order: idx }));
+          await newdbCreateTrickAndCards({
+            roundId: roundIdNew,
+            trickNumber: (game.play.trickNumber || 0) + 1,
+            leadSeatIndex,
+            winningSeatIndex: winnerIndex,
+            plays
+          });
+        } catch (e) {
+          console.warn('[NEWDB] Failed to dual-write trick/cards:', e);
         }
       }
     }

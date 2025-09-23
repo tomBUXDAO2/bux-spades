@@ -4,6 +4,7 @@ import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import prisma from '../../../../lib/prisma';
 import { games } from '../../../../gamesStore';
+import { newdbCreateRound } from '../../../../newdb/writers';
 
 // Hand summary continue tracking
 const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
@@ -201,6 +202,22 @@ export async function startNewHand(game: Game): Promise<void> {
     } catch (err) {
       console.error('Failed to start round logging for new hand:', err);
     }
+  }
+
+  // NEW DB: create round and initial hand snapshots
+  try {
+    const initialHands = game.hands.map((cards: any[], seatIndex: number) => ({
+      seatIndex,
+      cards: cards.map(c => ({ suit: c.suit, rank: String(c.rank) }))
+    }));
+    await newdbCreateRound({
+      gameId: game.id,
+      roundNumber: game.currentRound ?? 1,
+      dealerSeatIndex: newDealerIndex,
+      initialHands
+    });
+  } catch (e) {
+    console.warn('[NEWDB] Failed to create round/hand snapshots:', e);
   }
 
   // Emit new hand started event with dealing phase

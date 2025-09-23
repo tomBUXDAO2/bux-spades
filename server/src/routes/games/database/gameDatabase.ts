@@ -1,5 +1,6 @@
 import type { Game } from '../../../types/game';
 import prisma from '../../../lib/prisma';
+import { newdbCreateGame, newdbUpsertGamePlayer } from '../../../newdb/writers';
 
 /**
  * Log game start to database
@@ -37,6 +38,24 @@ export async function logGameStart(game: Game): Promise<void> {
         updatedAt: new Date()
       }
     });
+
+    // NEW DB: dual-write game
+    try {
+      const formatMap = (game.rules?.bidType as any) || 'REGULAR';
+      await newdbCreateGame({
+        gameId: game.id,
+        createdById: game.creatorId,
+        mode: (game.gameMode as any) || 'PARTNERS',
+        format: (formatMap as any),
+        gimmickVariant: (game.rules?.gimmickType as any) || undefined,
+        isLeague: !!game.league,
+        isRated: !!game.rated,
+        status: (game.status as any),
+        specialRules: game.specialRules || undefined
+      });
+    } catch (e) {
+      console.warn('[NEWDB] Failed to dual-write game create:', e);
+    }
 
     game.dbGameId = dbGame.id;
     console.log('[DATABASE] Game logged with ID:', dbGame.id);
@@ -119,6 +138,20 @@ export async function logGameStart(game: Game): Promise<void> {
             }
           });
           console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i} with userId ${userId}`);
+
+          // NEW DB: dual-write player
+          try {
+            const teamIndex = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 0 : 1) : null;
+            await newdbUpsertGamePlayer({
+              gameId: game.id,
+              userId,
+              seatIndex: i,
+              teamIndex,
+              isHuman: player.type !== 'bot'
+            });
+          } catch (e) {
+            console.warn('[NEWDB] Failed to dual-write game player:', e);
+          }
         } catch (error) {
           console.error(`[DATABASE] Failed to create GamePlayer record for ${player.username}:`, error);
         }

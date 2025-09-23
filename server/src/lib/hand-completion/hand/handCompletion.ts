@@ -4,6 +4,7 @@ import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 import type { Game } from '../../../types/game';
 import { completeGame } from '../game/gameCompletion';
 import prisma from '../../prisma';
+import { newdbEnsureRound, newdbRecordRoundEnd } from '../../../newdb/writers';
 
 // Import startTurnTimeout function
 declare function startTurnTimeout(game: Game, playerIndex: number, phase: string): void;
@@ -87,6 +88,46 @@ export async function handleHandCompletion(game: Game): Promise<void> {
         team1TotalScore: gameScore.team1RunningTotal,
         team2TotalScore: gameScore.team2RunningTotal
       };
+    }
+    
+    // NEW DB: record round end stats and score
+    try {
+      const roundIdNew = await newdbEnsureRound({ gameId: game.id, roundNumber: game.currentRound, dealerSeatIndex: game.dealerIndex ?? 0 });
+      const playerStats = game.players.map((p: any, i: number) => {
+        if (!p) return null as any;
+        const bid = (game.bidding?.bids?.[i] ?? 0) as number;
+        const tricksWon = (p.tricks ?? 0) as number;
+        const madeNil = bid === 0 && tricksWon === 0;
+        const madeBlindNil = bid === -1 && tricksWon === 0;
+        const teamIndex = game.gameMode === 'SOLO' || game.solo ? null : (i % 2);
+        const bagsThisRound = Math.max(0, tricksWon - (bid > 0 ? bid : 0));
+        return { userId: p.id, seatIndex: i, teamIndex, bid, tricksWon, bagsThisRound, madeNil, madeBlindNil };
+      }).filter(Boolean) as any;
+      const score = ((): any => {
+        if (game.gameMode === 'SOLO' || game.solo) {
+          return {
+            player0Score: playerScores[0],
+            player1Score: playerScores[1],
+            player2Score: playerScores[2],
+            player3Score: playerScores[3],
+            player0Running: playerScores[0],
+            player1Running: playerScores[1],
+            player2Running: playerScores[2],
+            player3Running: playerScores[3],
+          };
+        }
+        return {
+          team0Score: handSummary.team1Score ?? null,
+          team1Score: handSummary.team2Score ?? null,
+          team0Bags: handSummary.team1Bags ?? null,
+          team1Bags: handSummary.team2Bags ?? null,
+          team0RunningTotal: handSummary.team1TotalScore ?? null,
+          team1RunningTotal: handSummary.team2TotalScore ?? null,
+        };
+      })();
+      await newdbRecordRoundEnd({ roundId: roundIdNew, playerStats, score });
+    } catch (e) {
+      console.warn('[NEWDB] Failed to record round end:', e);
     }
     
     // Emit hand completed event with database scores

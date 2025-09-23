@@ -15,38 +15,47 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
   if (!socket.isAuthenticated || !socket.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     return;
+  }
 
   // Handle spectator joining a specific seat
   if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
-    
+    console.log('[SPECTATOR JOIN] Attempting to join seat:', { gameId, seat, username, userId: socket.userId });
+
     // Find the game
-    const game = games.get(gameId);
+    const game = games.find(g => g.id === gameId);
     if (!game) {
-      socket.emit("error", { message: "Game not found" });
+      socket.emit('error', { message: 'Game not found' });
       return;
     }
-    
+
     // Check if seat is empty
     if (game.players[seat]) {
-      socket.emit("error", { message: "Seat is already occupied" });
+      socket.emit('error', { message: 'Seat is already occupied' });
       return;
     }
-    
+
     // Add player to the seat
     game.players[seat] = {
       id: socket.userId,
       username: username,
       avatar: avatar,
-      isBot: false
-    };
-    
-    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
-    
-    // Emit game update to all clients
-    io.to(gameId).emit("game_update", enrichGameForClient(game));
+      type: 'human',
+      position: seat,
+      team: seat % 2,
+      bid: null,
+      tricks: 0,
+      points: 0,
+      bags: 0
+    } as any;
+
+    console.log('[SPECTATOR JOIN] Successfully joined seat', seat, 'for user', socket.userId);
+
+    // Join socket room and emit update
+    socket.join(gameId);
+    socket.emit('game_joined', { gameId });
+    io.to(gameId).emit('game_update', enrichGameForClient(game));
     return;
-  }  }
+  }
 
   try {
     console.log('[JOIN GAME DEBUG] Looking for game:', gameId);
@@ -61,38 +70,7 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
       console.log('[JOIN GAME DEBUG] Game not found:', gameId);
       socket.emit('error', { message: 'Game not found' });
       return;
-
-  // Handle spectator joining a specific seat
-  if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
-    
-    // Find the game
-    const game = games.get(gameId);
-    if (!game) {
-      socket.emit("error", { message: "Game not found" });
-      return;
     }
-    
-    // Check if seat is empty
-    if (game.players[seat]) {
-      socket.emit("error", { message: "Seat is already occupied" });
-      return;
-    }
-    
-    // Add player to the seat
-    game.players[seat] = {
-      id: socket.userId,
-      username: username,
-      avatar: avatar,
-      isBot: false
-    };
-    
-    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
-    
-    // Emit game update to all clients
-    io.to(gameId).emit("game_update", enrichGameForClient(game));
-    return;
-  }    }
 
     console.log('[SERVER DEBUG] Found game:', {
       gameId: game.id,
@@ -119,38 +97,7 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
       // IMPORTANT: Also emit to all players in the room to sync the UI
       io.to(gameId).emit('game_update', enrichGameForClient(game));
       return; // Exit early since user is already in game
-
-  // Handle spectator joining a specific seat
-  if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
-    
-    // Find the game
-    const game = games.get(gameId);
-    if (!game) {
-      socket.emit("error", { message: "Game not found" });
-      return;
     }
-    
-    // Check if seat is empty
-    if (game.players[seat]) {
-      socket.emit("error", { message: "Seat is already occupied" });
-      return;
-    }
-    
-    // Add player to the seat
-    game.players[seat] = {
-      id: socket.userId,
-      username: username,
-      avatar: avatar,
-      isBot: false
-    };
-    
-    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
-    
-    // Emit game update to all clients
-    io.to(gameId).emit("game_update", enrichGameForClient(game));
-    return;
-  }    }
 
     // Check if user is in another game (using database)
     const { prisma } = await import('../../../lib/prisma');
@@ -159,7 +106,7 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
         userId: socket.userId,
         Game: {
           status: {
-            in: ["WAITING", "BIDDING", "PLAYING"]
+            in: ['WAITING', 'BIDDING', 'PLAYING']
           }
         }
       },
@@ -171,75 +118,14 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
     if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
       socket.emit('error', { message: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
       return;
+    }
 
-  // Handle spectator joining a specific seat
-  if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
-    
-    // Find the game
-    const game = games.get(gameId);
-    if (!game) {
-      socket.emit("error", { message: "Game not found" });
-      return;
-    }
-    
-    // Check if seat is empty
-    if (game.players[seat]) {
-      socket.emit("error", { message: "Seat is already occupied" });
-      return;
-    }
-    
-    // Add player to the seat
-    game.players[seat] = {
-      id: socket.userId,
-      username: username,
-      avatar: avatar,
-      isBot: false
-    };
-    
-    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
-    
-    // Emit game update to all clients
-    io.to(gameId).emit("game_update", enrichGameForClient(game));
-    return;
-  }    }
     // For socket joins, we don't have a specific seat request, so find empty seat
     const emptySeatIndex = game.players.findIndex(p => p === null);
     if (emptySeatIndex === -1) {
       socket.emit('error', { message: 'Game is full' });
       return;
-
-  // Handle spectator joining a specific seat
-  if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
-    
-    // Find the game
-    const game = games.get(gameId);
-    if (!game) {
-      socket.emit("error", { message: "Game not found" });
-      return;
     }
-    
-    // Check if seat is empty
-    if (game.players[seat]) {
-      socket.emit("error", { message: "Seat is already occupied" });
-      return;
-    }
-    
-    // Add player to the seat
-    game.players[seat] = {
-      id: socket.userId,
-      username: username,
-      avatar: avatar,
-      isBot: false
-    };
-    
-    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
-    
-    // Emit game update to all clients
-    io.to(gameId).emit("game_update", enrichGameForClient(game));
-    return;
-  }    }
 
     // Add player to game - fetch user data from database
     const userData = await prisma.user.findUnique({
@@ -254,11 +140,11 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
       type: 'human',
       position: emptySeatIndex,
       team: emptySeatIndex % 2,
-      bid: undefined,
+      bid: null,
       tricks: 0,
       points: 0,
       bags: 0
-    };
+    } as any;
 
     // Join socket room
     socket.join(gameId);

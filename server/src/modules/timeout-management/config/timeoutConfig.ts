@@ -6,6 +6,7 @@ export const TIMEOUT_CONFIG = {
   PLAYING_TIMEOUT: 30000,    // 30 seconds for playing cards (changed from 45000)
   WARNING_TIMEOUT: 20000,    // 20 seconds before showing 10-second countdown overlay (NEW)
   CONSECUTIVE_TIMEOUT_LIMIT: 3, // Max consecutive timeouts before auto-disconnect
+  DISABLED: process.env.DISABLE_TURN_TIMEOUTS === 'true',
 } as const;
 
 /**

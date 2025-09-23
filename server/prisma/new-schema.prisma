@@ -1,0 +1,259 @@
+// datasource and generator for the NEW database. Do not replace existing schema.prisma yet.
+datasource db {
+  provider = "postgresql"
+  url      = env("NEW_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/new-client"
+}
+
+enum GameStatus {
+  WAITING
+  BIDDING
+  PLAYING
+  FINISHED
+}
+
+enum GameMode {
+  PARTNERS
+  SOLO
+}
+
+enum GameFormat {
+  REGULAR
+  WHIZ
+  MIRROR
+  GIMMICK
+}
+
+enum GimmickVariant {
+  SUICIDE
+  BID4NIL
+  BID3
+  BIDHEARTS
+  CRAZY_ACES
+}
+
+enum StatsMode {
+  ALL
+  PARTNERS
+  SOLO
+}
+
+enum StatsFormat {
+  ALL
+  REGULAR
+  WHIZ
+  MIRROR
+  GIMMICK
+}
+
+enum StatsGimmickVariant {
+  ALL
+  SUICIDE
+  BID4NIL
+  BID3
+  BIDHEARTS
+  CRAZY_ACES
+}
+
+model User {
+  id           String   @id @default(cuid())
+  discordId    String   @unique
+  username     String
+  avatarUrl    String?
+  coins        Int      @default(0)
+  soundEnabled Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model Game {
+  id             String        @id @default(cuid())
+  createdById    String
+  mode           GameMode
+  format         GameFormat
+  gimmickVariant GimmickVariant?
+  isLeague       Boolean       @default(false) // Discord = true, App = false
+  isRated        Boolean       @default(false) // App: true only if 4 humans at start; League always true
+  status         GameStatus
+  specialRules   Json?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model GamePlayer {
+  id         String   @id @default(cuid())
+  gameId     String
+  userId     String
+  seatIndex  Int      // 0..3
+  teamIndex  Int?     // 0|1 for partners; null for solo
+  isHuman    Boolean  @default(true)
+  joinedAt   DateTime @default(now())
+  leftAt     DateTime?
+
+  @@unique([gameId, seatIndex])
+  @@index([userId])
+}
+
+model Round {
+  id              String   @id @default(cuid())
+  gameId          String
+  roundNumber     Int
+  dealerSeatIndex Int
+  createdAt       DateTime @default(now())
+
+  @@unique([gameId, roundNumber])
+  @@index([gameId])
+}
+
+model RoundHandSnapshot {
+  id        String   @id @default(cuid())
+  roundId   String
+  seatIndex Int
+  cards     Json     // 13 cards dealt at start for this seat
+  createdAt DateTime @default(now())
+
+  @@index([roundId, seatIndex])
+}
+
+model RoundBid {
+  id         String   @id @default(cuid())
+  roundId    String
+  userId     String
+  seatIndex  Int
+  bid        Int      // -1 for blind nil, 0..13 otherwise
+  isBlindNil Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([roundId, userId])
+  @@index([roundId])
+}
+
+model Trick {
+  id               String   @id @default(cuid())
+  roundId          String
+  trickNumber      Int
+  leadSeatIndex    Int
+  winningSeatIndex Int
+  createdAt        DateTime @default(now())
+
+  @@unique([roundId, trickNumber])
+  @@index([roundId])
+}
+
+model TrickCard {
+  id        String   @id @default(cuid())
+  trickId   String
+  seatIndex Int
+  suit      String   // 'S','H','D','C'
+  rank      String   // '2'..'A'
+  playOrder Int      // 0..3
+  playedAt  DateTime @default(now())
+
+  @@unique([trickId, playOrder])
+  @@index([trickId])
+}
+
+model PlayerRoundStats {
+  id             String   @id @default(cuid())
+  roundId        String
+  userId         String
+  seatIndex      Int
+  teamIndex      Int?
+  bid            Int
+  isBlindNil     Boolean  @default(false)
+  tricksWon      Int
+  bagsThisRound  Int
+  madeNil        Boolean
+  madeBlindNil   Boolean
+
+  @@unique([roundId, userId])
+  @@index([userId])
+}
+
+model RoundScore {
+  id                String   @id @default(cuid())
+  roundId           String
+  // partners totals for the round
+  team0Score        Int?
+  team1Score        Int?
+  team0Bags         Int?
+  team1Bags         Int?
+  team0RunningTotal Int?
+  team1RunningTotal Int?
+  // solo per-player for the round
+  player0Score      Int?
+  player1Score      Int?
+  player2Score      Int?
+  player3Score      Int?
+  // solo running totals
+  player0Running    Int?
+  player1Running    Int?
+  player2Running    Int?
+  player3Running    Int?
+  createdAt         DateTime @default(now())
+
+  @@unique([roundId])
+}
+
+model GameResult {
+  id           String   @id @default(cuid())
+  gameId       String   @unique
+  winner       String   // 'TEAM0'|'TEAM1' or 'SEAT_0..3' for solo
+  team0Final   Int?
+  team1Final   Int?
+  player0Final Int?
+  player1Final Int?
+  player2Final Int?
+  player3Final Int?
+  totalRounds  Int
+  totalTricks  Int
+  meta         Json?
+  createdAt    DateTime @default(now())
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  startsAt  DateTime
+  endsAt    DateTime
+  rules     Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model EventGame {
+  eventId String
+  gameId  String
+
+  @@id([eventId, gameId])
+  @@index([gameId])
+}
+
+model UserStatsBreakdown {
+  id             String   @id @default(cuid())
+  userId         String
+  isLeague       Boolean
+  mode           StatsMode
+  format         StatsFormat
+  gimmick        StatsGimmickVariant
+
+  gamesPlayed    Int      @default(0)
+  gamesWon       Int      @default(0)
+  winPct         Float    @default(0)
+  totalBags      Int      @default(0)
+  bagsPerGame    Float    @default(0)
+  nilsBid        Int      @default(0)
+  nilsMade       Int      @default(0)
+  nilPct         Float    @default(0)
+  blindNilsBid   Int      @default(0)
+  blindNilsMade  Int      @default(0)
+  blindNilPct    Float    @default(0)
+
+  @@unique([userId, isLeague, mode, format, gimmick])
+  @@index([userId])
+} 
