@@ -1,7 +1,7 @@
 import { Interaction, ChatInputCommandInteraction } from 'discord.js';
 import { handleAutocomplete } from './autocompleteHandler';
 import { handleVerifyFacebookButton, handleGameLineButtons } from './buttonHandlers';
-import { handleGameCommands, handleStatsCommand, handleHelpCommand } from './commandHandlers';
+import { handleGameCommands, handleStatsCommand, handleHelpCommand, handleLeaderboardCommand } from './commandHandlers';
 import { activeGameLines, channelToOpenLine } from '../game-management';
 
 export async function handleInteraction(interaction: Interaction) {
@@ -70,6 +70,12 @@ export async function handleInteraction(interaction: Interaction) {
   // Handle help command
   if (interaction.isChatInputCommand() && interaction.commandName === 'help') {
     await handleHelpCommand(interaction as ChatInputCommandInteraction);
+    return;
+  }
+  
+  // Handle leaderboard command
+  if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
+    await handleLeaderboardCommand(interaction as ChatInputCommandInteraction);
     return;
   }
 }

@@ -225,7 +225,7 @@ export async function handleStatsCommand(interaction: ChatInputCommandInteractio
       .addFields(
         { name: 'TOTAL GAMES:', value: '\u200b', inline: false },
         { name: '🎮 Games', value: totalGames.toString(), inline: true },
-        { name: '�� Wins', value: totalWins.toString(), inline: true },
+        { name: '🏆 Wins', value: totalWins.toString(), inline: true },
         { name: '📈 Win Rate', value: `${totalWinPercentage}%`, inline: true },
         { name: '\u200b', value: '\u200b', inline: false },
         { name: 'LEAGUE GAMES:', value: '\u200b', inline: false },
@@ -295,5 +295,158 @@ export async function handleHelpCommand(interaction: ChatInputCommandInteraction
   } catch (error) {
     console.error('Error in help command:', error);
     await interaction.editReply('❌ Error displaying help. Please try again.');
+  }
+}
+
+export async function handleLeaderboardCommand(interaction: ChatInputCommandInteraction) {
+  try {
+    await interaction.deferReply();
+  } catch (error) {
+    console.error('Error deferring leaderboard reply:', error);
+    return;
+  }
+  
+  try {
+    const metric = interaction.options.getString('metric', true);
+    
+    // Get leaderboard data from database
+    const leaderboard = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        UserStats: {
+          select: {
+            gamesPlayed: true,
+            gamesWon: true,
+            totalBags: true,
+            bagsPerGame: true,
+            nilsBid: true,
+            nilsMade: true,
+          }
+        }
+      },
+      where: {
+        UserStats: {
+          gamesPlayed: {
+            gt: 0 // Only include users who have played games
+          }
+        }
+      },
+      orderBy: getOrderByForMetric(metric),
+      take: 10
+    });
+    
+    if (leaderboard.length === 0) {
+      await interaction.editReply('No players found for leaderboard.');
+      return;
+    }
+    
+    const embed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setTitle(`🏆 ${getMetricDisplayName(metric)} Leaderboard`)
+      .setDescription('Top 10 players')
+      .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
+      .setTimestamp();
+    
+    leaderboard.forEach((player, index) => {
+      const value = getPlayerValueForMetric(player, metric);
+      const displayValue = formatValueForMetric(value, metric);
+      
+      embed.addFields({
+        name: `${getRankEmoji(index + 1)} ${player.username}`,
+        value: displayValue,
+        inline: false
+      });
+    });
+    
+    await interaction.editReply({ embeds: [embed] });
+    
+  } catch (error) {
+    console.error('Error in leaderboard command:', error);
+    await interaction.editReply('❌ Error fetching leaderboard. Please try again.');
+  }
+}
+
+function getOrderByForMetric(metric: string) {
+  switch (metric) {
+    case 'games_won':
+      return { UserStats: { gamesWon: 'desc' as const } };
+    case 'games_played':
+      return { UserStats: { gamesPlayed: 'desc' as const } };
+    case 'win_pct':
+      return { 
+        UserStats: { 
+          gamesWon: 'desc' as const,
+          gamesPlayed: 'asc' as const 
+        } 
+      };
+    case 'bags_per_game':
+      return { 
+        UserStats: { 
+          bagsPerGame: 'desc' as const,
+          gamesPlayed: 'asc' as const 
+        } 
+      };
+    case 'nil_success_pct':
+      return { 
+        UserStats: { 
+          nilsMade: 'desc' as const,
+          nilsBid: 'asc' as const 
+        } 
+      };
+    default:
+      return { UserStats: { gamesWon: 'desc' as const } };
+  }
+}
+
+function getMetricDisplayName(metric: string): string {
+  switch (metric) {
+    case 'games_won': return 'Games Won';
+    case 'games_played': return 'Games Played';
+    case 'win_pct': return 'Win Percentage';
+    case 'bags_per_game': return 'Bags per Game';
+    case 'nil_success_pct': return 'Nil Success Rate';
+    default: return 'Games Won';
+  }
+}
+
+function getPlayerValueForMetric(player: any, metric: string): number {
+  const stats = player.UserStats;
+  if (!stats) return 0;
+  
+  switch (metric) {
+    case 'games_won':
+      return stats.gamesWon;
+    case 'games_played':
+      return stats.gamesPlayed;
+    case 'win_pct':
+      return stats.gamesPlayed > 0 ? (stats.gamesWon / stats.gamesPlayed) * 100 : 0;
+    case 'bags_per_game':
+      return stats.bagsPerGame;
+    case 'nil_success_pct':
+      return stats.nilsBid > 0 ? (stats.nilsMade / stats.nilsBid) * 100 : 0;
+    default:
+      return stats.gamesWon;
+  }
+}
+
+function formatValueForMetric(value: number, metric: string): string {
+  switch (metric) {
+    case 'win_pct':
+    case 'nil_success_pct':
+      return `${value.toFixed(1)}%`;
+    case 'bags_per_game':
+      return value.toFixed(2);
+    default:
+      return value.toString();
+  }
+}
+
+function getRankEmoji(rank: number): string {
+  switch (rank) {
+    case 1: return '🥇';
+    case 2: return '🥈';
+    case 3: return '🥉';
+    default: return `${rank}.`;
   }
 }

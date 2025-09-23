@@ -240,6 +240,18 @@ export async function postVerificationEmbed(client: any): Promise<void> {
       return;
     }
 
+    // Check recent messages for an existing verification embed
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const alreadyPosted = messages.some((m: any) => 
+      m.author.id === client.user?.id && 
+      m.embeds?.some((e: any) => (e.title || '').includes('League Game Rooms Access'))
+    );
+    
+    if (alreadyPosted) {
+      console.log('[DISCORD BOT] Verification embed already present; skipping post');
+      return;
+    }
+
     // Create the embed
     const embed = new EmbedBuilder()
       .setTitle('🎮 League Game Rooms Access')
