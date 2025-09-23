@@ -2,7 +2,8 @@ import { io } from '../../../index';
 import type { Game } from '../../../types/game';
 import prisma from '../../prisma';
 import { CoinManager } from '../../coin-management/coinManager';
-import { newdbRecordGameFinish } from '../../../newdb/writers';
+import { newdbRecordGameFinish } from "../../../newdb/writers";
+import { calculateAndStoreUserStats } from "../../../newdb/statistics";
 
 /**
  * Create GameResult entry for completed game
@@ -102,6 +103,8 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         totalTricks: totalTricks,
         finishedAt: new Date(),
       });
+          // Calculate and store user statistics
+      await calculateAndStoreUserStats(game.id);
     } catch (e) {
       console.warn('[NEWDB] Failed to record game finish:', e);
     }
