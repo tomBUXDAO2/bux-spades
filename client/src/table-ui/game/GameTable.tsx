@@ -1850,7 +1850,18 @@ export default function GameTable({
     function dealNext(idx: number) {
       setDealtCardCount(idx + 1);
       playCardSound();
-      
+    
+    // Remove card immediately from local hand for instant visual feedback
+    setGameState(prev => ({
+      ...prev,
+      hands: prev.hands?.map((hand, index) => {
+        const myPlayerIndex = prev.players?.findIndex(p => p?.id === user.id);
+        if (index === myPlayerIndex && Array.isArray(hand)) {
+          return hand.filter(c => !(c.suit === card.suit && c.rank === card.rank));
+        }
+        return hand;
+      })
+    }));      
       if (idx + 1 < sortedHand.length) {
         dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 50);
       } else {
@@ -2331,11 +2342,11 @@ export default function GameTable({
   }, []);
 
   // Calculate scores - use hand summary data if available, otherwise use game state
-  const team1Score = gameState.team1TotalScore ?? 0;
-  const team2Score = gameState.team2TotalScore ?? 0;
+  const team1Score = handSummaryData?.team1TotalScore ?? gameState.team1TotalScore ?? 0;
+  const team2Score = handSummaryData?.team2TotalScore ?? gameState.team2TotalScore ?? 0;
   // Bag counter should show only the last digit (modulo 10)
-  const team1Bags = (gameState.team1Bags ?? 0) % 10;
-  const team2Bags = (gameState.team2Bags ?? 0) % 10;
+  const team1Bags = ((handSummaryData?.team1Bags ?? gameState.team1Bags) ?? 0) % 10;
+  const team2Bags = ((handSummaryData?.team2Bags ?? gameState.team2Bags) ?? 0) % 10;
 
   // Update cardPlayers when game state changes
   useEffect(() => {
@@ -2678,7 +2689,18 @@ export default function GameTable({
     console.log('[CLIENT] Current game state:', { status: gameState.status, currentPlayer: gameState.currentPlayer, myTurn: gameState.currentPlayer === user.id });
     console.log('[CLIENT] Card being played:', `${card.rank}${card.suit}`);
     playCardSound();
-    setPendingPlayedCard(card); // Optimistically show the card
+    
+    // Remove card immediately from local hand for instant visual feedback
+    setGameState(prev => ({
+      ...prev,
+      hands: prev.hands?.map((hand, index) => {
+        const myPlayerIndex = prev.players?.findIndex(p => p?.id === user.id);
+        if (index === myPlayerIndex && Array.isArray(hand)) {
+          return hand.filter(c => !(c.suit === card.suit && c.rank === card.rank));
+        }
+        return hand;
+      })
+    }));    setPendingPlayedCard(card); // Optimistically show the card
     socket.emit('play_card', { gameId: gameState.id, userId: user.id, card });
     console.log('[CLIENT] play_card event emitted');
   };
