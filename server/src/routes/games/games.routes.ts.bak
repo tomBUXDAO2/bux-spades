@@ -121,7 +121,7 @@ router.get('/', async (req: Request, res: Response) => {
           bid: null as any,
           tricks: null as any,
           points: null as any,
-          bags: null as any
+          bags: null
         })),
         rules: {},
         createdAt: (dbGame as any).createdAt

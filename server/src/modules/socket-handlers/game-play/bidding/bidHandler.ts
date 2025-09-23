@@ -6,6 +6,8 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
 import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { prismaNew } from '../../../../newdb/client';
+import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
 
 /**
  * Get the database user ID for a player (human or bot)
@@ -75,6 +77,12 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
         where: { id: game.dbGameId },
         data: { status: 'BIDDING' }
       });
+      // Dual-write to new DB status as well
+      try {
+        await prismaNew.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any } });
+      } catch (err) {
+        console.error('[MAKE BID DEBUG] Failed to update newdb game status to BIDDING:', err);
+      }
     }
 
     // Persist the bid to database (RoundBid upsert) before proceeding
@@ -118,6 +126,14 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
             createdAt: new Date()
           }
         });
+      }
+
+      // Dual-write: ensure round and upsert bid in new DB
+      try {
+        const roundId = await newdbEnsureRound({ gameId: game.id, roundNumber: game.currentRound || 1, dealerSeatIndex: game.dealerIndex ?? 0 });
+        await newdbUpsertBid({ roundId, userId, seatIndex: playerIndex, bid });
+      } catch (err) {
+        console.error('[MAKE BID DEBUG] Failed to dual-write bid to new DB:', err);
       }
     } catch (err) {
       console.error('[MAKE BID DEBUG] Failed to persist RoundBid:', err);

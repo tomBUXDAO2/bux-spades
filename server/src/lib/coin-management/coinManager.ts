@@ -1,5 +1,7 @@
 import prisma from '../prisma';
 import type { Game } from '../../types/game';
+import { prismaNew } from '../../newdb/client';
+import { useNewDbOnly } from '../../newdb/toggle';
 
 /**
  * Handles all coin operations for completed games
@@ -14,13 +16,13 @@ export class CoinManager {
    * Only processes once per game to prevent double deductions/payouts
    */
   static async processGameCoins(game: Game, winningTeamOrPlayer: number): Promise<void> {
-    if (!game.dbGameId) {
+    if (!game.dbGameId && !useNewDbOnly) {
       console.log('[COIN MANAGER] No dbGameId, skipping coin processing');
       return;
     }
 
     // Check if we've already processed this game
-    if (this.processedGames.has(game.dbGameId)) {
+    if (game.dbGameId && this.processedGames.has(game.dbGameId)) {
       console.log('[COIN MANAGER] Game already processed, skipping:', game.dbGameId);
       return;
     }
@@ -36,17 +38,20 @@ export class CoinManager {
       return;
     }
 
-    console.log('[COIN MANAGER] Processing coins for game:', game.dbGameId, 'Buy-in:', game.buyIn);
+    console.log('[COIN MANAGER] Processing coins for game:', game.dbGameId ?? game.id, 'Buy-in:', game.buyIn);
 
     try {
-      // Mark this game as processed to prevent double processing
-      this.processedGames.add(game.dbGameId);
+      // Mark this game as processed to prevent double processing (old db id path)
+      if (game.dbGameId) this.processedGames.add(game.dbGameId);
 
       // Get all human players
       const humanPlayers = game.players.filter(p => p && p.type === 'human');
 
+      // Choose client based on flag
+      const client: any = useNewDbOnly ? prismaNew : prisma;
+
       // Process coins in a transaction
-      await prisma.$transaction(async (tx) => {
+      await client.$transaction(async (tx: any) => {
         // First, deduct buy-ins from all human players
         await this.deductBuyIns(tx, humanPlayers, game.buyIn);
         
@@ -54,11 +59,11 @@ export class CoinManager {
         await this.distributePrizes(tx, game, winningTeamOrPlayer, humanPlayers);
       });
 
-      console.log('[COIN MANAGER] Successfully processed coins for game:', game.dbGameId);
+      console.log('[COIN MANAGER] Successfully processed coins for game:', game.dbGameId ?? game.id);
     } catch (error) {
-      console.error('[COIN MANAGER ERROR] Failed to process coins for game:', game.dbGameId, error);
+      console.error('[COIN MANAGER ERROR] Failed to process coins for game:', game.dbGameId ?? game.id, error);
       // Remove from processed set so it can be retried
-      this.processedGames.delete(game.dbGameId);
+      if (game.dbGameId) this.processedGames.delete(game.dbGameId);
       throw error;
     }
   }
@@ -112,7 +117,7 @@ export class CoinManager {
   }
 
   /**
-   * Distribute prizes to winners based on game mode
+   * Distribute prizes for winners based on game mode
    */
   private static async distributePrizes(tx: any, game: Game, winningTeamOrPlayer: number, humanPlayers: any[]): Promise<void> {
     console.log('[COIN MANAGER] Distributing prizes for', game.gameMode, 'game');

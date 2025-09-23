@@ -161,7 +161,7 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
 
     // Delete unrated games from database completely
     if (!game.rated) {
-      // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
+      await deleteUnratedGameFromDatabase(game);
     }
 
     // const { updateStatsAndCoins } = await import('../routes/games.routes');

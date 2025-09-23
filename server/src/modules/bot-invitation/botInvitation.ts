@@ -2,6 +2,9 @@ import type { Game } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import prisma from '../../lib/prisma';
+import { prismaNew } from '../../newdb/client';
+import { newdbUpsertGamePlayer } from '../../newdb/writers';
+import { useNewDbOnly } from '../../newdb/toggle';
 
 // Single bot user ID for all bots
 const BOT_USER_ID = 'bot-user-universal';
@@ -70,9 +73,22 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
     points: 0,
   };
   
-  // If game is already in DB, upsert GamePlayer row for this bot
+  // If game exists in new DB, upsert GamePlayer row for this bot as well (dual-write)
   try {
-    if (game.dbGameId) {
+    await newdbUpsertGamePlayer({
+      gameId: game.id,
+      userId: botDisplayId,
+      seatIndex,
+      teamIndex: game.gameMode === 'PARTNERS' ? (seatIndex % 2) : null,
+      isHuman: false,
+    });
+  } catch (err) {
+    console.error('[BOT INVITATION] Failed to upsert newdb GamePlayer for bot seat:', err);
+  }
+  
+  // If game is already in old DB, upsert GamePlayer row for this bot
+  try {
+    if (!useNewDbOnly && game.dbGameId) {
       await prisma.gamePlayer.upsert({
         where: { gameId_position: { gameId: game.dbGameId, position: seatIndex } as any },
         update: {

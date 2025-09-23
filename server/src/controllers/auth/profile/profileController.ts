@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../../../lib/prisma';
+import { prismaNew } from '../../../newdb/client';
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -7,35 +7,24 @@ export const getProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: (req.user as any).id },
-      include: { UserStats: true }
+    // Use NEW DB only
+    const userNew = await prismaNew.user.findUnique({
+      where: { id: (req.user as any).id }
     });
 
-    if (!user) {
+    if (!userNew) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const stats = user.UserStats as any;
-
-    res.json({
+    return res.json({
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        discordId: user.discordId,
-        avatar: user.avatar,
-        coins: user.coins,
-        stats: {
-          gamesPlayed: stats?.gamesPlayed || 0,
-          gamesWon: stats?.gamesWon || 0,
-          nilsBid: stats?.nilsBid || 0,
-          nilsMade: stats?.nilsMade || 0,
-          blindNilsBid: stats?.blindNilsBid || 0,
-          blindNilsMade: stats?.blindNilsMade || 0,
-          totalBags: stats?.totalBags || 0,
-          bagsPerGame: stats?.bagsPerGame || 0
-        }
+        id: userNew.id,
+        username: userNew.username,
+        email: null, // Not in new schema yet
+        discordId: userNew.discordId,
+        avatar: userNew.avatarUrl,
+        coins: userNew.coins,
+        stats: {} // Will be populated from UserStatsBreakdown later
       }
     });
   } catch (error) {
@@ -50,15 +39,15 @@ export const updateProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { username, email, avatar } = req.body;
+    const { username, email, avatar, soundEnabled } = req.body;
     const userId = (req.user as any).id;
 
-    // Check if username is already taken
+    // Check if username is already taken (if updating username)
     if (username) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          username,
-          NOT: { id: userId }
+      const existingUser = await prismaNew.user.findFirst({
+        where: { 
+          username, 
+          id: { not: userId }
         }
       });
 
@@ -67,25 +56,25 @@ export const updateProfile = async (req: Request, res: Response) => {
       }
     }
 
-    // Update user
-    const updatedUser = await prisma.user.update({
+    // Update user in NEW DB
+    const updatedUser = await prismaNew.user.update({
       where: { id: userId },
       data: {
         ...(username && { username }),
-        ...(email && { email }),
-        ...(avatar && { avatar }),
-        updatedAt: new Date()
+        ...(avatar && { avatarUrl: avatar }),
+        ...(typeof soundEnabled === 'boolean' && { soundEnabled })
+        // Note: email not in new schema yet
       }
     });
 
-    res.json({ 
+    res.json({
       message: 'Profile updated successfully',
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
-        email: updatedUser.email,
+        email: null, // Not in new schema yet
         discordId: updatedUser.discordId,
-        avatar: updatedUser.avatar,
+        avatar: updatedUser.avatarUrl,
         coins: updatedUser.coins
       }
     });

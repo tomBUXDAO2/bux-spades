@@ -130,7 +130,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
             try {
               // Clean up database using the same function as game completion
               if (game.dbGameId) {
-                // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
+                await deleteUnratedGameFromDatabase(game);
               }
               
               // Remove game from memory

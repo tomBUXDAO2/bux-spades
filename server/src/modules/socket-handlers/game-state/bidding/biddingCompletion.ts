@@ -5,6 +5,8 @@ import { botPlayCard } from '../../../bot-play/botLogic';
 import prisma from '../../../../lib/prisma';
 import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
+import { prismaNew } from '../../../../newdb/client';
+import { useNewDbOnly } from '../../../../newdb/toggle';
 
 /**
  * Handles bidding completion
@@ -99,6 +101,19 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
       console.log('[BIDDING COMPLETE] Updated game status to PLAYING in database:', game.dbGameId);
     } catch (err) {
       console.error('[BIDDING COMPLETE] Failed to update game status in database:', err);
+    }
+  }
+
+  // NEW DB: also update status when using new DB only
+  if (useNewDbOnly) {
+    try {
+      await prismaNew.game.update({
+        where: { id: game.id },
+        data: { status: 'PLAYING' as any }
+      });
+      console.log('[BIDDING COMPLETE] Updated new DB game status to PLAYING:', game.id);
+    } catch (err) {
+      console.error('[BIDDING COMPLETE] Failed to update new DB game status:', err);
     }
   }
   

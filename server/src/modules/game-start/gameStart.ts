@@ -5,6 +5,8 @@ import prisma from '../../lib/prisma';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
+import { newdbCreateRound } from '../../newdb/writers';
+import { prismaNew } from '../../newdb/client';
 
 /**
  * Handles start_game socket event
@@ -64,6 +66,19 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
         game.players[index]!.hand = hand;
       }
     });
+
+    // Dual-write: update new DB Game status and create Round + initial hand snapshots
+    try {
+      await prismaNew.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any, startedAt: new Date() } });
+      await newdbCreateRound({
+        gameId: game.id,
+        roundNumber: 1,
+        dealerSeatIndex: dealerIndex,
+        initialHands: hands.map((hand, i) => ({ seatIndex: i, cards: hand.map(c => ({ suit: c.suit, rank: c.rank })) })),
+      });
+    } catch (err) {
+      console.error('[GAME START] Failed dual-write to new DB for round start:', err);
+    }
 
     // Bidding phase state
     const firstBidder = game.players[(dealerIndex + 1) % 4];
