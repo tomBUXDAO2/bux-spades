@@ -80,10 +80,10 @@ export async function handleBiddingTimeout(game: Game, playerIndex: number): Pro
     const nextIndex = (playerIndex + 1) % 4;
     const nextPlayer = game.players[nextIndex];
     game.bidding.currentPlayer = nextPlayer?.id ?? '';
-    
+  
     io.to(game.id).emit('game_update', enrichGameForClient(game));
-    
-    // If next player is bot, trigger their move
+  
+  // If next player is bot, trigger their move
     if (nextPlayer?.type === 'bot') {
       botMakeMove(game, nextIndex);
     } else {

@@ -34,6 +34,7 @@ export default function TablePage() {
 
   // Detect spectate intent
   const isSpectator = new URLSearchParams(location.search).get('spectate') === '1';
+  const [isSpectatorLocal, setIsSpectatorLocal] = useState(isSpectator);
 
   // Check if device is mobile or tablet
   const isMobileOrTablet = () => {
@@ -270,7 +271,7 @@ export default function TablePage() {
             console.error('[AUTO-JOIN FALLBACK] Error auto-joining user to game:', error);
           }
         }
-        
+
         // ROBUSTNESS CHECK: If user is not in game but should be (based on server state), try to add them
         if (!isUserInGame && !isSpectator && data.status === 'WAITING') {
           console.log('[ROBUSTNESS CHECK] User not found in game but game is WAITING, checking if they should be added...');
@@ -560,7 +561,7 @@ export default function TablePage() {
     
     if (socket && socket.connected && user && gameId) {
       // Only join via socket if we're not spectating and the game exists
-      if (!isSpectator) {
+      if (!isSpectatorLocal) {
         console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
         socket.emit('join_game', { gameId });
       } else {
@@ -568,7 +569,7 @@ export default function TablePage() {
         socket.emit('join_game_as_spectator', { gameId });
       }
     }
-  }, [socket, user, gameId, isSpectator]);
+  }, [socket, user, gameId, isSpectatorLocal]);
 
   // Listen for trick animation events to control animation state
   useEffect(() => {
@@ -591,35 +592,71 @@ export default function TablePage() {
     };
   }, [socket]);
   // Only join as a player if not spectating
-  const handleJoinGame = async () => {
-    if (!user || !gameId || isSpectator) return;
+  const handleJoinGame = async (
+    gameIdParam?: string,
+    userIdParam?: string,
+    options?: { seat?: number; username?: string; avatar?: string }
+  ) => {
+    const targetGameId = gameIdParam || gameId;
+    const targetUserId = userIdParam || user?.id;
     try {
-      console.log('[HTTP JOIN] Attempting to join game via HTTP:', { gameId, userId: user.id });
-      const response = await api.post(`/api/games/${gameId}/join`, {
-        id: user.id,
-        username: user.username,
-        avatar: user.avatar
+      if (!targetGameId || !targetUserId) return;
+
+      // If a specific seat is provided (e.g., spectator clicking JOIN seat), use it
+      if (options?.seat !== undefined) {
+        console.log('[HTTP JOIN] Spectator joining specific seat via HTTP:', { gameId: targetGameId, seat: options.seat });
+        const response = await api.post(`/api/games/${targetGameId}/join`, {
+          id: targetUserId,
+          username: options.username ?? user?.username,
+          avatar: options.avatar ?? user?.avatar,
+          seat: options.seat,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('[HTTP JOIN] Failed to join seat:', errorData);
+          throw new Error(`Failed to join seat: ${errorData.error || 'Unknown error'}`);
+        }
+        const joinResponse = await response.json();
+        const updatedGame = joinResponse.game;
+        console.log('[HTTP JOIN] Joined seat successfully. Updated game:', updatedGame);
+        setGame(prevGame => ({ ...prevGame, ...updatedGame }));
+        updateModalState(updatedGame);
+
+        // Now join the socket room as a player
+        if (socket && socket.connected) {
+          console.log('[HTTP JOIN] Emitting socket join after seat join:', { targetGameId });
+          socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() });
+        }
+
+        // Flip spectator status locally
+        setIsSpectatorLocal(false);
+        return;
+      }
+
+      // Default behavior (non-spectator user joining without specifying a seat)
+      if (isSpectatorLocal) return; // keep spectators from generic join without seat
+
+      console.log('[HTTP JOIN] Attempting to join game via HTTP:', { gameId: targetGameId, userId: targetUserId });
+      const response = await api.post(`/api/games/${targetGameId}/join`, {
+        id: targetUserId,
+        username: user?.username,
+        avatar: user?.avatar,
       });
       if (!response.ok) {
         const errorData = await response.json();
         console.error('[HTTP JOIN] Failed to join game:', errorData);
         throw new Error(`Failed to join game: ${errorData.error || 'Unknown error'}`);
       }
-      const joinResponse = await response.json(); const updatedGame = joinResponse.game;
+      const joinResponse = await response.json();
+      const updatedGame = joinResponse.game;
       console.log('[HTTP JOIN] Successfully joined game:', updatedGame);
       console.log('[HTTP JOIN] Game players after join:', updatedGame.players?.map((p: any, i: number) => `${i}: ${p ? p.id : 'null'}`));
       setGame(prevGame => ({ ...prevGame, ...updatedGame }));
-      // Update modal state when joining game
       updateModalState(updatedGame);
-      
-      // After successful HTTP join, emit socket join
+
       if (socket && socket.connected) {
         console.log('[HTTP JOIN] Emitting socket join after successful HTTP join, socket connected:', socket.connected);
-        socket.emit('join_game', {
-          gameId,
-          userId: user.id,
-          timestamp: new Date().toISOString()
-        });
+        socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() });
       } else {
         console.log('[HTTP JOIN] Socket not connected, cannot emit join_game');
       }
@@ -766,7 +803,7 @@ export default function TablePage() {
           onCloseBotWarning={handleCloseBotWarning}
           emptySeats={emptySeats}
           botCount={botCount}
-          isSpectator={isSpectator}
+          isSpectator={isSpectatorLocal}
 
         />
       </div>

@@ -3,7 +3,7 @@ import { io } from '../../../index';
 import { games } from '../../../gamesStore';
 import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 
-export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
+export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watchOnly, seat, username, avatar }: { gameId: string; watchOnly?: boolean; seat?: number; username?: string; avatar?: string }): Promise<void> {
   console.log('[JOIN GAME DEBUG] Socket join request:', {
     gameId,
     socketId: socket.id,
@@ -15,7 +15,38 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
   if (!socket.isAuthenticated || !socket.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     return;
-  }
+
+  // Handle spectator joining a specific seat
+  if (watchOnly === false && seat !== undefined && username && avatar) {
+    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
+    
+    // Find the game
+    const game = games.get(gameId);
+    if (!game) {
+      socket.emit("error", { message: "Game not found" });
+      return;
+    }
+    
+    // Check if seat is empty
+    if (game.players[seat]) {
+      socket.emit("error", { message: "Seat is already occupied" });
+      return;
+    }
+    
+    // Add player to the seat
+    game.players[seat] = {
+      id: socket.userId,
+      username: username,
+      avatar: avatar,
+      isBot: false
+    };
+    
+    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
+    
+    // Emit game update to all clients
+    io.to(gameId).emit("game_update", enrichGameForClient(game));
+    return;
+  }  }
 
   try {
     console.log('[JOIN GAME DEBUG] Looking for game:', gameId);
@@ -30,7 +61,38 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
       console.log('[JOIN GAME DEBUG] Game not found:', gameId);
       socket.emit('error', { message: 'Game not found' });
       return;
+
+  // Handle spectator joining a specific seat
+  if (watchOnly === false && seat !== undefined && username && avatar) {
+    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
+    
+    // Find the game
+    const game = games.get(gameId);
+    if (!game) {
+      socket.emit("error", { message: "Game not found" });
+      return;
     }
+    
+    // Check if seat is empty
+    if (game.players[seat]) {
+      socket.emit("error", { message: "Seat is already occupied" });
+      return;
+    }
+    
+    // Add player to the seat
+    game.players[seat] = {
+      id: socket.userId,
+      username: username,
+      avatar: avatar,
+      isBot: false
+    };
+    
+    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
+    
+    // Emit game update to all clients
+    io.to(gameId).emit("game_update", enrichGameForClient(game));
+    return;
+  }    }
 
     console.log('[SERVER DEBUG] Found game:', {
       gameId: game.id,
@@ -57,7 +119,38 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
       // IMPORTANT: Also emit to all players in the room to sync the UI
       io.to(gameId).emit('game_update', enrichGameForClient(game));
       return; // Exit early since user is already in game
+
+  // Handle spectator joining a specific seat
+  if (watchOnly === false && seat !== undefined && username && avatar) {
+    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
+    
+    // Find the game
+    const game = games.get(gameId);
+    if (!game) {
+      socket.emit("error", { message: "Game not found" });
+      return;
     }
+    
+    // Check if seat is empty
+    if (game.players[seat]) {
+      socket.emit("error", { message: "Seat is already occupied" });
+      return;
+    }
+    
+    // Add player to the seat
+    game.players[seat] = {
+      id: socket.userId,
+      username: username,
+      avatar: avatar,
+      isBot: false
+    };
+    
+    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
+    
+    // Emit game update to all clients
+    io.to(gameId).emit("game_update", enrichGameForClient(game));
+    return;
+  }    }
 
     // Check if user is in another game (using database)
     const { prisma } = await import('../../../lib/prisma');
@@ -78,13 +171,75 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId }: { 
     if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
       socket.emit('error', { message: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
       return;
+
+  // Handle spectator joining a specific seat
+  if (watchOnly === false && seat !== undefined && username && avatar) {
+    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
+    
+    // Find the game
+    const game = games.get(gameId);
+    if (!game) {
+      socket.emit("error", { message: "Game not found" });
+      return;
     }
+    
+    // Check if seat is empty
+    if (game.players[seat]) {
+      socket.emit("error", { message: "Seat is already occupied" });
+      return;
+    }
+    
+    // Add player to the seat
+    game.players[seat] = {
+      id: socket.userId,
+      username: username,
+      avatar: avatar,
+      isBot: false
+    };
+    
+    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
+    
+    // Emit game update to all clients
+    io.to(gameId).emit("game_update", enrichGameForClient(game));
+    return;
+  }    }
     // For socket joins, we don't have a specific seat request, so find empty seat
     const emptySeatIndex = game.players.findIndex(p => p === null);
     if (emptySeatIndex === -1) {
       socket.emit('error', { message: 'Game is full' });
       return;
+
+  // Handle spectator joining a specific seat
+  if (watchOnly === false && seat !== undefined && username && avatar) {
+    console.log("[SPECTATOR JOIN] Attempting to join seat:", { gameId, seat, username, userId: socket.userId });
+    
+    // Find the game
+    const game = games.get(gameId);
+    if (!game) {
+      socket.emit("error", { message: "Game not found" });
+      return;
     }
+    
+    // Check if seat is empty
+    if (game.players[seat]) {
+      socket.emit("error", { message: "Seat is already occupied" });
+      return;
+    }
+    
+    // Add player to the seat
+    game.players[seat] = {
+      id: socket.userId,
+      username: username,
+      avatar: avatar,
+      isBot: false
+    };
+    
+    console.log("[SPECTATOR JOIN] Successfully joined seat", seat, "for user", socket.userId);
+    
+    // Emit game update to all clients
+    io.to(gameId).emit("game_update", enrichGameForClient(game));
+    return;
+  }    }
 
     // Add player to game - fetch user data from database
     const userData = await prisma.user.findUnique({

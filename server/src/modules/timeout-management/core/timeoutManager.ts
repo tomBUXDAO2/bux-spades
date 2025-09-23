@@ -67,7 +67,7 @@ export function clearTurnTimeout(game: Game, playerId: string): void {
     
     // Clear main timer
     if (existingTimeout.timer) {
-      clearTimeout(existingTimeout.timer);
+    clearTimeout(existingTimeout.timer);
     }
     
     // Clear warning timer
@@ -89,7 +89,7 @@ export function clearTurnTimeoutOnly(game: Game, playerId: string): void {
   if (existingTimeout) {
     // Clear main timer
     if (existingTimeout.timer) {
-      clearTimeout(existingTimeout.timer);
+    clearTimeout(existingTimeout.timer);
     }
     
     // Clear warning timer
