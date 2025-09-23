@@ -333,13 +333,26 @@ export async function handleLeaderboardCommand(interaction: ChatInputCommandInte
         }
       },
       orderBy: getOrderByForMetric(metric),
-      take: 10
+      take: 50 // Get more data to sort properly for complex metrics
     });
     
     if (leaderboard.length === 0) {
       await interaction.editReply('No players found for leaderboard.');
       return;
     }
+    
+    // For complex metrics, sort in application
+    let sortedLeaderboard = leaderboard;
+    if (metric === 'win_pct' || metric === 'nil_success_pct') {
+      sortedLeaderboard = leaderboard.sort((a, b) => {
+        const aValue = getPlayerValueForMetric(a, metric);
+        const bValue = getPlayerValueForMetric(b, metric);
+        return bValue - aValue; // Descending order
+      });
+    }
+    
+    // Take top 10
+    const top10 = sortedLeaderboard.slice(0, 10);
     
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
@@ -348,7 +361,7 @@ export async function handleLeaderboardCommand(interaction: ChatInputCommandInte
       .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
       .setTimestamp();
     
-    leaderboard.forEach((player, index) => {
+    top10.forEach((player, index) => {
       const value = getPlayerValueForMetric(player, metric);
       const displayValue = formatValueForMetric(value, metric);
       
@@ -374,26 +387,11 @@ function getOrderByForMetric(metric: string) {
     case 'games_played':
       return { UserStats: { gamesPlayed: 'desc' as const } };
     case 'win_pct':
-      return { 
-        UserStats: { 
-          gamesWon: 'desc' as const,
-          gamesPlayed: 'asc' as const 
-        } 
-      };
+      return { UserStats: { gamesWon: 'desc' as const } };
     case 'bags_per_game':
-      return { 
-        UserStats: { 
-          bagsPerGame: 'desc' as const,
-          gamesPlayed: 'asc' as const 
-        } 
-      };
+      return { UserStats: { bagsPerGame: 'desc' as const } };
     case 'nil_success_pct':
-      return { 
-        UserStats: { 
-          nilsMade: 'desc' as const,
-          nilsBid: 'asc' as const 
-        } 
-      };
+      return { UserStats: { nilsMade: 'desc' as const } };
     default:
       return { UserStats: { gamesWon: 'desc' as const } };
   }
