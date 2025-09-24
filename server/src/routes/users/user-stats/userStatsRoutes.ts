@@ -18,10 +18,21 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       prismaNew.userStats.findUnique({ where: { userId } })
     ]);
     
+    console.log('[USER STATS API] User found:', !!user);
+    console.log('[USER STATS API] UserStats found:', !!userStats);
+    if (userStats) {
+      console.log('[USER STATS API] UserStats data:', {
+        totalGamesPlayed: userStats.totalGamesPlayed,
+        totalGamesWon: userStats.totalGamesWon,
+        totalBags: userStats.totalBags
+      });
+    }
+    
     if (!user) return res.status(404).json({ message: 'User not found' });
     
     // If no stats exist, return default values
     if (!userStats) {
+      console.log('[USER STATS API] No UserStats found, returning defaults');
       return res.json({
         stats: {
           gamesPlayed: 0,
@@ -149,6 +160,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       });
     }
     
+    console.log('[USER STATS API] Returning UserStats data');
+    
     // Calculate percentages
     const totalWinPct = userStats.totalGamesPlayed > 0 ? (userStats.totalGamesWon / userStats.totalGamesPlayed) * 100 : 0;
     const totalBagsPerGame = userStats.totalGamesPlayed > 0 ? userStats.totalBags / userStats.totalGamesPlayed : 0;
@@ -181,7 +194,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     const soloNilPct = userStats.soloNilsBid > 0 ? (userStats.soloNilsMade / userStats.soloNilsBid) * 100 : 0;
     const soloBlindNilPct = userStats.soloBlindNilsBid > 0 ? (userStats.soloBlindNilsMade / userStats.soloBlindNilsBid) * 100 : 0;
     
-    res.json({
+    const response = {
       stats: {
         // Overall stats
         gamesPlayed: userStats.totalGamesPlayed,
@@ -310,7 +323,16 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
         soloAssassinWinPct: userStats.soloAssassinPlayed > 0 ? Math.round((userStats.soloAssassinWon / userStats.soloAssassinPlayed) * 100 * 100) / 100 : 0
       },
       coins: user.coins ?? 0
+    };
+    
+    console.log('[USER STATS API] Response data:', {
+      gamesPlayed: response.stats.gamesPlayed,
+      gamesWon: response.stats.gamesWon,
+      winPct: response.stats.winPct,
+      totalBags: response.stats.totalBags
     });
+    
+    res.json(response);
   } catch (error) {
     console.error('[USER STATS API] Error:', error);
     res.status(500).json({ message: 'Internal server error' });
