@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "BidType" AS ENUM ('REGULAR', 'WHIZ', 'MIRRORS', 'GIMMICK');
+CREATE TYPE "BidType" AS ENUM ('REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK');
 
 -- CreateEnum
 CREATE TYPE "GameMode" AS ENUM ('PARTNERS', 'SOLO');

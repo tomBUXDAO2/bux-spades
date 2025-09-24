@@ -146,10 +146,21 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     
     // Emit game over event
     if (game.gameMode === 'SOLO') {
-      io.to(game.id).emit('game_over', {
-        playerScores: game.playerScores,
-        winningPlayer: winningTeamOrPlayer,
-      });
+      // Fetch latest running totals to ensure final round is included
+      try {
+        const { default: prisma } = await import('../../prisma');
+        const latest = await prisma.gameScore.findFirst({ where: { gameId: game.dbGameId as any }, orderBy: { roundNumber: 'desc' } });
+        const finalPlayerScores = latest ? [
+          latest.player0RunningTotal || 0,
+          latest.player1RunningTotal || 0,
+          latest.player2RunningTotal || 0,
+          latest.player3RunningTotal || 0,
+        ] : (game.playerScores || [0,0,0,0]);
+        io.to(game.id).emit('game_over', { playerScores: finalPlayerScores, winningPlayer: winningTeamOrPlayer });
+      } catch (e) {
+        console.warn('[GAME COMPLETION] Failed to fetch latest solo running totals, falling back', e);
+        io.to(game.id).emit('game_over', { playerScores: game.playerScores, winningPlayer: winningTeamOrPlayer });
+      }
     } else {
       io.to(game.id).emit('game_over', {
         team1Score: game.team1TotalScore,

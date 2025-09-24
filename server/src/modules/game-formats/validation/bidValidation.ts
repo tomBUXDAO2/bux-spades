@@ -7,7 +7,7 @@ import { GameFormatConfig, GimmickType } from '../config/gameFormatTypes';
 export function validateBid(bid: number, hand: any[], gameFormat: GameFormatConfig, playerIndex: number, game: Game): { valid: boolean; error?: string } {
   switch (gameFormat.format) {
     case 'MIRROR':
-      return validateMirrorsBid(bid, hand);
+      return validateMirrorBid(bid, hand);
     case 'WHIZ':
       return validateWhizBid(bid, hand);
     case 'GIMMICK':
@@ -28,12 +28,12 @@ function validateRegularBid(bid: number): { valid: boolean; error?: string } {
 }
 
 /**
- * Validates mirrors bid (must bid number of spades)
+ * Validates mirror bid (must bid number of spades)
  */
-function validateMirrorsBid(bid: number, hand: any[]): { valid: boolean; error?: string } {
+function validateMirrorBid(bid: number, hand: any[]): { valid: boolean; error?: string } {
   const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
   if (bid !== spadesCount) {
-    return { valid: false, error: `In Mirrors, you must bid exactly ${spadesCount} (number of spades in hand)` };
+    return { valid: false, error: `In Mirror, you must bid exactly ${spadesCount} (number of spades in hand)` };
   }
   return { valid: true };
 }

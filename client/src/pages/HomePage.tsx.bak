@@ -526,7 +526,7 @@ const HomePage: React.FC = () => {
       label = 'WHIZ';
     } else if (type === 'MIRROR') {
       color = 'bg-red-600';
-      label = 'MIRRORS';
+      label = 'MIRROR';
     } else if (type === 'GIMMICK') {
       color = 'bg-orange-500';
       const rawGt = (game as any).rules?.gimmickType || '';

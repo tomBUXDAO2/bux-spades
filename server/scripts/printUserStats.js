@@ -41,18 +41,18 @@ const { PrismaClient } = require('@prisma/client');
     const partnersWon = partners.filter(gp => gp.won).length;
     const soloWon = solo.filter(gp => gp.won).length;
 
-    // Format breakdown (normalize MIRROR->MIRRORS)
+    // Format breakdown (normalize MIRROR->MIRROR)
     function isType(game, type) {
       const raw = game.bidType;
-      if (type === 'MIRRORS') return raw === 'MIRROR';
+      if (type === 'MIRROR') return raw === 'MIRROR';
       return raw === type;
     }
     const regPlayed = finished.filter(gp => isType(gp.Game, 'REGULAR')).length;
     const regWon = finished.filter(gp => isType(gp.Game, 'REGULAR') && gp.won).length;
     const whizPlayed = finished.filter(gp => isType(gp.Game, 'WHIZ')).length;
     const whizWon = finished.filter(gp => isType(gp.Game, 'WHIZ') && gp.won).length;
-    const mirrorsPlayed = finished.filter(gp => isType(gp.Game, 'MIRRORS')).length;
-    const mirrorsWon = finished.filter(gp => isType(gp.Game, 'MIRRORS') && gp.won).length;
+    const mirrorPlayed = finished.filter(gp => isType(gp.Game, 'MIRROR')).length;
+    const mirrorWon = finished.filter(gp => isType(gp.Game, 'MIRROR') && gp.won).length;
     const gimmickPlayed = finished.filter(gp => isType(gp.Game, 'GIMMICK')).length;
     const gimmickWon = finished.filter(gp => isType(gp.Game, 'GIMMICK') && gp.won).length;
 
@@ -84,7 +84,7 @@ const { PrismaClient } = require('@prisma/client');
     }
     fmtLine('Regular', regWon, regPlayed);
     fmtLine('Whiz', whizWon, whizPlayed);
-    fmtLine('Mirrors', mirrorsWon, mirrorsPlayed);
+    fmtLine('Mirror', mirrorWon, mirrorPlayed);
     fmtLine('Gimmick', gimmickWon, gimmickPlayed);
     console.log('Special Rules');
     console.log('(won/played)(win %)');

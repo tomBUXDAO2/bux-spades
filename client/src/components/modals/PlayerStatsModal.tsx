@@ -91,7 +91,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const gameModeBreakdown = {
     regular: `${stats.regWon || 0}/${stats.regPlayed || 0}`,
     whiz: `${stats.whizWon || 0}/${stats.whizPlayed || 0}`,
-    mirrors: `${stats.mirrorWon || 0}/${stats.mirrorPlayed || 0}`,
+    mirror: `${stats.mirrorWon || 0}/${stats.mirrorPlayed || 0}`,
     gimmick: `${stats.gimmickWon || 0}/${stats.gimmickPlayed || 0}`
   };
 
@@ -266,9 +266,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xl text-white">Mirrors</span>
+                  <span className="text-xl text-white">Mirror</span>
                   <div className="flex space-x-8">
-                    <span className="text-xl text-white">{gameModeBreakdown.mirrors}</span>
+                    <span className="text-xl text-white">{gameModeBreakdown.mirror}</span>
                     <span className="text-xl text-white">{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
                   </div>
                 </div>

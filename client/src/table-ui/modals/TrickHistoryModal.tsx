@@ -121,7 +121,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
     return '♠';
   };
 
-  // Small-card CSS renderer (mirrors table small card styling)
+  // Small-card CSS renderer (mirror table small card styling)
   const SmallCssCard = ({ rank, suit, highlight = false }: { rank: string; suit: '♠'|'♥'|'♦'|'♣'; highlight?: boolean }) => {
     const suitSymbol = suit;
     const suitColor = suit === '♥' || suit === '♦' ? 'text-red-600' : 'text-black';

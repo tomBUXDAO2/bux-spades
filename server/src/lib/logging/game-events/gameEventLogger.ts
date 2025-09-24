@@ -22,7 +22,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
         bidType = 'REGULAR';
         break;
       case 'MIRROR':
-        bidType = 'MIRRORS';
+        bidType = '';
         break;
       case 'WHIZ':
       case 'GIMMICK':

@@ -194,7 +194,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
       biddingOption: ((): string => {
         const t = (gameLine.gameType || 'regular').toLowerCase();
         if (t === 'whiz') return 'WHIZ';
-        if (t === 'mirror' || t === 'mirrors') return 'MIRROR';
+        if (t === 'mirror' || t === 'mirror') return 'MIRROR';
         if (t === 'suicide') return 'SUICIDE';
         if (t === 'bid3' || t === 'bid 3') return 'BID 3';
         if (t === 'bidhearts' || t === 'bid hearts') return 'BID HEARTS';

@@ -15,7 +15,7 @@ A modern multiplayer Spades card game platform with customizable rules, real-tim
 - **Flexible Bidding Options**:
   - Regular (with optional nil and blind nil)
   - Whiz (must bid nil or number of spades)
-  - Mirrors (forced to bid number of spades)
+  - Mirror (forced to bid number of spades)
   - Gimmick (hearts, bid 3, bid 4 or nil, suicide)
 - **Special Rules**:
   - Screamer (spade play restrictions)
@@ -143,7 +143,7 @@ bux-spades-2.0/
 All game modes use the same scoring system, with differences only in bidding rules:
 - **Regular**: Standard bidding with optional nil and blind nil
 - **Whiz**: Must bid nil or number of spades in hand
-- **Mirrors**: Forced to bid number of spades in hand
+- **Mirror**: Forced to bid number of spades in hand
 - **Gimmick**: Forced specific bids:
   - Hearts bid: Must bid hearts
   - Bid 3: Must bid 3

@@ -213,7 +213,7 @@ model GameResult {
 enum BidType {
   REGULAR
   WHIZ
-  MIRRORS
+  MIRROR
   GIMMICK
 }
 

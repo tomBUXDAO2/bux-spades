@@ -165,7 +165,7 @@ router.post('/', rateLimit({ key: 'create_game', windowMs: 10_000, max: 5 }), re
       const dbBidType = ((): any => {
         const opt = newGame.rules.bidType;
         if (opt === 'WHIZ') return 'WHIZ';
-        if (opt === 'MIRROR') return 'MIRRORS';
+        if (opt === 'MIRROR') return 'MIRROR';
         if (opt === 'SUICIDE' || opt === '4 OR NIL' || opt === 'BID 3' || opt === 'BID HEARTS' || opt === 'CRAZY ACES') return 'GIMMICK';
         return 'REGULAR';
       })();
@@ -2904,7 +2904,7 @@ async function logCompletedGame(game: Game, winningTeamOrPlayer: number) {
         creatorId: game.players[0]?.id || 'unknown', // Use first player as creator
         status: 'FINISHED',
         gameMode: game.gameMode,
-                  bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK',
+                  bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : 'GIMMICK',
         specialRules: Object.keys(game.specialRules || {}).filter(key => game.specialRules?.[key as keyof typeof game.specialRules]).map(key => {
           if (key === 'screamer') return 'SCREAMER';
           if (key === 'assassin') return 'ASSASSIN';
@@ -3626,7 +3626,7 @@ export async function logGameStart(game: Game) {
         creatorId,
         status: 'PLAYING', // Game is now in progress
         gameMode: gameMode as any, // Cast to enum
-        bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK' as any, // Map to schema enum
+        bidType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : 'GIMMICK' as any, // Map to schema enum
         specialRules: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[],
         minPoints: game.rules?.minPoints || 0,
         maxPoints: game.rules?.maxPoints || 0,
@@ -3643,7 +3643,7 @@ export async function logGameStart(game: Game) {
         cancelled: false,
         finalScore: 0, // Will be updated when game completes
         winner: 0, // Will be updated when game completes
-        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRRORS' : 'GIMMICK',
+        gameType: bidType === 'WHIZ' ? 'WHIZ' : bidType === 'MIRROR' ? 'MIRROR' : 'GIMMICK',
         league: (game as any).league || false, // Add league flag
         specialRulesApplied: Object.keys(specialRules).filter(key => specialRules[key as keyof typeof specialRules] === true) as any[]
       }

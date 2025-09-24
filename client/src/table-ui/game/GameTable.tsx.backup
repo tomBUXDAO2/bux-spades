@@ -3715,7 +3715,7 @@ const [isStarting, setIsStarting] = useState(false);
                 label = 'WHIZ';
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
-                label = 'MIRRORS';
+                label = 'MIRROR';
               } else if (type === 'GIMMICK') {
                 color = 'bg-orange-500';
                 const rawGt = (gameState as any).rules?.gimmickType || (gameState as any).forcedBid || '';

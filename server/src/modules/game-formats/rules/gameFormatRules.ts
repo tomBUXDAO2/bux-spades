@@ -11,7 +11,7 @@ export function getGameFormatDescription(format: GameFormatConfig): string {
     case 'WHIZ':
       return 'Whiz - must bid nil or number of spades';
     case 'MIRROR':
-      return 'Mirrors - must bid number of spades in hand';
+      return 'Mirror - must bid number of spades in hand';
     case 'GIMMICK':
       return getGimmickDescription(format.gimmickType!);
     default:

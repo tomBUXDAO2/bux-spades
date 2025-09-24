@@ -161,6 +161,110 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     }
     
     console.log('[USER STATS API] Returning UserStats data');
+
+    // Respond with mode-specific stats including breakdowns
+    if (gameMode === 'PARTNERS' || gameMode === 'SOLO' || gameMode === 'ALL') {
+      const prefix = gameMode === 'PARTNERS' ? 'partners' : (gameMode === 'SOLO' ? 'solo' : 'total');
+      const get = (name: string) => (userStats as any)[`${prefix}${name}`] || 0;
+      const playedWon = (played: number, won: number) => played > 0 ? Math.round((won / played) * 10000) / 100 : 0;
+
+      const modeStats = {
+        // Core
+        gamesPlayed: get('GamesPlayed'),
+        gamesWon: get('GamesWon'),
+        winPct: playedWon(get('GamesPlayed'), get('GamesWon')),
+        nilsBid: get('NilsBid'),
+        nilsMade: get('NilsMade'),
+        nilPct: playedWon(get('NilsBid'), get('NilsMade')),
+        blindNilsBid: get('BlindNilsBid'),
+        blindNilsMade: get('BlindNilsMade'),
+        blindNilPct: playedWon(get('BlindNilsBid'), get('BlindNilsMade')),
+        totalBags: get('Bags'),
+        bagsPerGame: get('GamesPlayed') > 0 ? Math.round((get('Bags') / get('GamesPlayed')) * 100) / 100 : 0,
+        // Breakdown - Regular
+        regPlayed: get('RegularPlayed'),
+        regWon: get('RegularWon'),
+        regWinPct: playedWon(get('RegularPlayed'), get('RegularWon')),
+        // Breakdown - Whiz
+        whizPlayed: get('WhizPlayed'),
+        whizWon: get('WhizWon'),
+        whizWinPct: playedWon(get('WhizPlayed'), get('WhizWon')),
+        // Breakdown - Mirror
+        mirrorPlayed: get('MirrorPlayed'),
+        mirrorWon: get('MirrorWon'),
+        mirrorWinPct: playedWon(get('MirrorPlayed'), get('MirrorWon')),
+        // Breakdown - Gimmick
+        gimmickPlayed: get('GimmickPlayed'),
+        gimmickWon: get('GimmickWon'),
+        gimmickWinPct: playedWon(get('GimmickPlayed'), get('GimmickWon')),
+        // Breakdown - Screamer
+        screamerPlayed: get('ScreamerPlayed'),
+        screamerWon: get('ScreamerWon'),
+        screamerWinPct: playedWon(get('ScreamerPlayed'), get('ScreamerWon')),
+        // Breakdown - Assassin
+        assassinPlayed: get('AssassinPlayed'),
+        assassinWon: get('AssassinWon'),
+        assassinWinPct: playedWon(get('AssassinPlayed'), get('AssassinWon')),
+      } as any;
+
+      return res.json({ stats: modeStats, coins: user.coins ?? 0 });
+    }
+
+
+    // If a gameMode is provided, return only that mode's stats
+    if (gameMode === 'PARTNERS' || gameMode === 'SOLO' || gameMode === 'ALL') {
+      const mode = gameMode || 'ALL';
+      const getModeSpecificStats = (mode: string) => {
+        switch (mode) {
+          case 'PARTNERS':
+            return {
+              gamesPlayed: userStats.partnersGamesPlayed,
+              gamesWon: userStats.partnersGamesWon,
+              winPct: userStats.partnersGamesPlayed > 0 ? Math.round((userStats.partnersGamesWon / userStats.partnersGamesPlayed) * 10000) / 100 : 0,
+              nilsBid: userStats.partnersNilsBid,
+              nilsMade: userStats.partnersNilsMade,
+              nilPct: userStats.partnersNilsBid > 0 ? Math.round((userStats.partnersNilsMade / userStats.partnersNilsBid) * 10000) / 100 : 0,
+              blindNilsBid: userStats.partnersBlindNilsBid,
+              blindNilsMade: userStats.partnersBlindNilsMade,
+              blindNilPct: userStats.partnersBlindNilsBid > 0 ? Math.round((userStats.partnersBlindNilsMade / userStats.partnersBlindNilsBid) * 10000) / 100 : 0,
+              totalBags: userStats.partnersBags,
+              bagsPerGame: userStats.partnersGamesPlayed > 0 ? Math.round((userStats.partnersBags / userStats.partnersGamesPlayed) * 100) / 100 : 0,
+            };
+          case 'SOLO':
+            return {
+              gamesPlayed: userStats.soloGamesPlayed,
+              gamesWon: userStats.soloGamesWon,
+              winPct: userStats.soloGamesPlayed > 0 ? Math.round((userStats.soloGamesWon / userStats.soloGamesPlayed) * 10000) / 100 : 0,
+              nilsBid: userStats.soloNilsBid,
+              nilsMade: userStats.soloNilsMade,
+              nilPct: userStats.soloNilsBid > 0 ? Math.round((userStats.soloNilsMade / userStats.soloNilsBid) * 10000) / 100 : 0,
+              blindNilsBid: userStats.soloBlindNilsBid,
+              blindNilsMade: userStats.soloBlindNilsMade,
+              blindNilPct: userStats.soloBlindNilsBid > 0 ? Math.round((userStats.soloBlindNilsMade / userStats.soloBlindNilsBid) * 10000) / 100 : 0,
+              totalBags: userStats.soloBags,
+              bagsPerGame: userStats.soloGamesPlayed > 0 ? Math.round((userStats.soloBags / userStats.soloGamesPlayed) * 100) / 100 : 0,
+            };
+          case 'ALL':
+          default:
+            return {
+              gamesPlayed: userStats.totalGamesPlayed,
+              gamesWon: userStats.totalGamesWon,
+              winPct: userStats.totalGamesPlayed > 0 ? Math.round((userStats.totalGamesWon / userStats.totalGamesPlayed) * 10000) / 100 : 0,
+              nilsBid: userStats.totalNilsBid,
+              nilsMade: userStats.totalNilsMade,
+              nilPct: userStats.totalNilsBid > 0 ? Math.round((userStats.totalNilsMade / userStats.totalNilsBid) * 10000) / 100 : 0,
+              blindNilsBid: userStats.totalBlindNilsBid,
+              blindNilsMade: userStats.totalBlindNilsMade,
+              blindNilPct: userStats.totalBlindNilsBid > 0 ? Math.round((userStats.totalBlindNilsMade / userStats.totalBlindNilsBid) * 10000) / 100 : 0,
+              totalBags: userStats.totalBags,
+              bagsPerGame: userStats.totalGamesPlayed > 0 ? Math.round((userStats.totalBags / userStats.totalGamesPlayed) * 100) / 100 : 0,
+            };
+        }
+      };
+      const modeStats = getModeSpecificStats(mode);
+      return res.json({ stats: modeStats, coins: user.coins ?? 0 });
+    }
+
     
     // Calculate percentages
     const totalWinPct = userStats.totalGamesPlayed > 0 ? (userStats.totalGamesWon / userStats.totalGamesPlayed) * 100 : 0;
