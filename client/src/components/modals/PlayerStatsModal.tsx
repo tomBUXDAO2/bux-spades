@@ -61,7 +61,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
         console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
         const response = await api.get(url);
-        const stats = await response.json();
+        const data = await response.json(); const stats = data.stats || data;
         console.log('[PLAYER STATS MODAL] Received stats:', stats);
         setCurrentStats(stats);
       } catch (error) {
