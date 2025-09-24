@@ -49,7 +49,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
-  const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 
   // Fetch stats when mode changes or player changes
   useEffect(() => {
@@ -253,22 +252,22 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Regular</span>
                   <span className="text-white">{gameModeBreakdown.regular}</span>
-                  <span className="text-white">{Math.round((stats.regWon / stats.regPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.regWon || 0) / (stats.regPlayed || 1)) * 100)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Whiz</span>
                   <span className="text-white">{gameModeBreakdown.whiz}</span>
-                  <span className="text-white">{Math.round((stats.whizWon / stats.whizPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.whizWon || 0) / (stats.whizPlayed || 1)) * 100)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Mirrors</span>
                   <span className="text-white">{gameModeBreakdown.mirrors}</span>
-                  <span className="text-white">{Math.round((stats.mirrorWon / stats.mirrorPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.mirrorWon || 0) / (stats.mirrorPlayed || 1)) * 100)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Gimmick</span>
                   <span className="text-white">{gameModeBreakdown.gimmick}</span>
-                  <span className="text-white">{Math.round((stats.gimmickWon / stats.gimmickPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.gimmickWon || 0) / (stats.gimmickPlayed || 1)) * 100)}%</span>
                 </div>
               </div>
             </div>
@@ -280,12 +279,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Screamer</span>
                   <span className="text-white">{specialRules.screamer}</span>
-                  <span className="text-white">{Math.round((stats.screamerWon / stats.screamerPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.screamerWon || 0) / (stats.screamerPlayed || 1)) * 100)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Assassin</span>
                   <span className="text-white">{specialRules.assassin}</span>
-                  <span className="text-white">{Math.round((stats.assassinWon / stats.assassinPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{Math.round(((stats.assassinWon || 0) / (stats.assassinPlayed || 1)) * 100)}%</span>
                 </div>
               </div>
             </div>
