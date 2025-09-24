@@ -214,64 +214,42 @@ function canLeadSpades(game: GameState, hand: Card[]): boolean {
 function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean, trickCompleted: boolean = false): Card[] {
   if (!Array.isArray(hand) || !hand.length) return [];
 
+  // Normalized special rules: prefer top-level, fallback to rules.specialRules
+  const special = (game as any).specialRules || (game as any).rules?.specialRules || {};
+  
   // If leading the trick
   if (isLeadingTrick) {
-    // Check for Assassin rules first
-    if (game.specialRules?.assassin) {
-      // Assassin: cannot lead spades before they are broken, but if spades are broken and you have spades, all other cards are locked
-      const spades = Array.isArray(hand) ? hand.filter(isSpade) : [];
-      const nonSpades = Array.isArray(hand) ? hand.filter(card => !isSpade(card)) : [];
-      
-      console.log('[ASSASSIN DEBUG] Leading in Assassin mode:', {
-        hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : [],
-        spades: Array.isArray(spades) ? spades.map(card => `${card.rank}${card.suit}`) : [],
-        nonSpades: Array.isArray(nonSpades) ? nonSpades.map(card => `${card.rank}${card.suit}`) : [],
-        spadesBroken: hasSpadeBeenPlayed(game),
-        spadesCount: spades.length,
-        nonSpadesCount: nonSpades.length
-      });
-      
-      if (!hasSpadeBeenPlayed(game)) {
-        // Spades not broken yet - cannot lead spades unless only spades left
-        if (nonSpades.length > 0) {
-          console.log('[ASSASSIN DEBUG] Spades not broken, returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
-          return nonSpades; // Must lead non-spades if available
-        } else {
-          console.log('[ASSASSIN DEBUG] Spades not broken, only spades left, returning all cards');
-          return hand; // Only spades left, can lead spades
-        }
-      } else {
-        // Spades are broken - if you have spades, all other cards are locked
-        if (spades.length > 0) {
-          console.log('[ASSASSIN DEBUG] Spades broken and have spades, returning spades only:', spades.map(card => `${card.rank}${card.suit}`));
-          return spades; // Must lead spades if available
-        } else {
-          console.log('[ASSASSIN DEBUG] Spades broken but no spades in hand, returning all cards');
-          return hand; // No spades, can lead anything
-        }
+    // Assassin: if spades are broken, must lead spades if you have any
+    if (special?.assassin) {
+      const spadesBroken = (game as any).play?.spadesBroken;
+      const hasSpade = Array.isArray(hand) ? hand.some(c => c.suit === 'SPADES') : false;
+      if (spadesBroken && hasSpade) {
+        return (hand || []).filter(c => c.suit === 'SPADES');
       }
-    }
-    
-    // Check for Screamer rules
-    if (game.specialRules?.screamer) {
-      // Screamer: cannot lead spades unless only spades left (regardless of whether spades are broken)
-      const nonSpades = Array.isArray(hand) ? hand.filter(card => !isSpade(card)) : [];
-      if (nonSpades.length > 0) {
-        return nonSpades; // Must play non-spades if available
-      } else {
-        return hand; // Only spades left, can lead spades
+      // If not broken yet, standard rule: cannot lead spades unless only spades left
+      if (!spadesBroken) {
+        const nonSpades = Array.isArray(hand) ? (hand || []).filter(c => c.suit !== 'SPADES') : [];
+        if (nonSpades.length > 0) return nonSpades;
+        return hand || [];
       }
+      // Spades broken but no spades in hand -> can lead anything
+      return hand || [];
     }
-    
-    // Normal rules: If spades haven't been broken, filter out spades unless only spades remain
-    if (!canLeadSpades(game, hand)) {
-      const nonSpades = hand.filter(card => {
-        const s = (card.suit as unknown as string).toUpperCase();
-        return !(s === 'SPADES' || s === 'S' || s === '♠');
-      });
-      return nonSpades.length > 0 ? nonSpades : hand;
+
+    // Screamer: cannot lead spades if you have other suits
+    if (special?.screamer) {
+      const nonSpades = Array.isArray(hand) ? (hand || []).filter(c => c.suit !== 'SPADES') : [];
+      if (nonSpades.length > 0) return nonSpades;
+      return hand || [];
     }
-    return hand;
+
+    // Standard rule: cannot lead spades until broken unless only spades remain
+    const spadesBroken = (game as any).play?.spadesBroken;
+    if (!spadesBroken) {
+      const nonSpades = Array.isArray(hand) ? (hand || []).filter(c => c.suit !== 'SPADES') : [];
+      if (nonSpades.length > 0) return nonSpades;
+    }
+    return hand || [];
   }
 
   // If following
@@ -292,44 +270,21 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   }
   
   // Void in lead suit - can play any card, but apply special rules
-  console.log('[CARD LOCKING DEBUG] Void in lead suit, checking special rules:', {
-    specialRules: game.specialRules,
-    assassin: game.specialRules?.assassin,
-    screamer: game.specialRules?.screamer,
-    leadSuit,
-    hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : []
-  });
-  
-  if (game.specialRules?.assassin) {
-    // Assassin: when void in lead suit, all cards except spades are locked
+  if (special?.assassin) {
+    // Assassin: when void in lead suit, must cut with spades if available
     const spades = Array.isArray(hand) ? hand.filter(isSpade) : [];
-    if (spades.length > 0) {
-      return spades; // Must cut with spades if available
-    } else {
-      return hand; // No spades, can play anything
-    }
+    if (spades.length > 0) return spades;
+    return hand || [];
   }
   
-  if (game.specialRules?.screamer) {
-    // Screamer: cannot cut with spades unless only spades left (even after spades are broken)
-    const nonSpades = Array.isArray(hand) ? hand.filter(card => !isSpade(card)) : [];
-    console.log('[SCREAMER DEBUG] Void in lead suit, Screamer active:', {
-      hand: Array.isArray(hand) ? hand.map(card => `${card.rank}${card.suit}`) : [],
-      nonSpades: Array.isArray(nonSpades) ? nonSpades.map(card => `${card.rank}${card.suit}`) : [],
-      nonSpadesCount: nonSpades.length,
-      leadSuit,
-      cardSuits: Array.isArray(hand) ? hand.map(card => card.suit) : []
-    });
-    if (nonSpades.length > 0) {
-      console.log('[SCREAMER DEBUG] Returning non-spades only:', nonSpades.map(card => `${card.rank}${card.suit}`));
-      return nonSpades; // Must play non-spades if available
-    } else {
-      console.log('[SCREAMER DEBUG] Only spades left, returning all cards');
-      return hand; // Only spades left, can play spades
-    }
+  if (special?.screamer) {
+    // Screamer: cannot cut with spades unless only spades left
+    const nonSpades = Array.isArray(hand) ? hand.filter(c => c.suit !== 'SPADES') : [];
+    if (nonSpades.length > 0) return nonSpades;
+    return hand || [];
   }
-  
-  return hand; // No special rules, can play anything
+
+  return hand || [];
 }
 
 // Add this near the top of the file, after imports

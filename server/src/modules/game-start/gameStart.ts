@@ -7,6 +7,7 @@ import { botMakeMove } from '../bot-play/botLogic';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
 import { newdbCreateRound } from '../../newdb/writers';
 import { prismaNew } from '../../newdb/client';
+import { handleBiddingComplete } from '../socket-handlers/game-state/bidding/biddingCompletion';
 
 /**
  * Handles start_game socket event
@@ -102,6 +103,25 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
 
     // Emit game update to all clients
     io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+    // MIRROR: Auto-bid for all seats, then immediately complete bidding
+    if ((game as any).rules?.bidType === 'MIRROR') {
+      console.log('[GAME START][MIRROR] Auto-bidding for all players based on spade counts');
+      for (let i = 0; i < 4; i++) {
+        const hand = game.hands[i] || [];
+        const spades = hand.filter(c => c.suit === 'SPADES').length;
+        const bid = spades === 0 ? 0 : spades;
+        game.bidding.bids[i] = bid;
+        if (game.players[i]) {
+          game.players[i]!.bid = bid;
+        }
+      }
+      // Broadcast updated bids before moving to play
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      await handleBiddingComplete(game);
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
+      return; // Do not proceed with per-turn bidding scheduling
+    }
 
     // If first to bid is a bot, trigger bot move shortly after so UI can render dealing/animation
     const firstBidderIndex = (dealerIndex + 1) % 4;

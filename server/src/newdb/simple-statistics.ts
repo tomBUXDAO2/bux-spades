@@ -1,43 +1,49 @@
 import { prismaNew } from './client';
 
 export async function calculateAndStoreUserStats(gameId: string): Promise<void> {
-  console.log('[USER STATS] Calculating stats for game:', gameId);
   
   try {
-    // Get game details
+    // Load game data
     const game = await prismaNew.game.findUnique({
-      where: { id: gameId }
-    });
-
-    if (!game) {
-      console.error('[USER STATS] Game not found:', gameId);
-      return;
-    }
-
-    // Get game players
-    const gamePlayers = await prismaNew.gamePlayer.findMany({
-      where: { gameId }
-    });
-
-    // Get all rounds and their stats
-    const rounds = await prismaNew.round.findMany({
-      where: { gameId }
-    });
-
-    // Get player round stats for all rounds
-    const playerRoundStats = await prismaNew.playerRoundStats.findMany({
-      where: { 
-        roundId: { in: rounds.map(r => r.id) }
+      where: { id: gameId },
+      select: {
+        id: true,
+        isLeague: true,
+        mode: true,
+        format: true,
+        gimmickVariant: true,
+        specialRules: true
       }
     });
 
-    // Get game result
-    const gameResult = await prismaNew.gameResult.findUnique({
-      where: { gameId }
+    if (!game) {
+      console.log('[USER STATS] Game not found for stats:', gameId);
+      return;
+    }
+
+    // Load players
+    const gamePlayers = await prismaNew.gamePlayer.findMany({
+      where: { gameId },
+      select: { userId: true, seatIndex: true, teamIndex: true, isHuman: true }
     });
 
+    // Load round IDs for this game
+    const rounds = await prismaNew.round.findMany({
+      where: { gameId },
+      select: { id: true }
+    });
+    const roundIds = rounds.map(r => r.id);
+
+    // Load round stats used to compute per-player totals
+    const playerRoundStats = roundIds.length > 0 ? await prismaNew.playerRoundStats.findMany({
+      where: { roundId: { in: roundIds } as any },
+      select: { roundId: true, userId: true, seatIndex: true, teamIndex: true, bid: true, tricksWon: true, bagsThisRound: true, madeNil: true, madeBlindNil: true }
+    }) : [];
+
+    // Load final game result for winner
+    const gameResult = await prismaNew.gameResult.findUnique({ where: { gameId } });
     if (!gameResult) {
-      console.error('[USER STATS] Game result not found for game:', gameId);
+      console.log('[USER STATS] Game result not found for game:', gameId);
       return;
     }
 
@@ -50,6 +56,9 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       const mode = game.mode;
       const format = game.format;
       const gimmickVariant = game.gimmickVariant;
+      const special = (game as any).specialRules || {};
+      const hasScreamer = Boolean(special?.screamer);
+      const hasAssassin = Boolean(special?.assassin);
 
       // Get all rounds for this player
       const playerRounds = playerRoundStats.filter(prs => prs.userId === userId);
@@ -66,14 +75,9 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       console.log(`[USER STATS] Processing user ${userId}: gamesPlayed=${gamesPlayed}, gamesWon=${gamesWon}, totalBags=${totalBags}`);
 
       // Get or create user stats record
-      let userStats = await prismaNew.userStats.findUnique({
-        where: { userId }
-      });
-
+      let userStats = await prismaNew.userStats.findUnique({ where: { userId } });
       if (!userStats) {
-        userStats = await prismaNew.userStats.create({
-          data: { userId }
-        });
+        userStats = await prismaNew.userStats.create({ data: { userId } });
       }
 
       // Update all relevant fields
@@ -98,7 +102,7 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
         updateData.leagueBlindNilsMade = { increment: blindNilsMade };
       }
 
-      // Add mode-specific updates
+      // Add mode-specific bags counters
       if (mode === 'PARTNERS') {
         updateData.partnersGamesPlayed = { increment: gamesPlayed };
         updateData.partnersGamesWon = { increment: gamesWon };
@@ -176,6 +180,39 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
         }
       }
 
+      // Special rules: Screamer / Assassin
+      if (hasScreamer) {
+        updateData.totalScreamerPlayed = { increment: gamesPlayed };
+        updateData.totalScreamerWon = { increment: gamesWon };
+        if (isLeague) {
+          updateData.leagueScreamerPlayed = { increment: gamesPlayed };
+          updateData.leagueScreamerWon = { increment: gamesWon };
+        }
+        if (mode === 'PARTNERS') {
+          updateData.partnersScreamerPlayed = { increment: gamesPlayed };
+          updateData.partnersScreamerWon = { increment: gamesWon };
+        } else if (mode === 'SOLO') {
+          updateData.soloScreamerPlayed = { increment: gamesPlayed };
+          updateData.soloScreamerWon = { increment: gamesWon };
+        }
+      }
+
+      if (hasAssassin) {
+        updateData.totalAssassinPlayed = { increment: gamesPlayed };
+        updateData.totalAssassinWon = { increment: gamesWon };
+        if (isLeague) {
+          updateData.leagueAssassinPlayed = { increment: gamesPlayed };
+          updateData.leagueAssassinWon = { increment: gamesWon };
+        }
+        if (mode === 'PARTNERS') {
+          updateData.partnersAssassinPlayed = { increment: gamesPlayed };
+          updateData.partnersAssassinWon = { increment: gamesWon };
+        } else if (mode === 'SOLO') {
+          updateData.soloAssassinPlayed = { increment: gamesPlayed };
+          updateData.soloAssassinWon = { increment: gamesWon };
+        }
+      }
+
       // Update the user stats (counters)
       await prismaNew.userStats.update({
         where: { userId },
@@ -208,17 +245,21 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
 }
 
 function determineIfWon(gamePlayer: any, gameResult: any, gameMode: string): number {
-  if (gameMode === 'SOLO') {
-    // For solo games, check if this player's seat won
-    const seatIndex = gamePlayer.seatIndex;
-    const winner = gameResult.winner;
-    return winner === `SEAT_${seatIndex}` ? 1 : 0;
-  } else {
-    // For partners games, check if this player's team won
+  
+  try {
+    if (gameMode === 'SOLO') {
+      const seatIndex = gamePlayer.seatIndex;
+      const winner = gameResult.winner;
+      return winner === `SEAT_${seatIndex}` ? 1 : 0;
+    }
+    // Partners
     const teamIndex = gamePlayer.teamIndex;
     const winner = gameResult.winner;
     const expectedWinner = `TEAM${teamIndex}`;
     console.log(`[USER STATS] Checking win: teamIndex=${teamIndex}, expectedWinner=${expectedWinner}, actualWinner=${winner}`);
     return winner === expectedWinner ? 1 : 0;
+  } catch (e) {
+    console.warn('[USER STATS] determineIfWon failed, defaulting to 0:', e);
+    return 0;
   }
 }

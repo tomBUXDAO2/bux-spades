@@ -86,7 +86,8 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         if (game.gameMode === 'SOLO') {
           return `SEAT_${winningTeamOrPlayer}`;
         }
-        return winningTeamOrPlayer === 0 ? 'TEAM0' : 'TEAM1';
+        // Partners mode uses 1 for Team 0 (seats 0 & 2) and 2 for Team 1 (seats 1 & 3)
+        return winningTeamOrPlayer === 1 ? 'TEAM0' : 'TEAM1';
       })();
       await newdbRecordGameFinish({
         gameId: game.id,
@@ -103,7 +104,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         totalTricks: totalTricks,
         finishedAt: new Date(),
       });
-          // Calculate and store user statistics
+      // Calculate and store user statistics
       await calculateAndStoreUserStats(game.id);
     } catch (e) {
       console.warn('[NEWDB] Failed to record game finish:', e);
@@ -140,7 +141,7 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
       });
       console.log('[GAME COMPLETION] Updated database status to FINISHED for game:', game.dbGameId);
       
-      // Create GameResult entry
+      // Create GameResult entry (also records stats)
       await createGameResult(game, winningTeamOrPlayer);
     }
     
@@ -172,18 +173,16 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     // Process coins (buy-in deductions and prize payouts)
     // This only happens when the game is FINISHED to avoid losing coins on crashes
     await CoinManager.processGameCoins(game, winningTeamOrPlayer);
-
-    // Delete unrated games from database completely
-    if (!game.rated) {
-      // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
-    }
-
-    // const { updateStatsAndCoins } = await import('../routes/games.routes');
-    
-    
   } catch (error) {
     console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
     throw error;
+  } finally {
+    // Ensure stats are calculated even if createGameResult path was skipped
+    try {
+      await calculateAndStoreUserStats(game.id);
+    } catch (e) {
+      console.warn('[GAME COMPLETION] Failed to calculate user stats in finally:', e);
+    }
   }
 }
 

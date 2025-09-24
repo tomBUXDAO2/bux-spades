@@ -93,13 +93,41 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     console.log('[BOT DEBUG] Game.play is undefined, cannot play card.');
     return;
   }
+  // Guard: only act on the bot's actual turn
+  if (game.play.currentPlayerIndex !== seatIndex || game.play.currentPlayer !== bot.id) {
+    console.log('[BOT TURN DEBUG] Skipping botPlayCard; not seat', seatIndex, 'turn. currentIndex=', game.play.currentPlayerIndex, 'currentPlayerId=', game.play.currentPlayer, 'expectedBotId=', bot.id);
+    return;
+  }
 
   const hand = game.hands[seatIndex] || [];
   const leadSuit = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
-  const playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken);
+  let playableCards = getPlayableCards(hand, leadSuit, game.play.spadesBroken);
+
+  // Enforce special rules constraints on playable set so strategies (including nil) obey rules
+  const isLeading = leadSuit === null;
+  if (game.specialRules?.assassin) {
+    playableCards = getAssassinPlayableCards(game as any, hand as any, isLeading, game.play.currentTrick as any) as any;
+  } else if (game.specialRules?.screamer) {
+    playableCards = getScreamerPlayableCards(game as any, hand as any, isLeading, game.play.currentTrick as any) as any; // use helper to derive allowed set
+  }
 
   if (playableCards.length === 0) {
-    console.log(`[BOT CARD DEBUG] Bot ${bot.username} has no playable cards!`);
+    console.log(`[BOT CARD DEBUG] Bot ${bot.username} has no playable cards! Advancing turn.`);
+    // Advance turn gracefully when a bot cannot play (defensive against bad hand state)
+    const nextPlayerIndex = (seatIndex + 1) % 4;
+    game.play.currentPlayer = game.players[nextPlayerIndex]?.id || '';
+    game.play.currentPlayerIndex = nextPlayerIndex;
+    io.to(game.id).emit("game_update", enrichGameForClient(game));
+    if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
+      setTimeout(() => {
+        if (game.play?.currentPlayerIndex === nextPlayerIndex) {
+          botPlayCard(game, nextPlayerIndex);
+        }
+      }, 300);
+    } else if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'human') {
+      // Start timeout for the human player's turn
+      startTurnTimeout(game, nextPlayerIndex, 'playing');
+    }
     return;
   }
 
@@ -120,7 +148,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
   }
 
   if (botBid === 0) {
-    // Bot is nil - use sophisticated nil strategy
+    // Bot is nil - but still must obey special rules constraints via playableCards above
     console.log(`[BOT NIL] Bot ${bot.username} is playing nil`);
     const nilInput: NilPlayInput = {
       hand: playableCards,
@@ -128,7 +156,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
       leadSuit,
       spadesBroken: game.play.spadesBroken,
       playerIndex: seatIndex,
-      isLeading: leadSuit === null,
+      isLeading: isLeading,
       playOrder
     };
     const nilResult = getNilPlay(nilInput);
@@ -136,7 +164,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     reason = nilResult.reason;
 
   } else if (partnerBid === 0) {
-    // Partner is nil - use sophisticated nil-cover strategy
+    // Partner is nil - still constrained by special rules via playableCards
     console.log(`[BOT NIL COVER] Bot ${bot.username} covering nil partner`);
     const nilCoverInput: NilCoverPlayInput = {
       hand: playableCards,
@@ -144,7 +172,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
       leadSuit,
       spadesBroken: game.play.spadesBroken,
       playerIndex: seatIndex,
-      isLeading: leadSuit === null,
+      isLeading: isLeading,
       nilPartnerIndex: partnerIndex,
       playOrder
     };
@@ -159,7 +187,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
       hand: playableCards,
       seatIndex,
       currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
+      isLeading: isLeading
     });
     card = screamerResult.card;
     reason = screamerResult.reason;
@@ -171,7 +199,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
       hand: playableCards,
       seatIndex,
       currentTrick: game.play.currentTrick,
-      isLeading: leadSuit === null
+      isLeading: isLeading
     });
     card = assassinResult.card;
     reason = assassinResult.reason;
@@ -223,7 +251,11 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
     io.to(game.id).emit("game_update", enrichGameForClient(game));
     
     if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'bot') {
-      setTimeout(() => botPlayCard(game, nextPlayerIndex), 300);
+      setTimeout(() => {
+        if (game.play?.currentPlayerIndex === nextPlayerIndex) {
+          botPlayCard(game, nextPlayerIndex);
+        }
+      }, 300);
     } else if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'human') {
       // Start timeout for the human player's turn
       startTurnTimeout(game, nextPlayerIndex, 'playing');

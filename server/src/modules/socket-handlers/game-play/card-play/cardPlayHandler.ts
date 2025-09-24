@@ -6,6 +6,7 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botPlayCard } from '../../../bot-play/botLogic';
 import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
 import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { getAssassinPlayableCards, getScreamerPlayableCards } from '../../../bot-play';
 
 /**
  * Handles play_card socket event
@@ -48,14 +49,50 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
       return;
     }
 
-    // Enforce leading spades rule: cannot lead spades until broken unless only spades remain
     const isLeading = game.play.currentTrick.length === 0;
-    if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
-      const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
-      if (!onlySpadesLeft) {
-        socket.emit('error', { message: 'Cannot lead spades until spades are broken (unless you only have spades).' });
+
+    // Compute allowed cards based on special rules (Assassin/Screamer) or standard rules
+    let allowedCards = hand.slice();
+    if (game.specialRules?.assassin) {
+      allowedCards = getAssassinPlayableCards(game as any, hand as any, isLeading, game.play.currentTrick as any) as any;
+    } else if (game.specialRules?.screamer) {
+      allowedCards = getScreamerPlayableCards(game as any, hand as any, isLeading, game.play.currentTrick as any) as any;
+    } else {
+      // Standard rules: enforce leading spades rule below and following suit
+      const leadSuitStd = game.play.currentTrick.length > 0 ? game.play.currentTrick[0].suit : null;
+      if (leadSuitStd) {
+        const followSuitCards = hand.filter(c => c.suit === leadSuitStd);
+        if (followSuitCards.length > 0) {
+          allowedCards = followSuitCards;
+        }
+      }
+    }
+
+    // Enforce leading spades rule for standard or screamer (assassin playable already encodes constraints)
+    if (!game.specialRules?.assassin) {
+      if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
+        const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
+        if (!onlySpadesLeft) {
+          socket.emit('error', { message: 'Cannot lead spades until spades are broken (unless you only have spades).' });
+          return;
+        }
+      }
+    }
+
+    // For Assassin: if leading and spades are broken and player has any spades, they must lead spades
+    if (game.specialRules?.assassin && isLeading && game.play.spadesBroken) {
+      const hasSpade = hand.some(c => c.suit === 'SPADES');
+      if (hasSpade && card.suit !== 'SPADES') {
+        socket.emit('error', { message: 'Assassin: When leading after spades are broken, you must lead spades if you have any.' });
         return;
       }
+    }
+
+    // Check if chosen card is within allowed set
+    const isAllowed = allowedCards.some(c => c.suit === card.suit && c.rank === card.rank);
+    if (!isAllowed) {
+      socket.emit('error', { message: 'Illegal card for current rules.' });
+      return;
     }
 
     // Remove card from hand

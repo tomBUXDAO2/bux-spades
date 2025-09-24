@@ -43,27 +43,44 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
     return;
   }
   
-  // Ensure bot user exists in database
   // Create bot with unique display name and ID
-  const botNumber = Math.floor(Math.random() * 1000);
   const botDisplayId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  let baseNumber = Math.floor(Math.random() * 1000);
+  let botUsername = `Bot ${baseNumber}`;
 
-  // Create bot user in database with unique ID
-  await prisma.user.upsert({
-    where: { id: botDisplayId },
-    update: {},
-    create: {
-      id: botDisplayId,
-      username: `Bot ${botNumber}`,
-      avatar: '/bot-avatar.jpg',
-      discordId: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
+  // Try upsert with retries to avoid username collisions
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      await prisma.user.upsert({
+        where: { id: botDisplayId },
+        update: {},
+        create: {
+          id: botDisplayId,
+          username: botUsername,
+          avatar: '/bot-avatar.jpg',
+          discordId: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+      break; // success
+    } catch (err: any) {
+      if (err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('username')) {
+        // Username collision: change username and retry
+        baseNumber = Math.floor(Math.random() * 1000);
+        botUsername = `Bot ${baseNumber}-${Math.random().toString(36).slice(-3)}`;
+        retries--;
+        if (retries === 0) throw err;
+      } else {
+        throw err;
+      }
     }
-  });  
+  }
+
   game.players[seatIndex] = {
-    id: botDisplayId, // Unique display ID for game logic
-    username: `Bot ${botNumber}`,
+    id: botDisplayId,
+    username: botUsername,
     avatar: '/bot-avatar.jpg',
     type: 'bot',
     position: seatIndex,
@@ -94,7 +111,7 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
         update: {
           userId: botDisplayId,
           team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
-          username: `Bot ${botNumber}`,
+          username: botUsername,
           updatedAt: new Date()
         },
         create: {
@@ -106,7 +123,7 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
           bid: null,
           bags: 0,
           points: 0,
-          username: `Bot ${botNumber}`,
+          username: botUsername,
           createdAt: new Date(),
           updatedAt: new Date()
         }

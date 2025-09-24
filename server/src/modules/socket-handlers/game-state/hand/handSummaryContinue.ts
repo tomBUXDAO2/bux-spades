@@ -5,13 +5,15 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import prisma from '../../../../lib/prisma';
 import { games } from '../../../../gamesStore';
 import { newdbCreateRound } from '../../../../newdb/writers';
+import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { handleBiddingComplete } from '../bidding/biddingCompletion';
 
 // Hand summary continue tracking
 const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
 const handSummaryTimers = new Map<string, NodeJS.Timeout>(); // gameId -> timer
 
 /**
- * Handles hand summary continue event from client
+ * Handles hand_summary_continue socket event
  */
 export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
   console.log('[HAND SUMMARY CONTINUE] Event received:', { gameId, socketId: socket.id, userId: socket.userId });
@@ -240,4 +242,22 @@ export async function startNewHand(game: Game): Promise<void> {
       botMakeMove(game, game.bidding.currentBidderIndex);
     }
   }, 1000);
+
+  // MIRROR: Auto-bid for new hand then immediately complete bidding
+  if ((game as any).rules?.bidType === 'MIRROR') {
+    console.log('[START NEW HAND][MIRROR] Auto-bidding for all players based on spade counts');
+    for (let i = 0; i < 4; i++) {
+      const hand = game.hands[i] || [];
+      const spades = hand.filter((c: any) => c.suit === 'SPADES').length;
+      const bid = spades === 0 ? 0 : spades;
+      game.bidding.bids[i] = bid;
+      if (game.players[i]) {
+        game.players[i]!.bid = bid;
+      }
+    }
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    await handleBiddingComplete(game);
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    return;
+  }
 }

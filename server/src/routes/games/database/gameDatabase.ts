@@ -42,12 +42,29 @@ export async function logGameStart(game: Game): Promise<void> {
     // NEW DB: dual-write game
     try {
       const formatMap = (game.rules?.bidType as any) || 'REGULAR';
+      const gimmickLegacy = (game.rules?.gimmickType as any) || undefined;
+      const gimmickVariant = ((): any => {
+        switch (gimmickLegacy) {
+          case 'BID_4_OR_NIL':
+            return 'BID4NIL';
+          case 'BID_HEARTS':
+            return 'BIDHEARTS';
+          case 'BID_3':
+            return 'BID3';
+          case 'CRAZY_ACES':
+            return 'CRAZY_ACES';
+          case 'SUICIDE':
+            return 'SUICIDE';
+          default:
+            return undefined;
+        }
+      })();
       await newdbCreateGame({
         gameId: game.id,
         createdById: game.creatorId,
         mode: (game.gameMode as any) || 'PARTNERS',
         format: (formatMap as any),
-        gimmickVariant: (game.rules?.gimmickType as any) || undefined,
+        gimmickVariant,
         isLeague: !!game.league,
         isRated: !!game.rated,
         status: (game.status as any),
