@@ -644,7 +644,7 @@ const HomePage: React.FC = () => {
         avatar: user.avatar,
         status: 'not_friend' as const,
         coins: user.coins,
-        stats: stats || {
+        stats: stats.stats || {
           gamesPlayed: 0,
           gamesWon: 0,
           nilsBid: 0,
@@ -689,7 +689,7 @@ const HomePage: React.FC = () => {
         avatar: player.avatar,
         status: player.status,
         coins: player.coins,
-        stats: stats || {
+        stats: stats.stats || {
           gamesPlayed: 0,
           gamesWon: 0,
           nilsBid: 0,
