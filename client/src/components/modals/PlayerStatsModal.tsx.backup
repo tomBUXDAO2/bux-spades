@@ -1,0 +1,368 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../../lib/api';
+
+interface PlayerStats {
+  gamesPlayed: number;
+  gamesWon: number;
+  totalBags?: number;
+  bagsPerGame?: number;
+  nilsBid: number;
+  nilsMade: number;
+  blindNilsBid: number;
+  blindNilsMade: number;
+  regPlayed?: number;
+  regWon?: number;
+  whizPlayed?: number;
+  whizWon?: number;
+  mirrorPlayed?: number;
+  mirrorWon?: number;
+  gimmickPlayed?: number;
+  gimmickWon?: number;
+  screamerPlayed?: number;
+  screamerWon?: number;
+  assassinPlayed?: number;
+  assassinWon?: number;
+  // Mode-specific totals
+  partnersGamesPlayed?: number;
+  partnersGamesWon?: number;
+  soloGamesPlayed?: number;
+  soloGamesWon?: number;
+  totalCoinsWon?: number; // Added for new code
+}
+
+interface Player {
+  username: string;
+  avatar: string;
+  stats: PlayerStats
+  coins?: number;
+  id: string;
+  status: 'friend' | 'blocked' | 'not_friend';
+}
+
+interface PlayerStatsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  player: Player | null;
+}
+
+const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
+  const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
+  const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
+
+  const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
+
+  // Fetch stats when mode changes or player changes
+  useEffect(() => {
+    if (!isOpen || !player || !player.id) return;
+
+    const fetchStats = async () => {
+      try {
+        const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
+        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
+        console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
+        const response = await api.get(url);
+        const data = await response.json(); const stats = data.stats || data;
+        console.log('[PLAYER STATS MODAL] Received stats:', stats);
+        setCurrentStats(stats);
+      } catch (error) {
+        console.error('Error fetching player stats:', error);
+        // Fallback to original stats
+        setCurrentStats(player.stats);
+      }
+    };
+
+    fetchStats();
+  }, [isOpen, player, mode]);
+
+  if (!isOpen || !player) return null;
+
+  const stats = currentStats || player.stats || {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    nilsBid: 0,
+    nilsMade: 0,
+    blindNilsBid: 0,
+    blindNilsMade: 0,
+  } as any;
+
+  const displayCoins = (stats as any)?.coins ?? player.coins ?? 0;
+
+  // Get mode-specific stats
+  const getModeSpecificStats = () => {
+    if (mode === 'partners') {
+      return {
+        gamesPlayed: stats.partnersGamesPlayed || 0,
+        gamesWon: stats.partnersGamesWon || 0,
+        totalBags: stats.partnersBags || 0,
+        bagsPerGame: stats.partnersBagsPerGame || 0,
+        nilsBid: stats.partnersNilsBid || 0,
+        nilsMade: stats.partnersNilsMade || 0,
+        blindNilsBid: stats.partnersBlindNilsBid || 0,
+        blindNilsMade: stats.partnersBlindNilsMade || 0,
+        regPlayed: stats.partnersRegPlayed || 0,
+        regWon: stats.partnersRegWon || 0,
+        whizPlayed: stats.partnersWhizPlayed || 0,
+        whizWon: stats.partnersWhizWon || 0,
+        mirrorPlayed: stats.partnersMirrorPlayed || 0,
+        mirrorWon: stats.partnersMirrorWon || 0,
+        gimmickPlayed: stats.partnersGimmickPlayed || 0,
+        gimmickWon: stats.partnersGimmickWon || 0,
+        screamerPlayed: stats.partnersScreamerPlayed || 0,
+        screamerWon: stats.partnersScreamerWon || 0,
+        assassinPlayed: stats.partnersAssassinPlayed || 0,
+        assassinWon: stats.partnersAssassinWon || 0,
+      };
+    } else if (mode === 'solo') {
+      return {
+        gamesPlayed: stats.soloGamesPlayed || 0,
+        gamesWon: stats.soloGamesWon || 0,
+        totalBags: stats.soloBags || 0,
+        bagsPerGame: stats.soloBagsPerGame || 0,
+        nilsBid: stats.soloNilsBid || 0,
+        nilsMade: stats.soloNilsMade || 0,
+        blindNilsBid: stats.soloBlindNilsBid || 0,
+        blindNilsMade: stats.soloBlindNilsMade || 0,
+        regPlayed: stats.soloRegPlayed || 0,
+        regWon: stats.soloRegWon || 0,
+        whizPlayed: stats.soloWhizPlayed || 0,
+        whizWon: stats.soloWhizWon || 0,
+        mirrorPlayed: stats.soloMirrorPlayed || 0,
+        mirrorWon: stats.soloMirrorWon || 0,
+        gimmickPlayed: stats.soloGimmickPlayed || 0,
+        gimmickWon: stats.soloGimmickWon || 0,
+        screamerPlayed: stats.soloScreamerPlayed || 0,
+        screamerWon: stats.soloScreamerWon || 0,
+        assassinPlayed: stats.soloAssassinPlayed || 0,
+        assassinWon: stats.soloAssassinWon || 0,
+      };
+    } else {
+      // ALL mode - use total stats
+      return {
+        gamesPlayed: stats.gamesPlayed || 0,
+        gamesWon: stats.gamesWon || 0,
+        totalBags: stats.totalBags || 0,
+        bagsPerGame: stats.bagsPerGame || 0,
+        nilsBid: stats.nilsBid || 0,
+        nilsMade: stats.nilsMade || 0,
+        blindNilsBid: stats.blindNilsBid || 0,
+        blindNilsMade: stats.blindNilsMade || 0,
+        regPlayed: stats.regPlayed || 0,
+        regWon: stats.regWon || 0,
+        whizPlayed: stats.whizPlayed || 0,
+        whizWon: stats.whizWon || 0,
+        mirrorPlayed: stats.mirrorPlayed || 0,
+        mirrorWon: stats.mirrorWon || 0,
+        gimmickPlayed: stats.gimmickPlayed || 0,
+        gimmickWon: stats.gimmickWon || 0,
+        screamerPlayed: stats.screamerPlayed || 0,
+        screamerWon: stats.screamerWon || 0,
+        assassinPlayed: stats.assassinPlayed || 0,
+        assassinWon: stats.assassinWon || 0,
+      };
+    }
+  };
+
+  const modeStats = getModeSpecificStats();
+
+  // Calculate game mode breakdown
+  const gameModeBreakdown = {
+    regular: `${modeStats.regWon || 0}/${modeStats.regPlayed || 0}`,
+    whiz: `${modeStats.whizWon || 0}/${modeStats.whizPlayed || 0}`,
+    mirrors: `${modeStats.mirrorWon || 0}/${modeStats.mirrorPlayed || 0}`,
+    gimmick: `${modeStats.gimmickWon || 0}/${modeStats.gimmickPlayed || 0}`
+  };
+
+  // Calculate special rules breakdown
+  const specialRules = {
+    screamer: `${modeStats.screamerWon || 0}/${modeStats.screamerPlayed || 0}`,
+    assassin: `${modeStats.assassinWon || 0}/${modeStats.assassinPlayed || 0}`
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <img src={player.avatar} alt={player.username} className="w-12 h-12 rounded-full" />
+              <div>
+                <h2 className="text-2xl font-bold text-white">{player.username}</h2>
+                <div className="flex space-x-4 mt-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="all"
+                      checked={mode === 'all'}
+                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
+                      className="text-blue-500"
+                    />
+                    <span className="text-white">ALL</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="partners"
+                      checked={mode === 'partners'}
+                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
+                      className="text-blue-500"
+                    />
+                    <span className="text-white">PARTNERS</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="solo"
+                      checked={mode === 'solo'}
+                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
+                      className="text-blue-500"
+                    />
+                    <span className="text-white">SOLO</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white text-3xl hover:text-gray-300"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Content - Two columns with equal height */}
+        <div className="grid grid-cols-2 gap-6 p-6">
+          {/* Left Column */}
+          <div className="flex flex-col">
+            {/* Player Profile Card */}
+            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+              <div className="flex items-center space-x-4 mb-4">
+                <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
+                <h3 className="text-3xl font-bold text-white">{player.username}</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-yellow-400 text-2xl">⭐</span>
+                    <span className="text-2xl font-bold text-yellow-400">{Math.round((modeStats.gamesWon / modeStats.gamesPlayed) * 100)}% Win</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-2xl font-bold text-yellow-400">{Number(displayCoins).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">🏁</div>
+                    <div className="text-lg text-slate-300">Played</div>
+                    <div className="text-xl font-bold text-white">{modeStats.gamesPlayed || 0}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">🏆</div>
+                    <div className="text-lg text-slate-300">Won</div>
+                    <div className="text-xl font-bold text-white">{modeStats.gamesWon || 0}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">🎒</div>
+                    <div className="text-lg text-slate-300">Bags</div>
+                    <div className="text-xl font-bold text-white">{modeStats.totalBags || 0}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white">✅</div>
+                    <div className="text-lg text-slate-300">Bags/G</div>
+                    <div className="text-xl font-bold text-white">{modeStats.bagsPerGame || 0}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Nil Stats */}
+            <div className="bg-slate-700 rounded-lg p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Nil Stats</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Type</span>
+                  <span className="text-slate-300">Bid</span>
+                  <span className="text-slate-300">Made</span>
+                  <span className="text-slate-300">%</span>
+                  <span className="text-slate-300">Points</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white">Nil</span>
+                  <span className="text-white">{modeStats.nilsBid || 0}</span>
+                  <span className="text-white">{modeStats.nilsMade || 0}</span>
+                  <span className="text-white">{Math.round((modeStats.nilsMade / modeStats.nilsBid) * 100) || 0}%</span>
+                  <span className="text-white">{modeStats.nilsMade || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white">Blind Nil</span>
+                  <span className="text-white">{modeStats.blindNilsBid || 0}</span>
+                  <span className="text-white">{modeStats.blindNilsMade || 0}</span>
+                  <span className="text-white">{Math.round((modeStats.blindNilsMade / modeStats.blindNilsBid) * 100) || 0}%</span>
+                  <span className="text-white">{modeStats.blindNilsMade || 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="flex flex-col">
+            {/* Game Mode Breakdown */}
+            <div className="bg-slate-700 rounded-lg p-6 mb-6">
+              <h3 className="text-xl font-bold text-white mb-4">Game Mode Breakdown</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Regular</span>
+                  <span className="text-white">{gameModeBreakdown.regular}</span>
+                  <span className="text-white">{Math.round((modeStats.regWon / modeStats.regPlayed) * 100) || 0}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Whiz</span>
+                  <span className="text-white">{gameModeBreakdown.whiz}</span>
+                  <span className="text-white">{Math.round((modeStats.whizWon / modeStats.whizPlayed) * 100) || 0}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Mirrors</span>
+                  <span className="text-white">{gameModeBreakdown.mirrors}</span>
+                  <span className="text-white">{Math.round((modeStats.mirrorWon / modeStats.mirrorPlayed) * 100) || 0}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Gimmick</span>
+                  <span className="text-white">{gameModeBreakdown.gimmick}</span>
+                  <span className="text-white">{Math.round((modeStats.gimmickWon / modeStats.gimmickPlayed) * 100) || 0}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Special Rules */}
+            <div className="bg-slate-700 rounded-lg p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Special Rules</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Screamer</span>
+                  <span className="text-white">{specialRules.screamer}</span>
+                  <span className="text-white">{Math.round((modeStats.screamerWon / modeStats.screamerPlayed) * 100) || 0}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">Assassin</span>
+                  <span className="text-white">{specialRules.assassin}</span>
+                  <span className="text-white">{Math.round((modeStats.assassinWon / modeStats.assassinPlayed) * 100) || 0}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PlayerStatsModal;
