@@ -6,12 +6,7 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
   try {
     // Get game details
     const game = await prismaNew.game.findUnique({
-      where: { id: gameId },
-      include: {
-        GamePlayer: {
-          include: { User: true }
-        }
-      }
+      where: { id: gameId }
     });
 
     if (!game) {
@@ -19,12 +14,20 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       return;
     }
 
+    // Get game players
+    const gamePlayers = await prismaNew.gamePlayer.findMany({
+      where: { gameId }
+    });
+
     // Get all rounds and their stats
     const rounds = await prismaNew.round.findMany({
-      where: { gameId },
-      include: {
-        PlayerRoundStats: true,
-        RoundScore: true
+      where: { gameId }
+    });
+
+    // Get player round stats for all rounds
+    const playerRoundStats = await prismaNew.playerRoundStats.findMany({
+      where: { 
+        roundId: { in: rounds.map(r => r.id) }
       }
     });
 
@@ -39,19 +42,18 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
     }
 
     // Calculate stats for each human player
-    for (const gamePlayer of game.GamePlayer) {
+    for (const gamePlayer of gamePlayers) {
       if (!gamePlayer.isHuman) continue;
 
       const userId = gamePlayer.userId;
       const isLeague = game.isLeague;
       const mode = game.mode === 'PARTNERS' ? 'PARTNERS' : 'SOLO';
       const format = game.format;
-      const gimmick = game.gimmickVariant || 'ALL';
+      // Only set gimmick if format is GIMMICK, otherwise null
+      const gimmick = game.format === 'GIMMICK' ? (game.gimmickVariant || 'ALL') : null;
 
       // Get all rounds for this player
-      const playerRounds = rounds.flatMap(r => 
-        r.PlayerRoundStats.filter(prs => prs.userId === userId)
-      );
+      const playerRounds = playerRoundStats.filter(prs => prs.userId === userId);
 
       // Calculate stats
       const gamesPlayed = 1;
@@ -69,76 +71,72 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       const blindNilsMade = playerRounds.filter(prs => prs.bid === -1 && prs.madeBlindNil).length;
       const blindNilPct = blindNilsBid > 0 ? blindNilsMade / blindNilsBid : 0;
 
-      // Upsert UserStatsBreakdown
-      await prismaNew.userStatsBreakdown.upsert({
-        where: {
-          userId_isLeague_mode_format_gimmick: {
-            userId,
-            isLeague,
-            mode: mode as any,
-            format: format as any,
-            gimmick: gimmick as any
-          }
-        },
-        update: {
-          gamesPlayed: { increment: gamesPlayed },
-          gamesWon: { increment: gamesWon },
-          winPct: 0, // Will be recalculated
-          totalBags: { increment: totalBags },
-          bagsPerGame: 0, // Will be recalculated
-          nilsBid: { increment: nilsBid },
-          nilsMade: { increment: nilsMade },
-          nilPct: 0, // Will be recalculated
-          blindNilsBid: { increment: blindNilsBid },
-          blindNilsMade: { increment: blindNilsMade },
-          blindNilPct: 0 // Will be recalculated
-        },
-        create: {
-          userId,
-          isLeague,
-          mode: mode as any,
-          format: format as any,
-          gimmick: gimmick as any,
-          gamesPlayed,
-          gamesWon,
-          winPct,
-          totalBags,
-          bagsPerGame,
-          nilsBid,
-          nilsMade,
-          nilPct,
-          blindNilsBid,
-          blindNilsMade,
-          blindNilPct
-        }
-      });
+      console.log(`[USER STATS] Processing user ${userId}: gamesPlayed=${gamesPlayed}, gamesWon=${gamesWon}, totalBags=${totalBags}, gimmick=${gimmick}`);
 
-      // Recalculate percentages
-      const updatedStats = await prismaNew.userStatsBreakdown.findUnique({
-        where: {
-          userId_isLeague_mode_format_gimmick: {
-            userId,
-            isLeague,
-            mode: mode as any,
-            format: format as any,
-            gimmick: gimmick as any
-          }
-        }
-      });
-
-      if (updatedStats) {
-        const newWinPct = updatedStats.gamesPlayed > 0 ? updatedStats.gamesWon / updatedStats.gamesPlayed : 0;
-        const newBagsPerGame = updatedStats.gamesPlayed > 0 ? updatedStats.totalBags / updatedStats.gamesPlayed : 0;
-        const newNilPct = updatedStats.nilsBid > 0 ? updatedStats.nilsMade / updatedStats.nilsBid : 0;
-        const newBlindNilPct = updatedStats.blindNilsBid > 0 ? updatedStats.blindNilsMade / updatedStats.blindNilsBid : 0;
-
-        await prismaNew.userStatsBreakdown.update({
-          where: { id: updatedStats.id },
+      // For non-gimmick games, use a simple create approach
+      if (gimmick === null) {
+        await prismaNew.userStatsBreakdown.create({
           data: {
-            winPct: newWinPct,
-            bagsPerGame: newBagsPerGame,
-            nilPct: newNilPct,
-            blindNilPct: newBlindNilPct
+            userId,
+            isLeague,
+            mode: mode as any,
+            format: format as any,
+            gimmick: null,
+            gamesPlayed,
+            gamesWon,
+            winPct,
+            totalBags,
+            bagsPerGame,
+            nilsBid,
+            nilsMade,
+            nilPct,
+            blindNilsBid,
+            blindNilsMade,
+            blindNilPct
+          }
+        });
+      } else {
+        // For gimmick games, use upsert
+        await prismaNew.userStatsBreakdown.upsert({
+          where: {
+            userId_isLeague_mode_format_gimmick: {
+              userId,
+              isLeague,
+              mode: mode as any,
+              format: format as any,
+              gimmick: gimmick as any
+            }
+          },
+          update: {
+            gamesPlayed: { increment: gamesPlayed },
+            gamesWon: { increment: gamesWon },
+            winPct: 0, // Will be recalculated
+            totalBags: { increment: totalBags },
+            bagsPerGame: 0, // Will be recalculated
+            nilsBid: { increment: nilsBid },
+            nilsMade: { increment: nilsMade },
+            nilPct: 0, // Will be recalculated
+            blindNilsBid: { increment: blindNilsBid },
+            blindNilsMade: { increment: blindNilsMade },
+            blindNilPct: 0 // Will be recalculated
+          },
+          create: {
+            userId,
+            isLeague,
+            mode: mode as any,
+            format: format as any,
+            gimmick: gimmick as any,
+            gamesPlayed,
+            gamesWon,
+            winPct,
+            totalBags,
+            bagsPerGame,
+            nilsBid,
+            nilsMade,
+            nilPct,
+            blindNilsBid,
+            blindNilsMade,
+            blindNilPct
           }
         });
       }
@@ -162,6 +160,11 @@ function determineIfWon(gamePlayer: any, gameResult: any, gameMode: string): num
     // For partners games, check if this player's team won
     const teamIndex = gamePlayer.teamIndex;
     const winner = gameResult.winner;
-    return winner === `TEAM${teamIndex}` ? 1 : 0;
+    // Winner is stored as TEAM0 or TEAM1, but teamIndex is 0 or 1
+    // So if teamIndex is 0 and winner is TEAM0, they won
+    // If teamIndex is 1 and winner is TEAM1, they won
+    const expectedWinner = `TEAM${teamIndex}`;
+    console.log(`[USER STATS] Checking win: teamIndex=${teamIndex}, expectedWinner=${expectedWinner}, actualWinner=${winner}`);
+    return winner === expectedWinner ? 1 : 0;
   }
 }

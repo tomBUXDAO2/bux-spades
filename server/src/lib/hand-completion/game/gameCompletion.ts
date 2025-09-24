@@ -3,7 +3,7 @@ import type { Game } from '../../../types/game';
 import prisma from '../../prisma';
 import { CoinManager } from '../../coin-management/coinManager';
 import { newdbRecordGameFinish } from "../../../newdb/writers";
-import { calculateAndStoreUserStats } from "../../../newdb/statistics";
+import { calculateAndStoreUserStats } from "../../../newdb/simple-statistics";
 
 /**
  * Create GameResult entry for completed game

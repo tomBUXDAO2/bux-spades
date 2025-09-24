@@ -232,12 +232,12 @@ export function getWinningTeam(game: Game): number | null {
   }
   
   if (game.gameMode === 'SOLO') {
-    return game.team1TotalScore >= game.maxPoints ? 1 : 0;
+    return game.team1TotalScore >= game.maxPoints ? 0 : 1;
   } else {
-    if (game.team1TotalScore >= game.maxPoints) return 1;
-    if (game.team2TotalScore >= game.maxPoints) return 2;
-    if (game.team1TotalScore <= game.minPoints) return 2;
-    if (game.team2TotalScore <= game.minPoints) return 1;
+    if (game.team1TotalScore >= game.maxPoints) return 0;
+    if (game.team2TotalScore >= game.maxPoints) return 1;
+    if (game.team1TotalScore <= game.minPoints) return 1;
+    if (game.team2TotalScore <= game.minPoints) return 0;
   }
   
   return null;
