@@ -176,11 +176,27 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
         }
       }
 
-      // Update the user stats
+      // Update the user stats (counters)
       await prismaNew.userStats.update({
         where: { userId },
         data: updateData
       });
+
+      // Recalculate and persist bags-per-game fields based on current totals
+      const refreshed = await prismaNew.userStats.findUnique({ where: { userId } });
+      if (refreshed) {
+        const totalsForBagsPerGame = {
+          totalBagsPerGame: refreshed.totalGamesPlayed > 0 ? refreshed.totalBags / refreshed.totalGamesPlayed : 0,
+          leagueBagsPerGame: refreshed.leagueGamesPlayed > 0 ? refreshed.leagueBags / refreshed.leagueGamesPlayed : 0,
+          partnersBagsPerGame: refreshed.partnersGamesPlayed > 0 ? refreshed.partnersBags / refreshed.partnersGamesPlayed : 0,
+          soloBagsPerGame: refreshed.soloGamesPlayed > 0 ? refreshed.soloBags / refreshed.soloGamesPlayed : 0,
+        } as any;
+
+        await prismaNew.userStats.update({
+          where: { userId },
+          data: totalsForBagsPerGame
+        });
+      }
 
       console.log(`[USER STATS] Updated stats for user ${userId} in game ${gameId}`);
     }
