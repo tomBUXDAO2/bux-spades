@@ -33,10 +33,10 @@ interface PlayerStats {
 interface Player {
   username: string;
   avatar: string;
-  stats: PlayerStats
-  coins?: number;
-  id: string;
+  stats: PlayerStats;
   status: 'friend' | 'blocked' | 'not_friend';
+  coins?: number;
+  id?: string; // Add id for API calls
 }
 
 interface PlayerStatsModalProps {
@@ -49,6 +49,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
+  const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 
   // Fetch stats when mode changes or player changes
   useEffect(() => {
@@ -60,17 +61,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
         console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
         const response = await api.get(url);
-        const data = await response.json();
-        console.log('[PLAYER STATS MODAL] Received data:', data);
-        
-        // Fix: Use data.stats instead of data directly
-        if (data.stats) {
-          console.log('[PLAYER STATS MODAL] Using API stats:', data.stats);
-          setCurrentStats(data.stats);
-        } else {
-          console.log('[PLAYER STATS MODAL] No stats in response, using fallback');
-          setCurrentStats(player.stats);
-        }
+        const stats = await response.json();
+        console.log('[PLAYER STATS MODAL] Received stats:', stats);
+        setCurrentStats(stats);
       } catch (error) {
         console.error('Error fetching player stats:', error);
         // Fallback to original stats
@@ -110,50 +103,47 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6">
-          <div className="flex items-center justify-between">
+        <div className="flex justify-between items-center p-6 border-b border-slate-600">
+          <h2 className="text-3xl font-bold text-white">Player Stats</h2>
+          
+          {/* Radio buttons and close button */}
+          <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-4">
-              <img src={player.avatar} alt={player.username} className="w-12 h-12 rounded-full" />
-              <div>
-                <h2 className="text-2xl font-bold text-white">{player.username}</h2>
-                <div className="flex space-x-4 mt-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="mode"
-                      value="all"
-                      checked={mode === 'all'}
-                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
-                      className="text-blue-500"
-                    />
-                    <span className="text-white">ALL</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="mode"
-                      value="partners"
-                      checked={mode === 'partners'}
-                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
-                      className="text-blue-500"
-                    />
-                    <span className="text-white">PARTNERS</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="mode"
-                      value="solo"
-                      checked={mode === 'solo'}
-                      onChange={(e) => setMode(e.target.value as 'all' | 'partners' | 'solo')}
-                      className="text-blue-500"
-                    />
-                    <span className="text-white">SOLO</span>
-                  </label>
-                </div>
-              </div>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="all"
+                  checked={mode === 'all'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">ALL</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="partners"
+                  checked={mode === 'partners'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">PARTNERS</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="mode"
+                  value="solo"
+                  checked={mode === 'solo'}
+                  onChange={(e) => setMode(e.target.value as "all" | "partners" | "solo")}
+                  className="w-5 h-5 text-blue-600"
+                />
+                <span className="text-white text-lg">SOLO</span>
+              </label>
             </div>
             <button
               onClick={onClose}
@@ -188,57 +178,65 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-white">🏁</div>
-                    <div className="text-lg text-slate-300">Played</div>
-                    <div className="text-xl font-bold text-white">{stats.gamesPlayed || 0}</div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-blue-400">🏁</span>
+                    <span className="text-xl text-blue-400">{stats.gamesPlayed} Played</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-white">🏆</div>
-                    <div className="text-lg text-slate-300">Won</div>
-                    <div className="text-xl font-bold text-white">{stats.gamesWon || 0}</div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-purple-400">🏆</span>
+                    <span className="text-xl text-purple-400">{stats.gamesWon} Won</span>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-white">🎒</div>
-                    <div className="text-lg text-slate-300">Bags</div>
-                    <div className="text-xl font-bold text-white">{stats.totalBags || 0}</div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-green-400">🎒</span>
+                    <span className="text-xl text-green-400">{stats.totalBags} Bags</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-white">✅</div>
-                    <div className="text-lg text-slate-300">Bags/G</div>
-                    <div className="text-xl font-bold text-white">{stats.bagsPerGame || 0}</div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-orange-400">✅</span>
+                    <span className="text-xl text-orange-400">{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Nil Stats */}
-            <div className="bg-slate-700 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Nil Stats</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Type</span>
-                  <span className="text-slate-300">Bid</span>
-                  <span className="text-slate-300">Made</span>
-                  <span className="text-slate-300">%</span>
-                  <span className="text-slate-300">Points</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white">Nil</span>
-                  <span className="text-white">{stats.nilsBid || 0}</span>
-                  <span className="text-white">{stats.nilsMade || 0}</span>
-                  <span className="text-white">{Math.round((stats.nilsMade / stats.nilsBid) * 100) || 0}%</span>
-                  <span className="text-white">{stats.nilsMade || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white">Blind Nil</span>
-                  <span className="text-white">{stats.blindNilsBid || 0}</span>
-                  <span className="text-white">{stats.blindNilsMade || 0}</span>
-                  <span className="text-white">{Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) || 0}%</span>
-                  <span className="text-white">{stats.blindNilsMade || 0}</span>
-                </div>
+            <div className="bg-slate-700 rounded-lg p-6 flex-1">
+              <h3 className="text-2xl font-bold text-white mb-4">Nil Stats</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-white">
+                  <thead>
+                    <tr className="border-b border-slate-500">
+                      <th className="text-left py-2 text-lg">Type</th>
+                      <th className="text-center py-2 text-lg">Bid</th>
+                      <th className="text-center py-2 text-lg">Made</th>
+                      <th className="text-center py-2 text-lg">%</th>
+                      <th className="text-center py-2 text-lg">Points</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-600">
+                      <td className="py-3 text-lg">Nil</td>
+                      <td className="text-center py-3 text-lg">{stats.nilsBid}</td>
+                      <td className="text-center py-3 text-lg">{stats.nilsMade}</td>
+                      <td className="text-center py-3 text-lg">
+                        {stats.nilsBid > 0 ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%
+                      </td>
+                      <td className="text-center py-3 text-lg">
+                        {formatSigned((stats.nilsMade * 100) + ((stats.nilsBid - stats.nilsMade) * -100))}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 text-lg">Blind Nil</td>
+                      <td className="text-center py-3 text-lg">{stats.blindNilsBid}</td>
+                      <td className="text-center py-3 text-lg">{stats.blindNilsMade}</td>
+                      <td className="text-center py-3 text-lg">
+                        {stats.blindNilsBid > 0 ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%
+                      </td>
+                      <td className="text-center py-3 text-lg">
+                        {formatSigned((stats.blindNilsMade * 200) + ((stats.blindNilsBid - stats.blindNilsMade) * -200))}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -246,45 +244,67 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           {/* Right Column */}
           <div className="flex flex-col">
             {/* Game Mode Breakdown */}
-            <div className="bg-slate-700 rounded-lg p-6 mb-6">
-              <h3 className="text-xl font-bold text-white mb-4">Game Mode Breakdown</h3>
-              <div className="space-y-3">
+            <div className="bg-slate-700 rounded-lg p-6 mb-6 flex-1">
+              <h3 className="text-3xl font-bold text-white mb-4">Game Mode Breakdown</h3>
+              <div className="text-slate-300 text-lg mb-6 text-right">
+                <span className="mr-4">(won/played)</span>
+                <span>(win %)</span>
+              </div>
+              <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Regular</span>
-                  <span className="text-white">{gameModeBreakdown.regular}</span>
-                  <span className="text-white">{Math.round(((stats.regWon || 0) / (stats.regPlayed || 1)) * 100)}%</span>
+                  <span className="text-xl text-white">Regular</span>
+                  <div className="flex space-x-8">
+                    <span className="text-xl text-white">{gameModeBreakdown.regular}</span>
+                    <span className="text-xl text-white">{stats.regPlayed ? Math.round(((stats.regWon || 0) / stats.regPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Whiz</span>
-                  <span className="text-white">{gameModeBreakdown.whiz}</span>
-                  <span className="text-white">{Math.round(((stats.whizWon || 0) / (stats.whizPlayed || 1)) * 100)}%</span>
+                  <span className="text-xl text-white">Whiz</span>
+                  <div className="flex space-x-8">
+                    <span className="text-xl text-white">{gameModeBreakdown.whiz}</span>
+                    <span className="text-xl text-white">{stats.whizPlayed ? Math.round(((stats.whizWon || 0) / stats.whizPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Mirrors</span>
-                  <span className="text-white">{gameModeBreakdown.mirrors}</span>
-                  <span className="text-white">{Math.round(((stats.mirrorWon || 0) / (stats.mirrorPlayed || 1)) * 100)}%</span>
+                  <span className="text-xl text-white">Mirrors</span>
+                  <div className="flex space-x-8">
+                    <span className="text-xl text-white">{gameModeBreakdown.mirrors}</span>
+                    <span className="text-xl text-white">{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Gimmick</span>
-                  <span className="text-white">{gameModeBreakdown.gimmick}</span>
-                  <span className="text-white">{Math.round(((stats.gimmickWon || 0) / (stats.gimmickPlayed || 1)) * 100)}%</span>
+                  <span className="text-xl text-white">Gimmick</span>
+                  <div className="flex space-x-8">
+                    <span className="text-xl text-white">{gameModeBreakdown.gimmick}</span>
+                    <span className="text-xl text-white">{stats.gimmickPlayed ? Math.round(((stats.gimmickWon || 0) / stats.gimmickPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Special Rules */}
-            <div className="bg-slate-700 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Special Rules</h3>
+            <div className="bg-slate-700 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xl font-bold text-white">Special Rules</h3>
+                <div className="text-slate-300 text-lg text-right">
+                  <span className="mr-4">(won/played)</span>
+                  <span>(win %)</span>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Screamer</span>
-                  <span className="text-white">{specialRules.screamer}</span>
-                  <span className="text-white">{Math.round(((stats.screamerWon || 0) / (stats.screamerPlayed || 1)) * 100)}%</span>
+                  <span className="text-lg text-white">Screamer</span>
+                  <div className="flex space-x-8">
+                    <span className="text-lg text-white">{specialRules.screamer}</span>
+                    <span className="text-lg text-white">{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Assassin</span>
-                  <span className="text-white">{specialRules.assassin}</span>
-                  <span className="text-white">{Math.round(((stats.assassinWon || 0) / (stats.assassinPlayed || 1)) * 100)}%</span>
+                  <span className="text-lg text-white">Assassin</span>
+                  <div className="flex space-x-8">
+                    <span className="text-lg text-white">{specialRules.assassin}</span>
+                    <span className="text-lg text-white">{stats.assassinPlayed ? Math.round(((stats.assassinWon || 0) / stats.assassinPlayed) * 100) : 0}%</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -295,4 +315,4 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   );
 };
 
-export default PlayerStatsModal;
+export default PlayerStatsModal; 
