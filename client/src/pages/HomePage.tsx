@@ -526,7 +526,7 @@ const HomePage: React.FC = () => {
       label = 'WHIZ';
     } else if (type === 'MIRROR') {
       color = 'bg-red-600';
-      label = 'MIRRORS';
+      label = 'MIRROR';
     } else if (type === 'GIMMICK') {
       color = 'bg-orange-500';
       const rawGt = (game as any).rules?.gimmickType || '';
@@ -543,10 +543,10 @@ const HomePage: React.FC = () => {
 
   const getSpecialBricks = (game: GameState) => {
     const bricks = [];
-    if (game.specialRules?.assassin) {
+    if (game.specialRules?.assassin || (game as any).rules?.specialRules?.assassin) {
       bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
     }
-    if (game.specialRules?.screamer) {
+    if (game.specialRules?.screamer || (game as any).rules?.specialRules?.screamer) {
       bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
     }
     return bricks;

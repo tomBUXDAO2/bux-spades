@@ -3753,7 +3753,7 @@ const [isStarting, setIsStarting] = useState(false);
                 label = 'WHIZ';
               } else if (type === 'MIRROR') {
                 color = 'bg-red-600';
-                label = 'MIRRORS';
+                label = 'MIRROR';
               } else if (type === 'GIMMICK') {
                 color = 'bg-orange-500';
                 const rawGt = (gameState as any).rules?.gimmickType || (gameState as any).forcedBid || '';
@@ -3782,10 +3782,10 @@ const [isStarting, setIsStarting] = useState(false);
             </svg>
             <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{gameState.gameMode || (gameState.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
             {/* Special bricks for assassin/screamer */}
-            {gameState.specialRules?.assassin && (
+            {(gameState.specialRules?.assassin || (gameState as any).rules?.specialRules?.assassin) && (
               <span className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
             )}
-            {gameState.specialRules?.screamer && (
+            {(gameState.specialRules?.screamer || (gameState as any).rules?.specialRules?.screamer) && (
               <span className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
             )}
           </div>
