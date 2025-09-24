@@ -4,6 +4,7 @@ import prisma from '../../prisma';
 import { CoinManager } from '../../coin-management/coinManager';
 import { newdbRecordGameFinish } from "../../../newdb/writers";
 import { calculateAndStoreUserStats } from "../../../newdb/simple-statistics";
+import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 
 /**
  * Create GameResult entry for completed game
@@ -157,9 +158,16 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
           latest.player2RunningTotal || 0,
           latest.player3RunningTotal || 0,
         ] : (game.playerScores || [0,0,0,0]);
+        // Update in-memory state so clients see correct finals
+        game.playerScores = finalPlayerScores as any;
+        // Emit a final game_update with the final scores before winners modal
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
+        // Now emit winners modal payload
         io.to(game.id).emit('game_over', { playerScores: finalPlayerScores, winningPlayer: winningTeamOrPlayer });
       } catch (e) {
         console.warn('[GAME COMPLETION] Failed to fetch latest solo running totals, falling back', e);
+        // Ensure current in-memory scores are sent to clients first
+        io.to(game.id).emit('game_update', enrichGameForClient(game));
         io.to(game.id).emit('game_over', { playerScores: game.playerScores, winningPlayer: winningTeamOrPlayer });
       }
     } else {
@@ -176,13 +184,6 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
   } catch (error) {
     console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
     throw error;
-  } finally {
-    // Ensure stats are calculated even if createGameResult path was skipped
-    try {
-      await calculateAndStoreUserStats(game.id);
-    } catch (e) {
-      console.warn('[GAME COMPLETION] Failed to calculate user stats in finally:', e);
-    }
   }
 }
 

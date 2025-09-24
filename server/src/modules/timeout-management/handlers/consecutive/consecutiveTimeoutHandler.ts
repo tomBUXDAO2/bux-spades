@@ -43,7 +43,7 @@ export async function handleConsecutiveTimeouts(game: Game, playerIndex: number)
       console.log(`[TIMEOUT] No human players remaining in unrated game ${game.id} - deleting game`);
       io.to(game.id).emit('game_deleted', { reason: 'no_human_players' });
       try {
-        // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
+        await deleteUnratedGameFromDatabase(game);
         console.log('[TIMEOUT] Successfully deleted unrated game from database via consecutive timeout cleanup');
       } catch (err) {
         console.error('[TIMEOUT] Failed to delete unrated game via consecutive timeout cleanup:', err);

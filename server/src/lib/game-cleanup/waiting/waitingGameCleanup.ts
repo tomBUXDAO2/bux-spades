@@ -33,7 +33,7 @@ export async function cleanupWaitingGames(games: Game[], io?: Server): Promise<v
       if (!game.rated && game.dbGameId) {
         console.log(`[WAITING GAME CLEANUP] Cleaning up unrated game from database: ${game.dbGameId}`);
         try {
-          // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
+          await deleteUnratedGameFromDatabase(game);
           console.log(`[WAITING GAME CLEANUP] Successfully cleaned up unrated game: ${game.dbGameId}`);
         } catch (error) {
           console.error(`[WAITING GAME CLEANUP] Failed to clean up unrated game: ${game.dbGameId}`, error);

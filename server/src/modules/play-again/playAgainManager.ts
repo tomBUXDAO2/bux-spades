@@ -156,7 +156,7 @@ async function resetGameForRespondingPlayers(game: Game): Promise<void> {
     if (!game.rated && game.dbGameId) {
       console.log('[PLAY AGAIN] Cleaning up unrated game from database:', game.dbGameId);
       try {
-        // DISABLED FOR TESTING: await deleteUnratedGameFromDatabase(game);
+        await deleteUnratedGameFromDatabase(game);
       } catch (error) {
         console.error('[PLAY AGAIN] Failed to clean up unrated game from database:', error);
       }
