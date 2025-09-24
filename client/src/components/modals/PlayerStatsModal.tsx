@@ -49,8 +49,6 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
-  const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
-
   // Fetch stats when mode changes or player changes
   useEffect(() => {
     if (!isOpen || !player || !player.id) return;
@@ -107,6 +105,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const specialRules = {
     screamer: `${stats.screamerWon || 0}/${stats.screamerPlayed || 0}`,
     assassin: `${stats.assassinWon || 0}/${stats.assassinPlayed || 0}`
+  };
+
+  // Helper function to safely calculate percentages
+  const calculatePercentage = (won: number | undefined, played: number | undefined): number => {
+    if (!played || played === 0) return 0;
+    return Math.round(((won || 0) / played) * 100);
   };
 
   return (
@@ -253,22 +257,22 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Regular</span>
                   <span className="text-white">{gameModeBreakdown.regular}</span>
-                  <span className="text-white">{Math.round((stats.regWon / stats.regPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.regWon, stats.regPlayed)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Whiz</span>
                   <span className="text-white">{gameModeBreakdown.whiz}</span>
-                  <span className="text-white">{Math.round((stats.whizWon / stats.whizPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.whizWon, stats.whizPlayed)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Mirrors</span>
                   <span className="text-white">{gameModeBreakdown.mirrors}</span>
-                  <span className="text-white">{Math.round((stats.mirrorWon / stats.mirrorPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.mirrorWon, stats.mirrorPlayed)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Gimmick</span>
                   <span className="text-white">{gameModeBreakdown.gimmick}</span>
-                  <span className="text-white">{Math.round((stats.gimmickWon / stats.gimmickPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.gimmickWon, stats.gimmickPlayed)}%</span>
                 </div>
               </div>
             </div>
@@ -280,12 +284,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Screamer</span>
                   <span className="text-white">{specialRules.screamer}</span>
-                  <span className="text-white">{Math.round((stats.screamerWon / stats.screamerPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.screamerWon, stats.screamerPlayed)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">Assassin</span>
                   <span className="text-white">{specialRules.assassin}</span>
-                  <span className="text-white">{Math.round((stats.assassinWon / stats.assassinPlayed) * 100) || 0}%</span>
+                  <span className="text-white">{calculatePercentage(stats.assassinWon, stats.assassinPlayed)}%</span>
                 </div>
               </div>
             </div>
