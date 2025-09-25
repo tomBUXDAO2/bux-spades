@@ -51,39 +51,29 @@ router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
       (game as any).spectators = [];
     }
 
-    // Add to spectators
+    // Add spectator
     (game as any).spectators.push({
       id: userId,
-      username: username || 'Unknown',
-      avatar: avatar || '/default-pfp.jpg',
-      type: 'human',
+      username,
+      avatar
     });
 
-    // Join the socket room for chat
-    const userSocket = [...io.sockets.sockets.values()].find(s => (s as any).userId === userId);
-    if (userSocket) {
-      userSocket.join(gameId);
-      console.log(`[SPECTATE] User ${userId} joined socket room ${gameId} as spectator`);
-    }
+    // Join the game room
+    req.socket.join(gameId);
 
-    // Emit game update to all players in the room
-    io.to(gameId).emit('game_update', enrichGameForClient(game));
-    
-    // Update lobby for all clients
-    const lobbyGames = games.filter(g => {
-      if ((g as any).league && g.status === 'WAITING') {
-        return false;
-      }
-      return true;
+    // Notify all players in the game
+    io.to(gameId).emit('spectator_joined', {
+      id: userId,
+      username,
+      avatar
     });
-    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
 
-    res.json({ success: true, game: enrichGameForClient(game) });
+    res.json({ success: true });
   } catch (error) {
     console.error('Error spectating game:', error);
     res.status(500).json({ error: 'Failed to spectate game' });
   }
-});router.post('/:id/join', requireAuth as any, joinGame as any);
+});
 
 // Get all games - NEW DB ONLY
 router.get('/', async (req: Request, res: Response) => {
@@ -100,12 +90,15 @@ router.get('/', async (req: Request, res: Response) => {
     const clientGames = [] as any[];
     for (const dbGame of dbGames) {
       const players = await prismaNew.gamePlayer.findMany({
+        where: { gameId: dbGame.id },
+        orderBy: { seatIndex: 'asc' as any }
+      });
+
       const userIds = players.map(p => p.userId);
       const users = await prismaNew.user.findMany({
         where: { id: { in: userIds } }
       });
-      const userMap = new Map(users.map(u => [u.id, u]));        orderBy: { seatIndex: 'asc' as any }
-      });
+      const userMap = new Map(users.map(u => [u.id, u]));
 
       clientGames.push({
         id: dbGame.id,
@@ -116,8 +109,8 @@ router.get('/', async (req: Request, res: Response) => {
         solo: ((dbGame as any).mode === 'SOLO') || false,
         players: players.map(p => ({
           id: p.userId,
-          username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}` as any,
-          avatar: userMap.get(p.userId)?.avatarUrl || null as any,
+          username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
+          avatar: userMap.get(p.userId)?.avatarUrl || null,
           type: p.isHuman ? 'human' : 'bot',
           position: p.seatIndex,
           team: p.teamIndex ?? null,
@@ -141,32 +134,49 @@ router.get('/', async (req: Request, res: Response) => {
 // Get a specific game - NEW DB ONLY
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const dbGame = await prismaNew.game.findUnique({ where: { id: req.params.id } });
-    if (!dbGame) return res.status(404).json({ error: 'Game not found' });
+    const gameId = req.params.id;
+    
+    const dbGame = await prismaNew.game.findUnique({
+      where: { id: gameId }
+    });
+
+    if (!dbGame) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
 
     const players = await prismaNew.gamePlayer.findMany({
-      const userIds = players.map(p => p.userId);
-      const users = await prismaNew.user.findMany({
-        where: { id: { in: userIds } }
-      });
-      const userMap = new Map(users.map(u => [u.id, u]));      orderBy: { seatIndex: 'asc' as any }
+      where: { gameId: dbGame.id },
+      orderBy: { seatIndex: 'asc' as any }
     });
+
+    const userIds = players.map(p => p.userId);
+    const users = await prismaNew.user.findMany({
+      where: { id: { in: userIds } }
+    });
+    const userMap = new Map(users.map(u => [u.id, u]));
 
     const game = {
       id: dbGame.id,
       status: dbGame.status,
-      players: players.map((p: any) => ({
-        id: p.userId,
-        username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}` as any,
-        avatar: userMap.get(p.userId)?.avatarUrl || null as any,
-        type: p.isHuman ? 'human' : 'bot',
-        position: p.seatIndex,
-        team: p.teamIndex,
-      })),
+      gameMode: (dbGame as any).mode || 'PARTNERS',
       rated: (dbGame as any).isRated ?? false,
       league: (dbGame as any).isLeague ?? false,
+      solo: ((dbGame as any).mode === 'SOLO') || false,
+      players: players.map(p => ({
+        id: p.userId,
+        username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
+        avatar: userMap.get(p.userId)?.avatarUrl || null,
+        type: p.isHuman ? 'human' : 'bot',
+        position: p.seatIndex,
+        team: p.teamIndex ?? null,
+        bid: null as any,
+        tricks: null as any,
+        points: null as any,
+        bags: null as any
+      })),
+      rules: {},
       createdAt: (dbGame as any).createdAt
-    } as any;
+    };
 
     res.json({ success: true, game });
   } catch (error) {
@@ -175,7 +185,10 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Leave a game - ensure deletion from NEW DB for unrated with no humans
+// Join a game
+router.post('/:id/join', requireAuth, joinGame);
+
+// Leave a game
 router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
   try {
     const gameId = req.params.id;
@@ -186,105 +199,110 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    // Remove from players
-    // Make user leave the socket room
-    const userSocket = [...io.sockets.sockets.values()].find(s => (s as any).userId === userId);
-    if (userSocket) {
-      userSocket.leave(gameId);
-      console.log(`[LEAVE GAME] User ${userId} left socket room ${gameId}`);
-    }
-    const playerIdx = game.players.findIndex(p => p && p.id === userId);
-    if (playerIdx !== -1) {
-      game.players[playerIdx] = null;
+    // Remove player from game
+    const playerIndex = game.players.findIndex(p => p && p.id === userId);
+    if (playerIndex === -1) {
+      return res.status(400).json({ error: 'Not in this game' });
     }
 
-    // Remove from spectators
-    if (Array.isArray((game as any).spectators)) {
-      const specIdx = (game as any).spectators.findIndex((s: any) => s.id === userId);
-      if (specIdx !== -1) {
-        (game as any).spectators.splice(specIdx, 1);
-      }
-    }
+    game.players[playerIndex] = null;
 
-    // Emit game update to all players in the room first
-    io.to(gameId).emit('game_update', enrichGameForClient(game));
-    
-    // If no human players remain and not a league game, remove game
-    const hasHumanPlayers = game.players.some(p => p && p.type === 'human');
-    const isLeague = Boolean((game as any).league);
+    // Leave the game room
+    req.socket.leave(gameId);
 
-    if (!hasHumanPlayers && !isLeague) {
-      console.log(`[LEAVE GAME] No human players remaining in game ${gameId}`);
-      
-      // If this is an unrated game, clean it up completely in NEW DB
-      if (!game.rated) {
-        console.log(`[LEAVE GAME] Cleaning up unrated game ${gameId} from NEW database`);
-        try {
-          // Collect round and trick ids
-          const rounds = await prismaNew.round.findMany({ where: { gameId: game.id }, select: { id: true } });
-          const roundIds = rounds.map(r => r.id);
-          if (roundIds.length > 0) {
-            const tricks = await prismaNew.trick.findMany({ where: { roundId: { in: roundIds as any } }, select: { id: true } });
-            const trickIds = tricks.map(t => t.id);
-            if (trickIds.length > 0) {
-              await prismaNew.trickCard.deleteMany({ where: { trickId: { in: trickIds as any } } });
-            }
-            await prismaNew.trick.deleteMany({ where: { roundId: { in: roundIds as any } } });
-            await prismaNew.roundBid.deleteMany({ where: { roundId: { in: roundIds as any } } });
-            await prismaNew.roundHandSnapshot.deleteMany({ where: { roundId: { in: roundIds as any } } });
-            await prismaNew.roundScore.deleteMany({ where: { roundId: { in: roundIds as any } } });
-            await prismaNew.playerRoundStats.deleteMany({ where: { roundId: { in: roundIds as any } } });
-            // Finally delete rounds
-            await prismaNew.round.deleteMany({ where: { id: { in: roundIds as any } } });
-          }
-          await prismaNew.gameResult.deleteMany({ where: { gameId: game.id } });
-          await prismaNew.eventGame.deleteMany({ where: { gameId: game.id } });
-          await prismaNew.gamePlayer.deleteMany({ where: { gameId: game.id } });
-          await prismaNew.game.delete({ where: { id: game.id } });
-
-          // Remove game from memory
-          const index = games.findIndex(g => g.id === gameId);
-          if (index !== -1) games.splice(index, 1);
-          
-          // Notify all players that the game is closed
-          io.to(gameId).emit('game_closed', { gameId, reason: 'no_human_players_remaining' });
-          
-          console.log(`[LEAVE GAME] Successfully cleaned up unrated game ${gameId} (NEW DB)`);
-        } catch (error) {
-          console.error(`[LEAVE GAME] Failed to clean up unrated game ${gameId} (NEW DB):`, error);
-        }
-      } else {
-        // For rated games, just close the game but don't delete from database
-        console.log(`[LEAVE GAME] Closing rated game ${gameId} (keeping in NEW database)`);
-        
-        // Remove game from memory
-        const index = games.findIndex(g => g.id === gameId);
-        if (index !== -1) games.splice(index, 1);
-        
-        // Notify all players that the game is closed
-        io.to(gameId).emit('game_closed', { gameId, reason: 'no_human_players_remaining' });
-      }
-    }
-
-    // Update lobby for all clients
-    const lobbyGames = games.filter(g => {
-      if ((g as any).league && g.status === 'WAITING') {
-        return false;
-      }
-      return true;
+    // Notify other players
+    io.to(gameId).emit('player_left', {
+      userId,
+      seatIndex: playerIndex
     });
-    console.log(`[LEAVE GAME] Connected sockets: ${io.sockets.sockets.size}`);
-    console.log(`[LEAVE GAME] Emitting games_updated to all clients, ${lobbyGames.length} games`);
-    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
-    
-    // Also emit all games (including league games) for real-time league game detection
-    console.log(`[LEAVE GAME] Emitting all_games_updated to all clients, ${games.length} total games`);
-    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
+
+    // Check if game should be deleted (unrated games with no human players)
+    const humanPlayersRemaining = game.players.some(p => p && p.type === 'human');
+    if (!humanPlayersRemaining && !game.rated) {
+      console.log(`[LEAVE GAME] No human players remaining in unrated game ${gameId} - deleting game`);
+      io.to(gameId).emit('game_deleted', { reason: 'no_human_players' });
+      try {
+        await deleteUnratedGameFromDatabase(game);
+        console.log('[LEAVE GAME] Successfully deleted unrated game from database');
+      } catch (err) {
+        console.error('[LEAVE GAME] Failed to delete unrated game:', err);
+      }
+    }
 
     res.json({ success: true });
   } catch (error) {
     console.error('Error leaving game:', error);
     res.status(500).json({ error: 'Failed to leave game' });
+  }
+});
+
+// Start a game
+router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
+  try {
+    const gameId = req.params.id;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    const game = games.find(g => g.id === gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    // Check if user is the creator
+    if (game.createdBy !== userId) {
+      return res.status(403).json({ error: 'Only the game creator can start the game' });
+    }
+
+    // Check if game is in waiting state
+    if (game.status !== 'WAITING') {
+      return res.status(400).json({ error: 'Game is not in waiting state' });
+    }
+
+    // Check if all seats are filled
+    const filledSeats = game.players.filter(p => p !== null).length;
+    if (filledSeats < 4) {
+      return res.status(400).json({ error: 'All seats must be filled to start the game' });
+    }
+
+    // Start the game
+    game.status = 'BIDDING';
+    game.bidding = {
+      currentPlayer: 0,
+      bids: [null, null, null, null],
+      completed: false
+    };
+
+    // Notify all players
+    io.to(gameId).emit('game_started', enrichGameForClient(game));
+    io.emit('games_updated', games.map(g => enrichGameForClient(g)));
+
+    res.json({ success: true, game: enrichGameForClient(game) });
+  } catch (error) {
+    console.error('Error starting game:', error);
+    res.status(500).json({ error: 'Failed to start game' });
+  }
+});
+
+// Get lobby games (for homepage)
+router.get('/lobby/all', async (req: Request, res: Response) => {
+  try {
+    const lobbyGames = games.filter(g => g.status === 'WAITING');
+    const enrichedGames = lobbyGames.map(game => enrichGameForClient(game));
+    res.json({ success: true, games: enrichedGames });
+  } catch (error) {
+    console.error('Error fetching lobby games:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch lobby games' });
+  }
+});
+
+// Get all games (for homepage)
+router.get('/all', async (req: Request, res: Response) => {
+  try {
+    const allGames = games.filter(g => ['WAITING', 'BIDDING', 'PLAYING'].includes(g.status));
+    const enrichedGames = allGames.map(game => enrichGameForClient(game));
+    res.json({ success: true, games: enrichedGames });
+  } catch (error) {
+    console.error('Error fetching all games:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch all games' });
   }
 });
 
