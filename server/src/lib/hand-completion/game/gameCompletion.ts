@@ -166,11 +166,11 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
  */
 export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
   if (!game.dbGameId || game.rated) {
-    return; // Only delete unrated games
+    console.log("[GAME DELETION DEBUG] Early return check:", { hasDbGameId: !!game.dbGameId, rated: game.rated });    return; // Only delete unrated games
   }
   
   console.log('[GAME DELETION] Deleting unrated game from NEW database:', game.dbGameId);
-  
+    console.log("[GAME DELETION DEBUG] Game details:", { id: game.id, dbGameId: game.dbGameId, rated: game.rated });  
   try {
     const { prismaNew } = await import('../../../newdb/client');
     
