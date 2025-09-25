@@ -214,7 +214,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
           startTurnTimeout(game, winnerIndex, 'playing');
         }
       }
-    }, isLastTrick ? 2500 : 1000); // Longer delay for final trick to allow animation + clear table
+    }, isLastTrick ? 1000 : 400); // Longer delay for final trick to allow animation + clear table
     
   } catch (error) {
     console.error('[TRICK COMPLETION ERROR] Failed to complete trick:', error);

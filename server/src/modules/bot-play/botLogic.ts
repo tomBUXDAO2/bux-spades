@@ -123,7 +123,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
         if (game.play?.currentPlayerIndex === nextPlayerIndex) {
           botPlayCard(game, nextPlayerIndex);
         }
-      }, 300);
+      }, 100);
     } else if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'human') {
       // Start timeout for the human player's turn
       startTurnTimeout(game, nextPlayerIndex, 'playing');
@@ -255,7 +255,7 @@ export async function botPlayCard(game: Game, seatIndex: number): Promise<void> 
         if (game.play?.currentPlayerIndex === nextPlayerIndex) {
           botPlayCard(game, nextPlayerIndex);
         }
-      }, 300);
+      }, 100);
     } else if (game.players[nextPlayerIndex] && game.players[nextPlayerIndex].type === 'human') {
       // Start timeout for the human player's turn
       startTurnTimeout(game, nextPlayerIndex, 'playing');

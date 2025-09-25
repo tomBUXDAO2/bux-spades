@@ -1795,7 +1795,7 @@ export default function GameTable({
     
     // Remove card immediately from local hand for instant visual feedback
       if (idx + 1 < sortedHand.length) {
-        dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 50);
+        dealTimeoutRef.current = setTimeout(() => dealNext(idx + 1), 20);
       } else {
         // Dealing animation complete - allow bidding immediately
         setDealingComplete(true);
@@ -2148,7 +2148,7 @@ export default function GameTable({
       // Add a small delay to ensure all state updates are complete
       setTimeout(() => {
         setShowHandSummary(true);
-      }, 500);
+      }, 100);
     }
   }, [gameState.status, gameState.team1TotalScore, gameState.team2TotalScore, handSummaryData]); // Removed showHandSummary from dependencies
 
@@ -2986,10 +2986,10 @@ const [isStarting, setIsStarting] = useState(false);
     if (faceDown) {
     return (
         <div
-          className={`${className} bg-blue-800 border-2 border-white rounded-lg flex items-center justify-center`}
+          className={`${className} bg-blue-800 border-4 border-white rounded-lg relative overflow-hidden`}
           style={{ width, height }}
         >
-          <div className="text-white text-2xl font-bold">🂠</div>
+          <div className="absolute inset-0 opacity-20"><div className="absolute inset-0" style={{backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 10px, white 10px, white 12px), repeating-linear-gradient(-45deg, transparent, transparent 10px, white 10px, white 12px)"}}></div></div>
         </div>
       );
     }
