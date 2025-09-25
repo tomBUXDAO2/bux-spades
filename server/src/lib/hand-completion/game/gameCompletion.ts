@@ -44,6 +44,8 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         team1Score: team1Score,
         team2Score: team2Score,
         playerResults: {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
       }
     });
 
