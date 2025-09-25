@@ -247,10 +247,10 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
 function determineIfWon(gamePlayer: any, gameResult: any, gameMode: string): number {
   
   try {
-    if (gameMode === 'SOLO') {
-      const seatIndex = gamePlayer.seatIndex;
-      const winner = gameResult.winner;
-      return winner === `SEAT_${seatIndex}` ? 1 : 0;
+  if (gameMode === 'SOLO') {
+    const seatIndex = gamePlayer.seatIndex;
+    const winner = gameResult.winner;
+    return winner === `SEAT_${seatIndex}` ? 1 : 0;
     }
     // Partners
     const teamIndex = gamePlayer.teamIndex;

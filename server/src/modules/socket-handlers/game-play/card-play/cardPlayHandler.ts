@@ -70,12 +70,12 @@ export async function handlePlayCard(socket: AuthenticatedSocket, { gameId, user
 
     // Enforce leading spades rule for standard or screamer (assassin playable already encodes constraints)
     if (!game.specialRules?.assassin) {
-      if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
-        const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
-        if (!onlySpadesLeft) {
-          socket.emit('error', { message: 'Cannot lead spades until spades are broken (unless you only have spades).' });
-          return;
-        }
+    if (isLeading && card.suit === 'SPADES' && !game.play.spadesBroken) {
+      const onlySpadesLeft = hand.every(c => c.suit === 'SPADES');
+      if (!onlySpadesLeft) {
+        socket.emit('error', { message: 'Cannot lead spades until spades are broken (unless you only have spades).' });
+        return;
+      }
       }
     }
 

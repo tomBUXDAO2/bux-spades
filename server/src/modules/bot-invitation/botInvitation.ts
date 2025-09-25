@@ -52,18 +52,18 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
   let retries = 3;
   while (retries > 0) {
     try {
-      await prisma.user.upsert({
-        where: { id: botDisplayId },
-        update: {},
-        create: {
-          id: botDisplayId,
+  await prisma.user.upsert({
+    where: { id: botDisplayId },
+    update: {},
+    create: {
+      id: botDisplayId,
           username: botUsername,
-          avatar: '/bot-avatar.jpg',
-          discordId: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      });
+      avatar: '/bot-avatar.jpg',
+      discordId: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  });  
       break; // success
     } catch (err: any) {
       if (err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('username')) {
