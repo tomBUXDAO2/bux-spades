@@ -181,7 +181,7 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
     });
     
     const botUserIds = gamePlayersWithBots
-      .filter(gp => gp.User gp.user && gp.user.usernamegp.user && gp.user.username gp.User.username.startsWith('Bot '))
+      .filter(gp => gp.User && gp.User.username.startsWith('Bot '))
       .map(gp => gp.userId);
     
     // Get round IDs for this game
