@@ -197,19 +197,6 @@ function hasSpadeBeenPlayed(game: GameState): boolean {
   return spadesBroken;
 }
 
-function canLeadSpades(game: GameState, hand: Card[]): boolean {
-  // Check for Screamer rules first
-  if (game.specialRules?.screamer) {
-    // Screamer: cannot lead spades unless only spades left
-    const nonSpades = Array.isArray(hand) ? hand.filter(card => !isSpade(card)) : [];
-    return nonSpades.length === 0; // Only can lead spades if no other cards
-  }
-  
-  // Normal rules: Can lead spades if:
-  // 1. Spades have been broken, or
-  // 2. Player only has spades left
-  return hasSpadeBeenPlayed(game) || hand.every(isSpade);
-}
 
 function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTrick: boolean, trickCompleted: boolean = false): Card[] {
   if (!Array.isArray(hand) || !hand.length) return [];

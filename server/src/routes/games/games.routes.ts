@@ -110,7 +110,7 @@ router.get('/', async (req: Request, res: Response) => {
         players: players.map(p => ({
           id: p.userId,
           username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-          avatar: p.isHuman ? (userMap.get(p.userId)?.avatarUrl || null) : null,
+          avatar: userMap.get(p.userId)?.avatarUrl || null,
           type: p.isHuman ? 'human' : 'bot',
           position: p.seatIndex,
           team: p.teamIndex ?? null,
@@ -171,7 +171,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       players: players.map(p => ({
         id: p.userId,
         username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-        avatar: p.isHuman ? (userMap.get(p.userId)?.avatarUrl || null) : null,
+        avatar: userMap.get(p.userId)?.avatarUrl || null,
         type: p.isHuman ? 'human' : 'bot',
         position: p.seatIndex,
         team: p.teamIndex ?? null,
