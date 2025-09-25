@@ -296,6 +296,27 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
     });
     
     console.log('[GAME DELETION] Successfully deleted unrated game from NEW database:', game.dbGameId);
+
+    // Defensive cleanup: remove any orphans that may remain due to concurrent writes
+    try {
+      // Remove Trick rows whose Round was just deleted
+      const orphanTricksDeleted: any = await prismaNew.$executeRawUnsafe(
+        'DELETE FROM "Trick" t USING (SELECT t.id FROM "Trick" t LEFT JOIN "Round" r ON t."roundId"=r.id WHERE r.id IS NULL) dead WHERE t.id=dead.id;'
+      );
+      if (orphanTricksDeleted) {
+        console.log('[GAME DELETION] Defensive cleanup deleted orphan Tricks count:', orphanTricksDeleted);
+      }
+
+      // Remove TrickCard rows whose Trick was just deleted
+      const orphanTrickCardsDeleted: any = await prismaNew.$executeRawUnsafe(
+        'DELETE FROM "TrickCard" tc USING (SELECT tc.id FROM "TrickCard" tc LEFT JOIN "Trick" t ON tc."trickId"=t.id WHERE t.id IS NULL) dead WHERE tc.id=dead.id;'
+      );
+      if (orphanTrickCardsDeleted) {
+        console.log('[GAME DELETION] Defensive cleanup deleted orphan TrickCards count:', orphanTrickCardsDeleted);
+      }
+    } catch (cleanupErr) {
+      console.warn('[GAME DELETION] Defensive orphan cleanup failed (non-fatal):', cleanupErr);
+    }
   } catch (error) {
     console.error('[GAME DELETION ERROR] Failed to delete unrated game from NEW database:', game.dbGameId, error);
   }
