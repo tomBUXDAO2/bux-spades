@@ -32,7 +32,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
     const totalTricks = tricks.length;
 
     // Create game result in old database  
-    const gameResultId = `gameresult_${game.id}_${Date.now()}`;
+    const gameResultId = `gameresult_${game.dbGameId}_${Date.now()}`;
     await prisma.gameResult.create({
       data: {
         id: gameResultId,
@@ -61,7 +61,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
       })();
 
       await newdbRecordGameFinish({
-        gameId: game.id,
+        gameId: game.dbGameId,
         winner: winnerStr,
         team1Score,
         team2Score,
@@ -79,7 +79,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         console.log("[GAME COMPLETION] Skipping user stats for unrated game");
         return;
       }
-      await calculateAndStoreUserStats(game.id);
+      await calculateAndStoreUserStats(game.dbGameId);
     } catch (e) {
       console.warn('[NEWDB] Failed to record game finish:', e);
     }
@@ -95,7 +95,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
  * Import and use the completeGame function from index.ts
  */
 export async function completeGame(game: Game, winningTeamOrPlayer: number) {
-  console.log('[GAME COMPLETION] Completing game:', game.id, 'Winner:', winningTeamOrPlayer);
+  console.log('[GAME COMPLETION] Completing game:', game.dbGameId, 'Winner:', winningTeamOrPlayer);
   
   try {
     // Set game status to FINISHED
@@ -134,17 +134,17 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
         // Update in-memory state so clients see correct finals
         game.playerScores = finalPlayerScores as any;
         // Emit a final game_update with the final scores before winners modal
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
+        io.to(game.dbGameId).emit('game_update', enrichGameForClient(game));
         // Now emit winners modal payload
-        io.to(game.id).emit('game_over', { playerScores: finalPlayerScores, winningPlayer: winningTeamOrPlayer });
+        io.to(game.dbGameId).emit('game_over', { playerScores: finalPlayerScores, winningPlayer: winningTeamOrPlayer });
       } catch (e) {
         console.warn('[GAME COMPLETION] Failed to fetch latest solo running totals, falling back', e);
         // Ensure current in-memory scores are sent to clients first
-        io.to(game.id).emit('game_update', enrichGameForClient(game));
-        io.to(game.id).emit('game_over', { playerScores: game.playerScores, winningPlayer: winningTeamOrPlayer });
+        io.to(game.dbGameId).emit('game_update', enrichGameForClient(game));
+        io.to(game.dbGameId).emit('game_over', { playerScores: game.playerScores, winningPlayer: winningTeamOrPlayer });
       }
     } else {
-      io.to(game.id).emit('game_over', {
+      io.to(game.dbGameId).emit('game_over', {
         team1Score: game.team1TotalScore,
         team2Score: game.team2TotalScore,
         winningTeam: winningTeamOrPlayer,
@@ -165,18 +165,18 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
  * This prevents user stats from being recorded and cleans up all data
  */
 export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
-  if (!game.id || game.rated) {
+  if (!game.dbGameId || game.rated) {
     return; // Only delete unrated games
   }
   
-  console.log('[GAME DELETION] Deleting unrated game from NEW database:', game.id);
+  console.log('[GAME DELETION] Deleting unrated game from NEW database:', game.dbGameId);
   
   try {
     const { prismaNew } = await import('../../../newdb/client');
     
     // Get all bot user IDs from this game first
     const gamePlayersWithBots = await prismaNew.gamePlayer.findMany({
-      where: { gameId: game.id },
+      where: { gameId: game.dbGameId },
       include: { user: true }
     });
     
@@ -186,7 +186,7 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
     
     // Get round IDs for this game
     const rounds = await prismaNew.round.findMany({
-      where: { gameId: game.id },
+      where: { gameId: game.dbGameId },
       select: { id: true }
     });
     const roundIds = rounds.map(r => r.id);
@@ -246,19 +246,19 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
       
       // Delete game-related data
       await tx.gameResult.deleteMany({
-        where: { gameId: game.id }
+        where: { gameId: game.dbGameId }
       });
       await tx.eventGame.deleteMany({
-        where: { gameId: game.id }
+        where: { gameId: game.dbGameId }
       });
       await tx.gamePlayer.deleteMany({
-        where: { gameId: game.id }
+        where: { gameId: game.dbGameId }
       });
       console.log('[GAME DELETION] Deleted game-related data');
       
       // Delete the Game itself
       await tx.game.deleteMany({
-        where: { id: game.id }
+        where: { id: game.dbGameId }
       });
       console.log('[GAME DELETION] Deleted Game');
       
@@ -274,8 +274,8 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
       }
     });
     
-    console.log('[GAME DELETION] Successfully deleted unrated game from NEW database:', game.id);
+    console.log('[GAME DELETION] Successfully deleted unrated game from NEW database:', game.dbGameId);
   } catch (error) {
-    console.error('[GAME DELETION ERROR] Failed to delete unrated game from NEW database:', game.id, error);
+    console.error('[GAME DELETION ERROR] Failed to delete unrated game from NEW database:', game.dbGameId, error);
   }
 }
