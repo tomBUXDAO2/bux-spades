@@ -31,22 +31,19 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
     });
     const totalTricks = tricks.length;
 
-    // Create game result in old database  
+    // Create game result in old database (match old schema)
     const gameResultId = `gameresult_${game.dbGameId}_${Date.now()}`;
     await prisma.gameResult.create({
       data: {
         id: gameResultId,
-        gameId: game.dbGameId,
-        winningTeam: winningTeamOrPlayer,
+        gameId: game.dbGameId as any,
+        winner: winningTeamOrPlayer,
         finalScore: finalScore,
         totalRounds: totalRounds,
         totalTricks: totalTricks,
         team1Score: team1Score,
         team2Score: team2Score,
-        team1Bags: game.team1Bags || 0,
-        team2Bags: game.team2Bags || 0,
-        gameMode: game.gameMode || 'PARTNERS',
-        completed: true
+        playerResults: {},
       }
     });
 
@@ -86,8 +83,9 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
 
     console.log('[GAME COMPLETION] Created GameResult:', gameResultId);
   } catch (error) {
-    console.error('[GAME COMPLETION] Failed to create game result:', error);
-    throw error;
+    console.error('[GAME COMPLETION] Failed to create game result (continuing):', error);
+    // Do not throw here; winners modal emission must proceed
+    return;
   }
 }
 
