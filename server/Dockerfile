@@ -1,5 +1,5 @@
 # Use Node.js LTS
-FROM node:18-alpine
+FROM public.ecr.aws/docker/library/node:18-alpine
 
 # Install dependencies for Prisma
 RUN apk add --no-cache openssl
