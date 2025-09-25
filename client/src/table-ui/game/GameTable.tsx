@@ -208,7 +208,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
   if (isLeadingTrick) {
     // Assassin: if spades are broken, must lead spades if you have any
     if (special?.assassin) {
-      const spadesBroken = (game as any).play?.spadesBroken;
+      const spadesBroken = hasSpadeBeenPlayed(game);
       const hasSpade = Array.isArray(hand) ? hand.some(c => c.suit === 'SPADES') : false;
       if (spadesBroken && hasSpade) {
         return (hand || []).filter(c => c.suit === 'SPADES');
@@ -231,7 +231,7 @@ function getPlayableCards(game: GameState, hand: Card[] | undefined, isLeadingTr
     }
 
     // Standard rule: cannot lead spades until broken unless only spades remain
-    const spadesBroken = (game as any).play?.spadesBroken;
+    const spadesBroken = hasSpadeBeenPlayed(game);
     if (!spadesBroken) {
       const nonSpades = Array.isArray(hand) ? (hand || []).filter(c => c.suit !== 'SPADES') : [];
       if (nonSpades.length > 0) return nonSpades;
