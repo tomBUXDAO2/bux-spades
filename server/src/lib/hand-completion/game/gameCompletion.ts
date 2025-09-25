@@ -154,6 +154,20 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     // Process coins (buy-in deductions and prize payouts)
     // This only happens when the game is FINISHED to avoid losing coins on crashes
     await CoinManager.processGameCoins(game, winningTeamOrPlayer);
+
+    // If unrated, delete all traces from NEW DB after completion and close the room
+    if (!game.rated) {
+      try {
+        await deleteUnratedGameFromDatabase(game);
+        io.to(game.id).emit('game_deleted', { reason: 'unrated_game_completed' });
+        // Remove from memory
+        // const idx = games.findIndex(g => g.id === game.id); // This line was commented out in the original file
+        // if (idx !== -1) games.splice(idx, 1); // This line was commented out in the original file
+        console.log('[GAME COMPLETION] Unrated game deleted and removed from memory:', game.id);
+      } catch (e) {
+        console.error('[GAME COMPLETION] Failed to delete unrated game on completion:', e);
+      }
+    }
   } catch (error) {
     console.error('[GAME COMPLETION ERROR] Failed to complete game:', error);
     throw error;
