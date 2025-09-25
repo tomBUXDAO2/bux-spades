@@ -177,11 +177,11 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
     // Get all bot user IDs from this game first
     const gamePlayersWithBots = await prismaNew.gamePlayer.findMany({
       where: { gameId: game.dbGameId },
-      include: { user: true }
+      include: { User: true }
     });
     
     const botUserIds = gamePlayersWithBots
-      .filter(gp => gp.user && gp.user.username.startsWith('Bot '))
+      .filter(gp => gp.User gp.user && gp.user.usernamegp.user && gp.user.username gp.User.username.startsWith('Bot '))
       .map(gp => gp.userId);
     
     // Get round IDs for this game
