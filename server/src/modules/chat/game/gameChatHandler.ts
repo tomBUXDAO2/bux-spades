@@ -28,7 +28,7 @@ export async function handleGameChatMessage(
         id: message.id || `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         userId: 'system',
         username: 'System',
-        avatar: undefined,
+        avatarUrl: undefined,
         message: message.message || '',
         timestamp: message.timestamp || new Date().toISOString(),
         isSystemMessage: true,
@@ -43,7 +43,7 @@ export async function handleGameChatMessage(
     // Handle regular user messages
     const user = await prisma.user.findUnique({
       where: { id: socket.userId },
-      select: { username: true, avatar: true }
+      select: { username: true, avatarUrl: true }
     });
 
     if (!user) {
@@ -55,7 +55,7 @@ export async function handleGameChatMessage(
       id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       userId: socket.userId,
       username: user.username,
-      avatar: user.avatar,
+      avatarUrl: user.avatarUrl,
       message: typeof message === "string" ? message.trim() : message.message?.trim() || "",
       timestamp: new Date().toISOString(),
       isSystemMessage: false,

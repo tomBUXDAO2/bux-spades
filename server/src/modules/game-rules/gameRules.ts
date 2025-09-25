@@ -37,7 +37,7 @@ export const SUIT_HIERARCHY: { [key in Suit]: number } = {
 export function validateGameSettings(settings: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  if (!settings.gameMode || !['SOLO', 'PARTNERS'].includes(settings.gameMode)) {
+  if (!settings.mode || !['SOLO', 'PARTNERS'].includes(settings.mode)) {
     errors.push('Invalid game mode');
   }
   
@@ -215,7 +215,7 @@ export function calculateTeamScore(team1Tricks: number, team1Bid: number, team2T
  * Checks if game is complete
  */
 export function isGameComplete(game: Game): boolean {
-  if (game.gameMode === 'SOLO') {
+  if (game.mode === 'SOLO') {
     return game.team1TotalScore >= game.maxPoints || game.team1TotalScore <= game.minPoints;
   } else {
     return game.team1TotalScore >= game.maxPoints || game.team2TotalScore >= game.maxPoints ||
@@ -231,7 +231,7 @@ export function getWinningTeam(game: Game): number | null {
     return null;
   }
   
-  if (game.gameMode === 'SOLO') {
+  if (game.mode === 'SOLO') {
     return game.team1TotalScore >= game.maxPoints ? 0 : 1;
   } else {
     if (game.team1TotalScore >= game.maxPoints) return 0;

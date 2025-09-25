@@ -1,7 +1,6 @@
-import prisma from '../prisma';
-import type { Game } from '../../types/game';
-import { prismaNew } from '../../newdb/client';
-import { useNewDbOnly } from '../../newdb/toggle';
+import { prisma } from "../../lib/prisma";
+import type { Game } from "../../types/game";
+import { useNewDbOnly } from "../../newdb/toggle";import { useNewDbOnly } from '../../newdb/toggle';
 
 /**
  * Handles all coin operations for completed games
@@ -48,7 +47,7 @@ export class CoinManager {
       const humanPlayers = game.players.filter(p => p && p.type === 'human');
 
       // Choose client based on flag
-      const client: any = useNewDbOnly ? prismaNew : prisma;
+      const client: any = useNewDbOnly ? prisma : prisma;
 
       // Process coins in a transaction
       await client.$transaction(async (tx: any) => {
@@ -120,14 +119,14 @@ export class CoinManager {
    * Distribute prizes for winners based on game mode
    */
   private static async distributePrizes(tx: any, game: Game, winningTeamOrPlayer: number, humanPlayers: any[]): Promise<void> {
-    console.log('[COIN MANAGER] Distributing prizes for', game.gameMode, 'game');
+    console.log('[COIN MANAGER] Distributing prizes for', game.mode, 'game');
     
     const buyIn = game.buyIn;
     const totalPot = buyIn * 4; // Total pot from all 4 players (fixed regardless of human count)
     const rake = Math.floor(totalPot * 0.1); // 10% rake
     const prizePool = totalPot - rake; // 90% of pot goes to prizes
 
-    if (game.gameMode === 'SOLO' || game.solo) {
+    if (game.mode === 'SOLO' || game.mode === "SOLO") {
       await this.distributeSoloPrizes(tx, game, winningTeamOrPlayer, humanPlayers, buyIn);
     } else {
       await this.distributePartnersPrizes(tx, game, winningTeamOrPlayer, humanPlayers, prizePool);
@@ -149,7 +148,7 @@ export class CoinManager {
     // Create array of players with their scores and positions
     const playersWithScores = playerScores.map((score, index) => ({ 
       score, 
-      position: index,
+      seatIndex: index,
       player: game.players[index]
     }));
     

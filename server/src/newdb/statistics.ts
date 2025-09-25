@@ -1,11 +1,11 @@
-import { prismaNew } from './client';
+import { prisma } from '../lib/prisma';
 
 export async function calculateAndStoreUserStats(gameId: string): Promise<void> {
   console.log('[USER STATS] Calculating stats for game:', gameId);
   
   try {
     // Get game details
-    const game = await prismaNew.game.findUnique({
+    const game = await prisma.game.findUnique({
       where: { id: gameId }
     });
 
@@ -15,24 +15,24 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
     }
 
     // Get game players
-    const gamePlayers = await prismaNew.gamePlayer.findMany({
+    const gamePlayers = await prisma.gamePlayer.findMany({
       where: { gameId }
     });
 
     // Get all rounds and their stats
-    const rounds = await prismaNew.round.findMany({
+    const rounds = await prisma.round.findMany({
       where: { gameId }
     });
 
     // Get player round stats for all rounds
-    const playerRoundStats = await prismaNew.playerRoundStats.findMany({
+    const playerRoundStats = await prisma.playerRoundStats.findMany({
       where: { 
         roundId: { in: rounds.map(r => r.id) }
       }
     });
 
     // Get game result
-    const gameResult = await prismaNew.gameResult.findUnique({
+    const gameResult = await prisma.gameResult.findUnique({
       where: { gameId }
     });
 
@@ -56,12 +56,12 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       const playerRounds = playerRoundStats.filter(prs => prs.userId === userId);
 
       // Calculate stats
-      const gamesPlayed = 1;
-      const gamesWon = determineIfWon(gamePlayer, gameResult, game.mode);
-      const winPct = gamesWon / gamesPlayed;
+      const totalGamesPlayed = 1;
+      const totalGamesWon = determineIfWon(gamePlayer, gameResult, game.mode);
+      const winPct = totalGamesWon / totalGamesPlayed;
       
       const totalBags = playerRounds.reduce((sum, prs) => sum + prs.bagsThisRound, 0);
-      const bagsPerGame = totalBags / gamesPlayed;
+      const bagsPerGame = totalBags / totalGamesPlayed;
       
       const nilsBid = playerRounds.filter(prs => prs.bid === 0).length;
       const nilsMade = playerRounds.filter(prs => prs.bid === 0 && prs.madeNil).length;
@@ -71,19 +71,19 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
       const blindNilsMade = playerRounds.filter(prs => prs.bid === -1 && prs.madeBlindNil).length;
       const blindNilPct = blindNilsBid > 0 ? blindNilsMade / blindNilsBid : 0;
 
-      console.log(`[USER STATS] Processing user ${userId}: gamesPlayed=${gamesPlayed}, gamesWon=${gamesWon}, totalBags=${totalBags}, gimmick=${gimmick}`);
+      console.log(`[USER STATS] Processing user ${userId}: totalGamesPlayed=${totalGamesPlayed}, totalGamesWon=${totalGamesWon}, totalBags=${totalBags}, gimmick=${gimmick}`);
 
       // For non-gimmick games, use a simple create approach
       if (gimmick === null) {
-        await prismaNew.userStatsBreakdown.create({
+        await prisma.userStatsBreakdown.create({
           data: {
             userId,
             isLeague,
             mode: mode as any,
             format: format as any,
             gimmick: null,
-            gamesPlayed,
-            gamesWon,
+            totalGamesPlayed,
+            totalGamesWon,
             winPct,
             totalBags,
             bagsPerGame,
@@ -97,7 +97,7 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
         });
       } else {
         // For gimmick games, use upsert
-        await prismaNew.userStatsBreakdown.upsert({
+        await prisma.userStatsBreakdown.upsert({
           where: {
             userId_isLeague_mode_format_gimmick: {
               userId,
@@ -108,8 +108,8 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
             }
           },
           update: {
-            gamesPlayed: { increment: gamesPlayed },
-            gamesWon: { increment: gamesWon },
+            totalGamesPlayed: { increment: totalGamesPlayed },
+            totalGamesWon: { increment: totalGamesWon },
             winPct: 0, // Will be recalculated
             totalBags: { increment: totalBags },
             bagsPerGame: 0, // Will be recalculated
@@ -126,8 +126,8 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
             mode: mode as any,
             format: format as any,
             gimmick: gimmick as any,
-            gamesPlayed,
-            gamesWon,
+            totalGamesPlayed,
+            totalGamesWon,
             winPct,
             totalBags,
             bagsPerGame,
@@ -150,8 +150,8 @@ export async function calculateAndStoreUserStats(gameId: string): Promise<void> 
   }
 }
 
-function determineIfWon(gamePlayer: any, gameResult: any, gameMode: string): number {
-  if (gameMode === 'SOLO') {
+function determineIfWon(gamePlayer: any, gameResult: any, mode: string): number {
+  if (mode === 'SOLO') {
     // For solo games, check if this player's seat won
     const seatIndex = gamePlayer.seatIndex;
     const winner = gameResult.winner;

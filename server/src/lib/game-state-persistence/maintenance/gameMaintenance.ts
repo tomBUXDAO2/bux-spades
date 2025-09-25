@@ -21,7 +21,7 @@ export async function checkForStuckGames(): Promise<void> {
         where: { id: stuckGame.id },
         data: {
           status: 'FINISHED',
-          updatedAt: new Date()
+          // updatedAt: new Date()
         }
       });
       

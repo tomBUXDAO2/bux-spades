@@ -17,13 +17,13 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
     const finalScore = Math.max(team1Score, team2Score);
     
     // Get total rounds and tricks from database
-    const rounds = await prisma.round.findMany({
+    const rounds = await prismaNew.round.findMany({
       where: { gameId: game.dbGameId },
       select: { id: true }
     });
     const totalRounds = rounds.length;
     
-    const tricks = await prisma.trick.findMany({
+    const tricks = await prismaNew.trick.findMany({
       where: {
         roundId: { in: rounds.map(r => r.id) }
       },
@@ -33,7 +33,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
 
     // Create game result in old database (match old schema)
     const gameResultId = `gameresult_${game.dbGameId}_${Date.now()}`;
-    await prisma.gameResult.create({
+    await prismaNew.gameResult.create({
       data: {
         id: gameResultId,
         gameId: game.dbGameId as any,
@@ -45,14 +45,14 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         team2Score: team2Score,
         playerResults: {},
         createdAt: new Date(),
-        updatedAt: new Date(),
+        // updatedAt: new Date(),
       }
     });
 
     // NEW DB: record game finish
     try {
       const winnerStr = ((): string => {
-        if (game.gameMode === 'SOLO') {
+        if (game.mode === 'SOLO') {
           return `SEAT_${winningTeamOrPlayer}`;
         }
         // Partners mode uses 1 for Team 0 (seats 0 & 2) and 2 for Team 1 (seats 1 & 3)
@@ -69,7 +69,7 @@ async function createGameResult(game: Game, winningTeamOrPlayer: number) {
         totalRounds,
         totalTricks,
         finalScore,
-        gameMode: game.gameMode || 'PARTNERS'
+        mode: game.mode || 'PARTNERS'
       });
 
       // Calculate and store user statistics
@@ -103,8 +103,8 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     
     // Update database status to FINISHED
     if (game.dbGameId) {
-      const { prisma } = await import('../../prisma');
-      await prisma.game.update({
+      const { prismaNew } = await import('../../prisma');
+      await prismaNew.game.update({
         where: { id: game.dbGameId },
         data: { 
           status: 'FINISHED',
@@ -120,11 +120,11 @@ export async function completeGame(game: Game, winningTeamOrPlayer: number) {
     }
     
     // Emit game over event
-    if (game.gameMode === 'SOLO') {
+    if (game.mode === 'SOLO') {
       // Fetch latest running totals to ensure final round is included
       try {
         const { default: prisma } = await import('../../prisma');
-        const latest = await prisma.gameScore.findFirst({ where: { gameId: game.dbGameId as any }, orderBy: { roundNumber: 'desc' } });
+        // const latest = await prisma.gameScore.findFirst({ where: { gameId: game.dbGameId as any }, orderBy: { roundNumber: 'desc' } });
         const finalPlayerScores = latest ? [
           latest.player0RunningTotal || 0,
           latest.player1RunningTotal || 0,

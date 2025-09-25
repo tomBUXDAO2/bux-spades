@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { prismaNew } from '../../../newdb/client';
+import { prisma } from '../../../lib/prisma';
 
 export const login = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
 
     // Authenticate against NEW DB only
-    const user = await prismaNew.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: { username }
     });
 
@@ -30,7 +30,7 @@ export const login = async (req: Request, res: Response) => {
     // Active game lookup from NEW DB only - simplified for now
     let activeGame = null;
     try {
-      const activeGamePlayer = await prismaNew.gamePlayer.findFirst({
+      const activeGamePlayer = await prisma.gamePlayer.findFirst({
         where: { 
           userId: user.id,
           leftAt: null // Still active in game
@@ -38,7 +38,7 @@ export const login = async (req: Request, res: Response) => {
       });
 
       if (activeGamePlayer) {
-        const game = await prismaNew.game.findUnique({
+        const game = await prisma.game.findUnique({
           where: { id: activeGamePlayer.gameId },
           select: { id: true, status: true }
         });
@@ -57,9 +57,9 @@ export const login = async (req: Request, res: Response) => {
       user: {
         id: user.id,
         username: user.username,
-        email: null, // Not in new schema yet
+        // email: null, // Not in new schema yet
         discordId: user.discordId,
-        avatar: user.avatarUrl,
+        avatarUrl: user.avatarUrl,
         coins: user.coins
       },
       activeGame

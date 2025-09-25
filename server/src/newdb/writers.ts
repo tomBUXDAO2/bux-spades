@@ -1,4 +1,4 @@
-import { prismaNew } from './client';
+import { prisma } from '../lib/prisma';
 
 export async function newdbCreateGame(params: {
 	gameId: string;
@@ -12,10 +12,10 @@ export async function newdbCreateGame(params: {
 	specialRules?: any;
 	startedAt?: Date | null;
 }): Promise<void> {
-	await prismaNew.game.create({
+	await prisma.game.create({
 		data: {
 			id: params.gameId,
-			createdById: params.createdById,
+			createdById: params.createdByIdId,
 			mode: params.mode as any,
 			format: params.format as any,
 			gimmickVariant: (params.gimmickVariant ?? null) as any,
@@ -35,7 +35,7 @@ export async function newdbUpsertGamePlayer(params: {
 	teamIndex?: number | null;
 	isHuman: boolean;
 }): Promise<void> {
-	await prismaNew.gamePlayer.upsert({
+	await prisma.gamePlayer.upsert({
 		where: { gameId_seatIndex: { gameId: params.gameId, seatIndex: params.seatIndex } as any },
 		update: {
 			userId: params.userId,
@@ -57,7 +57,7 @@ export async function newdbEnsureRound(params: {
 	roundNumber: number;
 	dealerSeatIndex: number;
 }): Promise<string> {
-	const round = await prismaNew.round.upsert({
+	const round = await prisma.round.upsert({
 		where: { gameId_roundNumber: { gameId: params.gameId, roundNumber: params.roundNumber } as any },
 		update: { dealerSeatIndex: params.dealerSeatIndex },
 		create: { gameId: params.gameId, roundNumber: params.roundNumber, dealerSeatIndex: params.dealerSeatIndex }
@@ -71,12 +71,12 @@ export async function newdbCreateRound(params: {
 	dealerSeatIndex: number;
 	initialHands?: Array<{ seatIndex: number; cards: Array<{ suit: string; rank: string }> }>;
 }): Promise<string> {
-	const round = await prismaNew.round.create({
+	const round = await prisma.round.create({
 		data: { gameId: params.gameId, roundNumber: params.roundNumber, dealerSeatIndex: params.dealerSeatIndex }
 	});
 	if (params.initialHands && params.initialHands.length > 0) {
 		for (const hand of params.initialHands) {
-			await prismaNew.roundHandSnapshot.create({
+			await prisma.roundHandSnapshot.create({
 				data: { roundId: round.id, seatIndex: hand.seatIndex, cards: hand.cards as any }
 			});
 		}
@@ -90,7 +90,7 @@ export async function newdbUpsertBid(params: {
 	seatIndex: number;
 	bid: number; // -1 blind nil
 }): Promise<void> {
-	await prismaNew.roundBid.upsert({
+	await prisma.roundBid.upsert({
 		where: { roundId_userId: { roundId: params.roundId, userId: params.userId } as any },
 		update: { bid: params.bid, isBlindNil: params.bid === -1 },
 		create: { roundId: params.roundId, userId: params.userId, seatIndex: params.seatIndex, bid: params.bid, isBlindNil: params.bid === -1 }
@@ -104,11 +104,11 @@ export async function newdbCreateTrickAndCards(params: {
 	winningSeatIndex: number;
 	plays: Array<{ seatIndex: number; suit: string; rank: string; order: number }>;
 }): Promise<void> {
-	const trick = await prismaNew.trick.create({
+	const trick = await prisma.trick.create({
 		data: { roundId: params.roundId, trickNumber: params.trickNumber, leadSeatIndex: params.leadSeatIndex, winningSeatIndex: params.winningSeatIndex }
 	});
 	for (const p of params.plays) {
-		await prismaNew.trickCard.create({
+		await prisma.trickCard.create({
 			data: { trickId: trick.id, seatIndex: p.seatIndex, suit: p.suit, rank: p.rank, playOrder: p.order }
 		});
 	}
@@ -120,13 +120,13 @@ export async function newdbRecordRoundEnd(params: {
 	score: { team0Score?: number | null; team1Score?: number | null; team0Bags?: number | null; team1Bags?: number | null; team0RunningTotal?: number | null; team1RunningTotal?: number | null; player0Score?: number | null; player1Score?: number | null; player2Score?: number | null; player3Score?: number | null; player0Running?: number | null; player1Running?: number | null; player2Running?: number | null; player3Running?: number | null };
 }): Promise<void> {
 	for (const s of params.playerStats) {
-		await prismaNew.playerRoundStats.upsert({
+		await prisma.playerRoundStats.upsert({
 			where: { roundId_userId: { roundId: params.roundId, userId: s.userId } as any },
 			update: { seatIndex: s.seatIndex, teamIndex: s.teamIndex, bid: s.bid, isBlindNil: s.bid === -1, tricksWon: s.tricksWon, bagsThisRound: s.bagsThisRound, madeNil: s.madeNil, madeBlindNil: s.madeBlindNil },
 			create: { roundId: params.roundId, userId: s.userId, seatIndex: s.seatIndex, teamIndex: s.teamIndex, bid: s.bid, isBlindNil: s.bid === -1, tricksWon: s.tricksWon, bagsThisRound: s.bagsThisRound, madeNil: s.madeNil, madeBlindNil: s.madeBlindNil }
 		});
 	}
-	await prismaNew.roundScore.upsert({
+	await prisma.roundScore.upsert({
 		where: { roundId: params.roundId as any },
 		update: { ...params.score },
 		create: { roundId: params.roundId, ...params.score }
@@ -141,8 +141,8 @@ export async function newdbRecordGameFinish(params: {
 	totalTricks: number;
 	finishedAt?: Date | null;
 }): Promise<void> {
-	await prismaNew.gameResult.create({
+	await prisma.gameResult.create({
 		data: { gameId: params.gameId, winner: params.winner, team0Final: params.finals.team0Final ?? null, team1Final: params.finals.team1Final ?? null, player0Final: params.finals.player0Final ?? null, player1Final: params.finals.player1Final ?? null, player2Final: params.finals.player2Final ?? null, player3Final: params.finals.player3Final ?? null, totalRounds: params.totalRounds, totalTricks: params.totalTricks }
 	});
-	await prismaNew.game.update({ where: { id: params.gameId }, data: { status: 'FINISHED' as any, finishedAt: params.finishedAt ?? new Date() } });
+	await prisma.game.update({ where: { id: params.gameId }, data: { status: 'FINISHED' as any, finishedAt: params.finishedAt ?? new Date() } });
 } 

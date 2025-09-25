@@ -5,5 +5,5 @@ export const prismaNew = new PrismaClient();
  
 export async function ensureNewDbConnection(): Promise<void> {
 	// Simple health check; throws if NEW_DATABASE_URL is misconfigured
-	await prismaNew.$queryRaw`SELECT 1`;
+	await prisma.$queryRaw`SELECT 1`;
 } 

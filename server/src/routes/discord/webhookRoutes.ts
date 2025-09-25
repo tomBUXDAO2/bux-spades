@@ -110,7 +110,7 @@ router.post('/webhook/trigger-game-embed', async (req, res) => {
         where: { id: gameId },
         include: {
           GamePlayer: {
-            orderBy: { position: 'asc' }
+            orderBy: { seatIndex: 'asc' }
           },
           GameResult: true
         }
@@ -127,13 +127,13 @@ router.post('/webhook/trigger-game-embed', async (req, res) => {
       // Create game data object in the format expected by sendLeagueGameResults
       const gameData = {
         id: game.id,
-        gameMode: game.gameMode,
+        mode: game.mode,
         bidType: game.bidType,
         buyIn: game.buyIn,
         players: game.GamePlayer.map((p: any) => ({
           userId: p.discordId || p.userId,
           username: p.username,
-          position: p.position,
+          seatIndex: p.seatIndex,
           team: p.team,
           bid: p.bid,
           bags: p.bags,
@@ -146,7 +146,7 @@ router.post('/webhook/trigger-game-embed', async (req, res) => {
       };
       
       // Create game line string
-      const gameLine = `${game.buyIn >= 1000000 ? `${game.buyIn / 1000000}M` : `${game.buyIn / 1000}k`} ${game.gameMode} ${game.maxPoints}/${game.minPoints} ${game.bidType}`;
+      const gameLine = `${game.buyIn >= 1000000 ? `${game.buyIn / 1000000}M` : `${game.buyIn / 1000}k`} ${game.mode} ${game.maxPoints}/${game.minPoints} ${game.bidType}`;
       
       console.log(`Triggering Discord embed for game: ${gameId}`);
       await sendLeagueGameResults(gameData, gameLine);

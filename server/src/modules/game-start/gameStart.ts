@@ -6,7 +6,7 @@ import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
 import { newdbCreateRound } from '../../newdb/writers';
-import { prismaNew } from '../../newdb/client';
+import { prisma } from '../../lib/prisma';
 import { handleBiddingComplete } from '../socket-handlers/game-state/bidding/biddingCompletion';
 
 /**
@@ -70,7 +70,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, { gameId }: {
 
     // Dual-write: update new DB Game status and create Round + initial hand snapshots
     try {
-      await prismaNew.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any, startedAt: new Date() } });
+      await prisma.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any, startedAt: new Date() } });
       await newdbCreateRound({
         gameId: game.id,
         roundNumber: 1,

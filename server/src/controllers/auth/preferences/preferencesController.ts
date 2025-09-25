@@ -13,8 +13,8 @@ export const updateSoundPreference = async (req: Request, res: Response) => {
       select: {
         id: true,
         username: true,
-        email: true,
-        avatar: true,
+        // email: true,
+        avatarUrl: true,
         coins: true,
         soundEnabled: true
       }

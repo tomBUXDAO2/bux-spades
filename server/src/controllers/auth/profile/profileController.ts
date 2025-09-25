@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prismaNew } from '../../../newdb/client';
+import { prisma } from '../../../lib/prisma';
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -8,7 +8,7 @@ export const getProfile = async (req: Request, res: Response) => {
     }
 
     // Use NEW DB only
-    const userNew = await prismaNew.user.findUnique({
+    const userNew = await prisma.user.findUnique({
       where: { id: (req.user as any).id }
     });
 
@@ -20,9 +20,9 @@ export const getProfile = async (req: Request, res: Response) => {
       user: {
         id: userNew.id,
         username: userNew.username,
-        email: null, // Not in new schema yet
+        // email: null, // Not in new schema yet
         discordId: userNew.discordId,
-        avatar: userNew.avatarUrl,
+        avatarUrl: userNew.avatarUrl,
         coins: userNew.coins,
         stats: {} // Will be populated from UserStatsBreakdown later
       }
@@ -44,7 +44,7 @@ export const updateProfile = async (req: Request, res: Response) => {
 
     // Check if username is already taken (if updating username)
     if (username) {
-      const existingUser = await prismaNew.user.findFirst({
+      const existingUser = await prisma.user.findFirst({
         where: { 
           username, 
           id: { not: userId }
@@ -57,7 +57,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     }
 
     // Update user in NEW DB
-    const updatedUser = await prismaNew.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(username && { username }),
@@ -72,9 +72,9 @@ export const updateProfile = async (req: Request, res: Response) => {
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
-        email: null, // Not in new schema yet
+        // email: null, // Not in new schema yet
         discordId: updatedUser.discordId,
-        avatar: updatedUser.avatarUrl,
+        avatarUrl: updatedUser.avatarUrl,
         coins: updatedUser.coins
       }
     });

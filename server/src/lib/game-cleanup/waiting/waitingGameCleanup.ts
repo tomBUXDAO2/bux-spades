@@ -47,9 +47,9 @@ export async function cleanupWaitingGames(games: Game[], io?: Server): Promise<v
             where: { id: game.dbGameId },
             data: {
               status: 'FINISHED',
-              cancelled: true,
+              // cancelled: true,
               completed: true,
-              updatedAt: new Date()
+              // updatedAt: new Date()
             }
           });
           console.log(`[WAITING GAME CLEANUP] Successfully marked rated game as cancelled: ${game.dbGameId}`);

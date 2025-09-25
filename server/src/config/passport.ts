@@ -19,13 +19,13 @@ passport.use(new DiscordStrategy({
     });
     
     let currentNickname = profile.username;
-    let currentAvatar = profile.avatar;
+    let currentAvatar = profile.avatarUrl;
     
     if (discordUserResponse.ok) {
       const discordUser = await discordUserResponse.json() as any;
       // Use nickname if available, otherwise use username
       currentNickname = discordUser.global_name || discordUser.username;
-      currentAvatar = discordUser.avatar;
+      currentAvatar = discordUser.avatarUrl;
     }
 
     // Check if user already exists
@@ -42,9 +42,9 @@ passport.use(new DiscordStrategy({
           id: userId,
           username: currentNickname,
           discordId: profile.id,
-          email: profile.email || null,
-          password: '',
-          avatar: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : '/default-pfp.jpg',
+          // email: profile.email || null,
+          // password: '',
+          avatarUrl: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : '/default-pfp.jpg',
           createdAt: now,
           updatedAt: now
         } as any
@@ -67,7 +67,7 @@ passport.use(new DiscordStrategy({
         where: { id: user.id },
         data: {
           username: currentNickname,
-          avatar: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : user.avatar,
+          avatarUrl: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : user.avatarUrl,
           updatedAt: now
         } as any
       });
@@ -84,7 +84,7 @@ passport.use(new LocalStrategy(async (username, password, done) => {
   try {
     const user = await prisma.user.findFirst({
       where: { username },
-      include: { UserStats: true }
+      
     });
 
     if (!user || !user.UserStats) {
@@ -111,7 +111,7 @@ passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id },
-      include: { UserStats: true }
+      
     });
     done(null, user);
   } catch (error) {

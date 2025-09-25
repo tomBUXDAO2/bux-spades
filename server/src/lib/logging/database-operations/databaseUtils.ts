@@ -46,7 +46,7 @@ export async function createGameRecord(game: any, gameData: any): Promise<any> {
       data: {
         id: gameId,
         creatorId: game.creatorId || game.players.find((p: any) => p && p.type === 'human' && p.id)?.id || 'unknown',
-        gameMode: game.gameMode,
+        mode: game.mode,
         bidType: gameData.bidType,
         specialRules: [],
         minPoints: game.minPoints,
@@ -63,7 +63,7 @@ export async function createGameRecord(game: any, gameData: any): Promise<any> {
 /**
  * Create or update game player record
  */
-export async function upsertGamePlayer(dbGameId: string, player: any, position: number, gameMode: string, winner: number): Promise<void> {
+export async function upsertGamePlayer(dbGameId: string, player: any, seatIndex: number, mode: string, winner: number): Promise<void> {
   const userId = player.id;
   if (!userId) {
     console.log(`[GAME LOGGER] Player ${position} has no userId:`, player);
@@ -71,13 +71,13 @@ export async function upsertGamePlayer(dbGameId: string, player: any, position: 
   }
   
   let team: number | null = null;
-  if (gameMode === 'PARTNERS') team = position === 0 || position === 2 ? 1 : 2;
+  if (mode === 'PARTNERS') team = position === 0 || position === 2 ? 1 : 2;
   const finalBid = player.bid || 0;
   const finalTricks = player.tricks || 0;
   const finalBags = Math.max(0, finalTricks - finalBid);
-  const finalPoints = gameMode === 'SOLO' ? 0 : 0; // This would need to be calculated properly
+  const finalPoints = mode === 'SOLO' ? 0 : 0; // This would need to be calculated properly
   let won = false;
-  if (gameMode === 'SOLO') won = position === winner;
+  if (mode === 'SOLO') won = position === winner;
   else won = team === winner;
   
   const playerId = `player_${dbGameId}_${position}_${Date.now()}`;
@@ -85,9 +85,9 @@ export async function upsertGamePlayer(dbGameId: string, player: any, position: 
   
   await prisma.gamePlayer.upsert({
     where: {
-      gameId_position: {
+      gameId_seatIndex: {
         gameId: dbGameId,
-        position: position
+        seatIndex: position
       }
     },
     update: {
@@ -106,7 +106,7 @@ export async function upsertGamePlayer(dbGameId: string, player: any, position: 
       id: playerId,
       gameId: dbGameId,
       userId,
-      position: position,
+      seatIndex: position,
       team,
       bid: finalBid,
       bags: finalBags,

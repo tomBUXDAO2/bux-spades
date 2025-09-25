@@ -1,11 +1,11 @@
 import { prisma } from './prisma';
 
-export async function syncDiscordUserData(userId: string): Promise<{ username: string; avatar: string } | null> {
+export async function syncDiscordUserData(userId: string): Promise<{ username: string; avatarUrl: string } | null> {
   try {
     // Get user with Discord ID
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { discordId: true, username: true, avatar: true }
+      select: { discordId: true, username: true, avatarUrl: true }
     });
 
     if (!user || !user.discordId) {
@@ -29,16 +29,16 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
     
     // Get current nickname (global_name) or username
     const currentNickname = (discordUser as any).global_name || (discordUser as any).username;
-    const currentAvatar = (discordUser as any).avatar;
+    const currentAvatar = (discordUser as any).avatarUrl;
 
     // Check if we need to update
     const avatarUrl = currentAvatar ? `https://cdn.discordapp.com/avatars/${user.discordId}/${currentAvatar}.png` : '/default-pfp.jpg';
     
-    if (user.username !== currentNickname || user.avatar !== avatarUrl) {
+    if (user.username !== currentNickname || user.avatarUrl !== avatarUrl) {
       console.log(`[DISCORD SYNC] Updating user ${userId} data:`, {
         oldUsername: user.username,
         newUsername: currentNickname,
-        oldAvatar: user.avatar,
+        oldAvatar: user.avatarUrl,
         newAvatar: avatarUrl
       });
 
@@ -47,15 +47,15 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
         where: { id: userId },
         data: {
           username: currentNickname,
-          avatar: avatarUrl,
-          updatedAt: new Date()
+          avatarUrl: avatarUrl,
+          // updatedAt: new Date()
         }
       });
 
-      return { username: currentNickname, avatar: avatarUrl };
+      return { username: currentNickname, avatarUrl: avatarUrl };
     } else {
       console.log(`[DISCORD SYNC] User ${userId} data is up to date`);
-      return { username: user.username, avatar: user.avatar };
+      return { username: user.username, avatarUrl: user.avatarUrl };
     }
 
   } catch (error) {
@@ -64,12 +64,12 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
   }
 }
 
-export async function syncDiscordUserDataByDiscordId(discordId: string): Promise<{ username: string; avatar: string } | null> {
+export async function syncDiscordUserDataByDiscordId(discordId: string): Promise<{ username: string; avatarUrl: string } | null> {
   try {
     // Find user by Discord ID
     const user = await prisma.user.findUnique({
       where: { discordId },
-      select: { id: true, username: true, avatar: true }
+      select: { id: true, username: true, avatarUrl: true }
     });
 
     if (!user) {

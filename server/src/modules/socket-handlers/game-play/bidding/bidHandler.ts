@@ -6,7 +6,7 @@ import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
 import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
-import { prismaNew } from '../../../../newdb/client';
+import { prisma } from '../../../../lib/prisma';
 import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
 
 /**
@@ -79,7 +79,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
       });
       // Dual-write to new DB status as well
       try {
-        await prismaNew.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any } });
+        await prisma.game.update({ where: { id: game.id }, data: { status: 'BIDDING' as any } });
       } catch (err) {
         console.error('[MAKE BID DEBUG] Failed to update newdb game status to BIDDING:', err);
       }
@@ -99,7 +99,7 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
               gameId: game.dbGameId,
               roundNumber,
               createdAt: new Date(),
-              updatedAt: new Date()
+              // updatedAt: new Date()
             }
           });
         }

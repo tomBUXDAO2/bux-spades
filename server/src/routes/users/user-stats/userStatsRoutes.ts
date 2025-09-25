@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../../../middleware/auth.middleware';
-import { prismaNew } from '../../../newdb/client';
+import { prisma } from '../../../lib/prisma';
 
 const router = Router();
 
@@ -8,14 +8,14 @@ const router = Router();
 router.get('/:id/stats', requireAuth, async (req, res) => {
   try {
     const userId = req.params.id;
-    const gameMode = req.query.gameMode as 'PARTNERS' | 'SOLO' | 'ALL' | undefined;
+    const mode = req.query.mode as 'PARTNERS' | 'SOLO' | 'ALL' | undefined;
     
-    console.log('[USER STATS API] Request received:', { userId, gameMode, query: req.query });
+    console.log('[USER STATS API] Request received:', { userId, mode, query: req.query });
     
     // Get user and their stats from NEW DB
     const [user, userStats] = await Promise.all([
-      prismaNew.user.findUnique({ where: { id: userId } }),
-      prismaNew.userStats.findUnique({ where: { userId } })
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.userStats.findUnique({ where: { userId } })
     ]);
     
     console.log('[USER STATS API] User found:', !!user);
@@ -35,8 +35,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
       console.log('[USER STATS API] No UserStats found, returning defaults');
       return res.json({
         stats: {
-          gamesPlayed: 0,
-          gamesWon: 0,
+          totalGamesPlayed: 0,
+          totalGamesWon: 0,
           winPct: 0,
           nilsBid: 0,
           nilsMade: 0,
@@ -163,15 +163,15 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     console.log('[USER STATS API] Returning UserStats data');
 
     // Respond with mode-specific stats including breakdowns
-    if (gameMode === 'PARTNERS' || gameMode === 'SOLO' || gameMode === 'ALL') {
-      const prefix = gameMode === 'PARTNERS' ? 'partners' : (gameMode === 'SOLO' ? 'solo' : 'total');
+    if (mode === 'PARTNERS' || mode === 'SOLO' || mode === 'ALL') {
+      const prefix = mode === 'PARTNERS' ? 'partners' : (mode === 'SOLO' ? 'solo' : 'total');
       const get = (name: string) => (userStats as any)[`${prefix}${name}`] || 0;
       const playedWon = (played: number, won: number) => played > 0 ? Math.round((won / played) * 10000) / 100 : 0;
 
       const modeStats = {
         // Core
-        gamesPlayed: get('GamesPlayed'),
-        gamesWon: get('GamesWon'),
+        totalGamesPlayed: get('GamesPlayed'),
+        totalGamesWon: get('GamesWon'),
         winPct: playedWon(get('GamesPlayed'), get('GamesWon')),
         nilsBid: get('NilsBid'),
         nilsMade: get('NilsMade'),
@@ -211,15 +211,15 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     }
 
 
-    // If a gameMode is provided, return only that mode's stats
-    if (gameMode === 'PARTNERS' || gameMode === 'SOLO' || gameMode === 'ALL') {
-      const mode = gameMode || 'ALL';
+    // If a mode is provided, return only that mode's stats
+    if (mode === 'PARTNERS' || mode === 'SOLO' || mode === 'ALL') {
+      const mode = mode || 'ALL';
       const getModeSpecificStats = (mode: string) => {
         switch (mode) {
           case 'PARTNERS':
             return {
-              gamesPlayed: userStats.partnersGamesPlayed,
-              gamesWon: userStats.partnersGamesWon,
+              totalGamesPlayed: userStats.partnersGamesPlayed,
+              totalGamesWon: userStats.partnersGamesWon,
               winPct: userStats.partnersGamesPlayed > 0 ? Math.round((userStats.partnersGamesWon / userStats.partnersGamesPlayed) * 10000) / 100 : 0,
               nilsBid: userStats.partnersNilsBid,
               nilsMade: userStats.partnersNilsMade,
@@ -232,8 +232,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
             };
           case 'SOLO':
             return {
-              gamesPlayed: userStats.soloGamesPlayed,
-              gamesWon: userStats.soloGamesWon,
+              totalGamesPlayed: userStats.soloGamesPlayed,
+              totalGamesWon: userStats.soloGamesWon,
               winPct: userStats.soloGamesPlayed > 0 ? Math.round((userStats.soloGamesWon / userStats.soloGamesPlayed) * 10000) / 100 : 0,
               nilsBid: userStats.soloNilsBid,
               nilsMade: userStats.soloNilsMade,
@@ -247,8 +247,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
           case 'ALL':
           default:
             return {
-              gamesPlayed: userStats.totalGamesPlayed,
-              gamesWon: userStats.totalGamesWon,
+              totalGamesPlayed: userStats.totalGamesPlayed,
+              totalGamesWon: userStats.totalGamesWon,
               winPct: userStats.totalGamesPlayed > 0 ? Math.round((userStats.totalGamesWon / userStats.totalGamesPlayed) * 10000) / 100 : 0,
               nilsBid: userStats.totalNilsBid,
               nilsMade: userStats.totalNilsMade,
@@ -301,8 +301,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     const response = {
       stats: {
         // Overall stats
-        gamesPlayed: userStats.totalGamesPlayed,
-        gamesWon: userStats.totalGamesWon,
+        totalGamesPlayed: userStats.totalGamesPlayed,
+        totalGamesWon: userStats.totalGamesWon,
         winPct: Math.round(totalWinPct * 100) / 100,
         nilsBid: userStats.totalNilsBid,
         nilsMade: userStats.totalNilsMade,
@@ -430,8 +430,8 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
     };
     
     console.log('[USER STATS API] Response data:', {
-      gamesPlayed: response.stats.gamesPlayed,
-      gamesWon: response.stats.gamesWon,
+      totalGamesPlayed: response.stats.totalGamesPlayed,
+      totalGamesWon: response.stats.totalGamesWon,
       winPct: response.stats.winPct,
       totalBags: response.stats.totalBags
     });

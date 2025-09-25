@@ -2,7 +2,7 @@ import type { Game } from '../../types/game';
 import { io } from '../../index';
 import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import prisma from '../../lib/prisma';
-import { prismaNew } from '../../newdb/client';
+import { prisma } from '../../lib/prisma';
 import { newdbUpsertGamePlayer } from '../../newdb/writers';
 import { useNewDbOnly } from '../../newdb/toggle';
 
@@ -20,10 +20,10 @@ async function ensureBotUserExists(): Promise<void> {
       create: {
         id: BOT_USER_ID,
         username: 'Bot Player',
-        avatar: '/bot-avatar.jpg',
+        avatarUrl: '/bot-avatar.jpg',
         discordId: null,
         createdAt: new Date(),
-        updatedAt: new Date()
+        // updatedAt: new Date()
       }
     });
   } catch (error) {
@@ -58,10 +58,10 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
     create: {
       id: botDisplayId,
           username: botUsername,
-      avatar: '/bot-avatar.jpg',
+      avatarUrl: '/bot-avatar.jpg',
       discordId: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      // updatedAt: new Date()
     }
   });  
       break; // success
@@ -81,9 +81,9 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
   game.players[seatIndex] = {
     id: botDisplayId,
     username: botUsername,
-    avatar: '/bot-avatar.jpg',
+    avatarUrl: '/bot-avatar.jpg',
     type: 'bot',
-    position: seatIndex,
+    seatIndex: seatIndex,
     team: seatIndex % 2,
     bid: undefined,
     tricks: 0,
@@ -96,7 +96,7 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
       gameId: game.id,
       userId: botDisplayId,
       seatIndex,
-      teamIndex: game.gameMode === 'PARTNERS' ? (seatIndex % 2) : null,
+      teamIndex: game.mode === 'PARTNERS' ? (seatIndex % 2) : null,
       isHuman: false,
     });
   } catch (err) {
@@ -107,25 +107,25 @@ export async function addBotToSeat(game: Game, seatIndex: number): Promise<void>
   try {
     if (!useNewDbOnly && game.dbGameId) {
       await prisma.gamePlayer.upsert({
-        where: { gameId_position: { gameId: game.dbGameId, position: seatIndex } as any },
+        where: { gameId_seatIndex: { gameId: game.dbGameId, seatIndex: seatIndex } as any },
         update: {
           userId: botDisplayId,
-          team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+          team: game.mode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
           username: botUsername,
-          updatedAt: new Date()
+          // updatedAt: new Date()
         },
         create: {
           id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
           gameId: game.dbGameId,
           userId: botDisplayId,
-          position: seatIndex,
-          team: game.gameMode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
+          seatIndex: seatIndex,
+          team: game.mode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
           bid: null,
           bags: 0,
           points: 0,
           username: botUsername,
           createdAt: new Date(),
-          updatedAt: new Date()
+          // updatedAt: new Date()
         }
       });
     }

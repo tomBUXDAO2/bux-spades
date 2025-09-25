@@ -38,9 +38,9 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
     game.players[seat] = {
       id: socket.userId,
       username: username,
-      avatar: avatar,
+      avatarUrl: avatar,
       type: 'human',
-      position: seat,
+      seatIndex: seat,
       team: seat % 2,
       bid: null,
       tricks: 0,
@@ -130,15 +130,15 @@ export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watc
     // Add player to game - fetch user data from database
     const userData = await prisma.user.findUnique({
       where: { id: socket.userId },
-      select: { username: true, avatar: true }
+      select: { username: true, avatarUrl: true }
     });
     
     game.players[emptySeatIndex] = {
       id: socket.userId,
       username: userData?.username || 'Unknown Player',
-      avatar: userData?.avatar || '/default-avatar.jpg',
+      avatarUrl: userData?.avatarUrl || '/default-avatar.jpg',
       type: 'human',
-      position: emptySeatIndex,
+      seatIndex: emptySeatIndex,
       team: emptySeatIndex % 2,
       bid: null,
       tricks: 0,

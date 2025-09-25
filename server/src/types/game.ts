@@ -15,7 +15,7 @@ export interface Card {
 export interface GamePlayer {
 	id: string; // Ensure id is always a string and never null
 	username: string;
-	avatar: string | null;
+	avatarUrl: string | null;
 	type: 'human' | 'bot';
 	position?: number;
 	hand?: Card[];
@@ -50,7 +50,7 @@ export interface GameRules {
 }
 export interface Game {
 	id: string;
-	gameMode: GameMode;
+	mode: GameMode;
 	maxPoints: number;
 	minPoints: number;
 	buyIn: number;

@@ -7,7 +7,7 @@ import { handleHandCompletion } from '../hand/handCompletion';
 import prisma from '../../../lib/prisma';
 import { startTurnTimeout } from '../../../modules/timeout-management/core/timeoutManager';
 import { newdbEnsureRound, newdbCreateTrickAndCards } from '../../../newdb/writers';
-import { prismaNew } from '../../../newdb/client';
+import { prisma } from '../../../lib/prisma';
 import { useNewDbOnly } from '../../../newdb/toggle';
 
 /**
@@ -62,7 +62,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
         try {
           if (useNewDbOnly) {
             // New DB path
-            const roundRecordNew = await prismaNew.round.findFirst({
+            const roundRecordNew = await prisma.round.findFirst({
               where: { gameId: game.id },
               orderBy: { roundNumber: 'desc' as any }
             });
@@ -93,7 +93,7 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
                   leadPlayerId: leadPlayerId || '',
                   winningPlayerId: game.players[winnerIndex]!.id,
                   createdAt: new Date(),
-                  updatedAt: new Date()
+                  // updatedAt: new Date()
                 }
               });
               console.log(`[TRICK COMPLETION] Created Trick record: ${trickRecord.id}`);
@@ -109,9 +109,9 @@ export async function handleTrickCompletion(game: Game, socketId?: string): Prom
                     playerId: playerId || '',
                     suit: card.suit,
                     value: getCardValue(card), // Convert rank to numeric value
-                    position: i,
+                    seatIndex: i,
                     createdAt: new Date(),
-                    updatedAt: new Date()
+                    // updatedAt: new Date()
                   }
                 });
               }

@@ -13,7 +13,7 @@ export interface GameLine {
   hostId: string; 
   hostName: string; 
   coins: number; 
-  gameMode: string; 
+  mode: string; 
   maxPoints: number; 
   minPoints: number; 
   gameType: string; 
@@ -32,7 +32,7 @@ export const channelToOpenLine = new Map<string, string>();
 export async function updateGameLineEmbed(message: any, gameLine: GameLine) {
   try {
     // Format the game line title
-    const gameLineTitle = `${formatCoins(gameLine.coins)} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
+    const gameLineTitle = `${formatCoins(gameLine.coins)} ${gameLine.mode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
     
     // Build line suffix including nil/bn when regular
     const parts: string[] = [];
@@ -48,7 +48,7 @@ export async function updateGameLineEmbed(message: any, gameLine: GameLine) {
     let playerList = '';
     if (gameLine.players.length === 0) {
       playerList = 'No players joined yet';
-    } else if (gameLine.gameMode === 'partners') {
+    } else if (gameLine.mode === 'partners') {
       // Partners mode: Red team seats 0 & 2; Blue team seats 1 & 3
       const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2).sort((a,b)=>a.seat-b.seat);
       const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3).sort((a,b)=>a.seat-b.seat);
@@ -161,7 +161,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
           username: gameLine.hostName,
           discordId: gameLine.hostId,
           coins: 5000000,
-          avatar: null,
+          avatarUrl: null,
           createdAt: now,
           updatedAt: now
         } as any
@@ -186,7 +186,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
       creatorId: hostUser.id, // Use database User ID, not Discord ID
       creatorName: gameLine.hostName,
       buyIn: gameLine.coins,
-      gameMode: gameLine.gameMode.toUpperCase(),
+      mode: gameLine.mode.toUpperCase(),
       maxPoints: gameLine.maxPoints,
       minPoints: gameLine.minPoints,
       gameType: gameLine.gameType,
@@ -216,7 +216,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
         username: p.username,
         discordId: p.userId, // Use Discord ID for matching
         seat: p.seat,
-        avatar: p.avatar // Include avatar if available
+        avatarUrl: p.avatarUrl // Include avatar if available
       }))
     };
 
@@ -226,7 +226,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
     console.log('[DISCORD BOT] Making API call to create game with data:', {
       creatorId: gameData.creatorId,
       creatorName: gameData.creatorName,
-      gameMode: gameData.gameMode,
+      mode: gameData.mode,
       biddingOption: gameData.biddingOption,
       players: gameData.players.length
     });
@@ -251,7 +251,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
       const playerMentions = gameLine.players.map(p => `<@${p.userId}>`).join(' ');
       
       // Build game line format: "100k Partners 100/-100 Regular nil tick bn cross"
-      let gameLineFormat = `${formatCoins(gameLine.coins)} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
+      let gameLineFormat = `${formatCoins(gameLine.coins)} ${gameLine.mode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}`;
       
       // Add special rules to game line format
       const specialRules = [];
@@ -316,7 +316,7 @@ ${teamInfo}
       const finalEmbed = new EmbedBuilder()
         .setColor(0x00ff00)
         .setTitle('🎮 GAME LINE - FULL')
-        .setDescription(`**${formatCoins(gameLine.coins)} ${gameLine.gameMode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}**${finalSpecialRulesText}`)
+        .setDescription(`**${formatCoins(gameLine.coins)} ${gameLine.mode.toUpperCase()} ${gameLine.maxPoints}/${gameLine.minPoints} ${gameLine.gameType.toUpperCase()}**${finalSpecialRulesText}`)
         .setThumbnail('https://www.bux-spades.pro/bux-spades.png')
         .addFields(
           { name: '👤 Host', value: `<@${gameLine.hostId}>`, inline: true },

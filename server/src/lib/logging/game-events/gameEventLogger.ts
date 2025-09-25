@@ -11,7 +11,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
   
   try {
     // Determine settings
-    const gameMode = game.gameMode;
+    const mode = game.mode;
     const rawBidType = game.rules?.bidType || 'REGULAR';
     const specialRules = game.specialRules || {};
     
@@ -31,7 +31,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
       default:
         bidType = 'REGULAR';
     }
-    const solo = gameMode === 'SOLO';
+    const solo = mode === 'SOLO';
     const whiz = bidType === 'WHIZ';
     const mirror = bidType === 'MIRROR';
     const gimmick = ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'].includes(bidType);
@@ -41,7 +41,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
     let winner = 0;
     let team1Score = game.team1TotalScore ?? 0;
     let team2Score = game.team2TotalScore ?? 0;
-    if (gameMode === 'SOLO') {
+    if (mode === 'SOLO') {
       finalScore = (game.playerScores?.[winningTeamOrPlayer] ?? 0) as number;
       winner = winningTeamOrPlayer;
     } else {
@@ -109,7 +109,7 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
       }
       
       try {
-        await upsertGamePlayer(dbGame.id, player, i, gameMode, winner);
+        await upsertGamePlayer(dbGame.id, player, i, mode, winner);
         if (!isProduction) {
           console.log(`[GAME LOGGER] Upserted GamePlayer for ${player.username} at position ${i}`);
         }
@@ -123,23 +123,23 @@ export async function logCompletedGameToDbAndDiscord(game: any, winningTeamOrPla
     const { prisma } = await import('../../prisma');
     const dbGamePlayers = await prisma.gamePlayer.findMany({
       where: { gameId: dbGame.id },
-      orderBy: { position: 'asc' }
+      orderBy: { seatIndex: 'asc' }
     });
 
     const playerResults = {
       players: game.players.map((p: any, i: number) => {
-        const dbPlayer = dbGamePlayers.find(gp => gp.position === i);
+        const dbPlayer = dbGamePlayers.find(gp => gp.seatIndex === i);
         return {
-          position: i,
+          seatIndex: i,
           userId: p?.id, // DB user id
           discordId: p?.discordId || null,
           username: p?.username,
-          team: gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
+          team: mode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null,
           finalBid: dbPlayer?.bid || 0,
           finalTricks: dbPlayer?.tricksMade || 0,
           finalBags: dbPlayer?.finalBags || 0,
           finalScore: dbPlayer?.finalScore || 0,
-          won: gameMode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2)
+          won: mode === 'SOLO' ? i === winner : (i === 0 || i === 2 ? winner === 1 : winner === 2)
         };
       })
     };
@@ -180,7 +180,7 @@ async function sendDiscordResults(game: any, dbGame: any, winningTeamOrPlayer: n
     // Create game line string
     const formatCoins = (amount: number) => amount >= 1000000 ? `${amount / 1000000}M` : `${amount / 1000}k`;
     const typeUpper = (game.rules?.bidType || game.rules?.gameType || 'REGULAR').toUpperCase();
-    let gameLine = `${formatCoins(game.buyIn)} ${game.gameMode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
+    let gameLine = `${formatCoins(game.buyIn)} ${game.mode.toUpperCase()} ${game.maxPoints}/${game.minPoints} ${typeUpper}`;
     
     // Add nil and blind nil rules to the game line
     if (game.rules?.allowNil !== undefined || game.rules?.allowBlindNil !== undefined) {
@@ -196,7 +196,7 @@ async function sendDiscordResults(game: any, dbGame: any, winningTeamOrPlayer: n
           select: { discordId: true, username: true }
         }
       },
-      orderBy: { position: 'asc' }
+      orderBy: { seatIndex: 'asc' }
     });
     
     // Prepare game data for Discord
@@ -210,7 +210,7 @@ async function sendDiscordResults(game: any, dbGame: any, winningTeamOrPlayer: n
         const discordId = dbPlayer.User?.discordId || dbPlayer.discordId || dbPlayer.userId || '';
         return {
           userId: discordId,
-          won: game.gameMode === 'SOLO' 
+          won: game.mode === 'SOLO' 
             ? i === winningTeamOrPlayer 
             : (winningTeamOrPlayer === 1 && (i === 0 || i === 2)) || (winningTeamOrPlayer === 2 && (i === 1 || i === 3))
         };
@@ -222,9 +222,9 @@ async function sendDiscordResults(game: any, dbGame: any, winningTeamOrPlayer: n
     }
     
     // Add individual player scores for solo games
-    if (game.gameMode === 'SOLO' && game.playerScores) {
+    if (game.mode === 'SOLO' && game.playerScores) {
       (gameData as any).playerScores = game.playerScores;
-      (gameData as any).gameMode = game.gameMode;
+      (gameData as any).mode = game.mode;
     }
     
     await sendLeagueGameResults(discordClient, gameData, gameLine);

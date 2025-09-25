@@ -12,7 +12,7 @@ export function createSystemMessage(
     id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     userId: 'system',
     username: 'System',
-    avatar: undefined,
+    avatarUrl: undefined,
     message,
     timestamp: new Date().toISOString(),
     isSystemMessage: true,

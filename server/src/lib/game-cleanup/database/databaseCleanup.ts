@@ -26,7 +26,7 @@ export async function cleanupStuckDatabaseGames(): Promise<void> {
         data: {
           status: 'FINISHED',
           completed: true,
-          updatedAt: new Date()
+          // updatedAt: new Date()
         }
       });
       
@@ -65,7 +65,7 @@ export async function cleanupOrphanedGames(games: Game[]): Promise<void> {
           data: {
             status: 'FINISHED',
             completed: true,
-            updatedAt: new Date()
+            // updatedAt: new Date()
           }
         });
         
@@ -97,7 +97,7 @@ export async function forceCleanupGame(gameId: string, games: Game[]): Promise<v
       data: {
         status: 'FINISHED',
         completed: true,
-        updatedAt: new Date()
+        // updatedAt: new Date()
       }
     });
     

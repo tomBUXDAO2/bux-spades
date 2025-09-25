@@ -64,13 +64,13 @@ export class GameErrorHandler {
       return {
         id: game.id,
         status: game.status,
-        gameMode: game.gameMode,
+        mode: game.mode,
         players: game.players.map(p => p ? {
           id: p.id,
           username: p.username,
-          avatar: p.avatar,
+          avatarUrl: p.avatarUrl,
           type: p.type,
-          position: p.position,
+          seatIndex: p.seatIndex,
           team: p.team,
           connected: p.connected,
           // Don't send sensitive data like hands to other players

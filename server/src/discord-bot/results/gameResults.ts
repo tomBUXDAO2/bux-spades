@@ -58,11 +58,11 @@ export async function sendLeagueGameResults(client: any, gameData: any, gameLine
       .setTimestamp();
 
     // Add final scores - show individual player scores for solo games
-    if (gameData.gameMode === 'SOLO' && gameData.playerScores && gameData.players) {
+    if (gameData.mode === 'SOLO' && gameData.playerScores && gameData.players) {
       // Create array of players with their scores and usernames
       const playersWithScores = gameData.playerScores.map((score: number, index: number) => ({
         score,
-        position: index,
+        seatIndex: index,
         username: gameData.players[index]?.username || `Player ${index + 1}`
       }));
       

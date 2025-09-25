@@ -12,7 +12,7 @@ export async function logGameStart(game: Game): Promise<void> {
         id: game.id,
         creatorId: game.creatorId,
         status: game.status,
-        gameMode: game.gameMode,
+        mode: game.mode,
         bidType: game.rules?.bidType || 'REGULAR',
         specialRules: game.specialRules?.screamer || game.specialRules?.assassin ? 
           (game.specialRules?.screamer ? ['SCREAMER'] : []) : [],
@@ -28,14 +28,13 @@ export async function logGameStart(game: Game): Promise<void> {
         gimmick: game.rules?.bidType === 'GIMMICK',
         screamer: game.specialRules?.screamer || false,
         assassin: game.specialRules?.assassin || false,
-        solo: game.solo,
+        solo: game.mode === "SOLO",
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,
         dealer: game.dealerIndex,
         gimmickType: game.rules?.gimmickType || null,        gameState: game as any,
         lastActionAt: new Date(),
         createdAt: new Date(),
-        updatedAt: new Date()
       }
     });
 
@@ -62,7 +61,7 @@ export async function logGameStart(game: Game): Promise<void> {
       await newdbCreateGame({
         gameId: game.id,
         createdById: game.creatorId,
-        mode: (game.gameMode as any) || 'PARTNERS',
+        mode: (game.mode as any) || 'PARTNERS',
         format: (formatMap as any),
         gimmickVariant,
         isLeague: !!game.league,
@@ -91,15 +90,13 @@ export async function logGameStart(game: Game): Promise<void> {
           try {
             await prisma.user.upsert({
               where: { id: player.id },
-              update: { updatedAt: new Date() },
               create: {
                 id: player.id,
                 username: createUsername,
-                avatar: player.avatar || '/bot-avatar.jpg',
+                avatarUrl: player.avatarUrl || '/bot-avatar.jpg',
                 discordId: null,
                 coins: 0,
                 createdAt: new Date(),
-                updatedAt: new Date()
               }
             });
             console.log(`[DATABASE] Created/updated bot user: ${createUsername} (${player.id})`);
@@ -130,7 +127,7 @@ export async function logGameStart(game: Game): Promise<void> {
       if (!player) continue;
       if (player) {
         try {
-          const team = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
+          const team = game.mode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
           
           // For bots, use the universal bot user ID instead of the unique bot ID
           let userId = player.id;
@@ -143,7 +140,7 @@ export async function logGameStart(game: Game): Promise<void> {
               id: `player_${dbGame.id}_${i}_${Date.now()}`,
               gameId: dbGame.id,
               userId: userId,
-              position: i,
+              seatIndex: i,
               team: team,
               bid: null,
               bags: 0,
@@ -151,14 +148,13 @@ export async function logGameStart(game: Game): Promise<void> {
               username: player.username,
               discordId: player.discordId || null,
               createdAt: new Date(),
-              updatedAt: new Date()
             }
           });
           console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i} with userId ${userId}`);
 
           // NEW DB: dual-write player
           try {
-            const teamIndex = game.gameMode === 'PARTNERS' ? (i === 0 || i === 2 ? 0 : 1) : null;
+            const teamIndex = game.mode === 'PARTNERS' ? (i === 0 || i === 2 ? 0 : 1) : null;
             await newdbUpsertGamePlayer({
               gameId: game.id,
               userId,

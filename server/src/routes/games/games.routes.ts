@@ -7,7 +7,7 @@ import { createGame } from './create/gameCreation';
 import { enrichGameForClient } from './shared/gameUtils';
 import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 import { joinGame } from './join/gameJoining';
-import { prismaNew } from '../../newdb/client';
+import { prisma } from '../../lib/prisma';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -79,7 +79,7 @@ router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
 router.get('/', async (req: Request, res: Response) => {
   try {
     // Query games from NEW database
-    const dbGames = await prismaNew.game.findMany({
+    const dbGames = await prisma.game.findMany({
       where: {
         status: { in: ['WAITING' as any, 'BIDDING' as any, 'PLAYING' as any] }
       },
@@ -89,13 +89,13 @@ router.get('/', async (req: Request, res: Response) => {
     // For each game, fetch players from GamePlayer
     const clientGames = [] as any[];
     for (const dbGame of dbGames) {
-      const players = await prismaNew.gamePlayer.findMany({
+      const players = await prisma.gamePlayer.findMany({
         where: { gameId: dbGame.id },
         orderBy: { seatIndex: 'asc' as any }
       });
 
       const userIds = players.map(p => p.userId);
-      const users = await prismaNew.user.findMany({
+      const users = await prisma.user.findMany({
         where: { id: { in: userIds } }
       });
       const userMap = new Map(users.map(u => [u.id, u]));
@@ -103,16 +103,16 @@ router.get('/', async (req: Request, res: Response) => {
       clientGames.push({
         id: dbGame.id,
         status: dbGame.status,
-        gameMode: (dbGame as any).mode || 'PARTNERS',
+        mode: (dbGame as any).mode || 'PARTNERS',
         rated: (dbGame as any).isRated ?? false,
         league: (dbGame as any).isLeague ?? false,
         solo: ((dbGame as any).mode === 'SOLO') || false,
         players: players.map(p => ({
           id: p.userId,
           username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-          avatar: userMap.get(p.userId)?.avatarUrl || null,
+          avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
           type: p.isHuman ? 'human' : 'bot',
-          position: p.seatIndex,
+          seatIndex: p.seatIndex,
           team: p.teamIndex ?? null,
           bid: null as any,
           tricks: null as any,
@@ -142,7 +142,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const gameId = req.params.id;
     
-    const dbGame = await prismaNew.game.findUnique({
+    const dbGame = await prisma.game.findUnique({
       where: { id: gameId }
     });
 
@@ -150,13 +150,13 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    const players = await prismaNew.gamePlayer.findMany({
+    const players = await prisma.gamePlayer.findMany({
       where: { gameId: dbGame.id },
       orderBy: { seatIndex: 'asc' as any }
     });
 
     const userIds = players.map(p => p.userId);
-    const users = await prismaNew.user.findMany({
+    const users = await prisma.user.findMany({
       where: { id: { in: userIds } }
     });
     const userMap = new Map(users.map(u => [u.id, u]));
@@ -164,16 +164,16 @@ router.get('/:id', async (req: Request, res: Response) => {
     const game = {
       id: dbGame.id,
       status: dbGame.status,
-      gameMode: (dbGame as any).mode || 'PARTNERS',
+      mode: (dbGame as any).mode || 'PARTNERS',
       rated: (dbGame as any).isRated ?? false,
       league: (dbGame as any).isLeague ?? false,
       solo: ((dbGame as any).mode === 'SOLO') || false,
       players: players.map(p => ({
         id: p.userId,
         username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-        avatar: userMap.get(p.userId)?.avatarUrl || null,
+        avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
         type: p.isHuman ? 'human' : 'bot',
-        position: p.seatIndex,
+        seatIndex: p.seatIndex,
         team: p.teamIndex ?? null,
         bid: null as any,
         tricks: null as any,
@@ -260,7 +260,7 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
     }
 
     // Check if user is the creator
-    if (game.createdBy !== userId) {
+    if (game.createdById !== userId) {
       return res.status(403).json({ error: 'Only the game creator can start the game' });
     }
 

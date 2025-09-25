@@ -31,8 +31,8 @@ export const register = async (req: Request, res: Response) => {
         id: userId,
         username,
         email,
-        password: hashedPassword,
-        avatar: '/default-pfp.jpg',
+        // password: hashedPassword,
+        avatarUrl: '/default-pfp.jpg',
         coins: 5000000,
         createdAt: now,
         updatedAt: now

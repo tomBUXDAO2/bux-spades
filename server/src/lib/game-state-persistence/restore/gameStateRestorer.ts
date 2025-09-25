@@ -42,7 +42,7 @@ export async function restoreGameState(gameId: string): Promise<Game | null> {
       currentPlayer: gameState.players.find((p: any) => p?.id === gameState.currentPlayer) || null,
       dealer: gameState.dealer || 0,
       status: gameState.status,
-      gameMode: gameState.gameMode,
+      mode: gameState.mode,
       minPoints: gameState.minPoints,
       maxPoints: gameState.maxPoints,
       buyIn: gameState.buyIn,

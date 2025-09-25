@@ -29,7 +29,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     const creatorPlayer = {
       id: (req as AuthenticatedRequest).user!.id,
       username: settings.creatorName || 'Unknown',
-      avatar: settings.creatorImage || null,
+      avatarUrl: settings.creatorImage || null,
       type: 'human' as const,
     };
 
@@ -60,7 +60,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
               username: playerData.username,
               discordId: playerData.discordId || playerData.userId,
               coins: 5000000,
-              updatedAt: new Date(),
+              // updatedAt: new Date(),
             }
           });
         }
@@ -68,9 +68,9 @@ export async function createGame(req: Request, res: Response): Promise<void> {
         players[playerData.seat] = {
           id: user.id,
           username: user.username,
-          avatar: user.avatar,
+          avatarUrl: user.avatarUrl,
           type: 'human',
-          position: playerData.seat,
+          seatIndex: playerData.seat,
           team: playerData.seat % 2,
           bid: undefined,
           tricks: 0,
@@ -83,9 +83,9 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       players[0] = {
         id: creatorPlayer.id,
         username: creatorPlayer.username,
-        avatar: creatorPlayer.avatar,
+        avatarUrl: creatorPlayer.avatarUrl,
         type: 'human',
-        position: 0,
+        seatIndex: 0,
         team: 0,
         bid: undefined,
         tricks: 0,
@@ -102,7 +102,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       id: uuidv4(),
       creatorId: creatorPlayer.id,
       status: 'WAITING',
-      gameMode: settings.gameMode,
+      mode: settings.mode,
       maxPoints: settings.maxPoints,
       minPoints: settings.minPoints,
       buyIn: settings.buyIn,
@@ -111,7 +111,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       allowBlindNil: false,
       league: settings.league || false,
       completed: false,
-      solo: settings.gameMode === 'SOLO',
+      solo: settings.mode === 'SOLO',
       currentRound: 1,
       currentTrick: 1,
       dealerIndex: 0,
@@ -131,7 +131,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       spectators: [],
       completedTricks: [],
       rules: {
-        gameType: settings.gameMode,
+        gameType: settings.mode,
         allowNil: true,
         allowBlindNil: false,
         coinAmount: settings.buyIn,
@@ -159,7 +159,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
 
     console.log('[GAME CREATION] Created game:', {
       id: game.id,
-      gameMode: game.gameMode,
+      mode: game.mode,
       format: gameFormat.format,
       gimmickType: gameFormat.gimmickType,
       players: game.players.map(p => p ? p.username : 'empty')

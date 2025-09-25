@@ -18,7 +18,7 @@ export async function saveGameState(game: Game): Promise<void> {
         id: p.id,
         username: p.username,
         type: p.type,
-        position: p.position,
+        seatIndex: p.seatIndex,
         team: p.team,
         hand: p.hand, // ✅ STORING PLAYER HANDS
         bid: p.bid,
@@ -33,7 +33,7 @@ export async function saveGameState(game: Game): Promise<void> {
       currentPlayer: typeof game.currentPlayer === 'string' ? game.currentPlayer : (game.currentPlayer as any)?.id || null,
       dealer: game.dealer || 0,
       status: game.status,
-      gameMode: game.gameMode,
+      mode: game.mode,
       minPoints: game.minPoints,
       maxPoints: game.maxPoints,
       buyIn: game.buyIn,
@@ -68,7 +68,7 @@ export async function saveGameState(game: Game): Promise<void> {
         dealer: game.dealer || 0,
         gameState: gameState,
         lastActionAt: new Date(),
-        updatedAt: new Date()
+        // updatedAt: new Date()
       }
     });
 

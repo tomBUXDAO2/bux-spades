@@ -21,10 +21,10 @@ export async function handleHandCompletion(game: Game): Promise<void> {
   
   try {
     console.log('[HAND COMPLETION] Starting hand completion for game:', game.id);
-    console.log('[HAND COMPLETION DEBUG] Game mode:', game.gameMode);
-    console.log('[HAND COMPLETION DEBUG] Solo flag:', game.solo);
+    console.log('[HAND COMPLETION DEBUG] Game mode:', game.mode);
+    console.log('[HAND COMPLETION DEBUG] Solo flag:', game.mode === "SOLO");
     
-    if (game.gameMode === 'SOLO' || game.solo) {
+    if (game.mode === 'SOLO' || game.mode === "SOLO") {
       console.log('[HAND COMPLETION] Solo mode - using database scoring');
     } else {
       console.log('[HAND COMPLETION] Partners mode - using database scoring');
@@ -42,7 +42,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     let playerScores = [0, 0, 0, 0];
     let playerBags = [0, 0, 0, 0];
     
-    if (game.gameMode === 'SOLO' || game.solo) {
+    if (game.mode === 'SOLO' || game.mode === "SOLO") {
       // For solo games, get individual player scores from database
       
       // Get running total scores from database (not current round scores)
@@ -99,12 +99,12 @@ export async function handleHandCompletion(game: Game): Promise<void> {
         const tricksWon = (p.tricks ?? 0) as number;
         const madeNil = bid === 0 && tricksWon === 0;
         const madeBlindNil = bid === -1 && tricksWon === 0;
-        const teamIndex = game.gameMode === 'SOLO' || game.solo ? null : (i % 2);
+        const teamIndex = game.mode === 'SOLO' || game.mode === "SOLO" ? null : (i % 2);
         const bagsThisRound = Math.max(0, tricksWon - (bid > 0 ? bid : 0));
         return { userId: p.id, seatIndex: i, teamIndex, bid, tricksWon, bagsThisRound, madeNil, madeBlindNil };
       }).filter(Boolean) as any;
       const score = ((): any => {
-        if (game.gameMode === 'SOLO' || game.solo) {
+        if (game.mode === 'SOLO' || game.mode === "SOLO") {
           return {
             player0Score: playerScores[0],
             player1Score: playerScores[1],
@@ -133,7 +133,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     // Emit hand completed event with database scores
     
     // Update the game object with individual player scores for solo games
-    if (game.gameMode === 'SOLO' || game.solo) {
+    if (game.mode === 'SOLO' || game.mode === "SOLO") {
       game.playerScores = playerScores;
       game.playerBags = playerBags;
       console.log('[HAND COMPLETION] Updated game object with individual player scores:');
@@ -154,7 +154,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       team2Bags: game.team2Bags
     });
     
-    console.log(`[HAND COMPLETED] ${game.gameMode === "SOLO" || game.solo ? "Solo" : "Partners"} mode - Prepared hand summary with scores:`, handSummary);
+    console.log(`[HAND COMPLETED] ${game.mode === "SOLO" || game.mode === "SOLO" ? "Solo" : "Partners"} mode - Prepared hand summary with scores:`, handSummary);
     
     // Clear the last trick cards from the table before showing hand summary
     if (game.play && game.play.currentTrick) {

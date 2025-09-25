@@ -17,13 +17,13 @@ export async function handleAutocomplete(interaction: AutocompleteInteraction) {
     }
     if (focused.name === 'gimmicktype') {
       // Read gamemode robustly from provided options
-      let gameModeOpt = interaction.options.getString('gamemode');
-      if (!gameModeOpt) {
+      let modeOpt = interaction.options.getString('gamemode');
+      if (!modeOpt) {
         const gm = (interaction.options as any).data?.find?.((d: any) => d?.name === 'gamemode');
-        if (gm && typeof gm.value === 'string') gameModeOpt = gm.value;
+        if (gm && typeof gm.value === 'string') modeOpt = gm.value;
       }
-      if (typeof gameModeOpt === 'string') {
-        gameModeOpt = gameModeOpt.toLowerCase();
+      if (typeof modeOpt === 'string') {
+        modeOpt = modeOpt.toLowerCase();
       }
       const all = [
         { name: '4 or Nil', value: '4 OR NIL' },
@@ -32,7 +32,7 @@ export async function handleAutocomplete(interaction: AutocompleteInteraction) {
         { name: 'Crazy Aces', value: 'CRAZY ACES' },
         { name: 'Suicide', value: 'SUICIDE' }
       ];
-      const list = gameModeOpt === 'solo' ? all.filter(o => o.value !== 'SUICIDE') : all;
+      const list = modeOpt === 'solo' ? all.filter(o => o.value !== 'SUICIDE') : all;
       const q = String(focused.value || '').toLowerCase();
       const filtered = list.filter(o => o.name.toLowerCase().includes(q));
       await interaction.respond(filtered.slice(0,25));

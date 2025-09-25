@@ -19,7 +19,7 @@ export function setupSocketAuthentication(io: Server) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, username: true, avatar: true, discordId: true }
+        select: { id: true, username: true, avatarUrl: true, discordId: true }
       });
 
       if (!user) {

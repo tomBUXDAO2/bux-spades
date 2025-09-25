@@ -45,7 +45,7 @@ function getGimmickDescription(gimmickType: GimmickType): string {
 export function applyGameFormatRules(game: Game, format: GameFormatConfig): void {
   // Set game rules based on format
   game.rules = {
-    gameType: game.gameMode,
+    gameType: game.mode,
     minPoints: game.minPoints,
     maxPoints: game.maxPoints,
     coinAmount: game.buyIn,

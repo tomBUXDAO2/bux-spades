@@ -189,7 +189,7 @@ export async function startNewHand(game: Game): Promise<void> {
             gameId: game.dbGameId,
             roundNumber: nextRoundNumber,
             createdAt: new Date(),
-            updatedAt: new Date()
+            // updatedAt: new Date()
           }
         });
       }

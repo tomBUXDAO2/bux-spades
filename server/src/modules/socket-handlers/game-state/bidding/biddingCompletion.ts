@@ -5,7 +5,7 @@ import { botPlayCard } from '../../../bot-play/botLogic';
 import prisma from '../../../../lib/prisma';
 import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
-import { prismaNew } from '../../../../newdb/client';
+import { prisma } from '../../../../lib/prisma';
 import { useNewDbOnly } from '../../../../newdb/toggle';
 
 /**
@@ -31,7 +31,7 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
             gameId: game.dbGameId,
             roundNumber,
             createdAt: new Date(),
-            updatedAt: new Date()
+            // updatedAt: new Date()
           }
         });
       }
@@ -107,7 +107,7 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
   // NEW DB: also update status when using new DB only
   if (useNewDbOnly) {
     try {
-      await prismaNew.game.update({
+      await prisma.game.update({
         where: { id: game.id },
         data: { status: 'PLAYING' as any }
       });

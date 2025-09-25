@@ -25,7 +25,7 @@ export async function handleLobbyChatMessage(
   try {
     const user = await prisma.user.findUnique({
       where: { id: socket.userId },
-      select: { username: true, avatar: true }
+      select: { username: true, avatarUrl: true }
     });
 
     if (!user) {
@@ -37,7 +37,7 @@ export async function handleLobbyChatMessage(
       id: message.id || `${socket.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId: socket.userId,
       username: user.username,
-      avatar: user.avatar,
+      avatarUrl: user.avatarUrl,
       message: message.message.trim(),
       timestamp: message.timestamp || Date.now(),
       isSystemMessage: false

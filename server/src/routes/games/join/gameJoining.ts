@@ -62,9 +62,9 @@ export async function joinGame(req: AuthenticatedRequest, res: Response): Promis
     game.players[targetSeatIndex] = {
       id: userId,
       username: username || 'Unknown Player',
-      avatar: avatar || '/default-avatar.jpg',
+      avatarUrl: avatar || '/default-avatar.jpg',
       type: 'human',
-      position: targetSeatIndex,
+      seatIndex: targetSeatIndex,
       team: targetSeatIndex % 2,
       bid: undefined,
       tricks: 0,
