@@ -100,8 +100,11 @@ router.get('/', async (req: Request, res: Response) => {
     const clientGames = [] as any[];
     for (const dbGame of dbGames) {
       const players = await prismaNew.gamePlayer.findMany({
-        include: { user: true },        where: { gameId: dbGame.id },
-        orderBy: { seatIndex: 'asc' as any }
+      const userIds = players.map(p => p.userId);
+      const users = await prismaNew.user.findMany({
+        where: { id: { in: userIds } }
+      });
+      const userMap = new Map(users.map(u => [u.id, u]));        orderBy: { seatIndex: 'asc' as any }
       });
 
       clientGames.push({
@@ -113,8 +116,8 @@ router.get('/', async (req: Request, res: Response) => {
         solo: ((dbGame as any).mode === 'SOLO') || false,
         players: players.map(p => ({
           id: p.userId,
-          username: p.user?.username || `Bot ${p.userId.slice(-4)}` as any,
-          avatar: p.user?.avatar || null as any,
+          username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}` as any,
+          avatar: userMap.get(p.userId)?.avatarUrl || null as any,
           type: p.isHuman ? 'human' : 'bot',
           position: p.seatIndex,
           team: p.teamIndex ?? null,
@@ -142,8 +145,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     if (!dbGame) return res.status(404).json({ error: 'Game not found' });
 
     const players = await prismaNew.gamePlayer.findMany({
-        include: { user: true },      where: { gameId: dbGame.id },
-      orderBy: { seatIndex: 'asc' as any }
+      const userIds = players.map(p => p.userId);
+      const users = await prismaNew.user.findMany({
+        where: { id: { in: userIds } }
+      });
+      const userMap = new Map(users.map(u => [u.id, u]));      orderBy: { seatIndex: 'asc' as any }
     });
 
     const game = {
@@ -151,8 +157,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       status: dbGame.status,
       players: players.map((p: any) => ({
         id: p.userId,
-        username: p.user?.username || `Bot ${p.userId.slice(-4)}` as any,
-        avatar: p.user?.avatar || null as any,
+        username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}` as any,
+        avatar: userMap.get(p.userId)?.avatarUrl || null as any,
         type: p.isHuman ? 'human' : 'bot',
         position: p.seatIndex,
         team: p.teamIndex,
