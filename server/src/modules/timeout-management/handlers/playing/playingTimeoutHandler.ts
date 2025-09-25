@@ -4,11 +4,11 @@ import { botPlayCard } from '../../../bot-play/botLogic';
 import { handleTrickCompletion } from '../../../../lib/hand-completion/trick/trickCompletion';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { startTurnTimeout, clearTurnTimeoutOnly } from '../../core/timeoutManager';
-
+import { deleteUnratedGameFromDatabase } from "../../../../lib/hand-completion/game/gameCompletion";
 /**
  * Handles playing timeout
  */
-export function handlePlayingTimeout(game: Game, playerIndex: number): void {
+export async function handlePlayingTimeout(game: Game, playerIndex: number): Promise<void> {
   const player = game.players[playerIndex];
   if (!player || !game.play || !game.hands || !game.hands[playerIndex]) {
     return;
@@ -100,4 +100,15 @@ export function handlePlayingTimeout(game: Game, playerIndex: number): void {
       startTurnTimeout(game, nextPlayerIndex, 'playing');
     }
   }
-}
+  // Check if game should be deleted (unrated games with no human players)
+  const humanPlayersRemaining = game.players.some(p => p && p.type === "human");
+  if (!humanPlayersRemaining && !game.rated) {
+    console.log(`[TIMEOUT] No human players remaining in unrated game ${game.id} - deleting game`);
+    io.to(game.id).emit("game_deleted", { reason: "no_human_players" });
+    try {
+      await deleteUnratedGameFromDatabase(game);
+      console.log("[TIMEOUT] Successfully deleted unrated game from database via playing timeout cleanup");
+    } catch (err) {
+      console.error("[TIMEOUT] Failed to delete unrated game via playing timeout cleanup:", err);
+    }
+  }}

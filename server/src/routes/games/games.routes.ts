@@ -110,7 +110,7 @@ router.get('/', async (req: Request, res: Response) => {
         players: players.map(p => ({
           id: p.userId,
           username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-          avatar: userMap.get(p.userId)?.avatarUrl || null,
+          avatar: p.isHuman ? (userMap.get(p.userId)?.avatarUrl || null) : null,
           type: p.isHuman ? 'human' : 'bot',
           position: p.seatIndex,
           team: p.teamIndex ?? null,
@@ -119,8 +119,14 @@ router.get('/', async (req: Request, res: Response) => {
           points: null as any,
           bags: null as any
         })),
-        rules: {},
-        createdAt: (dbGame as any).createdAt
+        rules: {
+          minPoints: (dbGame as any).minPoints || 500,
+          maxPoints: (dbGame as any).maxPoints || 500,
+          allowNil: (dbGame as any).allowNil ?? true,
+          allowBlindNil: (dbGame as any).allowBlindNil ?? false,
+          assassin: (dbGame as any).assassin ?? false,
+          screamer: (dbGame as any).screamer ?? false
+        },        createdAt: (dbGame as any).createdAt
       });
     }
 
@@ -165,7 +171,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       players: players.map(p => ({
         id: p.userId,
         username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-        avatar: userMap.get(p.userId)?.avatarUrl || null,
+        avatar: p.isHuman ? (userMap.get(p.userId)?.avatarUrl || null) : null,
         type: p.isHuman ? 'human' : 'bot',
         position: p.seatIndex,
         team: p.teamIndex ?? null,
@@ -174,8 +180,14 @@ router.get('/:id', async (req: Request, res: Response) => {
         points: null as any,
         bags: null as any
       })),
-      rules: {},
-      createdAt: (dbGame as any).createdAt
+        rules: {
+          minPoints: (dbGame as any).minPoints || 500,
+          maxPoints: (dbGame as any).maxPoints || 500,
+          allowNil: (dbGame as any).allowNil ?? true,
+          allowBlindNil: (dbGame as any).allowBlindNil ?? false,
+          assassin: (dbGame as any).assassin ?? false,
+          screamer: (dbGame as any).screamer ?? false
+        },      createdAt: (dbGame as any).createdAt
     };
 
     res.json({ success: true, game });
