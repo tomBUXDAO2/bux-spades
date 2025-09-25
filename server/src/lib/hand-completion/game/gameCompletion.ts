@@ -174,15 +174,22 @@ export async function deleteUnratedGameFromDatabase(game: Game): Promise<void> {
   try {
     const { prismaNew } = await import('../../../newdb/client');
     
-    // Get all bot user IDs from this game first
-    const gamePlayersWithBots = await prismaNew.gamePlayer.findMany({
+    // Get all bot user IDs from this game first (no include: User relationship in new schema)
+    const gamePlayers = await prismaNew.gamePlayer.findMany({
       where: { gameId: game.dbGameId },
-      include: { User: true }
+      select: { userId: true }
     });
-    
-    const botUserIds = gamePlayersWithBots
-      .filter(gp => gp.User && gp.User.username.startsWith('Bot '))
-      .map(gp => gp.userId);
+
+    const userIds = gamePlayers.map(gp => gp.userId).filter(Boolean) as string[];
+
+    let botUserIds: string[] = [];
+    if (userIds.length > 0) {
+      const bots = await prismaNew.user.findMany({
+        where: { id: { in: userIds as any }, username: { startsWith: 'Bot ' } },
+        select: { id: true }
+      });
+      botUserIds = bots.map(b => b.id);
+    }
     
     // Get round IDs for this game
     const rounds = await prismaNew.round.findMany({
