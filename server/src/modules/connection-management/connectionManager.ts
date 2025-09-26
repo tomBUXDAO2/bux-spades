@@ -248,6 +248,82 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
           where: { id: socket.userId }
         });
 
+    // Handle fill seat with bot
+    socket.on("fill_seat_with_bot", async ({ gameId, seatIndex }: { gameId: string; seatIndex: number }) => {
+      console.log("[FILL SEAT] Received fill_seat_with_bot event:", { gameId, seatIndex });
+
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          console.log("Unauthorized fill_seat_with_bot attempt");
+          socket.emit("error", { message: "Not authorized" });
+          return;
+        }
+
+        // Find game in database
+        const dbGame = await prisma.game.findUnique({
+          where: { id: gameId },
+          include: { gamePlayers: { include: { user: true } } }
+        });
+
+        if (!dbGame) {
+          socket.emit("error", { message: "Game not found" });
+          return;
+        }
+
+        // Check if seat is already taken
+        const existingPlayer = dbGame.gamePlayers.find(gp => gp.seatIndex === seatIndex);
+        if (existingPlayer) {
+          socket.emit("error", { message: "Seat already taken" });
+          return;
+        }
+
+        // Create bot user
+        const botNumber = Math.floor(Math.random() * 1000);
+        const botId = `bot_${botNumber}_${Date.now()}`;
+
+        await prisma.user.upsert({
+          where: { id: botId },
+          update: {},
+          create: {
+            id: botId,
+            username: `Bot${botNumber}`,
+            avatarUrl: "/bot-avatar.jpg",
+            discordId: `bot_discord_${botNumber}_${Date.now()}`,
+            coins: 1000000,
+            createdAt: new Date()
+          }
+        });
+
+        // Create bot player in game
+        await prisma.gamePlayer.create({
+          data: {
+            gameId: gameId,
+            userId: botId,
+            seatIndex: seatIndex,
+            teamIndex: seatIndex % 2,
+            isHuman: false,
+            joinedAt: new Date()
+          }
+        });
+
+        // Get updated game and emit to clients
+        const updatedGame = await prisma.game.findUnique({
+          where: { id: gameId },
+          include: { gamePlayers: { include: { user: true } } }
+        });
+
+        if (updatedGame) {
+          const { enrichGameForClient } = require("../../routes/games/shared/gameUtils");
+          const enrichedGame = enrichGameForClient(updatedGame);
+          io.to(gameId).emit("game_update", enrichedGame);
+        }
+
+        console.log(`[FILL SEAT] Successfully added bot to seat ${seatIndex} in game ${gameId}`);
+      } catch (error) {
+        console.error("[FILL SEAT] Error filling seat with bot:", error);
+        socket.emit("error", { message: "Failed to add bot" });
+      }
+    });
         if (user) {
           // Broadcast emoji reaction to game room
           io.to(gameId).emit('emoji_reaction', {

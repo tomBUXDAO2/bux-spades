@@ -1199,7 +1199,7 @@ export default function GameTable({
           <button
             className={`${isVerySmallScreen ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-slate-600 border border-slate-300 text-slate-200 flex items-center justify-center hover:bg-slate-500 transition`}
             style={{ fontSize: isVerySmallScreen ? '10px' : '16px' }}
-            onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatarUrl })}
+            onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatar })}
           >
             JOIN
           </button>
@@ -3544,7 +3544,7 @@ const [isStarting, setIsStarting] = useState(false);
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : user.avatarUrl}
+                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : user.avatar}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
