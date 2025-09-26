@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { io } from '../../index';
 import { prisma } from '../../../lib/prisma';
+import { enrichGameForClient } from '../shared/gameUtils';
 
 export async function joinGame(req: Request, res: Response): Promise<void> {
   try {
@@ -78,6 +80,23 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
         isHuman: true
       }
     });
+    
+    // Emit game update to all clients
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+    
+    if (updatedGame) {
+      const enrichedGame = enrichGameForClient(updatedGame);
+      io.to(gameId).emit('game_update', enrichedGame);
+    }
     
     res.json({ success: true, seatIndex });
   } catch (error) {

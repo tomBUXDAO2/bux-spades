@@ -11,8 +11,10 @@ export interface AuthenticatedSocket extends Socket {
 export function setupSocketAuthentication(io: Server) {
   io.use(async (socket: Socket, next) => {
     try {
+      console.log('[SOCKET AUTH] Handshake auth:', socket.handshake.auth);
       const token = socket.handshake.auth.token;
       if (!token) {
+        console.log('[SOCKET AUTH] No token provided in handshake auth:', socket.handshake.auth);
         return next(new Error('No token provided'));
       }
 

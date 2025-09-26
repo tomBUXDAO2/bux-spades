@@ -3,7 +3,7 @@ import type { Game } from '../../../types/game';
 /**
  * Enrich game data for client consumption
  */
-export function enrichGameForClient(game: Game): any {
+export function enrichGameForClient(game: any): any {
   // Derive a top-level currentPlayer to keep frontend logic consistent
   let currentPlayer: string | undefined = undefined;
   if (game.status === 'BIDDING' && game.bidding) {
@@ -27,6 +27,28 @@ export function enrichGameForClient(game: Game): any {
     });
   }
 
+  // Build players array from gamePlayers
+  const players = [null, null, null, null];
+  if (game.gamePlayers) {
+    game.gamePlayers.forEach((gp: any) => {
+      if (gp.seatIndex !== null && gp.seatIndex >= 0 && gp.seatIndex < 4) {
+        players[gp.seatIndex] = {
+          id: gp.userId,
+          username: gp.user?.username || 'Unknown',
+          avatar: gp.user?.avatarUrl || '/default-avatar.png',
+          type: gp.isHuman ? 'human' : 'bot',
+          seatIndex: gp.seatIndex,
+          teamIndex: gp.teamIndex,
+          bid: null,
+          tricks: 0,
+          points: 0,
+          bags: 0,
+          isDealer: false
+        };
+      }
+    });
+  }
+
   const base = {
     id: game.id,
     status: game.status,
@@ -43,23 +65,21 @@ export function enrichGameForClient(game: Game): any {
     lastActivity: game.lastActivity,
     createdAt: game.createdAt,
     currentPlayer,
-    players: game.players ? game.players.map((p, i) => p ? {
-      id: p.id,
-      username: p.username,
-      avatarUrl: p.avatarUrl,
-      type: p.type,
-      seatIndex: 0,
-      teamIndex: p.team,
-      bid: p.bid,
-      tricks: p.tricks,
-      points: p.points,
-      bags: p.bags,
-      isDealer: typeof game.dealerIndex === "number" ? game.dealerIndex === i : Boolean((p as any).isDealer)
-    } : null) : [null, null, null, null],
+    players,
     bidding: game.bidding,
     play: game.play,
     isBotGame: game.isBotGame,
-    rules: game.rules,
+    rules: {
+      gameType: game.mode === "SOLO" ? "SOLO" : "REGULAR",
+      allowNil: game.nilAllowed,
+      allowBlindNil: game.blindNilAllowed,
+      minPoints: game.minPoints,
+      maxPoints: game.maxPoints,
+      coinAmount: game.buyIn || 0,
+      bidType: "REG",
+      numHands: 1,
+      specialRules: game.specialRules || {}
+    },
     playerScores: game.playerScores,
     playerBags: game.playerBags,
     forcedBid: game.forcedBid,

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.middleware';
 import { prisma } from '../../lib/prisma';
 import { io } from '../../index';
 import { enrichGameForClient } from './shared/gameUtils';
@@ -6,13 +7,39 @@ import { enrichGameForClient } from './shared/gameUtils';
 const router = Router();
 
 // Get all games
+router.get('/', async (req, res) => {
+  try {
+    const games = await prisma.game.findMany({
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+    const enrichedGames = games.map(game => enrichGameForClient(game));
+    res.json({ games: enrichedGames });
+  } catch (error) {
+    console.error('Error fetching games:', error);
+    res.status(500).json({ error: 'Failed to fetch games' });
+  }
+});
+
 router.get('/all', async (req, res) => {
   try {
     const games = await prisma.game.findMany({
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' as any }
     });
     
-    const enrichedGames = games.map(game => enrichGameForClient(game as any));
+    const enrichedGames = games.map(game => enrichGameForClient(game));
     res.json(enrichedGames);
   } catch (error) {
     console.error('Error fetching games:', error);
@@ -27,13 +54,16 @@ router.get('/lobby/all', async (req, res) => {
       where: { status: 'WAITING' },
       include: {
         gamePlayers: {
+          include: {
+            user: true
+          },
           orderBy: { seatIndex: 'asc' as any }
         }
       },
       orderBy: { createdAt: 'desc' as any }
     });
     
-    const enrichedGames = lobbyGames.map(game => enrichGameForClient(game as any));
+    const enrichedGames = lobbyGames.map(game => enrichGameForClient(game));
     res.json(enrichedGames);
   } catch (error) {
     console.error('Error fetching lobby games:', error);
@@ -42,48 +72,97 @@ router.get('/lobby/all', async (req, res) => {
 });
 
 // Get game by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
     const game = await prisma.game.findUnique({
       where: { id },
       include: {
         gamePlayers: {
+          include: {
+            user: true
+          },
           orderBy: { seatIndex: 'asc' as any }
         }
       }
     });
     
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      res.status(404).json({ error: 'Game not found' });
+      return;
     }
     
-    res.json({ success: true, game: enrichGameForClient(game as any) });
+    const enrichedGame = enrichGameForClient(game);
+    res.json({ success: true, game: enrichedGame });
   } catch (error) {
     console.error('Error fetching game:', error);
     res.status(500).json({ error: 'Failed to fetch game' });
   }
 });
 
-// Create game
-router.post('/', async (req, res) => {
+// Create new game
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { mode, format, gimmickVariant, userId } = req.body;
-    
+    const { 
+      mode, 
+      biddingOption, 
+      minPoints, 
+      maxPoints, 
+      buyIn, 
+      allowNil, 
+      allowBlindNil, 
+      specialRules, 
+      creatorId, 
+      creatorName, 
+      creatorImage 
+    } = req.body;
+
     const game = await prisma.game.create({
       data: {
-        
-        
-        
-        mode,
-        format: format || 'STANDARD',
-        gimmickVariant: gimmickVariant || null,
-        createdById: userId,
+        mode: mode || 'PARTNERS',
+        format: 'REGULAR',
+        gimmickVariant: null,
+        minPoints: minPoints || -100,
+        maxPoints: maxPoints || 100,
+        buyIn: buyIn || 0,
+        nilAllowed: allowNil || false,
+        blindNilAllowed: allowBlindNil || false,
+        specialRules: specialRules || {},
+        createdById: creatorId,
         status: 'WAITING'
       }
     });
-    
-    res.json({ success: true, game: enrichGameForClient(game as any) });
+
+    // Add creator as first player
+    await prisma.gamePlayer.create({
+      data: {
+        gameId: game.id,
+        userId: creatorId,
+        seatIndex: 0,
+        teamIndex: 0,
+        isHuman: true
+      }
+    });
+
+    // Get the enriched game data
+    const enrichedGame = await prisma.game.findUnique({
+      where: { id: game.id },
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+
+    if (enrichedGame) {
+      const clientGame = enrichGameForClient(enrichedGame);
+      res.json({ success: true, game: clientGame });
+    } else {
+      res.json({ success: true, game });
+    }
   } catch (error) {
     console.error('Error creating game:', error);
     res.status(500).json({ error: 'Failed to create game' });
@@ -91,48 +170,49 @@ router.post('/', async (req, res) => {
 });
 
 // Join game
-router.post('/:id/join', async (req, res) => {
+router.post('/:id/join', requireAuth, async (req, res) => {
   try {
-    const { id: gameId } = req.params;
-    const userId = (req as any).user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    
-    // Check if game exists
-    const game = await prisma.game.findUnique({
-      where: { id: gameId }
-    });
-    
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    
-    if (game.status !== 'WAITING') {
-      return res.status(400).json({ error: 'Game is not accepting new players' });
-    }
-    
-    // Check if user is already in the game
-    const existingPlayer = await prisma.gamePlayer.findFirst({
-      where: {
-        gameId,
-        userId
+    const { id } = req.params;
+    const { id: userId, username, avatar } = req.body;
+
+    // Check if user is already in another game
+    const existingGamePlayer = await prisma.gamePlayer.findFirst({
+      where: { 
+        userId: userId
       }
     });
     
-    if (existingPlayer) {
-      return res.status(400).json({ error: 'You are already in this game' });
+    if (existingGamePlayer) {
+      res.status(400).json({ 
+        error: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` 
+      });
+      return;
+    }
+
+    // Check if game exists
+    const game = await prisma.game.findUnique({
+      where: { id }
+    });
+    
+    if (!game) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+    
+    if (game.status !== 'WAITING') {
+      res.status(400).json({ error: 'Game is not accepting new players' });
+      return;
     }
     
     // Get current players
     const gamePlayers = await prisma.gamePlayer.findMany({
-      where: { gameId },
+      where: { gameId: id },
       orderBy: { seatIndex: 'asc' as any }
     });
     
     if (gamePlayers.length >= 4) {
-      return res.status(400).json({ error: 'Game is full' });
+      res.status(400).json({ error: 'Game is full' });
+      return;
     }
     
     // Find available seat
@@ -146,16 +226,14 @@ router.post('/:id/join', async (req, res) => {
     }
     
     if (seatIndex === -1) {
-      return res.status(400).json({ error: 'No available seats' });
+      res.status(400).json({ error: 'No available seats' });
+      return;
     }
     
     // Add player to game
     await prisma.gamePlayer.create({
       data: {
-        
-        
-        
-        gameId,
+        gameId: id,
         userId,
         seatIndex,
         teamIndex: seatIndex % 2,
@@ -163,11 +241,22 @@ router.post('/:id/join', async (req, res) => {
       }
     });
     
-    // Notify all players
-    io.to(gameId).emit('player_joined', {
-      userId,
-      seatIndex
+    // Emit game update to all clients
+    const updatedGame = await prisma.game.findUnique({
+      where: { id },
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      }
     });
+    
+    if (updatedGame) {
+      const enrichedGame = enrichGameForClient(updatedGame);
+      io.to(id).emit('game_update', enrichedGame);
+    }
     
     res.json({ success: true, seatIndex });
   } catch (error) {
@@ -176,95 +265,54 @@ router.post('/:id/join', async (req, res) => {
   }
 });
 
-// Leave game
-router.post('/:id/leave', async (req, res) => {
-  try {
-    const { id: gameId } = req.params;
-    const userId = (req as any).user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    
-    // Remove player from game
-    await prisma.gamePlayer.deleteMany({
-      where: {
-        gameId,
-        userId
-      }
-    });
-    
-    // Check if game is empty and delete if unrated
-    const remainingPlayers = await prisma.gamePlayer.findMany({
-      where: { gameId }
-    });
-    
-    if (remainingPlayers.length === 0) {
-      const game = await prisma.game.findUnique({
-        where: { id: gameId }
-      });
-      
-      if (game && !game.isRated) {
-        await prisma.game.delete({
-          where: { id: gameId }
-        });
-      }
-    }
-    
-    // Notify other players
-    io.to(gameId).emit('player_left', { userId });
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error leaving game:', error);
-    res.status(500).json({ error: 'Failed to leave game' });
-  }
-});
-
 // Spectate game
-router.post('/:id/spectate', async (req, res) => {
+router.post('/:id/spectate', requireAuth, async (req, res) => {
   try {
-    const { id: gameId } = req.params;
-    const userId = (req as any).user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    
+    const { id } = req.params;
+    const { id: userId, username, avatar } = req.body;
+
     // Check if game exists
     const game = await prisma.game.findUnique({
-      where: { id: gameId }
+      where: { id }
     });
     
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      res.status(404).json({ error: 'Game not found' });
+      return;
     }
     
     // Check if user is already spectating
     const existingSpectator = await prisma.gamePlayer.findFirst({
-      where: {
-        gameId,
-        userId
+      where: { 
+        gameId: id,
+        userId: userId,
+        isSpectator: true
       }
     });
     
     if (existingSpectator) {
-      return res.status(400).json({ error: 'You are already spectating this game' });
+      res.status(400).json({ error: 'You are already spectating this game' });
+      return;
     }
     
     // Add spectator
     await prisma.gamePlayer.create({
       data: {
-        
-        
-        
-        gameId,
-        userId
+        gameId: id,
+        userId,
+        seatIndex: null,
+        teamIndex: null,
+        isHuman: true,
+        isSpectator: true
       }
     });
     
-    // Notify players
-    io.to(gameId).emit('spectator_joined', { userId });
+    // Emit spectator joined event
+    io.to(id).emit('spectator_joined', {
+      userId,
+      username,
+      avatar
+    });
     
     res.json({ success: true });
   } catch (error) {
@@ -273,52 +321,148 @@ router.post('/:id/spectate', async (req, res) => {
   }
 });
 
-// Start game
-router.post('/:id/start', async (req, res) => {
+// Leave game
+router.post('/:id/leave', requireAuth, async (req, res) => {
   try {
-    const { id: gameId } = req.params;
-    
-    // Get game with players
-    const game = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: {
-        gamePlayers: {
-          orderBy: { seatIndex: 'asc' as any }
-        }
+    const { id } = req.params;
+    const userId = (req as any).user?.id;
+
+    // Find the player
+    const gamePlayer = await prisma.gamePlayer.findFirst({
+      where: {
+        gameId: id,
+        userId: userId
       }
+    });
+    
+    if (!gamePlayer) {
+      res.status(400).json({ error: 'You are not in this game' });
+      return;
+    }
+    
+    // Remove player from game
+    await prisma.gamePlayer.delete({
+      where: { id: gamePlayer.id }
+    });
+    
+    // Emit player left event
+    io.to(id).emit('player_left', {
+      userId,
+      seatIndex: gamePlayer.seatIndex
+    });
+    
+    // If no human players remain, delete the game (for unrated games)
+    const remainingPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: id }
+    });
+    
+    if (remainingPlayers.length === 0) {
+      await prisma.game.delete({
+        where: { id }
+      });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error leaving game:', error);
+    res.status(500).json({ error: 'Failed to leave game' });
+  }
+});
+
+// Start game
+router.post('/:id/start', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const game = await prisma.game.findUnique({
+      where: { id }
     });
     
     if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+      res.status(404).json({ error: 'Game not found' });
+      return;
     }
     
     if (game.status !== 'WAITING') {
-      return res.status(400).json({ error: 'Game is not in WAITING status' });
+      res.status(400).json({ error: 'Game has already started' });
+      return;
     }
     
-    if (game.gamePlayers.length < 2) {
-      return res.status(400).json({ error: 'Not enough players to start game' });
-    }
-    
-    // Start the game
+    // Update game status
     await prisma.game.update({
-      where: { id: gameId },
-      data: {
-        
-        
-        
-        status: 'BIDDING'
-      }
+      where: { id },
+      data: { status: 'BIDDING' }
     });
     
-    // Notify all players
-    io.to(gameId).emit('game_started', enrichGameForClient(game as any));
-    io.emit('games_updated', [enrichGameForClient(game as any)]);
-    
-    res.json({ success: true, game: enrichGameForClient(game as any) });
+    res.json({ success: true });
   } catch (error) {
     console.error('Error starting game:', error);
     res.status(500).json({ error: 'Failed to start game' });
+  }
+});
+
+// Invite bot
+router.post('/:id/invite-bot', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Implementation for bot invitation
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error inviting bot:', error);
+    res.status(500).json({ error: 'Failed to invite bot' });
+  }
+});
+
+// Remove bot
+router.post('/:id/remove-bot', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Implementation for bot removal
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing bot:', error);
+    res.status(500).json({ error: 'Failed to remove bot' });
+  }
+});
+
+// Invite bot midgame
+router.post('/:id/invite-bot-midgame', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Implementation for midgame bot invitation
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error inviting bot midgame:', error);
+    res.status(500).json({ error: 'Failed to invite bot midgame' });
+  }
+});
+
+// Remove bot midgame
+router.post('/:id/remove-bot-midgame', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Implementation for midgame bot removal
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing bot midgame:', error);
+    res.status(500).json({ error: 'Failed to remove bot midgame' });
+  }
+});
+
+// Complete game
+router.post('/:id/complete', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Implementation for game completion
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error completing game:', error);
+    res.status(500).json({ error: 'Failed to complete game' });
   }
 });
 

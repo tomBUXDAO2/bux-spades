@@ -86,6 +86,7 @@ model Game {
   isRated        Boolean       @default(false) // App: true only if 4 humans at start; League always true
   status         GameStatus
   minPoints      Int?
+  buyIn          Int?
   maxPoints      Int?
   nilAllowed     Boolean?      @default(true)
   blindNilAllowed Boolean?     @default(false)

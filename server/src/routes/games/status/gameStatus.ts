@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
+import { enrichGameForClient } from '../shared/gameUtils';
 
 export async function getGameStatus(req: Request, res: Response): Promise<void> {
   try {
@@ -9,6 +10,9 @@ export async function getGameStatus(req: Request, res: Response): Promise<void> 
       where: { id: gameId },
       include: {
         gamePlayers: {
+          include: {
+            user: true
+          },
           orderBy: { seatIndex: 'asc' as any }
         }
       }
@@ -19,24 +23,8 @@ export async function getGameStatus(req: Request, res: Response): Promise<void> 
       return;
     }
     
-    // Convert to client format
-    const clientGame = {
-      id: game.id,
-      status: game.status,
-      mode: game.mode,
-      format: game.format,
-      gimmickVariant: game.gimmickVariant,
-      createdAt: game.createdAt,
-      updatedAt: game.updatedAt,
-      players: game.gamePlayers.map((player: any) => ({
-        id: player.userId,
-        seatIndex: player.seatIndex,
-        teamIndex: player.teamIndex,
-        isHuman: player.isHuman
-      }))
-    };
-    
-    res.json({ success: true, game: clientGame });
+    const enrichedGame = enrichGameForClient(game);
+    res.json({ success: true, game: enrichedGame });
   } catch (error) {
     console.error('Error fetching game status:', error);
     res.status(500).json({ error: 'Failed to fetch game status' });

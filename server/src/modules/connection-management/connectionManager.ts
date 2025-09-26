@@ -8,8 +8,8 @@ import {
 } from '../socket-handlers';
 import { handleHandSummaryContinue } from '../socket-handlers/game-state/hand/handSummaryContinue';
 import { handlePlayAgainSocket } from '../socket-handlers/game-completion/playAgainHandler';
-import { handlePlayerLeaveDuringPlayAgain } from '../play-again/playAgainManager';
 import { prisma } from '../../lib/prisma';
+import { handleGameChatMessage } from '../chat/game/gameChatHandler';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
   io.on('connection', (socket: AuthenticatedSocket) => {
@@ -22,6 +22,12 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
 
     // Add to authenticated sockets map
     if (socket.isAuthenticated && socket.userId) {
+      // Emit authenticated event to client
+      socket.emit("authenticated", {
+        success: true,
+        userId: socket.userId,
+        games: [] // Empty for now, can be populated later if needed
+      });
       authenticatedSockets.set(socket.userId, socket);
       onlineUsers.add(socket.userId);
       console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
@@ -38,27 +44,6 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         authenticatedSockets.delete(socket.userId);
         onlineUsers.delete(socket.userId);
         console.log(`[CONNECTION] User ${socket.userId} disconnected. Online users:`, Array.from(onlineUsers));
-
-        // Handle player leaving during play again
-        try {
-          // Find games where this user is a player
-          const gamePlayers = await prisma.gamePlayer.findMany({
-            where: {
-              userId: socket.userId
-            },
-            select: {
-              gameId: true
-            }
-          });
-
-          const gameIds = gamePlayers.map(gp => gp.gameId);
-          
-          for (const gameId of gameIds) {
-            await handlePlayerLeaveDuringPlayAgain(gameId, socket.userId);
-          }
-        } catch (error) {
-          console.error('[CONNECTION] Error handling player leave during play again:', error);
-        }
       }
     });
 
@@ -67,13 +52,16 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       console.log('[SOCKET JOIN] Data received:', data);
       handleJoinGame(socket, data.gameId);
     });
+    
     socket.on('leave_game', (data: any) => {
       console.log('[LEAVE GAME] User wants to leave game:', { gameId: data.gameId, userId: socket.userId });
       // Handle leave game logic here
     });
+    
     socket.on('start_game', (data: any) => handleStartGame(socket, data));
     socket.on('bid', (data: any) => handleMakeBid(socket, data));
     socket.on('play_card', (data: any) => handlePlayCard(socket, data));
+    
     socket.on('hand_completed', ({ gameId }: { gameId: string }) => {
       console.log('[HAND COMPLETED] Initializing hand summary tracking for game:', gameId);
       // Get game from database
@@ -89,6 +77,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         console.error('[HAND COMPLETED] Error fetching game:', error);
       });
     });
+    
     socket.on('play_again', (data: any) => handlePlayAgainSocket(socket, data));
 
     // Handle hand summary continue
@@ -97,55 +86,14 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     // Handle spectate
     socket.on('spectate_game', async ({ gameId }: { gameId: string }) => {
       try {
-        console.log('[SPECTATE] User wants to spectate game:', { gameId, userId: socket.userId });
-        
         if (!socket.isAuthenticated || !socket.userId) {
           socket.emit('error', { message: 'Not authenticated' });
           return;
         }
 
-        // Check if game exists
-        const game = await prisma.game.findUnique({
-          where: { id: gameId }
-        });
-
-        if (!game) {
-          socket.emit('error', { message: 'Game not found' });
-          return;
-        }
-
-        // Check if user is already in this game
-        const existingPlayer = await prisma.gamePlayer.findFirst({
-          where: {
-            gameId: gameId,
-            userId: socket.userId
-          }
-        });
-
-        if (existingPlayer) {
-          socket.emit('error', { message: 'You are already in this game' });
-          return;
-        }
-
-        // Join game room
-        socket.join(gameId);
-        
-        // Get user profile
-        const user = await prisma.user.findUnique({
-          where: { id: socket.userId }
-        });
-
-        if (user) {
-          // Notify other players
-          socket.to(gameId).emit('spectator_joined', {
-            userId: socket.userId,
-            username: user.username,
-            avatarUrl: user.avatarUrl
-          });
-        }
-
-        console.log('[SPECTATE] User joined as spectator:', { gameId, userId: socket.userId });
-        
+        // Join the game room for spectating
+        await socket.join(gameId);
+        socket.emit('spectate_joined', { gameId });
       } catch (error) {
         console.error('[SPECTATE] Error handling spectate:', error);
         socket.emit('error', { message: 'Failed to spectate game' });
@@ -155,23 +103,8 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     // Handle leave spectate
     socket.on('leave_spectate', async ({ gameId }: { gameId: string }) => {
       try {
-        console.log('[LEAVE SPECTATE] User wants to leave spectate:', { gameId, userId: socket.userId });
-        
-        if (!socket.isAuthenticated || !socket.userId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        // Leave game room
-        socket.leave(gameId);
-        
-        // Notify other players
-        socket.to(gameId).emit('spectator_left', {
-          userId: socket.userId
-        });
-
-        console.log('[LEAVE SPECTATE] User left spectate:', { gameId, userId: socket.userId });
-        
+        await socket.leave(gameId);
+        socket.emit('spectate_left', { gameId });
       } catch (error) {
         console.error('[LEAVE SPECTATE] Error handling leave spectate:', error);
         socket.emit('error', { message: 'Failed to leave spectate' });
@@ -179,29 +112,11 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     });
 
     // Handle chat messages
-    socket.on('chat_message', async ({ gameId, message }: { gameId: string; message: string }) => {
+    socket.on('chat_message', async (data: any) => {
       try {
-        if (!socket.isAuthenticated || !socket.userId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        // Get user profile
-        const user = await prisma.user.findUnique({
-          where: { id: socket.userId }
-        });
-
-        if (user) {
-          // Broadcast message to game room
-          io.to(gameId).emit('chat_message', {
-            userId: socket.userId,
-            username: user.username,
-            avatarUrl: user.avatarUrl,
-            message: message,
-            timestamp: new Date().toISOString()
-          });
-        }
-
+        const { gameId, message } = data;
+        console.log('[CHAT DEBUG] Received chat message:', { gameId, message, userId: socket.userId });
+        await handleGameChatMessage(socket, gameId, message);
       } catch (error) {
         console.error('[CHAT] Error handling chat message:', error);
         socket.emit('error', { message: 'Failed to send message' });
@@ -216,13 +131,12 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
           return;
         }
 
-        // Get user profile
         const user = await prisma.user.findUnique({
-          where: { id: socket.userId }
+          where: { id: socket.userId },
+          select: { username: true, avatarUrl: true }
         });
 
         if (user) {
-          // Broadcast message to lobby
           io.emit('lobby_chat_message', {
             userId: socket.userId,
             username: user.username,
@@ -231,7 +145,6 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
             timestamp: new Date().toISOString()
           });
         }
-
       } catch (error) {
         console.error('[LOBBY CHAT] Error handling lobby chat message:', error);
         socket.emit('error', { message: 'Failed to send message' });
@@ -246,21 +159,11 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
           return;
         }
 
-        // Get user profile
-        const user = await prisma.user.findUnique({
-          where: { id: socket.userId }
+        io.to(gameId).emit('emoji_reaction', {
+          userId: socket.userId,
+          emoji: emoji,
+          timestamp: new Date().toISOString()
         });
-
-        if (user) {
-          // Broadcast emoji reaction to game room
-          io.to(gameId).emit('emoji_reaction', {
-            userId: socket.userId,
-            username: user.username,
-            emoji: emoji,
-            timestamp: new Date().toISOString()
-          });
-        }
-
       } catch (error) {
         console.error('[EMOJI] Error handling emoji reaction:', error);
         socket.emit('error', { message: 'Failed to send emoji reaction' });
@@ -270,28 +173,16 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     // Handle player profile requests
     socket.on('get_player_profile', async ({ userId }: { userId: string }) => {
       try {
-        if (!socket.isAuthenticated || !socket.userId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        // Get player profile
         const user = await prisma.user.findUnique({
-          where: { id: userId }
+          where: { id: userId },
+          select: { id: true, username: true, avatarUrl: true, coins: true }
         });
 
         if (user) {
-          socket.emit('player_profile', {
-            id: user.id,
-            username: user.username,
-            avatarUrl: user.avatarUrl,
-            coins: user.coins,
-            stats: null // userStats not available in current schema
-          });
+          socket.emit('player_profile', user);
         } else {
           socket.emit('error', { message: 'Player not found' });
         }
-
       } catch (error) {
         console.error('[PLAYER PROFILE] Error handling player profile request:', error);
         socket.emit('error', { message: 'Failed to get player profile' });

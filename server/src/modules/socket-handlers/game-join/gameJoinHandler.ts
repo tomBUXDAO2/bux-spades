@@ -1,11 +1,13 @@
 import type { AuthenticatedSocket } from '../../socket-auth/socketAuth';
+import { io } from '../../../index';
 import { prisma } from '../../../lib/prisma';
+import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 
 export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string) {
   try {
     console.log(`[GAME JOIN] User ${socket.userId} attempting to join game ${gameId}`);
     
-    // Check if game exists in database (no players relation on Game model)
+    // Check if game exists in database
     const dbGame = await prisma.game.findUnique({
       where: { id: gameId }
     });
@@ -32,11 +34,28 @@ export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string
     if (existingPlayer) {
       console.log(`[GAME JOIN] User ${socket.userId} already in game ${gameId} at seat ${existingPlayer.seatIndex}`);
       socket.join(gameId);
-      socket.emit('game_joined', { 
-        gameId, 
-        seatIndex: existingPlayer.seatIndex,
-        game: dbGame 
+      
+      // Get enriched game data
+      const updatedGame = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          gamePlayers: {
+            include: {
+              user: true
+            }
+          }
+        }
       });
+      
+      if (updatedGame) {
+        const enrichedGame = enrichGameForClient(updatedGame);
+        socket.emit('game_joined', { 
+          gameId, 
+          seatIndex: existingPlayer.seatIndex,
+          game: enrichedGame 
+        });
+        io.to(gameId).emit('game_update', enrichedGame);
+      }
       return;
     }
     
@@ -69,18 +88,37 @@ export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string
     // Join socket room
     socket.join(gameId);
     
-    // Emit success
-    socket.emit('game_joined', { 
-      gameId, 
-      seatIndex: targetSeatIndex,
-      game: dbGame 
+    // Get enriched game data
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        gamePlayers: {
+          include: {
+            user: true
+          }
+        }
+      }
     });
     
-    // Notify other players
-    socket.to(gameId).emit('player_joined', {
-      userId: socket.userId,
-      seatIndex: targetSeatIndex
-    });
+    if (updatedGame) {
+      const enrichedGame = enrichGameForClient(updatedGame);
+      
+      // Emit success
+      socket.emit('game_joined', { 
+        gameId, 
+        seatIndex: targetSeatIndex,
+        game: enrichedGame 
+      });
+      
+      // Notify other players
+      socket.to(gameId).emit('player_joined', {
+        userId: socket.userId,
+        seatIndex: targetSeatIndex
+      });
+      
+      // Emit game update to all clients
+      io.to(gameId).emit('game_update', enrichedGame);
+    }
     
     console.log(`[GAME JOIN] User ${socket.userId} successfully joined game ${gameId} at seat ${targetSeatIndex}`);
     
