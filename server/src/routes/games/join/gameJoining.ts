@@ -3,7 +3,7 @@ import { prisma } from '../../../lib/prisma';
 
 export async function joinGame(req: Request, res: Response): Promise<void> {
   try {
-    const { gameId } = req.params;
+    const { id } = req.params;
     const userId = (req as any).user?.id;
 
     if (!userId) {
@@ -11,7 +11,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    console.log(`[GAME JOIN] User ${userId} attempting to join game ${gameId}`);
+    console.log(`[GAME JOIN] User ${userId} attempting to join game ${id}`);
 
     // Check if user is already in another game
     const existingGamePlayer = await prisma.gamePlayer.findFirst({
@@ -32,7 +32,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
     
     // Check if game exists in database
     const dbGame = await prisma.game.findUnique({
-      where: { id: gameId }
+      where: { id: id }
     });
     
     if (!dbGame) {
@@ -47,7 +47,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
     
     // Check if game is full
     const playerCount = await prisma.gamePlayer.count({
-      where: { gameId: gameId }
+      where: { id: gameId }
     });
     
     if (playerCount >= 4) {
@@ -58,7 +58,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
     // Add player to game
     const newPlayer = await prisma.gamePlayer.create({
       data: {
-        gameId: gameId,
+        id: gameId,
         userId: userId,
         seatIndex: playerCount,
         teamIndex: playerCount % 2, // Simple team assignment
@@ -66,7 +66,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
       }
     });
     
-    console.log(`[GAME JOIN] User ${userId} joined game ${gameId} as seat ${newPlayer.seatIndex}`);
+    console.log(`[GAME JOIN] User ${userId} joined game ${id} as seat ${newPlayer.seatIndex}`);
     
     res.json({
       success: true,
