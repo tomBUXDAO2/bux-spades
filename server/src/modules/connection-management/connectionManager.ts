@@ -63,7 +63,7 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     });
 
     // Game-related socket events
-    socket.on('join_game', (data: any) => handleJoinGame(socket, data));
+    socket.on('join_game', (data: any) => handleJoinGame(socket, data.gameId));
     socket.on('leave_game', (data: any) => {
       console.log('[LEAVE GAME] User wants to leave game:', { gameId: data.gameId, userId: socket.userId });
       // Handle leave game logic here

@@ -515,7 +515,7 @@ const HomePage: React.FC = () => {
   const handleJoinGame = async (gameId: string, seatIndex: number) => {
     if (!user) return;
     // Ensure user is not null before accessing properties
-    const { id, username, avatar } = user;
+    const { id, username, avatarUrl } = user;
     const res = await api.post(`/api/games/${gameId}/join`, {
       id,
       username,

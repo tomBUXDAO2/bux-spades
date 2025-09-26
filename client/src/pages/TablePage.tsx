@@ -43,7 +43,6 @@ export default function TablePage() {
   };
 
   // Helper function to check if a player is a bot
-  const isBot = (p: any): p is any => p && p.type === 'bot';
 
   // Helper function to count empty seats and bot players
   const updateModalState = (gameState: GameState) => {
