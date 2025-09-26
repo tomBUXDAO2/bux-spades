@@ -1,15 +1,15 @@
-import { Server } from 'socket.io';
-import { games } from '../../gamesStore';
-import { AuthenticatedSocket } from '../socket-auth';
+import type { Server } from 'socket.io';
+import type { AuthenticatedSocket } from '../../types/socket';
 import { 
   handleJoinGame, 
+  handleStartGame, 
   handleMakeBid, 
-  handlePlayCard,
-  handleGameChatMessage,
-  handleLobbyChatMessage,
-  addBotToSeat,
-  createUserSession
-} from '../index';
+  handlePlayCard
+} from '../socket-handlers';
+import { handleHandSummaryContinue } from '../socket-handlers/game-state/hand/handSummaryContinue';
+import { handlePlayAgainSocket } from '../socket-handlers/game-completion/playAgainHandler';
+import { prisma } from '../../lib/prisma';
+import { handleGameChatMessage } from '../chat/game/gameChatHandler';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
   io.on('connection', (socket: AuthenticatedSocket) => {
@@ -17,99 +17,175 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       socketId: socket.id,
       userId: socket.userId,
       isAuthenticated: socket.isAuthenticated,
-      auth: socket.auth
+      connectedAt: new Date().toISOString()
     });
 
-    if (socket.userId) {
-      // Check if there's an existing socket for this user and disconnect it
-      const existingSocket = authenticatedSockets.get(socket.userId);
-      if (existingSocket && existingSocket.id !== socket.id) {
-        console.log(`[CONNECTION] Disconnecting existing socket for user ${socket.userId}:`, {
-          oldSocketId: existingSocket.id,
-          newSocketId: socket.id
-        });
-        existingSocket.emit('session_invalidated', {
-          reason: 'new_connection',
-          message: 'You have connected from another location'
-        });
-        existingSocket.disconnect();
-      }
-      
-      // Create new session for this user
-      const sessionId = createUserSession(socket.userId);
-      
+    // Add to authenticated sockets map
+    if (socket.isAuthenticated && socket.userId) {
+      // Emit authenticated event to client
+      socket.emit("authenticated", {
+        success: true,
+        userId: socket.userId,
+        games: [] // Empty for now, can be populated later if needed
+      });
       authenticatedSockets.set(socket.userId, socket);
       onlineUsers.add(socket.userId);
-      io.emit('online_users', Array.from(onlineUsers));
-      
-      console.log('User connected:', {
-        userId: socket.userId,
-        sessionId,
-        socketId: socket.id,
-        onlineUsers: Array.from(onlineUsers)
-      });
-
-      // Auto-join user to any games they're already in
-      games.forEach(game => {
-        const isPlayerInGame = game.players.some(player => player && player.id === socket.userId);
-        if (isPlayerInGame) {
-          socket.join(game.id);
-          console.log(`[CONNECTION] Auto-joined game room ${game.id} for user ${socket.userId}`);
-        }
-      });
+      console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
     }
 
-    // Socket event handlers
-    socket.on('join_game', (data) => handleJoinGame(socket, data));
-    socket.on('make_bid', (data) => handleMakeBid(socket, data));
-    socket.on('play_card', (data) => handlePlayCard(socket, data));
-
-    // Chat handlers
-    socket.on('chat_message', async ({ gameId, message }) => {
-      await handleGameChatMessage(socket, gameId, message);
-    });
-
-    socket.on("lobby_chat_message", async (message) => {
-      await handleLobbyChatMessage(socket, message);
-    });
-
-    // Fill seat with bot event (manual replacement)
-    socket.on('fill_seat_with_bot', ({ gameId, seatIndex }) => {
-      console.log('[FILL SEAT] Received fill_seat_with_bot event:', { gameId, seatIndex });
-      
-      if (!socket.isAuthenticated || !socket.userId) {
-        console.log('Unauthorized fill_seat_with_bot attempt');
-        socket.emit('error', { message: 'Not authorized' });
-        return;
-      }
-      
-      const game = games.find(g => g.id === gameId);
-      if (!game) {
-        socket.emit('error', { message: 'Game not found' });
-        return;
-      }
-      
-      // Check if seat is empty
-      if (game.players[seatIndex] !== null) {
-        socket.emit('error', { message: 'Seat is not empty' });
-        return;
-      }
-      
-      // Fill the seat with a bot (manual invitation)
-      addBotToSeat(game, seatIndex);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('[DISCONNECT] User disconnected:', {
-        userId: socket.userId,
+    // Handle disconnection
+    socket.on('disconnect', async () => {
+      console.log('[CONNECTION] Socket disconnected:', {
         socketId: socket.id,
-        reason
+        userId: socket.userId
       });
 
       if (socket.userId) {
         authenticatedSockets.delete(socket.userId);
         onlineUsers.delete(socket.userId);
-        io.emit('online_users', Array.from(onlineUsers));
+        console.log(`[CONNECTION] User ${socket.userId} disconnected. Online users:`, Array.from(onlineUsers));
+      }
+    });
+
+    // Game-related socket events
+    socket.on('join_game', (data: any) => {
+      console.log('[SOCKET JOIN] Data received:', data);
+      handleJoinGame(socket, data.gameId);
+    });
+    
+    socket.on('leave_game', (data: any) => {
+      console.log('[LEAVE GAME] User wants to leave game:', { gameId: data.gameId, userId: socket.userId });
+      // Handle leave game logic here
+    });
+    
+    socket.on('start_game', (data: any) => handleStartGame(socket, data));
+    socket.on('bid', (data: any) => handleMakeBid(socket, data));
+    socket.on('play_card', (data: any) => handlePlayCard(socket, data));
+    
+    socket.on('hand_completed', ({ gameId }: { gameId: string }) => {
+      console.log('[HAND COMPLETED] Initializing hand summary tracking for game:', gameId);
+      // Get game from database
+      prisma.game.findUnique({
+        where: { id: gameId }
+      }).then(game => {
+        if (game) {
+          // Import the tracking functions and initialize
+          const { initializeHandSummaryTracking } = require('../socket-handlers/game-state/hand/handSummaryContinue');
+          initializeHandSummaryTracking(game);
+        }
+      }).catch(error => {
+        console.error('[HAND COMPLETED] Error fetching game:', error);
+      });
+    });
+    
+    socket.on('play_again', (data: any) => handlePlayAgainSocket(socket, data));
+
+    // Handle hand summary continue
+    socket.on('hand_summary_continue', (data: any) => handleHandSummaryContinue(socket, data));
+
+    // Handle spectate
+    socket.on('spectate_game', async ({ gameId }: { gameId: string }) => {
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          socket.emit('error', { message: 'Not authenticated' });
+          return;
+        }
+
+        // Join the game room for spectating
+        await socket.join(gameId);
+        socket.emit('spectate_joined', { gameId });
+      } catch (error) {
+        console.error('[SPECTATE] Error handling spectate:', error);
+        socket.emit('error', { message: 'Failed to spectate game' });
+      }
+    });
+
+    // Handle leave spectate
+    socket.on('leave_spectate', async ({ gameId }: { gameId: string }) => {
+      try {
+        await socket.leave(gameId);
+        socket.emit('spectate_left', { gameId });
+      } catch (error) {
+        console.error('[LEAVE SPECTATE] Error handling leave spectate:', error);
+        socket.emit('error', { message: 'Failed to leave spectate' });
+      }
+    });
+
+    // Handle chat messages
+    socket.on('chat_message', async (data: any) => {
+      try {
+        const { gameId, message } = data;
+        console.log('[CHAT DEBUG] Received chat message:', { gameId, message, userId: socket.userId });
+        await handleGameChatMessage(socket, gameId, message);
+      } catch (error) {
+        console.error('[CHAT] Error handling chat message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
+    });
+
+    // Handle lobby chat messages
+    socket.on('lobby_chat_message', async ({ message }: { message: string }) => {
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          socket.emit('error', { message: 'Not authenticated' });
+          return;
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId },
+          select: { username: true, avatarUrl: true }
+        });
+
+        if (user) {
+          io.emit('lobby_chat_message', {
+            userId: socket.userId,
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            message: message,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('[LOBBY CHAT] Error handling lobby chat message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
+    });
+
+    // Handle emoji reactions
+    socket.on('emoji_reaction', async ({ gameId, emoji }: { gameId: string; emoji: string }) => {
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          socket.emit('error', { message: 'Not authenticated' });
+          return;
+        }
+
+        io.to(gameId).emit('emoji_reaction', {
+          userId: socket.userId,
+          emoji: emoji,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('[EMOJI] Error handling emoji reaction:', error);
+        socket.emit('error', { message: 'Failed to send emoji reaction' });
+      }
+    });
+
+    // Handle player profile requests
+    socket.on('get_player_profile', async ({ userId }: { userId: string }) => {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, username: true, avatarUrl: true, coins: true }
+        });
+
+        if (user) {
+          socket.emit('player_profile', user);
+        } else {
+          socket.emit('error', { message: 'Player not found' });
+        }
+      } catch (error) {
+        console.error('[PLAYER PROFILE] Error handling player profile request:', error);
+        socket.emit('error', { message: 'Failed to get player profile' });
       }
     });
   });

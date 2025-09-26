@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import type { Game } from '../../types/game';
+import { io } from "../../index";
+import { enrichGameForClient } from "../../routes/games/shared/gameUtils";
 
 /**
  * Create a bot player for a game
@@ -92,12 +94,14 @@ export async function addBotToGame(game: Game, seatIndex: number): Promise<void>
           teamIndex: botPlayer.team,
           isHuman: false,
           joinedAt: new Date(),
-          leftAt: new Date()
         }
       });
     }
     
     console.log(`[BOT INVITATION] Successfully added bot to game ${game.id}`);
+    
+    // Emit game update to all clients in the game room
+    io.to(game.id).emit("game_update", enrichGameForClient(game));
     
   } catch (error) {
     console.error(`[BOT INVITATION] Error adding bot to game:`, error);

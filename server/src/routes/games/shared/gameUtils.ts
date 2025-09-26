@@ -38,6 +38,7 @@ export function enrichGameForClient(game: any): any {
           avatar: gp.user?.avatarUrl || '/default-avatar.png',
           type: gp.isHuman ? 'human' : 'bot',
           seatIndex: gp.seatIndex,
+          position: gp.seatIndex,
           teamIndex: gp.teamIndex,
           bid: null,
           tricks: 0,

@@ -405,9 +405,68 @@ router.post('/:id/start', requireAuth, async (req, res) => {
 router.post('/:id/invite-bot', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const { seatIndex } = req.body;
     
-    // Implementation for bot invitation
-    res.json({ success: true });
+    console.log(`[BOT INVITATION] Inviting bot to seat ${seatIndex} in game ${id}`);
+    
+    // Get the game
+    const game = await prisma.game.findUnique({
+      where: { id },
+      include: { gamePlayers: { include: { user: true } } }
+    });
+    
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    // Check if seat is already taken
+    const existingPlayer = game.gamePlayers.find(gp => gp.seatIndex === seatIndex);
+    if (existingPlayer) {
+      return res.status(400).json({ error: 'Seat already taken' });
+    }
+    
+    // Create bot user
+    const botNumber = Math.floor(Math.random() * 1000);
+    const botId = `bot_${botNumber}_${Date.now()}`;
+    
+    const botUser = await prisma.user.upsert({
+      where: { id: botId },
+      update: {},
+      create: {
+        id: botId,
+        username: `Bot${botNumber}`,
+        avatarUrl: '/bot-avatar.jpg',
+        discordId: null,
+        coins: 1000000,
+        createdAt: new Date()
+      }
+    });
+    
+    // Create bot player in game
+    const botPlayer = await prisma.gamePlayer.create({
+      data: {
+        gameId: id,
+        userId: botId,
+        seatIndex: seatIndex,
+        teamIndex: seatIndex % 2, // Team assignment based on seat
+        isHuman: false,
+        joinedAt: new Date(),
+        hand: []
+      }
+    });
+    
+    // Emit game update to all clients
+    const updatedGame = await prisma.game.findUnique({
+      where: { id },
+      include: { gamePlayers: { include: { user: true } } }
+    });
+    
+    if (updatedGame) {
+      const enrichedGame = require('./shared/gameUtils').enrichGameForClient(updatedGame);
+      io.to(id).emit('game_update', enrichedGame);
+    }
+    
+    res.json({ success: true, botPlayer });
   } catch (error) {
     console.error('Error inviting bot:', error);
     res.status(500).json({ error: 'Failed to invite bot' });
