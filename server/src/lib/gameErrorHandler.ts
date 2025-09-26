@@ -70,8 +70,8 @@ export class GameErrorHandler {
           username: p.username,
           avatarUrl: p.avatarUrl,
           type: p.type,
-          seatIndex: p.seatIndex,
-          team: p.team,
+          seatIndex: p.position || 0, // Use position instead of seatIndex
+          teamIndex: p.team,
           connected: p.connected,
           // Don't send sensitive data like hands to other players
           hand: p.id === userId ? p.hand : undefined

@@ -104,7 +104,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   };
 
   const handleCreate = () => {
-    // Pass all necessary settings to onCreateGame
+    console.log("[CREATE GAME MODAL] handleCreate called");    // Pass all necessary settings to onCreateGame
     onCreateGame({
       gameMode: mode,
       biddingOption: getBiddingOption(),

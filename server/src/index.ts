@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import { syncAllDiscordUsers } from "./lib/discordSync";
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import passport from 'passport';
@@ -116,3 +117,34 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // Initialize server
 initializeServer(httpServer, PORT, io);
+
+// Setup periodic Discord sync (every 30 minutes)
+setInterval(async () => {
+  try {
+    await syncAllDiscordUsers();
+  } catch (error) {
+    console.error('[DISCORD SYNC] Error in periodic sync:', error);
+  }
+}, 30 * 60 * 1000); // 30 minutes
+
+// Run initial sync after 5 minutes
+setTimeout(async () => {
+  try {
+    console.log('[DISCORD SYNC] Running initial Discord sync...');
+    await syncAllDiscordUsers();
+  } catch (error) {
+    console.error('[DISCORD SYNC] Error in initial sync:', error);
+  }
+}, 5 * 60 * 1000); // 5 minutes
+
+// Manual Discord sync endpoint (for testing)
+app.post('/api/sync-discord', async (req, res) => {
+  try {
+    console.log('[DISCORD SYNC] Manual sync requested');
+    await syncAllDiscordUsers();
+    res.json({ success: true, message: 'Discord sync completed' });
+  } catch (error) {
+    console.error('[DISCORD SYNC] Manual sync error:', error);
+    res.status(500).json({ success: false, error: 'Sync failed' });
+  }
+});

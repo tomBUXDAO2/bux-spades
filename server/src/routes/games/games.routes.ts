@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { Request, Response } from 'express';
-import { games } from '../../gamesStore';
 import { io } from '../../index';
 import { requireAuth } from '../../middleware/auth.middleware';
 import { createGame } from './create/gameCreation';
@@ -24,39 +23,29 @@ router.post('/', requireAuth, createGame);
 
 // Join a game
 
-// Spectate a game
+// Spectate a game (DB-only)
 router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
   try {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
-    const { username, avatar } = req.body;
+    const { username: bodyUsername, avatar: bodyAvatar } = req.body || {};
 
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
+    // Ensure game exists
+    const dbGame = await prisma.game.findUnique({ where: { id: gameId } });
+    if (!dbGame) {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    // Prevent duplicate spectate
-    if ((game as any).spectators?.some((s: any) => s.id === userId)) {
-      return res.status(400).json({ error: 'Already spectating' });
-    }
-
     // Prevent joining as both player and spectator
-    if (game.players.some(p => p && p.id === userId)) {
+    const existingPlayer = await prisma.gamePlayer.findFirst({ where: { gameId, userId } });
+    if (existingPlayer) {
       return res.status(400).json({ error: 'Already joined as player' });
     }
 
-    // Initialize spectators array if it doesn't exist
-    if (!(game as any).spectators) {
-      (game as any).spectators = [];
-    }
-
-    // Add spectator
-    (game as any).spectators.push({
-      id: userId,
-      username,
-      avatar
-    });
+    // Load latest user profile for name/avatar fallback
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const username = bodyUsername || user?.username || `User ${userId.slice(-4)}`;
+    const avatar = bodyAvatar || user?.avatarUrl || null;
 
     // Join the game room
     req.socket.join(gameId);
@@ -113,7 +102,7 @@ router.get('/', async (req: Request, res: Response) => {
           avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
           type: p.isHuman ? 'human' : 'bot',
           seatIndex: p.seatIndex,
-          team: p.teamIndex ?? null,
+          teamIndex: p.teamIndex ?? null,
           bid: null as any,
           tricks: null as any,
           points: null as any,
@@ -174,7 +163,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
         type: p.isHuman ? 'human' : 'bot',
         seatIndex: p.seatIndex,
-        team: p.teamIndex ?? null,
+        teamIndex: p.teamIndex ?? null,
         bid: null as any,
         tricks: null as any,
         points: null as any,
@@ -200,24 +189,20 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Join a game
 router.post('/:id/join', requireAuth, joinGame);
 
-// Leave a game
+// Leave a game (DB-only)
 router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
   try {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
 
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-
-    // Remove player from game
-    const playerIndex = game.players.findIndex(p => p && p.id === userId);
-    if (playerIndex === -1) {
+    // Find player in this game
+    const player = await prisma.gamePlayer.findFirst({ where: { gameId, userId } });
+    if (!player) {
       return res.status(400).json({ error: 'Not in this game' });
     }
 
-    game.players[playerIndex] = null;
+    // Remove player from game
+    await prisma.gamePlayer.delete({ where: { id: player.id } });
 
     // Leave the game room
     req.socket.leave(gameId);
@@ -225,16 +210,23 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
     // Notify other players
     io.to(gameId).emit('player_left', {
       userId,
-      seatIndex: playerIndex
+      seatIndex: player.seatIndex
     });
 
-    // Check if game should be deleted (unrated games with no human players)
-    const humanPlayersRemaining = game.players.some(p => p && p.type === 'human');
-    if (!humanPlayersRemaining && !game.rated) {
+    // If no human players remain and game is not rated, delete the game entirely
+    const [remainingHumans, dbGame] = await Promise.all([
+      prisma.gamePlayer.count({ where: { gameId, isHuman: true } }),
+      prisma.game.findUnique({ where: { id: gameId } })
+    ]);
+
+    const isRated = (dbGame as any)?.isRated ?? false;
+
+    if (remainingHumans === 0 && !isRated) {
       console.log(`[LEAVE GAME] No human players remaining in unrated game ${gameId} - deleting game`);
       io.to(gameId).emit('game_deleted', { reason: 'no_human_players' });
       try {
-        await deleteUnratedGameFromDatabase(game);
+        // Delete game and related rows
+        await prisma.game.delete({ where: { id: gameId } });
         console.log('[LEAVE GAME] Successfully deleted unrated game from database');
       } catch (err) {
         console.error('[LEAVE GAME] Failed to delete unrated game:', err);
@@ -254,7 +246,7 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
     const gameId = req.params.id;
     const userId = (req as AuthenticatedRequest).user!.id;
 
-    const game = games.find(g => g.id === gameId);
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
     }
@@ -270,22 +262,26 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
     }
 
     // Check if all seats are filled
-    const filledSeats = game.players.filter(p => p !== null).length;
+    const filledSeats = await prisma.gamePlayer.count({ where: { gameId, isHuman: true } });
     if (filledSeats < 4) {
       return res.status(400).json({ error: 'All seats must be filled to start the game' });
     }
 
     // Start the game
-    game.status = 'BIDDING';
-    game.bidding = {
-      currentPlayer: 0,
-      bids: [null, null, null, null],
-      completed: false
-    };
+    await prisma.game.update({
+      where: { id: gameId },
+      data: {
+        status: 'BIDDING',
+        bidding: {
+          currentPlayer: "0",
+          bids: [null, null, null, null],
+        }
+      }
+    });
 
     // Notify all players
     io.to(gameId).emit('game_started', enrichGameForClient(game));
-    io.emit('games_updated', games.map(g => enrichGameForClient(g)));
+    io.emit('games_updated', [enrichGameForClient(game)]);
 
     res.json({ success: true, game: enrichGameForClient(game) });
   } catch (error) {
@@ -297,7 +293,10 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
 // Get lobby games (for homepage)
 router.get('/lobby/all', async (req: Request, res: Response) => {
   try {
-    const lobbyGames = games.filter(g => g.status === 'WAITING');
+    const lobbyGames = await prisma.game.findMany({
+      where: { status: 'WAITING' },
+      orderBy: { createdAt: 'desc' as any }
+    });
     const enrichedGames = lobbyGames.map(game => enrichGameForClient(game));
     res.json({ success: true, games: enrichedGames });
   } catch (error) {
@@ -309,7 +308,10 @@ router.get('/lobby/all', async (req: Request, res: Response) => {
 // Get all games (for homepage)
 router.get('/all', async (req: Request, res: Response) => {
   try {
-    const allGames = games.filter(g => ['WAITING', 'BIDDING', 'PLAYING'].includes(g.status));
+    const allGames = await prisma.game.findMany({
+      where: { status: { in: ['WAITING', 'BIDDING', 'PLAYING'] } },
+      orderBy: { createdAt: 'desc' as any }
+    });
     const enrichedGames = allGames.map(game => enrichGameForClient(game));
     res.json({ success: true, games: enrichedGames });
   } catch (error) {

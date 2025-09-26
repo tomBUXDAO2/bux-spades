@@ -33,7 +33,7 @@ export async function cleanupWaitingGames(games: Game[], io?: Server): Promise<v
       if (!game.rated && game.dbGameId) {
         console.log(`[WAITING GAME CLEANUP] Cleaning up unrated game from database: ${game.dbGameId}`);
         try {
-          await deleteUnratedGameFromDatabase(game);
+          await deleteUnratedGameFromDatabase(game.id);
           console.log(`[WAITING GAME CLEANUP] Successfully cleaned up unrated game: ${game.dbGameId}`);
         } catch (error) {
           console.error(`[WAITING GAME CLEANUP] Failed to clean up unrated game: ${game.dbGameId}`, error);
@@ -46,10 +46,7 @@ export async function cleanupWaitingGames(games: Game[], io?: Server): Promise<v
           await prisma.game.update({
             where: { id: game.dbGameId },
             data: {
-              status: 'FINISHED',
-              // cancelled: true,
-              completed: true,
-              // updatedAt: new Date()
+              status: 'FINISHED'
             }
           });
           console.log(`[WAITING GAME CLEANUP] Successfully marked rated game as cancelled: ${game.dbGameId}`);

@@ -15,7 +15,7 @@ export async function newdbCreateGame(params: {
 	await prisma.game.create({
 		data: {
 			id: params.gameId,
-			createdById: params.createdByIdId,
+			createdById: params.createdById,
 			mode: params.mode as any,
 			format: params.format as any,
 			gimmickVariant: (params.gimmickVariant ?? null) as any,

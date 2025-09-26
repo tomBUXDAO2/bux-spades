@@ -213,7 +213,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
 
     // If a mode is provided, return only that mode's stats
     if (mode === 'PARTNERS' || mode === 'SOLO' || mode === 'ALL') {
-      const mode = mode || 'ALL';
+      const selectedMode = mode || 'ALL';
       const getModeSpecificStats = (mode: string) => {
         switch (mode) {
           case 'PARTNERS':
@@ -261,7 +261,7 @@ router.get('/:id/stats', requireAuth, async (req, res) => {
             };
         }
       };
-      const modeStats = getModeSpecificStats(mode);
+      const modeStats = getModeSpecificStats(selectedMode);
       return res.json({ stats: modeStats, coins: user.coins ?? 0 });
     }
 

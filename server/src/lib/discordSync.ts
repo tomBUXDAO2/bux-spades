@@ -29,7 +29,7 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
     
     // Get current nickname (global_name) or username
     const currentNickname = (discordUser as any).global_name || (discordUser as any).username;
-    const currentAvatar = (discordUser as any).avatarUrl;
+    const currentAvatar = (discordUser as any).avatar;
 
     // Check if we need to update
     const avatarUrl = currentAvatar ? `https://cdn.discordapp.com/avatars/${user.discordId}/${currentAvatar}.png` : '/default-pfp.jpg';
@@ -47,8 +47,7 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
         where: { id: userId },
         data: {
           username: currentNickname,
-          avatarUrl: avatarUrl,
-          // updatedAt: new Date()
+          avatarUrl: avatarUrl
         }
       });
 
@@ -66,9 +65,9 @@ export async function syncDiscordUserData(userId: string): Promise<{ username: s
 
 export async function syncDiscordUserDataByDiscordId(discordId: string): Promise<{ username: string; avatarUrl: string } | null> {
   try {
-    // Find user by Discord ID
+    // Get user by Discord ID
     const user = await prisma.user.findUnique({
-      where: { discordId },
+      where: { discordId: discordId },
       select: { id: true, username: true, avatarUrl: true }
     });
 
@@ -78,9 +77,42 @@ export async function syncDiscordUserDataByDiscordId(discordId: string): Promise
     }
 
     return await syncDiscordUserData(user.id);
-
   } catch (error) {
     console.error(`[DISCORD SYNC] Error syncing Discord data for Discord ID ${discordId}:`, error);
     return null;
   }
-} 
+}
+
+// Periodic sync function to update all users' Discord data
+export async function syncAllDiscordUsers(): Promise<void> {
+  try {
+    console.log('[DISCORD SYNC] Starting periodic sync of all Discord users...');
+    
+    // Get all users with Discord IDs (non-empty)
+    const users = await prisma.user.findMany({
+      where: {
+        discordId: {
+          not: ''
+        }
+      },
+      select: { id: true, discordId: true, username: true }
+    });
+
+    console.log(`[DISCORD SYNC] Found ${users.length} users with Discord IDs`);
+
+    // Sync each user
+    for (const user of users) {
+      try {
+        await syncDiscordUserData(user.id);
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`[DISCORD SYNC] Error syncing user ${user.id}:`, error);
+      }
+    }
+
+    console.log('[DISCORD SYNC] Periodic sync completed');
+  } catch (error) {
+    console.error('[DISCORD SYNC] Error in periodic sync:', error);
+  }
+}

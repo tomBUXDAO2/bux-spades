@@ -28,7 +28,7 @@ export async function protectRatedGame(game: Game, operation: () => Promise<void
     console.error(`[CRASH PREVENTION] Operation failed for rated game ${game.id}:`, error);
     
     // Try to restore game state
-    await restoreGameStateSafely(game);
+    await restoreGameStateSafely(game.id);
     
     // Re-throw error to be handled by caller
     throw error;

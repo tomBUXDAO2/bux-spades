@@ -47,8 +47,15 @@ export default function TablePage() {
 
   // Helper function to count empty seats and bot players
   const updateModalState = (gameState: GameState) => {
-    const emptySeatsCount = (gameState.players || []).filter(p => !p).length;
-    const botPlayersCount = (gameState.players || []).filter(p => p && isBot(p)).length;
+    // Determine occupied seats from player.position or seatIndex
+    const players = (gameState.players || []).filter(Boolean) as any[];
+    const occupied = new Set<number>();
+    players.forEach(p => {
+      const seat = (p as any).position ?? (p as any).seatIndex;
+      if (typeof seat === 'number' && seat >= 0 && seat <= 3) occupied.add(seat);
+    });
+    const emptySeatsCount = 4 - occupied.size;
+    const botPlayersCount = players.filter(p => (p as any)?.type === 'bot').length;
     setEmptySeats(emptySeatsCount);
     setBotCount(botPlayersCount);
   };
@@ -182,7 +189,7 @@ export default function TablePage() {
           await api.post(`/api/games/${gameId}/spectate`, {
             id: user.id,
             username: user.username,
-            avatar: user.avatar
+            avatar: user.avatarUrl
           });
         }
         const response = await api.get(`/api/games/${gameId}`);
@@ -229,7 +236,7 @@ export default function TablePage() {
             const joinResponse = await api.post(`/api/games/${gameId}/join`, {
               id: user.id,
               username: user.username,
-              avatar: user.avatar
+              avatar: user.avatarUrl
             });
             if (joinResponse.ok) {
               const updatedGame = await joinResponse.json();
@@ -256,7 +263,7 @@ export default function TablePage() {
             const joinResponse = await api.post(`/api/games/${gameId}/join`, {
               id: user.id,
               username: user.username,
-              avatar: user.avatar
+              avatar: user.avatarUrl
             });
             if (joinResponse.ok) {
               const updatedGame = await joinResponse.json();
@@ -284,7 +291,7 @@ export default function TablePage() {
               const joinResponse = await api.post(`/api/games/${gameId}/join`, {
                 id: user.id,
                 username: user.username,
-                avatar: user.avatar
+                avatar: user.avatarUrl
               });
               if (joinResponse.ok) {
                 const updatedGame = await joinResponse.json();
@@ -313,7 +320,7 @@ export default function TablePage() {
         if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
           setTimeout(() => {
             if (socket && socket.connected) {
-              socket.emit('join_game', { gameId });
+              // socket.emit('join_game', { gameId }); // User already in game
             }
           }, 300);
         }
@@ -342,7 +349,7 @@ export default function TablePage() {
     const fallbackJoinGame = () => {
       if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
         console.log('SENDING JOIN_GAME EVENT');
-        socket.emit('join_game', { gameId });
+        // socket.emit('join_game', { gameId }); // User already in game
       } else {
         console.log('SOCKET NOT READY FOR JOIN_GAME');
       }
@@ -368,7 +375,7 @@ export default function TablePage() {
         const activeGameId = localStorage.getItem('activeGameId');
         if (activeGameId && !isSpectator) {
           console.log('[TABLE PAGE] Reconnect detected; rejoining game', activeGameId);
-          socket.emit('join_game', { gameId: activeGameId });
+          // socket.emit('join_game', { gameId: activeGameId }); // User already in game
         }
       } catch {}
     };
@@ -563,7 +570,7 @@ export default function TablePage() {
       // Only join via socket if we're not spectating and the game exists
       if (!isSpectatorLocal) {
         console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
-        socket.emit('join_game', { gameId });
+        // socket.emit('join_game', { gameId }); // User already in game
       } else {
         console.log('[SOCKET DEBUG] Emitting join_game_as_spectator:', { gameId });
         socket.emit('join_game_as_spectator', { gameId });
@@ -608,7 +615,7 @@ export default function TablePage() {
         const response = await api.post(`/api/games/${targetGameId}/join`, {
           id: targetUserId,
           username: options.username ?? user?.username,
-          avatar: options.avatar ?? user?.avatar,
+          avatar: options.avatar ?? user?.avatarUrl,
           seat: options.seat,
         });
         if (!response.ok) {
@@ -636,7 +643,7 @@ export default function TablePage() {
         // Now join the socket room as a player
         if (socket && socket.connected) {
           console.log('[HTTP JOIN] Emitting socket join after seat join:', { targetGameId });
-          socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() });
+          // socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() }); // User already in game
         }
 
         // Flip spectator status locally
@@ -651,7 +658,7 @@ export default function TablePage() {
       const response = await api.post(`/api/games/${targetGameId}/join`, {
         id: targetUserId,
         username: user?.username,
-        avatar: user?.avatar,
+        avatar: user?.avatarUrl,
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -678,7 +685,7 @@ export default function TablePage() {
 
       if (socket && socket.connected) {
         console.log('[HTTP JOIN] Emitting socket join after successful HTTP join, socket connected:', socket.connected);
-        socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() });
+        // socket.emit('join_game', { gameId: targetGameId, userId: targetUserId, timestamp: new Date().toISOString() }); // User already in game
       } else {
         console.log('[HTTP JOIN] Socket not connected, cannot emit join_game');
       }
@@ -735,29 +742,46 @@ export default function TablePage() {
     try {
       console.log('Playing with bots:', gameId);
       
-      // First, invite bots to all empty seats
-      const emptySeatIndexes = (game.players || []).map((p, i) => p ? null : i).filter(i => i !== null);
-      for (const seatIndex of emptySeatIndexes) {
-        try {
-          const endpoint = game.status === 'WAITING'
-            ? `/api/games/${gameId}/invite-bot`
-            : `/api/games/${gameId}/invite-bot-midgame`;
-          
-          console.log('Inviting bot to seat:', seatIndex);
-          const res = await api.post(endpoint, { seatIndex, requesterId: user.id });
-          
-          if (!res.ok) {
-            const error = await res.json();
-            console.error('Failed to invite bot:', error);
-          } else {
-            const updatedGame = await res.json();
-            console.log('Bot invited successfully:', updatedGame);
-            setGame(prevGame => ({ ...prevGame, ...updatedGame }));
+      // Determine empty seats from player positions
+      const players = (game.players || []).filter(Boolean) as any[];
+      const occupied = new Set<number>();
+      players.forEach(p => {
+        const seat = (p as any).position ?? (p as any).seatIndex;
+        if (typeof seat === 'number' && seat >= 0 && seat <= 3) occupied.add(seat);
+      });
+      const emptySeatIndexes = [0,1,2,3].filter(i => !occupied.has(i));
+
+      // Prefer socket path (matches in-table Invite Bot button behavior)
+      if (socket.connected) {
+        for (const seatIndex of emptySeatIndexes) {
+          console.log('[BOTS] Emitting fill_seat_with_bot via socket for seat', seatIndex);
+          socket.emit('fill_seat_with_bot', { gameId, seatIndex });
+        }
+      } else {
+        // Fallback to HTTP endpoints
+        for (const seatIndex of emptySeatIndexes) {
+          try {
+            const endpoint = game.status === 'WAITING'
+              ? `/api/games/${gameId}/invite-bot`
+              : `/api/games/${gameId}/invite-bot-midgame`;
+            console.log('[BOTS] Inviting via HTTP for seat', seatIndex);
+            const res = await api.post(endpoint, { seatIndex, requesterId: user.id });
+            if (!res.ok) {
+              const error = await res.json();
+              console.error('Failed to invite bot:', error);
+            } else {
+              const updatedGame = await res.json();
+              setGame(prevGame => ({ ...prevGame, ...updatedGame }));
+              updateModalState(updatedGame as any);
+            }
+          } catch (err) {
+            console.error('Error inviting bot to seat', seatIndex, ':', err);
           }
-        } catch (err) {
-          console.error('Error inviting bot to seat', seatIndex, ':', err);
         }
       }
+      
+      // Give the server a moment to broadcast game_update with bots
+      await new Promise(r => setTimeout(r, 300));
       
       // Then start the game
       await socketApi.startGame(socket, gameId);

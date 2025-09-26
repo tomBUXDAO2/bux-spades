@@ -6,12 +6,12 @@ import type { Game } from '../../../types/game';
  */
 export async function cleanupStuckDatabaseGames(): Promise<void> {
   try {
-    const stuckGames = await (prisma.game.findMany as any)({
+    const stuckGames = await prisma.game.findMany({
       where: {
         status: {
-          in: ['PLAYING'] as any
+          in: ['PLAYING']
         },
-        lastActionAt: {
+        updatedAt: {
           lt: new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
         }
       }
@@ -21,12 +21,10 @@ export async function cleanupStuckDatabaseGames(): Promise<void> {
       console.log(`[GAME CLEANUP] Found stuck game in DB: ${stuckGame.id}`);
       
       // Mark as finished
-      await (prisma.game.update as any)({
+      await prisma.game.update({
         where: { id: stuckGame.id },
         data: {
-          status: 'FINISHED',
-          completed: true,
-          // updatedAt: new Date()
+          status: 'FINISHED'
         }
       });
       
@@ -42,14 +40,14 @@ export async function cleanupStuckDatabaseGames(): Promise<void> {
  */
 export async function cleanupOrphanedGames(games: Game[]): Promise<void> {
   try {
-    const memoryGameIds = new Set(Array.from(games.keys()));
+    const memoryGameIds = new Set(games.map(g => g.id));
     
-    const orphanedGames = await (prisma.game.findMany as any)({
+    const orphanedGames = await prisma.game.findMany({
       where: {
         status: {
-          in: ['PLAYING'] as any
+          in: ['PLAYING']
         },
-        lastActionAt: {
+        updatedAt: {
           lt: new Date(Date.now() - 15 * 60 * 1000) // 15 minutes ago
         }
       }
@@ -60,12 +58,10 @@ export async function cleanupOrphanedGames(games: Game[]): Promise<void> {
         console.log(`[GAME CLEANUP] Found orphaned game: ${orphanedGame.id}`);
         
         // Mark as finished
-        await (prisma.game.update as any)({
+        await prisma.game.update({
           where: { id: orphanedGame.id },
           data: {
-            status: 'FINISHED',
-            completed: true,
-            // updatedAt: new Date()
+            status: 'FINISHED'
           }
         });
         
@@ -92,12 +88,10 @@ export async function forceCleanupGame(gameId: string, games: Game[]): Promise<v
     }
     
     // Mark as finished in database
-    await (prisma.game.update as any)({
+    await prisma.game.update({
       where: { id: gameId },
       data: {
-        status: 'FINISHED',
-        completed: true,
-        // updatedAt: new Date()
+        status: 'FINISHED'
       }
     });
     

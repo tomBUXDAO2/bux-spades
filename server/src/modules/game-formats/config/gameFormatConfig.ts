@@ -61,23 +61,19 @@ function determineGameFormat(biddingOption: string): GameFormat {
  * Determines gimmick type from bidding option
  */
 function determineGimmickType(biddingOption: string): GimmickType | undefined {
-  
   const option = biddingOption.toUpperCase();
   
-  switch (option) {
-    case 'SUICIDE': return 'SUICIDE';
-    case 'BID_4_OR_NIL':
-    case '4 OR NIL':
-      return 'BID_4_OR_NIL';
-    case 'BID_3':
-    case 'BID 3':
-      return 'BID_3';
-    case 'BID_HEARTS':
-    case 'BID HEARTS':
-      return 'BID_HEARTS';
-    case 'CRAZY_ACES':
-    case 'CRAZY ACES':
-      return 'CRAZY_ACES';
-    default: return undefined;
+  if (option === 'SUICIDE' || option === 'BID_4_OR_NIL' || option === '4 OR NIL') {
+    return 'BID_4_OR_NIL';
+  } else if (option === 'BID_3' || option === 'BID 3') {
+    return 'BID_3';
+  } else if (option === 'BID_HEARTS' || option === 'BID HEARTS') {
+    return 'BID_HEARTS';
+  } else if (option === 'CRAZY_ACES' || option === 'CRAZY ACES') {
+    return 'CRAZY_ACES';
+  } else if (option === 'SUICIDE') {
+    return 'SUICIDE';
   }
+  
+  return undefined;
 }

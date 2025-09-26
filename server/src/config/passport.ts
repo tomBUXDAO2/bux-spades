@@ -1,7 +1,5 @@
 import passport from 'passport';
 import { Strategy as DiscordStrategy } from 'passport-discord';
-import { Strategy as LocalStrategy } from 'passport-local';
-import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma';
 
 passport.use(new DiscordStrategy({
@@ -11,6 +9,12 @@ passport.use(new DiscordStrategy({
   scope: ['identify', 'email']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    console.log('[DISCORD AUTH] Profile data:', {
+      id: profile.id,
+      username: profile.username,
+      avatar: profile.avatar
+    });
+
     // Fetch current Discord user data to get nickname and avatar
     const discordUserResponse = await fetch('https://discord.com/api/users/@me', {
       headers: {
@@ -19,14 +23,25 @@ passport.use(new DiscordStrategy({
     });
     
     let currentNickname = profile.username;
-    let currentAvatar = profile.avatarUrl;
+    let currentAvatar = profile.avatar;
     
     if (discordUserResponse.ok) {
       const discordUser = await discordUserResponse.json() as any;
+      console.log('[DISCORD AUTH] Discord API response:', {
+        username: discordUser.username,
+        global_name: discordUser.global_name,
+        avatar: discordUser.avatar
+      });
+      
       // Use nickname if available, otherwise use username
       currentNickname = discordUser.global_name || discordUser.username;
-      currentAvatar = discordUser.avatarUrl;
+      currentAvatar = discordUser.avatar;
+    } else {
+      console.log('[DISCORD AUTH] Failed to fetch Discord user data:', discordUserResponse.status);
     }
+
+    const avatarUrl = currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : '/default-pfp.jpg';
+    console.log('[DISCORD AUTH] Final avatar URL:', avatarUrl);
 
     // Check if user already exists
     let user = await prisma.user.findUnique({
@@ -34,71 +49,43 @@ passport.use(new DiscordStrategy({
     });
 
     if (!user) {
-      // Create new user
-      const now = new Date();
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('[DISCORD AUTH] Creating new user with avatar:', avatarUrl);
+      // Create new user - only include fields that exist in the schema
       user = await prisma.user.create({
         data: {
-          id: userId,
           username: currentNickname,
           discordId: profile.id,
-          // email: profile.email || null,
-          // password: '',
-          avatarUrl: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : '/default-pfp.jpg',
-          createdAt: now,
-          updatedAt: now
-        } as any
+          avatarUrl: avatarUrl
+        }
       });
 
       // Create user stats
-      const statsId = `stats_${userId}_${Date.now()}`;
       await prisma.userStats.create({
         data: {
-          id: statsId,
-          userId: userId,
-          createdAt: now,
-          updatedAt: now
-        } as any
+          userId: user.id
+        }
       });
     } else {
+      console.log('[DISCORD AUTH] Updating existing user with avatar:', avatarUrl);
       // Update existing user with current Discord data
-      const now = new Date();
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
           username: currentNickname,
-          avatarUrl: currentAvatar ? `https://cdn.discordapp.com/avatars/${profile.id}/${currentAvatar}.png` : user.avatarUrl,
-          updatedAt: now
-        } as any
+          avatarUrl: avatarUrl
+        }
       });
     }
+
+    console.log('[DISCORD AUTH] User created/updated successfully:', {
+      id: user.id,
+      username: user.username,
+      avatarUrl: user.avatarUrl
+    });
 
     return done(null, user);
   } catch (error) {
     console.error('Discord strategy error:', error);
-    return done(error as Error);
-  }
-}));
-
-passport.use(new LocalStrategy(async (username, password, done) => {
-  try {
-    const user = await prisma.user.findFirst({
-      where: { username },
-      
-    });
-
-    if (!user || !user.UserStats) {
-      return done(null, false, { message: 'Invalid credentials' });
-    }
-
-    const stats = user.UserStats as any;
-    
-    if (!user.password || !(await bcrypt.compare(password, user.password))) {
-      return done(null, false, { message: 'Invalid credentials' });
-    }
-
-    return done(null, user);
-  } catch (error) {
     return done(error as Error);
   }
 }));
@@ -110,13 +97,12 @@ passport.serializeUser((user: any, done) => {
 passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id },
-      
+      where: { id }
     });
     done(null, user);
   } catch (error) {
-    done(error as Error);
+    done(error, null);
   }
 });
 
-export default passport; 
+export default passport;

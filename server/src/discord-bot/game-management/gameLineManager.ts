@@ -216,7 +216,7 @@ export async function createGameAndNotifyPlayers(message: any, gameLine: GameLin
         username: p.username,
         discordId: p.userId, // Use Discord ID for matching
         seat: p.seat,
-        avatarUrl: p.avatarUrl // Include avatar if available
+        avatarUrl: p.avatar // Include avatar if available
       }))
     };
 

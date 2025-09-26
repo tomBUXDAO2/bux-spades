@@ -4,20 +4,17 @@ import { prisma } from '../../../lib/prisma';
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
 
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username },
-          { email }
-        ]
+        username: username
       }
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: 'Username or email already exists' });
+      return res.status(400).json({ error: 'Username already exists' });
     }
 
     // Hash password
@@ -30,7 +27,6 @@ export const register = async (req: Request, res: Response) => {
       data: {
         id: userId,
         username,
-        email,
         // password: hashedPassword,
         avatarUrl: '/default-pfp.jpg',
         coins: 5000000,

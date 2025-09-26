@@ -1,80 +1,82 @@
 import { Request, Response } from 'express';
-import { games } from '../../../gamesStore';
-import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
-import prisma from '../../../lib/prisma';
-export async function joinGame(req: AuthenticatedRequest, res: Response): Promise<void> {
-  try {
-    const gameId = req.params.id;
-    const userId = req.user!.id;
-    const { username, avatar, seat } = req.body; // Get from request body
+import { prisma } from '../../../lib/prisma';
 
-    const game = games.find(g => g.id === gameId);
-    // Check if user is already in another game (using database)
+export async function joinGame(req: Request, res: Response): Promise<void> {
+  try {
+    const { gameId } = req.params;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    console.log(`[GAME JOIN] User ${userId} attempting to join game ${gameId}`);
+
+    // Check if user is already in another game
     const existingGamePlayer = await prisma.gamePlayer.findFirst({
-      where: {
+      where: { 
         userId: userId,
-        Game: {
-          status: {
-            in: ["WAITING", "BIDDING", "PLAYING"]
-          }
+        game: {
+          status: { in: ['WAITING', 'BIDDING', 'PLAYING'] }
         }
-      },
-      include: {
-        Game: true
       }
     });
     
-    if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
-      res.status(400).json({ error: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
+    if (existingGamePlayer) {
+      res.status(400).json({ 
+        error: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` 
+      });
       return;
-    }    if (!game) {
+    }
+    
+    // Check if game exists in database
+    const dbGame = await prisma.game.findUnique({
+      where: { id: gameId }
+    });
+    
+    if (!dbGame) {
       res.status(404).json({ error: 'Game not found' });
       return;
     }
-
-    // Check if user is already in the game
-    const existingPlayerIndex = game.players.findIndex(p => p && p.id === userId);
-    if (existingPlayerIndex !== -1) {
-      res.json({ success: true, message: 'Already in game' });
-      return;
-    }
-
-
-    // Use specific seat if provided, otherwise find empty seat
-    let targetSeatIndex = seat;
-    if (targetSeatIndex === undefined || targetSeatIndex === null) {
-      targetSeatIndex = game.players.findIndex(p => p === null);
-    }
     
-    // Validate seat index
-    if (targetSeatIndex < 0 || targetSeatIndex > 3) {
-      res.status(400).json({ error: 'Invalid seat number' });
+    if (dbGame.status !== 'WAITING') {
+      res.status(400).json({ error: 'Game is not accepting new players' });
       return;
     }
     
-    // Check if the specific seat is available
-    if (game.players[targetSeatIndex] !== null) {
-      res.status(400).json({ error: 'Seat is already occupied' });
+    // Check if game is full
+    const playerCount = await prisma.gamePlayer.count({
+      where: { gameId: gameId }
+    });
+    
+    if (playerCount >= 4) {
+      res.status(400).json({ error: 'Game is full' });
       return;
     }
-
+    
     // Add player to game
-    game.players[targetSeatIndex] = {
-      id: userId,
-      username: username || 'Unknown Player',
-      avatarUrl: avatar || '/default-avatar.jpg',
-      type: 'human',
-      seatIndex: targetSeatIndex,
-      team: targetSeatIndex % 2,
-      bid: undefined,
-      tricks: 0,
-      points: 0,
-      bags: 0
-    };
+    const newPlayer = await prisma.gamePlayer.create({
+      data: {
+        gameId: gameId,
+        userId: userId,
+        seatIndex: playerCount,
+        teamIndex: playerCount % 2, // Simple team assignment
+        isHuman: true
+      }
+    });
+    
+    console.log(`[GAME JOIN] User ${userId} joined game ${gameId} as seat ${newPlayer.seatIndex}`);
+    
+    res.json({
+      success: true,
+      message: 'Successfully joined game',
+      seatIndex: newPlayer.seatIndex,
+      teamIndex: newPlayer.teamIndex
+    });
 
-    res.json({ success: true, message: 'Joined game successfully' });
   } catch (error) {
-    console.error('Error joining game:', error);
+    console.error('[GAME JOIN] Error joining game:', error);
     res.status(500).json({ error: 'Failed to join game' });
   }
 }

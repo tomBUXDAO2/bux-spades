@@ -1,0 +1,105 @@
+import { prisma } from '../../../lib/prisma';
+import { gamesStore } from '../../../gamesStore';
+
+export async function joinGame(req: any, res: any) {
+  try {
+    const { gameId } = req.params;
+    const userId = req.user.id;
+    
+    console.log(`[GAME JOIN] User ${userId} attempting to join game ${gameId}`);
+    
+    // Check if user is already in another game
+    const existingGamePlayer = await prisma.gamePlayer.findFirst({
+      where: {
+        userId: userId,
+        gameId: {
+          not: gameId
+        }
+      }
+    });
+    
+    if (existingGamePlayer) {
+      return res.status(400).json({ 
+        error: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` 
+      });
+    }
+    
+    // Check if game exists and is joinable
+    // Check if game exists in database
+    const dbGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { players: true }
+    });
+    
+    if (!dbGame) {
+      return res.status(404).json({ error: "Game not found" });
+    }
+    
+    if (dbGame.status !== "WAITING") {
+      return res.status(400).json({ error: "Game is not accepting new players" });
+    }
+    
+    // Find an available seat
+    const occupiedSeats = dbGame.players.map(p => p.seatIndex);
+    let targetSeatIndex = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!occupiedSeats.includes(i)) {
+        targetSeatIndex = i;
+        break;
+      }
+    }
+    
+    if (targetSeatIndex === -1) {
+      return res.status(400).json({ error: "Game is full" });
+    }
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    if (game.status !== 'WAITING') {
+      return res.status(400).json({ error: 'Game is not accepting new players' });
+    }
+    
+    // Find an available seat
+    let targetSeatIndex = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!game.players[i]) {
+        targetSeatIndex = i;
+        break;
+      }
+    }
+    
+    if (targetSeatIndex === -1) {
+      return res.status(400).json({ error: 'Game is full' });
+    }
+    
+    // Add player to game
+    game.players[targetSeatIndex] = {
+      id: userId,
+      username: req.user.username || 'Unknown',
+      avatarUrl: req.user.avatarUrl || '/default-avatar.jpg',
+      type: 'human',
+      seatIndex: targetSeatIndex,
+      teamIndex: game.mode === 'PARTNERS' ? (targetSeatIndex % 2) : null
+    };
+    
+    // Update game status if needed
+    if (game.players.filter(p => p).length === 4) {
+      game.status = 'BIDDING';
+    }
+    
+    // Emit success
+    res.json({ 
+      success: true,
+      gameId, 
+      seatIndex: targetSeatIndex,
+      game: game 
+    });
+    
+    console.log(`[GAME JOIN] User ${userId} successfully joined game ${gameId} at seat ${targetSeatIndex}`);
+    
+  } catch (error) {
+    console.error('[GAME JOIN] Error joining game:', error);
+    res.status(500).json({ error: 'Failed to join game' });
+  }
+}

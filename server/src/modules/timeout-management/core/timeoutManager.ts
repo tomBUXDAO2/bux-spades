@@ -1,127 +1,90 @@
 import type { Game } from '../../../types/game';
-import { turnTimeouts } from '../../../gamesStore';
-import { TIMEOUT_CONFIG, TimeoutData } from '../config/timeoutConfig';
-import { handlePlayerTimeout } from '../handlers/timeoutHandlers';
-import { io } from '../../../index';
+
+// Global timeout storage
+const turnTimeouts = new Map<string, NodeJS.Timeout>();
 
 /**
- * Starts a timeout for a player's turn
+ * Start turn timeout for a player
  */
-export function startTurnTimeout(game: Game, playerIndex: number, phase: 'bidding' | 'playing'): void {
-  const player = game.players[playerIndex];
-  if (!player) {
-    console.log('[TIMEOUT] No player at index', playerIndex);
-    return;
-  }
-
-  // Kill-switch: disable all turn timeouts
-  if (TIMEOUT_CONFIG.DISABLED) {
-    const playerId = player.id;
-    const timeoutKey = `${game.id}_${playerId}`;
-    // Ensure any existing timers are cleared and not re-set
-    clearTurnTimeout(game, playerId);
-    turnTimeouts.set(timeoutKey, {
-      gameId: game.id,
-      playerId,
-      playerIndex,
-      phase,
-      timer: null,
-      warningTimer: null,
-      consecutiveTimeouts: 0,
-      startTime: Date.now(),
-    });
-    console.log('[TIMEOUT] Turn timeouts are DISABLED via env; no timers set');
-    return;
-  }
-
-  const playerId = player.id;
-  const timeoutKey = `${game.id}_${playerId}`;
-
-  // Preserve existing consecutive timeout count across turns (until the player acts)
-  const previousData = turnTimeouts.get(timeoutKey);
-  const previousConsecutive = previousData ? previousData.consecutiveTimeouts : 0;
-  
-  // Clear existing timeout if any
-  clearTurnTimeout(game, playerId);
-  
-  const timeoutDuration = phase === 'bidding' ? TIMEOUT_CONFIG.BIDDING_TIMEOUT : TIMEOUT_CONFIG.PLAYING_TIMEOUT;
-  
-  console.log(`[TIMEOUT] Starting ${phase} timeout for player ${player.username} (${timeoutDuration}ms)`);
-  
-  const timer = setTimeout(() => {
-    handlePlayerTimeout(game, playerIndex, phase);
-  }, timeoutDuration);
-  
-  // Start warning timer (20 seconds) to show countdown overlay
-  const warningTimer = setTimeout(() => {
-    console.log(`[TIMEOUT] Warning: Player ${player.username} has 10 seconds left`);
-    io.to(game.id).emit('countdown_start', {
-      playerId: player.id,
-      playerIndex: playerIndex,
-      timeLeft: 10
-    });
-  }, TIMEOUT_CONFIG.WARNING_TIMEOUT);
-  
-  // Store timeout data (including warning timer), preserving consecutive count
-  turnTimeouts.set(timeoutKey, {
-    gameId: game.id,
-    playerId,
-    playerIndex,
-    phase,
-    timer,
-    warningTimer,  // NEW: Store warning timer
-    consecutiveTimeouts: previousConsecutive,
-    startTime: Date.now()
-  });
-}
-
-/**
- * Clears a timeout for a specific player
- */
-export function clearTurnTimeout(game: Game, playerId: string): void {
-  const timeoutKey = `${game.id}_${playerId}`;
-  const existingTimeout = turnTimeouts.get(timeoutKey);
-  
-  if (existingTimeout) {
-    console.log(`[TIMEOUT] Clearing timeout for player ${playerId}`);
+export function startTurnTimeout(game: Game, playerIndex: number, phase: string): void {
+  try {
+    console.log(`[TIMEOUT MANAGER] Starting timeout for player ${playerIndex} in phase ${phase} for game ${game.id}`);
     
-    // Clear main timer
-    if (existingTimeout.timer) {
-    clearTimeout(existingTimeout.timer);
-    }
+    // Clear existing timeout for this game
+    clearTurnTimeout(game.id);
     
-    // Clear warning timer
-    if (existingTimeout.warningTimer) {
-      clearTimeout(existingTimeout.warningTimer);
-    }
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      console.log(`[TIMEOUT MANAGER] Timeout triggered for player ${playerIndex} in game ${game.id}`);
+      handleTurnTimeout(game, playerIndex, phase);
+    }, 30000); // 30 second timeout
     
-    turnTimeouts.delete(timeoutKey);
+    turnTimeouts.set(game.id, timeout);
+    
+  } catch (error) {
+    console.error('[TIMEOUT MANAGER] Error starting turn timeout:', error);
   }
 }
 
 /**
- * Clears timeout but keeps consecutive timeout count
+ * Clear turn timeout for a game
  */
-export function clearTurnTimeoutOnly(game: Game, playerId: string): void {
-  const timeoutKey = `${game.id}_${playerId}`;
-  const existingTimeout = turnTimeouts.get(timeoutKey);
-  
-  if (existingTimeout) {
-    // Clear main timer
-    if (existingTimeout.timer) {
-    clearTimeout(existingTimeout.timer);
+export function clearTurnTimeout(gameId: string): void {
+  try {
+    const timeout = turnTimeouts.get(gameId);
+    if (timeout) {
+      clearTimeout(timeout);
+      turnTimeouts.delete(gameId);
+      console.log(`[TIMEOUT MANAGER] Cleared timeout for game ${gameId}`);
     }
-    
-    // Clear warning timer
-    if (existingTimeout.warningTimer) {
-      clearTimeout(existingTimeout.warningTimer);
-    }
-    
-    turnTimeouts.set(timeoutKey, {
-      ...existingTimeout,
-      timer: null,
-      warningTimer: null,  // NEW: Clear warning timer
-      consecutiveTimeouts: existingTimeout.consecutiveTimeouts
-    });
+  } catch (error) {
+    console.error('[TIMEOUT MANAGER] Error clearing turn timeout:', error);
   }
+}
+
+/**
+ * Handle turn timeout
+ */
+async function handleTurnTimeout(game: Game, playerIndex: number, phase: string): Promise<void> {
+  try {
+    console.log(`[TIMEOUT MANAGER] Handling timeout for player ${playerIndex} in phase ${phase}`);
+    
+    // Import bot logic
+    const { botMakeMove } = await import('../../bot-play/botLogic');
+    
+    // Trigger bot move
+    await botMakeMove(game, playerIndex, phase);
+    
+  } catch (error) {
+    console.error('[TIMEOUT MANAGER] Error handling turn timeout:', error);
+  }
+}
+
+/**
+ * Clear all timeouts
+ */
+export function clearAllTimeouts(): void {
+  try {
+    for (const [gameId, timeout] of turnTimeouts) {
+      clearTimeout(timeout);
+      console.log(`[TIMEOUT MANAGER] Cleared timeout for game ${gameId}`);
+    }
+    turnTimeouts.clear();
+  } catch (error) {
+    console.error('[TIMEOUT MANAGER] Error clearing all timeouts:', error);
+  }
+}
+
+/**
+ * Get timeout for a game
+ */
+export function getTimeout(gameId: string): NodeJS.Timeout | undefined {
+  return turnTimeouts.get(gameId);
+}
+
+/**
+ * Check if game has timeout
+ */
+export function hasTimeout(gameId: string): boolean {
+  return turnTimeouts.has(gameId);
 }

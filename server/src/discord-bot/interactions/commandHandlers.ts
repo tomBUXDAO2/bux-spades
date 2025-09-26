@@ -125,7 +125,7 @@ export async function handleGameCommands(interaction: ChatInputCommandInteractio
       hostId: interaction.user.id,
       hostName: interaction.user.username,
       coins,
-      gameMode,
+      mode: gameMode,
       maxPoints,
       minPoints,
       gameType,
@@ -210,8 +210,8 @@ export async function handleStatsCommand(interaction: ChatInputCommandInteractio
     }
     
     // Calculate stats from UserStats
-    const totalGames = userStats.gamesPlayed || 0;
-    const totalWins = userStats.gamesWon || 0;
+    const totalGames = userStats.totalGamesPlayed || 0;
+    const totalWins = userStats.totalGamesWon || 0;
     const totalWinPercentage = totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : "0.0";
     
     // League games are all finished games (same as app)
@@ -311,29 +311,9 @@ export async function handleLeaderboardCommand(interaction: ChatInputCommandInte
     
     // Get leaderboard data from database
     const leaderboard = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        UserStats: {
-          select: {
-            gamesPlayed: true,
-            gamesWon: true,
-            totalBags: true,
-            bagsPerGame: true,
-            nilsBid: true,
-            nilsMade: true,
-          }
-        }
-      },
-      where: {
-        UserStats: {
-          gamesPlayed: {
-            gt: 0 // Only include users who have played games
-          }
-        }
-      },
-      orderBy: getOrderByForMetric(metric),
-      take: 50 // Get more data to sort properly for complex metrics
+      select: { id: true, username: true, coins: true },
+      orderBy: { username: 'asc' as const },
+      take: 50
     });
     
     if (leaderboard.length === 0) {
@@ -383,17 +363,17 @@ export async function handleLeaderboardCommand(interaction: ChatInputCommandInte
 function getOrderByForMetric(metric: string) {
   switch (metric) {
     case 'games_won':
-      return { UserStats: { gamesWon: 'desc' as const } };
+      return { userStats: { totalGamesWon: 'desc' } } as any;
     case 'games_played':
-      return { UserStats: { gamesPlayed: 'desc' as const } };
+      return { userStats: { totalGamesPlayed: 'desc' } } as any;
     case 'win_pct':
-      return { UserStats: { gamesWon: 'desc' as const } };
+      return { userStats: { totalGamesWon: 'desc' } } as any;
     case 'bags_per_game':
-      return { UserStats: { bagsPerGame: 'desc' as const } };
+      return { userStats: { bagsPerGame: 'desc' } } as any;
     case 'nil_success_pct':
-      return { UserStats: { nilsMade: 'desc' as const } };
+      return { userStats: { nilsMade: 'desc' } } as any;
     default:
-      return { UserStats: { gamesWon: 'desc' as const } };
+      return { userStats: { totalGamesWon: 'desc' } } as any;
   }
 }
 
@@ -409,22 +389,22 @@ function getMetricDisplayName(metric: string): string {
 }
 
 function getPlayerValueForMetric(player: any, metric: string): number {
-  const stats = player.UserStats;
+  const stats = player.userStats;
   if (!stats) return 0;
   
   switch (metric) {
     case 'games_won':
-      return stats.gamesWon;
+      return stats.totalGamesWon;
     case 'games_played':
-      return stats.gamesPlayed;
+      return stats.totalGamesPlayed;
     case 'win_pct':
-      return stats.gamesPlayed > 0 ? (stats.gamesWon / stats.gamesPlayed) * 100 : 0;
+      return stats.totalGamesPlayed > 0 ? (stats.totalGamesWon / stats.totalGamesPlayed) * 100 : 0;
     case 'bags_per_game':
       return stats.bagsPerGame;
     case 'nil_success_pct':
       return stats.nilsBid > 0 ? (stats.nilsMade / stats.nilsBid) * 100 : 0;
     default:
-      return stats.gamesWon;
+      return stats.totalGamesWon;
   }
 }
 

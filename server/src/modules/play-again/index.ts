@@ -1,8 +1,9 @@
-// Play Again Module
-// Handles play again functionality for completed games
-
-export { 
-  handlePlayAgain, 
-  handlePlayerLeaveDuringPlayAgain, 
-  cleanupPlayAgainState 
+// Play again module exports
+export {
+  handlePlayAgain,
+  handlePlayerLeaveDuringPlayAgain,
+  clearPlayAgainResponses,
+  getPlayAgainResponses,
+  allHumanPlayersResponded,
+  cleanupPlayAgainState
 } from './playAgainManager';

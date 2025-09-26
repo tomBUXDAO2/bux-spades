@@ -1,12 +1,11 @@
 import type { Game } from '../../../../types/game';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
-import { botPlayCard } from '../../../bot-play/botLogic';
 import prisma from '../../../../lib/prisma';
 import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
 import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
-import { prisma } from '../../../../lib/prisma';
 import { useNewDbOnly } from '../../../../newdb/toggle';
+import { botPlayCard } from '../../../bot-play';
 
 /**
  * Handles bidding completion
@@ -27,6 +26,7 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
       if (!roundRecord) {
         roundRecord = await prisma.round.create({
           data: {
+            dealerSeatIndex: 0,
             id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
             gameId: game.dbGameId,
             roundNumber,
@@ -40,12 +40,13 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
         if (!p) continue;
         const bid = game.bidding.bids[i] ?? 0;
         await prisma.roundBid.upsert({
-          where: { roundId_playerId: { roundId: roundRecord.id, playerId: p.id } },
+          where: { roundId_userId: { roundId: roundRecord.id, userId: p.id } },
           update: { bid, isBlindNil: bid === -1 },
           create: {
             id: `bid_${roundRecord.id}_${i}_${Date.now()}`,
             roundId: roundRecord.id,
-            playerId: p.id,
+            userId: p.id,
+            seatIndex: i, // Add the required seatIndex field
             bid,
             isBlindNil: bid === -1,
             createdAt: new Date()
@@ -96,7 +97,8 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
     try {
       await prisma.game.update({
         where: { id: game.dbGameId },
-        data: { status: 'PLAYING' }
+        data: {
+            status: 'PLAYING' }
       });
       console.log('[BIDDING COMPLETE] Updated game status to PLAYING in database:', game.dbGameId);
     } catch (err) {
@@ -109,7 +111,8 @@ export async function handleBiddingComplete(game: Game): Promise<void> {
     try {
       await prisma.game.update({
         where: { id: game.id },
-        data: { status: 'PLAYING' as any }
+        data: {
+            status: 'PLAYING' as any }
       });
       console.log('[BIDDING COMPLETE] Updated new DB game status to PLAYING:', game.id);
     } catch (err) {

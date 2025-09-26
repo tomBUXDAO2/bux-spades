@@ -1,175 +1,91 @@
-import type { AuthenticatedSocket } from '../../socket-auth';
-import { io } from '../../../index';
-import { games } from '../../../gamesStore';
-import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
+import type { AuthenticatedSocket } from '../../socket-auth/socketAuth';
+import { prisma } from '../../../lib/prisma';
 
-export async function handleJoinGame(socket: AuthenticatedSocket, { gameId, watchOnly, seat, username, avatar }: { gameId: string; watchOnly?: boolean; seat?: number; username?: string; avatar?: string }): Promise<void> {
-  console.log('[JOIN GAME DEBUG] Socket join request:', {
-    gameId,
-    socketId: socket.id,
-    userId: socket.userId,
-    isAuthenticated: socket.isAuthenticated,
-    timestamp: new Date().toISOString()
-  });
-
-  if (!socket.isAuthenticated || !socket.userId) {
-    socket.emit('error', { message: 'Not authenticated' });
-    return;
-  }
-
-  // Handle spectator joining a specific seat
-  if (watchOnly === false && seat !== undefined && username && avatar) {
-    console.log('[SPECTATOR JOIN] Attempting to join seat:', { gameId, seat, username, userId: socket.userId });
-
-    // Find the game
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      socket.emit('error', { message: 'Game not found' });
-      return;
-    }
-
-    // Check if seat is empty
-    if (game.players[seat]) {
-      socket.emit('error', { message: 'Seat is already occupied' });
-      return;
-    }
-
-    // Add player to the seat
-    game.players[seat] = {
-      id: socket.userId,
-      username: username,
-      avatarUrl: avatar,
-      type: 'human',
-      seatIndex: seat,
-      team: seat % 2,
-      bid: null,
-      tricks: 0,
-      points: 0,
-      bags: 0
-    } as any;
-
-    console.log('[SPECTATOR JOIN] Successfully joined seat', seat, 'for user', socket.userId);
-
-    // Join socket room and emit update
-    socket.join(gameId);
-    socket.emit('game_joined', { gameId });
-    io.to(gameId).emit('game_update', enrichGameForClient(game));
-    return;
-  }
-
+export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string) {
   try {
-    console.log('[JOIN GAME DEBUG] Looking for game:', gameId);
-    console.log('[JOIN GAME DEBUG] Available games:', games.map(g => ({
-      id: g.id,
-      status: g.status,
-      players: g.players.map(p => p ? p.id : 'null')
-    })));
-
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      console.log('[JOIN GAME DEBUG] Game not found:', gameId);
-      socket.emit('error', { message: 'Game not found' });
-      return;
-    }
-
-    console.log('[SERVER DEBUG] Found game:', {
-      gameId: game.id,
-      status: game.status,
-      currentPlayer: game.currentPlayer,
-      biddingCurrentPlayer: game.bidding?.currentPlayer,
-      playCurrentPlayer: game.play?.currentPlayer,
-      players: game.players.map(p => p ? {
-        id: p.id,
-        username: p.username,
-        type: p.type
-      } : null)
-    });
-
-    // Check if user is already in this game
-    const existingPlayerIndex = game.players.findIndex(p => p && p.id === socket.userId);
-    if (existingPlayerIndex !== -1) {
-      console.log('[JOIN GAME] User already in game, rejoining...');
-      // User is already in the game, just join the socket room
-      socket.join(gameId);
-      socket.emit('game_joined', { gameId });
-      socket.emit('game_update', enrichGameForClient(game));
-      
-      // IMPORTANT: Also emit to all players in the room to sync the UI
-      io.to(gameId).emit('game_update', enrichGameForClient(game));
-      return; // Exit early since user is already in game
-    }
-
-    // Check if user is in another game (using database)
-    const { prisma } = await import('../../../lib/prisma');
-    const existingGamePlayer = await prisma.gamePlayer.findFirst({
-      where: {
-        userId: socket.userId,
-        Game: {
-          status: {
-            in: ['WAITING', 'BIDDING', 'PLAYING']
-          }
-        }
-      },
-      include: {
-        Game: true
-      }
+    console.log(`[GAME JOIN] User ${socket.userId} attempting to join game ${gameId}`);
+    
+    // Check if game exists in database (no players relation on Game model)
+    const dbGame = await prisma.game.findUnique({
+      where: { id: gameId }
     });
     
-    if (existingGamePlayer && existingGamePlayer.gameId !== gameId) {
-      socket.emit('error', { message: `You are already in game ${existingGamePlayer.gameId}. Please leave that game first.` });
+    if (!dbGame) {
+      console.log(`[GAME JOIN] Game ${gameId} not found in database`);
+      socket.emit('error', { message: 'Game not found' });
       return;
     }
-
-    // For socket joins, we don't have a specific seat request, so find empty seat
-    const emptySeatIndex = game.players.findIndex(p => p === null);
-    if (emptySeatIndex === -1) {
+    
+    if (dbGame.status !== 'WAITING') {
+      socket.emit('error', { message: 'Game is not accepting new players' });
+      return;
+    }
+    
+    // Load existing players for this game
+    const gamePlayers = await prisma.gamePlayer.findMany({
+      where: { gameId },
+      orderBy: { seatIndex: 'asc' }
+    });
+    
+    // Check if user is already in the game
+    const existingPlayer = gamePlayers.find(p => p.userId === socket.userId);
+    if (existingPlayer) {
+      console.log(`[GAME JOIN] User ${socket.userId} already in game ${gameId} at seat ${existingPlayer.seatIndex}`);
+      socket.join(gameId);
+      socket.emit('game_joined', { 
+        gameId, 
+        seatIndex: existingPlayer.seatIndex,
+        game: dbGame 
+      });
+      return;
+    }
+    
+    // Find an available seat
+    const occupiedSeats = new Set(gamePlayers.map(p => p.seatIndex));
+    let targetSeatIndex = -1;
+    for (let i = 0; i < 4; i++) {
+      if (!occupiedSeats.has(i)) {
+        targetSeatIndex = i;
+        break;
+      }
+    }
+    
+    if (targetSeatIndex === -1) {
       socket.emit('error', { message: 'Game is full' });
       return;
     }
-
-    // Add player to game - fetch user data from database
-    const userData = await prisma.user.findUnique({
-      where: { id: socket.userId },
-      select: { username: true, avatarUrl: true }
+    
+    // Add player to database
+    await prisma.gamePlayer.create({
+      data: {
+        gameId: gameId,
+        userId: socket.userId!,
+        seatIndex: targetSeatIndex,
+        teamIndex: targetSeatIndex % 2, // Simple team assignment
+        isHuman: true
+      }
     });
     
-    game.players[emptySeatIndex] = {
-      id: socket.userId,
-      username: userData?.username || 'Unknown Player',
-      avatarUrl: userData?.avatarUrl || '/default-avatar.jpg',
-      type: 'human',
-      seatIndex: emptySeatIndex,
-      team: emptySeatIndex % 2,
-      bid: null,
-      tricks: 0,
-      points: 0,
-      bags: 0
-    } as any;
-
     // Join socket room
     socket.join(gameId);
-    socket.emit('game_joined', { gameId });
-
-    console.log('[JOIN GAME] Socket', socket.id, 'joined room', gameId);
-    console.log('[JOIN GAME] Successfully joined game', gameId, 'for user', socket.userId);
-
-    // Emit game update to all players
-    io.to(gameId).emit('game_update', enrichGameForClient(game));
-
-    // Update lobby for all clients
-    const lobbyGames = games.filter(g => {
-      if ((g as any).league && g.status === 'WAITING') {
-        return false;
-      }
-      return true;
-    });
-    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
     
-    // Also emit all games (including league games) for real-time league game detection
-    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
-
+    // Emit success
+    socket.emit('game_joined', { 
+      gameId, 
+      seatIndex: targetSeatIndex,
+      game: dbGame 
+    });
+    
+    // Notify other players
+    socket.to(gameId).emit('player_joined', {
+      userId: socket.userId,
+      seatIndex: targetSeatIndex
+    });
+    
+    console.log(`[GAME JOIN] User ${socket.userId} successfully joined game ${gameId} at seat ${targetSeatIndex}`);
+    
   } catch (error) {
-    console.error('[JOIN GAME ERROR]', error);
+    console.error('[GAME JOIN] Error joining game:', error);
     socket.emit('error', { message: 'Failed to join game' });
   }
 }

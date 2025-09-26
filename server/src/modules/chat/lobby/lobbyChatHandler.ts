@@ -37,7 +37,7 @@ export async function handleLobbyChatMessage(
       id: message.id || `${socket.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId: socket.userId,
       username: user.username,
-      avatarUrl: user.avatarUrl,
+      avatar: user.avatarUrl,
       message: message.message.trim(),
       timestamp: message.timestamp || Date.now(),
       isSystemMessage: false

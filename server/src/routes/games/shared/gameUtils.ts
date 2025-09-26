@@ -13,7 +13,7 @@ export function enrichGameForClient(game: Game): any {
   }
 
   // Log scores appropriately based on game mode
-  if (!game.mode === "SOLO") {
+  if (game.mode !== "SOLO") {
     console.log(`[ENRICH GAME] Enriching game for client - Team scores:`, {
       team1TotalScore: game.team1TotalScore,
       team2TotalScore: game.team2TotalScore,
@@ -43,20 +43,19 @@ export function enrichGameForClient(game: Game): any {
     lastActivity: game.lastActivity,
     createdAt: game.createdAt,
     currentPlayer,
-    players: game.players.map((p, i) => p ? {
+    players: game.players ? game.players.map((p, i) => p ? {
       id: p.id,
       username: p.username,
       avatarUrl: p.avatarUrl,
       type: p.type,
-      seatIndex: p.seatIndex,
-      team: p.team,
+      seatIndex: 0,
+      teamIndex: p.team,
       bid: p.bid,
       tricks: p.tricks,
       points: p.points,
       bags: p.bags,
-      isDealer: typeof game.dealerIndex === 'number' ? game.dealerIndex === i : Boolean((p as any).isDealer)
-    } : null),
-    hands: game.hands,
+      isDealer: typeof game.dealerIndex === "number" ? game.dealerIndex === i : Boolean((p as any).isDealer)
+    } : null) : [null, null, null, null],
     bidding: game.bidding,
     play: game.play,
     isBotGame: game.isBotGame,
@@ -68,7 +67,7 @@ export function enrichGameForClient(game: Game): any {
   } as any;
 
   // Only include team fields for non-solo games
-  if (!game.mode === "SOLO") {
+  if (game.mode !== "SOLO") {
     base.team1TotalScore = game.team1TotalScore;
     base.team2TotalScore = game.team2TotalScore;
     base.team1Bags = game.team1Bags;

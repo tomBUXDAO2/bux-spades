@@ -1,181 +1,60 @@
-import type { Game } from '../../../types/game';
-import prisma from '../../../lib/prisma';
-import { newdbCreateGame, newdbUpsertGamePlayer } from '../../../newdb/writers';
+import { prisma } from '../../../lib/prisma';
+import { Game, GamePlayer } from '@prisma/client';
 
-/**
- * Log game start to database
- */
-export async function logGameStart(game: Game): Promise<void> {
+export async function logGameStart(game: any): Promise<string> {
   try {
+    console.log('[DATABASE] Starting to log game to database...');
+    
+    // Generate a unique database ID for the game
+    const dbGameId = game.id;
+    game.dbGameId = dbGameId;
+    
+    // Create the game record
     const dbGame = await prisma.game.create({
       data: {
-        id: game.id,
-        creatorId: game.creatorId,
-        status: game.status,
+        id: dbGameId,
+        createdById: game.creatorId,
         mode: game.mode,
-        bidType: game.rules?.bidType || 'REGULAR',
-        specialRules: game.specialRules?.screamer || game.specialRules?.assassin ? 
-          (game.specialRules?.screamer ? ['SCREAMER'] : []) : [],
-        minPoints: game.minPoints,
-        maxPoints: game.maxPoints,
-        buyIn: game.buyIn,
-        rated: game.rated,
-        allowNil: game.rules?.allowNil ?? game.allowNil,
-        allowBlindNil: game.rules?.allowBlindNil ?? game.allowBlindNil,
-        league: game.league,
-        whiz: game.rules?.bidType === 'WHIZ',
-        mirror: game.rules?.bidType === 'MIRROR',
-        gimmick: game.rules?.bidType === 'GIMMICK',
-        screamer: game.specialRules?.screamer || false,
-        assassin: game.specialRules?.assassin || false,
-        solo: game.mode === "SOLO",
-        currentRound: game.currentRound,
-        currentTrick: game.currentTrick,
-        dealer: game.dealerIndex,
-        gimmickType: game.rules?.gimmickType || null,        gameState: game as any,
-        lastActionAt: new Date(),
+        format: game.rules?.bidType || 'REGULAR',
+        gimmickVariant: game.forcedBid || null,
+        isLeague: game.league || false,
+        isRated: game.rated || false,
+        status: game.status,
+        specialRules: game.specialRules || {},
+        startedAt: game.status === 'BIDDING' ? new Date() : null,
+        finishedAt: null,
         createdAt: new Date(),
+        updatedAt: new Date()
       }
     });
-
-    // NEW DB: dual-write game
-    try {
-      const formatMap = (game.rules?.bidType as any) || 'REGULAR';
-      const gimmickLegacy = (game.rules?.gimmickType as any) || undefined;
-      const gimmickVariant = ((): any => {
-        switch (gimmickLegacy) {
-          case 'BID_4_OR_NIL':
-            return 'BID4NIL';
-          case 'BID_HEARTS':
-            return 'BIDHEARTS';
-          case 'BID_3':
-            return 'BID3';
-          case 'CRAZY_ACES':
-            return 'CRAZY_ACES';
-          case 'SUICIDE':
-            return 'SUICIDE';
-          default:
-            return undefined;
+    
+    console.log('[DATABASE] Created game record with ID:', dbGame.id);
+    
+    // Create GamePlayer records for each player
+    for (let i = 0; i < game.players.length; i++) {
+      const player = game.players[i];
+      if (!player || !player.id) continue;
+      
+      const userId = player.id;
+      const team = game.mode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
+      
+      await prisma.gamePlayer.create({
+        data: {
+          id: `player_${dbGame.id}_${i}_${Date.now()}`,
+          gameId: dbGame.id,
+          userId: userId,
+          seatIndex: i,
+          teamIndex: team,
+          isHuman: player.type === 'human'
         }
-      })();
-      await newdbCreateGame({
-        gameId: game.id,
-        createdById: game.creatorId,
-        mode: (game.mode as any) || 'PARTNERS',
-        format: (formatMap as any),
-        gimmickVariant,
-        isLeague: !!game.league,
-        isRated: !!game.rated,
-        status: (game.status as any),
-        specialRules: game.specialRules || undefined
       });
-    } catch (e) {
-      console.warn('[NEWDB] Failed to dual-write game create:', e);
-    }
-
-    game.dbGameId = dbGame.id;
-    console.log('[DATABASE] Game logged with ID:', dbGame.id);
-    
-    // Create bot users in User table first if they don't exist
-    console.log('[DATABASE] Creating bot users...');
-    for (let i = 0; i < 4; i++) {
-      const player = game.players[i];
-      if (!player) continue;
-      if (player && player.type === 'bot') {
-        let retries = 3;
-        let success = false;
-        // Start with the provided username, but allow fallback if it collides
-        let createUsername = player.username;
-        while (retries > 0 && !success) {
-          try {
-            await prisma.user.upsert({
-              where: { id: player.id },
-              create: {
-                id: player.id,
-                username: createUsername,
-                avatarUrl: player.avatarUrl || '/bot-avatar.jpg',
-                discordId: null,
-                coins: 0,
-                createdAt: new Date(),
-              }
-            });
-            console.log(`[DATABASE] Created/updated bot user: ${createUsername} (${player.id})`);
-            success = true;
-          } catch (error: any) {
-            retries--;
-            // If username unique constraint fails, try a suffixed variant to ensure uniqueness
-            if (error?.code === 'P2002') {
-              const suffix = player.id.slice(-6);
-              createUsername = `${player.username}-${suffix}`;
-              console.warn(`[DATABASE] Username collision for ${player.username}. Retrying with '${createUsername}' (${retries} retries left).`);
-            } else {
-              console.error(`[DATABASE] Failed to create bot user ${player.username} (${retries} retries left):`, error);
-            }
-            if (retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            } else {
-              throw new Error(`Failed to create bot user ${player.username} after 3 attempts`);
-            }
-          }
-        }
-      }
     }
     
-    // Create GamePlayer records for all players
-    for (let i = 0; i < 4; i++) {
-      const player = game.players[i];
-      if (!player) continue;
-      if (player) {
-        try {
-          const team = game.mode === 'PARTNERS' ? (i === 0 || i === 2 ? 1 : 2) : null;
-          
-          // For bots, use the universal bot user ID instead of the unique bot ID
-          let userId = player.id;
-          if (player.type === 'bot') {
-            userId = player.id;
-          }
-          
-          await prisma.gamePlayer.create({
-            data: {
-              id: `player_${dbGame.id}_${i}_${Date.now()}`,
-              gameId: dbGame.id,
-              userId: userId,
-              seatIndex: i,
-              team: team,
-              bid: null,
-              bags: 0,
-              points: 0,
-              username: player.username,
-              discordId: player.discordId || null,
-              createdAt: new Date(),
-            }
-          });
-          console.log(`[DATABASE] Created GamePlayer record for ${player.username} at position ${i} with userId ${userId}`);
-
-          // NEW DB: dual-write player
-          try {
-            const teamIndex = game.mode === 'PARTNERS' ? (i === 0 || i === 2 ? 0 : 1) : null;
-            await newdbUpsertGamePlayer({
-              gameId: game.id,
-              userId,
-              seatIndex: i,
-              teamIndex,
-              isHuman: player.type !== 'bot'
-            });
-          } catch (e) {
-            console.warn('[NEWDB] Failed to dual-write game player:', e);
-          }
-        } catch (error) {
-          console.error(`[DATABASE] Failed to create GamePlayer record for ${player.username}:`, error);
-        }
-      }
-    }
+    console.log('[DATABASE] Successfully logged game to database');
+    return dbGame.id;
+    
   } catch (error) {
-    console.error('[DATABASE] Failed to log game start:', error);
+    console.error('[DATABASE] Error logging game to database:', error);
     throw error;
   }
 }
-
-/**
- * Ensure GamePlayer records exist for all players in a game
- */

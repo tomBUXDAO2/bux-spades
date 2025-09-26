@@ -1,4 +1,3 @@
-import { games } from '../../gamesStore';
 import { restoreAllActiveGames, startGameStateAutoSave, checkForStuckGames } from '../../lib/gameStatePersistence';
 import { gameCleanupManager } from "../../lib/game-cleanup";
 import type { Server } from 'socket.io';
@@ -38,7 +37,7 @@ export function initializeServer(httpServer: any, PORT: number, io?: Server) {
     console.log('🔍 Stuck game checker enabled (every minute)');
     
     // Start comprehensive game cleanup system (operates against current in-memory list and DB)
-    gameCleanupManager.startCleanup(games);
+    gameCleanupManager.startCleanup([] as any);
     console.log('🧹 Game cleanup system enabled (every 30 seconds)');
   });
 }

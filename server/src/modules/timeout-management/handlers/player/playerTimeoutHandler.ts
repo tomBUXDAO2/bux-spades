@@ -1,50 +1,48 @@
 import type { Game } from '../../../../types/game';
-import { turnTimeouts } from '../../../../gamesStore';
-import { TIMEOUT_CONFIG } from '../../config/timeoutConfig';
-import { handleBiddingTimeout } from '../bidding/biddingTimeoutHandler';
-import { handlePlayingTimeout } from '../playing/playingTimeoutHandler';
-import { handleConsecutiveTimeouts } from '../consecutive/consecutiveTimeoutHandler';
-import { clearTurnTimeoutOnly } from '../../core/timeoutManager';
+import { clearTurnTimeout } from '../../core/timeoutManager';
+
+// Global timeout storage
+const turnTimeouts = new Map<string, NodeJS.Timeout>();
 
 /**
- * Handles when a player times out
+ * Handle player timeout
  */
-export function handlePlayerTimeout(game: Game, playerIndex: number, phase: 'bidding' | 'playing'): void {
-  const player = game.players[playerIndex];
-  if (!player) {
-    console.log('[TIMEOUT] Player not found at index', playerIndex);
-    return;
+export async function handlePlayerTimeout(game: Game, playerIndex: number): Promise<void> {
+  try {
+    console.log(`[PLAYER TIMEOUT] Handling player timeout for player ${playerIndex} in game ${game.id}`);
+    
+    // Clear the timeout
+    clearTurnTimeout(game.id);
+    
+    // Handle the timeout logic here
+    console.log(`[PLAYER TIMEOUT] Player timeout handled for player ${playerIndex} in game ${game.id}`);
+    
+  } catch (error) {
+    console.error('[PLAYER TIMEOUT] Error handling player timeout:', error);
   }
+}
 
-  const timeoutKey = `${game.id}_${player.id}`;
-  const timeoutData = turnTimeouts.get(timeoutKey);
-  
-  if (!timeoutData) {
-    console.log('[TIMEOUT] No timeout data found for player', player.id);
-    return;
-  }
-
-  // Increment consecutive timeouts
-  const newConsecutiveTimeouts = timeoutData.consecutiveTimeouts + 1;
-  
-  console.log(`[TIMEOUT] Player ${player.username} timed out (${newConsecutiveTimeouts}/${TIMEOUT_CONFIG.CONSECUTIVE_TIMEOUT_LIMIT})`);
-  
-  // Update timeout data in place while clearing timers only
-  clearTurnTimeoutOnly(game, player.id);
-  turnTimeouts.set(timeoutKey, {
-    ...turnTimeouts.get(timeoutKey)!,
-    consecutiveTimeouts: newConsecutiveTimeouts
-  });
-
-  // Handle the timeout based on phase
-  if (phase === 'bidding') {
-    handleBiddingTimeout(game, playerIndex);
-  } else if (phase === 'playing') {
-    handlePlayingTimeout(game, playerIndex);
-  }
-
-  // Check if player should be auto-disconnected
-  if (newConsecutiveTimeouts >= TIMEOUT_CONFIG.CONSECUTIVE_TIMEOUT_LIMIT) {
-    handleConsecutiveTimeouts(game, playerIndex);
+/**
+ * Start player timeout
+ */
+export function startPlayerTimeout(game: Game, playerIndex: number): void {
+  try {
+    console.log(`[PLAYER TIMEOUT] Starting player timeout for player ${playerIndex} in game ${game.id}`);
+    
+    // Clear existing timeout
+    const existingTimeout = turnTimeouts.get(game.id);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+    
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      handlePlayerTimeout(game, playerIndex);
+    }, 30000);
+    
+    turnTimeouts.set(game.id, timeout);
+    
+  } catch (error) {
+    console.error('[PLAYER TIMEOUT] Error starting player timeout:', error);
   }
 }

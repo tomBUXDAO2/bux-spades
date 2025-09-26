@@ -134,7 +134,7 @@ router.post('/webhook/trigger-game-embed', async (req, res) => {
           userId: p.discordId || p.userId,
           username: p.username,
           seatIndex: p.seatIndex,
-          team: p.team,
+          teamIndex: p.team,
           bid: p.bid,
           bags: p.bags,
           points: p.points,

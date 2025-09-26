@@ -2,7 +2,6 @@
 export * from './dealing';
 export * from './bot-play';
 export * from './game-rules';
-export * from './socket-handlers';
 export * from './timeout-management';
 export * from './game-formats';
 export * from './chat';
@@ -16,3 +15,17 @@ export * from './error-handling';
 export * from './discord-integration';
 export * from './server-initialization';
 export * from './play-again';
+
+// Socket handlers - explicit exports to avoid conflicts
+export { 
+  handleJoinGame,
+  handleMakeBid,
+  handlePlayCard,
+  handleBiddingComplete,
+  handleTrickComplete,
+  handleHandComplete,
+  handlePlayAgainSocket
+} from './socket-handlers';
+
+// Game start handler - explicit export to avoid conflicts
+export { handleStartGame } from './socket-handlers/game-start';

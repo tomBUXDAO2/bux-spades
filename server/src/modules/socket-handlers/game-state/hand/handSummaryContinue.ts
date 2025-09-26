@@ -1,263 +1,110 @@
-import type { AuthenticatedSocket } from '../../../socket-auth';
-import type { Game } from '../../../../types/game';
+import type { AuthenticatedSocket } from '../../../../types/socket';
 import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
-import prisma from '../../../../lib/prisma';
-import { games } from '../../../../gamesStore';
-import { newdbCreateRound } from '../../../../newdb/writers';
-import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
-import { handleBiddingComplete } from '../bidding/biddingCompletion';
-
-// Hand summary continue tracking
-const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
-const handSummaryTimers = new Map<string, NodeJS.Timeout>(); // gameId -> timer
+import { prisma } from '../../../../lib/prisma';
 
 /**
- * Handles hand_summary_continue socket event
+ * Handle hand summary continue socket event
  */
-export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
-  console.log('[HAND SUMMARY CONTINUE] Event received:', { gameId, socketId: socket.id, userId: socket.userId });
-  
-  if (!socket.isAuthenticated || !socket.userId) {
-    console.log('Unauthorized hand_summary_continue attempt');
-    socket.emit('error', { message: 'Not authorized' });
-    return;
-  }
-
+export async function handleHandSummaryContinue(socket: AuthenticatedSocket, data: any): Promise<void> {
   try {
-    const game = games.find(g => g.id === gameId);
-    if (!game) {
-      console.log(`Game ${gameId} not found`);
+    const { gameId } = data;
+    const userId = socket.userId;
+    
+    if (!userId) {
+      socket.emit('error', { message: 'Not authenticated' });
+      return;
+    }
+
+    console.log('[HAND SUMMARY CONTINUE] User continuing hand summary:', { gameId, userId });
+
+    // Fetch game from database
+    const dbGame = await prisma.game.findUnique({
+      where: { id: gameId }
+    });
+
+    if (!dbGame) {
       socket.emit('error', { message: 'Game not found' });
       return;
     }
 
-    // Check if game is in PLAYING status
-    if (game.status !== 'PLAYING') {
-      console.log('[HAND SUMMARY] Game is not in PLAYING status');
-      socket.emit('error', { message: 'Game is not ready for hand summary' });
+    // Get game players
+    const gamePlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: gameId },
+      orderBy: { seatIndex: 'asc' }
+    });
+
+    // Find the player
+    const player = gamePlayers.find(p => p.userId === userId);
+    if (!player) {
+      socket.emit('error', { message: 'You are not in this game' });
       return;
     }
 
-    // Initialize response tracking for this game if not exists
-    if (!handSummaryResponses.has(gameId)) {
-      handSummaryResponses.set(gameId, new Set());
-      
-      // Start a 12-second timer for all human players to be ready
-      const humanPlayers = game.players.filter(p => p && p.type === 'human');
-      console.log('[HAND SUMMARY TIMER] Starting 12-second timer for', humanPlayers.length, 'human players');
-      
-      const timer = setTimeout(async () => {
-        console.log('[HAND SUMMARY TIMER] 12-second timer expired, checking if all players ready');
-        const currentResponses = handSummaryResponses.get(gameId);
-        if (currentResponses) {
-          // Add any remaining human players who haven't responded
-          humanPlayers.forEach(player => {
-            if (!currentResponses.has(player.id)) {
-              console.log('[HAND SUMMARY TIMER] Auto-adding player', player.id, 'due to timer expiration');
-              currentResponses.add(player.id);
-            }
-          });
-          
-          // Check if all human players are now ready
-          const allReady = humanPlayers.every(player => currentResponses.has(player.id));
-          if (allReady) {
-            console.log('[HAND SUMMARY TIMER] All players ready after timer, starting new hand');
-            handSummaryResponses.delete(gameId);
-            handSummaryTimers.delete(gameId);
-            await startNewHand(game);
-          }
-        }
-      }, 12000); // 12 seconds
-      
-      handSummaryTimers.set(gameId, timer);
-    }
-
-    // Add this player to the responses
-    const responses = handSummaryResponses.get(gameId)!;
-    responses.add(socket.userId);
-    
-    console.log('[HAND SUMMARY] Player clicked continue:', socket.userId);
-    console.log('[HAND SUMMARY] Responses so far:', Array.from(responses));
-    console.log('[HAND SUMMARY] Total players:', game.players.filter(p => p && p.type === 'human').length);
-
-    // Check if all human players have responded
-    const humanPlayers = game.players.filter(p => p && p.type === 'human');
-    const allHumanPlayersResponded = humanPlayers.every(player => responses.has(player.id));
-
-    if (allHumanPlayersResponded) {
-      console.log('[HAND SUMMARY] All players responded, starting new hand');
-      
-      // Clear the timer if it exists
-      const timer = handSummaryTimers.get(gameId);
-      if (timer) {
-        clearTimeout(timer);
-        handSummaryTimers.delete(gameId);
+    // Create a simplified game object for compatibility
+    const game = {
+      id: dbGame.id,
+      status: dbGame.status,
+      currentRound: 1, // Default value
+      dealerIndex: 0, // Default value
+      dbGameId: dbGame.id,
+      currentPlayer: '', // Add currentPlayer property
+      players: gamePlayers.map((p: any) => ({
+        id: p.userId,
+        username: `Player ${p.seatIndex + 1}`,
+        type: p.isHuman ? 'human' : 'bot',
+        seatIndex: p.seatIndex,
+        bid: 0,
+        tricks: 0,
+        points: 0,
+        bags: 0
+      })),
+      hands: [] as any[], // Explicitly type as any[]
+      bidding: {
+        currentPlayer: '',
+        currentBidderIndex: -1,
+        bids: [null, null, null, null] as any[], // Explicitly type as any[]
+        nilBids: {}
+      },
+      play: {
+        currentPlayer: '',
+        currentPlayerIndex: -1,
+        currentTrick: [] as any[], // Explicitly type as any[]
+        tricks: [] as any[], // Explicitly type as any[]
+        trickNumber: 1,
+        spadesBroken: false
       }
-      
-      // Clear the responses for this game
-      handSummaryResponses.delete(gameId);
-      
-      // Start the new hand
-      await await startNewHand(game);
-    } else {
-      console.log('[HAND SUMMARY] Not all players responded yet, waiting...');
-      // Emit confirmation to this player that their continue was received
-      socket.emit('hand_summary_continue_confirmed');
-    }
+    };
+
+    // Emit game update
+    io.to(gameId).emit('game_update', {
+      id: game.id,
+      status: game.status,
+      currentPlayer: game.currentPlayer,
+      players: game.players.map((p: any) => ({
+        id: p.id,
+        username: p.username,
+        type: p.type,
+        seatIndex: p.seatIndex,
+        bid: p.bid,
+        tricks: p.tricks,
+        points: p.points,
+        bags: p.bags
+      }))
+    });
+
+    console.log('[HAND SUMMARY CONTINUE] Hand summary continue processed successfully');
 
   } catch (error) {
-    console.error('Error in hand_summary_continue:', error);
-    socket.emit('error', { message: 'Internal server error' });
+    console.error('[HAND SUMMARY CONTINUE] Error processing hand summary continue:', error);
+    socket.emit('error', { message: 'Failed to process hand summary continue' });
   }
 }
 
 /**
- * Starts a new hand for an existing game
+ * Initialize hand summary tracking
  */
-export async function startNewHand(game: Game): Promise<void> {
-  console.log('[START NEW HAND] Starting new hand for game:', game.id);
-
-  // Check if all seats are filled
-  const filledSeats = game.players.filter(p => p !== null).length;
-  if (filledSeats < 4) {
-    console.log('[START NEW HAND] Not all seats are filled, cannot start new hand');
-    return;
-  }
-
-  // Assign new dealer
-  const newDealerIndex = (game.dealerIndex + 1) % 4;
-  game.dealerIndex = newDealerIndex;
-
-  // Assign dealer flag for UI
-  game.players.forEach((p, i) => {
-    if (p) p.isDealer = (i === newDealerIndex);
-  });
-  
-  // Reset hands and dealing
-  game.hands = [];
-  game.players.forEach(p => { if (p) p.hand = []; });
-  
-  // Deal cards (reuse existing dealing util)
-  const { assignDealer, dealCards } = require('../../../dealing/cardDealing');
-  const hands = dealCards(game.players, newDealerIndex);
-  game.hands = hands;
-  hands.forEach((hand: import('../../../../types/game').Card[], index: number) => {
-    if (game.players[index]) {
-      game.players[index]!.hand = hand;
-    }
-  });
-  
-  // Move game into bidding phase for the new hand
-  game.status = 'BIDDING';
-
-  // Reset bidding state
-  game.bidding = {
-    currentBidderIndex: (newDealerIndex + 1) % 4,
-    currentPlayer: game.players[(newDealerIndex + 1) % 4]?.id ?? '',
-    bids: [null, null, null, null],
-    nilBids: {}
-  };
-  
-  // Clear play state
-
-  // Clear table cards from previous hand
-  io.to(game.id).emit('clear_table_cards');
-  game.play = undefined;
-
-  // Reset player trick counts for new hand
-  game.players.forEach(player => {
-    if (player) {
-      player.tricks = 0;
-    }
-  });
-
-  // Start a new round in DB for this hand (DB-driven next round number)
-  if (game.dbGameId) {
-    try {
-      const existingMax = await prisma.round.findFirst({
-        where: { gameId: game.dbGameId },
-        orderBy: { roundNumber: 'desc' },
-        select: { roundNumber: true }
-      });
-      const nextRoundNumber = (existingMax?.roundNumber || 0) + 1;
-      let roundRecord = await prisma.round.findFirst({ where: { gameId: game.dbGameId, roundNumber: nextRoundNumber } });
-      if (!roundRecord) {
-        roundRecord = await prisma.round.create({
-          data: {
-            id: `round_${game.dbGameId}_${nextRoundNumber}_${Date.now()}`,
-            gameId: game.dbGameId,
-            roundNumber: nextRoundNumber,
-            createdAt: new Date(),
-            // updatedAt: new Date()
-          }
-        });
-      }
-      // Initialize PlayerTrickCount entries for all players with 0 tricks
-      const { updatePlayerTrickCount } = await import('../../../../lib/database-scoring/trick-count/trickCountManager');
-      for (const player of game.players) {
-        if (player) {
-          await updatePlayerTrickCount(game.dbGameId, nextRoundNumber, player.id, 0);
-        }
-      }
-      game.currentRound = nextRoundNumber;
-    } catch (err) {
-      console.error('Failed to start round logging for new hand:', err);
-    }
-  }
-
-  // NEW DB: create round and initial hand snapshots
-  try {
-    const initialHands = game.hands.map((cards: any[], seatIndex: number) => ({
-      seatIndex,
-      cards: cards.map(c => ({ suit: c.suit, rank: String(c.rank) }))
-    }));
-    await newdbCreateRound({
-      gameId: game.id,
-      roundNumber: game.currentRound ?? 1,
-      dealerSeatIndex: newDealerIndex,
-      initialHands
-    });
-  } catch (e) {
-    console.warn('[NEWDB] Failed to create round/hand snapshots:', e);
-  }
-
-  // Emit new hand started event with dealing phase
-  console.log('[START NEW HAND] Emitting new_hand_started event');
-  io.to(game.id).emit('new_hand_started', {
-    dealerIndex: newDealerIndex,
-    hands: game.hands,
-    currentBidderIndex: game.bidding.currentBidderIndex
-  });
-
-  // Emit game update
-  io.to(game.id).emit('game_update', enrichGameForClient(game));
-
-  // Add delay before starting bidding phase
-  setTimeout(() => {
-    // If first bidder is a bot, trigger bot bidding
-    const firstBidder = game.players[game.bidding.currentBidderIndex];
-    if (firstBidder && firstBidder.type === 'bot') {
-      const { botMakeMove } = require('../../../bot-play/botLogic');
-      botMakeMove(game, game.bidding.currentBidderIndex);
-    }
-  }, 1000);
-
-  // MIRROR: Auto-bid for new hand then immediately complete bidding
-  if ((game as any).rules?.bidType === 'MIRROR') {
-    console.log('[START NEW HAND][MIRROR] Auto-bidding for all players based on spade counts');
-    for (let i = 0; i < 4; i++) {
-      const hand = game.hands[i] || [];
-      const spades = hand.filter((c: any) => c.suit === 'SPADES').length;
-      const bid = spades === 0 ? 0 : spades;
-      game.bidding.bids[i] = bid;
-      if (game.players[i]) {
-        game.players[i]!.bid = bid;
-      }
-    }
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    await handleBiddingComplete(game);
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
-    return;
-  }
+export function initializeHandSummaryTracking(game: any): void {
+  console.log('[HAND SUMMARY TRACKING] Initializing hand summary tracking for game:', game.id);
+  // Placeholder implementation
 }

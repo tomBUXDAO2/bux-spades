@@ -53,7 +53,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSocket(socketManager.getSocket());
     });
 
-    socketManager.initialize(user.id, user.username, user.avatar || undefined);
+    socketManager.initialize(user.id, user.username, user.avatarUrl || undefined);
 
     // Ensure we auto-join any active game room after authentication
     socketManager.onStateChange((s) => {
@@ -64,7 +64,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const activeGameId = stored;
             const sock = socketManager.getSocket();
             if (sock && sock.connected) {
-              sock.emit('join_game', { gameId: activeGameId });
+              // sock.emit('join_game', { gameId: activeGameId }); // User already in game
             }
           }
         } catch {}

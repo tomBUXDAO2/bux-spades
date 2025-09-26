@@ -1,25 +1,30 @@
-import { games } from '../../gamesStore';
+import { prisma } from '../../lib/prisma';
 
-export function getGameById(gameId: string) {
-  return games.find(g => g.id === gameId);
+export async function getGameById(gameId: string) {
+	return await prisma.game.findUnique({ where: { id: gameId } });
 }
 
-export function getAllGames() {
-  return games;
+export async function getAllGames() {
+	return await prisma.game.findMany();
 }
 
-export function addGame(game: any) {
-  games.push(game);
+export async function addGame(game: any) {
+	// No-op: games are created via dedicated creation logic using Prisma
+	return game;
 }
 
-export function removeGame(gameId: string) {
-  const index = games.findIndex(g => g.id === gameId); if (index !== -1) games.splice(index, 1);
+export async function removeGame(gameId: string) {
+	try {
+		await prisma.game.delete({ where: { id: gameId } });
+	} catch (err) {
+		// swallow if already deleted
+	}
 }
 
-export function updateGame(gameId: string, updates: Partial<any>) {
-  const game = games.find(g => g.id === gameId);
-  if (game) {
-    Object.assign(game, updates);
-    games.push(game);
-  }
+export async function updateGame(gameId: string, updates: Partial<any>) {
+	try {
+		return await prisma.game.update({ where: { id: gameId }, data: updates as any });
+	} catch (err) {
+		return null;
+	}
 }

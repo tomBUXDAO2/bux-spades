@@ -1,161 +1,196 @@
-import type { Game } from '../../types/game';
-import { io } from '../../index';
-import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
-import prisma from '../../lib/prisma';
 import { prisma } from '../../lib/prisma';
-import { newdbUpsertGamePlayer } from '../../newdb/writers';
-import { useNewDbOnly } from '../../newdb/toggle';
-
-// Single bot user ID for all bots
-const BOT_USER_ID = 'bot-user-universal';
+import type { Game } from '../../types/game';
 
 /**
- * Ensures the universal bot user exists in the database
+ * Create a bot player for a game
  */
-async function ensureBotUserExists(): Promise<void> {
+export async function createBotPlayer(game: Game, seatIndex: number): Promise<any> {
   try {
-    await prisma.user.upsert({
-      where: { id: BOT_USER_ID },
-      update: {},
-      create: {
-        id: BOT_USER_ID,
-        username: 'Bot Player',
-        avatarUrl: '/bot-avatar.jpg',
-        discordId: null,
-        createdAt: new Date(),
-        // updatedAt: new Date()
+    console.log(`[BOT INVITATION] Creating bot player for seat ${seatIndex} in game ${game.id}`);
+    
+    // Generate unique bot display ID
+    let baseNumber = Math.floor(Math.random() * 1000);
+    let botDisplayId = `bot_${baseNumber}`;
+    
+    // Try upsert with retries to avoid username collisions
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await prisma.user.upsert({
+          where: { id: botDisplayId },
+          update: {},
+          create: {
+            id: botDisplayId,
+            username: `Bot${baseNumber}`,
+            avatarUrl: '/bot-avatar.jpg',
+            discordId: null,
+            coins: 1000000,
+            createdAt: new Date()
+          }
+        });  
+        break; // success
+      } catch (err: any) {
+        if (err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('username')) {
+          // Username collision: change username and retry
+          baseNumber = Math.floor(Math.random() * 1000);
+          botDisplayId = `bot_${baseNumber}`;
+          retries--;
+          if (retries === 0) throw err;
+        } else {
+          throw err;
+        }
       }
-    });
+    }
+    
+    // Create bot player object
+    const botPlayer = {
+      id: botDisplayId,
+      username: `Bot${baseNumber}`,
+      type: 'bot' as const,
+      position: seatIndex,
+      team: seatIndex % 2,
+      hand: [] as any[],
+      bid: 0,
+      tricks: 0,
+      points: 0,
+      nil: false,
+      blindNil: false,
+      connected: true
+    };
+    
+    console.log(`[BOT INVITATION] Created bot player:`, botPlayer);
+    return botPlayer;
+    
   } catch (error) {
-    console.error('[BOT INVITATION] Failed to ensure bot user exists:', error);
+    console.error(`[BOT INVITATION] Error creating bot player:`, error);
+    throw error;
   }
 }
 
 /**
- * Adds a bot to a specific seat in a game
+ * Add bot player to game
  */
-export async function addBotToSeat(game: Game, seatIndex: number): Promise<void> {
-  console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
-  
-  // Check if seat is empty
-  if (game.players[seatIndex] !== null) {
-    console.log(`[BOT INVITATION] Seat ${seatIndex} is not empty`);
-    return;
-  }
-  
-  // Create bot with unique display name and ID
-  const botDisplayId = `bot-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  let baseNumber = Math.floor(Math.random() * 1000);
-  let botUsername = `Bot ${baseNumber}`;
-
-  // Try upsert with retries to avoid username collisions
-  let retries = 3;
-  while (retries > 0) {
-    try {
-  await prisma.user.upsert({
-    where: { id: botDisplayId },
-    update: {},
-    create: {
-      id: botDisplayId,
-          username: botUsername,
-      avatarUrl: '/bot-avatar.jpg',
-      discordId: null,
-      createdAt: new Date(),
-      // updatedAt: new Date()
-    }
-  });  
-      break; // success
-    } catch (err: any) {
-      if (err?.code === 'P2002' && Array.isArray(err?.meta?.target) && err.meta.target.includes('username')) {
-        // Username collision: change username and retry
-        baseNumber = Math.floor(Math.random() * 1000);
-        botUsername = `Bot ${baseNumber}-${Math.random().toString(36).slice(-3)}`;
-        retries--;
-        if (retries === 0) throw err;
-      } else {
-        throw err;
-      }
-    }
-  }
-
-  game.players[seatIndex] = {
-    id: botDisplayId,
-    username: botUsername,
-    avatarUrl: '/bot-avatar.jpg',
-    type: 'bot',
-    seatIndex: seatIndex,
-    team: seatIndex % 2,
-    bid: undefined,
-    tricks: 0,
-    points: 0,
-  };
-  
-  // If game exists in new DB, upsert GamePlayer row for this bot as well (dual-write)
+export async function addBotToGame(game: Game, seatIndex: number): Promise<void> {
   try {
-    await newdbUpsertGamePlayer({
-      gameId: game.id,
-      userId: botDisplayId,
-      seatIndex,
-      teamIndex: game.mode === 'PARTNERS' ? (seatIndex % 2) : null,
-      isHuman: false,
-    });
-  } catch (err) {
-    console.error('[BOT INVITATION] Failed to upsert newdb GamePlayer for bot seat:', err);
-  }
-  
-  // If game is already in old DB, upsert GamePlayer row for this bot
-  try {
-    if (!useNewDbOnly && game.dbGameId) {
-      await prisma.gamePlayer.upsert({
-        where: { gameId_seatIndex: { gameId: game.dbGameId, seatIndex: seatIndex } as any },
-        update: {
-          userId: botDisplayId,
-          team: game.mode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
-          username: botUsername,
-          // updatedAt: new Date()
-        },
-        create: {
-          id: `player_${game.dbGameId}_${seatIndex}_${Date.now()}`,
+    console.log(`[BOT INVITATION] Adding bot to seat ${seatIndex} in game ${game.id}`);
+    
+    // Create bot player
+    const botPlayer = await createBotPlayer(game, seatIndex);
+    
+    // Add bot to game players array
+    if (game.players) {
+      game.players[seatIndex] = botPlayer;
+    }
+    
+    // Create game player record in database
+    if (game.dbGameId) {
+      await prisma.gamePlayer.create({
+        data: {
           gameId: game.dbGameId,
-          userId: botDisplayId,
+          userId: botPlayer.id,
           seatIndex: seatIndex,
-          team: game.mode === 'PARTNERS' ? (seatIndex === 0 || seatIndex === 2 ? 1 : 2) : null,
-          bid: null,
-          bags: 0,
-          points: 0,
-          username: botUsername,
-          createdAt: new Date(),
-          // updatedAt: new Date()
+          teamIndex: botPlayer.team,
+          isHuman: false,
+          joinedAt: new Date(),
+          leftAt: new Date()
         }
       });
     }
-  } catch (err) {
-    console.error('[BOT INVITATION] Failed to upsert GamePlayer for bot seat:', err);
+    
+    console.log(`[BOT INVITATION] Successfully added bot to game ${game.id}`);
+    
+  } catch (error) {
+    console.error(`[BOT INVITATION] Error adding bot to game:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Remove bot player from game
+ */
+export async function removeBotFromGame(game: Game, seatIndex: number): Promise<void> {
+  try {
+    console.log(`[BOT INVITATION] Removing bot from seat ${seatIndex} in game ${game.id}`);
+    
+    // Remove bot from game players array
+    if (game.players && game.players[seatIndex]) {
+      const botPlayer = game.players[seatIndex];
+      game.players[seatIndex] = null;
+      
+      // Remove game player record from database
+      if (game.dbGameId) {
+        await prisma.gamePlayer.deleteMany({
+          where: {
+            gameId: game.dbGameId,
+            userId: botPlayer.id
+          }
+        });
+      }
+    }
+    
+    console.log(`[BOT INVITATION] Successfully removed bot from game ${game.id}`);
+    
+  } catch (error) {
+    console.error(`[BOT INVITATION] Error removing bot from game:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Check if a seat is available for a bot
+ */
+export function isSeatAvailableForBot(game: Game, seatIndex: number): boolean {
+  if (!game.players || seatIndex < 0 || seatIndex >= 4) {
+    return false;
   }
   
-  // Set isBotGame flag
-  game.isBotGame = game.players.some(p => p && p.type === 'bot');
+  const player = game.players[seatIndex];
+  return player === null || player === undefined;
+}
+
+/**
+ * Get available seats for bots
+ */
+export function getAvailableSeatsForBots(game: Game): number[] {
+  if (!game.players) {
+    return [];
+  }
   
-  // Send system message via chat
-  const systemMessage = {
-    id: `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    userId: 'system',
-    userName: 'System',
-    message: `A bot was invited to seat ${seatIndex + 1}.`,
-    timestamp: Date.now(),
-    isGameMessage: true
-  };
+  const availableSeats: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    if (isSeatAvailableForBot(game, i)) {
+      availableSeats.push(i);
+    }
+  }
   
-  // Emit chat message
-  io.to(game.id).emit('chat_message', { gameId: game.id, message: systemMessage });
-  
-  // Update all clients
-  const enrichedGame = enrichGameForClient(game);
-  console.log(`[BOT INVITATION] Emitting game_update after bot addition:`, {
-    gameId: game.id,
-    players: enrichedGame.players.map((p: any, i: number) => `${i}: ${p ? `${p.username} (${p.type})` : 'null'}`)
-  });
-  io.to(game.id).emit('game_update', enrichedGame);
-  
-  console.log(`[BOT INVITATION] Bot added to seat ${seatIndex} in game ${game.id}`);
+  return availableSeats;
+}
+
+/**
+ * Fill empty seats with bots
+ */
+export async function fillEmptySeatsWithBots(game: Game): Promise<void> {
+  try {
+    console.log(`[BOT INVITATION] Filling empty seats with bots for game ${game.id}`);
+    
+    const availableSeats = getAvailableSeatsForBots(game);
+    console.log(`[BOT INVITATION] Available seats:`, availableSeats);
+    
+    for (const seatIndex of availableSeats) {
+      await addBotToGame(game, seatIndex);
+    }
+    
+    console.log(`[BOT INVITATION] Successfully filled ${availableSeats.length} empty seats with bots`);
+    
+  } catch (error) {
+    console.error(`[BOT INVITATION] Error filling empty seats with bots:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Add bot to specific seat (alias for addBotToGame)
+ */
+export async function addBotToSeat(game: Game, seatIndex: number): Promise<void> {
+  return await addBotToGame(game, seatIndex);
 }

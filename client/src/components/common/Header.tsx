@@ -139,7 +139,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               >
                 <div className="flex items-center space-x-3">
                   <img
-                    src={user?.avatar || '/default-avatar.png'}
+                    src={user?.avatarUrl || '/default-avatar.png'}
                     alt="Profile"
                     className="w-8 h-8 rounded-full bg-slate-700"
                   />

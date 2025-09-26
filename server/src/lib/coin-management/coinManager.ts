@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import type { Game } from "../../types/game";
-import { useNewDbOnly } from "../../newdb/toggle";import { useNewDbOnly } from '../../newdb/toggle';
+import { useNewDbOnly } from "../../newdb/toggle";
 
 /**
  * Handles all coin operations for completed games
@@ -126,7 +126,7 @@ export class CoinManager {
     const rake = Math.floor(totalPot * 0.1); // 10% rake
     const prizePool = totalPot - rake; // 90% of pot goes to prizes
 
-    if (game.mode === 'SOLO' || game.mode === "SOLO") {
+    if (game.mode === 'SOLO') {
       await this.distributeSoloPrizes(tx, game, winningTeamOrPlayer, humanPlayers, buyIn);
     } else {
       await this.distributePartnersPrizes(tx, game, winningTeamOrPlayer, humanPlayers, prizePool);
@@ -157,7 +157,8 @@ export class CoinManager {
     
     // Distribute prizes
     for (let rank = 0; rank < playersWithScores.length; rank++) {
-      const { position, player } = playersWithScores[rank];
+      const { player } = playersWithScores[rank];
+      const position = rank;
       
       if (!player || player.type !== 'human') continue;
       
@@ -184,7 +185,7 @@ export class CoinManager {
   private static async distributePartnersPrizes(tx: any, game: Game, winningTeam: number, humanPlayers: any[], prizePool: number): Promise<void> {
     // Map winningTeam (1 | 2) to player.team (0 | 1)
     const winningTeamIndex = winningTeam === 1 ? 0 : 1;
-    console.log('[COIN MANAGER] Distributing partners prizes, winning team:', winningTeam, 'mapped index:', winningTeamIndex);
+    console.log('[COIN MANAGER] Distributing partners prizes, winning teamIndex:', winningTeam, 'mapped index:', winningTeamIndex);
     
     // Find all human players on the winning team
     const winningPlayers = humanPlayers.filter(player => player.team === winningTeamIndex);

@@ -1,0 +1,1 @@
+export { handleStartGame } from './gameStartHandler';

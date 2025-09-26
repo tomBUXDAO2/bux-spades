@@ -1,185 +1,139 @@
-import { enrichGameForClient } from '../shared/gameUtils';
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import type { Game, GamePlayer } from '../../../types/game';
-import { games } from '../../../gamesStore';
 import { io } from '../../../index';
-import prisma from '../../../lib/prisma';
-import { logGameStart } from '../database/gameDatabase';
-import { AuthenticatedRequest } from '../../../middleware/auth.middleware';
-import { 
-  validateGameSettings,
-  createGameFormatConfig,
-  applyGameFormatRules
-} from '../../../modules';
-
-/**
- * Helper function to filter out null values
- */
-function isNonNull<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined;
-}
+import { prisma } from '../../../lib/prisma';
+import { enrichGameForClient } from '../shared/gameUtils';
+import { startGame } from '../../../modules/game-start/gameStart';
+import type { Game } from '../../../types/game';
 
 /**
  * Create a new game
  */
 export async function createGame(req: Request, res: Response): Promise<void> {
   try {
-    const settings = req.body;
-    const creatorPlayer = {
-      id: (req as AuthenticatedRequest).user!.id,
-      username: settings.creatorName || 'Unknown',
-      avatarUrl: settings.creatorImage || null,
-      type: 'human' as const,
-    };
-
-    // Validate game settings using our modular function
-    const validation = validateGameSettings(settings);
-    if (!validation.valid) {
-      res.status(400).json({ error: 'Invalid game settings', details: validation.errors });
+    const { 
+      mode, 
+      format,
+      gimmickVariant,
+      specialRules
+    } = req.body;
+    
+    const userId = (req as any).user?.id;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
       return;
     }
 
-    // Create game format configuration
-    const gameFormat = createGameFormatConfig(settings);
+    console.log('[GAME CREATION] Creating game:', { 
+      mode, 
+      format,
+      gimmickVariant,
+      userId 
+    });
 
-    // Handle pre-assigned players for league games
-    let players: (GamePlayer | null)[] = [null, null, null, null];
-    
-    if (settings.league && settings.players && settings.players.length === 4) {
-      // League game with pre-assigned players
-      for (const playerData of settings.players) {
-        let user = await prisma.user.findFirst({
-          where: { discordId: playerData.discordId || playerData.userId }
-        });
-        
-        if (!user) {
-          user = await prisma.user.create({
-            data: {
-              id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              username: playerData.username,
-              discordId: playerData.discordId || playerData.userId,
-              coins: 5000000,
-              // updatedAt: new Date(),
-            }
-          });
-        }
-        
-        players[playerData.seat] = {
-          id: user.id,
-          username: user.username,
-          avatarUrl: user.avatarUrl,
-          type: 'human',
-          seatIndex: playerData.seat,
-          team: playerData.seat % 2,
-          bid: undefined,
-          tricks: 0,
-          points: 0,
-          bags: 0
-        };
+    // Create game in database
+    const dbGame = await prisma.game.create({
+      data: {
+        mode: mode || 'PARTNERS',
+        format: format || 'REGULAR',
+        gimmickVariant: gimmickVariant || null,
+        createdById: userId,
+        status: 'WAITING',
+        specialRules: specialRules || {}
       }
-    } else {
-      // Regular game - creator takes first available seat
-      players[0] = {
-        id: creatorPlayer.id,
-        username: creatorPlayer.username,
-        avatarUrl: creatorPlayer.avatarUrl,
-        type: 'human',
-        seatIndex: 0,
-        team: 0,
-        bid: undefined,
-        tricks: 0,
-        points: 0,
-        bags: 0
-      };
-    }
+    });
 
-    // Determine rating at creation time ONLY: unrated if any initial player is a bot
-    const hasBotAtCreation = players.filter(isNonNull).some(p => p.type === 'bot' || (p.username && p.username.startsWith('Bot ')));
-
-    // Create the game
+    // Create a simplified game object for compatibility
     const game: Game = {
-      id: uuidv4(),
-      creatorId: creatorPlayer.id,
-      status: 'WAITING',
-      mode: settings.mode,
-      maxPoints: settings.maxPoints,
-      minPoints: settings.minPoints,
-      buyIn: settings.buyIn,
-      rated: false,
-      allowNil: true,
+      id: dbGame.id,
+      status: dbGame.status as any,
+      mode: dbGame.mode as any,
+      maxPoints: 500, // Default values
+      minPoints: -500,
+      buyIn: 0,
+      forcedBid: false,
+      specialRules: dbGame.specialRules as any,
+      allowNil: true, // Default values
       allowBlindNil: false,
-      league: settings.league || false,
-      completed: false,
-      solo: settings.mode === 'SOLO',
+      format: dbGame.format as any,
+      gimmickVariant: dbGame.gimmickVariant as any, // Fix: Use the actual value from DB
+      createdById: dbGame.createdById,
+      createdAt: dbGame.createdAt.getTime(),
+      updatedAt: dbGame.updatedAt.getTime(),
+      dbGameId: dbGame.id,
+      players: [],
+      spectators: [],
       currentRound: 1,
       currentTrick: 1,
       dealerIndex: 0,
-      lastActivity: Date.now(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      players,
       hands: [],
-      bidding: undefined,
-      play: undefined,
-      team1TotalScore: 0,
-      team2TotalScore: 0,
-      team1Bags: 0,
-      team2Bags: 0,
-      forcedBid: undefined as any,
-      specialRules: settings.specialRules || {},
-      spectators: [],
+      bidding: {
+        currentPlayer: '',
+        currentBidderIndex: -1,
+        bids: [null, null, null, null],
+        nilBids: {}
+      },
+      play: {
+        currentPlayer: '',
+        currentPlayerIndex: -1,
+        currentTrick: [],
+        tricks: [],
+        trickNumber: 1,
+        spadesBroken: false
+      },
       completedTricks: [],
       rules: {
-        gameType: settings.mode,
+        gameType: dbGame.mode as any,
+        coinAmount: 0,
+        maxPoints: 500,
+        minPoints: -500,
+        bidType: 'NORMAL' as any,
         allowNil: true,
-        allowBlindNil: false,
-        coinAmount: settings.buyIn,
-        maxPoints: settings.maxPoints,
-        minPoints: settings.minPoints,
-        bidType: 'REGULAR',
-        gimmickType: undefined as any
+        allowBlindNil: false
       },
-      isBotGame: false
+      isBotGame: false,
+      team1Bags: 0,
+      team2Bags: 0,
+      playerScores: [0, 0, 0, 0],
+      playerBags: [0, 0, 0, 0],
+      winningPlayer: null,
+      winningTeam: null,
+      lastActivity: Date.now(),
+      rounds: 0,
+      league: false,
+      rated: false,
+      leagueReady: false,
+      dealer: 0,
+      roundHistory: [],
+      currentTrickCards: [],
+      lastAction: null,
+      lastActionTime: null,
+      completed: false,
+      winner: null,
+      finalScore: null,
+      solo: false,
+      team1TotalScore: 0,
+      team2TotalScore: 0
     };
 
-    // Apply game format rules
-    applyGameFormatRules(game, gameFormat);
+    // Start the game
+    await startGame(game);
 
-    // Add to games array
-    games.push(game);
-    // Save game to database immediately when created
-    console.log('[GAME CREATION] Saving game to database...');
-    try {
-      await logGameStart(game);
-      console.log('[GAME CREATION] Game saved to database with ID:', game.dbGameId);
-    } catch (error) {
-      console.error('[GAME CREATION] Failed to save game to database:', error);
-    }
-
-    console.log('[GAME CREATION] Created game:', {
-      id: game.id,
-      mode: game.mode,
-      format: gameFormat.format,
-      gimmickType: gameFormat.gimmickType,
-      players: game.players.map(p => p ? p.username : 'empty')
+    // Get all games for lobby
+    const lobbyGames = await prisma.game.findMany({
+      where: { status: 'WAITING' }
     });
 
-    // Emit socket events to notify clients about the new game
-    // Filter out league games in waiting status for lobby
-    const lobbyGames = games.filter(game => {
-      if ((game as any).league && game.status === 'WAITING') {
-        return false;
-      }
-      return true;
-    });
+    // Get all games
+    const allGames = await prisma.game.findMany();
+
     console.log(`[GAME CREATION] Connected sockets: ${io.sockets.sockets.size}`);
     console.log(`[GAME CREATION] Emitting games_updated to all clients, ${lobbyGames.length} lobby games`);
-    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g as any)));
     
     // Also emit all games (including league games) for real-time league game detection
-    console.log(`[GAME CREATION] Emitting all_games_updated to all clients, ${games.length} total games`);
-    io.emit('all_games_updated', games.map(g => enrichGameForClient(g)));
+    console.log(`[GAME CREATION] Emitting all_games_updated to all clients, ${allGames.length} total games`);
+    io.emit('all_games_updated', allGames.map(g => enrichGameForClient(g as any)));
 
     res.json({
       success: true,
@@ -187,7 +141,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     });
 
   } catch (error) {
-    console.error('Error creating game:', error);
+    console.error('[GAME CREATION] Error creating game:', error);
     res.status(500).json({ error: 'Failed to create game' });
   }
 }

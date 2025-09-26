@@ -16,3 +16,6 @@ export {
   handleTrickComplete, 
   handleHandComplete 
 } from './game-state';
+
+// Game start handler
+export { handleStartGame } from './game-start';

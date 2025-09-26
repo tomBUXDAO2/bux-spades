@@ -1199,7 +1199,7 @@ export default function GameTable({
           <button
             className={`${isVerySmallScreen ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-slate-600 border border-slate-300 text-slate-200 flex items-center justify-center hover:bg-slate-500 transition`}
             style={{ fontSize: isVerySmallScreen ? '10px' : '16px' }}
-            onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatar })}
+            onClick={() => joinGame(gameState.id, user.id, { seat: position, username: user.username, avatar: user.avatarUrl })}
           >
             JOIN
           </button>
@@ -1433,7 +1433,7 @@ export default function GameTable({
     })();
     
     const displayName = isHuman ? player.username : 'Bot';
-    const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
+    const displayAvatar = isHuman ? player.avatarUrl || player.avatar : '/bot-avatar.jpg';
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
@@ -2501,41 +2501,40 @@ export default function GameTable({
     };
   }, [socket]);
 
-  // Listen for game chat messages
+  // Restore speech bubble updates: listen for game chat and show a transient bubble near the sender
   useEffect(() => {
     if (!socket) return;
-    
-    const handleGameChatMessage = (data: { gameId: string; message: ChatMessage }) => {
-      console.log('GameTable: Received chat message:', data);
-      const message = data.message;
-      
-      // Only handle messages for this game
-      if (data.gameId !== gameState?.id) return;
-      
-      // Skip system messages
-      if (message.userId === 'system') return;
-      
-      // Store the most recent message from each player
-      setRecentChatMessages(prev => ({
-        ...prev,
-        [message.userId]: message
-      }));
-      
-      // Clear the message after 5 seconds
+    const handleGameChat = (data: any) => {
+      const message = 'gameId' in data ? data.message : data;
+      if (!message || message.userId === 'system') return; // ignore system messages for bubbles
+      const senderId = message.userId as string;
+      const chat: ChatMessage = {
+        id: message.id,
+        userId: senderId,
+        userName: (message as any).userName,
+        message: message.message,
+        timestamp: message.timestamp || Date.now(),
+        isGameMessage: true,
+      };
+      setRecentChatMessages(prev => ({ ...prev, [senderId]: chat }));
+      // Clear after 4.5s (matches Chat fade timing)
       setTimeout(() => {
         setRecentChatMessages(prev => {
-          const newState = { ...prev };
-          delete newState[message.userId];
-          return newState;
+          const current = prev[senderId];
+          if (current && current.id === chat.id) {
+            const copy = { ...prev };
+            delete copy[senderId];
+            return copy;
+          }
+          return prev;
         });
-      }, 5000);
+      }, 4500);
     };
-    
-    socket.on('chat_message', handleGameChatMessage);
+    socket.on('chat_message', handleGameChat);
     return () => {
-      socket.off('chat_message', handleGameChatMessage);
+      socket.off('chat_message', handleGameChat);
     };
-  }, [socket, gameState?.id]);
+  }, [socket]);
 
   // Loosen the chatReady guard so Chat UI renders for both players and spectators
   const chatReady = Boolean(gameState?.id);
@@ -3297,7 +3296,7 @@ const [isStarting, setIsStarting] = useState(false);
               {/* Center content */}
               {/* Overlay the game status buttons/messages on top of the play area */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {!isLeague && gameState.status === "WAITING" && !isStarting && sanitizedPlayers.length === 4 && sanitizedPlayers[0]?.id === currentPlayerId ? (
+                {!isLeague && gameState.status === "WAITING" && !isStarting && sanitizedPlayers.length >= 1 && sanitizedPlayers[0]?.id === currentPlayerId ? (
                   <button
                     onClick={handleStartGame}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[99999]"
@@ -3545,10 +3544,11 @@ const [isStarting, setIsStarting] = useState(false);
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={user.avatar}
+                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : user.avatarUrl}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
+                gameMessages={recentChatMessages}
                 spectators={(gameState as any).spectators || []}
                 isSpectator={isSpectator}
                 onPlayerClick={handleViewPlayerStats}

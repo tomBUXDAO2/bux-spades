@@ -4,12 +4,16 @@ import { io } from '../../../../index';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import prisma from '../../../../lib/prisma';
 import { games } from '../../../../gamesStore';
+import { newdbCreateRound } from '../../../../newdb/writers';
+import { startTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { handleBiddingComplete } from '../bidding/biddingCompletion';
 
 // Hand summary continue tracking
 const handSummaryResponses = new Map<string, Set<string>>(); // gameId -> Set of player IDs who clicked continue
+const handSummaryTimers = new Map<string, NodeJS.Timeout>(); // gameId -> timer
 
 /**
- * Handles hand summary continue event from client
+ * Handles hand_summary_continue socket event
  */
 export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { gameId }: { gameId: string }): Promise<void> {
   console.log('[HAND SUMMARY CONTINUE] Event received:', { gameId, socketId: socket.id, userId: socket.userId });
@@ -38,6 +42,35 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
     // Initialize response tracking for this game if not exists
     if (!handSummaryResponses.has(gameId)) {
       handSummaryResponses.set(gameId, new Set());
+      
+      // Start a 12-second timer for all human players to be ready
+      const humanPlayers = game.players.filter(p => p && p.type === 'human');
+      console.log('[HAND SUMMARY TIMER] Starting 12-second timer for', humanPlayers.length, 'human players');
+      
+      const timer = setTimeout(async () => {
+        console.log('[HAND SUMMARY TIMER] 12-second timer expired, checking if all players ready');
+        const currentResponses = handSummaryResponses.get(gameId);
+        if (currentResponses) {
+          // Add any remaining human players who haven't responded
+          humanPlayers.forEach(player => {
+            if (!currentResponses.has(player.id)) {
+              console.log('[HAND SUMMARY TIMER] Auto-adding player', player.id, 'due to timer expiration');
+              currentResponses.add(player.id);
+            }
+          });
+          
+          // Check if all human players are now ready
+          const allReady = humanPlayers.every(player => currentResponses.has(player.id));
+          if (allReady) {
+            console.log('[HAND SUMMARY TIMER] All players ready after timer, starting new hand');
+            handSummaryResponses.delete(gameId);
+            handSummaryTimers.delete(gameId);
+            await startNewHand(game);
+          }
+        }
+      }, 12000); // 12 seconds
+      
+      handSummaryTimers.set(gameId, timer);
     }
 
     // Add this player to the responses
@@ -55,11 +88,18 @@ export async function handleHandSummaryContinue(socket: AuthenticatedSocket, { g
     if (allHumanPlayersResponded) {
       console.log('[HAND SUMMARY] All players responded, starting new hand');
       
+      // Clear the timer if it exists
+      const timer = handSummaryTimers.get(gameId);
+      if (timer) {
+        clearTimeout(timer);
+        handSummaryTimers.delete(gameId);
+      }
+      
       // Clear the responses for this game
       handSummaryResponses.delete(gameId);
       
       // Start the new hand
-      await startNewHand(game);
+      await await startNewHand(game);
     } else {
       console.log('[HAND SUMMARY] Not all players responded yet, waiting...');
       // Emit confirmation to this player that their continue was received
@@ -145,11 +185,12 @@ export async function startNewHand(game: Game): Promise<void> {
       if (!roundRecord) {
         roundRecord = await prisma.round.create({
           data: {
+          dealerSeatIndex: 0,
             id: `round_${game.dbGameId}_${nextRoundNumber}_${Date.now()}`,
             gameId: game.dbGameId,
             roundNumber: nextRoundNumber,
             createdAt: new Date(),
-            updatedAt: new Date()
+            // updatedAt: new Date()
           }
         });
       }
@@ -164,6 +205,22 @@ export async function startNewHand(game: Game): Promise<void> {
     } catch (err) {
       console.error('Failed to start round logging for new hand:', err);
     }
+  }
+
+  // NEW DB: create round and initial hand snapshots
+  try {
+    const initialHands = game.hands.map((cards: any[], seatIndex: number) => ({
+      seatIndex,
+      cards: cards.map(c => ({ suit: c.suit, rank: String(c.rank) }))
+    }));
+    await newdbCreateRound({
+      gameId: game.id,
+      roundNumber: game.currentRound ?? 1,
+      dealerSeatIndex: newDealerIndex,
+      initialHands
+    });
+  } catch (e) {
+    console.warn('[NEWDB] Failed to create round/hand snapshots:', e);
   }
 
   // Emit new hand started event with dealing phase
@@ -186,4 +243,22 @@ export async function startNewHand(game: Game): Promise<void> {
       botMakeMove(game, game.bidding.currentBidderIndex);
     }
   }, 1000);
+
+  // MIRROR: Auto-bid for new hand then immediately complete bidding
+  if ((game as any).rules?.bidType === 'MIRROR') {
+    console.log('[START NEW HAND][MIRROR] Auto-bidding for all players based on spade counts');
+    for (let i = 0; i < 4; i++) {
+      const hand = game.hands[i] || [];
+      const spades = hand.filter((c: any) => c.suit === 'SPADES').length;
+      const bid = spades === 0 ? 0 : spades;
+      game.bidding.bids[i] = bid;
+      if (game.players[i]) {
+        game.players[i]!.bid = bid;
+      }
+    }
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    await handleBiddingComplete(game);
+    io.to(game.id).emit('game_update', enrichGameForClient(game));
+    return;
+  }
 }

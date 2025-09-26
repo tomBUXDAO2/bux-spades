@@ -274,7 +274,7 @@ export default function TestTablePage() {
         id: user.id,
         name: user.username || 'TestPlayer1',
         username: user.username || 'TestPlayer1',
-        avatar: user.avatar || '/default-pfp.jpg'
+        avatar: user.avatarUrl || '/default-pfp.jpg'
       };
     }
     

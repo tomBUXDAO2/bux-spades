@@ -20,18 +20,11 @@ export async function loadVerifiedUsersFromDatabase(): Promise<void> {
     const totalUsers = await prisma.user.count();
     console.log('[DISCORD BOT] Total users in database:', totalUsers);
     
-    const usersWithDiscord = await prisma.user.count({
-      where: {
-        discordId: { not: null }
-      }
-    });
-    console.log('[DISCORD BOT] Users with Discord ID:', usersWithDiscord);
+    // In the new database, all users have discordId, so we don't need to filter
+    console.log('[DISCORD BOT] All users have Discord ID in new database');
     
-    // Get all users with discordId (these are Discord users) - limit to recent users to reduce data transfer
+    // Get all users (they all have discordId in the new database) - limit to recent users to reduce data transfer
     const users = await prisma.user.findMany({
-      where: {
-        discordId: { not: null }
-      },
       select: {
         discordId: true
       },
@@ -49,14 +42,7 @@ export async function loadVerifiedUsersFromDatabase(): Promise<void> {
     console.log(`Loaded ${oauth2VerifiedUsers.size} verified users from database`);
   } catch (error) {
     console.error('Error loading verified users from database:', error);
-    
-    // Check if it's a quota exceeded error
-    if (error instanceof Error && error.message.includes('data transfer quota')) {
-      console.warn('Database quota exceeded - Discord bot will continue without loading verified users');
-      console.warn('Consider upgrading your Neon database plan or optimizing queries');
-    } else {
-      console.error('Unexpected error loading verified users:', error);
-    }
+    throw error;
   }
 }
 

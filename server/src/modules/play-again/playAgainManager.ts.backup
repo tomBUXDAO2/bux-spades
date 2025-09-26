@@ -4,8 +4,8 @@ import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { addBotToSeat } from '../bot-invitation/botInvitation';
 import { assignDealer, dealCards } from '../dealing/cardDealing';
 import { logGameStart } from '../../routes/games/database/gameDatabase';
-import { trickLogger } from '../../lib/trick-logging';
 import { games } from '../../gamesStore';
+import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 
 // Track play again responses
 const playAgainResponses = new Map<string, Set<string>>();
@@ -145,12 +145,17 @@ async function resetGameForRespondingPlayers(game: Game): Promise<void> {
   const remainingHumanPlayers = game.players.filter(p => p && p.type === 'human');
   if (remainingHumanPlayers.length === 0) {
     console.log('[PLAY AGAIN] No human players remaining, closing game');
-    // Remove game from games array
-    const gameIndex = games.findIndex(g => g.id === game.id);
-    if (gameIndex !== -1) {
-      games.splice(gameIndex, 1);
-    }
     io.to(game.id).emit('game_closed', { gameId: game.id });
+    
+    // Clean up database for unrated games
+    if (!game.rated && game.dbGameId) {
+      console.log('[PLAY AGAIN] Cleaning up unrated game from database:', game.dbGameId);
+      try {
+        await deleteUnratedGameFromDatabase(game);
+      } catch (error) {
+        console.error('[PLAY AGAIN] Failed to clean up unrated game from database:', error);
+      }
+    }
     return;
   }
 
@@ -208,10 +213,10 @@ async function resetGameState(game: Game): Promise<void> {
     game.dbGameId = undefined;
   }
 
-  // Clear trick logger for this game
-  // trickLogger.clearGame(game.id); // TODO: Implement clearGame method
-
-  console.log('[PLAY AGAIN] Game state reset complete:', game.id);
+  // Assign dealer, deal, etc. for next start
+  assignDealer(game);
+  const hands = dealCards(game.players, game.dealerIndex);
+  game.hands = hands;
 }
 
 /**

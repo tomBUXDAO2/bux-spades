@@ -46,7 +46,7 @@ export class GameValidator {
       const firstPlayer = game.players.find(p => p !== null);
       if (firstPlayer) {
         if (!game.bidding) game.bidding = { currentPlayer: "0", currentBidderIndex: 0, nilBids: {}, bids: [null, null, null, null] };
-        game.bidding.currentPlayer = String(firstPlayer.seatIndex || 0);
+        game.bidding.currentPlayer = String(firstPlayer.position || 0);
       } else {
         game.status = 'FINISHED';
         fixes.push('No active players found - marking as FINISHED');
@@ -56,9 +56,9 @@ export class GameValidator {
 
     // Check for invalid player positions
     game.players.forEach((player, index) => {
-      if (player && player.seatIndex !== index) {
+      if (player && player.position !== index) {
         fixes.push(`Player ${player.username} has wrong position - fixing`);
-        player.seatIndex = index;
+        player.position = index;
         isValid = false;
       }
     });

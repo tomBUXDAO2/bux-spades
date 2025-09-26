@@ -24,7 +24,7 @@ export async function handleHandCompletion(game: Game): Promise<void> {
     console.log('[HAND COMPLETION DEBUG] Game mode:', game.mode);
     console.log('[HAND COMPLETION DEBUG] Solo flag:', game.mode === "SOLO");
     
-    if (game.mode === 'SOLO' || game.mode === "SOLO") {
+    if (game.mode === 'SOLO') {
       console.log('[HAND COMPLETION] Solo mode - using database scoring');
     } else {
       console.log('[HAND COMPLETION] Partners mode - using database scoring');
@@ -35,162 +35,124 @@ export async function handleHandCompletion(game: Game): Promise<void> {
       gameId: game.dbGameId,
       roundNumber: game.currentRound
     });
-    const gameScore = await calculateAndStoreGameScore(game.dbGameId, game.currentRound);
+    const gameScore = await calculateAndStoreGameScore(game.dbGameId);
     
     // Create hand summary data for frontend using database scores
     let handSummary;
     let playerScores = [0, 0, 0, 0];
     let playerBags = [0, 0, 0, 0];
     
-    if (game.mode === 'SOLO' || game.mode === "SOLO") {
+    if (game.mode === 'SOLO') {
       // For solo games, get individual player scores from database
       
       // Get running total scores from database (not current round scores)
-      if (game.dbGameId && gameScore) {
-        playerScores[0] = gameScore.player0RunningTotal || 0;
-        playerScores[1] = gameScore.player1RunningTotal || 0;
-        playerScores[2] = gameScore.player2RunningTotal || 0;
-        playerScores[3] = gameScore.player3RunningTotal || 0;
-        playerBags[0] = gameScore.player0Bags || 0;
-        playerBags[1] = gameScore.player1Bags || 0;
-        playerBags[2] = gameScore.player2Bags || 0;
-        playerBags[3] = gameScore.player3Bags || 0;
+      if (game.dbGameId && gameScore && typeof gameScore === 'object' && 'success' in gameScore) {
+        const scoreData = gameScore as any;
+        playerScores[0] = scoreData.player0RunningTotal || 0;
+        playerScores[1] = scoreData.player1RunningTotal || 0;
+        playerScores[2] = scoreData.player2RunningTotal || 0;
+        playerScores[3] = scoreData.player3RunningTotal || 0;
+        playerBags[0] = scoreData.player0Bags || 0;
+        playerBags[1] = scoreData.player1Bags || 0;
+        playerBags[2] = scoreData.player2Bags || 0;
+        playerBags[3] = scoreData.player3Bags || 0;
         
         console.log('[HAND COMPLETION] Solo game - using database running totals:', {
           player0: playerScores[0],
-          player1: playerScores[1], 
+          player1: playerScores[1],
           player2: playerScores[2],
           player3: playerScores[3]
         });
+      } else {
+        console.log('[HAND COMPLETION] Solo game - no database scores available, using zeros');
       }
-      
-      handSummary = {
-        team1Score: 0, // Not used in solo
-        team2Score: 0, // Not used in solo
-        team1Bags: 0,  // Not used in solo
-        team2Bags: 0,  // Not used in solo
-        tricksPerPlayer: game.players.map((p: any) => p?.tricks || 0),
-        playerScores: playerScores,
-        playerBags: playerBags,
-        team1TotalScore: 0, // Not used in solo
-        team2TotalScore: 0  // Not used in solo
-      };
     } else {
-      // For partners games, use team scores
-      handSummary = {
-        team1Score: gameScore.team1Score,
-        team2Score: gameScore.team2Score,
-        team1Bags: gameScore.team1Bags,
-        team2Bags: gameScore.team2Bags,
-        tricksPerPlayer: game.players.map((p: any) => p?.tricks || 0),
-        playerScores: [0, 0, 0, 0],
-        playerBags: [0, 0, 0, 0],
-        team1TotalScore: gameScore.team1RunningTotal,
-        team2TotalScore: gameScore.team2RunningTotal
-      };
+      // For partners games, get team scores from database
+      if (game.dbGameId && gameScore && typeof gameScore === 'object' && 'success' in gameScore) {
+        const scoreData = gameScore as any;
+        const team0Score = scoreData.team0Score || 0;
+        const team1Score = scoreData.team1Score || 0;
+        const team0Bags = scoreData.team0Bags || 0;
+        const team1Bags = scoreData.team1Bags || 0;
+        
+        // Assign team scores to players
+        playerScores[0] = team0Score; // Player 0 (team 0)
+        playerScores[1] = team1Score; // Player 1 (team 1)
+        playerScores[2] = team0Score; // Player 2 (team 0)
+        playerScores[3] = team1Score; // Player 3 (team 1)
+        playerBags[0] = team0Bags;
+        playerBags[1] = team1Bags;
+        playerBags[2] = team0Bags;
+        playerBags[3] = team1Bags;
+        
+        console.log('[HAND COMPLETION] Partners game - using database team scores:', {
+          team0: team0Score,
+          team1: team1Score,
+          team0Bags: team0Bags,
+          team1Bags: team1Bags
+        });
+      } else {
+        console.log('[HAND COMPLETION] Partners game - no database scores available, using zeros');
+      }
     }
     
-    // NEW DB: record round end stats and score
-    try {
-      const roundIdNew = await newdbEnsureRound({ gameId: game.id, roundNumber: game.currentRound, dealerSeatIndex: game.dealerIndex ?? 0 });
-      const playerStats = game.players.map((p: any, i: number) => {
-        if (!p) return null as any;
-        const bid = (game.bidding?.bids?.[i] ?? 0) as number;
-        const tricksWon = (p.tricks ?? 0) as number;
-        const madeNil = bid === 0 && tricksWon === 0;
-        const madeBlindNil = bid === -1 && tricksWon === 0;
-        const teamIndex = game.mode === 'SOLO' || game.mode === "SOLO" ? null : (i % 2);
-        const bagsThisRound = Math.max(0, tricksWon - (bid > 0 ? bid : 0));
-        return { userId: p.id, seatIndex: i, teamIndex, bid, tricksWon, bagsThisRound, madeNil, madeBlindNil };
-      }).filter(Boolean) as any;
-      const score = ((): any => {
-        if (game.mode === 'SOLO' || game.mode === "SOLO") {
-          return {
-            player0Score: playerScores[0],
-            player1Score: playerScores[1],
-            player2Score: playerScores[2],
-            player3Score: playerScores[3],
-            player0Running: playerScores[0],
-            player1Running: playerScores[1],
-            player2Running: playerScores[2],
-            player3Running: playerScores[3],
-          };
+    // Create hand summary for frontend
+    handSummary = {
+      round: game.currentRound,
+      playerScores,
+      playerBags,
+      gameMode: game.mode,
+      isGameComplete: false
+    };
+    
+    console.log('[HAND COMPLETION DEBUG] Hand summary created:', handSummary);
+    
+    // Emit hand summary to all players
+    console.log('[HAND COMPLETION DEBUG] Emitting hand_summary to game room:', game.id);
+    io.to(game.id).emit('hand_summary', handSummary);
+    
+    // Check if game is complete
+    console.log('[HAND COMPLETION DEBUG] Checking game completion...');
+    const completionResult = await checkGameCompletion(game.dbGameId, 500, -500);
+    console.log('[HAND COMPLETION DEBUG] Game completion check result:', completionResult);
+    
+    if (completionResult.isGameOver) {
+      console.log('[HAND COMPLETION] Game is complete, calling completeGame...');
+      // Fix: Pass all 5 required arguments to completeGame
+      await completeGame(game, completionResult.winningTeam || 0, {}, game.currentRound || 1, 13);
+    } else {
+      console.log('[HAND COMPLETION] Game continues, starting next round...');
+      
+      // Start next round
+      game.currentRound += 1;
+      game.currentTrick = 1;
+      game.currentPlayer = null;
+      
+      // Reset player states for next round
+      game.players.forEach(player => {
+        if (player) {
+          player.hand = [];
+          player.bid = 0;
+          player.tricks = 0;
+          player.nil = false;
+          player.blindNil = false;
         }
-        return {
-          team0Score: handSummary.team1Score ?? null,
-          team1Score: handSummary.team2Score ?? null,
-          team0Bags: handSummary.team1Bags ?? null,
-          team1Bags: handSummary.team2Bags ?? null,
-          team0RunningTotal: handSummary.team1TotalScore ?? null,
-          team1RunningTotal: handSummary.team2TotalScore ?? null,
-        };
-      })();
-      await newdbRecordRoundEnd({ roundId: roundIdNew, playerStats, score });
-    } catch (e) {
-      console.warn('[NEWDB] Failed to record round end:', e);
-    }
-    
-    // Emit hand completed event with database scores
-    
-    // Update the game object with individual player scores for solo games
-    if (game.mode === 'SOLO' || game.mode === "SOLO") {
-      game.playerScores = playerScores;
-      game.playerBags = playerBags;
-      console.log('[HAND COMPLETION] Updated game object with individual player scores:');
-      console.log('[HAND COMPLETION] playerScores:', playerScores);
-      console.log('[HAND COMPLETION] playerBags:', playerBags);
-    } else {
-      // For partners games, update team scores
-      game.team1TotalScore = gameScore.team1RunningTotal;
-      game.team2TotalScore = gameScore.team2RunningTotal;
-      game.team1Bags = gameScore.team1Bags;
-      game.team2Bags = gameScore.team2Bags;
-    }
-    
-    console.log(`[HAND COMPLETION] Updated team scores in game object:`, {
-      team1TotalScore: game.team1TotalScore,
-      team2TotalScore: game.team2TotalScore,
-      team1Bags: game.team1Bags,
-      team2Bags: game.team2Bags
-    });
-    
-    console.log(`[HAND COMPLETED] ${game.mode === "SOLO" || game.mode === "SOLO" ? "Solo" : "Partners"} mode - Prepared hand summary with scores:`, handSummary);
-    
-    // Clear the last trick cards from the table before showing hand summary
-    if (game.play && game.play.currentTrick) {
-      console.log('[HAND COMPLETION] Clearing last trick cards from table');
-      game.play.currentTrick = [];
-    }
-    // Move hand_completed emission after game completion check
-    
-    
-    // Check if game is complete BEFORE emitting hand_completed
-    console.log('[HAND COMPLETION DEBUG] Checking game completion with:', {
-      gameId: game.dbGameId,
-      maxPoints: game.maxPoints,
-      minPoints: game.minPoints
-    });
-    const completionCheck = await checkGameCompletion(game.dbGameId, game.maxPoints, game.minPoints);
-    console.log("[HAND COMPLETION DEBUG] completionCheck result:", completionCheck);
-    console.log('[HAND COMPLETION DEBUG] Game completion check result:', completionCheck);
-    if (completionCheck.isGameOver) {
-      console.log('[GAME COMPLETION] Game is over, winning team: - SKIPPING hand_completed', completionCheck.winningTeam);
+      });
       
-      // ACTUALLY COMPLETE THE GAME
-      await completeGame(game, completionCheck.winningTeam);
-    } else {
-      console.log('[HAND COMPLETION] Game continues, emitting hand_completed and starting next round...');
-
-      // Only emit hand_completed if game is NOT over
-      io.to(game.id).emit('hand_completed', handSummary);
+      // Emit game update
+      io.to(game.id).emit('game_update', enrichGameForClient(game));
       
-      // Import and call startNewHand to begin the next round
-      const { startNewHand } = await import('../../../modules/socket-handlers/game-state/hand/handSummaryContinue');
-      // await startNewHand(game); // Let hand summary continue tracking handle this
+      // Start next round after delay
+      setTimeout(() => {
+        console.log('[HAND COMPLETION] Starting next round...');
+        io.to(game.id).emit('start_round', { round: game.currentRound });
+      }, 3000);
     }
     
   } catch (error) {
-    console.error('[HAND COMPLETION ERROR] Failed to complete hand:', error);
-    throw error;
+    console.error('[HAND COMPLETION ERROR] Error in handleHandCompletion:', error);
+    if (error instanceof Error) {
+      console.error('[HAND COMPLETION ERROR] Stack trace:', error.stack);
+    }
   }
 }

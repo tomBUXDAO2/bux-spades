@@ -400,7 +400,10 @@ const HomePage: React.FC = () => {
     socket.on('lobby_chat_message', handleLobbyChatMessage);
     socket.on('online_users', handleOnlineUsers);
     socket.on('friendAdded', handleFriendAdded);
-
+    socket.on('game_joined', (data: { gameId: string, seatIndex: number, game: any }) => {
+      console.log('[GAME JOINED] Successfully joined game:', data);
+      navigate(`/table/${data.gameId}`);
+    });
     // Listen for the custom online_users_updated event
     const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
       console.log('Online users custom event:', event.detail);
@@ -419,6 +422,7 @@ const HomePage: React.FC = () => {
       socket.off('lobby_chat_message', handleLobbyChatMessage);
       socket.off('online_users', handleOnlineUsers);
       socket.off('friendAdded', handleFriendAdded);
+            socket.off('game_joined');
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
     };
   }, [socket, isAuthenticated, user, navigate]);
@@ -470,16 +474,30 @@ const HomePage: React.FC = () => {
   const handleCreateGame = async (settings: any) => {
     setIsCreateGameModalOpen(false);
     try {
-      const res = await api.post('/api/games', {
-        ...settings,
+      // Map client fields to server fields
+      const serverSettings = {
+        mode: settings.gameMode, // client sends 'gameMode', server expects 'mode'
+        biddingOption: settings.biddingOption,
+        minPoints: settings.minPoints,
+        maxPoints: settings.maxPoints,
+        buyIn: settings.buyIn,
+        allowNil: settings.specialRules?.allowNil ?? true,
+        allowBlindNil: settings.specialRules?.allowBlindNil ?? false,
+        specialRules: settings.specialRules,
         creatorId: user.id,
         creatorName: user.username,
-        creatorImage: user.avatar // or user.image if that's the field
-      });
+        creatorImage: user.avatarUrl
+      };
+      
+      const res = await api.post('/api/games', serverSettings);
       if (!res.ok) throw new Error('Failed to create game');
-      const response = await res.json(); const game: GameState = response.game;
+      const response = await res.json();
+      console.log("[GAME CREATION DEBUG] API Response:", response);
+      console.log("[GAME CREATION DEBUG] Game ID:", response.game?.id);
+      console.log("[GAME CREATION DEBUG] About to navigate to:", `/table/${response.game?.id}`);      const game: GameState = response.game;
       navigate(`/table/${game.id}`);
-    } catch (err) {
+      console.log("[NAVIGATION DEBUG] Navigating to table page");    } catch (err) {
+      console.error('Game creation error:', err);
       alert('Failed to create game');
     }
   };
@@ -641,7 +659,7 @@ const HomePage: React.FC = () => {
       setSelectedPlayer({
         id: user.id, // Add user ID for API calls
         username: user.username,
-        avatar: user.avatar,
+        avatar: user.avatarUrl,
         status: 'not_friend' as const,
         coins: user.coins,
         stats: stats.stats || {
@@ -660,7 +678,7 @@ const HomePage: React.FC = () => {
       setSelectedPlayer({
         id: user.id, // Add user ID for API calls
         username: user.username,
-        avatar: user.avatar,
+        avatar: user.avatarUrl,
         status: 'not_friend' as const,
         coins: user.coins,
         stats: {
@@ -1068,7 +1086,7 @@ const HomePage: React.FC = () => {
                         {msg.userId === user.id && (
                           <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
                             <img 
-                              src={user.avatar || getUserAvatar(msg.userId)} 
+                              src={user.avatarUrl || getUserAvatar(msg.userId)} 
                               alt={msg.userName || ''} 
                               width={32}
                               height={32}

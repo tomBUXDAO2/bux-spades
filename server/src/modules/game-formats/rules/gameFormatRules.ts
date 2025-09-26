@@ -14,6 +14,7 @@ export function getGameFormatDescription(format: GameFormatConfig): string {
       return 'Mirror - must bid number of spades in hand';
     case 'GIMMICK':
       return getGimmickDescription(format.gimmickType!);
+      return getGimmickDescription(format.gimmickType!);
     default:
       return 'Unknown format';
   }

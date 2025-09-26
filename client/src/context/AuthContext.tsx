@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { useSocket } from './SocketContext';
+
 
 // Configure axios defaults
 axios.defaults.baseURL = import.meta.env.PROD
@@ -48,7 +48,7 @@ interface User {
   id: string;
   username: string;
   email: string;
-  avatar: string | null;
+  avatarUrl: string | null;
   coins: number;
   isAuthenticated?: boolean;
   stats?: {
@@ -70,7 +70,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<{ activeGame?: { id: string; status: string } }>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  updateProfile: (username: string, avatar: string) => Promise<void>;
+  updateProfile: (username: string, avatarUrl: string) => Promise<void>;
   updateSoundPreference: (soundEnabled: boolean) => void;
   showSessionInvalidatedModal: boolean;
   setShowSessionInvalidatedModal: (show: boolean) => void;
@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSessionInvalidatedModal, setShowSessionInvalidatedModal] = useState(false);
-  const { socket } = useSocket();
+  
 
   useEffect(() => {
     const token = localStorage.getItem('sessionToken');
@@ -112,24 +112,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  // Listen for real-time coin updates
-  useEffect(() => {
-    if (!socket || !user) return;
-
-    const handleCoinUpdate = (data: { userId: string; newBalance: number }) => {
-      console.log('Coin update received:', data);
-      if (data.userId === user.id) {
-        setUser(prev => prev ? { ...prev, coins: data.newBalance } : null);
-        console.log('Updated user coin balance to:', data.newBalance);
-      }
-    };
-
-    socket.on('coin_updated', handleCoinUpdate);
-    
-    return () => {
-      socket.off('coin_updated', handleCoinUpdate);
-    };
-  }, [socket, user]);
 
   const fetchProfile = async () => {
     try {
@@ -275,14 +257,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (username: string, avatar: string) => {
+  const updateProfile = async (username: string, avatarUrl: string) => {
     try {
       setError(null);
 
-      console.log('Attempting profile update:', { username, avatar });
+      console.log('Attempting profile update:', { username, avatarUrl });
       const response = await axios.put(
         '/api/auth/profile',
-        { username, avatar },
+        { username, avatarUrl },
         {
           withCredentials: true
         }

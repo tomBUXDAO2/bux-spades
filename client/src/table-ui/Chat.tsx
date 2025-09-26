@@ -20,6 +20,7 @@ interface ChatProps {
   chatType?: 'game' | 'lobby';
   onToggleChatType?: () => void;
   lobbyMessages?: ChatMessage[];
+  gameMessages?: Record<string, ChatMessage>;
   isSpectator?: boolean;
   onPlayerClick?: (player: Player) => void;
 }
@@ -32,7 +33,7 @@ export interface ChatMessage {
   message: string;
   text?: string; // For compatibility with existing code
   user?: string; // For compatibility with existing code
-  timestamp: number;
+  timestamp: number | string;
   isGameMessage?: boolean;
 }
 
@@ -70,8 +71,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   useEffect(() => {
     console.log('Emoji data loaded:', data);
   }, []);
-
-
 
   // Add responsive sizing state
   const [screenSize, setScreenSize] = useState({
@@ -141,29 +140,31 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         // Debug logging for message details
         console.log('Chat: Message details:', {
           userId: message.userId,
-          userName: message.userName,
+          userName: (message as any).userName,
           message: message.message,
           timestamp: message.timestamp
         });
         
-        // Handle system messages
-        if (message.userId === 'system') {
-          console.log('Chat: Received system message:', message);
-          setMessages(prev => [...prev, {
+        // Dedupe by id if present
+        setMessages(prev => {
+          const id = message.id as string | undefined;
+          if (id && prev.some(m => m.id === id)) return prev;
+          // Handle system messages
+          if (message.userId === 'system') {
+            return [...prev, {
+              ...message,
+              id: id || `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              timestamp: message.timestamp || Date.now(),
+              userName: 'System'
+            } as ChatMessage];
+          }
+          // Player messages
+          return [...prev, {
             ...message,
-            id: message.id || `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: message.timestamp || Date.now(),
-            userName: 'System'
-          }]);
-          return;
-        }
-
-        // Handle player messages
-        setMessages(prev => [...prev, {
-          ...message,
-          id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: message.timestamp || Date.now()
-        }]);
+            id: id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: message.timestamp || Date.now()
+          } as ChatMessage];
+        });
       } 
       // Handle lobby chat messages
       else {
@@ -172,11 +173,15 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           return;
         }
         const message = data as ChatMessage;
-        setMessages(prev => [...prev, {
-          ...message,
-          id: message.id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: message.timestamp || Date.now()
-        }]);
+        setMessages(prev => {
+          const id = message.id as string | undefined;
+          if (id && prev.some(m => m.id === id)) return prev;
+          return [...prev, {
+            ...message,
+            id: id || `${message.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: message.timestamp || Date.now()
+          } as ChatMessage];
+        });
       }
     };
 
@@ -285,7 +290,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         console.log('Current socket state:', { 
           socketId: socket.id, 
           isConnected: socket.connected,
-          transport: socket.io?.engine?.transport?.name
+          transport: (socket as any).io?.engine?.transport?.name
         });
         
         if (chatType === 'game') {
@@ -313,13 +318,14 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     sendMessageWithRetry();
   };
 
-  const formatTime = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (timestamp: number | string): string => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const playerColors: Record<string, string> = {};
   players.forEach(player => {
-    playerColors[player.id] = player.team === 1 ? 'text-red-400' : 'text-blue-400';
+    playerColors[player.id] = (player as any).team === 1 ? 'text-red-400' : 'text-blue-400';
   });
 
   // Add state for lobby chat if needed
@@ -399,70 +405,62 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   // Get a player's avatar - updated to match GameTable.tsx logic
   const getPlayerAvatar = (playerId: string): string => {
     console.log('[AVATAR DEBUG] getPlayerAvatar called with playerId:', playerId);
-    console.log('[AVATAR DEBUG] Available players:', players.map(p => ({ id: p.id, username: p.username, avatar: p.avatar })));
-    console.log('[AVATAR DEBUG] Available spectators:', spectators?.map(s => ({ id: s.id, username: s.username, avatar: s.avatar })));
+    console.log('[AVATAR DEBUG] Available players:', players.map(p => ({ id: p.id, username: (p as any).username, avatar: (p as any).avatar, avatarUrl: (p as any).avatarUrl })));
+    console.log('[AVATAR DEBUG] Available spectators:', spectators?.map(s => ({ id: s.id, username: (s as any).username, avatar: (s as any).avatar, avatarUrl: (s as any).avatarUrl })));
     
     // Find the player in the players array by exact ID match
-    let player = players.find(p => p.id === playerId);
+    let player = players.find(p => p.id === playerId) as any;
     console.log('[AVATAR DEBUG] Found player by exact ID:', player);
     
     // If no exact match, try to find by username (for system messages or other cases)
     if (!player && playerId !== 'system') {
-      // Try to extract username from playerId if it looks like a Discord-style ID
-      const possibleUsername = playerId.split('_')[0]; // Try to get username part
-      player = players.find(p => p.username && p.username.toLowerCase().includes(possibleUsername.toLowerCase()));
+      const possibleUsername = playerId.split('_')[0];
+      player = players.find(p => (p as any).username && (p as any).username.toLowerCase().includes(possibleUsername.toLowerCase()));
       console.log('[AVATAR DEBUG] Found player by username match:', player);
-      
-      // If still no match, try to find by partial ID match (for cases where IDs are similar but not exact)
       if (!player) {
         player = players.find(p => p.id && p.id.includes(playerId.substring(0, 8)));
         console.log('[AVATAR DEBUG] Found player by partial ID match:', player);
       }
     }
     
-    // Check for avatar property first (most common)
-    if (player && player.avatar) {
-      console.log('[AVATAR DEBUG] Using player avatar:', player.avatar);
-      return player.avatar;
+    // Prefer avatarUrl, then avatar
+    if (player && (player as any).avatarUrl) {
+      console.log('[AVATAR DEBUG] Using player avatarUrl:', (player as any).avatarUrl);
+      return (player as any).avatarUrl as string;
     }
-    
-    // Check for image property as fallback
-    if (player && 'image' in player && player.image) {
-      console.log('[AVATAR DEBUG] Using player image:', player.image);
-      return player.image as string;
+    if (player && (player as any).avatar) {
+      console.log('[AVATAR DEBUG] Using player avatar:', (player as any).avatar);
+      return (player as any).avatar as string;
     }
     
     // Check if it's a spectator
-    const spectator = spectators?.find(s => s.id === playerId);
+    const spectator = (spectators as any)?.find((s: any) => s.id === playerId);
     console.log('[AVATAR DEBUG] Found spectator:', spectator);
+    if (spectator && spectator.avatarUrl) {
+      console.log('[AVATAR DEBUG] Using spectator avatarUrl:', spectator.avatarUrl);
+      return spectator.avatarUrl as string;
+    }
     if (spectator && spectator.avatar) {
       console.log('[AVATAR DEBUG] Using spectator avatar:', spectator.avatar);
-      return spectator.avatar;
+      return spectator.avatar as string;
     }
     
-    // For system messages, use a special system avatar
     if (playerId === 'system') {
       console.log('[AVATAR DEBUG] Using system avatar');
-      return '/system-avatar.png'; // You can create this or use a default
+      return '/system-avatar.png';
     }
     
-    // Discord user ID (numeric string)
     if (playerId && /^\d+$/.test(playerId)) {
-      // For Discord users without an avatar hash or with invalid avatar, use the default Discord avatar
       const discordAvatar = `https://cdn.discordapp.com/embed/avatars/${parseInt(playerId) % 5}.png`;
       console.log('[AVATAR DEBUG] Using Discord avatar:', discordAvatar);
       return discordAvatar;
     }
     
-    // Guest user, use default avatar
     if (playerId && playerId.startsWith('guest_')) {
       console.log('[AVATAR DEBUG] Using guest avatar:', GUEST_AVATAR);
       return GUEST_AVATAR;
     }
     
-    // Don't use other players' avatars as fallback - use proper defaults
-    
-    // Final fallback to bot avatar
     console.log('[AVATAR DEBUG] Using bot avatar fallback:', BOT_AVATAR);
     return BOT_AVATAR;
   };
@@ -549,24 +547,24 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
               activeMessages.map((msg, index) => (
                 msg.userId === 'system' ? (
                   <div
-                    key={msg.id || index}
+                    key={msg.id || `sys-${index}`}
                     className="w-full text-center my-2"
                   >
                     <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: isMobile ? `${mobileFontSize - 1}px` : `${mobileFontSize + 2}px` }}>
                       {msg.message || msg.text}
-                      {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes(s.username || s.name)) && <EyeIcon />}
+                      {(msg.message || msg.text)?.includes('joined the game') && spectators?.some(s => (msg.message || msg.text)?.includes((s as any).username || (s as any).name)) && <EyeIcon />}
                     </span>
                   </div>
                 ) : (
                   <div
-                    key={msg.id || index}
+                    key={msg.id || `${msg.userId}-${index}`}
                     className={`mb-2 flex items-start ${msg.userId === userId ? 'justify-end' : ''}`}
                   >
                     {msg.userId !== userId && (
                       <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} mr-2 rounded-full overflow-hidden flex-shrink-0`}>
                         <img 
                           src={getPlayerAvatar(msg.userId)} 
-                          alt={msg.userName || msg.user || ''} 
+                          alt={(msg as any).userName || msg.user || ''} 
                           width={isMobile ? 24 : 32} 
                           height={isMobile ? 24 : 32}
                           className="w-full h-full object-cover"
@@ -576,7 +574,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     <div className={`max-w-[80%] ${msg.userId === userId ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-${isMobile ? '2' : '3'} py-${isMobile ? '1' : '2'}`}> 
                       <div className="flex justify-between items-center mb-1">
                         {msg.userId !== userId && (
-                          <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{msg.userName || msg.user}</span>
+                          <span className="font-medium text-xs opacity-80" style={{ fontSize: isMobile ? '9px' : '' }}>{(msg as any).userName || msg.user}</span>
                         )}
                         <span className="text-xs opacity-75 ml-auto" style={{ fontSize: isMobile ? '9px' : '' }}> {formatTime(msg.timestamp)}</span>
                       </div>
@@ -586,7 +584,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                       <div className={`w-${isMobile ? '6' : '8'} h-${isMobile ? '6' : '8'} ml-2 rounded-full overflow-hidden flex-shrink-0`}>
                         <img 
                           src={userAvatar || getPlayerAvatar(msg.userId)} 
-                          alt={msg.userName || msg.user || ''} 
+                          alt={(msg as any).userName || msg.user || ''} 
                           width={isMobile ? 24 : 32} 
                           height={isMobile ? 24 : 32}
                           className="w-full h-full object-cover"
@@ -704,7 +702,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           {/* Seated players */}
           {players.map(player => (
             <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
-              <img src={player.avatar || player.image || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+              <img src={(player as any).avatarUrl || (player as any).avatar || '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
               <span
                 className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(player.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
@@ -712,8 +710,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     onPlayerClick(player);
                   } else {
                   setStatsPlayer({
-                    username: player.username || player.name,
-                    avatar: player.avatar || player.image || '/bot-avatar.jpg',
+                    username: (player as any).username || (player as any).name,
+                    avatar: (player as any).avatarUrl || (player as any).avatar || '/bot-avatar.jpg',
                     stats: (player as any)?.stats || {},
                     status: playerStatuses[player.id] || 'not_friend'
                   });
@@ -721,7 +719,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   }
                 }}
               >
-                {player.username || player.name}
+                {(player as any).username || (player as any).name}
                 {(window as any).onlineUsers?.includes?.(player.id) && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
                 {playerStatuses[player.id] === 'friend' && (
                   <img src="/friend.svg" alt="Friend" className="ml-2 w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
@@ -778,7 +776,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
           {/* Spectators */}
           {Array.isArray(spectators) && spectators.map(spectator => (
             <div key={spectator.id} className="flex items-center gap-3 p-2 rounded bg-slate-700 opacity-80">
-              <img src={spectator.avatar || spectator.image || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
+              <img src={(spectator as any).avatarUrl || (spectator as any).avatar || '/guest-avatar.png'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
               <span
                 className={`text-sm font-medium ${(window as any).onlineUsers?.includes?.(spectator.id) ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                 onClick={() => {
@@ -786,8 +784,8 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                     onPlayerClick(spectator);
                   } else {
                   setStatsPlayer({
-                    username: spectator.username || spectator.name,
-                    avatar: spectator.avatar || spectator.image || '/guest-avatar.png',
+                    username: (spectator as any).username || (spectator as any).name,
+                    avatar: (spectator as any).avatarUrl || (spectator as any).avatar || '/guest-avatar.png',
                     stats: (spectator as any)?.stats || {},
                     status: playerStatuses[spectator.id] || 'not_friend'
                   });
@@ -795,7 +793,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
                   }
                 }}
               >
-                {spectator.username || spectator.name}
+                {(spectator as any).username || (spectator as any).name}
                 {(window as any).onlineUsers?.includes?.(spectator.id) && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
                 <EyeIcon />
               </span>

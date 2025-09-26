@@ -1,1 +1,2 @@
-export { handleStartGame } from './gameStart';
+// Game start module exports
+export { startGame, handleStartGame } from './gameStart';

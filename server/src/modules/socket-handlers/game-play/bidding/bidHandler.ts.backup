@@ -1,10 +1,12 @@
 import type { AuthenticatedSocket } from '../../../socket-auth';
 import { io } from '../../../../index';
 import { games } from '../../../../gamesStore';
-import prisma from '../../../../lib/prisma';
 import { enrichGameForClient } from '../../../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../../../bot-play/botLogic';
 import { handleBiddingComplete } from '../../../socket-handlers/game-state/bidding/biddingCompletion';
+import { startTurnTimeout, clearTurnTimeout } from '../../../timeout-management/core/timeoutManager';
+import { prisma } from '../../../../lib/prisma';
+import { newdbEnsureRound, newdbUpsertBid } from '../../../../newdb/writers';
 
 /**
  * Get the database user ID for a player (human or bot)
@@ -64,7 +66,25 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
     console.log('[MAKE BID DEBUG] Bid recorded:', { playerIndex, bid, totalBids: game.bidding.bids.filter(b => b !== null).length });
 
     // Emit an immediate update so UI reflects the bid
+    // Emit an immediate update so UI reflects the bid
     io.to(game.id).emit('game_update', enrichGameForClient(game));
+
+    // Update game status to BIDDING if still WAITING (before first bid)
+    if ((game.status as string) === 'WAITING') {
+      game.status = 'BIDDING';
+      await prisma.game.update({
+        where: { id: game.dbGameId },
+        data: {
+              status: 'BIDDING' }
+      });
+      // Dual-write to new DB status as well
+      try {
+        await prisma.game.update({ where: { id: game.id }, data: {
+              status: 'BIDDING' as any } });
+      } catch (err) {
+        console.error('[MAKE BID DEBUG] Failed to update newdb game status to BIDDING:', err);
+      }
+    }
 
     // Persist the bid to database (RoundBid upsert) before proceeding
     try {
@@ -76,31 +96,23 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
         if (!roundRecord) {
           roundRecord = await prisma.round.create({
             data: {
+              dealerSeatIndex: 0,
               id: `round_${game.dbGameId}_${roundNumber}_${Date.now()}`,
               gameId: game.dbGameId,
               roundNumber,
               createdAt: new Date(),
-              updatedAt: new Date()
+              // updatedAt: new Date()
             }
           });
         }
 
         const dbPlayerId = getPlayerDbUserId(game.players[playerIndex]!);
 
-        // Update game status to BIDDING if still WAITING (before first bid)
-        if (game.status === 'WAITING') {
-          game.status = 'BIDDING';
-          await prisma.game.update({
-            where: { id: game.dbGameId },
-            data: { status: 'BIDDING' }
-          });
-        }
-        // Upsert RoundBid using correct player ID
         await prisma.roundBid.upsert({
           where: {
-            roundId_playerId: {
+            roundId_userId: {
               roundId: roundRecord.id,
-              playerId: dbPlayerId
+              userId: dbPlayerId
             }
           },
           update: {
@@ -110,17 +122,29 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
           create: {
             id: `bid_${roundRecord.id}_${playerIndex}_${Date.now()}`,
             roundId: roundRecord.id,
-            playerId: dbPlayerId,
+            userId: dbPlayerId,
+            seatIndex: playerIndex,
             bid,
             isBlindNil: bid === -1,
             createdAt: new Date()
           }
         });
       }
+
+      // Dual-write: ensure round and upsert bid in new DB
+      try {
+        const roundId = await newdbEnsureRound({ gameId: game.id, roundNumber: game.currentRound || 1, dealerSeatIndex: game.dealerIndex ?? 0 });
+        await newdbUpsertBid({ roundId, userId, seatIndex: playerIndex, bid });
+      } catch (err) {
+        console.error('[MAKE BID DEBUG] Failed to dual-write bid to new DB:', err);
+      }
     } catch (err) {
       console.error('[MAKE BID DEBUG] Failed to persist RoundBid:', err);
       // Continue gameplay even if DB logging failed
     }
+
+    // Clear timeout for current player since they acted
+    clearTurnTimeout(game, userId);
 
     // Check if all players have bid (null means not yet bid)
     const bidsComplete = game.bidding.bids.every(b => b !== null);
@@ -137,6 +161,9 @@ export async function handleMakeBid(socket: AuthenticatedSocket, { gameId, userI
 
       if (nextPlayer?.type === 'bot') {
         await botMakeMove(game, nextIndex);
+      } else {
+        // Start timeout for human player's turn
+        startTurnTimeout(game, nextIndex, 'bidding');
       }
     }
   } catch (error) {

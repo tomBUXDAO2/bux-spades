@@ -1,37 +1,39 @@
 import type { Game } from '../../../types/game';
-import { turnTimeouts } from '../../../gamesStore';
-import { TimeoutData } from '../config/timeoutConfig';
+
+// Global timeout storage
+const turnTimeouts = new Map<string, NodeJS.Timeout>();
 
 /**
- * Gets timeout status for a player
+ * Get timeout for a game
  */
-export function getTimeoutStatus(game: Game, playerId: string): TimeoutData | null {
-  const timeoutKey = `${game.id}_${playerId}`;
-  return turnTimeouts.get(timeoutKey) || null;
+export function getTimeout(gameId: string): NodeJS.Timeout | undefined {
+  return turnTimeouts.get(gameId);
 }
 
 /**
- * Clears all timeouts for a game
+ * Set timeout for a game
  */
-export function clearAllTimeoutsForGame(gameId: string): void {
-  for (const [key, timeoutData] of turnTimeouts.entries()) {
-    if (timeoutData.gameId === gameId) {
-      // Clear main timer
-      if (timeoutData.timer) {
-        clearTimeout(timeoutData.timer);
-      }
-      // Clear warning timer
-      if (timeoutData.warningTimer) {
-        clearTimeout(timeoutData.warningTimer);
-      }
-      turnTimeouts.delete(key);
-    }
+export function setGameTimeout(gameId: string, timeout: NodeJS.Timeout): void {
+  turnTimeouts.set(gameId, timeout);
+}
+
+/**
+ * Clear timeout for a game
+ */
+export function clearGameTimeout(gameId: string): void {
+  const timeout = turnTimeouts.get(gameId);
+  if (timeout) {
+    clearTimeout(timeout);
+    turnTimeouts.delete(gameId);
   }
 }
 
 /**
- * Gets all active timeouts
+ * Clear all timeouts
  */
-export function getAllActiveTimeouts(): Map<string, TimeoutData> {
-  return new Map(turnTimeouts);
+export function clearAllTimeouts(): void {
+  for (const [gameId, timeout] of turnTimeouts) {
+    clearTimeout(timeout);
+  }
+  turnTimeouts.clear();
 }

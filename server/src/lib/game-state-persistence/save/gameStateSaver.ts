@@ -18,8 +18,8 @@ export async function saveGameState(game: Game): Promise<void> {
         id: p.id,
         username: p.username,
         type: p.type,
-        seatIndex: p.seatIndex,
-        team: p.team,
+        seatIndex: p.position || 0, // Use position instead of seatIndex
+        teamIndex: p.team,
         hand: p.hand, // ✅ STORING PLAYER HANDS
         bid: p.bid,
         tricks: p.tricks,
