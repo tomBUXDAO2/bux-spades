@@ -13,6 +13,18 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
 
     console.log(`[GAME JOIN] User ${userId} attempting to join game ${id}`);
 
+    // Check if user is already in this specific game
+    const existingPlayerInGame = await prisma.gamePlayer.findFirst({
+      where: { 
+        userId: userId,
+        gameId: id
+      }
+    });
+    
+    if (existingPlayerInGame) {
+      res.status(200).json({ message: "Already in this game" });
+      return;
+    }
     // Check if user is already in another game
     const existingGamePlayer = await prisma.gamePlayer.findFirst({
       where: { 
