@@ -61,7 +61,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           const stored = localStorage.getItem('activeGameId');
           if (stored) {
-            const activeGameId = stored;
+            // const activeGameId = stored; // Unused variable
             const sock = socketManager.getSocket();
             if (sock && sock.connected) {
               // sock.emit('join_game', { gameId: activeGameId }); // User already in game

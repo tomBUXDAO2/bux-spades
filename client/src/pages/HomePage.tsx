@@ -515,11 +515,11 @@ const HomePage: React.FC = () => {
   const handleJoinGame = async (gameId: string, seatIndex: number) => {
     if (!user) return;
     // Ensure user is not null before accessing properties
-    const { id, username, avatar } = user;
+    const { id, username, avatarUrl } = user;
     const res = await api.post(`/api/games/${gameId}/join`, {
       id,
       username,
-      avatar,
+      avatarUrl,
       seat: seatIndex,
     });
     if (!res.ok) {
@@ -704,7 +704,7 @@ const HomePage: React.FC = () => {
       setSelectedPlayer({
         id: player.id, // Add player ID for API calls
         username: player.username,
-        avatar: player.avatar,
+        avatar: player.avatarUrl,
         status: player.status,
         coins: player.coins,
         stats: stats.stats || {
@@ -723,7 +723,7 @@ const HomePage: React.FC = () => {
       setSelectedPlayer({
         id: player.id, // Add player ID for API calls
         username: player.username,
-        avatar: player.avatar,
+        avatar: player.avatarUrl,
         status: player.status,
         coins: player.coins,
         stats: {
