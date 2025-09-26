@@ -58,16 +58,16 @@ export class GameCleanupManager {
       console.log('[GAME CLEANUP] Starting cleanup cycle...');
       
       // 1. Clean up WAITING games that have been waiting too long (15 minutes)
-      await cleanupWaitingGames(games, this.io || undefined);
+      await cleanupWaitingGames([], this.io || undefined);
       
       // 2. Clean up memory games that are finished but still in memory
-      await cleanupFinishedGamesInMemory(games);
+      await cleanupFinishedGamesInMemory([]);
       
       // 3. Clean up database games that are stuck
       await cleanupStuckDatabaseGames();
       
       // 4. Clean up orphaned games (in DB but not in memory)
-      await cleanupOrphanedGames(games);
+      await cleanupOrphanedGames([]);
       
       // 5. Clean up games with no human players for too long
       await cleanupAbandonedGames(games);

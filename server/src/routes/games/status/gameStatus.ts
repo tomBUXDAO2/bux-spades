@@ -1,125 +1,44 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../../lib/prisma';
 
-export async function getAllGames(req: Request, res: Response): Promise<void> {
+export async function getGameStatus(req: Request, res: Response): Promise<void> {
   try {
-    // Load games from database only - no in-memory storage
-    const dbGames = await prisma.game.findMany({
-      where: {
-        status: {
-          in: ['WAITING', 'BIDDING', 'PLAYING']
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Get players for each game
-    const gamesWithPlayers = await Promise.all(
-      dbGames.map(async (game) => {
-        const players = await prisma.gamePlayer.findMany({
-          where: { gameId: game.id }
-        });
-        
-        // Create players array with proper structure
-        const playersArray = new Array(4).fill(null);
-        players.forEach(player => {
-          playersArray[player.seatIndex] = {
-            id: player.userId,
-            username: `Player ${player.seatIndex + 1}`,
-            avatarUrl: '/default-avatar.jpg',
-            type: player.isHuman ? 'human' : 'bot',
-            seatIndex: player.seatIndex,
-            team: player.teamIndex,
-            isHuman: player.isHuman
-          };
-        });
-
-        return {
-          id: game.id,
-          status: game.status,
-          mode: game.mode,
-          maxPoints: 500,
-          minPoints: -500,
-          buyIn: 100,
-          players: playersArray,
-          createdAt: game.createdAt,
-        };
-      })
-    );
+    const { gameId } = req.params;
     
-    res.json({
-      success: true,
-      games: gamesWithPlayers
-    });
-  } catch (error) {
-    console.error('Error fetching games from database:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch games'
-    });
-  }
-}
-
-/**
- * Get a specific game by ID
- */
-export async function getGameById(req: Request, res: Response): Promise<void> {
-  try {
-    // This function was not updated in the edit, so it remains as is.
-    // It will now fetch from the database directly.
-    // ONLY use database - no in-memory games
-        const game = await prisma.game.findUnique({
-      where: { id: req.params.id },
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
       include: {
-        players: true
+        gamePlayers: {
+          orderBy: { seatIndex: 'asc' as any }
+        }
       }
     });
     
     if (!game) {
-      res.status(404).json({
-        success: false,
-        error: 'Game not found'
-      });
+      res.status(404).json({ error: 'Game not found' });
       return;
     }
-
-    // Convert database game to client format
-    const players = new Array(4).fill(null);
-    game.players.forEach(player => {
-      players[player.seatIndex] = {
-        id: player.userId,
-        username: `Player ${player.seatIndex + 1}`, // You may want to store username in DB
-        avatarUrl: '/default-avatar.jpg',
-        type: player.isHuman ? 'human' : 'bot',
-        seatIndex: player.seatIndex,
-        team: player.teamIndex,
-        isHuman: player.isHuman
-      };
-    });
-
-    const enrichedGame = {
+    
+    // Convert to client format
+    const clientGame = {
       id: game.id,
       status: game.status,
       mode: game.mode,
-      maxPoints: 500, // You may want to store these in DB
-      minPoints: -500,
-      buyIn: 100,
-      players: players,
+      format: game.format,
+      gimmickVariant: game.gimmickVariant,
       createdAt: game.createdAt,
-      // Add other required fields based on your client expectations
+      updatedAt: game.updatedAt,
+      players: game.gamePlayers.map((player: any) => ({
+        id: player.userId,
+        seatIndex: player.seatIndex,
+        teamIndex: player.teamIndex,
+        isHuman: player.isHuman
+      }))
     };
     
-    res.json({
-      success: true,
-      game: enrichedGame
-    });
+    res.json({ success: true, game: clientGame });
   } catch (error) {
-    console.error('Error fetching game:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch game'
-    });
+    console.error('Error fetching game status:', error);
+    res.status(500).json({ error: 'Failed to fetch game status' });
   }
 }

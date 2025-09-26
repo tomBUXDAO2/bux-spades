@@ -60,6 +60,7 @@ enum StatsGimmickVariant {
 }
 
 model User {
+  gamePlayers GamePlayer[]
   id           String   @id @default(cuid())
   discordId    String   @unique
   username     String
@@ -74,6 +75,8 @@ model User {
 }
 
 model Game {
+  gamePlayers GamePlayer[]
+  rounds      Round[]
   id             String        @id @default(cuid())
   createdById    String
   mode           GameMode
@@ -82,6 +85,10 @@ model Game {
   isLeague       Boolean       @default(false) // Discord = true, App = false
   isRated        Boolean       @default(false) // App: true only if 4 humans at start; League always true
   status         GameStatus
+  minPoints      Int?
+  maxPoints      Int?
+  nilAllowed     Boolean?      @default(true)
+  blindNilAllowed Boolean?     @default(false)
   specialRules   Json?
   startedAt      DateTime?
   finishedAt     DateTime?
@@ -90,12 +97,15 @@ model Game {
 }
 
 model GamePlayer {
+  game Game @relation(fields: [gameId], references: [id])
+  user User @relation(fields: [userId], references: [id])
   id         String   @id @default(cuid())
   gameId     String
   userId     String
-  seatIndex  Int      // 0..3
+  seatIndex  Int?     // 0..3 for players, null for spectators
   teamIndex  Int?     // 0|1 for partners; null for solo
   isHuman    Boolean  @default(true)
+  isSpectator Boolean  @default(false)
   joinedAt   DateTime @default(now())
   leftAt     DateTime?
 
@@ -104,6 +114,7 @@ model GamePlayer {
 }
 
 model Round {
+  game Game @relation(fields: [gameId], references: [id])
   id              String   @id @default(cuid())
   gameId          String
   roundNumber     Int
@@ -395,3 +406,5 @@ model UserStats {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+

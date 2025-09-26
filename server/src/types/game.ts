@@ -1,4 +1,6 @@
 export type GameMode = 'PARTNERS' | 'SOLO';
+export type GameFormat = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+export type GimmickVariant = 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY_ACES';
 export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
 export type GamePlayOption = 'NONE' | 'SCREAMER' | 'ASSASSIN';
 export type GimmickType = 'SUICIDE' | 'BID4NIL' | 'BID3' | 'BIDHEARTS' | 'CRAZY ACES';
@@ -51,6 +53,8 @@ export interface GameRules {
 export interface Game {
 	id: string;
 	mode: GameMode;
+format?: GameFormat;
+gimmickVariant?: GimmickVariant;
 	maxPoints: number;
 	minPoints: number;
 	buyIn: number;
@@ -132,6 +136,7 @@ export interface Game {
 	finalScore?: number;
 	solo?: boolean;
 	creatorId?: string;
+createdById?: string;
 	allowNil?: boolean;
 	allowBlindNil?: boolean;
 	team1TotalScore?: number;

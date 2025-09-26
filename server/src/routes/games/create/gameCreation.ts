@@ -51,12 +51,12 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       maxPoints: 500, // Default values
       minPoints: -500,
       buyIn: 0,
-      forcedBid: false,
+      forcedBid: null,
       specialRules: dbGame.specialRules as any,
       allowNil: true, // Default values
       allowBlindNil: false,
-      format: dbGame.format as any,
-      gimmickVariant: dbGame.gimmickVariant as any, // Fix: Use the actual value from DB
+      
+      gimmickVariant: dbGame.format === "GIMMICK" ? dbGame.gimmickVariant : null,
       createdById: dbGame.createdById,
       createdAt: dbGame.createdAt.getTime(),
       updatedAt: dbGame.updatedAt.getTime(),
@@ -99,10 +99,10 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       winningPlayer: null,
       winningTeam: null,
       lastActivity: Date.now(),
-      rounds: 0,
+      rounds: [],
       league: false,
       rated: false,
-      leagueReady: false,
+      leagueReady: [],
       dealer: 0,
       roundHistory: [],
       currentTrickCards: [],
