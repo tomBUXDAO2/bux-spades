@@ -117,6 +117,19 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     };
 
     // Start the game
+    // Add creator to the game as seat 0
+    await prisma.gamePlayer.create({
+      data: {
+        gameId: dbGame.id,
+        userId: userId,
+        seatIndex: 0,
+        teamIndex: 0,
+        isHuman: true,
+        joinedAt: new Date()
+      }
+    });
+    
+    console.log(`[GAME CREATION] Added creator ${userId} to game ${dbGame.id} at seat 0`);
     await startGame(game);
 
     // Get all games for lobby
