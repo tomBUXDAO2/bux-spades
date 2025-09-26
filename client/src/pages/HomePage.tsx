@@ -519,7 +519,7 @@ const HomePage: React.FC = () => {
     const res = await api.post(`/api/games/${gameId}/join`, {
       id,
       username,
-      avatar,
+      avatarUrl,
       seat: seatIndex,
     });
     if (!res.ok) {

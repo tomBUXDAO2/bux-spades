@@ -1433,7 +1433,7 @@ export default function GameTable({
     })();
     
     const displayName = isHuman ? player.username : 'Bot';
-    const displayAvatar = isHuman ? player.avatar || player.avatarUrl : '/bot-avatar.jpg';
+    const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
