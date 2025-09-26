@@ -47,7 +47,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
     
     // Check if game is full
     const playerCount = await prisma.gamePlayer.count({
-      where: { id: gameId }
+      where: { gameId: id }
     });
     
     if (playerCount >= 4) {
@@ -58,7 +58,7 @@ export async function joinGame(req: Request, res: Response): Promise<void> {
     // Add player to game
     const newPlayer = await prisma.gamePlayer.create({
       data: {
-        id: gameId,
+        gameId: id,
         userId: userId,
         seatIndex: playerCount,
         teamIndex: playerCount % 2, // Simple team assignment
