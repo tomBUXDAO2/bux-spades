@@ -982,14 +982,14 @@ export default function GameTable({
   // FIXED ROTATION: Always put current player at bottom (South)
   const rotatePlayersForCurrentView = () => {
     // Find the current player's position
-    const currentPlayerPosition = currentPlayer?.position ?? 0;
+    const currentPlayerPosition = currentPlayer?.seatIndex ?? 0;
     
     // Create a rotated array where current player is at position 0 (South)
     const rotatedPlayers = sanitizedPlayers.map((player) => {
       if (!player) return null;
       // Calculate new position: (4 + originalPos - currentPlayerPosition) % 4
       // This ensures current player is at 0, and others are rotated accordingly
-      const newPosition = (4 + (player.position ?? 0) - currentPlayerPosition) % 4;
+      const newPosition = (4 + (player.seatIndex ?? 0) - currentPlayerPosition) % 4;
       return { ...player, displayPosition: newPosition } as (Player | Bot) & { displayPosition: number };
     });
     
@@ -1433,7 +1433,7 @@ export default function GameTable({
     })();
     
     const displayName = isHuman ? player.username : 'Bot';
-    const displayAvatar = isHuman ? player.avatarUrlUrl : '/bot-avatar.jpg';
+    const displayAvatar = isHuman ? player.avatarUrl : '/bot-avatar.jpg';
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
@@ -3544,7 +3544,7 @@ const [isStarting, setIsStarting] = useState(false);
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatarUrlUrl : user.avatar}
+                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatarUrl : user.avatar}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}

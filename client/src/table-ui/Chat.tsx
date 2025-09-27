@@ -294,7 +294,7 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         });
         
         if (chatType === 'game') {
-          socket.emit('chat_message.message', { gameId, message });
+          socket.emit('chat_message', { gameId, message });
         } else {
           socket.emit('lobby_chat_message', message);
         }

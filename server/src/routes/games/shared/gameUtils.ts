@@ -3,7 +3,7 @@ import type { Game } from '../../../types/game';
 /**
  * Enrich game data for client consumption
  */
-export function enrichGameForClient(game: Game): any {
+export function enrichGameForClient(game: Game | any): any {
   // Derive a top-level currentPlayer to keep frontend logic consistent
   let currentPlayer: string | undefined = undefined;
   if (game.status === 'BIDDING' && game.bidding) {
@@ -43,19 +43,45 @@ export function enrichGameForClient(game: Game): any {
     lastActivity: game.lastActivity,
     createdAt: game.createdAt,
     currentPlayer,
-    players: game.players ? game.players.map((p, i) => p ? {
-      id: p.id,
-      username: p.username,
-      avatarUrl: p.avatarUrl,
-      type: p.type,
-      seatIndex: 0,
-      teamIndex: p.team,
-      bid: p.bid,
-      tricks: p.tricks,
-      points: p.points,
-      bags: p.bags,
-      isDealer: typeof game.dealerIndex === "number" ? game.dealerIndex === i : Boolean((p as any).isDealer)
-    } : null) : [null, null, null, null],
+    players: (() => {
+      // Handle database games with gamePlayers
+      if (game.gamePlayers) {
+
+        const players = new Array(4).fill(null);
+        game.gamePlayers.forEach((gp: any) => {
+
+          players[gp.seatIndex] = {
+            id: gp.userId,
+            username: gp.user?.username || `Player ${gp.seatIndex + 1}`,
+            avatarUrl: gp.user?.avatarUrl || '/default-avatar.jpg',
+            type: gp.isHuman ? 'human' : 'bot',
+            seatIndex: gp.seatIndex,
+            teamIndex: gp.teamIndex,
+            bid: gp.bid || null,
+            tricks: gp.tricks || null,
+            points: gp.points || null,
+            bags: gp.bags || null,
+            isDealer: typeof game.dealerIndex === "number" ? game.dealerIndex === gp.seatIndex : false
+          };
+        });
+
+        return players;
+      }
+      // Handle in-memory games
+      return game.players ? game.players.map((p, i) => p ? {
+        id: p.id,
+        username: p.username,
+        avatarUrl: p.avatarUrl,
+        type: p.type,
+        seatIndex: i,
+        teamIndex: p.team,
+        bid: p.bid,
+        tricks: p.tricks,
+        points: p.points,
+        bags: p.bags,
+        isDealer: typeof game.dealerIndex === "number" ? game.dealerIndex === i : Boolean((p as any).isDealer)
+      } : null) : [null, null, null, null];
+    })(),
     bidding: game.bidding,
     play: game.play,
     isBotGame: game.isBotGame,

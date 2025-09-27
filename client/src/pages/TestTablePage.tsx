@@ -84,6 +84,7 @@ const createMockGame = (): GameState => {
       username: 'TestPlayer1',
       avatar: '/default-pfp.jpg',
       position: 0,
+      seatIndex: 0,
       team: 1,
       isDealer: true,
       hand: hands[0] as Card[], // Cast to Card[] type
@@ -96,6 +97,7 @@ const createMockGame = (): GameState => {
       username: 'TestPlayer2',
       avatar: '/default-pfp.jpg',
       position: 1,
+      seatIndex: 1,
       team: 2,
       isDealer: false,
       hand: hands[1] as Card[], // Cast to Card[] type
@@ -108,6 +110,7 @@ const createMockGame = (): GameState => {
       username: 'TestPlayer3',
       avatar: '/default-pfp.jpg',
       position: 2,
+      seatIndex: 2,
       team: 1,
       isDealer: false,
       hand: hands[2] as Card[], // Cast to Card[] type
@@ -120,6 +123,7 @@ const createMockGame = (): GameState => {
       username: 'TestPlayer4',
       avatar: '/default-pfp.jpg',
       position: 3,
+      seatIndex: 3,
       team: 2,
       isDealer: false,
       hand: hands[3] as Card[], // Cast to Card[] type

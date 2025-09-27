@@ -17,6 +17,7 @@ export interface Player {
   name: string;
   team: number;
   position: number;
+  seatIndex: number;
   isDealer: boolean;
   image?: string;
   hand: Card[];
@@ -32,6 +33,7 @@ export interface Bot {
   avatar: string;
   type: 'bot';
   position: number;
+  seatIndex: number;
   hand: Card[];
   bid?: number;
   tricks?: number;

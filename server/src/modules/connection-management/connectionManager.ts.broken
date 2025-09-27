@@ -9,7 +9,6 @@ import {
 import { handleHandSummaryContinue } from '../socket-handlers/game-state/hand/handSummaryContinue';
 import { handlePlayAgainSocket } from '../socket-handlers/game-completion/playAgainHandler';
 import { handlePlayerLeaveDuringPlayAgain } from '../play-again/playAgainManager';
-import { handleGameChatMessage, handleLobbyChatMessage } from '../chat';
 import { prisma } from '../../lib/prisma';
 
 export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<string, AuthenticatedSocket>, onlineUsers: Set<string>) {
@@ -26,13 +25,6 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       authenticatedSockets.set(socket.userId, socket);
       onlineUsers.add(socket.userId);
       console.log(`[CONNECTION] User ${socket.userId} connected. Online users:`, Array.from(onlineUsers));
-      
-      // Emit authenticated event to client
-      socket.emit('authenticated', {
-        success: true,
-        userId: socket.userId,
-        games: [] // Empty for now, can be populated later if needed
-      });
     }
 
     // Handle disconnection
@@ -184,13 +176,63 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
     });
 
     // Handle chat messages
-    socket.on('chat_message', async ({ gameId, message }: { gameId: string; message: any }) => {
-      await handleGameChatMessage(socket, gameId, message);
+    socket.on('chat_message', async ({ gameId, message }: { gameId: string; message: string }) => {
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          socket.emit('error', { message: 'Not authenticated' });
+          return;
+        }
+
+        // Get user profile
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId }
+        });
+
+        if (user) {
+          // Broadcast message to game room
+          io.to(gameId).emit('chat_message', {
+            userId: socket.userId,
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            message: message,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+      } catch (error) {
+        console.error('[CHAT] Error handling chat message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
     });
 
     // Handle lobby chat messages
-    socket.on('lobby_chat_message', async (message: any) => {
-      await handleLobbyChatMessage(socket, message);
+    socket.on('lobby_chat_message', async ({ message }: { message: string }) => {
+      try {
+        if (!socket.isAuthenticated || !socket.userId) {
+          socket.emit('error', { message: 'Not authenticated' });
+          return;
+        }
+
+        // Get user profile
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId }
+        });
+
+        if (user) {
+          // Broadcast message to lobby
+          io.emit('lobby_chat_message', {
+            userId: socket.userId,
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            message: message,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+      } catch (error) {
+        console.error('[LOBBY CHAT] Error handling lobby chat message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
     });
 
     // Handle emoji reactions
@@ -205,22 +247,6 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         const user = await prisma.user.findUnique({
           where: { id: socket.userId }
         });
-
-        if (user) {
-          // Broadcast emoji reaction to game room
-          io.to(gameId).emit('emoji_reaction', {
-            userId: socket.userId,
-            username: user.username,
-            emoji: emoji,
-            timestamp: new Date().toISOString()
-          });
-        }
-
-      } catch (error) {
-        console.error('[EMOJI] Error handling emoji reaction:', error);
-        socket.emit('error', { message: 'Failed to send emoji reaction' });
-      }
-    });
 
     // Handle fill seat with bot
     socket.on("fill_seat_with_bot", async ({ gameId, seatIndex }: { gameId: string; seatIndex: number }) => {
@@ -298,20 +324,6 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
         socket.emit("error", { message: "Failed to add bot" });
       }
     });
-
-    // Handle emoji reactions
-    socket.on('emoji_reaction', async ({ gameId, emoji }: { gameId: string; emoji: string }) => {
-      try {
-        if (!socket.isAuthenticated || !socket.userId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        // Get user profile
-        const user = await prisma.user.findUnique({
-          where: { id: socket.userId }
-        });
-
         if (user) {
           // Broadcast emoji reaction to game room
           io.to(gameId).emit('emoji_reaction', {
