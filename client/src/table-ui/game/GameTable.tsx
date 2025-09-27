@@ -370,6 +370,14 @@ export default function GameTable({
   testTrickWinner = null
 }: GameTableProps) {
   const { socket, isAuthenticated, isReady } = useSocket();
+  
+  // Debug socket state
+  console.log('[GAME TABLE] Socket state:', { 
+    socket: socket ? 'exists' : 'null', 
+    isAuthenticated, 
+    isReady,
+    connected: socket?.connected 
+  });
   // Using propUser elsewhere; no need to pull from AuthContext here
 // const { user } = useAuth();
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
