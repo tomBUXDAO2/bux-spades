@@ -369,7 +369,7 @@ export default function GameTable({
   testAnimatingTrick = false,
   testTrickWinner = null
 }: GameTableProps) {
-  const { socket, isAuthenticated } = useSocket();
+  const { socket, isAuthenticated, isReady } = useSocket();
   // Using propUser elsewhere; no need to pull from AuthContext here
 // const { user } = useAuth();
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
@@ -380,8 +380,7 @@ export default function GameTable({
   const [countdownPlayer, setCountdownPlayer] = useState<{playerId: string, playerIndex: number, timeLeft: number} | null>(null);
   
   // Coin debit animation state
-  const [showCoinDebit, setShowCoinDebit] = useState(false);
-  const [coinDebitAmount, setCoinDebitAmount] = useState(0);
+  // Removed unused coin debit state
   
 
   

@@ -159,10 +159,14 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       console.log(`[GAME START] Emitting game_started event to room ${gameId} with ${gameStartedData.hands.length} hands`);
       console.log(`[GAME START] Hands data:`, gameStartedData.hands.map((h: any) => ({ playerId: h.playerId, cardCount: h.hand.length })));
       
-      io.to(gameId).emit('game_started', gameStartedData);
-      io.to(gameId).emit('game_update', enrichedGame);
+      // Add small delay to ensure client is in room
+      setTimeout(() => {
+        io.to(gameId).emit('game_started', gameStartedData);
+        io.to(gameId).emit('game_update', enrichedGame);
+        console.log(`[GAME START] Events emitted to room ${gameId} (with delay)`);
+      }, 500);
       
-      console.log(`[GAME START] Events emitted to room ${gameId}`);
+      console.log(`[GAME START] Events scheduled for room ${gameId}`);
     }
     
     console.log(`[GAME START] Game started: ${gameId}, isRated: ${isRated}, humanPlayers: ${humanPlayers}`);
