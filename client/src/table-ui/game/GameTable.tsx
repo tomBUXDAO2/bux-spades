@@ -521,6 +521,7 @@ export default function GameTable({
   
   // Handle game started event - SIMPLE VERSION
   useEffect(() => {
+    console.log('[GAME STARTED] useEffect triggered');
     if (!socket || !isReady) {
       console.log('[GAME STARTED] Socket not ready:', { socket: !!socket, isReady });
       return;
