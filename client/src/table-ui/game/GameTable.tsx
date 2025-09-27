@@ -1256,7 +1256,7 @@ export default function GameTable({
         "bg-gradient-to-r from-green-700 to-green-500"  // Position 3: Green
       ];
       // Use original position for color assignment, not display position
-      const originalPosition = player.position ?? position;
+      const originalPosition = player.seatIndex ?? position;
       playerGradient = soloColors[originalPosition];
     } else {
       // Partners mode: 2 team colors
@@ -1267,7 +1267,7 @@ export default function GameTable({
       
       // Use ORIGINAL position for team assignment, not display position
       // Get the original position from the player object
-      const originalPosition = player.position ?? position;
+      const originalPosition = player.seatIndex ?? position;
       console.log(`[TEAM COLOR DEBUG] Player ${player.username} at display position ${position}, original position ${originalPosition}, team assignment: ${(originalPosition === 0 || originalPosition === 2) ? 'RED' : 'BLUE'}`);
       playerGradient = (originalPosition === 0 || originalPosition === 2)
         ? redTeamGradient
@@ -1290,9 +1290,9 @@ export default function GameTable({
     
     if (isPartnerGame) {
       // Partner game logic - use original positions for partner calculation
-      const originalPosition = player.position ?? position;
+      const originalPosition = player.seatIndex ?? position;
       const partnerOriginalPosition = (originalPosition + 2) % 4;
-      const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+      const partner = gameState.players.find(p => p && p.seatIndex === partnerOriginalPosition);
       const partnerActualSeatIndex = partner?.position; // Use actual seat position
       const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
@@ -1402,9 +1402,9 @@ export default function GameTable({
             return true;
           }
           // Human players can remove their partner if partner is a bot
-          const originalPosition = player.position ?? position;
+          const originalPosition = player.seatIndex ?? position;
           const partnerOriginalPosition = (originalPosition + 2) % 4;
-          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+          const partner = gameState.players.find(p => p && p.seatIndex === partnerOriginalPosition);
           return partner?.id === currentPlayerId && !isHuman; // Only if partner is bot
       } else {
           // Host can remove any bot
@@ -1412,9 +1412,9 @@ export default function GameTable({
             return true;
           }
           // Human players can remove their partner bot
-        const originalPosition = player.position ?? position;
+        const originalPosition = player.seatIndex ?? position;
         const partnerOriginalPosition = (originalPosition + 2) % 4;
-        const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+        const partner = gameState.players.find(p => p && p.seatIndex === partnerOriginalPosition);
         return partner?.id === currentPlayerId;
         }
       } else {
@@ -1424,9 +1424,9 @@ export default function GameTable({
           return false;
         } else {
           // Bots can be removed by their partner ONLY if spectators are available
-          const originalPosition = player.position ?? position;
+          const originalPosition = player.seatIndex ?? position;
           const partnerOriginalPosition = (originalPosition + 2) % 4;
-          const partner = gameState.players.find(p => p && p.position === partnerOriginalPosition);
+          const partner = gameState.players.find(p => p && p.seatIndex === partnerOriginalPosition);
           return partner?.id === currentPlayerId && hasAvailableSpectators;
         }
       }

@@ -321,3 +321,83 @@ router.get('/all', async (req: Request, res: Response) => {
 });
 
 export default router;
+
+// Remove a bot from a seat (pre-game)
+router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
+  try {
+    const gameId = req.params.id;
+    const { seatIndex, requesterId } = req.body;
+    const userId = (req as AuthenticatedRequest).user!.id;
+
+    // Validate requester
+    if (requesterId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Find the game
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gamePlayers: { include: { user: true } } }
+    });
+
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    // Check if game is in waiting state
+    if (game.status !== 'WAITING') {
+      return res.status(400).json({ error: 'Game already started' });
+    }
+
+    // Validate seat index
+    if (seatIndex < 0 || seatIndex > 3) {
+      return res.status(400).json({ error: 'Invalid seat index' });
+    }
+
+    // Find the player at this seat
+    const playerToRemove = game.gamePlayers.find(gp => gp.seatIndex === seatIndex);
+    if (!playerToRemove) {
+      return res.status(400).json({ error: 'No player at this seat' });
+    }
+
+    // Check if it's a bot
+    if (playerToRemove.isHuman) {
+      return res.status(400).json({ error: 'Cannot remove human players' });
+    }
+
+    // Check if requester is the game creator (host)
+    if (game.createdById !== userId) {
+      return res.status(403).json({ error: 'Only the game creator can remove bots' });
+    }
+
+    // Remove the bot from the database
+    await prisma.gamePlayer.delete({
+      where: { id: playerToRemove.id }
+    });
+
+    // Also delete the bot user if it's a bot
+    if (playerToRemove.userId.startsWith('bot_')) {
+      await prisma.user.delete({
+        where: { id: playerToRemove.userId }
+      });
+    }
+
+    // Get updated game and emit to clients
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gamePlayers: { include: { user: true } } }
+    });
+
+    if (updatedGame) {
+      const enrichedGame = enrichGameForClient(updatedGame);
+      io.to(gameId).emit("game_update", enrichedGame);
+    }
+
+    console.log(`[REMOVE BOT] Successfully removed bot from seat ${seatIndex} in game ${gameId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing bot:', error);
+    res.status(500).json({ error: 'Failed to remove bot' });
+  }
+});
+
