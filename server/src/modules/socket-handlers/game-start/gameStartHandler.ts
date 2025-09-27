@@ -80,6 +80,10 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       console.log(`[GAME START] Added bot ${botUsername} to seat ${seatIndex}`);
     }
     
+    // Note: Card dealing will be handled by the client-side game logic
+    // The database doesn't store hands, they are generated client-side
+    console.log(`[GAME START] Game ready for card dealing and bidding`);
+    
     // Count human players to determine if game is rated
     const humanPlayers = await prisma.gamePlayer.count({
       where: { gameId, isHuman: true }

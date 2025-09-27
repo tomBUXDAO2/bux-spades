@@ -14,7 +14,10 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       mode, 
       format,
       gimmickVariant,
-      specialRules
+      specialRules,
+      minPoints,
+      maxPoints,
+      buyIn
     } = req.body;
     
     const userId = (req as any).user?.id;
@@ -39,7 +42,10 @@ export async function createGame(req: Request, res: Response): Promise<void> {
         gimmickVariant: gimmickVariant || null,
         createdById: userId,
         status: 'WAITING',
-        specialRules: specialRules || {}
+        specialRules: specialRules || {},
+        minPoints: minPoints || -500,
+        maxPoints: maxPoints || 500,
+        buyIn: buyIn || 0
       }
     });
 
