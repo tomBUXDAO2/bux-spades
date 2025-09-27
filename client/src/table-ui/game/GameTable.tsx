@@ -513,7 +513,10 @@ export default function GameTable({
   
   // Handle game started event - SIMPLE VERSION
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isReady) {
+      console.log('[GAME STARTED] Socket not ready:', { socket: !!socket, isReady });
+      return;
+    }
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received:', data);
@@ -530,7 +533,7 @@ export default function GameTable({
     console.log('[GAME STARTED] Listener registered');
     
     return () => socket.off('game_started', handleGameStarted);
-  }, [socket]);
+  }, [socket, isReady]);
 
   
   // const isMyTurn = game.currentPlayer === propUser?.id; // Removed unused variable
