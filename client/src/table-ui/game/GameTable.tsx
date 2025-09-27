@@ -522,16 +522,16 @@ export default function GameTable({
   // Handle game started event - SIMPLE VERSION
   useEffect(() => {
     console.log('[GAME STARTED] useEffect triggered');
-    if (!socket || !isReady) {
+    if (!socket) {
       console.log('[GAME STARTED] Socket not ready:', { socket: !!socket, isReady });
       return;
     }
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received:', data);
-      if (data.hands) {
+      if (data.hands || (data.status === "BIDDING" && gameState.hands)) {
         const handsArray = data.hands.map((h: any) => h.hand);
-        setGameState(prev => ({ ...prev, hands: handsArray }));
+        setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING" }));
         setDealingComplete(true);
         setBiddingReady(false);
         setCardsRevealed(false);
@@ -544,7 +544,7 @@ export default function GameTable({
     return () => {
       socket.off('game_started', handleGameStarted);
     };
-  }, [socket, isReady]);
+  }, [socket]);
 
   
   // const isMyTurn = game.currentPlayer === propUser?.id; // Removed unused variable

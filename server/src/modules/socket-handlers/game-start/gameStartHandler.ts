@@ -124,51 +124,46 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
     
     const isRated = humanPlayers === 4;
     
+    // Get updated game for client first
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { gamePlayers: { include: { user: true } } }
+    });
+    
+    // Determine dealer and first bidder
+    const firstBidderIndex = (dealerIndex + 1) % 4; // First bidder is position 3
+    
     // Update game status and rating
     await prisma.game.update({
       where: { id: gameId },
       data: {
         status: 'BIDDING',
         isRated: isRated,
-        // bidding: {
-        //   currentPlayer: "0",
-        //   bids: [null, null, null, null],
-        // } // Field doesn't exist in schema
+        
+        
       }
     });
-
-    // Get updated game for client
-    const updatedGame = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: { gamePlayers: { include: { user: true } } }
-    });
-
-    if (updatedGame) {
-      const { enrichGameForClient } = require('../../../routes/games/shared/gameUtils');
-      const enrichedGame = enrichGameForClient(updatedGame);
-      
-      // Notify all players with hands data
-      const gameStartedData = {
-        ...enrichedGame,
-        hands: hands.map((hand, index) => ({
-          playerId: updatedGame.gamePlayers[index]?.userId || `player_${index}`,
-          hand: hand
-        }))
-      };
-      
-      console.log(`[GAME START] Emitting game_started event to room ${gameId} with ${gameStartedData.hands.length} hands`);
-      console.log(`[GAME START] Hands data:`, gameStartedData.hands.map((h: any) => ({ playerId: h.playerId, cardCount: h.hand.length })));
-      
-      // Add small delay to ensure client is in room
-      setTimeout(() => {
-        io.to(gameId).emit('game_started', gameStartedData);
-        io.to(gameId).emit('game_update', enrichedGame);
-        console.log(`[GAME START] Events emitted to room ${gameId} (with delay)`);
-      }, 500);
-      
-      console.log(`[GAME START] Events scheduled for room ${gameId}`);
-    }
+    const { enrichGameForClient } = require('../../../routes/games/shared/gameUtils');
+    const enrichedGame = enrichGameForClient(updatedGame);
     
+    // Notify all players with hands data
+    const gameStartedData = {
+      ...enrichedGame,
+      hands: hands.map((hand, index) => ({
+        playerId: updatedGame.gamePlayers[index]?.userId || `player_${index}`,
+        hand: hand
+      }))
+    };
+    
+    console.log(`[GAME START] Emitting game_started event to room ${gameId} with ${gameStartedData.hands.length} hands`);
+    console.log(`[GAME START] Hands data:`, gameStartedData.hands.map((h: any) => ({ playerId: h.playerId, cardCount: h.hand.length })));
+    
+    // Add small delay to ensure client is in room
+    // Emit immediately instead of with delay
+      io.to(gameId).emit('game_started', gameStartedData);
+      io.to(gameId).emit('game_update', enrichedGame);
+    
+    console.log(`[GAME START] Events scheduled for room ${gameId}`);
     console.log(`[GAME START] Game started: ${gameId}, isRated: ${isRated}, humanPlayers: ${humanPlayers}`);
 
   } catch (error) {

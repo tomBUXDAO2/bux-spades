@@ -578,9 +578,19 @@ export default function TablePage() {
     }
   }, [socket, user, gameId, isSpectatorLocal]);
 
-  // Listen for trick animation events to control animation state
+  // Listen for game_started and trick animation events
   useEffect(() => {
     if (!socket) return;
+    
+    const handleGameStarted = (data: any) => {
+      console.log('[GAME STARTED] Event received in TablePage:', data);
+      if (data.hands || (data.status === "BIDDING" && game.hands)) {
+        setGame(prevGame => {
+          if (!prevGame) return null;
+          return { ...prevGame, hands: data.hands.map((h: any) => h.hand), status: data.status || "BIDDING" };
+        });
+      }
+    };
     
     const handleTrickComplete = () => {
       setIsAnimatingTrick(true);
@@ -590,15 +600,17 @@ export default function TablePage() {
       setIsAnimatingTrick(false);
     };
     
+    socket.off('game_started', handleGameStarted);
+    socket.on('game_started', handleGameStarted);
     socket.on('trick_complete', handleTrickComplete);
     socket.on('clear_trick', handleClearTrick);
     
     return () => {
+      socket.off('game_started', handleGameStarted);
       socket.off('trick_complete', handleTrickComplete);
       socket.off('clear_trick', handleClearTrick);
     };
-  }, [socket]);
-  // Only join as a player if not spectating
+  }, [socket]);  // Only join as a player if not spectating
   const handleJoinGame = async (
     gameIdParam?: string,
     userIdParam?: string,

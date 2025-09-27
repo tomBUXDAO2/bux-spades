@@ -6,6 +6,7 @@ import { createGame } from './create/gameCreation';
 import { enrichGameForClient } from './shared/gameUtils';
 import { deleteUnratedGameFromDatabase } from '../../lib/hand-completion/game/gameCompletion';
 import { joinGame } from './join/gameJoining';
+import { handleStartGame } from "../../modules/socket-handlers/game-start/gameStartHandler";
 import { prisma } from '../../lib/prisma';
 
 interface AuthenticatedRequest extends Request {
@@ -57,7 +58,7 @@ router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
       avatar
     });
 
-    res.json(enrichedGame || { success: true });
+    res.json({ success: true });
   } catch (error) {
     console.error('Error spectating game:', error);
     res.status(500).json({ error: 'Failed to spectate game' });
@@ -157,6 +158,9 @@ router.get('/:id', async (req: Request, res: Response) => {
       rated: (dbGame as any).isRated ?? false,
       league: (dbGame as any).isLeague ?? false,
       solo: ((dbGame as any).mode === 'SOLO') || false,
+      minPoints: (dbGame as any).minPoints || -100,
+      maxPoints: (dbGame as any).maxPoints || 150,
+      buyIn: (dbGame as any).buyIn || 100000,
       players: players.map(p => ({
         id: p.userId,
         username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
@@ -169,15 +173,15 @@ router.get('/:id', async (req: Request, res: Response) => {
         points: null as any,
         bags: null as any
       })),
-        rules: {
-          minPoints: (dbGame as any).minPoints || 500,
-          maxPoints: (dbGame as any).maxPoints || 500,
-          allowNil: (dbGame as any).allowNil ?? true,
-          allowBlindNil: (dbGame as any).allowBlindNil ?? false,
-          assassin: (dbGame as any).assassin ?? false,
-          screamer: (dbGame as any).screamer ?? false
-        },      createdAt: (dbGame as any).createdAt
-    };
+      rules: {
+        minPoints: (dbGame as any).minPoints || -100,
+        maxPoints: (dbGame as any).maxPoints || 150,
+        allowNil: (dbGame as any).allowNil ?? true,
+        allowBlindNil: (dbGame as any).allowBlindNil ?? false,
+        assassin: (dbGame as any).assassin ?? false,
+        screamer: (dbGame as any).screamer ?? false
+      },
+      createdAt: (dbGame as any).createdAt    };
 
     res.json({ success: true, game });
   } catch (error) {
@@ -258,7 +262,7 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       }
     }
 
-    res.json(enrichedGame || { success: true });
+    res.json({ success: true });
   } catch (error) {
     console.error('Error leaving game:', error);
     res.status(500).json({ error: 'Failed to leave game' });
@@ -305,7 +309,9 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
     });
 
     // Notify all players
-    io.to(gameId).emit('game_started', enrichGameForClient(game));
+    // Call socket handler to start game with hands
+    const mockSocket = { userId, emit: () => {} };
+    await handleStartGame(mockSocket, { gameId });
     io.emit('games_updated', [enrichGameForClient(game)]);
 
     res.json({ success: true, game: enrichGameForClient(game) });
@@ -420,7 +426,7 @@ router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
     }
 
     console.log(`[REMOVE BOT] Successfully removed bot from seat ${seatIndex} in game ${gameId}`);
-    res.json(enrichedGame || { success: true });
+    res.json({ success: true });
   } catch (error) {
     console.error('Error removing bot:', error);
     res.status(500).json({ error: 'Failed to remove bot' });

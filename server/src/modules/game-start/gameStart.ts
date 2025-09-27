@@ -81,31 +81,6 @@ export async function startGame(game: Game): Promise<void> {
     }
 
   } catch (error) {
-    console.error('[GAME START] Error starting game:', error);
-    io.to(game.id).emit('game_error', { message: 'Failed to start game' });
-  }
-}
-
-/**
- * Handle start game socket event
- */
-export async function handleStartGame(socket: any, data: any): Promise<void> {
-  try {
-    const { gameId } = data;
-    const userId = socket.userId;
-    
-    if (!userId) {
-      socket.emit('error', { message: 'Not authenticated' });
-      return;
-    }
-
-    console.log('[START GAME HANDLER] User starting game:', { gameId, userId });
-
-    // For now, just emit success - actual game start logic is handled elsewhere
-    socket.emit('game_started', { gameId });
-    
-  } catch (error) {
-    console.error('[START GAME HANDLER] Error starting game:', error);
-    socket.emit('error', { message: 'Failed to start game' });
+    console.error("[GAME START] Error starting game:", error);
   }
 }
