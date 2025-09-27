@@ -204,8 +204,12 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
     // Remove player from game
     await prisma.gamePlayer.delete({ where: { id: player.id } });
 
-    // Leave the game room
-    req.socket.leave(gameId);
+    // Leave the game room - find the user's socket
+    const userSocket = [...io.sockets.sockets.values()].find(s => (s as any).userId === userId);
+    if (userSocket) {
+      userSocket.leave(gameId);
+      console.log(`[LEAVE GAME] User ${userId} left socket room ${gameId}`);
+    }
 
     // Notify other players
     io.to(gameId).emit('player_left', {
