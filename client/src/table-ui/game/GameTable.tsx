@@ -1433,7 +1433,7 @@ export default function GameTable({
     })();
     
     const displayName = isHuman ? player.username : 'Bot';
-    const displayAvatar = isHuman ? player.avatar : '/bot-avatar.jpg';
+    const displayAvatar = isHuman ? player.avatarUrl : '/bot-avatar.jpg';
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
@@ -3544,7 +3544,7 @@ const [isStarting, setIsStarting] = useState(false);
                 userId={currentPlayerId || ''}
                 userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatar : user.avatar}
+                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatarUrl : user.avatar}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
