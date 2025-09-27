@@ -57,7 +57,7 @@ router.post('/:id/spectate', requireAuth, async (req: any, res: Response) => {
       avatar
     });
 
-    res.json({ success: true });
+    res.json(enrichedGame || { success: true });
   } catch (error) {
     console.error('Error spectating game:', error);
     res.status(500).json({ error: 'Failed to spectate game' });
@@ -233,7 +233,7 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       }
     }
 
-    res.json({ success: true });
+    res.json(enrichedGame || { success: true });
   } catch (error) {
     console.error('Error leaving game:', error);
     res.status(500).json({ error: 'Failed to leave game' });
@@ -388,13 +388,14 @@ router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
       include: { gamePlayers: { include: { user: true } } }
     });
 
+    let enrichedGame = null;
     if (updatedGame) {
-      const enrichedGame = enrichGameForClient(updatedGame);
+      enrichedGame = enrichGameForClient(updatedGame);
       io.to(gameId).emit("game_update", enrichedGame);
     }
 
     console.log(`[REMOVE BOT] Successfully removed bot from seat ${seatIndex} in game ${gameId}`);
-    res.json({ success: true });
+    res.json(enrichedGame || { success: true });
   } catch (error) {
     console.error('Error removing bot:', error);
     res.status(500).json({ error: 'Failed to remove bot' });

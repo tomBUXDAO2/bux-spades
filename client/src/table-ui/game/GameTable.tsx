@@ -562,7 +562,7 @@ export default function GameTable({
 
   // Helper function to determine user's team
   const getUserTeam = () => {
-    const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
+    const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === user?.id) : -1;
     if (myPlayerIndex === -1) return 1; // Default to team 1
     
     // In partners mode: positions 0,2 = Red Team (1), positions 1,3 = Blue Team (2)
@@ -663,7 +663,7 @@ export default function GameTable({
       // Check for forced bid games
       if (game.forcedBid === 'SUICIDE') {
         // Suicide logic: bid 0 if partner bid something, otherwise use normal logic
-        const partnerIndex = (game.players.findIndex(p => p?.id === currentPlayerId) + 2) % 4;
+        const partnerIndex = (game.players?.findIndex(p => p?.id === currentPlayerId) + 2) % 4;
         const partnerBid = game.bidding?.bids?.[partnerIndex];
         if (partnerBid !== undefined && partnerBid > 0) {
           bid = 0; // Partner bid something, must nil
@@ -870,7 +870,7 @@ export default function GameTable({
   
   // Add debug logs for hand mapping
   const currentPlayerId = user?.id;
-  const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
+  const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === user?.id) : -1;
   const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands[myPlayerIndex] || [] : [];
   console.log('myPlayerIndex:', myPlayerIndex);
   console.log('gameState.hands:', (gameState as any).hands);
@@ -1111,7 +1111,7 @@ export default function GameTable({
   const handleRemoveBot = async (seatIndex: number) => {
     try {
       // Get the player type before removing them
-      const player = gameState.players[seatIndex];
+      const player = gameState.players?.[seatIndex];
       const playerType = (player as any)?.type === 'bot' ? 'bot' : 'player';
       
       const endpoint = gameState.status === 'WAITING'
@@ -2596,7 +2596,7 @@ export default function GameTable({
 
   // --- Always show current user's hand ---
   // const myUserId = user?.id;
-  // const myHand = Array.isArray(gameState?.hands) && myUserId ? gameState.hands[gameState.players.findIndex(p => p.id === myUserId)] : [];
+  // const myHand = Array.isArray(gameState?.hands) && myUserId ? gameState.hands[gameState.players?.findIndex(p => p.id === myUserId)] : [];
   // Use myHand for rendering your cards, both in bidding and play phases.
 
   // --- Show cards on the table (current trick) with player info ---
@@ -2640,7 +2640,7 @@ export default function GameTable({
   useEffect(() => {
     if (!pendingPlayedCard) return;
     const currentTrick = (gameState as any)?.play?.currentTrick || [];
-    const myPlayerIndex = gameState.players ? gameState.players.findIndex(p => p && p.id === user?.id) : -1;
+    const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === user?.id) : -1;
     if (Array.isArray(currentTrick) && currentTrick.some((c: Card & { playerIndex: number }) => c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank && c.playerIndex === myPlayerIndex)) {
       setPendingPlayedCard(null);
     }
@@ -3120,9 +3120,9 @@ const [isStarting, setIsStarting] = useState(false);
   }, [socket, gameState.id]);
 
   const isLeague = (gameState as any).league;
-  const isHost = isLeague && gameState.players[0]?.id === user?.id;
-  const myIndex = gameState.players.findIndex(p => p && p.id === user?.id);
-  const allHumansReady = gameState.players.every((p, i) => {
+  const isHost = isLeague && gameState.players?.[0]?.id === user?.id;
+  const myIndex = gameState.players?.findIndex(p => p && p.id === user?.id);
+  const allHumansReady = gameState.players?.every((p, i) => {
     if (!isPlayer(p)) return true;
     // Host does not need to ready; require other humans only
     if (i === myIndex) return true;
@@ -3782,7 +3782,7 @@ const [isStarting, setIsStarting] = useState(false);
           playerScores={finalPlayerScores || gameState.playerScores || [0, 0, 0, 0]}
           winningPlayer={gameState.winningPlayer || 0}
           onPlayAgain={handlePlayAgain}
-          userPlayerIndex={gameState.players.findIndex(p => p && p.id === user?.id)}
+          userPlayerIndex={gameState.players?.findIndex(p => p && p.id === user?.id)}
           humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}
