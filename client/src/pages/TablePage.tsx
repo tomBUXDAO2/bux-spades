@@ -584,7 +584,7 @@ export default function TablePage() {
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received in TablePage:', data);
-      if (data.hands || (data.status === "BIDDING" && game.hands)) {
+      if (data.hands || (data.status === "BIDDING" if (data.hands || (data.status === "BIDDING" && game.hands)) {if (data.hands || (data.status === "BIDDING" && game.hands)) { game?.hands)) {
         setGame(prevGame => {
           if (!prevGame) return null;
           return { ...prevGame, hands: data.hands.map((h: any) => h.hand), status: data.status || "BIDDING" };
