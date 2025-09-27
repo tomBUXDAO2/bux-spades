@@ -513,7 +513,13 @@ export default function GameTable({
   
   // Handle game started event to show coin debit animation
   useEffect(() => {
-    if (!socket) return;
+    if (!socket) {
+      console.log('[GAME STARTED] No socket available');
+      return;
+    }
+    
+    console.log('[GAME STARTED] Setting up game_started listener, socket connected:', socket.connected);
+    console.log('[GAME STARTED] Socket ID:', socket.id);
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received:', data);
@@ -549,8 +555,10 @@ export default function GameTable({
     };
     
     socket.on('game_started', handleGameStarted);
+    console.log('[GAME STARTED] Event listener registered');
     
     return () => {
+      console.log('[GAME STARTED] Cleaning up event listener');
       socket.off('game_started', handleGameStarted);
     };
   }, [game.buyIn, socket]);

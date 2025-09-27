@@ -31,7 +31,9 @@ export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string
     const existingPlayer = gamePlayers.find(p => p.userId === socket.userId);
     if (existingPlayer) {
       console.log(`[GAME JOIN] User ${socket.userId} already in game ${gameId} at seat ${existingPlayer.seatIndex}`);
+      console.log(`[GAME JOIN] Adding socket ${socket.id} to room ${gameId}`);
       socket.join(gameId);
+      console.log(`[GAME JOIN] Socket ${socket.id} successfully joined room ${gameId}`);
       socket.emit('game_joined', { 
         gameId, 
         seatIndex: existingPlayer.seatIndex,
