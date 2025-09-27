@@ -513,6 +513,7 @@ export default function GameTable({
   
   // Handle game started event to show coin debit animation
   useEffect(() => {
+    console.log('[GAME STARTED] useEffect triggered, socket:', socket ? 'exists' : 'null');
     if (!socket) {
       console.log('[GAME STARTED] No socket available');
       return;
@@ -520,6 +521,7 @@ export default function GameTable({
     
     console.log('[GAME STARTED] Setting up game_started listener, socket connected:', socket.connected);
     console.log('[GAME STARTED] Socket ID:', socket.id);
+    console.log('[GAME STARTED] Socket state:', { connected: socket.connected, id: socket.id });
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received:', data);
@@ -563,6 +565,46 @@ export default function GameTable({
     };
   }, [socket]);
   
+  // Additional effect to handle socket reconnection
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleConnect = () => {
+      console.log('[GAME STARTED] Socket reconnected, re-registering game_started listener');
+      // Re-register the game_started listener
+      const handleGameStarted = (data: any) => {
+        console.log('[GAME STARTED] Event received (reconnect):', data);
+        console.log('[GAME STARTED] Hands data (reconnect):', data.hands);
+        
+        // Process hands data
+        if (data.hands) {
+          const handsArray = data.hands.map((h: any) => h.hand);
+          console.log('[GAME STARTED] Processed hands array (reconnect):', handsArray);
+          setGameState(prev => ({
+            ...prev,
+            hands: handsArray
+          }));
+          console.log('[GAME STARTED] Updated gameState with hands (reconnect)');
+        } else {
+          console.log('[GAME STARTED] No hands data received (reconnect)');
+        }
+        
+        // Mark dealing as complete
+        setDealingComplete(true);
+        setBiddingReady(false);
+        setCardsRevealed(false);
+      };
+      
+      socket.on('game_started', handleGameStarted);
+      console.log('[GAME STARTED] Event listener re-registered on reconnect');
+    };
+    
+    socket.on('connect', handleConnect);
+    
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [socket]);
 
   
   // const isMyTurn = game.currentPlayer === propUser?.id; // Removed unused variable
