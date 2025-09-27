@@ -388,8 +388,8 @@ export default function GameTable({
   const [countdownPlayer, setCountdownPlayer] = useState<{playerId: string, playerIndex: number, timeLeft: number} | null>(null);
   
   // Coin debit animation state
-  const [showCoinDebit, setShowCoinDebit] = useState(false);
-  const [coinDebitAmount, setCoinDebitAmount] = useState(0);
+  const [showCoinDebit, _setShowCoinDebit] = useState(false);
+  const [coinDebitAmount, _setCoinDebitAmount] = useState(0);
   
 
   
@@ -541,7 +541,9 @@ export default function GameTable({
     socket.on('game_started', handleGameStarted);
     console.log('[GAME STARTED] Listener registered');
     
-    return () => socket.off('game_started', handleGameStarted);
+    return () => {
+      socket.off('game_started', handleGameStarted);
+    };
   }, [socket, isReady]);
 
   
