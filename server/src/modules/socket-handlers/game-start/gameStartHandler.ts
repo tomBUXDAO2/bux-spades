@@ -1,6 +1,7 @@
 import type { AuthenticatedSocket } from '../../../types/socket';
 import { io } from '../../../index';
 import { prisma } from '../../../lib/prisma';
+import { newdbCreateRound } from '../../../newdb/writers';
 
 /**
  * Handle game start socket event
@@ -91,9 +92,30 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       { id: 'player_3', seatIndex: 3, username: 'Player 4', avatarUrl: '', type: 'human' as const }
     ];
     
-    const hands = dealCards(mockPlayers, 0); // Start with dealer at position 0
+    // Randomly assign dealer
+    const dealerIndex = Math.floor(Math.random() * 4);
+    const hands = dealCards(mockPlayers, dealerIndex);
     
-    console.log(`[GAME START] Dealt cards for game ${gameId}`);
+    console.log(`[GAME START] Dealt cards for game ${gameId}, dealer at position ${dealerIndex}`);
+    
+    // Create round and log hands to RoundHandSnapshot table
+    try {
+      const initialHands = hands.map((hand, seatIndex) => ({
+        seatIndex,
+        cards: hand.map(c => ({ suit: c.suit, rank: String(c.rank) }))
+      }));
+      
+      await newdbCreateRound({
+        gameId: gameId,
+        roundNumber: 1, // First round
+        dealerSeatIndex: dealerIndex,
+        initialHands
+      });
+      
+      console.log(`[GAME START] Created round 1 and logged hands to database for game ${gameId}`);
+    } catch (error) {
+      console.error(`[GAME START] Failed to create round and log hands:`, error);
+    }
     
     // Count human players to determine if game is rated
     const humanPlayers = await prisma.gamePlayer.count({
@@ -134,8 +156,13 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
         }))
       };
       
+      console.log(`[GAME START] Emitting game_started event to room ${gameId} with ${gameStartedData.hands.length} hands`);
+      console.log(`[GAME START] Hands data:`, gameStartedData.hands.map((h: any) => ({ playerId: h.playerId, cardCount: h.hand.length })));
+      
       io.to(gameId).emit('game_started', gameStartedData);
       io.to(gameId).emit('game_update', enrichedGame);
+      
+      console.log(`[GAME START] Events emitted to room ${gameId}`);
     }
     
     console.log(`[GAME START] Game started: ${gameId}, isRated: ${isRated}, humanPlayers: ${humanPlayers}`);
