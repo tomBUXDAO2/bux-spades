@@ -225,9 +225,30 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       console.log(`[LEAVE GAME] No human players remaining in unrated game ${gameId} - deleting game`);
       io.to(gameId).emit('game_deleted', { reason: 'no_human_players' });
       try {
-        // Delete game and related rows
+        // First, get all bot players to delete their user records
+        const botPlayers = await prisma.gamePlayer.findMany({
+          where: { gameId, isHuman: false },
+          select: { userId: true }
+        });
+
+        // Delete bot users from User table
+        for (const botPlayer of botPlayers) {
+          if (botPlayer.userId.startsWith('bot_')) {
+            try {
+              await prisma.user.delete({ where: { id: botPlayer.userId } });
+              console.log(`[LEAVE GAME] Deleted bot user: ${botPlayer.userId}`);
+            } catch (userErr) {
+              console.error(`[LEAVE GAME] Failed to delete bot user ${botPlayer.userId}:`, userErr);
+            }
+          }
+        }
+
+        // Delete all game players (cascades automatically)
+        await prisma.gamePlayer.deleteMany({ where: { gameId } });
+        
+        // Delete the game
         await prisma.game.delete({ where: { id: gameId } });
-        console.log('[LEAVE GAME] Successfully deleted unrated game from database');
+        console.log('[LEAVE GAME] Successfully deleted unrated game and all bot users from database');
       } catch (err) {
         console.error('[LEAVE GAME] Failed to delete unrated game:', err);
       }
