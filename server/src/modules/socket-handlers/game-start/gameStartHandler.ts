@@ -80,9 +80,20 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       console.log(`[GAME START] Added bot ${botUsername} to seat ${seatIndex}`);
     }
     
-    // Note: Card dealing will be handled by the client-side game logic
-    // The database doesn't store hands, they are generated client-side
-    console.log(`[GAME START] Game ready for card dealing and bidding`);
+    // Deal cards to all players
+    const { dealCards } = await import('../../dealing/cardDealing');
+    
+    // Create a mock players array for dealing (GamePlayer | null)[] format
+    const mockPlayers = [
+      { id: 'player_0', seatIndex: 0, username: 'Player 1', avatarUrl: '', type: 'human' as const },
+      { id: 'player_1', seatIndex: 1, username: 'Player 2', avatarUrl: '', type: 'human' as const },
+      { id: 'player_2', seatIndex: 2, username: 'Player 3', avatarUrl: '', type: 'human' as const },
+      { id: 'player_3', seatIndex: 3, username: 'Player 4', avatarUrl: '', type: 'human' as const }
+    ];
+    
+    const hands = dealCards(mockPlayers, 0); // Start with dealer at position 0
+    
+    console.log(`[GAME START] Dealt cards for game ${gameId}`);
     
     // Count human players to determine if game is rated
     const humanPlayers = await prisma.gamePlayer.count({
@@ -114,8 +125,16 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       const { enrichGameForClient } = require('../../../routes/games/shared/gameUtils');
       const enrichedGame = enrichGameForClient(updatedGame);
       
-      // Notify all players
-      io.to(gameId).emit('game_started', enrichedGame);
+      // Notify all players with hands data
+      const gameStartedData = {
+        ...enrichedGame,
+        hands: hands.map((hand, index) => ({
+          playerId: updatedGame.gamePlayers[index]?.userId || `player_${index}`,
+          hand: hand
+        }))
+      };
+      
+      io.to(gameId).emit('game_started', gameStartedData);
       io.to(gameId).emit('game_update', enrichedGame);
     }
     
