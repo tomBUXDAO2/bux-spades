@@ -516,13 +516,20 @@ export default function GameTable({
     if (!socket) return;
     
     const handleGameStarted = (data: any) => {
+      console.log('[GAME STARTED] Event received:', data);
+      console.log('[GAME STARTED] Hands data:', data.hands);
+      
       // Process hands data
       if (data.hands) {
         const handsArray = data.hands.map((h: any) => h.hand);
+        console.log('[GAME STARTED] Processed hands array:', handsArray);
         setGameState(prev => ({
           ...prev,
           hands: handsArray
         }));
+        console.log('[GAME STARTED] Updated gameState with hands');
+      } else {
+        console.log('[GAME STARTED] No hands data received');
       }
       
       // Mark dealing as complete (cards dealt face down) and keep cards hidden until player's turn

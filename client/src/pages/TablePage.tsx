@@ -319,7 +319,8 @@ export default function TablePage() {
         if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
           setTimeout(() => {
             if (socket && socket.connected) {
-              // socket.emit('join_game', { gameId }); // User already in game
+              console.log('[TABLE PAGE] Emitting join_game for game:', gameId);
+              socket.emit('join_game', { gameId });
             }
           }, 300);
         }
@@ -348,7 +349,7 @@ export default function TablePage() {
     const fallbackJoinGame = () => {
       if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
         console.log('SENDING JOIN_GAME EVENT');
-        // socket.emit('join_game', { gameId }); // User already in game
+        socket.emit('join_game', { gameId });
       } else {
         console.log('SOCKET NOT READY FOR JOIN_GAME');
       }
@@ -374,7 +375,7 @@ export default function TablePage() {
         const activeGameId = localStorage.getItem('activeGameId');
         if (activeGameId && !isSpectator) {
           console.log('[TABLE PAGE] Reconnect detected; rejoining game', activeGameId);
-          // socket.emit('join_game', { gameId: activeGameId }); // User already in game
+          socket.emit('join_game', { gameId: activeGameId });
         }
       } catch {}
     };
