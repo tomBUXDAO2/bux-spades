@@ -511,99 +511,25 @@ export default function GameTable({
     };
   }, [socket]);
   
-  // Handle game started event to show coin debit animation
+  // Handle game started event - SIMPLE VERSION
   useEffect(() => {
-    console.log('[GAME STARTED] useEffect triggered, socket:', socket ? 'exists' : 'null');
-    if (!socket) {
-      console.log('[GAME STARTED] No socket available');
-      return;
-    }
-    
-    console.log('[GAME STARTED] Setting up game_started listener, socket connected:', socket.connected);
-    console.log('[GAME STARTED] Socket ID:', socket.id);
-    console.log('[GAME STARTED] Socket state:', { connected: socket.connected, id: socket.id });
+    if (!socket) return;
     
     const handleGameStarted = (data: any) => {
       console.log('[GAME STARTED] Event received:', data);
-      console.log('[GAME STARTED] Hands data:', data.hands);
-      
-      // Process hands data
       if (data.hands) {
         const handsArray = data.hands.map((h: any) => h.hand);
-        console.log('[GAME STARTED] Processed hands array:', handsArray);
-        setGameState(prev => ({
-          ...prev,
-          hands: handsArray
-        }));
-        console.log('[GAME STARTED] Updated gameState with hands');
-      } else {
-        console.log('[GAME STARTED] No hands data received');
-      }
-      
-      // Mark dealing as complete (cards dealt face down) and keep cards hidden until player's turn
-      setDealingComplete(true);
-      setBiddingReady(false);
-      setCardsRevealed(false);
-      
-      // Show coin debit animation for any buy-in game
-      if ((game.buyIn ?? 0) > 0 && game.rated) {
-        setCoinDebitAmount(game.buyIn || 0);
-        setShowCoinDebit(true);
-        // Hide animation after 1.5 seconds
-        setTimeout(() => {
-          setShowCoinDebit(false);
-        }, 1500);
+        setGameState(prev => ({ ...prev, hands: handsArray }));
+        setDealingComplete(true);
+        setBiddingReady(false);
+        setCardsRevealed(false);
       }
     };
     
     socket.on('game_started', handleGameStarted);
-    console.log('[GAME STARTED] Event listener registered');
+    console.log('[GAME STARTED] Listener registered');
     
-    return () => {
-      console.log('[GAME STARTED] Cleaning up event listener');
-      socket.off('game_started', handleGameStarted);
-    };
-  }, [socket]);
-  
-  // Additional effect to handle socket reconnection
-  useEffect(() => {
-    if (!socket) return;
-    
-    const handleConnect = () => {
-      console.log('[GAME STARTED] Socket reconnected, re-registering game_started listener');
-      // Re-register the game_started listener
-      const handleGameStarted = (data: any) => {
-        console.log('[GAME STARTED] Event received (reconnect):', data);
-        console.log('[GAME STARTED] Hands data (reconnect):', data.hands);
-        
-        // Process hands data
-        if (data.hands) {
-          const handsArray = data.hands.map((h: any) => h.hand);
-          console.log('[GAME STARTED] Processed hands array (reconnect):', handsArray);
-          setGameState(prev => ({
-            ...prev,
-            hands: handsArray
-          }));
-          console.log('[GAME STARTED] Updated gameState with hands (reconnect)');
-        } else {
-          console.log('[GAME STARTED] No hands data received (reconnect)');
-        }
-        
-        // Mark dealing as complete
-        setDealingComplete(true);
-        setBiddingReady(false);
-        setCardsRevealed(false);
-      };
-      
-      socket.on('game_started', handleGameStarted);
-      console.log('[GAME STARTED] Event listener re-registered on reconnect');
-    };
-    
-    socket.on('connect', handleConnect);
-    
-    return () => {
-      socket.off('connect', handleConnect);
-    };
+    return () => socket.off('game_started', handleGameStarted);
   }, [socket]);
 
   
