@@ -380,7 +380,8 @@ export default function GameTable({
   const [countdownPlayer, setCountdownPlayer] = useState<{playerId: string, playerIndex: number, timeLeft: number} | null>(null);
   
   // Coin debit animation state
-  // Removed unused coin debit state
+  const [showCoinDebit, setShowCoinDebit] = useState(false);
+  const [coinDebitAmount, setCoinDebitAmount] = useState(0);
   
 
   
