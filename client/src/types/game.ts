@@ -22,7 +22,7 @@ export interface Player {
   hand: Card[];
   bid?: number;
   tricks?: number;
-  avatar?: string;
+  avatarUrl?: string;
   username?: string;
 }
 
