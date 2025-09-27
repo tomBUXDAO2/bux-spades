@@ -561,7 +561,7 @@ export default function GameTable({
       console.log('[GAME STARTED] Cleaning up event listener');
       socket.off('game_started', handleGameStarted);
     };
-  }, [game.buyIn, socket]);
+  }, [socket]);
   
 
   
