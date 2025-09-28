@@ -73,7 +73,6 @@ const initializeAudio = () => {
     (window as any).bidAudio = bidAudio;
     (window as any).winAudio = winAudio;
     
-    console.log('Audio initialized successfully');
   } catch (error) {
     console.log('Audio initialization failed:', error);
   }
@@ -132,6 +131,7 @@ const playWinSound = () => {
 
 interface GameTableProps {
   game: GameState;
+  gameId?: string;
   joinGame: (gameId: string, userId: string, options?: any) => void;
   onLeaveTable: () => void;
   startGame: (gameId: string, userId?: string) => Promise<void>;
@@ -357,6 +357,7 @@ export default function GameTable({
   onLeaveTable,
   startGame,
   user: propUser,
+  gameId,
   // Add modal props with defaults
   showStartWarning = false,
   showBotWarning = false,
@@ -371,13 +372,7 @@ export default function GameTable({
 }: GameTableProps) {
   const { socket, isAuthenticated, isReady } = useSocket();
   
-  // Debug socket state
-  console.log('[GAME TABLE] Socket state:', { 
-    socket: socket ? 'exists' : 'null', 
-    isAuthenticated, 
-    isReady,
-    connected: socket?.connected 
-  });
+
   // Using propUser elsewhere; no need to pull from AuthContext here
 // const { user } = useAuth();
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
@@ -410,7 +405,6 @@ export default function GameTable({
     if (!socket) return;
     
     const handleCountdownStart = (data: {playerId: string, playerIndex: number, timeLeft: number}) => {
-      console.log('[COUNTDOWN] Starting countdown for player:', data);
       setCountdownPlayer(data);
       
       // Start countdown timer
@@ -428,7 +422,6 @@ export default function GameTable({
     
     // Clear countdown when any player acts (bidding or playing)
     const handlePlayerActed = () => {
-      console.log('[COUNTDOWN] Player acted, clearing countdown');
       setCountdownPlayer(null);
     };
     
@@ -508,7 +501,6 @@ export default function GameTable({
     if (!socket) return;
     
     const handleNewHandStartedEvent = (data: any) => {
-      console.log('[NEW HAND STARTED] Event received:', data);
       handleNewHandStarted();
     };
     
@@ -519,27 +511,60 @@ export default function GameTable({
     };
   }, [socket]);
   
+  // Handle game joined event - for reconnection to active games
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleGameJoined = (data: any) => {
+      
+      // If this is a reconnection to an active game, handle the active game state
+      if (data.activeGameState) {
+        
+        // Update game state with the active game data
+        if (data.activeGameState.hands && data.activeGameState.hands.length > 0) {
+          const handsArray = data.activeGameState.hands.map((h: any) => h.hand || h);
+          setGameState(prev => ({ 
+            ...prev, 
+            hands: handsArray, 
+            status: data.activeGameState.status || "BIDDING",
+            currentPlayer: data.activeGameState.currentPlayer || data.activeGameState.bidding?.currentPlayer,
+            bidding: data.activeGameState.bidding,
+            play: data.activeGameState.play,
+            rules: data.activeGameState.rules
+          }));
+          setDealingComplete(true);
+          setBiddingReady(true);
+          setCardsRevealed(true);
+          setIsStarting(false);
+        }
+      }
+    };
+    
+    socket.on('game_joined', handleGameJoined);
+    
+    return () => {
+      socket.off('game_joined', handleGameJoined);
+    };
+  }, [socket]);
+
   // Handle game started event - SIMPLE VERSION
   useEffect(() => {
-    console.log('[GAME STARTED] useEffect triggered');
     if (!socket) {
-      console.log('[GAME STARTED] Socket not ready:', { socket: !!socket, isReady });
       return;
     }
     
     const handleGameStarted = (data: any) => {
-      console.log('[GAME STARTED] Event received:', data);
       if (data.hands || (data.status === "BIDDING" && gameState.hands)) {
         const handsArray = data.hands.map((h: any) => h.hand);
-        setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING" }));
+        setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING", currentPlayer: data.currentPlayer }));
         setDealingComplete(true);
         setBiddingReady(false);
         setCardsRevealed(false);
+        setIsStarting(false); // Reset starting state
       }
     };
     
     socket.on('game_started', handleGameStarted);
-    console.log('[GAME STARTED] Listener registered');
     
     return () => {
       socket.off('game_started', handleGameStarted);
@@ -551,7 +576,6 @@ export default function GameTable({
   
   // Add dummy handlePlayAgain to fix missing reference error
   const handlePlayAgain = () => {
-    console.log('[PLAY AGAIN] User clicked play again');
     if (socket) {
       socket.emit('play_again', { gameId: gameState.id });
     }
@@ -574,26 +598,21 @@ export default function GameTable({
   // Auto-play handler
   // @ts-ignore
   const handleAutoPlay = () => {
-    console.log('[AUTO PLAY DEBUG] handleAutoPlay called');
     if (!game) {
-      console.log('[AUTO PLAY DEBUG] No game state');
       return;
     }
     
     const currentPlayerId = game.currentPlayer;
     const currentPlayer = game.players.find(p => p?.id === currentPlayerId);
     
-    console.log('[AUTO PLAY DEBUG] Current player:', currentPlayer);
     
     if (!currentPlayer || isBot(currentPlayer)) {
-      console.log('[AUTO PLAY DEBUG] Not a human player or no player found');
       return;
     }
     
     // Increment auto-play count
     setAutoPlayCount(prev => {
       const newCount = (prev[currentPlayerId] || 0) + 1;
-      console.log('[AUTO PLAY DEBUG] Updated auto-play count for', currentPlayerId, ':', newCount);
       return {
         ...prev,
         [currentPlayerId]: newCount
@@ -602,14 +621,11 @@ export default function GameTable({
     
     // If 3 auto-plays in a row, remove player
     const currentAutoPlayCount = (autoPlayCount[currentPlayerId] || 0) + 1;
-    console.log('[AUTO PLAY DEBUG] Auto-play count:', currentAutoPlayCount, 'for player:', currentPlayerId);
     
     if (currentAutoPlayCount >= 3) {
-      console.log('[TIMER] Player auto-played 3 times, removing from table');
       
       // Check if this is the current user being removed
       if (currentPlayerId === propUser?.id) {
-        console.log('[TIMER] Current user is being removed, closing window');
         // Close the window/tab for the removed player
         window.close();
         // Fallback if window.close() doesn't work
@@ -622,7 +638,6 @@ export default function GameTable({
       const remainingHumanPlayers = remainingPlayers.filter(p => p && !isBot(p));
       
       if (remainingHumanPlayers.length === 0) {
-        console.log('[TIMER] No human players remaining, closing table for all');
         // Close table for all remaining players (they're all bots)
         if (socket) {
           socket.emit('close_table', { gameId: game.id, reason: 'no_humans_remaining' });
@@ -645,12 +660,10 @@ export default function GameTable({
     // Auto-play logic
     if (game.status === 'BIDDING') {
       // Use bot bidding logic instead of just bidding nil
-      console.log('[TIMER] Auto-bidding using bot logic for timeout');
       
       // Get the player's hand
       const myHand = game.hands?.find((_, index) => game.players[index]?.id === currentPlayerId);
       if (!myHand) {
-        console.log('[AUTO PLAY DEBUG] No hand found for auto-bid');
         return;
       }
       
@@ -667,7 +680,6 @@ export default function GameTable({
         } else {
           // Use normal bidding logic
           if (!myHand || !Array.isArray(myHand)) {
-            console.log('[TIMER] No hand available for bidding, skipping auto-bid');
             return;
           }
         const expectedTricks = Math.max(1, Math.floor((myHand && Array.isArray(myHand) ? myHand.length : 0) / 3));
@@ -676,7 +688,6 @@ export default function GameTable({
       } else if (game.forcedBid === 'BID4NIL') {
         // 4 OR NIL: bid 4 or nil
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for BID4NIL, skipping auto-bid');
           return;
         }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
@@ -687,7 +698,6 @@ export default function GameTable({
       } else if (game.forcedBid === 'BIDHEARTS') {
         // BID HEARTS: bid number of hearts
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for BIDHEARTS, skipping auto-bid');
           return;
         }
         bid = myHand.filter((c: Card) => {
@@ -697,7 +707,6 @@ export default function GameTable({
       } else if (game.forcedBid === 'CRAZY ACES') {
         // CRAZY ACES: bid 3 for each ace
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for CRAZY ACES, skipping auto-bid');
           return;
         }
         const acesCount = myHand.filter((c: Card) => c.rank === 'A').length;
@@ -705,14 +714,12 @@ export default function GameTable({
       } else if (game.rules?.bidType === 'MIRROR') {
         // Mirror: bid number of spades
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for MIRROR, skipping auto-bid');
           return;
         }
         bid = myHand.filter((c: Card) => isSpade(c)).length;
       } else if (game.rules?.bidType === 'WHIZ') {
         // Whiz: bid number of spades, or nil if no spades
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for WHIZ, skipping auto-bid');
           return;
         }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
@@ -729,7 +736,6 @@ export default function GameTable({
       } else {
         // Regular bidding: use bot logic
         if (!myHand || !Array.isArray(myHand)) {
-          console.log('[TIMER] No hand available for regular bidding, skipping auto-bid');
           return;
         }
         const spadesCount = myHand.filter((c: Card) => isSpade(c)).length;
@@ -742,9 +748,13 @@ export default function GameTable({
         }
       }
       
-      console.log('[TIMER] Auto-bidding calculated bid:', bid, 'for game type:', game.rules?.bidType, 'forced bid:', game.forcedBid);
       
-      if (socket) {
+      // Do not auto-bid for the current human player; only emit for bots/other seats
+      const me = game.players.find(p => p && p.id === currentPlayerId);
+      const isMyTurn = game.currentPlayer === currentPlayerId || game.bidding?.currentPlayer === currentPlayerId;
+      if (me && isPlayer(me) && isMyTurn) {
+        // Skip auto-bid for current human player
+      } else if (socket) {
         socket.emit('make_bid', { 
           gameId: game.id, 
           userId: currentPlayerId, 
@@ -754,12 +764,10 @@ export default function GameTable({
     } else if (game.status === 'PLAYING') {
       // Auto-play first playable card
       const myHand = game.hands?.find((_, index) => game.players[index]?.id === currentPlayerId);
-      console.log('[AUTO PLAY DEBUG] My hand:', myHand);
       
       if (myHand && Array.isArray(myHand) && myHand.length > 0) {
         const playableCards = getPlayableCards(game, myHand, game.play?.currentTrick?.length === 0, false);
         const cardToPlay = playableCards.length > 0 ? playableCards[0] : myHand[0];
-        console.log('[TIMER] Auto-playing card:', cardToPlay);
         if (socket) {
           socket.emit('play_card', { 
             gameId: game.id, 
@@ -767,17 +775,12 @@ export default function GameTable({
             card: cardToPlay 
           });
         }
-      } else {
-        console.log('[TIMER] No hand available for auto-play, skipping');
       }
     }
   };
 
   // Function to handle hand summary continue
   const handleHandSummaryContinue = () => {
-    console.log('[HAND SUMMARY CONTINUE] Function called');
-    console.log('Socket connected:', socket?.connected);
-    console.log('Game ID:', gameState.id);
     console.log('Socket ID:', socket?.id);
     
     // Close modal locally for this player
@@ -787,24 +790,15 @@ export default function GameTable({
     
     // Emit hand summary continue event to server
     if (socket && gameState.id) {
-      console.log('[HAND SUMMARY CONTINUE] Emitting hand_summary_continue event...');
-      console.log('[HAND SUMMARY CONTINUE] Socket ready state:', { connected: socket.connected, id: socket.id });
       
       if (socket.connected) {
-        socket.emit('hand_summary_continue', { gameId: gameState.id }, (response: any) => {
-          console.log('[HAND SUMMARY CONTINUE] Server response:', response);
-        });
-        console.log('[HAND SUMMARY CONTINUE] hand_summary_continue event emitted');
+        socket.emit('hand_summary_continue', { gameId: gameState.id });
       } else {
-        console.error('[HAND SUMMARY CONTINUE] Socket not connected, cannot emit event');
         // Try to reconnect and emit
         socket.connect();
         setTimeout(() => {
           if (socket.connected) {
-            console.log('[HAND SUMMARY CONTINUE] Retrying emit after reconnect...');
-            socket.emit('hand_summary_continue', { gameId: gameState.id }, (response: any) => {
-              console.log('[HAND SUMMARY CONTINUE] Server response (retry):', response);
-            });
+            socket.emit('hand_summary_continue', { gameId: gameState.id });
           }
         }, 1000);
       }
@@ -815,7 +809,6 @@ export default function GameTable({
 
   // Function to handle new hand started (called when server starts new hand)
   const handleNewHandStarted = () => {
-    console.log('[NEW HAND STARTED] Function called');
     
     // Reset dealing state for new hand
     setDealingComplete(false);
@@ -869,15 +862,11 @@ export default function GameTable({
   const currentPlayerId = user?.id;
   const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === user?.id) : -1;
   const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands[myPlayerIndex] || [] : [];
-  console.log('myPlayerIndex:', myPlayerIndex);
-  console.log('gameState.hands:', (gameState as any).hands);
-  console.log('myHand:', myHand);
   
   
   // After getting the players array:
   const sanitizedPlayers = (gameState.players || []);
   
-  console.log('game.players:', gameState.players); // Debug log to catch nulls
 
   // Find the current player's position and team
   const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === currentPlayerId) || null;
@@ -890,17 +879,6 @@ export default function GameTable({
     // Don't show blind nil modal for spectators
     if (myPlayerIndex === -1) return;
     
-    console.log('[BLIND NIL DEBUG] Checking blind nil modal conditions:');
-    console.log('[BLIND NIL DEBUG] gameState.status:', gameState.status);
-    console.log('[BLIND NIL DEBUG] gameState.currentPlayer:', gameState.currentPlayer);
-    console.log('[BLIND NIL DEBUG] currentPlayerId:', currentPlayerId);
-    console.log('[BLIND NIL DEBUG] dealingComplete:', dealingComplete);
-    console.log('[BLIND NIL DEBUG] biddingReady:', biddingReady);
-    console.log('[BLIND NIL DEBUG] gameState.rules?.allowBlindNil:', gameState.rules?.allowBlindNil);
-    console.log('[BLIND NIL DEBUG] showBlindNilModal:', showBlindNilModal);
-    console.log('[BLIND NIL DEBUG] isBlindNil:', isBlindNil);
-    console.log('[BLIND NIL DEBUG] blindNilDismissed:', blindNilDismissed);
-    console.log('[BLIND NIL DEBUG] cardsRevealed:', cardsRevealed);
     
     if (gameState.status === "BIDDING" && 
         gameState.currentPlayer === currentPlayerId && 
@@ -911,15 +889,12 @@ export default function GameTable({
         !isBlindNil &&
         !blindNilDismissed &&
         !cardsRevealed) {
-      console.log('[BLIND NIL DEBUG] All conditions met, showing blind nil modal');
       // Show blind nil modal BEFORE revealing cards
       const timer = setTimeout(() => {
         setShowBlindNilModal(true);
       }, 1000); // 1 second delay after dealing
       
       return () => clearTimeout(timer);
-    } else {
-      console.log('[BLIND NIL DEBUG] Conditions not met for blind nil modal');
     }
   }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, biddingReady, isBlindNil, gameState.rules?.allowBlindNil, blindNilDismissed, cardsRevealed, myPlayerIndex]);
 
@@ -940,7 +915,6 @@ export default function GameTable({
         !cardsRevealed;
     
     if (shouldShowBlindNilFirst) {
-      console.log('[BLIND NIL DEBUG] Blind nil should be shown first, not revealing cards yet');
       return;
     }
     
@@ -953,7 +927,6 @@ export default function GameTable({
         !cardsRevealed &&
         !showBlindNilModal &&
         !isBlindNil) {
-      console.log('[BLIND NIL DEBUG] Revealing cards for regular bidding');
       // For regular games, reveal cards immediately when it's your turn
       setCardsRevealed(true);
     }
@@ -962,7 +935,6 @@ export default function GameTable({
   // Track all game state changes that would affect the UI
   useEffect(() => {
     if (lastCurrentPlayer !== gameState.currentPlayer) {
-      console.log(`Current player changed: ${lastCurrentPlayer} -> ${gameState.currentPlayer} (my ID: ${currentPlayerId})`);
       setLastCurrentPlayer(gameState.currentPlayer);
       
       // Force a component state update to trigger re-renders of children
@@ -1055,7 +1027,6 @@ export default function GameTable({
   };
 
   const handleBlindNil = () => {
-    console.log('[BLIND NIL] User chose blind nil');
     setIsBlindNil(true);
     setShowBlindNilModal(false);
     setBlindNilDismissed(true);
@@ -1064,7 +1035,6 @@ export default function GameTable({
   };
 
   const handleRegularBid = () => {
-    console.log('[BLIND NIL] User chose regular bid');
     setShowBlindNilModal(false);
     setBlindNilDismissed(true);
     setCardsRevealed(true);
@@ -1188,7 +1158,6 @@ export default function GameTable({
       return basePositions[pos];
     };
 
-    console.log('Rendering player position', position, player);
     // If seat is empty and user is not in game, show join button (including spectators)
     if (!player && myPlayerIndex === -1) {
       return (
@@ -1265,20 +1234,24 @@ export default function GameTable({
       // Use ORIGINAL position for team assignment, not display position
       // Get the original position from the player object
       const originalPosition = player.seatIndex ?? position;
-      console.log(`[TEAM COLOR DEBUG] Player ${player.username} at display position ${position}, original position ${originalPosition}, team assignment: ${(originalPosition === 0 || originalPosition === 2) ? 'RED' : 'BLUE'}`);
       playerGradient = (originalPosition === 0 || originalPosition === 2)
         ? redTeamGradient
         : blueTeamGradient;
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
-    const actualSeatIndex = player.position; // Use actual seat position
+    // Use the player's position in the players array to match the server's bidding.bids array
+    // The server's bidding.bids array is indexed by the player's position in the players array (0,1,2,3)
+    const actualSeatIndex = position;
     const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    
+    
     const bidCount = rawBid !== undefined ? rawBid : 0;
-    const hasBid = rawBid !== undefined;    let madeStatus = null;
+    const hasBid = rawBid !== undefined;
+    
+    let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
     const formatBid = (bid: number | null) => {
-      console.log("[BID FORMAT DEBUG] bid:", bid, "formatted:", bid === -1 ? "bn" : bid === 0 ? "n" : bid === null ? "null" : bid.toString());
       if (bid === null || bid === undefined) return "0";
       if (bid === -1) return "bn";
       if (bid === 0) return "n";
@@ -1286,12 +1259,10 @@ export default function GameTable({
     };
     
     if (isPartnerGame) {
-      // Partner game logic - use original positions for partner calculation
-      const originalPosition = player.seatIndex ?? position;
-      const partnerOriginalPosition = (originalPosition + 2) % 4;
-      const partner = gameState.players.find(p => p && p.seatIndex === partnerOriginalPosition);
-      const partnerActualSeatIndex = partner?.position; // Use actual seat position
-      const partnerBid = partnerActualSeatIndex !== undefined ? (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0 : 0;
+      // Partner game logic - use array positions for partner calculation
+      const partnerPosition = (position + 2) % 4;
+      const partner = gameState.players[partnerPosition];
+      const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
       
       // Calculate team totals
@@ -1352,16 +1323,13 @@ export default function GameTable({
     // Debug logging for tick/cross logic
     if (gameState.status === 'PLAYING' && (bidCount > 0 || madeCount > 0)) {
       if (isPartnerGame) {
-        // Use actual seat position for partner calculation
-        const actualSeatIndex = player?.position ?? position;
-        const partnerActualSeatIndex = (actualSeatIndex + 2) % 4;
-        const partnerBid = (gameState as any).bidding?.bids?.[partnerActualSeatIndex] ?? 0;
-        const partnerMade = gameState.players?.[partnerActualSeatIndex]?.tricks ?? 0;
+        // Use the same actualSeatIndex calculation as above for consistency
+        const partnerPosition = (actualSeatIndex + 2) % 4;
+        const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
+        const partnerMade = gameState.players?.[partnerPosition]?.tricks ?? 0;
         const teamBid = bidCount + partnerBid;
         const teamMade = madeCount + partnerMade;
-        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}) at original pos ${actualSeatIndex}: bid=${bidCount}, made=${madeCount}, partnerBid=${partnerBid}, partnerMade=${partnerMade}, teamBid=${teamBid}, teamMade=${teamMade}, tricksLeft=${tricksLeft}, status=${madeStatus}, canMakeBid=${teamMade + tricksLeft >= teamBid}`);
       } else {
-        console.log(`[TICK/CROSS DEBUG] Player ${position} (${player?.username}): bid=${bidCount}, made=${madeCount}, tricksLeft=${tricksLeft}, status=${madeStatus}, isPartnerGame=${isPartnerGame}`);
       }
     }
     // --- END NEW LOGIC ---
@@ -1431,6 +1399,10 @@ export default function GameTable({
     
     const displayName = isHuman ? player.username : 'Bot';
     const displayAvatar = isHuman ? player.avatarUrl : '/bot-avatar.jpg';
+    
+    // Debug avatar loading
+    if (isHuman && player.id === user?.id) {
+    }
     return (
       <div className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
@@ -1481,7 +1453,6 @@ export default function GameTable({
                       {/* Dealer chip for bots */}
                       {player.isDealer && (
                         <>
-                          {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
                           <div className="absolute -bottom-1 -right-1">
                             <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
                               <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
@@ -1532,7 +1503,6 @@ export default function GameTable({
                   {/* Dealer chip for bots */}
                   {player.isDealer && (
                     <>
-                      {(() => { console.log('Rendering dealer chip for', player.username, player.isDealer); return null; })()}
                       <div className="absolute -bottom-1 -right-1">
                         <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
                           <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
@@ -1816,7 +1786,6 @@ export default function GameTable({
   useEffect(() => {
     if (gameState.status === 'BIDDING' && myHand && myHand.length > 0 && !dealingComplete) {
       const timeout = setTimeout(() => {
-        console.log('[FALLBACK] Forcing dealing completion after timeout');
         setDealtCardCount(myHand && Array.isArray(myHand) ? myHand.length : 0);
         setDealingComplete(true);
       }, 3000);
@@ -1835,7 +1804,6 @@ export default function GameTable({
   // After dealing animation completes, enable bidding immediately
   useEffect(() => {
     if (dealingComplete && gameState.status === 'BIDDING') {
-      console.log('[DEBUG] Dealing complete. Enabling bidding immediately.');
       setBiddingReady(true);
     } else {
       setBiddingReady(false);
@@ -1850,19 +1818,11 @@ export default function GameTable({
       currentPlayer &&
       isBot(currentPlayer) &&
       gameState.currentPlayer === currentPlayer.id &&
-      typeof (gameState as any).bidding?.bids?.[currentPlayer.position] === 'undefined'
+      typeof (gameState as any).bidding?.bids?.[currentPlayer.seatIndex] === 'undefined'
     ) {
-      console.log('[DEBUG] Bot bidding triggered:', {
-        dealingComplete,
-        biddingReady,
-        currentPlayer,
-        currentPlayerId: currentPlayer.id,
-        bids: (gameState as any).bidding?.bids
-      });
       // Add a random delay between 1 and 1.5 seconds
       const delay = 200 + Math.random() * 300;
       const botBidTimeout = setTimeout(() => {
-        console.log('[DEBUG] Bot is making a bid after delay:', { delay, botId: currentPlayer.id });
         // Choose a simple bot bid (random or always 4 for now)
         const botBid = 4; // TODO: Replace with smarter logic if needed
         playBidSound();
@@ -1890,7 +1850,6 @@ export default function GameTable({
   }, [(gameState as any)?.bidding?.bids]);
 
   const renderPlayerHand = () => {
-    // console.log('[DEBUG] renderPlayerHand called', { myHand, handImagesLoaded, gameStateStatus: gameState.status });
     if (!myHand || myHand.length === 0) return null;
     const sortedHand = sortCards(myHand);
     const isLeadingTrick = currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0;
@@ -1899,9 +1858,6 @@ export default function GameTable({
     const isMyTurn = (gameState.status === "PLAYING" || gameState.status === "BIDDING") && gameState.currentPlayer === currentPlayerId;
     // Only log if these exist
     if (typeof playableCards !== 'undefined' && typeof myHand !== 'undefined') {
-          // console.log('[DEBUG] isMyTurn:', isMyTurn);
-    // console.log('[DEBUG] playableCards:', playableCards);
-    // console.log('[DEBUG] myHand:', myHand);
     }
     // Defensive: only use myHand and playableCards if defined
     let effectivePlayableCards: typeof myHand = [];
@@ -1958,9 +1914,6 @@ export default function GameTable({
     const showAllCards = gameState.status === 'PLAYING' || gameState.status === 'BIDDING' || dealingComplete;
     const visibleCount = showAllCards ? (sortedHand && Array.isArray(sortedHand) ? sortedHand.length : 0) : dealtCardCount;
 
-    // console.log('[DEBUG] isMyTurn:', isMyTurn);
-    // console.log('[DEBUG] playableCards:', playableCards);
-    // console.log('[DEBUG] myHand:', myHand);
 
     return (
       <div
@@ -1983,21 +1936,6 @@ export default function GameTable({
               (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
             const isVisible = index < visibleCount;
             
-            // Debug card playability
-            if (index === 0) {
-              console.log('[CARD DEBUG] Card playability check:', {
-                card: `${card.rank}${card.suit}`,
-                gameStateStatus: gameState.status,
-                currentPlayer: gameState.currentPlayer,
-                currentPlayerId,
-                isMyTurn: gameState.currentPlayer === currentPlayerId,
-                effectivePlayableCards: Array.isArray(effectivePlayableCards) ? effectivePlayableCards.map((c: Card) => `${c.rank}${c.suit}`) : [],
-                isPlayable,
-                isLeading: currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0,
-                trickCompleted,
-                currentTrickLength: currentTrick && Array.isArray(currentTrick) ? currentTrick.length : 0
-              });
-            }
             return (
               <div
                 key={`${card.suit}${card.rank}`}
@@ -2012,12 +1950,8 @@ export default function GameTable({
                                        filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
                 }}
                 onClick={() => {
-                  console.log('[CARD CLICK DEBUG] Card clicked:', card, 'isPlayable:', isPlayable, 'gameState.status:', gameState.status);
                   if (isPlayable && gameState.status === "PLAYING") {
-                    console.log('[CARD CLICK DEBUG] Calling handlePlayCard');
                     handlePlayCard(card);
-                  } else {
-                    console.log('[CARD CLICK DEBUG] Click ignored - not playable or wrong game state');
                   }
                 }}
               >
@@ -2096,16 +2030,12 @@ export default function GameTable({
     if (!socket) return;
 
     // Listen for hand completion event
-    const handleHandCompleted = (data?: any) => {
-      console.log('[HAND COMPLETED] Client received hand completion event:', data);
-      console.log('Hand summary data received:', JSON.stringify(data, null, 2));
+  const handleHandCompleted = (data?: any) => {
       
       // Store the hand summary data from server
       if (data) {
         setHandSummaryData(data);
-        console.log('Hand summary data stored in state');
       } else {
-        console.log('No hand summary data received');
       }
       
       // Don't show hand summary immediately - wait for game state update
@@ -2113,15 +2043,12 @@ export default function GameTable({
     };
       setShowHandSummary(true);    
     const handCompletedHandler = (data: any) => {
-      console.log('[CLIENT] hand_completed event received - SOCKET CONNECTED:', socket?.connected);
-      console.log('[CLIENT] hand_completed event received:', data);
       handleHandCompleted(data);
     };
     // Register event listener for hand completion
     if (socket) {
       socket.on('hand_completed', handCompletedHandler);
     } else {
-      console.log('[SOCKET] Cannot register hand_completed listener - no socket');
     }
     
     return () => {
@@ -2135,12 +2062,6 @@ export default function GameTable({
   useEffect(() => {
     // Only show hand summary if we have hand summary data and the game state has been updated
     if (handSummaryData && true && !showHandSummary) {
-      console.log('[HAND SUMMARY TRIGGER] Game state updated, showing hand summary with final scores:', {
-        team1TotalScore: gameState.team1TotalScore,
-        team2TotalScore: gameState.team2TotalScore,
-        handSummaryDataTeam1: handSummaryData.team1TotalScore,
-        handSummaryDataTeam2: handSummaryData.team2TotalScore
-      });
       
       // Add a small delay to ensure all state updates are complete
       setTimeout(() => {
@@ -2157,7 +2078,6 @@ export default function GameTable({
     if (!socket) return;
 
     const handleNewHandStarted = (data: any) => {
-      console.log('[NEW HAND] New hand started event received:', data);
       setDealingComplete(true); // Cards are dealt immediately
       setBiddingReady(false); // Bidding not ready yet
       setDealtCardCount(13);
@@ -2184,7 +2104,8 @@ export default function GameTable({
         bidding: {
           ...prev.bidding,
           currentBidderIndex: data.currentBidderIndex,
-          bids: [null, null, null, null],
+          // DON'T overwrite existing bids - keep them from server
+          // bids: [null, null, null, null], // REMOVED - this was wiping out server bids
           nilBids: {},
           currentPlayer: data.hands && Array.isArray(data.hands) && data.hands.length > 0 && prev.players && Array.isArray(prev.players) && prev.players[(data.dealerIndex + 1) % 4]
             ? prev.players[(data.dealerIndex + 1) % 4]!.id
@@ -2196,7 +2117,6 @@ export default function GameTable({
     };
 
     const handleBiddingReady = (data: any) => {
-      console.log('[BIDDING READY] Bidding phase ready:', data);
       setBiddingReady(true);
       setGameState(prev => ({
         ...prev,
@@ -2209,7 +2129,6 @@ export default function GameTable({
     };
 
     const handleBiddingComplete = (data: any) => {
-      console.log('[BIDDING COMPLETE] Bidding completed:', data);
       setBiddingReady(true);
       setGameState(prev => ({
         ...prev,
@@ -2219,7 +2138,6 @@ export default function GameTable({
     };
 
     const handlePlayStart = (data: any) => {
-      console.log('[PLAY START] Play phase started:', data);
       setBiddingReady(true);
       setGameState(prev => ({
         ...prev,
@@ -2230,14 +2148,15 @@ export default function GameTable({
 
     socket.on('new_hand_started', handleNewHandStarted);
     socket.on('bidding_ready', handleBiddingReady);
-    socket.on('bidding_complete', handleBiddingComplete);
-    socket.on('play_start', handlePlayStart);
+    // Comment out individual phase transition handlers to avoid conflicts with game_update
+    // socket.on('bidding_complete', handleBiddingComplete);
+    // socket.on('play_start', handlePlayStart);
 
     return () => {
       socket.off('new_hand_started', handleNewHandStarted);
       socket.off('bidding_ready', handleBiddingReady);
-      socket.off('bidding_complete', handleBiddingComplete);
-      socket.off('play_start', handlePlayStart);
+      // socket.off('bidding_complete', handleBiddingComplete);
+      // socket.off('play_start', handlePlayStart);
     };
   }, [socket]);
 
@@ -2246,7 +2165,6 @@ export default function GameTable({
     if (!socket) return;
 
     const handleSeatReplacementStarted = (data: { gameId: string; seatIndex: number; expiresAt: number }) => {
-      console.log('[SEAT REPLACEMENT] Seat replacement started:', data);
       setSeatReplacement({
         isOpen: true,
         seatIndex: data.seatIndex,
@@ -2288,8 +2206,7 @@ export default function GameTable({
   useEffect(() => {
     if (!socket) return;
 
-    const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
-      console.log('[GAME OVER] Socket event received:', data);
+  const handleGameOver = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
       
       // Store the final scores from the server
       if (gameState.gameMode === 'SOLO' && data.playerScores) {
@@ -2297,8 +2214,6 @@ export default function GameTable({
       } else {
       setFinalScores({ team1Score: data.team1Score, team2Score: data.team2Score });
       }
-      console.log('[GAME OVER] Current game status:', gameState.status);
-      console.log('[GAME OVER] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
       // Call the server to complete the game
       try {
@@ -2316,7 +2231,7 @@ export default function GameTable({
         });
         
         if (response.ok) {
-          console.log('[GAME OVER] Game completion API call successful');
+          // Game completion API call successful
         } else {
           console.error('[GAME OVER] Game completion API call failed:', response.status);
         }
@@ -2331,16 +2246,13 @@ export default function GameTable({
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
         if (data.winningTeam === 1) {
-          console.log('[GAME OVER] Setting showWinner to true');
           setShowWinner(true);
           setShowLoser(false);
         } else {
-          console.log('[GAME OVER] Setting showLoser to true');
           setShowLoser(true);
           setShowWinner(false);
         }
       } else {
-        console.log('[GAME OVER] Modal already showing, ignoring socket event');
       }
     };
 
@@ -2355,8 +2267,6 @@ export default function GameTable({
   useEffect(() => {
     if (gameState.status === "FINISHED") {
       const winningTeam = gameState.winningTeam === "team1" ? 1 : 2;
-      console.log('[GAME STATUS] Game finished/completed, winning team:', winningTeam);
-      console.log('[GAME STATUS] Current modal states - showWinner:', showWinner, 'showLoser:', showLoser);
       
       setShowHandSummary(false);
       setHandSummaryData(null);
@@ -2365,20 +2275,16 @@ export default function GameTable({
       // Only set modal state if not already showing a modal
       if (!showWinner && !showLoser) {
         if (winningTeam === 1) {
-          console.log('[GAME STATUS] Setting showWinner to true');
           setShowWinner(true);
           setShowLoser(false);
         } else {
-          console.log('[GAME STATUS] Setting showLoser to true');
           setShowLoser(true);
           setShowWinner(false);
         }
       } else {
-        console.log('[GAME STATUS] Modal already showing, ignoring status change');
       }
     } else if (gameState.status === "WAITING") {
       // Close winner/loser modals when game resets to WAITING status
-      console.log('[GAME STATUS] Game reset to WAITING, closing all modals');
       setShowWinner(false);
       setShowLoser(false);
       setShowHandSummary(false);
@@ -2441,13 +2347,6 @@ export default function GameTable({
       // Check if this card is the winning card
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
       
-      // Debug logging
-      console.log('[TRICK CARD DEBUG]', {
-        windowHeight: window.innerHeight,
-        isMobile,
-        cardWidth: isMobile ? 50 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 25 : window.innerHeight >= 400 && window.innerHeight < 500 ? 43 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 64 : window.innerHeight > 550 && window.innerHeight < 600 ? 57 : window.innerHeight >= 600 && window.innerHeight < 650 ? 64 : window.innerHeight >= 650 && window.innerHeight < 700 ? 71 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160),
-        cardHeight: isMobile ? 69 : (window.innerHeight >= 300 && window.innerHeight < 400 ? 35 : window.innerHeight >= 400 && window.innerHeight < 500 ? 60 : window.innerHeight >= 500 && window.innerHeight <= 550 ? 120 : window.innerHeight > 550 && window.innerHeight <= 600 ? 130 : window.innerHeight > 600 && window.innerHeight < 650 ? 90 : window.innerHeight >= 650 && window.innerHeight < 700 ? 100 : window.innerHeight >= 700 && window.innerHeight < 750 ? 120 : window.innerHeight >= 750 && window.innerHeight < 800 ? 140 : window.innerHeight >= 800 && window.innerHeight < 840 ? 160 : 160)
-      });
       
       return (
         <div
@@ -2544,7 +2443,6 @@ export default function GameTable({
     if (socket.connected && isAuthenticated) {
       // Clear the flag on reconnection to allow system message
       if (window.__sentJoinSystemMessage === gameState.id) {
-        console.log('[SYSTEM MESSAGE] Clearing flag for reconnection');
         window.__sentJoinSystemMessage = null;
       }
       
@@ -2558,11 +2456,9 @@ export default function GameTable({
         timestamp: Date.now(),
         isGameMessage: true
       };
-        console.log('[SYSTEM MESSAGE] Sending join system message:', systemMessage);
       socket.emit('chat_message', { gameId: gameState.id, message: systemMessage });
       window.__sentJoinSystemMessage = gameState.id;
       } else {
-        console.log('[SYSTEM MESSAGE] System message already sent for this game, skipping');
       }
     }
   }, [socket, isAuthenticated, gameState?.id, user?.username]);
@@ -2784,6 +2680,11 @@ export default function GameTable({
     if (typeof startGame === 'function' && gameState?.id && user?.id) {
       await startGame(gameState.id, user.id);
     }
+    
+    // Reset starting state after a timeout in case game start fails
+    setTimeout(() => {
+      setIsStarting(false);
+    }, 5000);
   };
 
   // Handle starting game with bots (from bot warning modal)
@@ -3314,23 +3215,16 @@ const [isStarting, setIsStarting] = useState(false);
                     <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.username || 'Unknown'} can start</div>
                   </div>
                 ) : (() => {
-                  console.log('[BIDDING DEBUG] Checking bidding conditions:', {
-                    gameStateStatus: gameState.status,
-                    currentPlayerId,
-                    gameStateCurrentPlayer: gameState.currentPlayer,
-                    dealingComplete,
-                    biddingReady,
-                    isBiddingPhase: gameState.status === "BIDDING",
-                    isMyTurn: gameState.currentPlayer === currentPlayerId,
-                    isSpectator: isSpectator,
-                  });
                   return null;
                 })() || gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete &&  myPlayerIndex !== -1 ? (
                   <div className="flex items-center justify-center w-full h-full pointer-events-auto">
                     {(() => {
                       // Determine game type, including all gimmick games
-                      let gameType = (gameState as any).rules.bidType || (gameState as any).rules.gameType;
+                      let gameType = (gameState as any).rules?.bidType || (gameState as any).rules?.gameType;
                       const forcedBid = (gameState as any).forcedBid;
+                      const gimmickType = (gameState as any).rules?.gimmickType;
+                      
+                      // Handle gimmick games
                       if (forcedBid === 'SUICIDE') {
                         gameType = 'SUICIDE';
                       } else if (forcedBid === 'BID4NIL') {
@@ -3341,37 +3235,26 @@ const [isStarting, setIsStarting] = useState(false);
                         gameType = 'BID HEARTS';
                       } else if (forcedBid === 'CRAZY ACES') {
                         gameType = 'CRAZY ACES';
+                      } else if (gimmickType === 'SUICIDE') {
+                        gameType = 'SUICIDE';
+                      } else if (gimmickType === 'BID4NIL') {
+                        gameType = '4 OR NIL';
+                      } else if (gimmickType === 'BID3') {
+                        gameType = 'BID 3';
+                      } else if (gimmickType === 'BIDHEARTS') {
+                        gameType = 'BID HEARTS';
+                      } else if (gimmickType === 'CRAZY ACES') {
+                        gameType = 'CRAZY ACES';
                       }
-  
-  console.log('[GAMETABLE DEBUG] Game state analysis:', {
-    gameMode: gameState.gameMode,
-    rulesGameType: (gameState as any).rules?.gameType,
-    forcedBid: (gameState as any).forcedBid,
-    specialRules: gameState.specialRules,
-    finalGameType: gameType
-  });
-                      console.log('[GAMETABLE DEBUG] BiddingInterface props:', {
-                        gameType,
-                        gameStateRules: (gameState as any).rules,
-                        currentPlayerId,
-                        gameStateCurrentPlayer: gameState.currentPlayer,
-                        numSpades: currentPlayer ? countSpades(currentPlayer.hand) : 0,
-                        gameStateStatus: gameState.status,
-                        dealingComplete,
-                        biddingReady
-                      });
+                      
+                      // Fallback to REGULAR if no gameType is determined
+                      if (!gameType) {
+                        gameType = 'REGULAR';
+                      }
                       // Get the current player's hand from gameState.hands array
                       const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
                       const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
                       
-                      // Debug logging to see what's in the hand
-                      console.log('[WHIZ DEBUG] Hand data:', {
-                        currentPlayerIndex,
-                        currentPlayerHand,
-                        handLength: currentPlayerHand?.length,
-                        spadesInHand: Array.isArray(currentPlayerHand) ? currentPlayerHand.filter((card: any) => card.suit === '♠') : [],
-                        allCards: Array.isArray(currentPlayerHand) ? currentPlayerHand.map((card: any) => `${card.suit}${card.rank}`) : []
-                      });
                       
                       // Calculate if player has Ace of Spades for Whiz games
                       const hasAceSpades = Array.isArray(currentPlayerHand) ? currentPlayerHand.some((card: any) => (card.suit === 'SPADES') && card.rank === 'A') : false;
@@ -3538,10 +3421,10 @@ const [isStarting, setIsStarting] = useState(false);
             {chatReady ? (
               <Chat 
                 gameId={gameState.id}
-                userId={currentPlayerId || ''}
-                userName={isPlayer(currentPlayer) ? (currentPlayer.username || 'Unknown') : isBot(currentPlayer) ? (currentPlayer.username || 'Unknown') : 'Unknown'}
+                userId={user?.id || ''}
+                userName={user?.username || 'Unknown'}
                 players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
-                userAvatar={isPlayer(currentPlayer) ? currentPlayer.avatarUrl : user.avatar}
+                userAvatar={user?.avatarUrl || user?.avatar}
                 chatType={chatType}
                 onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
                 lobbyMessages={lobbyMessages}
@@ -3780,12 +3663,12 @@ const [isStarting, setIsStarting] = useState(false);
           winningPlayer={gameState.winningPlayer || 0}
           onPlayAgain={handlePlayAgain}
           userPlayerIndex={gameState.players?.findIndex(p => p && p.id === user?.id)}
-          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          humanPlayerCount={(gameState.players || []).filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}
           onLeaveTable={handleLeaveTable}
           players={gameState.players}
-          isRated={gameState.players.filter(p => p && !isBot(p)).length === 4}
+          isRated={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
         />
       )}
 
@@ -3799,14 +3682,14 @@ const [isStarting, setIsStarting] = useState(false);
           winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
           onPlayAgain={handlePlayAgain}
           userTeam={getUserTeam()}
-          isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
+          isCoinGame={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
           coinsWon={(() => {
             if (!gameState.buyIn) return 0;
             const buyIn = gameState.buyIn;
             const prizePot = buyIn * 4 * 0.9; // 90% of total buy-ins
             return prizePot / 2; // Each winning team member gets half the pot
           })()}
-          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          humanPlayerCount={(gameState.players || []).filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           onLeaveTable={handleLeaveTable}
           players={gameState.players}
@@ -3823,9 +3706,9 @@ const [isStarting, setIsStarting] = useState(false);
           winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
           onPlayAgain={handlePlayAgain}
           userTeam={getUserTeam()}
-          isCoinGame={gameState.players.filter(p => p && !isBot(p)).length === 4}
+          isCoinGame={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
           coinsWon={0} // Losers get 0 coins
-          humanPlayerCount={gameState.players.filter(p => p && !isBot(p)).length}
+          humanPlayerCount={(gameState.players || []).filter(p => p && !isBot(p)).length}
           onTimerExpire={handleTimerExpire}
           onLeaveTable={handleLeaveTable}
           players={gameState.players}

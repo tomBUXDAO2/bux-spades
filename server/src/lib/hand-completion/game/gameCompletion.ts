@@ -16,6 +16,50 @@ export async function completeGame(game: any, winningTeamOrPlayer: number, final
 
 // Export the missing function
 export async function deleteUnratedGameFromDatabase(gameId: string) {
-  console.log('[GAME COMPLETION] Delete unrated game not yet implemented');
-  return { success: true };
+  try {
+    const { prisma } = await import('../../prisma');
+    
+    console.log(`[GAME COMPLETION] Deleting unrated game and all related data: ${gameId}`);
+    
+    // First, get all bot players to delete their user records
+    const botPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId, isHuman: false },
+      select: { userId: true }
+    });
+
+    // Delete bot users from User table
+    for (const botPlayer of botPlayers) {
+      if (botPlayer.userId.startsWith('bot_')) {
+        try {
+          await prisma.user.delete({ where: { id: botPlayer.userId } });
+          console.log(`[GAME COMPLETION] Deleted bot user: ${botPlayer.userId}`);
+        } catch (userErr) {
+          console.error(`[GAME COMPLETION] Failed to delete bot user ${botPlayer.userId}:`, userErr);
+        }
+      }
+    }
+
+    // Delete all related data in correct order to avoid foreign key constraints
+    // 1. Delete round bids first
+    const rounds = await prisma.round.findMany({ where: { gameId } });
+    for (const round of rounds) {
+      await prisma.roundBid.deleteMany({ where: { roundId: round.id } });
+      await prisma.roundHandSnapshot.deleteMany({ where: { roundId: round.id } });
+    }
+    
+    // 2. Delete rounds
+    await prisma.round.deleteMany({ where: { gameId } });
+    
+    // 3. Delete all game players
+    await prisma.gamePlayer.deleteMany({ where: { gameId } });
+    
+    // 4. Delete the game
+    await prisma.game.delete({ where: { id: gameId } });
+    
+    console.log(`[GAME COMPLETION] Successfully deleted unrated game, rounds, bids, hand snapshots, and all bot users: ${gameId}`);
+    return { success: true };
+  } catch (error) {
+    console.error(`[GAME COMPLETION] Failed to delete unrated game ${gameId}:`, error);
+    return { success: false, error };
+  }
 }

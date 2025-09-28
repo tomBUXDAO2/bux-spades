@@ -71,10 +71,7 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
     // It will now fetch from the database directly.
     // ONLY use database - no in-memory games
         const game = await prisma.game.findUnique({
-      where: { id: req.params.id },
-      include: {
-        players: true
-      }
+      where: { id: req.params.id }
     });
     
     if (!game) {
@@ -85,9 +82,15 @@ export async function getGameById(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Get game players separately
+    const gamePlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id },
+      orderBy: { seatIndex: 'asc' }
+    });
+
     // Convert database game to client format
     const players = new Array(4).fill(null);
-    game.players.forEach(player => {
+    gamePlayers.forEach(player => {
       players[player.seatIndex] = {
         id: player.userId,
         username: `Player ${player.seatIndex + 1}`, // You may want to store username in DB

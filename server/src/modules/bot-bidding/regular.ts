@@ -92,8 +92,12 @@ function estimateTricksRegular(hand: Card[]): number {
 function isNilSafe(hand: Card[]): { safe: boolean; reason: string } {
   const bySuit = countBySuit(hand);
 
+  // Debug: Log the hand to see what cards we have
+  console.log(`[NIL SAFE DEBUG] Hand:`, hand.map(c => `${c.rank}${c.suit}`).join(', '));
+
   // Never nil if holding Ace of Spades or both K and Q of Spades
   const spRanks = bySuit.SPADES.map(c => c.rank);
+  console.log(`[NIL SAFE DEBUG] Spade ranks:`, spRanks);
   if (spRanks.includes('A')) return { safe: false, reason: 'Holds Ace of Spades' };
   if (spRanks.includes('K') && spRanks.includes('Q')) return { safe: false, reason: 'Holds K and Q of Spades' };
 
@@ -144,7 +148,10 @@ export function getRegularBid(input: RegularBidInput): RegularBidResult {
   const currentSum = existingBids.reduce((s, b) => s + (b || 0), 0);
 
   if (nilCheck.safe) {
+    console.log(`[REGULAR BID DEBUG] Bot choosing nil: ${nilCheck.reason}`);
     return { bid: 0, reason: `Nil safe: ${nilCheck.reason}` };
+  } else {
+    console.log(`[REGULAR BID DEBUG] Bot not choosing nil: ${nilCheck.reason}`);
   }
 
   // Clamp estimate between 1 and 6 to avoid extremes

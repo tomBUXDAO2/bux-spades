@@ -12,7 +12,6 @@ export async function handleLobbyChatMessage(
   socket: AuthenticatedSocket,
   message: any
 ): Promise<void> {
-  console.log('[CHAT DEBUG] handleLobbyChatMessage called with:', { message });
   if (!socket.isAuthenticated || !socket.userId) {
     socket.emit('error', { message: 'Not authenticated' });
     return;
@@ -43,7 +42,6 @@ export async function handleLobbyChatMessage(
       isSystemMessage: false
     };
 
-    console.log("Broadcasting lobby message:", lobbyMessage);
     
     // Broadcast to all connected clients (lobby is global)
     io.emit("lobby_chat_message", lobbyMessage);

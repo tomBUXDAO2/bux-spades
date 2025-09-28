@@ -36,7 +36,6 @@ export const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${baseUrl}${endpoint}`;
   const token = getAuthToken();
   
-  console.log('API call:', { endpoint, fullUrl: url, isProduction: window.location.hostname !== 'localhost' });
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

@@ -23,8 +23,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
 
     // Check if game exists
     const game = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: { gamePlayers: { include: { user: true } } }
+      where: { id: gameId }
     });
 
     if (!game) {
@@ -45,8 +44,11 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
     }
 
     // Get current players
-    const currentPlayers = game.gamePlayers || [];
-    const occupiedSeats = new Set(currentPlayers.map(p => p.seatIndex));
+    const existingPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId },
+      orderBy: { seatIndex: 'asc' }
+    });
+    const occupiedSeats = new Set(existingPlayers.map(p => p.seatIndex));
     const emptySeats = [0, 1, 2, 3].filter(seat => !occupiedSeats.has(seat));
     
     // Fill empty seats with bots
@@ -69,6 +71,7 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
       // Add bot to game
       await prisma.gamePlayer.create({
         data: {
+          id: `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           gameId: gameId,
           userId: botId,
           seatIndex: seatIndex,
@@ -95,6 +98,9 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
     // Randomly assign dealer
     const dealerIndex = Math.floor(Math.random() * 4);
     const hands = dealCards(mockPlayers, dealerIndex);
+    
+    // Update the game object with the correct dealer index
+    game.dealerIndex = dealerIndex;
     
     console.log(`[GAME START] Dealt cards for game ${gameId}, dealer at position ${dealerIndex}`);
     
@@ -124,33 +130,69 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
     
     const isRated = humanPlayers === 4;
     
-    // Get updated game for client first
-    const updatedGame = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: { gamePlayers: { include: { user: true } } }
+    // Get current players first
+    const currentPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId },
+      orderBy: { seatIndex: 'asc' }
     });
     
     // Determine dealer and first bidder
     const firstBidderIndex = (dealerIndex + 1) % 4; // First bidder is position 3
+    const firstBidder = currentPlayers.find(p => p.seatIndex === firstBidderIndex);
+    
+    if (!firstBidder) {
+      socket.emit('error', { message: 'Could not determine first bidder' });
+      return;
+    }
     
     // Update game status and rating
     await prisma.game.update({
       where: { id: gameId },
       data: {
         status: 'BIDDING',
-        isRated: isRated,
-        
-        
+        isRated: isRated
       }
     });
+    
+    // Get updated game for client
+    const updatedGame = await prisma.game.findUnique({
+      where: { id: gameId }
+    });
+    
+    // Fetch user data for all current players
+    const userIds = currentPlayers.map(p => p.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } }
+    });
+    const userMap = new Map(users.map(u => [u.id, u]));
+    
+    // Add user relationship to gamePlayers
+    const gamePlayersWithUsers = currentPlayers.map(gp => ({
+      ...gp,
+      user: userMap.get(gp.userId)
+    }));
+    
+    // Add bidding state to the game object for enrichment
+    const gameWithBiddingState = {
+      ...updatedGame,
+      gamePlayers: gamePlayersWithUsers,
+      bidding: {
+        currentPlayer: firstBidder.userId,
+        currentBidderIndex: firstBidderIndex,
+        bids: [null, null, null, null] as (number | null)[],
+        nilBids: {}
+      },
+      dealerIndex: dealerIndex
+    };
+    
     const { enrichGameForClient } = require('../../../routes/games/shared/gameUtils');
-    const enrichedGame = enrichGameForClient(updatedGame);
+    const enrichedGame = enrichGameForClient(gameWithBiddingState);
     
     // Notify all players with hands data
     const gameStartedData = {
       ...enrichedGame,
       hands: hands.map((hand, index) => ({
-        playerId: updatedGame.gamePlayers[index]?.userId || `player_${index}`,
+        playerId: currentPlayers[index]?.userId || `player_${index}`,
         hand: hand
       }))
     };
@@ -158,10 +200,54 @@ export async function handleStartGame(socket: AuthenticatedSocket, data: any): P
     console.log(`[GAME START] Emitting game_started event to room ${gameId} with ${gameStartedData.hands.length} hands`);
     console.log(`[GAME START] Hands data:`, gameStartedData.hands.map((h: any) => ({ playerId: h.playerId, cardCount: h.hand.length })));
     
+    // Add game to gamesStore for bot logic access
+    const { gamesStore } = await import('../../../gamesStore');
+    const gameForStore = {
+      ...gameWithBiddingState,
+      hands: hands,
+      players: currentPlayers.map(p => ({
+        id: p.userId,
+        username: p.user?.username || `Bot ${p.userId.slice(-4)}`,
+        type: p.isHuman ? 'human' as const : 'bot' as const,
+        seatIndex: p.seatIndex,
+        teamIndex: p.teamIndex,
+        bid: null as number | null,
+        tricks: null as number | null,
+        points: null as number | null,
+        bags: null as number | null
+      }))
+    };
+    gamesStore.addGame(gameForStore as any);
+    
     // Add small delay to ensure client is in room
     // Emit immediately instead of with delay
       io.to(gameId).emit('game_started', gameStartedData);
       io.to(gameId).emit('game_update', enrichedGame);
+    
+    // If first to bid is a bot, trigger bot move shortly after so UI can render dealing/animation
+    const firstBidderPlayer = currentPlayers.find(p => p.seatIndex === firstBidderIndex);
+    if (firstBidderPlayer && !firstBidderPlayer.isHuman) {
+      console.log('[GAME START] First bidder is a bot; triggering bot bid');
+      setTimeout(async () => {
+        try {
+          // Import gamesStore to get the game
+          const { gamesStore } = await import('../../../gamesStore');
+          const game = gamesStore.getGame(gameId);
+          
+          if (game) {
+            // Import bot logic
+            const { botMakeMove } = await import('../../bot-play/botLogic');
+            // Use the io instance that's already imported at the top of this file
+            console.log('[GAME START] io instance:', io ? 'available' : 'undefined');
+            await botMakeMove(game, firstBidderIndex, 'bidding', io);
+          } else {
+            console.log('[GAME START] Game not found in gamesStore, bot bidding skipped');
+          }
+        } catch (error) {
+          console.error('[GAME START] Error triggering bot bid:', error);
+        }
+      }, 1500);
+    }
     
     console.log(`[GAME START] Events scheduled for room ${gameId}`);
     console.log(`[GAME START] Game started: ${gameId}, isRated: ${isRated}, humanPlayers: ${humanPlayers}`);

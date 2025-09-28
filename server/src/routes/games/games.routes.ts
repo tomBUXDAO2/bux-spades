@@ -71,9 +71,9 @@ router.get('/', async (req: Request, res: Response) => {
     // Query games from NEW database
     const dbGames = await prisma.game.findMany({
       where: {
-        status: { in: ['WAITING' as any, 'BIDDING' as any, 'PLAYING' as any] }
+        status: { in: ['WAITING', 'BIDDING', 'PLAYING'] }
       },
-      orderBy: { createdAt: 'desc' as any }
+      orderBy: { createdAt: 'desc' }
     });
 
     // For each game, fetch players from GamePlayer
@@ -81,7 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
     for (const dbGame of dbGames) {
       const players = await prisma.gamePlayer.findMany({
         where: { gameId: dbGame.id },
-        orderBy: { seatIndex: 'asc' as any }
+        orderBy: { seatIndex: 'asc' }
       });
 
       const userIds = players.map(p => p.userId);
@@ -90,13 +90,25 @@ router.get('/', async (req: Request, res: Response) => {
       });
       const userMap = new Map(users.map(u => [u.id, u]));
 
+      // Get current round and bids
+      const currentRound = await prisma.round.findFirst({
+        where: { gameId: dbGame.id },
+        orderBy: { roundNumber: 'desc' }
+      });
+      
+      const bids = currentRound ? await prisma.roundBid.findMany({
+        where: { roundId: currentRound.id }
+      }) : [];
+      
+      const bidMap = new Map(bids.map(b => [b.userId, b.bid]));
+
       clientGames.push({
         id: dbGame.id,
         status: dbGame.status,
-        mode: (dbGame as any).mode || 'PARTNERS',
-        rated: (dbGame as any).isRated ?? false,
-        league: (dbGame as any).isLeague ?? false,
-        solo: ((dbGame as any).mode === 'SOLO') || false,
+        mode: dbGame.mode || 'PARTNERS',
+        rated: dbGame.isRated ?? false,
+        league: dbGame.isLeague ?? false,
+        solo: (dbGame.mode === 'SOLO') || false,
         players: players.map(p => ({
           id: p.userId,
           username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
@@ -104,19 +116,20 @@ router.get('/', async (req: Request, res: Response) => {
           type: p.isHuman ? 'human' : 'bot',
           seatIndex: p.seatIndex,
           teamIndex: p.teamIndex ?? null,
-          bid: null as any,
-          tricks: null as any,
-          points: null as any,
-          bags: null as any
+          bid: bidMap.get(p.userId) ?? null,
+          tricks: null as number | null,
+          points: null as number | null,
+          bags: null as number | null
         })),
         rules: {
-          minPoints: (dbGame as any).minPoints || 500,
-          maxPoints: (dbGame as any).maxPoints || 500,
-          allowNil: (dbGame as any).allowNil ?? true,
-          allowBlindNil: (dbGame as any).allowBlindNil ?? false,
-          assassin: (dbGame as any).assassin ?? false,
-          screamer: (dbGame as any).screamer ?? false
-        },        createdAt: (dbGame as any).createdAt
+          minPoints: dbGame.minPoints || 500,
+          maxPoints: dbGame.maxPoints || 500,
+          allowNil: dbGame.nilAllowed ?? true,
+          allowBlindNil: dbGame.blindNilAllowed ?? false,
+          assassin: false, // TODO: Extract from specialRules JSON
+          screamer: false  // TODO: Extract from specialRules JSON
+        },
+        createdAt: dbGame.createdAt
       });
     }
 
@@ -142,7 +155,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     const players = await prisma.gamePlayer.findMany({
       where: { gameId: dbGame.id },
-      orderBy: { seatIndex: 'asc' as any }
+      orderBy: { seatIndex: 'asc' }
     });
 
     const userIds = players.map(p => p.userId);
@@ -151,16 +164,28 @@ router.get('/:id', async (req: Request, res: Response) => {
     });
     const userMap = new Map(users.map(u => [u.id, u]));
 
+    // Get current round and bids
+    const currentRound = await prisma.round.findFirst({
+      where: { gameId: dbGame.id },
+      orderBy: { roundNumber: 'desc' }
+    });
+    
+    const bids = currentRound ? await prisma.roundBid.findMany({
+      where: { roundId: currentRound.id }
+    }) : [];
+    
+    const bidMap = new Map(bids.map(b => [b.userId, b.bid]));
+
     const game = {
       id: dbGame.id,
       status: dbGame.status,
-      mode: (dbGame as any).mode || 'PARTNERS',
-      rated: (dbGame as any).isRated ?? false,
-      league: (dbGame as any).isLeague ?? false,
-      solo: ((dbGame as any).mode === 'SOLO') || false,
-      minPoints: (dbGame as any).minPoints || -100,
-      maxPoints: (dbGame as any).maxPoints || 150,
-      buyIn: (dbGame as any).buyIn || 100000,
+      mode: dbGame.mode || 'PARTNERS',
+      rated: dbGame.isRated ?? false,
+      league: dbGame.isLeague ?? false,
+      solo: (dbGame.mode === 'SOLO') || false,
+      minPoints: dbGame.minPoints || -100,
+      maxPoints: dbGame.maxPoints || 150,
+      buyIn: dbGame.buyIn || 100000,
       players: players.map(p => ({
         id: p.userId,
         username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
@@ -168,20 +193,21 @@ router.get('/:id', async (req: Request, res: Response) => {
         type: p.isHuman ? 'human' : 'bot',
         seatIndex: p.seatIndex,
         teamIndex: p.teamIndex ?? null,
-        bid: null as any,
-        tricks: null as any,
-        points: null as any,
-        bags: null as any
+        bid: bidMap.get(p.userId) ?? null,
+        tricks: null as number | null,
+        points: null as number | null,
+        bags: null as number | null
       })),
       rules: {
-        minPoints: (dbGame as any).minPoints || -100,
-        maxPoints: (dbGame as any).maxPoints || 150,
-        allowNil: (dbGame as any).allowNil ?? true,
-        allowBlindNil: (dbGame as any).allowBlindNil ?? false,
-        assassin: (dbGame as any).assassin ?? false,
-        screamer: (dbGame as any).screamer ?? false
+        minPoints: dbGame.minPoints || -100,
+        maxPoints: dbGame.maxPoints || 150,
+        allowNil: dbGame.nilAllowed ?? true,
+        allowBlindNil: dbGame.blindNilAllowed ?? false,
+        assassin: false, // TODO: Extract from specialRules JSON
+        screamer: false  // TODO: Extract from specialRules JSON
       },
-      createdAt: (dbGame as any).createdAt    };
+      createdAt: dbGame.createdAt
+    };
 
     res.json({ success: true, game });
   } catch (error) {
@@ -227,7 +253,7 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
       prisma.game.findUnique({ where: { id: gameId } })
     ]);
 
-    const isRated = (dbGame as any)?.isRated ?? false;
+    const isRated = dbGame?.isRated ?? false;
 
     if (remainingHumans === 0 && !isRated) {
       console.log(`[LEAVE GAME] No human players remaining in unrated game ${gameId} - deleting game`);
@@ -251,12 +277,23 @@ router.post('/:id/leave', requireAuth, async (req: any, res: Response) => {
           }
         }
 
-        // Delete all game players (cascades automatically)
+        // Delete all related data in correct order to avoid foreign key constraints
+        // 1. Delete round bids first
+        const rounds = await prisma.round.findMany({ where: { gameId } });
+        for (const round of rounds) {
+          await prisma.roundBid.deleteMany({ where: { roundId: round.id } });
+          await prisma.roundHandSnapshot.deleteMany({ where: { roundId: round.id } });
+        }
+        
+        // 2. Delete rounds
+        await prisma.round.deleteMany({ where: { gameId } });
+        
+        // 3. Delete all game players
         await prisma.gamePlayer.deleteMany({ where: { gameId } });
         
-        // Delete the game
+        // 4. Delete the game
         await prisma.game.delete({ where: { id: gameId } });
-        console.log('[LEAVE GAME] Successfully deleted unrated game and all bot users from database');
+        console.log('[LEAVE GAME] Successfully deleted unrated game, rounds, bids, hand snapshots, and all bot users from database');
       } catch (err) {
         console.error('[LEAVE GAME] Failed to delete unrated game:', err);
       }
@@ -300,17 +337,13 @@ router.post('/:id/start', requireAuth, async (req: any, res: Response) => {
     await prisma.game.update({
       where: { id: gameId },
       data: {
-        status: 'BIDDING',
-        bidding: {
-          currentPlayer: "0",
-          bids: [null, null, null, null],
-        }
+        status: 'BIDDING'
       }
     });
 
     // Notify all players
     // Call socket handler to start game with hands
-    const mockSocket = { userId, emit: () => {} };
+    const mockSocket = { userId, emit: () => {} } as any;
     await handleStartGame(mockSocket, { gameId });
     io.emit('games_updated', [enrichGameForClient(game)]);
 
@@ -326,7 +359,7 @@ router.get('/lobby/all', async (req: Request, res: Response) => {
   try {
     const lobbyGames = await prisma.game.findMany({
       where: { status: 'WAITING' },
-      orderBy: { createdAt: 'desc' as any }
+      orderBy: { createdAt: 'desc' }
     });
     const enrichedGames = lobbyGames.map(game => enrichGameForClient(game));
     res.json({ success: true, games: enrichedGames });
@@ -341,7 +374,7 @@ router.get('/all', async (req: Request, res: Response) => {
   try {
     const allGames = await prisma.game.findMany({
       where: { status: { in: ['WAITING', 'BIDDING', 'PLAYING'] } },
-      orderBy: { createdAt: 'desc' as any }
+      orderBy: { createdAt: 'desc' }
     });
     const enrichedGames = allGames.map(game => enrichGameForClient(game));
     res.json({ success: true, games: enrichedGames });
@@ -367,8 +400,7 @@ router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
 
     // Find the game
     const game = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: { gamePlayers: { include: { user: true } } }
+      where: { id: gameId }
     });
 
     if (!game) {
@@ -386,7 +418,9 @@ router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
     }
 
     // Find the player at this seat
-    const playerToRemove = game.gamePlayers.find(gp => gp.seatIndex === seatIndex);
+    const playerToRemove = await prisma.gamePlayer.findFirst({
+      where: { gameId, seatIndex }
+    });
     if (!playerToRemove) {
       return res.status(400).json({ error: 'No player at this seat' });
     }
@@ -415,8 +449,7 @@ router.post('/:id/remove-bot', requireAuth, async (req: any, res: Response) => {
 
     // Get updated game and emit to clients
     const updatedGame = await prisma.game.findUnique({
-      where: { id: gameId },
-      include: { gamePlayers: { include: { user: true } } }
+      where: { id: gameId }
     });
 
     let enrichedGame = null;

@@ -44,18 +44,15 @@ export function isGameOver(game: GameState): boolean {
   
   // Validate that we have the required game settings
   if (maxPoints === undefined || minPoints === undefined) {
-    console.error('[GAME OVER CHECK] Missing game settings - maxPoints:', maxPoints, 'minPoints:', minPoints);
     return false;
   }
   
   // Check if it's Solo mode
   if (game.gameMode === 'SOLO') {
     const playerScores = game.playerScores || [];
-    console.log('[GAME OVER CHECK] Solo mode - Player scores:', playerScores, 'Max points:', maxPoints, 'Min points:', minPoints);
   
     // Check if any player has reached max points or gone below min points
     const isOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
-    console.log('[GAME OVER CHECK] Solo mode game over result:', isOver);
     return isOver;
   }
 
@@ -63,15 +60,8 @@ export function isGameOver(game: GameState): boolean {
   const team1Score = game.team1TotalScore || 0;
   const team2Score = game.team2TotalScore || 0;
   
-  console.log('[GAME OVER CHECK] Partners mode - Team 1 score:', team1Score, 'Team 2 score:', team2Score, 'Max points:', maxPoints, 'Min points:', minPoints);
   
   const isOver = team1Score >= maxPoints || team2Score >= maxPoints || team1Score <= minPoints || team2Score <= minPoints;
-  console.log('[GAME OVER CHECK] Partners mode game over result:', isOver, 'Reason:', {
-    team1AboveMax: team1Score >= maxPoints,
-    team2AboveMax: team2Score >= maxPoints,
-    team1BelowMin: team1Score <= minPoints,
-    team2BelowMin: team2Score <= minPoints
-  });
   
   return isOver;
 }

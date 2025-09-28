@@ -47,14 +47,12 @@ export const setupSocketListeners = (
         
         // Don't retry if we failed to join this same game in the last 30 seconds
         if (lastFailedGameId === activeGameId && timeSinceLastFail < 30000) {
-          console.log('[SOCKET MANAGER] Skipping auto-join - recently failed to join this game');
           return;
         }
         
         // Double-check that the game ID still exists (in case it was cleared by another event)
         const currentActiveGameId = localStorage.getItem('activeGameId');
         if (currentActiveGameId !== activeGameId) {
-          console.log('[SOCKET MANAGER] Skipping auto-join - game ID was cleared by another event');
           return;
         }
         
@@ -62,10 +60,8 @@ export const setupSocketListeners = (
           // Triple-check before actually joining
           const finalActiveGameId = localStorage.getItem('activeGameId');
           if (finalActiveGameId === activeGameId && socket && socket.connected) {
-            console.log('[SOCKET MANAGER] Auto-join on connect for game:', activeGameId);
             socket.emit('join_game', { gameId: activeGameId });
           } else {
-            console.log('[SOCKET MANAGER] Skipping auto-join - game ID was cleared before timeout');
           }
         }, 200);
       }
@@ -142,11 +138,9 @@ export const setupSocketListeners = (
         
         // Don't retry if we failed to join this same game in the last 30 seconds
         if (lastFailedGameId === activeGameId && timeSinceLastFail < 30000) {
-          console.log('[SOCKET MANAGER] Skipping auto-join - recently failed to join this game');
           return;
         }
         
-        console.log('[SOCKET MANAGER] Auto-join on authenticated for game:', activeGameId);
         socket.emit('join_game', { gameId: activeGameId });
       }
     } catch {}
@@ -159,7 +153,6 @@ export const setupSocketListeners = (
     
     // If it's a "Game not found" error, clear the invalid game ID from localStorage
     if (error.message === 'Game not found') {
-      console.log('[SOCKET MANAGER] Clearing invalid game ID from localStorage');
       const activeGameId = localStorage.getItem('activeGameId');
       if (activeGameId) {
         // Record this failed join attempt

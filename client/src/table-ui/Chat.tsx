@@ -69,7 +69,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
   // Debug emoji data
   useEffect(() => {
-    console.log('Emoji data loaded:', data);
   }, []);
 
   // Add responsive sizing state
@@ -127,7 +126,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     // Set up message handler
     const handleMessage = (data: ChatMessage | { gameId: string; message: ChatMessage }) => {
-      console.log('Chat: Received message:', data);
       
       // Handle game chat messages
       if (chatType === 'game') {
@@ -137,13 +135,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
         }
         const message = data.message;
         
-        // Debug logging for message details
-        console.log('Chat: Message details:', {
-          userId: message.userId,
-          userName: (message as any).userName,
-          message: message.message,
-          timestamp: message.timestamp
-        });
         
         // Dedupe by id if present
         setMessages(prev => {
@@ -187,7 +178,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     // Set up reconnection handler
     const handleReconnect = () => {
-      console.log('Chat: Socket reconnected');
       if (socket && isAuthenticated) {
         if (chatType === 'game') {
           if (isSpectator) {
@@ -201,7 +191,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     // Set up connection handlers
     const onConnect = () => {
-      console.log('Chat: Socket connected');
       if (socket && isAuthenticated) {
         if (chatType === 'game') {
           if (isSpectator) {
@@ -214,7 +203,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
     };
 
     const onDisconnect = () => {
-      console.log('Chat: Socket disconnected');
     };
 
     const onError = (err: Error) => {
@@ -223,13 +211,10 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     // Set up event listeners based on chat type
     if (socket) {
-      console.log('Chat: Setting up event listeners for', chatType, 'chat, isSpectator:', isSpectator);
       
       if (chatType === 'game') {
-        console.log('Chat: Registering chat_message event listener');
         socket.on('chat_message', handleMessage);
       } else {
-        console.log('Chat: Registering lobby_chat_message event listener');
         socket.on('lobby_chat_message', handleMessage);
       }
       
@@ -240,7 +225,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
       // Join the game room if needed
       if (isAuthenticated && chatType === 'game') {
-        console.log('Chat: Joining game:', gameId, 'as', isSpectator ? 'spectator' : 'player');
         // Only join as spectator if user is actually a spectator
         if (isSpectator) {
           socket.emit('join_game_as_spectator', { gameId });
@@ -251,13 +235,10 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
 
     return () => {
       if (socket) {
-        console.log('Chat: Cleaning up event listeners for', chatType, 'chat, isSpectator:', isSpectator);
         
         if (chatType === 'game') {
-          console.log('Chat: Removing chat_message event listener');
           socket.off('chat_message', handleMessage);
         } else {
-          console.log('Chat: Removing lobby_chat_message event listener');
           socket.off('lobby_chat_message', handleMessage);
         }
         socket.off('reconnect', handleReconnect);
@@ -468,7 +449,6 @@ export default function Chat({ gameId, userId, userName, players, spectators, us
   useEffect(() => {
     if (!socket || !isAuthenticated) return;
     const logAll = (event: string, ...args: unknown[]) => {
-      console.log('SOCKET EVENT:', event, ...args);
       if (event === 'online_users' && Array.isArray(args[0])) {
         (window as any).onlineUsers = args[0] as string[];
       }

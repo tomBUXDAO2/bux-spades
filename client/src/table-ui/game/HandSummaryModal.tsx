@@ -44,7 +44,6 @@ export default function HandSummaryModal({
 
   // Require handSummaryData to be present - no fallback calculations
   if (!handSummaryData) {
-    console.error('[HandSummaryModal] handSummaryData is required but not provided');
     return null;
   }
 
@@ -58,7 +57,6 @@ export default function HandSummaryModal({
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          console.log('[HandSummaryModal] Timer expired, auto-continuing');
           onNextHand();
           return 0;
         }

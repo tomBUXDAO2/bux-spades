@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma';
 import { enrichGameForClient } from '../shared/gameUtils';
 import { startGame } from '../../../modules/game-start/gameStart';
 import type { Game } from '../../../types/game';
+import type { AuthenticatedSocket } from '../../../types/socket';
 
 /**
  * Create a new game
@@ -37,6 +38,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     // Create game in database
     const dbGame = await prisma.game.create({
       data: {
+        id: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         mode: mode || 'PARTNERS',
         format: format || 'REGULAR',
         gimmickVariant: gimmickVariant || null,
@@ -45,28 +47,23 @@ export async function createGame(req: Request, res: Response): Promise<void> {
         specialRules: specialRules || {},
         minPoints: minPoints || -500,
         maxPoints: maxPoints || 500,
-        buyIn: buyIn || 0
+        buyIn: buyIn || 0,
+        updatedAt: new Date()
       }
     });
 
     // Create a simplified game object for compatibility
     const game: Game = {
       id: dbGame.id,
-      status: dbGame.status as any,
-      mode: dbGame.mode as any,
-      maxPoints: 500, // Default values
-      minPoints: -500,
-      buyIn: 0,
-      forcedBid: false,
-      specialRules: dbGame.specialRules as any,
-      allowNil: true, // Default values
-      allowBlindNil: false,
-      format: dbGame.format as any,
-      gimmickVariant: dbGame.gimmickVariant as any, // Fix: Use the actual value from DB
-      createdById: dbGame.createdById,
-      createdAt: dbGame.createdAt.getTime(),
-      updatedAt: dbGame.updatedAt.getTime(),
-      dbGameId: dbGame.id,
+      status: dbGame.status,
+      mode: dbGame.mode,
+      maxPoints: dbGame.maxPoints || 500,
+      minPoints: dbGame.minPoints || -500,
+      buyIn: dbGame.buyIn || 0,
+      forcedBid: undefined,
+      specialRules: typeof dbGame.specialRules === 'object' && dbGame.specialRules ? dbGame.specialRules as { screamer?: boolean; assassin?: boolean } : {},
+      allowNil: dbGame.nilAllowed ?? true,
+      allowBlindNil: dbGame.blindNilAllowed ?? false,
       players: [],
       spectators: [],
       currentRound: 1,
@@ -89,13 +86,13 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       },
       completedTricks: [],
       rules: {
-        gameType: dbGame.mode as any,
+        gameType: dbGame.mode,
         coinAmount: 0,
-        maxPoints: 500,
-        minPoints: -500,
-        bidType: 'NORMAL' as any,
-        allowNil: true,
-        allowBlindNil: false
+        maxPoints: dbGame.maxPoints || 500,
+        minPoints: dbGame.minPoints || -500,
+        bidType: 'REGULAR',
+        allowNil: dbGame.nilAllowed ?? true,
+        allowBlindNil: dbGame.blindNilAllowed ?? false
       },
       isBotGame: false,
       team1Bags: 0,
@@ -105,10 +102,10 @@ export async function createGame(req: Request, res: Response): Promise<void> {
       winningPlayer: null,
       winningTeam: null,
       lastActivity: Date.now(),
-      rounds: 0,
+      rounds: [],
       league: false,
       rated: false,
-      leagueReady: false,
+      leagueReady: [false, false, false, false],
       dealer: 0,
       roundHistory: [],
       currentTrickCards: [],
@@ -126,6 +123,7 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     // Add creator to the game as seat 0
     await prisma.gamePlayer.create({
       data: {
+        id: `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         gameId: dbGame.id,
         userId: userId,
         seatIndex: 0,
@@ -136,6 +134,8 @@ export async function createGame(req: Request, res: Response): Promise<void> {
     });
     
     console.log(`[GAME CREATION] Added creator ${userId} to game ${dbGame.id} at seat 0`);
+    
+    
     await startGame(game);
 
     // Get all games for lobby
@@ -148,11 +148,11 @@ export async function createGame(req: Request, res: Response): Promise<void> {
 
     console.log(`[GAME CREATION] Connected sockets: ${io.sockets.sockets.size}`);
     console.log(`[GAME CREATION] Emitting games_updated to all clients, ${lobbyGames.length} lobby games`);
-    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g as any)));
+    io.emit('games_updated', lobbyGames.map(g => enrichGameForClient(g)));
     
     // Also emit all games (including league games) for real-time league game detection
     console.log(`[GAME CREATION] Emitting all_games_updated to all clients, ${allGames.length} total games`);
-    io.emit('all_games_updated', allGames.map(g => enrichGameForClient(g as any)));
+    io.emit('all_games_updated', allGames.map(g => enrichGameForClient(g)));
 
     res.json({
       success: true,

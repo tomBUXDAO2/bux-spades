@@ -5,16 +5,21 @@ import prisma from '../../prisma';
  */
 export async function checkForStuckGames(): Promise<void> {
   try {
+    // Only check games that have been stuck for at least 30 minutes
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    
     const stuckGames = await (prisma.game.findMany as any)({
       where: {
         status: {
           in: ['PLAYING'] as any
+        },
+        updatedAt: {
+          lt: thirtyMinutesAgo
         }
       }
     });
 
     for (const stuckGame of stuckGames) {
-      console.log(`[STUCK GAME] ⚠️ Found stuck game ${stuckGame.id} - status: ${(stuckGame as any).status}`);
       
       // Auto-complete the game or reset it
       await (prisma.game.update as any)({
@@ -25,7 +30,6 @@ export async function checkForStuckGames(): Promise<void> {
         }
       });
       
-      console.log(`[STUCK GAME] ✅ Auto-completed stuck game ${stuckGame.id}`);
     }
   } catch (error) {
     console.error('[STUCK GAME] ❌ Failed to check for stuck games:', error);

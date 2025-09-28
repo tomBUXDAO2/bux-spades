@@ -60,7 +60,12 @@ export async function newdbEnsureRound(params: {
 	const round = await prisma.round.upsert({
 		where: { gameId_roundNumber: { gameId: params.gameId, roundNumber: params.roundNumber } as any },
 		update: { dealerSeatIndex: params.dealerSeatIndex },
-		create: { gameId: params.gameId, roundNumber: params.roundNumber, dealerSeatIndex: params.dealerSeatIndex }
+		create: { 
+			id: `round_${params.gameId}_${params.roundNumber}_${Date.now()}`,
+			gameId: params.gameId, 
+			roundNumber: params.roundNumber, 
+			dealerSeatIndex: params.dealerSeatIndex 
+		}
 	});
 	return round.id;
 }
@@ -72,12 +77,22 @@ export async function newdbCreateRound(params: {
 	initialHands?: Array<{ seatIndex: number; cards: Array<{ suit: string; rank: string }> }>;
 }): Promise<string> {
 	const round = await prisma.round.create({
-		data: { gameId: params.gameId, roundNumber: params.roundNumber, dealerSeatIndex: params.dealerSeatIndex }
+		data: { 
+			id: `round_${params.gameId}_${params.roundNumber}_${Date.now()}`,
+			gameId: params.gameId, 
+			roundNumber: params.roundNumber, 
+			dealerSeatIndex: params.dealerSeatIndex 
+		}
 	});
 	if (params.initialHands && params.initialHands.length > 0) {
 		for (const hand of params.initialHands) {
 			await prisma.roundHandSnapshot.create({
-				data: { roundId: round.id, seatIndex: hand.seatIndex, cards: hand.cards as any }
+				data: { 
+					id: `hand_${round.id}_${hand.seatIndex}_${Date.now()}`,
+					roundId: round.id, 
+					seatIndex: hand.seatIndex, 
+					cards: hand.cards as any 
+				}
 			});
 		}
 	}
@@ -93,7 +108,14 @@ export async function newdbUpsertBid(params: {
 	await prisma.roundBid.upsert({
 		where: { roundId_userId: { roundId: params.roundId, userId: params.userId } as any },
 		update: { bid: params.bid, isBlindNil: params.bid === -1 },
-		create: { roundId: params.roundId, userId: params.userId, seatIndex: params.seatIndex, bid: params.bid, isBlindNil: params.bid === -1 }
+		create: { 
+			id: `bid_${params.roundId}_${params.userId}_${Date.now()}`,
+			roundId: params.roundId, 
+			userId: params.userId, 
+			seatIndex: params.seatIndex, 
+			bid: params.bid, 
+			isBlindNil: params.bid === -1 
+		}
 	});
 }
 

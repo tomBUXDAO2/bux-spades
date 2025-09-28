@@ -10,12 +10,12 @@ import type { GameState } from '../types/game';
 import { socketApi } from '../table-ui/lib/socketApi';
 import { api } from '@/lib/api';
 import LandscapePrompt from '../LandscapePrompt';
+import { io } from 'socket.io-client';
 
 export default function TablePage() {
-  console.log('🚨🚨🚨 [CRITICAL DEBUG] TablePage component loaded at:', new Date().toISOString());
-  const { gameId } = useParams<{ gameId: string }>(); console.log('[TABLE PAGE DEBUG] gameId from useParams:', gameId);
+  const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, isReady } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [game, setGame] = useState<GameState | null>(null);
@@ -112,14 +112,7 @@ export default function TablePage() {
 
   // Debug logging for game state changes
   useEffect(() => {
-    console.log('[REFRESH DEBUG] Component mounted/updated, game state:', game ? 'exists' : 'null');
     if (game) {
-      console.log('[GAME STATE DEBUG] Game state updated:', {
-        currentPlayer: game.currentPlayer,
-        status: game.status,
-        playCurrentPlayer: game.play?.currentPlayer,
-        biddingCurrentPlayer: game.bidding?.currentPlayer
-      });
     }
   }, [game]);
 
@@ -172,7 +165,6 @@ export default function TablePage() {
       return;
     }
 
-    console.log('[INIT] Starting initialization sequence for game:', gameId);
     
     // Persist active game id immediately for reconnect logic
     if (gameId && gameId !== 'undefined') { try { localStorage.setItem('activeGameId', String(gameId)); } catch {} }
@@ -181,7 +173,6 @@ export default function TablePage() {
 
     const fetchGame = async (retryCount = 0) => {
       try {
-        console.log(`[GAME FETCH] Attempting to fetch game ${gameId} (attempt ${retryCount + 1})`);
         
         // If spectating, call spectate endpoint
         if (isSpectator) {
@@ -217,19 +208,9 @@ export default function TablePage() {
         const isUserInGame = data.players.some((player: any) => player && player.id === user.id);
         const isUserAssignedToLeagueGame = isLeagueGame && isUserInGame;
         
-        console.log('[LEAGUE GAME DEBUG] Checking game and user status:', {
-          userId: user.id,
-          isLeagueGame,
-          isUserInGame,
-          isUserAssignedToLeagueGame,
-          isSpectator,
-          gameStatus: data.status,
-          gamePlayers: data.players.map((p: any) => p ? { id: p.id, username: p.username } : null)
-        });
         
         // For league games, if user is assigned and not spectating, auto-join them
         if (isUserAssignedToLeagueGame && !isSpectator) {
-          console.log('[LEAGUE GAME] User is assigned to this league game, auto-joining...');
           // Auto-join the user to the game
           try {
             const joinResponse = await api.post(`/api/games/${gameId}/join`, {
@@ -241,7 +222,6 @@ export default function TablePage() {
               const updatedGame = await joinResponse.json();
               setGame(prevGame => ({ ...prevGame, ...updatedGame }));
               updateModalState(updatedGame);
-              console.log('[LEAGUE GAME] Successfully auto-joined user to game');
             } else {
               const errorData = await joinResponse.json();
               console.error('[LEAGUE GAME] Failed to auto-join user to game:', errorData);
@@ -251,7 +231,6 @@ export default function TablePage() {
           }
         } else if (isUserAssignedToLeagueGame && isSpectator) {
           // If user is assigned to league game but accessing as spectator, redirect them to player view
-          console.log('[LEAGUE GAME] User is assigned to league game but accessing as spectator, redirecting to player view');
           navigate(`/table/${gameId}`, { replace: true });
         }
         
@@ -316,9 +295,9 @@ export default function TablePage() {
 
         // After fetching game, store activeGameId and ensure we join the socket room if socket is ready
         if (gameId && gameId !== 'undefined') { try { localStorage.setItem('activeGameId', String(gameId)); } catch {} }
-        if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
+        if (socket && isReady && !isSpectator && gameId && gameId !== 'undefined') {
           setTimeout(() => {
-            if (socket && socket.connected) {
+            if (socket && isReady) {
               console.log('[TABLE PAGE] Emitting join_game for game:', gameId);
               socket.emit('join_game', { gameId });
             }
@@ -345,18 +324,7 @@ export default function TablePage() {
 
     fetchGame();
 
-    // Add a fallback mechanism to ensure join_game is sent
-    const fallbackJoinGame = () => {
-      if (socket && socket.connected && !isSpectator && gameId && gameId !== 'undefined') {
-        console.log('SENDING JOIN_GAME EVENT');
-        socket.emit('join_game', { gameId });
-      } else {
-        console.log('SOCKET NOT READY FOR JOIN_GAME');
-      }
-    };
-
-    // Try to join game after a delay as fallback
-    setTimeout(fallbackJoinGame, 2000);
+    // Fallback mechanism removed - the main useEffect handles socket joining properly
 
     return () => {
       // Socket cleanup is handled by SocketContext
@@ -383,145 +351,152 @@ export default function TablePage() {
     return () => { socket.off('reconnect', onReconnect); };
   }, [socket, isSpectator]);
 
+
   // Listen for game_update events and update local game state
   useEffect(() => {
     if (!socket) return;
     
     const handleGameUpdate = (updatedGame: any) => {
-      console.log('[GAME UPDATE] Received game update:', {
-        status: updatedGame.status,
-        currentPlayer: updatedGame.currentPlayer,
-        biddingCurrentPlayer: updatedGame.bidding?.currentPlayer,
-        playCurrentPlayer: updatedGame.play?.currentPlayer
-      });
       
-      // Ensure currentPlayer is set correctly
-      if (updatedGame.status === 'BIDDING' && updatedGame.bidding?.currentPlayer) {
-        updatedGame.currentPlayer = updatedGame.bidding.currentPlayer;
-      } else if (updatedGame.status === 'PLAYING' && updatedGame.play?.currentPlayer) {
-        updatedGame.currentPlayer = updatedGame.play.currentPlayer;
-      }
-      
-      setGame(prevGame => ({ ...prevGame, ...updatedGame }));
-      
-      // Update modal state when game state changes
-      updateModalState(updatedGame);
-    };
-    
-    // Remove any existing listeners first to prevent duplicates
-    socket.off('game_update', handleGameUpdate);
-    socket.on('game_update', handleGameUpdate);
-    
-    // Handle table inactivity
-    const handleTableInactive = (data: { reason: string; message: string }) => {
-      console.log('[INACTIVITY] Table inactive event received:', data);
-      try {
-        localStorage.setItem('tableClosureMessage', 'The table was closed due to 15 minute inactivity');
-        localStorage.removeItem('activeGameId');
-      } catch {}
-      navigate('/', { replace: true });
-    };
+      setGame(prevGame => {
+        const mergedPlayers = updatedGame.players?.map((newPlayer: any, index: number) => {
+          const existingPlayer = prevGame?.players?.[index];
+          if (existingPlayer && newPlayer) {
+            const mergedPlayer = {
+              ...existingPlayer,
+              ...newPlayer,
+              // CRITICAL: Only update bid if newPlayer has a valid bid (not null/undefined)
+              // This prevents the server from overwriting our bid with null
+              bid: newPlayer.hasOwnProperty('bid') && newPlayer.bid !== null && newPlayer.bid !== undefined 
+                ? newPlayer.bid 
+                : existingPlayer.bid
+            };
+            
+            
+            return mergedPlayer;
+          }
+          return newPlayer;
+        }) || updatedGame.players;
 
-    socket.off('table_inactive', handleTableInactive);
-    socket.on('table_inactive', handleTableInactive);
+        return { 
+          ...prevGame, 
+          ...updatedGame,
+          players: mergedPlayers
+        };
+      });
+    };
+    
+    socket.on('game_update', handleGameUpdate);
     
     return () => {
       socket.off('game_update', handleGameUpdate);
-      socket.off('table_inactive', handleTableInactive);
     };
-  }, [socket, isAnimatingTrick]);
+  }, [socket]);
 
   // Listen for bidding_update events and update only the bidding part of the game state
   useEffect(() => {
     if (!socket) return;
     
-      const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
+    const handleBiddingUpdate = (bidding: { currentBidderIndex: number, bids: (number|null)[] }) => {
       console.log('[BIDDING UPDATE] Received bidding update:', bidding);
       
-    setGame(prev => {
-      if (!prev) return prev;
-      
-      const nextPlayer = prev.players[bidding.currentBidderIndex];
-      
-      const updatedGame = {
-        ...prev,
-        bidding: {
-          ...prev.bidding,
-          currentBidderIndex: bidding.currentBidderIndex,
-          currentPlayer: nextPlayer?.id ?? '',
-          bids: bidding.bids,
-        },
-        // --- CRITICAL FIX: Update root-level currentPlayer! ---
-        currentPlayer: nextPlayer?.id ?? '',
-      };
-        
-        console.log('[BIDDING UPDATE] Updated game state:', {
-          currentBidderIndex: updatedGame.bidding.currentBidderIndex,
-          currentPlayer: updatedGame.currentPlayer,
-          bids: updatedGame.bidding.bids
-        });
-      
-      return updatedGame;
-    });
-  };
-    
-    // Handle bidding completion
-      const handleBiddingComplete = (data: { bids: (number|null)[] }) => {
-    setGame(prev => {
-      if (!prev) return prev;
-      
-              const updatedGame = {
+      setGame(prev => {
+        if (!prev) return prev;
+        return {
           ...prev,
-          status: 'PLAYING' as const,
           bidding: {
             ...prev.bidding,
-            bids: data.bids,
+            ...bidding
           }
         };
-      
-      return updatedGame;
-    });
-  };
-    
-    // Handle play start
-      const handlePlayStart = (data: { gameId: string, currentPlayerIndex: number, currentTrick: any[], trickNumber: number }) => {
-    setGame(prev => {
-      if (!prev) return prev;
-      const currentPlayer = prev.players[data.currentPlayerIndex];
-      
-      const updatedGame = {
-        ...prev,
-        status: 'PLAYING' as const,
-        play: {
-          currentPlayer: currentPlayer?.id ?? '',
-          currentPlayerIndex: data.currentPlayerIndex,
-          currentTrick: isAnimatingTrick ? prev.play.currentTrick : data.currentTrick,
-          trickNumber: data.trickNumber,
-          spadesBroken: false
-        }
-      };
-      
-      return updatedGame;
-    });
-  };
-    
-    // Remove any existing listeners first to prevent duplicates
-    socket.off('bidding_update', handleBiddingUpdate);
-    socket.off('bidding_complete', handleBiddingComplete);
-    socket.off('play_start', handlePlayStart);
+      });
+    };
     
     socket.on('bidding_update', handleBiddingUpdate);
-    socket.on('bidding_complete', handleBiddingComplete);
-    socket.on('play_start', handlePlayStart);
     
     return () => {
       socket.off('bidding_update', handleBiddingUpdate);
-      socket.off('bidding_complete', handleBiddingComplete);
-      socket.off('play_start', handlePlayStart);
     };
   }, [socket, isAnimatingTrick]);
 
+  // Listen for play updates
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handlePlayUpdate = (data: { currentPlayerIndex: number, currentTrick: any[], hands: any[] }) => {
+      setGame(prev => prev ? ({
+        ...prev,
+        play: {
+          ...prev.play,
+          currentPlayerIndex: data.currentPlayerIndex,
+          currentTrick: data.currentTrick
+        },
+        hands: data.hands
+      }) : prev);
+    };
+
+    socket.on('play_update', handlePlayUpdate);
+    
+    return () => {
+      socket.off('play_update', handlePlayUpdate);
+    };
+  }, [socket, isAnimatingTrick]);
+
+  // Listen for socket reconnection
+  useEffect(() => {
+    if (!socket) return;
+    
+    const onReconnect = () => {
+      console.log('[REFRESH DEBUG] Socket reconnected, refreshing game state');
+      if (gameId) {
+        fetchGame(gameId);
+      }
+    };
+    
+    socket.on('reconnect', onReconnect);
+    
+    return () => {
+      socket.off('reconnect', onReconnect);
+    };
+  }, [socket, gameId]);
+
+  // Initialize socket and fetch game
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    if (gameId) {
+      fetchGame(gameId);
+    }
+  }, [socket, user, gameId, isSpectatorLocal]);
+
+  // Join game room
+  useEffect(() => {
+    if (!socket || !gameId) return;
+    
+    socket.emit('join_game', { gameId, isSpectator: isSpectatorLocal });
+    
+    return () => {
+      socket.emit('leave_game', { gameId });
+    };
+  }, [socket]);  // Only join as a player if not spectating
+
   const lastTrickLengthRef = useRef(0);
+
+  // Fetch game data
+  const fetchGame = async (gameId: string) => {
+    try {
+      const response = await fetch(`/api/games/${gameId}`);
+      if (response.ok) {
+        const gameData = await response.json();
+        setGame(gameData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch game:', error);
+    }
+  };
 
   // Listen for play_update events and update play state
   useEffect(() => {
@@ -561,29 +536,28 @@ export default function TablePage() {
   useEffect(() => {
     console.log('[REFRESH DEBUG] Socket effect triggered:', { 
       hasSocket: !!socket, 
-      isConnected: socket?.connected, 
+      isReady, 
       hasUser: !!user, 
       hasGameId: !!gameId 
     });
     
-    if (socket && socket.connected && user && gameId) {
+    if (socket && isReady && user && gameId) {
       // Only join via socket if we're not spectating and the game exists
       if (!isSpectatorLocal) {
         console.log('[SOCKET DEBUG] Emitting join_game:', { gameId });
-        // socket.emit('join_game', { gameId }); // User already in game
+        socket.emit('join_game', { gameId });
       } else {
         console.log('[SOCKET DEBUG] Emitting join_game_as_spectator:', { gameId });
         socket.emit('join_game_as_spectator', { gameId });
       }
     }
-  }, [socket, user, gameId, isSpectatorLocal]);
+  }, [socket, isReady, user, gameId, isSpectatorLocal]);
 
   // Listen for game_started and trick animation events
   useEffect(() => {
     if (!socket) return;
     
     const handleGameStarted = (data: any) => {
-      console.log('[GAME STARTED] Event received in TablePage:', data);
       if (data.hands || (data.status === "BIDDING" && game?.hands)) {
         setGame(prevGame => {
           if (!prevGame) return null;
@@ -611,6 +585,7 @@ export default function TablePage() {
       socket.off('clear_trick', handleClearTrick);
     };
   }, [socket]);  // Only join as a player if not spectating
+
   const handleJoinGame = async (
     gameIdParam?: string,
     userIdParam?: string,
@@ -851,6 +826,7 @@ export default function TablePage() {
         
         <GameTable
           game={game}
+          gameId={gameId}
           joinGame={handleJoinGame}
           onLeaveTable={handleLeaveTable}
           startGame={handleStartGame}

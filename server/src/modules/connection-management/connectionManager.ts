@@ -77,7 +77,17 @@ export function setupConnectionHandlers(io: Server, authenticatedSockets: Map<st
       // Handle leave game logic here
     });
     socket.on('start_game', (data: any) => handleStartGame(socket, data));
-    socket.on('bid', (data: any) => handleMakeBid(socket, data));
+    socket.on('make_bid', (data: any) => handleMakeBid(socket, data));
+  
+  // Debug: Handle test connection from client
+  socket.on('test_connection', (data: any) => {
+    console.log('[SOCKET DEBUG] Received test connection from client:', data);
+    socket.emit('test_connection_response', { 
+      message: 'Server received test connection', 
+      clientData: data,
+      timestamp: Date.now()
+    });
+  });
     socket.on('play_card', (data: any) => handlePlayCard(socket, data));
     socket.on('hand_completed', ({ gameId }: { gameId: string }) => {
       console.log('[HAND COMPLETED] Initializing hand summary tracking for game:', gameId);
