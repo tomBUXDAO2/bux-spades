@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model BlockedUser {
+  id                               String   @id @default(cuid())
+  userId                           String
+  blockedId                        String
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime
+  User_BlockedUser_blockedIdToUser User     @relation("BlockedUser_blockedIdToUser", fields: [blockedId], references: [id])
+  User_BlockedUser_userIdToUser    User     @relation("BlockedUser_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, blockedId])
+}
+
+model Event {
+  id        String   @id
+  name      String
+  startsAt  DateTime
+  endsAt    DateTime
+  rules     Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model EventGame {
+  eventId String
+  gameId  String
+
+  @@id([eventId, gameId])
+  @@index([gameId])
+}
+
+model Friend {
+  id                         String   @id @default(cuid())
+  userId                     String
+  friendId                   String
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime
+  User_Friend_friendIdToUser User     @relation("Friend_friendIdToUser", fields: [friendId], references: [id])
+  User_Friend_userIdToUser   User     @relation("Friend_userIdToUser", fields: [userId], references: [id])
+
+  @@unique([userId, friendId])
+}
+
+model Game {
+  id              String          @id(map: "Game_reordered_pkey") @default(cuid())
+  createdById     String
+  mode            GameMode
+  format          GameFormat
+  gimmickVariant  GimmickVariant?
+  isLeague        Boolean         @default(false)
+  isRated         Boolean         @default(false)
+  status          GameStatus
+  minPoints       Int?
+  maxPoints       Int?
+  nilAllowed      Boolean?        @default(true)
+  blindNilAllowed Boolean?        @default(false)
+  specialRules    Json?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  buyIn           Int?
+  // Added fields to persist live game state snapshots
+  currentRound    Int?
+  currentTrick    Int?
+  currentPlayer   String?
+  dealer          Int?
+  gameState       Json?
+  lastActionAt    DateTime?
+}
+
+model GamePlayer {
+  id          String    @id @default(cuid())
+  gameId      String
+  userId      String
+  seatIndex   Int?
+  teamIndex   Int?
+  isHuman     Boolean   @default(true)
+  joinedAt    DateTime  @default(now())
+  leftAt      DateTime?
+  isSpectator Boolean?  @default(false)
+
+  @@unique([gameId, seatIndex])
+  @@index([userId])
+}
+
+model GameResult {
+  id           String   @id @default(cuid())
+  gameId       String   @unique
+  winner       String
+  team0Final   Int?
+  team1Final   Int?
+  player0Final Int?
+  player1Final Int?
+  player2Final Int?
+  player3Final Int?
+  totalRounds  Int
+  totalTricks  Int
+  meta         Json?
+  createdAt    DateTime @default(now())
+}
+
+model PlayerRoundStats {
+  id            String  @id @default(cuid())
+  roundId       String
+  userId        String
+  seatIndex     Int
+  teamIndex     Int?
+  bid           Int
+  isBlindNil    Boolean @default(false)
+  tricksWon     Int
+  bagsThisRound Int
+  madeNil       Boolean
+  madeBlindNil  Boolean
+
+  @@unique([roundId, userId])
+  @@index([userId])
+}
+
+model Round {
+  id              String   @id @default(cuid())
+  gameId          String
+  roundNumber     Int
+  dealerSeatIndex Int
+  createdAt       DateTime @default(now())
+
+  @@unique([gameId, roundNumber])
+  @@index([gameId])
+}
+
+model RoundBid {
+  id         String   @id @default(cuid())
+  roundId    String
+  userId     String
+  seatIndex  Int
+  bid        Int
+  isBlindNil Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([roundId, userId])
+  @@index([roundId])
+}
+
+model RoundHandSnapshot {
+  id        String   @id @default(cuid())
+  roundId   String
+  seatIndex Int
+  cards     Json
+  createdAt DateTime @default(now())
+
+  @@index([roundId, seatIndex])
+}
+
+model RoundScore {
+  id                String   @id @default(cuid())
+  roundId           String   @unique
+  team0Score        Int?
+  team1Score        Int?
+  team0Bags         Int?
+  team1Bags         Int?
+  team0RunningTotal Int?
+  team1RunningTotal Int?
+  player0Score      Int?
+  player1Score      Int?
+  player2Score      Int?
+  player3Score      Int?
+  player0Running    Int?
+  player1Running    Int?
+  player2Running    Int?
+  player3Running    Int?
+  createdAt         DateTime @default(now())
+}
+
+model Trick {
+  id               String   @id @default(cuid())
+  roundId          String
+  trickNumber      Int
+  leadSeatIndex    Int
+  winningSeatIndex Int
+  createdAt        DateTime @default(now())
+
+  @@unique([roundId, trickNumber])
+  @@index([roundId])
+}
+
+model TrickCard {
+  id        String   @id @default(cuid())
+  trickId   String
+  seatIndex Int
+  suit      String
+  rank      String
+  playOrder Int
+  playedAt  DateTime @default(now())
+
+  @@unique([trickId, playOrder])
+  @@index([trickId])
+}
+
+model User {
+  id                                      String        @id @default(cuid())
+  discordId                               String        @unique
+  username                                String
+  avatarUrl                               String?
+  createdAt                               DateTime      @default(now())
+  coins                                   Int           @default(0)
+  soundEnabled                            Boolean       @default(true)
+  BlockedUser_BlockedUser_blockedIdToUser BlockedUser[] @relation("BlockedUser_blockedIdToUser")
+  BlockedUser_BlockedUser_userIdToUser    BlockedUser[] @relation("BlockedUser_userIdToUser")
+  Friend_Friend_friendIdToUser            Friend[]      @relation("Friend_friendIdToUser")
+  Friend_Friend_userIdToUser              Friend[]      @relation("Friend_userIdToUser")
+}
+
+model UserStats {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  totalGamesPlayed       Int      @default(0)
+  totalGamesWon          Int      @default(0)
+  totalWinPct            Float    @default(0)
+  totalBags              Int      @default(0)
+  totalBagsPerGame       Float    @default(0)
+  totalNilsBid           Int      @default(0)
+  totalNilsMade          Int      @default(0)
+  totalNilPct            Float    @default(0)
+  totalBlindNilsBid      Int      @default(0)
+  totalBlindNilsMade     Int      @default(0)
+  totalBlindNilPct       Float    @default(0)
+  totalRegularPlayed     Int      @default(0)
+  totalRegularWon        Int      @default(0)
+  totalRegularWinPct     Float    @default(0)
+  totalWhizPlayed        Int      @default(0)
+  totalWhizWon           Int      @default(0)
+  totalWhizWinPct        Float    @default(0)
+  totalMirrorPlayed      Int      @default(0)
+  totalMirrorWon         Int      @default(0)
+  totalMirrorWinPct      Float    @default(0)
+  totalGimmickPlayed     Int      @default(0)
+  totalGimmickWon        Int      @default(0)
+  totalGimmickWinPct     Float    @default(0)
+  totalScreamerPlayed    Int      @default(0)
+  totalScreamerWon       Int      @default(0)
+  totalScreamerWinPct    Float    @default(0)
+  totalAssassinPlayed    Int      @default(0)
+  totalAssassinWon       Int      @default(0)
+  totalAssassinWinPct    Float    @default(0)
+  leagueGamesPlayed      Int      @default(0)
+  leagueGamesWon         Int      @default(0)
+  leagueWinPct           Float    @default(0)
+  leagueBags             Int      @default(0)
+  leagueBagsPerGame      Float    @default(0)
+  leagueNilsBid          Int      @default(0)
+  leagueNilsMade         Int      @default(0)
+  leagueNilPct           Float    @default(0)
+  leagueBlindNilsBid     Int      @default(0)
+  leagueBlindNilsMade    Int      @default(0)
+  leagueBlindNilPct      Float    @default(0)
+  leagueRegularPlayed    Int      @default(0)
+  leagueRegularWon       Int      @default(0)
+  leagueRegularWinPct    Float    @default(0)
+  leagueWhizPlayed       Int      @default(0)
+  leagueWhizWon          Int      @default(0)
+  leagueWhizWinPct       Float    @default(0)
+  leagueMirrorPlayed     Int      @default(0)
+  leagueMirrorWon        Int      @default(0)
+  leagueMirrorWinPct     Float    @default(0)
+  leagueGimmickPlayed    Int      @default(0)
+  leagueGimmickWon       Int      @default(0)
+  leagueGimmickWinPct    Float    @default(0)
+  leagueScreamerPlayed   Int      @default(0)
+  leagueScreamerWon      Int      @default(0)
+  leagueScreamerWinPct   Float    @default(0)
+  leagueAssassinPlayed   Int      @default(0)
+  leagueAssassinWon      Int      @default(0)
+  leagueAssassinWinPct   Float    @default(0)
+  partnersGamesPlayed    Int      @default(0)
+  partnersGamesWon       Int      @default(0)
+  partnersWinPct         Float    @default(0)
+  partnersBags           Int      @default(0)
+  partnersBagsPerGame    Float    @default(0)
+  partnersNilsBid        Int      @default(0)
+  partnersNilsMade       Int      @default(0)
+  partnersNilPct         Float    @default(0)
+  partnersBlindNilsBid   Int      @default(0)
+  partnersBlindNilsMade  Int      @default(0)
+  partnersBlindNilPct    Float    @default(0)
+  partnersRegularPlayed  Int      @default(0)
+  partnersRegularWon     Int      @default(0)
+  partnersRegularWinPct  Float    @default(0)
+  partnersWhizPlayed     Int      @default(0)
+  partnersWhizWon        Int      @default(0)
+  partnersWhizWinPct     Float    @default(0)
+  partnersMirrorPlayed   Int      @default(0)
+  partnersMirrorWon      Int      @default(0)
+  partnersMirrorWinPct   Float    @default(0)
+  partnersGimmickPlayed  Int      @default(0)
+  partnersGimmickWon     Int      @default(0)
+  partnersGimmickWinPct  Float    @default(0)
+  partnersScreamerPlayed Int      @default(0)
+  partnersScreamerWon    Int      @default(0)
+  partnersScreamerWinPct Float    @default(0)
+  partnersAssassinPlayed Int      @default(0)
+  partnersAssassinWon    Int      @default(0)
+  partnersAssassinWinPct Float    @default(0)
+  soloGamesPlayed        Int      @default(0)
+  soloGamesWon           Int      @default(0)
+  soloWinPct             Float    @default(0)
+  soloBags               Int      @default(0)
+  soloBagsPerGame        Float    @default(0)
+  soloNilsBid            Int      @default(0)
+  soloNilsMade           Int      @default(0)
+  soloNilPct             Float    @default(0)
+  soloBlindNilsBid       Int      @default(0)
+  soloBlindNilsMade      Int      @default(0)
+  soloBlindNilPct        Float    @default(0)
+  soloRegularPlayed      Int      @default(0)
+  soloRegularWon         Int      @default(0)
+  soloRegularWinPct      Float    @default(0)
+  soloWhizPlayed         Int      @default(0)
+  soloWhizWon            Int      @default(0)
+  soloWhizWinPct         Float    @default(0)
+  soloMirrorPlayed       Int      @default(0)
+  soloMirrorWon          Int      @default(0)
+  soloMirrorWinPct       Float    @default(0)
+  soloGimmickPlayed      Int      @default(0)
+  soloGimmickWon         Int      @default(0)
+  soloGimmickWinPct      Float    @default(0)
+  soloScreamerPlayed     Int      @default(0)
+  soloScreamerWon        Int      @default(0)
+  soloScreamerWinPct     Float    @default(0)
+  soloAssassinPlayed     Int      @default(0)
+  soloAssassinWon        Int      @default(0)
+  soloAssassinWinPct     Float    @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+enum GameFormat {
+  REGULAR
+  WHIZ
+  MIRROR
+  GIMMICK
+}
+
+enum GameMode {
+  PARTNERS
+  SOLO
+}
+
+enum GameStatus {
+  WAITING
+  BIDDING
+  PLAYING
+  FINISHED
+}
+
+enum GimmickVariant {
+  SUICIDE
+  BID4NIL
+  BID3
+  BIDHEARTS
+  CRAZY_ACES
+}
+
+enum StatsFormat {
+  ALL
+  REGULAR
+  WHIZ
+  MIRROR
+  GIMMICK
+}
+
+enum StatsGimmickVariant {
+  ALL
+  SUICIDE
+  BID4NIL
+  BID3
+  BIDHEARTS
+  CRAZY_ACES
+}
+
+enum StatsMode {
+  ALL
+  PARTNERS
+  SOLO
+}
