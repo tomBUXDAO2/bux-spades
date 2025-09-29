@@ -22,8 +22,8 @@ export class GameValidator {
     // Check for games with no players
     const activePlayers = game.players.filter(p => p !== null);
     if (activePlayers.length === 0 && game.status !== 'FINISHED') {
-      fixes.push('Game has no players - marking as FINISHED');
-      game.status = 'FINISHED';
+      fixes.push('Game has no players - keeping game open (WAITING)');
+      game.status = 'WAITING';
       isValid = false;
     }
 
@@ -35,18 +35,16 @@ export class GameValidator {
         game.currentPlayer = firstPlayer.id;
         // Set current player index based on player position
         if (game.play) {
-          game.play.currentPlayerIndex = firstPlayer.seatIndex ?? firstPlayer.position ?? 0;
+          game.play.currentPlayerIndex = firstPlayer.position ?? 0;
         }
       } else {
-        // Only mark as FINISHED if there are truly no players AND game has been stuck for a while
+        // Do not auto-finish here; keep the game open to avoid premature FINISHED state
         const now = Date.now();
         const lastActivity = (game as any).lastActivity || now;
         const timeSinceActivity = now - lastActivity;
-        
-        // Only mark as FINISHED if no activity for more than 5 minutes
         if (timeSinceActivity > 300000) {
-          game.status = 'FINISHED';
-          fixes.push('No active players found after 5 minutes - marking as FINISHED');
+          fixes.push('No active players after 5 minutes - keeping game as WAITING');
+          game.status = 'WAITING';
         } else {
           fixes.push('No active players found but recent activity - keeping as PLAYING');
         }
@@ -62,15 +60,13 @@ export class GameValidator {
         if (!game.bidding) game.bidding = { currentPlayer: "0", currentBidderIndex: 0, nilBids: {}, bids: [null, null, null, null] };
         game.bidding.currentPlayer = String(firstPlayer.position || 0);
       } else {
-        // Only mark as FINISHED if there are truly no players AND game has been stuck for a while
+        // Do not auto-finish here; keep the game in WAITING to avoid premature FINISHED state
         const now = Date.now();
         const lastActivity = (game as any).lastActivity || now;
         const timeSinceActivity = now - lastActivity;
-        
-        // Only mark as FINISHED if no activity for more than 5 minutes
         if (timeSinceActivity > 300000) {
-          game.status = 'FINISHED';
-          fixes.push('No active players found after 5 minutes - marking as FINISHED');
+          fixes.push('No active players after 5 minutes - keeping game as WAITING');
+          game.status = 'WAITING';
         } else {
           fixes.push('No active players found but recent activity - keeping as BIDDING');
         }

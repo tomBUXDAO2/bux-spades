@@ -31,12 +31,13 @@ export async function saveGameStateSafely(game: Game): Promise<void> {
         lastSaved: Date.now()
       };
 
-      if (game.dbGameId) {
-        await prisma.game.update({
-          where: { id: game.dbGameId },
-          data: { status: gameState.status === "CANCELLED" ? "FINISHED" : gameState.status || "PLAYING" }
-        });
-      }
+      // Disabled status updates to prevent premature FINISHED status
+      // if (game.dbGameId) {
+      //   await prisma.game.update({
+      //     where: { id: game.dbGameId },
+      //     data: { status: gameState.status || "PLAYING" }
+      //   });
+      // }
     },
     () => {
       console.log(`[CRASH PREVENTION] Failed to save game state for ${game.id} - using fallback`);
@@ -107,11 +108,12 @@ export async function loadGameStateSafely(gameId: string): Promise<Game | null> 
  */
 export async function updateGameStatusSafely(gameId: string, status: string): Promise<void> {
   try {
-    const validStatus = status === "CANCELLED" ? "FINISHED" : status;
-    await prisma.game.update({
-      where: { id: gameId },
-      data: { status: validStatus as any }
-    });
+    // TEMPORARILY DISABLED TO FIND WHAT'S SETTING FINISHED STATUS
+    console.log(`[CRASH PREVENTION] Status update disabled: ${gameId} -> ${status}`);
+    // await prisma.game.update({
+    //   where: { id: gameId },
+    //   data: { status: validStatus as any }
+    // });
   } catch (error) {
     console.log(`[CRASH PREVENTION] Failed to update game status for ${gameId} - using fallback`);
   }

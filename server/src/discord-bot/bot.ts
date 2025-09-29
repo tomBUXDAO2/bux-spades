@@ -10,6 +10,7 @@ import {
   postVerificationEmbed 
 } from './verification';
 import { postMeetTheTeamEmbedOnce } from './embeds';
+import { handleWelcomeMessage } from './events/welcomeMessage';
 
 // Create a new client instance
 const client = new Client({
@@ -54,6 +55,9 @@ client.once(Events.ClientReady, async (readyClient) => {
 // Event: New member joins
 client.on(Events.GuildMemberAdd, async (member) => {
   console.log(`New member joined: ${member.user.username} (${member.id})`);
+  
+  // Send welcome message and give 5M coins
+  await handleWelcomeMessage(member);
   
   // Check if they have Facebook connected and award role if so
   await checkAndUpdateUserRole(member.id, client);

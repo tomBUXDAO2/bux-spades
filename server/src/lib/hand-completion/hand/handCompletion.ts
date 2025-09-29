@@ -4,7 +4,6 @@ import { enrichGameForClient } from '../../../routes/games/shared/gameUtils';
 import type { Game } from '../../../types/game';
 import { completeGame } from '../game/gameCompletion';
 import prisma from '../../prisma';
-import { newdbEnsureRound, newdbRecordRoundEnd } from '../../../newdb/writers';
 
 // Import startTurnTimeout function
 declare function startTurnTimeout(game: Game, playerIndex: number, phase: string): void;

@@ -2148,15 +2148,14 @@ export default function GameTable({
 
     socket.on('new_hand_started', handleNewHandStarted);
     socket.on('bidding_ready', handleBiddingReady);
-    // Comment out individual phase transition handlers to avoid conflicts with game_update
-    // socket.on('bidding_complete', handleBiddingComplete);
-    // socket.on('play_start', handlePlayStart);
+    socket.on('bidding_complete', handleBiddingComplete);
+    socket.on('play_start', handlePlayStart);
 
     return () => {
       socket.off('new_hand_started', handleNewHandStarted);
       socket.off('bidding_ready', handleBiddingReady);
-      // socket.off('bidding_complete', handleBiddingComplete);
-      // socket.off('play_start', handlePlayStart);
+      socket.off('bidding_complete', handleBiddingComplete);
+      socket.off('play_start', handlePlayStart);
     };
   }, [socket]);
 
@@ -2317,11 +2316,27 @@ export default function GameTable({
   // --- Trick card rendering on the table, not inside player info ---
   const renderTrickCards = () => {
     // Use animated trick cards during animation, otherwise use current trick
+    console.log('[RENDER TRICK CARDS] Game state:', {
+      play: gameState?.play,
+      currentTrick: gameState?.play?.currentTrick,
+      currentTrickLength: gameState?.play?.currentTrick?.length,
+      currentTrickContent: gameState?.play?.currentTrick,
+      animatingTrick,
+      animatedTrickCards
+    });
     let displayTrick = animatingTrick ? animatedTrickCards : ((gameState as any)?.play?.currentTrick || []);
+    console.log('[RENDER TRICK CARDS] displayTrick before fallback:', displayTrick);
     if (!displayTrick.length && lastNonEmptyTrick.length) {
       displayTrick = lastNonEmptyTrick;
+      console.log('[RENDER TRICK CARDS] Using lastNonEmptyTrick:', displayTrick);
     }
-    if (!displayTrick.length) return null;
+    console.log('[RENDER TRICK CARDS] Final displayTrick:', displayTrick, 'length:', displayTrick.length);
+    if (!displayTrick.length) {
+      console.log('[RENDER TRICK CARDS] Returning null - no cards to display');
+      return null;
+    }
+    
+    console.log('[RENDER TRICK CARDS] About to render cards, displayTrick:', displayTrick);
 
     // Table positions: 0 = South (you), 1 = West, 2 = North, 3 = East
     const positions: Record<number, string> = {
@@ -2338,11 +2353,33 @@ export default function GameTable({
     // For spectators, use seat 0 as the reference point
     const referenceSeatIndex = mySeatIndex >= 0 ? mySeatIndex : 0;
     const orderedPlayers = [0,1,2,3].map(i => seatOrderedPlayers[(referenceSeatIndex + i) % 4]);
+    
+    console.log('[RENDER TRICK CARDS] Player positioning debug:', {
+      seatOrderedPlayers: seatOrderedPlayers.map(p => p ? { id: p.id, position: p.position } : 'null'),
+      mySeatIndex,
+      referenceSeatIndex,
+      orderedPlayers: orderedPlayers.map(p => p ? { id: p.id, position: p.position } : 'null'),
+      orderedPlayersFull: orderedPlayers,
+      seatOrderedPlayersFull: seatOrderedPlayers
+    });
 
-    return Array.isArray(displayTrick) && displayTrick.map((card: Card, i: number) => {
+    const result = Array.isArray(displayTrick) ? displayTrick.map((card: Card, i: number) => {
       const seatIndex = (card as any).playerIndex;
-      const displayPosition = orderedPlayers.findIndex(p => p && p.position === seatIndex);
-      if (displayPosition === -1 || displayPosition === undefined) return null;
+      const displayPosition = orderedPlayers.findIndex(p => p && (p.position === seatIndex || p.seatIndex === seatIndex));
+      console.log('[RENDER TRICK CARDS] Card mapping:', {
+        card,
+        seatIndex,
+        displayPosition,
+        orderedPlayers: orderedPlayers.map(p => p ? { position: p.position, seatIndex: p.seatIndex, id: p.id } : 'null'),
+        orderedPlayersFull: orderedPlayers,
+        seatOrderedPlayers: seatOrderedPlayers,
+        mySeatIndex,
+        referenceSeatIndex
+      });
+      if (displayPosition === -1 || displayPosition === undefined) {
+        console.log('[RENDER TRICK CARDS] Returning null for card due to displayPosition:', displayPosition);
+        return null;
+      }
       
       // Check if this card is the winning card
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
@@ -2378,7 +2415,10 @@ export default function GameTable({
           )}
         </div>
       );
-    });
+    }) : [];
+    
+    console.log('[RENDER TRICK CARDS] Returning rendered cards:', result);
+    return result;
   };
 
   // --- Lobby chat toggle state ---
@@ -2524,7 +2564,9 @@ export default function GameTable({
         }
         return hand;
       })
-    }));    setPendingPlayedCard(card); // Optimistically show the card
+    }));
+    
+    setPendingPlayedCard(card); // Optimistically show the card
     socket.emit('play_card', { gameId: gameState.id, userId: user.id, card });
     console.log('[CLIENT] play_card event emitted');
   };

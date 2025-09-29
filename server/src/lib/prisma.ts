@@ -6,13 +6,33 @@ const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 export const prisma: PrismaClient = globalForPrisma.prisma || new PrismaClient({
   datasources: {
     db: {
-      url: process.env.NEW_DATABASE_URL,
+      url: process.env.DATABASE_URL,
     },
   },
   // Optimized logging - only errors in production
   log: process.env.NODE_ENV === 'production' ? ['error'] : ['error', 'warn'],
   // Performance optimizations
   errorFormat: 'minimal',
+  // Connection pool configuration to prevent exhaustion
+  // __internal: {
+  //   engine: {
+  //     connection_limit: 50,
+  //     pool_timeout: 30,
+  //   },
+  // },
+});
+
+// Add middleware to log ALL status updates to FINISHED
+prisma.$use(async (params, next) => {
+  if (params.model === 'Game' && params.action === 'update') {
+    const args = params.args as any;
+    if (args?.data?.status === 'FINISHED') {
+      console.log(`🚨 [PRISMA INTERCEPT] Setting game ${args.where?.id} to FINISHED!`);
+      console.log(`🚨 [PRISMA INTERCEPT] Stack trace:`, new Error().stack);
+      console.log(`🚨 [PRISMA INTERCEPT] Args:`, JSON.stringify(args, null, 2));
+    }
+  }
+  return next(params);
 });
 
 // Optimized connection health check - less frequent in production

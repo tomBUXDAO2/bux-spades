@@ -77,7 +77,17 @@ export async function handleMakeBid(socket: AuthenticatedSocket, data: any): Pro
             isBlindNil: false
           }
         });
+        
+        // Update in-memory game state
+        const { gamesStore } = await import('../../../../gamesStore');
+        const inMemoryGame = gamesStore.getGame(gameId);
+        if (inMemoryGame && inMemoryGame.bidding) {
+          inMemoryGame.bidding.bids[player.seatIndex] = bid;
+          inMemoryGame.players[player.seatIndex].bid = bid;
+          console.log(`[BID HANDLER] Updated in-memory game state with bid ${bid} for seat ${player.seatIndex}`);
+        }
       } else {
+        console.log(`[BID HANDLER] No current round found for game ${gameId}`);
       }
     } catch (dbError) {
       console.error(`[BID HANDLER] Error storing human bid in database:`, dbError);
@@ -122,6 +132,11 @@ export async function handleMakeBid(socket: AuthenticatedSocket, data: any): Pro
     
     console.log(`[BID HANDLER] Total bids count: ${allBidsCount}/4`);
     
+    // Debug: Check what bids we have
+    if (inMemoryGame && inMemoryGame.bidding) {
+      console.log('[BID HANDLER] In-memory bids:', inMemoryGame.bidding.bids);
+    }
+    
     // If all 4 players have bid, move to playing phase
     if (allBidsCount >= 4) {
       console.log('[BID HANDLER] All players have bid, transitioning to play phase');
@@ -145,6 +160,16 @@ export async function handleMakeBid(socket: AuthenticatedSocket, data: any): Pro
           where: { id: { in: userIds } }
         });
         const userMap = new Map(users.map(u => [u.id, u]));
+        
+        // Get bids for this round
+        const currentRound = await prisma.round.findFirst({
+          where: { gameId: gameId },
+          orderBy: { roundNumber: 'desc' }
+        });
+        
+        const allBids = currentRound ? await prisma.roundBid.findMany({
+          where: { roundId: currentRound.id }
+        }) : [];
         
         const bidMap = new Map(allBids.map(b => [b.userId, b.bid]));
         

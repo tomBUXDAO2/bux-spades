@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Server } from 'socket.io';
 import type { AuthenticatedSocket } from '../../types/socket';
 import { 

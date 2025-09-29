@@ -3,6 +3,7 @@ import { enrichGameForClient } from '../../routes/games/shared/gameUtils';
 import { botMakeMove } from '../bot-play/botLogic';
 import { handleBiddingComplete } from '../socket-handlers/game-state/gameStateHandler';
 import type { Game } from '../../types/game';
+import { prisma } from '../../lib/prisma';
 
 /**
  * Start a game - deal cards and begin bidding
@@ -43,7 +44,23 @@ export async function startGame(game: Game): Promise<void> {
     }
     
     // Determine dealer and first bidder
-    const dealerIndex = game.dealerIndex || 0;
+  const dealerIndex = game.dealerIndex || 0;
+  game.dealerIndex = dealerIndex as any;
+  (game as any).dealer = dealerIndex;
+  // Persist startedAt and dealer to DB (startedAt only if null)
+  try {
+    await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        dealer: dealerIndex,
+        startedAt: (await prisma.game.findUnique({ where: { id: game.id }, select: { startedAt: true } }))?.startedAt
+          ? undefined
+          : new Date()
+      }
+    });
+  } catch (e) {
+    console.error('[GAME START] Failed to persist startedAt/dealer:', e);
+  }
     const firstBidderIndex = (dealerIndex + 1) % 4;
     
     // Set current bidder
@@ -51,8 +68,8 @@ export async function startGame(game: Game): Promise<void> {
     game.bidding.currentPlayer = game.players[firstBidderIndex]?.id || '';
     game.currentPlayer = game.players[firstBidderIndex]?.id || '';
     
-    // Emit game update
-    io.to(game.id).emit('game_update', enrichGameForClient(game));
+  // Emit game update (includes dealer)
+  io.to(game.id).emit('game_update', enrichGameForClient(game));
 
     // MIRROR: Auto-bid for all seats, then immediately complete bidding
     if ((game as any).rules?.bidType === 'MIRROR') {

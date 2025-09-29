@@ -43,6 +43,16 @@ export async function deleteUnratedGameFromDatabase(gameId: string) {
     // 1. Delete round bids first
     const rounds = await prisma.round.findMany({ where: { gameId } });
     for (const round of rounds) {
+      // Delete trick cards first (they reference tricks)
+      const tricks = await prisma.trick.findMany({ where: { roundId: round.id } });
+      for (const trick of tricks) {
+        await prisma.trickCard.deleteMany({ where: { trickId: trick.id } });
+      }
+      
+      // Delete tricks
+      await prisma.trick.deleteMany({ where: { roundId: round.id } });
+      
+      // Delete round bids and hand snapshots
       await prisma.roundBid.deleteMany({ where: { roundId: round.id } });
       await prisma.roundHandSnapshot.deleteMany({ where: { roundId: round.id } });
     }
@@ -56,7 +66,7 @@ export async function deleteUnratedGameFromDatabase(gameId: string) {
     // 4. Delete the game
     await prisma.game.delete({ where: { id: gameId } });
     
-    console.log(`[GAME COMPLETION] Successfully deleted unrated game, rounds, bids, hand snapshots, and all bot users: ${gameId}`);
+    console.log(`[GAME COMPLETION] Successfully deleted unrated game, rounds, tricks, trick cards, bids, hand snapshots, and all bot users: ${gameId}`);
     return { success: true };
   } catch (error) {
     console.error(`[GAME COMPLETION] Failed to delete unrated game ${gameId}:`, error);

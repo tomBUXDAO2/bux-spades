@@ -57,22 +57,25 @@ export class GameCleanupManager {
     try {
       console.log('[GAME CLEANUP] Starting cleanup cycle...');
       
+      // TEMPORARILY DISABLED ALL CLEANUP TO FIND WHAT'S SETTING FINISHED STATUS
+      console.log('[GAME CLEANUP] All cleanup disabled to debug FINISHED status issue');
+      
       // 1. Clean up WAITING games that have been waiting too long (15 minutes)
-      await cleanupWaitingGames(games, this.io || undefined);
+      // await cleanupWaitingGames(games, this.io || undefined);
       
       // 2. Clean up memory games that are finished but still in memory
-      await cleanupFinishedGamesInMemory(games);
+      // await cleanupFinishedGamesInMemory(games);
       
       // 3. Clean up database games that are stuck
-      await cleanupStuckDatabaseGames();
+      // await cleanupStuckDatabaseGames();
       
       // 4. Clean up orphaned games (in DB but not in memory)
-      await cleanupOrphanedGames(games);
+      // await cleanupOrphanedGames(games);
       
       // 5. Clean up games with no human players for too long
-      await cleanupAbandonedGames(games);
+      // await cleanupAbandonedGames(games);
       
-      console.log('[GAME CLEANUP] Cleanup cycle completed');
+      console.log('[GAME CLEANUP] Cleanup cycle completed (all disabled)');
     } catch (error) {
       console.error('[GAME CLEANUP] Error during cleanup:', error);
     }

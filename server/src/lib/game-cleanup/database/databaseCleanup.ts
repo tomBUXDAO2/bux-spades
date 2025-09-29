@@ -19,16 +19,8 @@ export async function cleanupStuckDatabaseGames(): Promise<void> {
 
     for (const stuckGame of stuckGames) {
       console.log(`[GAME CLEANUP] Found stuck game in DB: ${stuckGame.id}`);
-      
-      // Mark as finished
-      await prisma.game.update({
-        where: { id: stuckGame.id },
-        data: {
-          status: 'FINISHED'
-        }
-      });
-      
-      console.log(`[GAME CLEANUP] Marked stuck game as finished: ${stuckGame.id}`);
+      // Do NOT auto-finish here; just log for observability
+      // Optionally, we could ping or set a heartbeat marker
     }
   } catch (error) {
     console.error('[GAME CLEANUP] Error cleaning up stuck database games:', error);
@@ -56,16 +48,7 @@ export async function cleanupOrphanedGames(games: Game[]): Promise<void> {
     for (const orphanedGame of orphanedGames) {
       if (!memoryGameIds.has(orphanedGame.id)) {
         console.log(`[GAME CLEANUP] Found orphaned game: ${orphanedGame.id}`);
-        
-        // Mark as finished
-        await prisma.game.update({
-          where: { id: orphanedGame.id },
-          data: {
-            status: 'FINISHED'
-          }
-        });
-        
-        console.log(`[GAME CLEANUP] Marked orphaned game as finished: ${orphanedGame.id}`);
+        // Do NOT auto-finish; manual/explicit finish only
       }
     }
   } catch (error) {
@@ -87,15 +70,8 @@ export async function forceCleanupGame(gameId: string, games: Game[]): Promise<v
       console.log(`[GAME CLEANUP] Removed game from memory: ${gameId}`);
     }
     
-    // Mark as finished in database
-    await prisma.game.update({
-      where: { id: gameId },
-      data: {
-        status: 'FINISHED'
-      }
-    });
-    
-    console.log(`[GAME CLEANUP] Marked game as finished in database: ${gameId}`);
+  // Do NOT change DB status here implicitly
+  console.log(`[GAME CLEANUP] Skipped DB FINISHED transition for: ${gameId}`);
   } catch (error) {
     console.error(`[GAME CLEANUP] Error force cleaning up game ${gameId}:`, error);
   }

@@ -122,6 +122,7 @@ export interface Game {
 	currentTrick?: number;
 	dealer?: number;
 	roundHistory?: any[];
+	trickHistory?: any[];
 	currentTrickCards?: Card[];
 	lastAction?: string;
 	lastActionTime?: number;

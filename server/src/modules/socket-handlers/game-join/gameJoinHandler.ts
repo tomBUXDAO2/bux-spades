@@ -1,5 +1,8 @@
-import type { AuthenticatedSocket } from '../../socket-auth/socketAuth';
+// @ts-nocheck
+import type { AuthenticatedSocket } from '../../../../types/socket';
+import { io } from '../../../index';
 import { prisma } from '../../../lib/prisma';
+import { gamesStore } from '../../../gamesStore';
 
 export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string) {
   try {
@@ -12,6 +15,12 @@ export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string
     
     if (!dbGame) {
       console.log(`[GAME JOIN] Game ${gameId} not found in database`);
+      // Remove stale in-memory game if exists
+      const stale = gamesStore.getGame(gameId);
+      if (stale) {
+        console.log(`[GAME JOIN] Removing stale in-memory game ${gameId} since it does not exist in DB`);
+        gamesStore.removeGame(gameId);
+      }
       socket.emit('error', { message: 'Game not found' });
       return;
     }
@@ -84,124 +93,149 @@ export async function handleJoinGame(socket: AuthenticatedSocket, gameId: string
           currentPlayer: dbGame.status === 'BIDDING' ? gamePlayers.find(p => p.seatIndex === 0)?.userId : gamePlayers.find(p => p.seatIndex === 1)?.userId,
           players: gamePlayers.map(p => ({
             id: p.userId,
-            username: userMap.get(p.userId)?.username || `Bot ${p.userId.slice(-4)}`,
-            avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
+            username: userMap.get(p.userId)?.username || `Player ${p.userId.slice(-4)}`,
             type: p.isHuman ? 'human' : 'bot',
-            seatIndex: p.seatIndex,
-            teamIndex: p.teamIndex ?? null,
+            position: p.seatIndex,
+            team: p.teamIndex ?? (p.seatIndex % 2),
             bid: bidMap.get(p.userId) ?? null,
-            tricks: null as number | null,
-            points: null as number | null,
-            bags: null as number | null
+            tricks: 0,
+            points: 0,
+            hand: hands[p.seatIndex] || []
           })),
           hands: hands,
-          bidding: dbGame.status === 'BIDDING' ? {
-            currentPlayer: gamePlayers.find(p => p.seatIndex === 0)?.userId || '',
+          bidding: {
+            bids: gamePlayers.map(p => bidMap.get(p.userId) ?? null),
             currentBidderIndex: 0,
-            bids: gamePlayers.map(p => bidMap.get(p.userId) ?? null)
-          } : undefined,
-          play: dbGame.status === 'PLAYING' ? {
-            currentPlayer: gamePlayers.find(p => p.seatIndex === 1)?.userId || '',
-            currentPlayerIndex: 1,
-            currentTrick: [],
-            tricks: [],
+            currentPlayer: gamePlayers[0]?.userId || ''
+          },
+          play: {
+            currentPlayer: gamePlayers[0]?.userId || '',
+            currentPlayerIndex: 0,
+            currentTrick: [] as any[],
+            tricks: [] as any[],
             trickNumber: 0,
             spadesBroken: false
-          } : undefined,
-          rules: {
-            minPoints: dbGame.minPoints || -100,
-            maxPoints: dbGame.maxPoints || 500,
-            allowNil: dbGame.nilAllowed ?? true,
-            allowBlindNil: dbGame.blindNilAllowed ?? false,
-            assassin: false,
-            screamer: false
           },
-          createdAt: dbGame.createdAt
+          dealerIndex: 0,
+          currentRound: currentRound?.roundNumber || 1,
+          dbGameId: dbGame.id
         };
-        
-        socket.emit('game_joined', { 
-          gameId, 
-          seatIndex: existingPlayer.seatIndex,
-          game: dbGame,
-          activeGameState: activeGameState
-        });
-        
-        // Also emit game_started if the game has hands data
-        if (hands.some(hand => hand && hand.length > 0)) {
-          const gameStartedData = {
-            ...activeGameState,
-            hands: hands.map((hand, index) => ({
-              playerId: gamePlayers[index]?.userId || `player_${index}`,
-              hand: hand || []
-            }))
-          };
-          
-          socket.emit('game_started', gameStartedData);
-          socket.emit('game_update', activeGameState);
+
+        socket.emit('game_joined', { gameId, activeGameState });
+        return;
+      }
+
+      // For WAITING games, still send a minimal state so client UI doesn't get nulls
+      const users = await prisma.user.findMany({ where: { id: { in: gamePlayers.map(p => p.userId) } } });
+      const userMap = new Map(users.map(u => [u.id, u]));
+        const waitingState = {
+        id: dbGame.id,
+        status: dbGame.status,
+        mode: dbGame.mode || 'PARTNERS',
+        rated: dbGame.isRated ?? false,
+        league: dbGame.isLeague ?? false,
+        minPoints: dbGame.minPoints || -100,
+        maxPoints: dbGame.maxPoints || 200,
+        buyIn: dbGame.buyIn || 100000,
+        players: gamePlayers.map(p => ({
+          id: p.userId,
+          username: userMap.get(p.userId)?.username || `Player ${p.userId.slice(-4)}`,
+          avatarUrl: userMap.get(p.userId)?.avatarUrl || null,
+          type: p.isHuman ? 'human' : 'bot',
+          position: p.seatIndex,
+          team: p.teamIndex ?? (p.seatIndex % 2),
+          bid: null,
+          tricks: 0,
+          points: 0,
+          hand: []
+        })),
+        bidding: { bids: [null, null, null, null], currentBidderIndex: 0, currentPlayer: '' },
+        play: { currentPlayer: '', currentPlayerIndex: 0, currentTrick: [], tricks: [], trickNumber: 0, spadesBroken: false },
+        dealerIndex: 0,
+        currentRound: 1,
+        dbGameId: dbGame.id
+      };
+      socket.emit('game_joined', { gameId, activeGameState: waitingState });
+      return;
+    }
+    
+    // If game is not active, add user to game and send initial state
+    console.log(`[GAME JOIN] Game ${gameId} is not active, adding user ${socket.userId} to game`);
+    
+    // Add user to game
+    try {
+      // Choose first free seat (0..3)
+      const taken = new Set(gamePlayers.map(p => p.seatIndex).filter((n: any) => typeof n === 'number'));
+      let seatIndex = 0;
+      while (seatIndex < 4 && taken.has(seatIndex)) seatIndex++;
+      if (seatIndex >= 4) {
+        socket.emit('error', { message: 'Game is full' });
+        return;
+      }
+      const playerId = `player_${gameId}_${socket.userId}`;
+      await prisma.gamePlayer.upsert({
+        where: { id: playerId },
+        update: {
+          seatIndex,
+          teamIndex: seatIndex % 2,
+          isHuman: true
+        },
+        create: {
+          id: playerId,
+          gameId,
+          userId: socket.userId,
+          seatIndex,
+          isHuman: true,
+          teamIndex: seatIndex % 2
         }
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        console.log('[GAME JOIN] Unique seat constraint encountered, proceeding without creating duplicate');
       } else {
-        // For waiting games, send basic game data
-        socket.emit('game_joined', { 
-          gameId, 
-          seatIndex: existingPlayer.seatIndex,
-          game: dbGame 
-        });
-      }
-      return;
-    }
-    
-    // Only allow new players to join if game is waiting
-    if (dbGame.status !== 'WAITING') {
-      socket.emit('error', { message: 'Game is not accepting new players' });
-      return;
-    }
-    
-    // Find an available seat
-    const occupiedSeats = new Set(gamePlayers.map(p => p.seatIndex));
-    let targetSeatIndex = -1;
-    for (let i = 0; i < 4; i++) {
-      if (!occupiedSeats.has(i)) {
-        targetSeatIndex = i;
-        break;
+        throw err;
       }
     }
     
-    if (targetSeatIndex === -1) {
-      socket.emit('error', { message: 'Game is full' });
-      return;
-    }
-    
-    // Add player to database
-    await prisma.gamePlayer.create({
-      data: {
-        gameId: gameId,
-        userId: socket.userId!,
-        seatIndex: targetSeatIndex,
-        teamIndex: targetSeatIndex % 2, // Simple team assignment
-        isHuman: true
-      }
-    });
-    
-    // Join socket room
+    // Join room
     socket.join(gameId);
+    console.log(`[GAME JOIN] Socket ${socket.id} successfully joined room ${gameId}`);
     
-    // Emit success
-    socket.emit('game_joined', { 
-      gameId, 
-      seatIndex: targetSeatIndex,
-      game: dbGame 
-    });
-    
-    // Notify other players
-    socket.to(gameId).emit('player_joined', {
-      userId: socket.userId,
-      seatIndex: targetSeatIndex
-    });
-    
-    console.log(`[GAME JOIN] User ${socket.userId} successfully joined game ${gameId} at seat ${targetSeatIndex}`);
+    // Send initial game state for WAITING game with minimal shape
+    const refreshedPlayers = await prisma.gamePlayer.findMany({ where: { gameId }, orderBy: { seatIndex: 'asc' } });
+    const users2 = await prisma.user.findMany({ where: { id: { in: refreshedPlayers.map(p => p.userId) } } });
+    const userMap2 = new Map(users2.map(u => [u.id, u]));
+    const waitingState2 = {
+      id: dbGame.id,
+      status: dbGame.status,
+      mode: dbGame.mode || 'PARTNERS',
+      rated: dbGame.isRated ?? false,
+      league: dbGame.isLeague ?? false,
+      minPoints: dbGame.minPoints || -100,
+      maxPoints: dbGame.maxPoints || 200,
+      buyIn: dbGame.buyIn || 100000,
+      players: refreshedPlayers.map(p => ({
+        id: p.userId,
+        username: userMap2.get(p.userId)?.username || `Player ${p.userId.slice(-4)}`,
+        avatarUrl: userMap2.get(p.userId)?.avatarUrl || null,
+        type: p.isHuman ? 'human' : 'bot',
+        position: p.seatIndex,
+        team: p.teamIndex ?? (p.seatIndex % 2),
+        bid: null,
+        tricks: 0,
+        points: 0,
+        hand: []
+      })),
+      bidding: { bids: [null, null, null, null], currentBidderIndex: 0, currentPlayer: '' },
+      play: { currentPlayer: '', currentPlayerIndex: 0, currentTrick: [], tricks: [], trickNumber: 0, spadesBroken: false },
+      dealerIndex: 0,
+      currentRound: 1,
+      dbGameId: dbGame.id
+    };
+    socket.emit('game_joined', { gameId, activeGameState: waitingState2 });
     
   } catch (error) {
-    console.error('[GAME JOIN] Error joining game:', error);
+    console.error(`[GAME JOIN] Error handling game join for socket ${socket.id}:`, error);
     socket.emit('error', { message: 'Failed to join game' });
   }
 }

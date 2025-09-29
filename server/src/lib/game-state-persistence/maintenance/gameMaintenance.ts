@@ -25,8 +25,7 @@ export async function checkForStuckGames(): Promise<void> {
       await (prisma.game.update as any)({
         where: { id: stuckGame.id },
         data: {
-          status: 'FINISHED',
-          // updatedAt: new Date()
+          // Never auto-finish here
         }
       });
       

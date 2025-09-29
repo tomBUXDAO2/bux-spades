@@ -52,10 +52,10 @@ export async function saveGameState(game: Game): Promise<void> {
       playerScores: game.playerScores,
       playerBags: game.playerBags,
       // Additional state for complete recovery - these are runtime properties, not database fields
-      // deck: game.deck || [], // ✅ STORING REMAINING DECK
-      // playedCards: game.playedCards || [], // ✅ STORING PLAYED CARDS
-      // trickHistory: game.trickHistory || [], // ✅ STORING TRICK HISTORY
-      // roundScores: game.roundScores || [] // ✅ STORING ROUND-BY-ROUND SCORES
+      deck: game.deck || [], // ✅ STORING REMAINING DECK
+      playedCards: game.playedCards || [], // ✅ STORING PLAYED CARDS
+      trickHistory: game.play?.tricks || [], // ✅ STORING TRICK HISTORY
+      roundScores: game.roundScores || [] // ✅ STORING ROUND-BY-ROUND SCORES
     };
 
     // Use type assertion to bypass Prisma type issues
@@ -73,8 +73,10 @@ export async function saveGameState(game: Game): Promise<void> {
     });
 
     console.log(`[GAME STATE] ✅ Saved COMPLETE state for game ${game.id} - Round ${game.currentRound || 1}, Trick ${game.currentTrick || 1}`);
-    console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${(gameState as any).trickHistory?.length || 0} tricks`);
-    console.log(`[GAME STATE DEBUG] Player hands:`, game.players.map((p, i) => `${i}: ${p?.username} = ${p?.hand?.length || 0} cards`));  } catch (error) {
+    console.log(`[GAME STATE] 📊 Stored: ${game.players.filter(p => p?.hand?.length).length} player hands, ${gameState.roundHistory.length} rounds, ${gameState.trickHistory.length} tricks`);
+    console.log(`[GAME STATE DEBUG] Player hands:`, game.players.map((p, i) => `${i}: ${p?.username} = ${p?.hand?.length || 0} cards`));
+    console.log(`[GAME STATE DEBUG] Game object has trickHistory:`, !!game.play?.tricks, 'length:', game.play?.tricks?.length || 0);
+    console.log(`[GAME STATE DEBUG] Game object has roundHistory:`, !!game.roundHistory, 'length:', game.roundHistory?.length || 0);  } catch (error) {
     console.error(`[GAME STATE] ❌ Failed to save state for game ${game.id}:`, error);
   }
 }

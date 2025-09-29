@@ -357,6 +357,12 @@ export default function TablePage() {
     if (!socket) return;
     
     const handleGameUpdate = (updatedGame: any) => {
+      console.log('[GAME UPDATE] Received game update:', {
+        id: updatedGame.id,
+        status: updatedGame.status,
+        play: updatedGame.play,
+        currentTrick: updatedGame.play?.currentTrick
+      });
       
       setGame(prevGame => {
         const mergedPlayers = updatedGame.players?.map((newPlayer: any, index: number) => {
@@ -585,6 +591,55 @@ export default function TablePage() {
       socket.off('clear_trick', handleClearTrick);
     };
   }, [socket]);  // Only join as a player if not spectating
+
+  // Handle game_joined event - for when user is already in the game
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleGameJoined = (data: any) => {
+      console.log('[TABLE PAGE] Received game_joined event:', data);
+      
+      // Update the game state with the received data
+      if (data.game) {
+        setGame(prevGame => {
+          const updatedGame = { ...prevGame, ...data.game };
+          
+          // Ensure the user is properly placed in their seat
+          if (data.seatIndex !== undefined && user) {
+            const players = [...(updatedGame.players || [])];
+            players[data.seatIndex] = {
+              id: user.id,
+              username: user.username,
+              avatarUrl: user.avatarUrl,
+              type: 'human',
+              seatIndex: data.seatIndex,
+              position: data.seatIndex
+            };
+            updatedGame.players = players;
+          }
+          
+          return updatedGame;
+        });
+        updateModalState(data.game);
+      }
+      
+      // If this is a reconnection to an active game, handle the active game state
+      if (data.activeGameState) {
+        console.log('[TABLE PAGE] Handling active game state:', data.activeGameState);
+        setGame(prevGame => ({ 
+          ...prevGame, 
+          ...data.activeGameState,
+          status: data.activeGameState.status || "BIDDING"
+        }));
+      }
+    };
+    
+    socket.on('game_joined', handleGameJoined);
+    
+    return () => {
+      socket.off('game_joined', handleGameJoined);
+    };
+  }, [socket, user]);
 
   const handleJoinGame = async (
     gameIdParam?: string,

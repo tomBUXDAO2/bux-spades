@@ -46,7 +46,8 @@ export async function createGameRecord(game: any, gameData: any): Promise<any> {
         isLeague: game.isLeague || false,
         isRated: game.isRated || false,
         specialRules: [],
-        status: 'FINISHED',
+        // never set FINISHED here; creation-only util
+        status: 'WAITING',
         createdAt: now,
         updatedAt: now
       }

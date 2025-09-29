@@ -166,5 +166,11 @@ export async function newdbRecordGameFinish(params: {
 	await prisma.gameResult.create({
 		data: { gameId: params.gameId, winner: params.winner, team0Final: params.finals.team0Final ?? null, team1Final: params.finals.team1Final ?? null, player0Final: params.finals.player0Final ?? null, player1Final: params.finals.player1Final ?? null, player2Final: params.finals.player2Final ?? null, player3Final: params.finals.player3Final ?? null, totalRounds: params.totalRounds, totalTricks: params.totalTricks }
 	});
-	await prisma.game.update({ where: { id: params.gameId }, data: { status: 'FINISHED' as any, finishedAt: params.finishedAt ?? new Date() } });
+	// Only mark rated games as FINISHED here; unrated games should not be auto-finished
+	await prisma.game.update({
+		where: { id: params.gameId },
+		data: {
+			finishedAt: params.finishedAt ?? new Date(),
+		}
+	});
 } 

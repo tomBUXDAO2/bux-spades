@@ -4,11 +4,11 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("NEW_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model BlockedUser {
-  id                               String   @id
+  id                               String   @id @default(cuid())
   userId                           String
   blockedId                        String
   createdAt                        DateTime @default(now())
@@ -38,7 +38,7 @@ model EventGame {
 }
 
 model Friend {
-  id                         String   @id
+  id                         String   @id @default(cuid())
   userId                     String
   friendId                   String
   createdAt                  DateTime @default(now())
@@ -50,7 +50,7 @@ model Friend {
 }
 
 model Game {
-  id              String          @id(map: "Game_reordered_pkey")
+  id              String          @id(map: "Game_reordered_pkey") @default(cuid())
   createdById     String
   mode            GameMode
   format          GameFormat
@@ -66,12 +66,19 @@ model Game {
   startedAt       DateTime?
   finishedAt      DateTime?
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime        @updatedAt
   buyIn           Int?
+  // Added fields to persist live game state snapshots
+  currentRound    Int?
+  currentTrick    Int?
+  currentPlayer   String?
+  dealer          Int?
+  gameState       Json?
+  lastActionAt    DateTime?
 }
 
 model GamePlayer {
-  id          String    @id
+  id          String    @id @default(cuid())
   gameId      String
   userId      String
   seatIndex   Int?
@@ -86,7 +93,7 @@ model GamePlayer {
 }
 
 model GameResult {
-  id           String   @id
+  id           String   @id @default(cuid())
   gameId       String   @unique
   winner       String
   team0Final   Int?
@@ -102,7 +109,7 @@ model GameResult {
 }
 
 model PlayerRoundStats {
-  id            String  @id
+  id            String  @id @default(cuid())
   roundId       String
   userId        String
   seatIndex     Int
@@ -119,7 +126,7 @@ model PlayerRoundStats {
 }
 
 model Round {
-  id              String   @id
+  id              String   @id @default(cuid())
   gameId          String
   roundNumber     Int
   dealerSeatIndex Int
@@ -130,7 +137,7 @@ model Round {
 }
 
 model RoundBid {
-  id         String   @id
+  id         String   @id @default(cuid())
   roundId    String
   userId     String
   seatIndex  Int
@@ -143,7 +150,7 @@ model RoundBid {
 }
 
 model RoundHandSnapshot {
-  id        String   @id
+  id        String   @id @default(cuid())
   roundId   String
   seatIndex Int
   cards     Json
@@ -153,7 +160,7 @@ model RoundHandSnapshot {
 }
 
 model RoundScore {
-  id                String   @id
+  id                String   @id @default(cuid())
   roundId           String   @unique
   team0Score        Int?
   team1Score        Int?
@@ -173,7 +180,7 @@ model RoundScore {
 }
 
 model Trick {
-  id               String   @id
+  id               String   @id @default(cuid())
   roundId          String
   trickNumber      Int
   leadSeatIndex    Int
@@ -185,7 +192,7 @@ model Trick {
 }
 
 model TrickCard {
-  id        String   @id
+  id        String   @id @default(cuid())
   trickId   String
   seatIndex Int
   suit      String
@@ -198,7 +205,7 @@ model TrickCard {
 }
 
 model User {
-  id                                      String        @id
+  id                                      String        @id @default(cuid())
   discordId                               String        @unique
   username                                String
   avatarUrl                               String?
@@ -212,7 +219,7 @@ model User {
 }
 
 model UserStats {
-  id                     String   @id
+  id                     String   @id @default(cuid())
   userId                 String   @unique
   totalGamesPlayed       Int      @default(0)
   totalGamesWon          Int      @default(0)
@@ -331,7 +338,7 @@ model UserStats {
   soloAssassinWon        Int      @default(0)
   soloAssassinWinPct     Float    @default(0)
   createdAt              DateTime @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime @updatedAt
 }
 
 enum GameFormat {

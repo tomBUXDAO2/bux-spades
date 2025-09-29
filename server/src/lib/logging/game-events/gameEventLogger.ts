@@ -188,7 +188,8 @@ export async function logGameEndToDb(game: any, winningTeamOrPlayer: number): Pr
     
     // Update game record
     await updateGameRecord(game.id, {
-      status: 'FINISHED',
+      // status change must be explicit via game finish pipeline
+      status: (undefined as unknown as any),
       finalScore: game.mode === 'SOLO' 
         ? (game.playerScores?.[winningTeamOrPlayer] ?? 0)
         : Math.max(game.team1TotalScore ?? 0, game.team2TotalScore ?? 0),

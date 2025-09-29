@@ -1,9 +1,7 @@
 import type { AuthenticatedSocket } from '../../socket-auth';
 import { io } from '../../../index';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/prisma';
 import { LobbyChatMessage } from '../types/chatTypes';
-
-const prisma = new PrismaClient();
 
 /**
  * Handles lobby chat messages

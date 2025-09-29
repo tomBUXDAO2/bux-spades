@@ -29,29 +29,20 @@ export async function cleanupWaitingGames(games: Game[], io?: Server): Promise<v
       // Remove game from memory
       games.splice(i, 1);
       
-      // Clean up database if it's an unrated game
+      // Clean up database only if it's unrated AND still in WAITING
       if (!game.rated && game.dbGameId) {
-        console.log(`[WAITING GAME CLEANUP] Cleaning up unrated game from database: ${game.dbGameId}`);
-        try {
-          await deleteUnratedGameFromDatabase(game.id);
-          console.log(`[WAITING GAME CLEANUP] Successfully cleaned up unrated game: ${game.dbGameId}`);
-        } catch (error) {
-          console.error(`[WAITING GAME CLEANUP] Failed to clean up unrated game: ${game.dbGameId}`, error);
-        }
-      } else if (game.rated && game.dbGameId) {
-        // For rated games, just mark as cancelled in database
-        console.log(`[WAITING GAME CLEANUP] Marking rated game as cancelled: ${game.dbGameId}`);
         try {
           const { prisma } = await import('../../prisma');
-          await prisma.game.update({
-            where: { id: game.dbGameId },
-            data: {
-              status: 'FINISHED'
-            }
-          });
-          console.log(`[WAITING GAME CLEANUP] Successfully marked rated game as cancelled: ${game.dbGameId}`);
+          const db = await prisma.game.findUnique({ where: { id: game.dbGameId }, select: { status: true } });
+          if (db?.status === 'WAITING') {
+            console.log(`[WAITING GAME CLEANUP] Cleaning up unrated WAITING game from database: ${game.dbGameId}`);
+            await deleteUnratedGameFromDatabase(game.id);
+            console.log(`[WAITING GAME CLEANUP] Successfully cleaned up unrated game: ${game.dbGameId}`);
+          } else {
+            console.log(`[WAITING GAME CLEANUP] Skip cleanup; DB status is ${db?.status}`);
+          }
         } catch (error) {
-          console.error(`[WAITING GAME CLEANUP] Failed to mark rated game as cancelled: ${game.dbGameId}`, error);
+          console.error(`[WAITING GAME CLEANUP] Failed to clean up unrated game: ${game.dbGameId}`, error);
         }
       }
       

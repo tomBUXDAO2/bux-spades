@@ -6,17 +6,18 @@ const turnTimeouts = new Map<string, NodeJS.Timeout>();
 /**
  * Start turn timeout for a player
  */
-export function startTurnTimeout(game: Game, playerIndex: number, phase: string): void {
+export function startTurnTimeout(game: any, seatIndex: number, phase: 'bidding' | 'playing' | string) {
+  const normalizedPhase: 'bidding' | 'playing' = (phase === 'bidding' || phase === 'playing') ? phase : 'playing';
   try {
-    console.log(`[TIMEOUT MANAGER] Starting timeout for player ${playerIndex} in phase ${phase} for game ${game.id}`);
+    console.log(`[TIMEOUT MANAGER] Starting timeout for player ${seatIndex} in phase ${normalizedPhase} for game ${game.id}`);
     
     // Clear existing timeout for this game
     clearTurnTimeout(game.id);
     
     // Set new timeout
     const timeout = setTimeout(() => {
-      console.log(`[TIMEOUT MANAGER] Timeout triggered for player ${playerIndex} in game ${game.id}`);
-      handleTurnTimeout(game, playerIndex, phase);
+      console.log(`[TIMEOUT MANAGER] Timeout triggered for player ${seatIndex} in game ${game.id}`);
+      handleTurnTimeout(game, seatIndex, normalizedPhase);
     }, 30000); // 30 second timeout
     
     turnTimeouts.set(game.id, timeout);
@@ -53,7 +54,7 @@ async function handleTurnTimeout(game: Game, playerIndex: number, phase: string)
     const { botMakeMove } = await import('../../bot-play/botLogic');
     
     // Trigger bot move
-    await botMakeMove(game, playerIndex, phase);
+    await botMakeMove(game, playerIndex, (phase === 'bidding' ? 'bidding' : 'playing'));
     
   } catch (error) {
     console.error('[TIMEOUT MANAGER] Error handling turn timeout:', error);
