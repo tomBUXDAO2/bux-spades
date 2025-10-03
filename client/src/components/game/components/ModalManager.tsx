@@ -3,14 +3,14 @@
 
 import React from 'react';
 import type { GameState, Player, Bot } from "../../../types/game";
-import HandSummaryModal from '@/features/game/components/HandSummaryModal';
-import TrickHistoryModal from '@/components/modals/TrickHistoryModal';
-import SeatReplacementModal from '@/features/game/components/SeatReplacementModal';
-import SoloWinnerModal from '@/features/game/components/SoloWinnerModal';
-import WinnerModal from '@/features/game/components/WinnerModal';
-import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
-import { getUserTeam } from '@/features/game/utils/gameUtils';
-import { isGameOver } from '@/features/game/services/lib/gameRules';
+import HandSummaryModal from '../../../features/game/components/HandSummaryModal';
+import TrickHistoryModal from '../../../components/modals/TrickHistoryModal';
+import SeatReplacementModal from '../../../features/game/components/SeatReplacementModal';
+import SoloWinnerModal from '../../../features/game/components/SoloWinnerModal';
+import WinnerModal from '../../../features/game/components/WinnerModal';
+import PlayerStatsModal from '../../../components/modals/PlayerStatsModal';
+import { getUserTeam } from '../../../features/game/utils/gameUtils';
+import { isGameOver } from '../../../features/game/services/lib/gameRules';
 
 interface ModalManagerProps {
   // Game state

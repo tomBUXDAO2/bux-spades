@@ -3,9 +3,9 @@
 
 import React from 'react';
 import type { GameState, Player, Bot } from "../../../types/game";
-import BlindNilModal from '@/features/game/components/BlindNilModal';
-import BiddingInterface from '@/features/game/components/BiddingInterface';
-import { countSpades } from '@/features/game/utils/gameUtils';
+import BlindNilModal from '../../../features/game/components/BlindNilModal';
+import BiddingInterface from '../../../features/game/components/BiddingInterface';
+import { countSpades } from '../../../features/game/utils/gameUtils';
 import { abbreviateBotName } from '../../../utils/botUtils';
 
 interface GameStatusOverlayProps {
