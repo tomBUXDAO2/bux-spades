@@ -1,4 +1,4 @@
-import type { GameState } from "../../types/game"""""';
+import type { GameState } from "../../types/game";
 import { isGameOver } from '../gameplay/gameplayRules';
 
 /**

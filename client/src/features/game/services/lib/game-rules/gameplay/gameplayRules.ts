@@ -1,4 +1,4 @@
-import type { Card, Suit, GameState } from "../../types/game"""""';
+import type { Card, Suit, GameState } from "../../types/game";
 
 /**
  * ⚠️  WARNING: This file contains game rules that should be moved to backend

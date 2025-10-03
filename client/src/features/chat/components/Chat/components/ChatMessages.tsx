@@ -2,7 +2,7 @@
 // Extracted from Chat.tsx
 
 import React, { useRef, useEffect } from 'react';
-import type { ChatMessage } from "../../chat/Chat"';
+import type { ChatMessage } from "../../chat/Chat";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];

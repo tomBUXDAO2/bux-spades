@@ -1,7 +1,7 @@
 // League utility functions for GameTable component
 // These functions handle league game overlay data preparation
 
-import type { GameState, Player, Bot } from "../../types/game"""""';
+import type { GameState, Player, Bot } from "../../types/game";
 
 export interface LeagueOverlayCallbacks {
   toggleReady: (ready: boolean) => void;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { GameType, Card } from "@/types/game";
+import { GameType, Card } from "../../types/game";
 
 interface BiddingProps {
   onBid: (bid: number) => void;

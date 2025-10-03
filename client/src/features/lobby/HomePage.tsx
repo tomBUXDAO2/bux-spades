@@ -12,7 +12,7 @@ import ChatSection from '@/features/lobby/components/lobby/ChatSection';
 import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
-import type { GameState, Player, Bot } from "../../types/game"""';
+import type { GameState, Player, Bot } from "../../types/game";
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '@/features/auth/SocketContext';
 import { api } from '@/services/lib/api';

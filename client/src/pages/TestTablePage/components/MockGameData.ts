@@ -1,4 +1,4 @@
-import type { GameState, Card, Rank, Suit } from "../../types/game"""""';
+import type { GameState, Card, Rank, Suit } from "../../types/game";
 
 export const createMockGame = (): GameState => {
   // Create the hands array first with realistic mixed card distributions
