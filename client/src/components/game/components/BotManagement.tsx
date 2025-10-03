@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSocket } from '../../features/auth/SocketContext';
+import { useSocket } from '../../../features/auth/SocketContext';
 
 interface BotManagementProps {
   gameId: string;

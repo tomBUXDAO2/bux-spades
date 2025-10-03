@@ -1,7 +1,7 @@
 // Bid utility functions for GameTable component
 // These functions handle bidding logic
 
-import type { GameState } from "../../types/game"""';
+import type { GameState } from "../../types/game"""""';
 
 export interface BidCallbacks {
   playBidSound: () => void;

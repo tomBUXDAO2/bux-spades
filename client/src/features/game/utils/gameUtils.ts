@@ -1,7 +1,7 @@
 // Game utility functions for GameTable component
 // These functions handle card operations, game logic, and team calculations
 
-import type { Card, Suit, GameState, Player } from "../../types/game"""';
+import type { Card, Suit, GameState, Player } from "../../types/game"""""';
 
 /**
  * Get card rank value for sorting

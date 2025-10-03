@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 import GameTable from '../../features/game/components/GameTable';
-import type { GameState } from "../../types/game"""';
+import type { GameState } from "../../types/game"""""';
 import { createMockGame } from './components/MockGameData';
 import { isMobileOrTablet, isBot } from './components/DeviceDetection';
 import { requestFullScreen, exitFullScreen } from './components/FullScreenManager';

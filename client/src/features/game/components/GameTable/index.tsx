@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Player, Bot } from "../../types/game";
-import type { ChatMessage } from '../../chat/Chat';
-import Chat from '../../chat/Chat';
+import type { ChatMessage } from '../../../chat/Chat';
+import Chat from '../../../chat/Chat';
 import LandscapePrompt from '../../../../LandscapePrompt';
 
 // Extracted components
@@ -31,7 +31,7 @@ import { handleStartGame } from '../utils/startGameUtils';
 import { handleBid } from '../utils/bidUtils';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
-import { useSocket } from '../../../auth/SocketContext';
+import { useSocket } from '../../../features/auth/SocketContext';
 import { useWindowSize } from '../../../../hooks/useWindowSize';
 import { createPortal } from 'react-dom';
 
