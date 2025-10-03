@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { useAuth } from '../../context/AuthContext';
-import GameTable from '../../table-ui/game/GameTable';
-import type { GameState } from '../types/game';
-import { createMockGame } from './test/MockGameData';
-import { isMobileOrTablet, isBot } from './test/DeviceDetection';
-import { requestFullScreen, exitFullScreen } from './test/FullScreenManager';
-import { TestModeIndicator } from './test/TestModeIndicator';
-import { FullScreenToggle } from './test/FullScreenToggle';
-import LandscapePrompt from '../LandscapePrompt';
-import TableInactivityModal from '../components/modals/TableInactivityModal';
+import { useAuth } from '../../features/auth/AuthContext';
+import GameTable from '../../features/game/components/GameTable';
+import type { GameState } from '../../types/game';
+import { createMockGame } from './components/MockGameData';
+import { isMobileOrTablet, isBot } from './components/DeviceDetection';
+import { requestFullScreen, exitFullScreen } from './components/FullScreenManager';
+import { TestModeIndicator } from './components/TestModeIndicator';
+import { FullScreenToggle } from './components/FullScreenToggle';
+import LandscapePrompt from '../../LandscapePrompt';
+import TableInactivityModal from '../../components/modals/TableInactivityModal';
 
 export default function TestTablePageModular() {
   const { user } = useAuth();

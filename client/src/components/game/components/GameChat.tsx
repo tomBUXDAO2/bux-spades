@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSocket } from '../../context/SocketContext';
-import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../features/auth/SocketContext';
+import { useAuth } from '../../features/auth/AuthContext';
 
 interface GameChatProps {
   gameId: string;
