@@ -1,1 +1,0 @@
-export { initializeDiscordBot } from './discordBot';

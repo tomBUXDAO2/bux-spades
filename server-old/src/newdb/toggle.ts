@@ -1,1 +1,0 @@
-export const useNewDbOnly: boolean = process.env.NEWDB_ONLY === 'true'; 

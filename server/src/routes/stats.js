@@ -1,6 +1,6 @@
 import express from 'express';
 import { DetailedStatsService } from '../services/DetailedStatsService.js';
-import { prisma } from '../config/database.js';
+import { prisma } from '../config/databaseFirst.js';
 
 const router = express.Router();
 

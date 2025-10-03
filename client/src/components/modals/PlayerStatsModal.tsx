@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
+import { api } from '@/services/lib/api';
 
 interface PlayerStats {
   gamesPlayed: number;
@@ -33,6 +33,7 @@ interface PlayerStats {
 interface Player {
   username: string;
   avatar: string;
+  avatarUrl?: string; // Support both avatar and avatarUrl properties
   stats: PlayerStats;
   status: 'friend' | 'blocked' | 'not_friend';
   coins?: number;
@@ -61,7 +62,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
         console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
         const response = await api.get(url);
-        const data = await response.json(); const stats = data.stats || data;
+        const stats = await response.json();
         console.log('[PLAYER STATS MODAL] Received stats:', stats);
         setCurrentStats(stats);
       } catch (error) {
@@ -91,7 +92,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   const gameModeBreakdown = {
     regular: `${stats.regWon || 0}/${stats.regPlayed || 0}`,
     whiz: `${stats.whizWon || 0}/${stats.whizPlayed || 0}`,
-    mirror: `${stats.mirrorWon || 0}/${stats.mirrorPlayed || 0}`,
+    mirrors: `${stats.mirrorWon || 0}/${stats.mirrorPlayed || 0}`,
     gimmick: `${stats.gimmickWon || 0}/${stats.gimmickPlayed || 0}`
   };
 
@@ -161,7 +162,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             {/* Player Profile Card */}
             <div className="bg-slate-700 rounded-lg p-6 mb-6">
               <div className="flex items-center space-x-4 mb-4">
-                <img src={player.avatar} alt={player.username} className="w-16 h-16 rounded-full" />
+                <img src={player.avatar || player.avatarUrl || '/default-avatar.png'} alt={player.username} className="w-16 h-16 rounded-full" />
                 <h3 className="text-3xl font-bold text-white">{player.username}</h3>
               </div>
               <div className="space-y-4">
@@ -266,9 +267,9 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xl text-white">Mirror</span>
+                  <span className="text-xl text-white">Mirrors</span>
                   <div className="flex space-x-8">
-                    <span className="text-xl text-white">{gameModeBreakdown.mirror}</span>
+                    <span className="text-xl text-white">{gameModeBreakdown.mirrors}</span>
                     <span className="text-xl text-white">{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
                   </div>
                 </div>

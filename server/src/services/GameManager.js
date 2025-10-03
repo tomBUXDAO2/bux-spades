@@ -1,4 +1,5 @@
 import { GameService } from './GameService.js';
+import { Game } from '../models/Game.js';
 
 // In-memory game store for active games
 class GameManager {
@@ -7,11 +8,31 @@ class GameManager {
     this.socketRooms = new Map(); // gameId -> Set of socketIds
   }
 
+  // Create/load a game instance from DB result into memory
+  // Accepts an already-constructed Game instance or a plain object that GameService would return
+  createGameFromDB(dbGame) {
+    if (!dbGame) return null;
+    
+    // If it's already a Game instance, just add it
+    if (dbGame instanceof Game) {
+      this.addGame(dbGame);
+      return dbGame;
+    }
+    
+    // If it's a raw DB result, we need to load it properly through GameService
+    // This should not happen in normal flow, but let's handle it gracefully
+    console.warn('[GAME MANAGER] createGameFromDB called with raw DB result, this should not happen');
+    return null;
+  }
+
   // Add game to memory
   addGame(game) {
+    console.log(`[GAME MANAGER] ADDING GAME ${game.id} TO MEMORY`);
+    console.trace('[GAME MANAGER] Stack trace for addGame call');
     this.games.set(game.id, game);
     this.socketRooms.set(game.id, new Set());
     console.log(`[GAME MANAGER] Added game ${game.id} to memory`);
+    console.log(`[GAME MANAGER] Total games in memory: ${this.games.size}`);
   }
 
   // Get game from memory
@@ -21,6 +42,8 @@ class GameManager {
 
   // Remove game from memory
   removeGame(gameId) {
+    console.log(`[GAME MANAGER] REMOVING GAME ${gameId} FROM MEMORY`);
+    console.trace('[GAME MANAGER] Stack trace for removeGame call');
     this.games.delete(gameId);
     this.socketRooms.delete(gameId);
     console.log(`[GAME MANAGER] Removed game ${gameId} from memory`);
@@ -96,6 +119,10 @@ class GameManager {
   async createGame(gameData) {
     try {
       const game = await GameService.createGame(gameData);
+      
+      // Creator is already added to the database by GameService
+      console.log(`[GAME MANAGER] Game ${game.id} created with creator ${gameData.createdById} in database`);
+      
       this.addGame(game);
       return game;
     } catch (error) {
@@ -119,3 +146,4 @@ class GameManager {
 
 // Singleton instance
 export const gameManager = new GameManager();
+export { GameManager };

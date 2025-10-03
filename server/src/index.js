@@ -2,6 +2,7 @@ import { app, server, io, PORT } from './config/server.js';
 import { gameManager } from './services/GameManager.js';
 import { setupSocketHandlers } from './socket/socketHandlers.js';
 import { setupRoutes } from './routes/index.js';
+import { PeriodicCleanupService } from './services/PeriodicCleanupService.js';
 
 // Setup routes
 setupRoutes(app);
@@ -16,6 +17,9 @@ gameManager.loadAllActiveGames().then(() => {
   console.error('[SERVER] Error loading games:', error);
 });
 
+// Start periodic cleanup service (temporarily disabled for debugging)
+// PeriodicCleanupService.start();
+
 // Start server
 server.listen(PORT, () => {
   console.log(`[SERVER] Server running on port ${PORT}`);
@@ -25,6 +29,9 @@ server.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('[SERVER] Shutting down gracefully...');
+  
+  // Stop periodic cleanup service
+  PeriodicCleanupService.stop();
   
   // Save all games before shutdown
   const games = gameManager.getAllGames();

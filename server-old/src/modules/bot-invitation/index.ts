@@ -1,1 +1,0 @@
-export { addBotToSeat } from './botInvitation';

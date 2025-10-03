@@ -1,24 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 
-// Single Prisma client instance
-const globalForPrisma = globalThis;
-
-export const prisma = globalForPrisma.prisma || new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-  log: process.env.NODE_ENV === 'production' ? ['error'] : ['query', 'error', 'warn'],
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+// NOTE: Removed previous hard guard that forcibly blocked Game.status='FINISHED'.
+// Game completion must be allowed so the lifecycle can progress correctly.
 
-// Graceful shutdown
+// Handle graceful shutdown
 process.on('beforeExit', async () => {
   await prisma.$disconnect();
 });
 
-export default prisma;
+export { prisma };

@@ -1,14 +1,50 @@
 import express from 'express';
 import { gameManager } from '../services/GameManager.js';
+import { GameService } from '../services/GameService.js';
 import { Game } from '../models/Game.js';
 
 const router = express.Router();
 
-// Get all active games
+// Get all active games (ONLY from database)
 router.get('/', async (req, res) => {
   try {
-    const games = gameManager.getAllGames();
-    res.json(games.map(game => game.toClientFormat()));
+    // Load games ONLY from database
+    const dbGames = await GameService.getActiveGames();
+    console.log(`[API] Found ${dbGames.length} games in database`);
+    
+    console.log(`[API] Returning ${dbGames.length} database games only`);
+    
+    // Format database games for client
+    const clientGames = dbGames.map(game => ({
+      id: game.id,
+      createdById: game.createdById,
+      mode: game.mode,
+      format: game.format,
+      gimmickVariant: game.gimmickVariant,
+      isLeague: game.isLeague,
+      isRated: game.isRated,
+      status: game.status,
+      minPoints: game.minPoints,
+      maxPoints: game.maxPoints,
+      nilAllowed: game.nilAllowed,
+      blindNilAllowed: game.blindNilAllowed,
+      specialRules: game.specialRules,
+      buyIn: game.buyIn,
+      createdAt: game.createdAt,
+      updatedAt: game.updatedAt,
+      players: game.players.map(player => ({
+        id: player.userId,
+        username: player.user?.username || 'Unknown',
+        avatarUrl: player.user?.avatarUrl || null,
+        seatIndex: player.seatIndex,
+        teamIndex: player.teamIndex,
+        isHuman: player.isHuman,
+        joinedAt: player.joinedAt,
+        isSpectator: player.isSpectator
+      }))
+    }));
+    
+    res.json(clientGames);
   } catch (error) {
     console.error('[API] Error getting games:', error);
     res.status(500).json({ error: 'Failed to get games' });
@@ -41,10 +77,21 @@ router.post('/', async (req, res) => {
   try {
     const gameData = {
       id: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdById: req.body.creatorId || req.body.createdById || 'system', // Use creatorId from client
+      createdByUsername: req.body.creatorName || req.body.createdByUsername || 'Unknown',
+      createdByAvatar: req.body.creatorImage || req.body.createdByAvatar || null,
       mode: req.body.mode || 'PARTNERS',
+      format: req.body.format || 'REGULAR', // Required field
+      gimmickVariant: req.body.gimmickVariant || null,
       maxPoints: req.body.maxPoints || 200,
       minPoints: req.body.minPoints || -100,
       buyIn: req.body.buyIn || 0,
+      nilAllowed: req.body.specialRules?.allowNil !== false,
+      blindNilAllowed: req.body.specialRules?.allowBlindNil || false,
+      specialRules: req.body.specialRules || {
+        screamer: false,
+        assassin: false
+      },
       rules: req.body.rules || {
         gameType: 'PARTNERS',
         allowNil: true,
@@ -61,10 +108,32 @@ router.post('/', async (req, res) => {
     };
 
     const game = await gameManager.createGame(gameData);
-    res.json(game.toClientFormat());
+    
+    // Format the database game for client
+    const clientGame = {
+      id: game.id,
+      createdById: game.createdById,
+      mode: game.mode,
+      format: game.format,
+      gimmickVariant: game.gimmickVariant,
+      isLeague: game.isLeague,
+      isRated: game.isRated,
+      status: game.status,
+      minPoints: game.minPoints,
+      maxPoints: game.maxPoints,
+      nilAllowed: game.nilAllowed,
+      blindNilAllowed: game.blindNilAllowed,
+      specialRules: game.specialRules,
+      buyIn: game.buyIn,
+      createdAt: game.createdAt,
+      updatedAt: game.updatedAt,
+      players: [] // Will be populated when players join
+    };
+    
+    res.json(clientGame);
   } catch (error) {
     console.error('[API] Error creating game:', error);
-    res.status(500).json({ error: 'Failed to create game' });
+    res.status(500).json({ error: 'Failed to create game', message: error?.message || 'unknown' });
   }
 });
 

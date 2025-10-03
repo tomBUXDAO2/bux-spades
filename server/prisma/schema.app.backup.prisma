@@ -1,0 +1,326 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core User model
+model User {
+  id          String   @id @default(cuid())
+  discordId   String   @unique
+  username    String
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  coins       Int      @default(0)
+  soundEnabled Boolean @default(true)
+  
+  // Relations
+  games       GamePlayer[]
+  stats       UserStats? // One-to-one relationship for basic aggregated data
+  friends     Friend[] @relation("UserFriends")
+  friendOf    Friend[] @relation("FriendOf")
+  blocked     BlockedUser[] @relation("BlockedBy")
+  blockedBy   BlockedUser[] @relation("BlockedUser")
+  messages    GameMessage[]
+  roundStats  PlayerRoundStats[]
+}
+
+// Simplified UserStats - just stores basic aggregated data for quick access
+model UserStats {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  totalGamesPlayed Int      @default(0)
+  totalGamesWon    Int      @default(0)
+  totalCoinsWon    Int      @default(0)
+  totalCoinsLost   Int      @default(0)
+  lastGameAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Game model - cleaner structure
+model Game {
+  id              String       @id @default(cuid())
+  createdById     String
+  mode            GameMode
+  format          GameFormat
+  gimmickVariant  GimmickVariant?
+  isLeague        Boolean      @default(false)
+  isRated         Boolean      @default(false)
+  status          GameStatus
+  minPoints       Int?
+  maxPoints       Int?
+  nilAllowed      Boolean      @default(true)
+  blindNilAllowed Boolean      @default(false)
+  specialRules    Json?        // Store special rules like screamer, assassin, etc.
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  buyIn           Int?
+  
+  // Live game state fields
+  currentRound    Int?
+  currentTrick    Int?
+  currentPlayer   String?
+  dealer          Int?
+  gameState       Json?
+  lastActionAt    DateTime?
+  
+  // Relations
+  players         GamePlayer[]
+  rounds          Round[]
+  result          GameResult?
+  discordCommand  DiscordGame?
+  messages        GameMessage[]
+  actionLogs      GameActionLog[]
+}
+
+// GamePlayer - stores player participation in games
+model GamePlayer {
+  id          String    @id @default(cuid())
+  gameId      String
+  userId      String
+  seatIndex   Int
+  teamIndex   Int?
+  isHuman     Boolean   @default(true)
+  joinedAt    DateTime  @default(now())
+  leftAt      DateTime?
+  isSpectator Boolean   @default(false)
+  
+  // Relations
+  game        Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+  
+  @@unique([gameId, seatIndex])
+  @@unique([gameId, userId])
+  @@index([userId])
+}
+
+// Round - represents one hand/round of play
+model Round {
+  id            String   @id @default(cuid())
+  gameId        String
+  roundNumber   Int
+  dealerSeatIndex Int
+  
+  // Relations
+  game          Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  bids          RoundBid[]
+  tricks        Trick[]
+  playerStats   PlayerRoundStats[]
+  handSnapshots RoundHandSnapshot[]
+  
+  @@unique([gameId, roundNumber])
+}
+
+// RoundBid - stores each player's bid for a round
+model RoundBid {
+  id           String   @id @default(cuid())
+  roundId      String
+  userId       String
+  seatIndex    Int
+  bid          Int
+  isNil        Boolean  @default(false)
+  isBlindNil   Boolean  @default(false)
+  bidAt        DateTime @default(now())
+  
+  // Relations
+  round        Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  
+  @@unique([roundId, seatIndex])
+}
+
+// Trick - represents one trick within a round
+model Trick {
+  id              String   @id @default(cuid())
+  roundId         String
+  trickNumber     Int
+  winningSeatIndex Int?
+  
+  // Relations
+  round           Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  cards           TrickCard[]
+  
+  @@unique([roundId, trickNumber])
+}
+
+// TrickCard - stores each card played in a trick
+model TrickCard {
+  id        String   @id @default(cuid())
+  trickId   String
+  seatIndex Int
+  suit      String
+  rank      String
+  playOrder Int
+  playedAt  DateTime @default(now())
+  
+  // Relations
+  trick     Trick    @relation(fields: [trickId], references: [id], onDelete: Cascade)
+  
+  @@unique([trickId, playOrder])
+}
+
+// RoundHandSnapshot - stores dealt hands for each round
+model RoundHandSnapshot {
+  id        String   @id @default(cuid())
+  roundId   String
+  seatIndex Int
+  cards     Json     // Array of card objects
+  createdAt DateTime @default(now())
+  
+  // Relations
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  
+  @@unique([roundId, seatIndex])
+}
+
+// PlayerRoundStats - stores stats for each player in each round
+model PlayerRoundStats {
+  id            String   @id @default(cuid())
+  roundId       String
+  userId        String
+  seatIndex     Int
+  teamIndex     Int?
+  bid           Int?
+  isBlindNil    Boolean  @default(false)
+  tricksWon     Int      @default(0)
+  bagsThisRound Int      @default(0)
+  madeNil       Boolean  @default(false)
+  madeBlindNil  Boolean  @default(false)
+  
+  // Relations
+  round         Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([roundId, userId])
+}
+
+// GameResult - final game results
+model GameResult {
+  id           String   @id @default(cuid())
+  gameId       String   @unique
+  winner       String
+  team0Final   Int?
+  team1Final   Int?
+  player0Final Int?
+  player1Final Int?
+  player2Final Int?
+  player3Final Int?
+  totalRounds  Int
+  totalTricks  Int
+  meta         Json?
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+// DiscordGame - for games created via Discord commands
+model DiscordGame {
+  id              String   @id @default(cuid())
+  gameId          String   @unique
+  commandMessageId String  @unique
+  channelId       String
+  createdBy       String
+  player1Id       String
+  player2Id       String
+  player3Id       String
+  player4Id       String
+  createdAt       DateTime @default(now())
+  startedAt       DateTime?
+  
+  // Relations
+  game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+// Game Messages - for in-game chat
+model GameMessage {
+  id        String   @id @default(cuid())
+  gameId    String
+  userId    String
+  message   String
+  timestamp DateTime @default(now())
+  
+  // Relations
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Social features
+model Friend {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, friendId])
+}
+
+model BlockedUser {
+  id        String   @id @default(cuid())
+  userId    String
+  blockedId String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User     @relation("BlockedBy", fields: [userId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, blockedId])
+}
+
+// Enums
+enum GameFormat {
+  REGULAR
+  WHIZ
+  MIRROR
+  GIMMICK
+}
+
+enum GameMode {
+  PARTNERS
+  SOLO
+}
+
+enum GameStatus {
+  WAITING
+  BIDDING
+  PLAYING
+  FINISHED
+}
+
+enum GimmickVariant {
+  SUICIDE
+  BID4NIL
+  BID3
+  BIDHEARTS
+  CRAZY_ACES
+}
+
+// Game Action Log - comprehensive logging of all game actions
+model GameActionLog {
+  id        String   @id @default(cuid())
+  gameId    String
+  action    String   // bid, play_card, trick_complete, round_complete, game_complete, etc.
+  data      String   // JSON string of action-specific data
+  userId    String
+  seatIndex Int
+  timestamp DateTime @default(now())
+  
+  // Relations
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  
+  @@index([gameId, timestamp])
+  @@index([gameId, action])
+}

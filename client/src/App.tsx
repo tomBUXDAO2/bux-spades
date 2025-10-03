@@ -4,19 +4,19 @@ import {
   createBrowserRouter,
   Navigate,
 } from 'react-router-dom';
-import { AuthProvider as AuthContextProvider, useAuth } from '@/context/AuthContext';
-import Login from '@/components/auth/Login';
-import Register from '@/components/auth/Register';
-import AuthCallback from '@/components/auth/AuthCallback';
-import HomePage from './pages/HomePage';
+import { AuthProvider as AuthContextProvider, useAuth } from '@/features/auth/AuthContext';
+import Login from '@/features/auth/components/Login';
+import Register from '@/features/auth/components/Register';
+import AuthCallback from '@/features/auth/components/AuthCallback';
+import HomePage from '@/features/lobby/HomePage';
 import TablePage from './pages/TablePage';
 import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
-import { SocketProvider } from './context/SocketContext';
+import { SocketProvider } from '@/features/auth/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
-import { preloadImages } from './utils/imagePreloader';
+import { preloadImages } from './services/utils/imagePreloader';
 
 // Placeholder components - these will be implemented later
 const Profile = () => <div>Profile Page</div>;

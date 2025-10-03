@@ -1,6 +1,0 @@
-  console.log(`[BOT CARD DEBUG] Bot ${bot.username} selected card: ${card.rank}${card.suit} - ${reason}`);
-
-  // Use proper card play handler
-  const { handleBotCardPlay } = await import('./botCardHandler');
-  await handleBotCardPlay(game, bot.id, card);
-  return;

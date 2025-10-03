@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth/AuthContext';
 import GameRulesModal from '@/components/modals/GameRulesModal';
 
 interface HeaderProps {
@@ -128,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-slate-200 font-medium">{user?.coins?.toLocaleString()}</span>
+              <span className="text-slate-200 font-medium">{user?.coins?.toLocaleString() || '0'}</span>
             </div>
 
             {/* User Profile */}
@@ -139,11 +139,11 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               >
                 <div className="flex items-center space-x-3">
                   <img
-                    src={user?.avatarUrl || '/default-avatar.png'}
+                    src={user?.avatar || user?.avatarUrl || '/default-avatar.png'}
                     alt="Profile"
                     className="w-8 h-8 rounded-full bg-slate-700"
                   />
-                  <span className="text-slate-200 font-medium hidden sm:inline">{user?.username}</span>
+                  <span className="text-slate-200 font-medium hidden sm:inline">{user?.username || 'Loading...'}</span>
                 </div>
                 <svg
                   className={`w-5 h-5 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}

@@ -10,6 +10,8 @@ export interface Card {
   suit: Suit;
   rank: Rank;
   playedBy?: Player;
+  playerId?: string;
+  seatIndex?: number;
 }
 
 export interface Player {

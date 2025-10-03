@@ -115,8 +115,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
       specialRules: {
         screamer: specialRule === 'screamer',
         assassin: specialRule === 'assassin',
-        allowNil,
-        allowBlindNil
+      allowNil,
+      allowBlindNil
       }
     });
     onClose();
@@ -137,7 +137,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className={`bg-slate-800 rounded-lg border border-white/20 flex flex-col items-center justify-center w-full ${
-        useLandscapeLayout
+        useLandscapeLayout 
           ? 'max-w-4xl max-h-[95vh] overflow-y-auto p-4'
           : isMobile 
             ? 'max-w-sm max-h-[90vh] overflow-y-auto p-3' 
@@ -344,18 +344,18 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               {/* Action Buttons */}
               <div className="flex flex-col items-center space-y-2">
                 <div className="flex gap-3">
-                  <button
-                    onClick={onClose}
+              <button
+                onClick={onClose}
                     className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreate}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors text-sm"
-                  >
+              >
                     Create Game
-                  </button>
+              </button>
                 </div>
               </div>
             </div>
@@ -611,7 +611,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </label>
             </div>
           </div>
-        </div>
+          </div>
         )}
 
         {/* Action buttons for portrait mode only */}
@@ -619,23 +619,23 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
           <div className={`flex justify-center gap-4 mt-4 w-full ${
             isMobile ? 'mt-3' : 'mt-4'
           }`}>
-          <button
-            onClick={onClose}
+            <button
+              onClick={onClose}
               className={`text-slate-300 hover:text-slate-100 transition-colors ${
                 isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'
               }`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
               className={`bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors ${
                 isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'
               }`}
-          >
-            Create Game
-          </button>
-        </div>
+            >
+              Create Game
+            </button>
+          </div>
         )}
       </div>
     </div>
