@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../../types/game";
 
 interface UseSocketEventHandlersProps {
   socket: any;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '@/features/auth/SocketContext';
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../../types/game";
 
 export const useGameStateManagement = (gameId: string, userId: string) => {
   const { socket, isReady } = useSocket();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaRobot, FaMinus } from 'react-icons/fa';
-import type { GameState, Player, Bot } from "../../types/game";
+import type { GameState, Player, Bot } from "../../../types/game";
 import PlayerProfileDropdown from './PlayerProfileDropdown';
 import EmojiReaction from './EmojiReaction';
 import CoinDebitAnimation from './CoinDebitAnimation';

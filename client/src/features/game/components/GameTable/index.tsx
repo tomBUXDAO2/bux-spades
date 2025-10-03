@@ -2,45 +2,48 @@
 // This is a simplified version that uses the extracted components
 
 import React, { useState, useEffect, useRef } from "react";
-import type { GameState, Card, Player, Bot } from "../../types/game";
-import type { ChatMessage } from "../../../chat/Chat";
-import Chat from "../../../chat/Chat";
+import type { GameState, Card, Player, Bot } from "../../../types/game";
+import type { ChatMessage } from "../../../features/chat/Chat";
+import Chat from "../../../features/chat/Chat";
 import LandscapePrompt from "../../../../LandscapePrompt";
 
 // Extracted components
-import { useAudioManager } from '../../../components/game/components/AudioManager';
-import { PlayerHandRenderer, SpectatorHandRenderer } from '../../../components/game/components/CardRenderer';
-import { GameStatusOverlay } from '../../../components/game/components/GameStatusOverlay';
-import { ModalManager } from '../../../components/game/components/ModalManager';
-import { useGameEventHandlers } from '../../../components/game/components/GameEventHandlers';
+import { useAudioManager } from '../../../../components/game/components/AudioManager';
+import { PlayerHandRenderer, SpectatorHandRenderer } from '../../../../components/game/components/CardRenderer';
+import { GameStatusOverlay } from '../../../../components/game/components/GameStatusOverlay';
+import { ModalManager } from '../../../../components/game/components/ModalManager';
+import { useGameEventHandlers } from '../../../../components/game/components/GameEventHandlers';
 
 // Existing components
-import GameTableHeader from '../../../components/game/components/GameTableHeader';
-import GameTableScoreboard from '../../../components/game/components/GameTableScoreboard';
-import GameTablePlayers from '../../../components/game/components/GameTablePlayers';
-import CoinDebitAnimation from '../../../components/game/components/CoinDebitAnimation';
-import EmojiTravel from '../../../components/game/components/EmojiTravel';
+import GameTableHeader from '../../../../components/game/components/GameTableHeader';
+import GameTableScoreboard from '../../../../components/game/components/GameTableScoreboard';
+import GameTablePlayers from '../../../../components/game/components/GameTablePlayers';
+import CoinDebitAnimation from '../../../../components/game/components/CoinDebitAnimation';
+import EmojiTravel from '../../../../components/game/components/EmojiTravel';
 
 // Utility imports
-import { getTrickCardPositions, getOrderedPlayersForTrick } from '../utils/trickUtils';
-import { rotatePlayersForCurrentView } from '../utils/playerUtils';
-import { getScaleFactor } from '../utils/scaleUtils';
-import { handleGameOver } from '../utils/gameOverUtils';
-import { handlePlayCard } from '../utils/playCardUtils';
-import { handleStartGame } from '../utils/startGameUtils';
-import { handleBid } from '../utils/bidUtils';
-import { getUserTeam } from '../utils/gameUtils';
-import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
+import { getTrickCardPositions, getOrderedPlayersForTrick } from '../../utils/trickUtils';
+import { rotatePlayersForCurrentView } from '../../utils/playerUtils';
+import { getScaleFactor } from '../../utils/scaleUtils';
+import { handleGameOver } from '../../utils/gameOverUtils';
+import { handlePlayCard } from '../../utils/playCardUtils';
+import { handleStartGame } from '../../utils/startGameUtils';
+import { handleBid } from '../../utils/bidUtils';
+import { getUserTeam } from '../../utils/gameUtils';
+import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../../utils/leagueUtils';
 import { useSocket } from '../../../features/auth/SocketContext';
-import { useWindowSize } from "../../../hooks/useWindowSize";
+import { useWindowSize } from "../../../../hooks/useWindowSize";
 import { createPortal } from 'react-dom';
 
 interface GameTableModularProps {
   game: GameState;
   gameId?: string;
   joinGame: (gameId: string, userId: string, options?: any) => void;
+  leaveGame: () => void;
   onLeaveTable: () => void;
   startGame: (gameId: string, userId?: string) => Promise<void>;
+  makeBid: (bid: number, isNil?: boolean, isBlindNil?: boolean) => void;
+  playCard: (card: Card) => void;
   user?: any;
   showStartWarning?: boolean;
   showBotWarning?: boolean;

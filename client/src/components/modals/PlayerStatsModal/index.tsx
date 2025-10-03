@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { usePlayerStatsData } from './PlayerStatsData';
-import { PlayerStatsModeSelector } from './PlayerStatsModeSelector';
-import { PlayerStatsDisplay } from './PlayerStatsDisplay';
+import { usePlayerStatsData } from './hooks/PlayerStatsData';
+import { PlayerStatsModeSelector } from './components/PlayerStatsModeSelector';
+import { PlayerStatsDisplay } from './components/PlayerStatsDisplay';
 
 interface PlayerStats {
   gamesPlayed: number;

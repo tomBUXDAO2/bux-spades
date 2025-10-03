@@ -1,6 +1,6 @@
 import React from 'react';
 import GameTile from '@/components/game/GameTile';
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../../types/game";
 
 interface GamesSectionProps {
   games: GameState[];

@@ -2,14 +2,14 @@
 // This is a simplified version that uses the extracted components
 
 import React from 'react';
-import { useChatHooks } from './components/ChatHooks';
+import { useChatHooks } from './hooks/ChatHooks';
 import { ChatHeader } from './components/ChatHeader';
 import { ChatMessages } from './components/ChatMessages';
 import { ChatInput } from './components/ChatInput';
 import { PlayerList } from './components/PlayerList';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
-import type { Player } from "../../types/game";
-import type { ChatMessage } from "../../../chat/Chat";
+import type { Player } from "../../../types/game";
+import type { ChatMessage } from "../../../features/chat/Chat";
 
 interface ChatModularProps {
   gameId: string;
