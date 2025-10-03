@@ -49,7 +49,7 @@ export const useProfileManagement = ({ user, setUser, setError }: UseProfileMana
           username: response.data.username || username,
           avatar: response.data.avatar || avatarUrl
         };
-        setUser(updatedUser);
+        setUser(updatedUser as User);
         
         // Update localStorage
         try {

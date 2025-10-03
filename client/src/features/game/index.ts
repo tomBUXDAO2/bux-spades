@@ -1,5 +1,5 @@
 // export { default as GameTable } from './GameTable';
-// export * from "../../../types/game";
+// export * from "../../../../types/game";
 
 // export { default as Chat } from './Chat';
 // export { default as BiddingInterface } from './BiddingInterface';
@@ -7,7 +7,7 @@
 // export { default as WinnerModal } from './WinnerModal';
 
 // Export types
-// export * from "../../../types/game";
+// export * from "../../../../types/game";
 
 // Export hooks
 export * from './hooks/useGameState';

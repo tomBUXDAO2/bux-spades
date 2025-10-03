@@ -1,4 +1,4 @@
-import type { Card, Suit, GameState } from "../../../types/game";
+import type { Card, Suit, GameState } from "../../../../../../types/game";
 
 /**
  * ⚠️  WARNING: This file contains game rules that should be moved to backend
@@ -38,7 +38,7 @@ export function isPlayableCard(
  */
 export function isHandComplete(game: GameState): boolean {
   // A hand is complete when all players have played all their cards
-  return game.players.every(player => player && player.hand.length === 0);
+  return game.players.every((player: any) => player && player.hand.length === 0);
 }
 
 /**
@@ -59,7 +59,7 @@ export function isGameOver(game: GameState): boolean {
     const playerScores = game.playerScores || [];
   
     // Check if any player has reached max points or gone below min points
-    const isOver = playerScores.some(score => score >= maxPoints || score <= minPoints);
+    const isOver = playerScores.some((score: any) => score >= maxPoints || score <= minPoints);
     return isOver;
   }
 

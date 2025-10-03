@@ -70,7 +70,7 @@ export default function HandSummaryModal({
     if (!player) return 'Empty';
     const username = player.username || 'Unknown';
     // Abbreviate bot names
-    return player.type === 'bot' ? abbreviateBotName(username) : username;
+    return (player as any).type === 'bot' ? abbreviateBotName(username) : username;
   };
 
   // Get player avatar helper
@@ -78,23 +78,23 @@ export default function HandSummaryModal({
     const player = gameState.players[index];
     if (!player) return '/default-pfp.jpg';
     // Check for avatarUrl property (from database) or avatar property
-    return player.avatarUrl || player.avatar || '/default-pfp.jpg';
+    return (player as any).avatarUrl || (player as any).avatar || '/default-pfp.jpg';
   };
 
   // Team data comes from backend - no calculation needed
   const tricksPerPlayer = handSummaryData?.tricksPerPlayer || [0, 0, 0, 0];
   
   // Team 1 (Red) - seats 0, 2
-  const team1Bid = handSummaryData?.team1Bid || 0;
-  const team1Tricks = handSummaryData?.team1Tricks || 0;
-  const team1NilPoints = handSummaryData?.team1NilPoints || 0;
+  const team1Bid = (handSummaryData as any)?.team1Bid || 0;
+  const team1Tricks = (handSummaryData as any)?.team1Tricks || 0;
+  const team1NilPoints = (handSummaryData as any)?.team1NilPoints || 0;
   const team1Bags = handSummaryData?.team1Bags || 0;
   const team1Score = handSummaryData?.team1Score || 0;
   
   // Team 2 (Blue) - seats 1, 3  
-  const team2Bid = handSummaryData?.team2Bid || 0;
-  const team2Tricks = handSummaryData?.team2Tricks || 0;
-  const team2NilPoints = handSummaryData?.team2NilPoints || 0;
+  const team2Bid = (handSummaryData as any)?.team2Bid || 0;
+  const team2Tricks = (handSummaryData as any)?.team2Tricks || 0;
+  const team2NilPoints = (handSummaryData as any)?.team2NilPoints || 0;
   const team2Bags = handSummaryData?.team2Bags || 0;
   const team2Score = handSummaryData?.team2Score || 0;
 

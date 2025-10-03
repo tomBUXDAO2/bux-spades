@@ -24,7 +24,7 @@ export const setupSocketListeners = (
   console.log('🔧 Socket state:', {
     connected: socket.connected,
     id: socket.id,
-    readyState: socket.readyState
+    readyState: (socket as any).readyState
   });
   
   // Remove any existing listeners first
@@ -216,7 +216,7 @@ export const setupSocketListeners = (
   const originalEmit = socket.emit;
   socket.emit = function(...args: any[]) {
     console.log('📤 SOCKET EMIT:', args[0], args[1]);
-    return originalEmit.apply(this, args);
+    return originalEmit.apply(this, args as any);
   };
   
   // Debug: Log when listeners are removed

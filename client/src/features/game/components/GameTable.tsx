@@ -2,39 +2,39 @@
 // This is a simplified version that uses the extracted components
 
 import React, { useState, useEffect, useRef } from "react";
-import type { GameState, Card, Player, Bot } from '@/types/game';
-import type { ChatMessage } from '@/features/chat/Chat';
-import Chat from '@/features/chat/Chat';
+import type { GameState, Card, Player, Bot } from '../../../types/game';
+import type { ChatMessage } from '../../../features/chat/Chat';
+import Chat from '../../../features/chat/Chat';
 import LandscapePrompt from "../../../LandscapePrompt";
 
 // Extracted components
-import { useAudioManager } from '@/components/game/components/AudioManager';
-import { PlayerHandRenderer, SpectatorHandRenderer, CardImage } from '@/components/game/components/CardRenderer';
-import { getCardDimensions } from '@/features/game/utils/cardUtils';
-import { GameStatusOverlay } from '@/components/game/components/GameStatusOverlay';
-import { ModalManager } from '@/components/game/components/ModalManager';
-import { useGameEventHandlers } from '@/components/game/components/GameEventHandlers';
+import { useAudioManager } from '../../../components/game/components/AudioManager';
+import { PlayerHandRenderer, SpectatorHandRenderer, CardImage } from '../../../components/game/components/CardRenderer';
+import { getCardDimensions } from '../utils/cardUtils';
+import { GameStatusOverlay } from '../../../components/game/components/GameStatusOverlay';
+import { ModalManager } from '../../../components/game/components/ModalManager';
+import { useGameEventHandlers } from '../../../components/game/components/GameEventHandlers';
 import TableDetailsModal from './TableDetailsModal';
 
 // Existing components
-import GameTableHeader from '@/components/game/components/GameTableHeader';
-import GameTableScoreboard from '@/components/game/components/GameTableScoreboard';
-import GameTablePlayers from '@/components/game/components/GameTablePlayers';
-import CoinDebitAnimation from '@/components/game/components/CoinDebitAnimation';
-import EmojiTravel from '@/components/game/components/EmojiTravel';
+import GameTableHeader from '../../../components/game/components/GameTableHeader';
+import GameTableScoreboard from '../../../components/game/components/GameTableScoreboard';
+import GameTablePlayers from '../../../components/game/components/GameTablePlayers';
+import CoinDebitAnimation from '../../../components/game/components/CoinDebitAnimation';
+import EmojiTravel from '../../../components/game/components/EmojiTravel';
 
 // Utility imports
-import { getTrickCardPositions, getOrderedPlayersForTrick } from '@/features/game/utils/trickUtils';
-import { rotatePlayersForCurrentView } from '@/features/game/utils/playerUtils';
-import { getScaleFactor } from '@/features/game/utils/scaleUtils';
-import { handleGameOver } from '@/features/game/utils/gameOverUtils';
-import { handlePlayCard } from '@/features/game/utils/playCardUtils';
-import { handleStartGame } from '@/features/game/utils/startGameUtils';
-import { handleBid } from '@/features/game/utils/bidUtils';
-import { getUserTeam } from '@/features/game/utils/gameUtils';
-import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '@/features/game/utils/leagueUtils';
-import { useSocket } from '@/features/auth/SocketContext';
-import { useWindowSize } from '@/hooks/useWindowSize';
+import { getTrickCardPositions, getOrderedPlayersForTrick } from '../utils/trickUtils';
+import { rotatePlayersForCurrentView } from '../utils/playerUtils';
+import { getScaleFactor } from '../utils/scaleUtils';
+import { handleGameOver } from '../utils/gameOverUtils';
+import { handlePlayCard } from '../utils/playCardUtils';
+import { handleStartGame } from '../utils/startGameUtils';
+import { handleBid } from '../utils/bidUtils';
+import { getUserTeam } from '../utils/gameUtils';
+import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
+import { useSocket } from '../../../features/auth/SocketContext';
+import { useWindowSize } from '../../../hooks/useWindowSize';
 import { createPortal } from 'react-dom';
 
 interface GameTableModularProps {

@@ -122,7 +122,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
               <PlayerProfileDropdown
                 player={player}
                 isCurrentUser={player.id === user?.id}
-                onViewStats={() => handleViewPlayerStats(player)}
+                onViewStats={() => handleViewPlayerStats(player as Player)}
                 onShowEmojiPicker={() => {}}
                 onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
                 onSendEmoji={(emoji) => handleSendEmoji(player.id, emoji)}
@@ -131,7 +131,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                 <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600
                   hover:from-gray-300 hover:to-gray-500 transition-all duration-200 cursor-pointer">
                   <img
-                    src={player.avatar || '/default-pfp.jpg'}
+                    src={(player as any).avatar || (player as any).avatarUrl || '/default-pfp.jpg'}
                     alt={player.username}
                     className="rounded-full"
                     style={{ width: avatarWidth, height: avatarHeight }}

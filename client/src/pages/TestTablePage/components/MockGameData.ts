@@ -67,66 +67,81 @@ export const createMockGame = (): GameState => {
 
   return {
     id: 'test-game-1',
-    name: 'Test Game',
     status: 'PLAYING',
     gameMode: 'PARTNERS',
     currentPlayer: 'user-1',
+    currentTrick: [],
+    completedTricks: [],
+    rules: {
+      gameType: 'REGULAR',
+      allowNil: true,
+      allowBlindNil: true,
+      numHands: 8,
+      coinAmount: 100,
+      bidType: 'REGULAR'
+    },
+    round: 1,
+    maxPoints: 500,
+    minPoints: -500,
+    team1TotalScore: 0,
+    team2TotalScore: 0,
+    team1Bags: 0,
+    team2Bags: 0,
+    rated: false,
+    creatorId: 'user-1',
+    hands: hands,
     players: [
       {
         id: 'user-1',
+        name: 'Test Player 1',
         username: 'Test Player 1',
-        avatar: '/default-pfp.jpg',
+        avatarUrl: '/default-pfp.jpg',
         seatIndex: 0,
+        position: 0,
         team: 0,
-        type: 'human',
-        connected: true,
-        hand: hands[0],
+        isDealer: false,
+        hand: hands[0] as Card[],
         bid: 3,
         tricks: 0,
-        points: 0,
-        bags: 0
       },
       {
         id: 'user-2',
+        name: 'Test Player 2',
         username: 'Test Player 2',
-        avatar: '/default-pfp.jpg',
+        avatarUrl: '/default-pfp.jpg',
         seatIndex: 1,
+        position: 1,
         team: 1,
-        type: 'human',
-        connected: true,
-        hand: hands[1],
+        isDealer: false,
+        hand: hands[1] as Card[],
         bid: 2,
         tricks: 0,
-        points: 0,
-        bags: 0
       },
       {
         id: 'user-3',
+        name: 'Test Player 3',
         username: 'Test Player 3',
-        avatar: '/default-pfp.jpg',
+        avatarUrl: '/default-pfp.jpg',
         seatIndex: 2,
+        position: 2,
         team: 0,
-        type: 'human',
-        connected: true,
-        hand: hands[2],
+        isDealer: false,
+        hand: hands[2] as Card[],
         bid: 4,
         tricks: 0,
-        points: 0,
-        bags: 0
       },
       {
         id: 'user-4',
+        name: 'Test Player 4',
         username: 'Test Player 4',
-        avatar: '/default-pfp.jpg',
+        avatarUrl: '/default-pfp.jpg',
         seatIndex: 3,
+        position: 3,
         team: 1,
-        type: 'human',
-        connected: true,
-        hand: hands[3],
+        isDealer: false,
+        hand: hands[3] as Card[],
         bid: 4,
         tricks: 0,
-        points: 0,
-        bags: 0
       }
     ],
     bidding: {
@@ -140,21 +155,5 @@ export const createMockGame = (): GameState => {
       tricks: [],
       leadSuit: null
     },
-    scores: {
-      'user-1': 0,
-      'user-2': 0,
-      'user-3': 0,
-      'user-4': 0
-    },
-    teamScores: {
-      'team-0': 0,
-      'team-1': 0
-    },
-    trickScores: {
-      'user-1': 0,
-      'user-2': 0,
-      'user-3': 0,
-      'user-4': 2
-    }
   };
 };

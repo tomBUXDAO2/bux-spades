@@ -2,11 +2,11 @@
 // Extracted from Chat.tsx
 
 import { useState, useEffect, useRef } from 'react';
-import { useSocket } from '@/features/auth/SocketContext';
-import { useAuth } from '@/features/auth/AuthContext';
-import { api } from '@/services/lib/api';
-import type { ChatMessage } from "../../../features/chat/Chat";
-import type { Player } from '@/types/game';
+import { useSocket } from '../../../../auth/SocketContext';
+import { useAuth } from '../../../../auth/AuthContext';
+import { api } from '../../../../../services/lib/api';
+import type { ChatMessage } from "../../../Chat";
+import type { Player } from '../../../../../types/game';
 
 interface ChatHooksProps {
   gameId: string;
@@ -90,7 +90,7 @@ export const useChatHooks = ({
       
       try {
         const response = await api.get('/api/auth/users');
-        const allUsers = response.data;
+        const allUsers = (response as any).data;
         
         const statuses: Record<string, 'friend' | 'blocked' | 'not_friend'> = {};
         
@@ -98,8 +98,8 @@ export const useChatHooks = ({
         const friendsResponse = await api.get('/api/auth/friends');
         const blockedResponse = await api.get('/api/auth/blocked');
         
-        const friends = friendsResponse.data || [];
-        const blocked = blockedResponse.data || [];
+        const friends = (friendsResponse as any).data || [];
+        const blocked = (blockedResponse as any).data || [];
         
         // Set statuses for all players and spectators
         [...players, ...spectators].forEach(player => {

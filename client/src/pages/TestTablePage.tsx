@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import GameTable from '@/features/game/components/GameTable';
-import type { GameState } from "../../../types/game";
+import type { GameState } from "../types/game";
 import { createMockGame } from './TestTablePage/components/MockGameData';
 import { isMobileOrTablet, isBot } from './TestTablePage/components/DeviceDetection';
 import { requestFullScreen, exitFullScreen } from './TestTablePage/components/FullScreenManager';
@@ -26,8 +26,8 @@ export default function TestTablePageModular() {
 
   // Helper function to count empty seats and bot players
   const updateModalState = (gameState: GameState) => {
-    const emptySeatsCount = (gameState.players || []).filter(p => !p).length;
-    const botPlayersCount = (gameState.players || []).filter(p => p && isBot(p)).length;
+    const emptySeatsCount = (gameState.players || []).filter((p: any) => !p).length;
+    const botPlayersCount = (gameState.players || []).filter((p: any) => p && isBot(p)).length;
     setEmptySeats(emptySeatsCount);
     setBotCount(botPlayersCount);
   };

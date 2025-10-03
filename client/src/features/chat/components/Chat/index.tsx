@@ -7,9 +7,9 @@ import { ChatHeader } from './components/ChatHeader';
 import { ChatMessages } from './components/ChatMessages';
 import { ChatInput } from './components/ChatInput';
 import { PlayerList } from './components/PlayerList';
-import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
-import type { Player } from "../../../types/game";
-import type { ChatMessage } from "../../../features/chat/Chat";
+import PlayerStatsModal from '../../../../components/modals/PlayerStatsModal';
+import type { Player } from "../../../../types/game";
+import type { ChatMessage } from "../../Chat";
 
 interface ChatModularProps {
   gameId: string;

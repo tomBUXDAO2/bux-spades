@@ -2,7 +2,7 @@
 // Extracted from Chat.tsx
 
 import React, { useRef, useEffect } from 'react';
-import type { ChatMessage } from "../../../features/chat/Chat";
+import type { ChatMessage } from "../../../Chat";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -110,7 +110,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             {!isCurrentUser && (
               <div className={`w-8 h-8 mr-2 rounded-full overflow-hidden flex-shrink-0`}>
                 <img 
-                  src={message.userAvatar || GUEST_AVATAR} 
+                  src={(message as any).userAvatar || GUEST_AVATAR} 
                   alt={message.userName || ''} 
                   width={32}
                   height={32}

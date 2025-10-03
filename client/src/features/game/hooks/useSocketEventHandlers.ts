@@ -67,7 +67,7 @@ export const useSocketEventHandlers = ({
           setGameState(normalizeGameState(biddingData.gameState));
         } else {
           // Fallback to partial update if gameState not provided
-          setGameState(prevState => {
+          (setGameState as any)((prevState: any) => {
             if (!prevState) return prevState;
             return {
               ...prevState,
@@ -82,7 +82,7 @@ export const useSocketEventHandlers = ({
       console.log('🎮 Card played event received:', cardData);
       console.log('🎮 Card played - currentTrick data:', cardData.gameState?.play?.currentTrick);
       if (cardData && cardData.gameId === gameId) {
-        setGameState(prevState => {
+        (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
           // Use the full gameState from the server if provided
           if (cardData.gameState) {
@@ -105,7 +105,7 @@ export const useSocketEventHandlers = ({
     const handleTrickComplete = (trickData: any) => {
       console.log('🎮 Trick complete event received:', trickData);
       if (trickData && trickData.gameId === gameId) {
-        setGameState(prevState => {
+        (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
           // Use the full gameState from the server if provided
           if (trickData.gameState) {
@@ -134,7 +134,7 @@ export const useSocketEventHandlers = ({
           setGameState(normalizeGameState(trickData.gameState));
         } else {
           // Fallback to partial update if gameState not provided
-          setGameState(prevState => {
+          (setGameState as any)((prevState: any) => {
             if (!prevState) return prevState;
             return {
               ...prevState,
@@ -152,7 +152,7 @@ export const useSocketEventHandlers = ({
     const handleRoundStarted = (roundData: any) => {
       console.log('🎮 Round started event received:', roundData);
       if (roundData && roundData.gameId === gameId) {
-        setGameState(prevState => {
+        (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
           return {
             ...prevState,

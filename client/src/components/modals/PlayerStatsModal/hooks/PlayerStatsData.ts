@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from "../../../services/lib/api";
+import { api } from "../../../../services/lib/api";
 
 interface PlayerStats {
   gamesPlayed: number;

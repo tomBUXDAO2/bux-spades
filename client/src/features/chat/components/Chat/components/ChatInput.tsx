@@ -55,7 +55,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }, [isEmojiPickerOpen, setIsEmojiPickerOpen]);
 
   const handleEmojiSelect = (emoji: EmojiData) => {
-    setNewMessage(prev => prev + emoji.native);
+    (setNewMessage as any)((prev: string) => prev + emoji.native);
     setIsEmojiPickerOpen(false);
   };
 

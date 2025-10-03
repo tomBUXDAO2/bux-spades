@@ -61,7 +61,7 @@ export const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({
           <span className="text-2xl">👤</span>
         </div>
         <div>
-          <h3 className="text-2xl font-bold text-white">{stats.username || 'Unknown Player'}</h3>
+          <h3 className="text-2xl font-bold text-white">{(stats as any).username || 'Unknown Player'}</h3>
           <p className="text-gray-400">Coins: {displayCoins.toLocaleString()}</p>
         </div>
       </div>

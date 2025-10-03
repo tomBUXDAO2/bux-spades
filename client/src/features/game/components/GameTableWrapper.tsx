@@ -45,7 +45,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
     if (!gameState || !user?.id) return;
     
     // Check for empty seats
-    const emptySeats = (gameState.players || []).filter(p => !p).length;
+    const emptySeats = (gameState.players || []).filter((p: any) => !p).length;
     
     if (emptySeats > 0) {
       // Show warning modal for empty seats
@@ -111,8 +111,8 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
   }
 
   // Calculate empty seats and bot count
-  const emptySeats = effectiveGameState ? (effectiveGameState.players || []).filter(p => !p).length : 0;
-  const botCount = effectiveGameState ? (effectiveGameState.players || []).filter(p => p && p.type === 'bot').length : 0;
+  const emptySeats = effectiveGameState ? (effectiveGameState.players || []).filter((p: any) => !p).length : 0;
+  const botCount = effectiveGameState ? (effectiveGameState.players || []).filter((p: any) => p && p.type === 'bot').length : 0;
 
   // Render the actual game table with real-time data
   return (
@@ -124,18 +124,12 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
         onLeaveTable={onLeaveTable}
         // Pass socket actions
         joinGame={joinGame}
-        leaveGame={leaveGame}
-        makeBid={makeBid}
-        playCard={playCard}
         startGame={handleStartGame}
         // Modal states
         showStartWarning={showStartWarning}
         showBotWarning={showBotWarning}
-        showHandSummary={showHandSummary}
-        handSummaryData={handSummaryData}
         onCloseStartWarning={handleCloseStartWarning}
         onCloseBotWarning={() => setShowBotWarning(false)}
-        onCloseHandSummary={() => setShowHandSummary(false)}
         emptySeats={emptySeats}
         botCount={botCount}
         isSpectator={false}

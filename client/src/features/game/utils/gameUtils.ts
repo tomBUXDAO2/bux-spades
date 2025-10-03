@@ -113,7 +113,7 @@ export const canInviteBot = ({
  * Determine user's team
  */
 export const getUserTeam = (gameState: GameState, userId: string): number => {
-  const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === userId) : -1;
+  const myPlayerIndex = gameState.players ? gameState.players?.findIndex((p: any) => p && p.id === userId) : -1;
   if (myPlayerIndex === -1) return 1; // Default to team 1
   
   // In partners mode: positions 0,2 = Red Team (1), positions 1,3 = Blue Team (2)

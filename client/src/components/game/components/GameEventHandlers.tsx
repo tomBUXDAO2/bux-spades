@@ -132,7 +132,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       
       // Start countdown timer
       const countdownInterval = setInterval(() => {
-        setCountdownPlayer(prev => {
+        (setCountdownPlayer as any)((prev: any) => {
           if (!prev) return null;
           if (prev.timeLeft <= 1) {
             clearInterval(countdownInterval);
