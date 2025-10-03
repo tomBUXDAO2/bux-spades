@@ -32,7 +32,7 @@ import { handleBid } from '../utils/bidUtils';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
 import { useSocket } from '../../../features/auth/SocketContext';
-import { useWindowSize } from "../../../hooks/useWindowSize"';
+import { useWindowSize } from "../../../hooks/useWindowSize";
 import { createPortal } from 'react-dom';
 
 interface GameTableModularProps {

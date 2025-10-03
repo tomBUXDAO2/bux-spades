@@ -2,7 +2,7 @@
 // Handles all modals and overlays
 
 import React from 'react';
-import type { GameState, Player, Bot } from "../../types/game""";
+import type { GameState, Player, Bot } from "../../types/game";
 import HandSummaryModal from '@/features/game/components/HandSummaryModal';
 import TrickHistoryModal from '@/components/modals/TrickHistoryModal';
 import SeatReplacementModal from '@/features/game/components/SeatReplacementModal';
