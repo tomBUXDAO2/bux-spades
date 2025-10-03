@@ -1,4 +1,4 @@
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../types/game""";
 
 interface GameCardProps {
   game: GameState;

@@ -1,4 +1,4 @@
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../types/game""";
 
 export const normalizeGameState = (state: any): GameState => {
   if (!state) return state;

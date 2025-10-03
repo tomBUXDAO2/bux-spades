@@ -2,8 +2,8 @@
 // Handles all socket events and game state updates
 
 import { useEffect, useRef } from 'react';
-import type { GameState, Card, Player, Bot } from "../../types/game";
-import type { ChatMessage } from "../../chat/Chat";
+import type { GameState, Card, Player, Bot } from "../../types/game""";
+import type { ChatMessage } from "../../../chat/Chat""";
 
 interface GameEventHandlersProps {
   socket: any;

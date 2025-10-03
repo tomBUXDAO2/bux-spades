@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Player, Bot } from '@/types/game';
 import type { ChatMessage } from '@/features/chat/Chat';
 import Chat from '@/features/chat/Chat';
-import LandscapePrompt from '../../LandscapePrompt';
+import LandscapePrompt from "../../LandscapePrompt"';
 
 // Extracted components
 import { useAudioManager } from '@/components/game/components/AudioManager';

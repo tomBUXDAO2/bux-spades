@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GameState } from "../../types/game";
+import type { GameState } from "../../types/game""";
 import { getPlayerColor } from '@/features/game/services/lib/gameRules';
 
 interface GameTableScoreboardProps {

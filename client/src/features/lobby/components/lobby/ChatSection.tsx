@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
-import type { Player, Bot } from "../../types/game";
+import type { Player, Bot } from "../../types/game""";
 
 interface ChatMessage {
   id?: string;

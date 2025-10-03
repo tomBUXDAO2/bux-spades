@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '@/features/auth/SocketContext';
 import { useAuth } from '@/features/auth/AuthContext';
 import { api } from '@/services/lib/api';
-import type { ChatMessage } from "../../chat/Chat";
+import type { ChatMessage } from "../../../chat/Chat""";
 import type { Player } from '@/types/game';
 
 interface ChatHooksProps {

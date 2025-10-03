@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { GameState, Card } from "../../types/game";
+import type { GameState, Card } from "../../types/game""";
 
 interface UseGameActionsProps {
   socket: any;
