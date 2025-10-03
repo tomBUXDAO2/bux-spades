@@ -1,5 +1,5 @@
 import { getSocket } from './socketManager';
-import type { GameRules } from '../../types/game';
+import type { GameRules } from "../../types/game"""';
 import type { Socket } from 'socket.io-client';
 
 // Helper function to wait for socket to be ready

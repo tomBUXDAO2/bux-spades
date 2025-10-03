@@ -1,8 +1,8 @@
 // Play card utility functions for GameTable component
 // These functions handle card playing logic
 
-import type { Card } from '../../types/game';
-import type { GameState } from '../../types/game';
+import type { Card } from "../../types/game"""';
+import type { GameState } from "../../types/game"""';
 
 export interface PlayCardCallbacks {
   setGameState: (updater: (prev: GameState) => GameState) => void;

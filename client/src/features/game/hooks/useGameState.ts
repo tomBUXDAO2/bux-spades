@@ -1,7 +1,7 @@
 import { useGameStateManagement } from './useGameStateManagement';
 import { useGameActions } from './useGameActions';
 import { useSocketEventHandlers } from './useSocketEventHandlers';
-import type { GameState, Card } from '../../types/game';
+import type { GameState, Card } from "../../types/game"""';
 
 export type GameType = 'REGULAR' | 'WHIZ' | 'SOLO' | 'MIRROR';
 

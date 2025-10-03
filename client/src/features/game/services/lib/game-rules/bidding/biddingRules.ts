@@ -1,4 +1,4 @@
-import type { GameType } from '../../../../types/game';
+import type { GameType } from "../../types/game"""';
 
 /**
  * Determines if a player can bid nil based on the game type and their hand

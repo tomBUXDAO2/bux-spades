@@ -1,4 +1,4 @@
-import type { GameState, Player, Bot } from '../../types/game';
+import type { GameState, Player, Bot } from "../../types/game"""';
 
 interface PlayerStatusProps {
   gameState: GameState;

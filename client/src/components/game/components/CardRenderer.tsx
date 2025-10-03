@@ -2,7 +2,7 @@
 // Handles player hand, spectator hand, and card images
 
 import React from 'react';
-import type { Card, GameState, Player, Bot } from '../../types/game';
+import type { Card, GameState, Player, Bot } from "../../types/game"""';
 import { getCardDimensions, getCardOverlapOffset, getCardVisibility, getSpectatorHandDimensions } from '@/features/game/utils/cardUtils';
 import { sortCards, getPlayableCards } from '@/features/game/utils/gameUtils';
 

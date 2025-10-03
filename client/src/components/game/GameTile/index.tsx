@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GameState } from '../../types/game';
+import type { GameState } from "../../types/game"""';
 
 interface GameTileProps {
   game: GameState;

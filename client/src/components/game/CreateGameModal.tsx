@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { GameSettings, GameMode, BiddingOption } from '../../types/game';
+import type { GameSettings, GameMode, BiddingOption } from "../../types/game"""';
 import { useWindowSize } from '../../hooks/useWindowSize';
 
 interface CreateGameModalProps {

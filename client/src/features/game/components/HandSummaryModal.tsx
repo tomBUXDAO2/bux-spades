@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { isGameOver } from '@/features/game/services/lib/gameRules';
-import type { GameState } from '../../types/game';
+import type { GameState } from "../../types/game"""';
 import { useEffect } from 'react';
 import { abbreviateBotName } from '../../../utils/botUtils';
 
