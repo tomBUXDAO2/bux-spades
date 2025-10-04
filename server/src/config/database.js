@@ -13,17 +13,6 @@ const prisma = new PrismaClient({
     engine: {
       binaryTargets: ['native']
     }
-  },
-  // NUCLEAR: Extreme connection pooling
-  connectionLimit: 20,
-  poolTimeout: 0,
-  connectTimeout: 0,
-  queryTimeout: 0,
-  // NUCLEAR: Disable all safety checks for speed
-  transactionOptions: {
-    maxWait: 0,
-    timeout: 0,
-    isolationLevel: 'ReadCommitted'
   }
 });
 
