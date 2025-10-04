@@ -395,18 +395,28 @@ const HomePage: React.FC = () => {
       if (!res.ok) throw new Error('Failed to create game');
       const response = await res.json();
       console.log('[GAME CREATION DEBUG] API Response:', response);
-      console.log('[GAME CREATION DEBUG] Response type:', typeof response);
-      console.log('[GAME CREATION DEBUG] Response.id:', response?.id);
-      console.log('[GAME CREATION DEBUG] Response keys:', Object.keys(response || {}));
       
-      // Try accessing the ID directly without type casting first
-      const gameId = response?.id;
-      console.log('[GAME CREATION DEBUG] Direct gameId:', gameId);
+      // Extract the game ID directly from the response
+      let gameId;
+      if (response && typeof response === 'object') {
+        // Try different possible locations for the ID
+        gameId = response.id || response.data?.id || response.gameId;
+        console.log('[GAME CREATION DEBUG] Extracted gameId:', gameId);
+        
+        // If still no ID, try to find it in the response
+        if (!gameId) {
+          const responseStr = JSON.stringify(response);
+          const idMatch = responseStr.match(/"id":"([^"]+)"/);
+          if (idMatch) {
+            gameId = idMatch[1];
+            console.log('[GAME CREATION DEBUG] Found ID via regex:', gameId);
+          }
+        }
+      }
       
       // Create a minimal game object with just the ID for navigation
       const game = { id: gameId };
-      console.log('[GAME CREATION DEBUG] Game object:', game);
-      console.log('[GAME CREATION DEBUG] Game ID from object:', game?.id);
+      console.log('[GAME CREATION DEBUG] Final game object:', game);
       
       // Validate game object has required fields
       if (!game || !game.id) {
