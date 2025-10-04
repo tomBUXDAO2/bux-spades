@@ -651,18 +651,11 @@ export default function GameTableModular({
   const renderTrickCards = () => {
     let displayTrick = animatingTrick ? animatedTrickCards : ((gameState as any)?.play?.currentTrick || []);
     
-    console.log('[RENDER TRICK CARDS] gameState.play:', (gameState as any)?.play);
-    console.log('[RENDER TRICK CARDS] currentTrick:', (gameState as any)?.play?.currentTrick);
-    console.log('[RENDER TRICK CARDS] displayTrick:', displayTrick);
-    console.log('[RENDER TRICK CARDS] animatingTrick:', animatingTrick);
-    console.log('[RENDER TRICK CARDS] animatedTrickCards:', animatedTrickCards);
-    
     if (!displayTrick.length && lastNonEmptyTrick.length && gameState?.play?.currentTrick?.length > 0) {
       displayTrick = lastNonEmptyTrick;
     }
     
     if (!displayTrick.length) {
-      console.log('[RENDER TRICK CARDS] Returning null - no displayTrick');
       return null;
     }
     

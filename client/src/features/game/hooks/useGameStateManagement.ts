@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/features/auth/SocketContext';
 import type { GameState } from "../../../types/game";
 
@@ -8,6 +8,7 @@ export const useGameStateManagement = (gameId: string, userId: string) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasAttemptedJoin, setHasAttemptedJoin] = useState<boolean>(false);
+  const lastLoggedStatus = useRef<string>('');
 
   // Reset join attempt when gameId changes
   useEffect(() => {
@@ -30,20 +31,21 @@ export const useGameStateManagement = (gameId: string, userId: string) => {
     }
   }, [isReady, socket, gameId, userId, hasAttemptedJoin]);
 
-  // Debug: Log game state changes (display-only)
+  // Debug: Log game state changes (display-only) - only log major state changes
   useEffect(() => {
-    if (gameState) {
-      console.log('🎮 Game state updated (display-only):', {
-        status: gameState.status,
-        currentPlayer: gameState.currentPlayer,
-        players: gameState.players?.length || 0,
-        gameId: !!gameId,
-        userId: !!userId,
-        hands: (gameState as any).hands ? (gameState as any).hands.map((hand: any, i: number) => ({ seat: i, cards: hand?.length || 0 })) : 'no hands',
-        playerHands: gameState.players?.map((p: any, i: number) => ({ seat: i, player: p?.username, handCards: p?.hand?.length || 0 })) || []
-      });
+    if (gameState && gameState.status) {
+      // Only log status changes, not every render
+      const statusKey = `${gameState.status}-${gameState.currentPlayer}`;
+      if (statusKey !== lastLoggedStatus.current) {
+        lastLoggedStatus.current = statusKey;
+        console.log('🎮 Game state updated:', {
+          status: gameState.status,
+          currentPlayer: gameState.currentPlayer,
+          players: gameState.players?.length || 0
+        });
+      }
     }
-  }, [gameState, gameId, userId]);
+  }, [gameState?.status, gameState?.currentPlayer, gameState?.players?.length]);
 
   return {
     gameState,

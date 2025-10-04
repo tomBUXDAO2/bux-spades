@@ -27,7 +27,6 @@ export const useSocketEventHandlers = ({
     if (!socket || !isReady) return;
 
     const handleGameJoined = (gameData: any) => {
-      console.log('🎮 Game joined event received:', gameData);
       if (gameData && gameData.gameId === gameId) {
         setGameState(normalizeGameState(gameData.gameState));
         setIsLoading(false);
@@ -44,9 +43,7 @@ export const useSocketEventHandlers = ({
     };
 
     const handleGameUpdate = (gameData: any) => {
-      console.log('🎮 Game update event received:', gameData);
       if (gameData && gameData.gameId === gameId) {
-        console.log('🎮 Setting game state with currentPlayer:', gameData.gameState?.currentPlayer);
         setGameState(normalizeGameState(gameData.gameState));
       }
     };

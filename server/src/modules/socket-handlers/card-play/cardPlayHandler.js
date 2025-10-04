@@ -128,7 +128,7 @@ class CardPlayHandler {
             }
           });
 
-          // Wait 1 second to show all 4 cards before completing trick
+          // Wait 500ms to show all 4 cards before completing trick
           setTimeout(async () => {
             // Find the winning player by seat index
             console.log(`[CARD PLAY] Looking for winning player at seat ${trickResult.winningSeatIndex}`);
@@ -187,9 +187,9 @@ class CardPlayHandler {
               // Trigger bot play if current player is a bot
               setTimeout(() => {
                 this.triggerBotPlayIfNeeded(gameId);
-              }, 100);
+              }, 50); // Reduced delay for faster gameplay
             }
-          }, 1000); // 1 second delay to show all 4 cards
+          }, 500); // 500ms delay to show all 4 cards
         }
       } else {
         // Move to next player

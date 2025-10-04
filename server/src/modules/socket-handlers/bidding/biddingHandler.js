@@ -109,7 +109,7 @@ class BiddingHandler {
         // Small delay to let UI update before starting round
         setTimeout(() => {
           this.startRound(gameId, currentRound.id);
-        }, 500);
+        }, 200); // Reduced delay for faster gameplay
       } else {
         // Move to next player
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
@@ -136,7 +136,7 @@ class BiddingHandler {
         // Trigger bot bid if next player is a bot
         setTimeout(() => {
           this.triggerBotBidIfNeeded(gameId);
-        }, 1000); // Small delay to let UI update
+        }, 300); // Reduced delay for faster gameplay
       }
 
       console.log(`[BIDDING] Bid processed successfully`);

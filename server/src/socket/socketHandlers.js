@@ -60,8 +60,6 @@ export function setupSocketHandlers(io) {
 
     // Game join/leave events
     socket.on('join_game', (data) => {
-      console.log(`[SOCKET] join_game event received from socket ${socket.id}, userId: ${socket.userId}`);
-      console.log(`[SOCKET] join_game data:`, data);
       try {
         const gameId = data?.gameId;
         const now = Date.now();
@@ -87,8 +85,6 @@ export function setupSocketHandlers(io) {
 
     // Chat events
     socket.on('game_message', (data) => {
-      console.log(`[SOCKET] game_message event received from socket ${socket.id}, userId: ${socket.userId}`);
-      console.log(`[SOCKET] game_message data:`, data);
       gameChatHandler.handleGameMessage(data);
     });
     socket.on('get_game_messages', (data) => gameChatHandler.handleGetGameMessages(data));

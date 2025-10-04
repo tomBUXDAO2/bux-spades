@@ -675,14 +675,11 @@ export default function GameTablePlayers({
   return (
     <>
       {/* Players around the table */}
-      {[0, 1, 2, 3].map((position) => {
-        console.log(`[RENDER DEBUG] Rendering position ${position}, player:`, sanitizedPlayers[position]);
-        return (
-          <div key={`player-position-${position}`}>
-            {renderPlayerPosition(position)}
-          </div>
-        );
-      })}
+      {[0, 1, 2, 3].map((position) => (
+        <div key={`player-position-${position}`}>
+          {renderPlayerPosition(position)}
+        </div>
+      ))}
     </>
   );
 }
