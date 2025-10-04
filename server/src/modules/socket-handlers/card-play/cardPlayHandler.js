@@ -2,7 +2,6 @@ import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
-import { GameStateCache } from '../../../services/GameStateCache.js';
 import { prisma } from '../../../config/database.js';
 
 /**
@@ -119,8 +118,6 @@ class CardPlayHandler {
           
           // First, emit card played event so client can render the 4th card
           const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
-          // Invalidate cache since game state changed
-          GameStateCache.invalidateGame(gameId);
 
           this.io.to(gameId).emit('card_played', {
             gameId,
