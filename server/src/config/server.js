@@ -17,7 +17,9 @@ const corsOptions = {
     'http://localhost:5173',
     'http://localhost:3000',
     'https://bux-spades.vercel.app',
-    'https://bux-spades-git-main-tombuxdao.vercel.app'
+    'https://bux-spades-git-main-tombuxdao.vercel.app',
+    'https://www.bux-spades.pro',
+    'https://bux-spades.pro'
   ],
   credentials: true
 };
