@@ -396,6 +396,8 @@ const HomePage: React.FC = () => {
       const response = await res.json();
       console.log('[GAME CREATION DEBUG] API Response:', response);
       console.log('[GAME CREATION DEBUG] FORCE DEPLOY TEST - New code is live!');
+      console.log('[GAME CREATION DEBUG] Response type:', typeof response);
+      console.log('[GAME CREATION DEBUG] Response.id directly:', response.id);
       
       // Extract the game ID directly from the response
       let gameId;
@@ -403,6 +405,7 @@ const HomePage: React.FC = () => {
         // Try different possible locations for the ID
         gameId = response.id || response.data?.id || response.gameId;
         console.log('[GAME CREATION DEBUG] Extracted gameId:', gameId);
+        console.log('[GAME CREATION DEBUG] Response has id property:', 'id' in response);
         
         // If still no ID, try to find it in the response
         if (!gameId) {
