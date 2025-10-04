@@ -398,10 +398,15 @@ const HomePage: React.FC = () => {
       console.log('[GAME CREATION DEBUG] Response type:', typeof response);
       console.log('[GAME CREATION DEBUG] Response.id:', response?.id);
       console.log('[GAME CREATION DEBUG] Response keys:', Object.keys(response || {}));
-      const game: GameState = response;
-      console.log('[GAME CREATION DEBUG] Game ID:', game?.id);
-      console.log('[GAME CREATION DEBUG] Game type:', typeof game);
-      console.log('[GAME CREATION DEBUG] Game keys:', Object.keys(game || {}));
+      
+      // Try accessing the ID directly without type casting first
+      const gameId = response?.id;
+      console.log('[GAME CREATION DEBUG] Direct gameId:', gameId);
+      
+      // Create a minimal game object with just the ID for navigation
+      const game = { id: gameId };
+      console.log('[GAME CREATION DEBUG] Game object:', game);
+      console.log('[GAME CREATION DEBUG] Game ID from object:', game?.id);
       
       // Validate game object has required fields
       if (!game || !game.id) {
