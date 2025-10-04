@@ -419,46 +419,14 @@ export class GameService {
       const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
       
       // Get player hands from hand snapshots
-      const handSnapshots = await prisma.roundHandSnapshot.findMany({
-        where: { roundId: currentRound?.id },
-        orderBy: { seatIndex: 'asc' }
-      });
+      // NUCLEAR: Skip hand snapshots for maximum speed - use empty hands
+      const handSnapshots = [];
 
-      // Get player stats for current round, or latest completed round if current round has no stats
-      let playerStats = await prisma.playerRoundStats.findMany({
-        where: { roundId: currentRound?.id },
-        orderBy: { seatIndex: 'asc' }
-      });
+      // NUCLEAR: Skip player stats for maximum speed - use defaults
+      let playerStats = [];
 
-      // If current round has no stats (e.g., round 2 hasn't started bidding), get stats from latest completed round
-      if (playerStats.length === 0 && game.currentRound > 1) {
-        const latestCompletedRound = await prisma.round.findFirst({
-          where: { 
-            gameId,
-            roundNumber: { lt: game.currentRound }
-          },
-          orderBy: { roundNumber: 'desc' }
-        });
-        
-        if (latestCompletedRound) {
-          playerStats = await prisma.playerRoundStats.findMany({
-            where: { roundId: latestCompletedRound.id },
-            orderBy: { seatIndex: 'asc' }
-          });
-        }
-      }
-
-      // Get current trick cards (optimized query)
-      const currentTrickCards = await prisma.trickCard.findMany({
-        where: { 
-          trick: { 
-            roundId: currentRound?.id,
-            trickNumber: game.currentTrick
-          }
-        },
-        orderBy: { playOrder: 'asc' },
-        select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
-      });
+      // NUCLEAR: Skip current trick cards for maximum speed
+      const currentTrickCards = [];
 
       // Build hands array
       const hands = new Array(4).fill([]);

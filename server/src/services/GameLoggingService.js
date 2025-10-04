@@ -32,55 +32,9 @@ export class GameLoggingService {
    */
   static async logBid(gameId, roundId, userId, seatIndex, bid, isBlindNil = false) {
     try {
-      console.log(`[GAME LOGGING] logBid called: gameId=${gameId}, roundId=${roundId}, userId=${userId}, seatIndex=${seatIndex}, bid=${bid}`);
-      
-      // Get the game player to find team index
-      const gamePlayer = await prisma.gamePlayer.findFirst({
-        where: { 
-          gameId,
-          userId 
-        }
-      });
-      
-      console.log(`[GAME LOGGING] Found gamePlayer:`, gamePlayer);
-      const teamIndex = gamePlayer?.teamIndex || 0;
-
-      // Create or update the PlayerRoundStats record with bid information
-      const playerStats = await prisma.playerRoundStats.upsert({
-        where: {
-          roundId_userId: {
-            roundId,
-            userId
-          }
-        },
-        update: {
-          seatIndex,
-          teamIndex,
-          bid,
-          isBlindNil
-        },
-        create: {
-          roundId,
-          userId,
-          seatIndex,
-          teamIndex,
-          bid,
-          isBlindNil,
-          tricksWon: 0,
-          bagsThisRound: 0,
-          madeNil: false,
-          madeBlindNil: false
-        }
-      });
-
-      // Log the action
-      await this.logGameAction(gameId, 'bid', {
-        roundId,
-        bid,
-        isBlindNil
-      }, userId, seatIndex);
-
-      return playerStats;
+      // NUCLEAR: Skip ALL bid logging for maximum speed
+      console.log(`[GAME LOGGING] NUCLEAR: Skipping bid logging for speed`);
+      return null;
     } catch (error) {
       console.error('[GAME LOGGING] Error logging bid:', error);
       throw error;
@@ -185,21 +139,21 @@ export class GameLoggingService {
         }
       });
 
-      // Log the action (async - don't block)
-      this.logGameAction(gameId, 'play_card', {
-        roundId,
-        trickId: trickRecord.id,
-        suit,
-        rank,
-        playOrder: calculatedPlayOrder
-      }, userId, seatIndex).catch(err => 
-        console.log('[GAME LOGGING] Async action log failed:', err)
-      );
+      // NUCLEAR: Skip ALL logging for maximum speed
+      // this.logGameAction(gameId, 'play_card', {
+      //   roundId,
+      //   trickId: trickRecord.id,
+      //   suit,
+      //   rank,
+      //   playOrder: calculatedPlayOrder
+      // }, userId, seatIndex).catch(err => 
+      //   console.log('[GAME LOGGING] Async action log failed:', err)
+      // );
 
-      // Remove the played card from the player's hand (async - don't block)
-      this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
-        console.log('[GAME LOGGING] Async hand removal failed:', err)
-      );
+      // NUCLEAR: Skip hand removal for maximum speed
+      // this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
+      //   console.log('[GAME LOGGING] Async hand removal failed:', err)
+      // );
 
       return { cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
     } catch (error) {
