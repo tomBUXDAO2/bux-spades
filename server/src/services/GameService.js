@@ -616,9 +616,12 @@ export class GameService {
 
       console.log(`[GAME SERVICE] Deal hands - Database updated with currentPlayer: ${currentPlayer}`);
 
-      // REAL-TIME: Clear ALL Redis cache for this game to force fresh rebuild
-      await redisGameState.cleanupGame(gameId);
-      console.log(`[GAME SERVICE] Cleared ALL Redis cache for fresh game state rebuild`);
+      // CRITICAL: Update Redis cache with full game state (don't clear it!)
+      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
+      if (fullGameState) {
+        await redisGameState.setGameState(gameId, fullGameState);
+        console.log(`[GAME SERVICE] Updated Redis cache with full game state after dealing hands`);
+      }
       
       // Initialize empty bids array in Redis for new round
       await redisGameState.setPlayerBids(gameId, new Array(4).fill(null));
