@@ -342,6 +342,22 @@ class BotService {
       cardToPlay = hand[0]; // Fallback
     }
 
+    // CRITICAL: Validate that the chosen card is actually in the bot's hand
+    const cardInHand = hand.find(card => 
+      card.suit === cardToPlay.suit && card.rank === cardToPlay.rank
+    );
+    
+    if (!cardInHand) {
+      console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} chose card ${cardToPlay.suit}${cardToPlay.rank} but it's not in their hand!`);
+      console.error(`[BOT SERVICE] Bot's actual hand:`, hand.map(c => `${c.suit}${c.rank}`));
+      // Use first available card as emergency fallback
+      cardToPlay = hand[0];
+      if (!cardToPlay) {
+        console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} has no cards at all!`);
+        return null;
+      }
+    }
+
     console.log(`[BOT SERVICE] Bot ${bot.username} playing ${cardToPlay.suit}${cardToPlay.rank}`);
 
     // Don't remove card from hand here - CardPlayHandler.processCardPlay() will do it

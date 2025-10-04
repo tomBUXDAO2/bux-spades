@@ -32,9 +32,23 @@ export class GameLoggingService {
    */
   static async logBid(gameId, roundId, userId, seatIndex, bid, isBlindNil = false) {
     try {
-      // NUCLEAR: Skip ALL bid logging for maximum speed
-      console.log(`[GAME LOGGING] NUCLEAR: Skipping bid logging for speed`);
-      return null;
+      // Update PlayerRoundStats with bid
+      await prisma.playerRoundStats.updateMany({
+        where: {
+          roundId: roundId,
+          userId: userId
+        },
+        data: {
+          bid: bid,
+          isBlindNil: isBlindNil
+        }
+      });
+      
+      // Don't clear Redis cache - we want to keep the bids in Redis
+      // The Redis bids will be updated separately in the bidding handler
+      
+      console.log(`[GAME LOGGING] Logged bid: user=${userId}, bid=${bid}, blind=${isBlindNil}`);
+      return true;
     } catch (error) {
       console.error('[GAME LOGGING] Error logging bid:', error);
       throw error;
@@ -116,13 +130,13 @@ export class GameLoggingService {
       const existingCardsCount = await prisma.trickCard.count({ where: { trickId: trickRecord.id } });
       if (existingCardsCount >= 4) {
         console.log(`[GAME LOGGING] Guard: trick ${trickRecord.id} already has ${existingCardsCount} cards. Skipping insert.`);
-        return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount };
+        return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
       // 2) Do not allow the same seat to play twice in a trick
       const seatAlreadyPlayed = await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id, seatIndex } });
       if (seatAlreadyPlayed) {
         console.log(`[GAME LOGGING] Guard: seat ${seatIndex} already played in trick ${trickRecord.id}. Skipping insert.`);
-        return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount };
+        return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
       const calculatedPlayOrder = existingCardsCount + 1;
       console.log(`[GAME LOGGING] Calculated playOrder from DB: ${calculatedPlayOrder} (${existingCardsCount} existing cards in trick ${trickRecord.id})`);
@@ -150,10 +164,8 @@ export class GameLoggingService {
       //   console.log('[GAME LOGGING] Async action log failed:', err)
       // );
 
-      // NUCLEAR: Skip hand removal for maximum speed
-      // this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
-      //   console.log('[GAME LOGGING] Async hand removal failed:', err)
-      // );
+      // Remove card from hand (required for game logic) - SYNCHRONOUS
+      await this.removeCardFromHand(roundId, seatIndex, suit, rank);
 
       return { cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
     } catch (error) {
@@ -163,7 +175,7 @@ export class GameLoggingService {
   }
 
   /**
-   * Remove a played card from the player's hand in RoundHandSnapshot
+   * Remove a played card from the player's hand in RoundHandSnapshot and Redis
    */
   static async removeCardFromHand(roundId, seatIndex, suit, rank) {
     try {
@@ -177,8 +189,16 @@ export class GameLoggingService {
         return;
       }
 
-      // Get current hand
-      const currentHand = handSnapshot.cards || [];
+      // Get current hand - ensure it's an array
+      let currentHand = handSnapshot.cards || [];
+      if (typeof currentHand === 'string') {
+        try {
+          currentHand = JSON.parse(currentHand);
+        } catch (error) {
+          console.error(`[GAME LOGGING] Failed to parse cards JSON for seat ${seatIndex}:`, error);
+          currentHand = [];
+        }
+      }
       
       // Find and remove the played card
       const updatedHand = currentHand.filter(card => 
@@ -190,11 +210,38 @@ export class GameLoggingService {
         return;
       }
 
-      // Update the hand snapshot
+      // Update the hand snapshot in database
       await prisma.roundHandSnapshot.update({
         where: { id: handSnapshot.id },
         data: { cards: updatedHand }
       });
+
+      // Update Redis cache
+      try {
+        const { redisClient } = await import('../config/redis.js');
+        // Get gameId from round
+        const round = await prisma.round.findUnique({
+          where: { id: roundId },
+          select: { gameId: true }
+        });
+        
+        if (round?.gameId) {
+          // Get current hands from Redis using correct key format
+          const currentRedisHands = await redisClient.get(`game:hands:${round.gameId}`);
+          if (currentRedisHands) {
+            const hands = JSON.parse(currentRedisHands);
+            if (hands[seatIndex]) {
+              hands[seatIndex] = hands[seatIndex].filter(card => 
+                !(card.suit === suit && card.rank === rank)
+              );
+              await redisClient.set(`game:hands:${round.gameId}`, JSON.stringify(hands), { EX: 3600 });
+              console.log(`[GAME LOGGING] Updated Redis hands for seat ${seatIndex}`);
+            }
+          }
+        }
+      } catch (redisError) {
+        console.error('[GAME LOGGING] Error updating Redis hands:', redisError);
+      }
 
       console.log(`[GAME LOGGING] Removed card ${suit}${rank} from seat ${seatIndex} hand (${currentHand.length} -> ${updatedHand.length})`);
     } catch (error) {

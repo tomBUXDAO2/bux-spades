@@ -1,4 +1,5 @@
 import { prisma } from '../config/database.js';
+import redisGameState from './RedisGameStateService.js';
 import { ScoringService } from './ScoringService.js';
 
 /**
@@ -410,6 +411,15 @@ export class GameService {
    */
   static async getGameStateForClient(gameId) {
     try {
+      // REAL-TIME: Try to get game state from Redis first (instant)
+      let cachedGameState = await redisGameState.getGameState(gameId);
+      if (cachedGameState) {
+        console.log(`[GAME SERVICE] Returning cached state from Redis for game ${gameId}`);
+        return cachedGameState;
+      }
+
+      // Fallback to database if Redis miss
+      console.log(`[GAME SERVICE] Redis miss, fetching from database for game ${gameId}`);
       const game = await this.getGame(gameId);
       if (!game) {
         return null;
@@ -422,26 +432,84 @@ export class GameService {
       // NUCLEAR: Skip hand snapshots for maximum speed - use empty hands
       const handSnapshots = [];
 
-      // NUCLEAR: Skip player stats for maximum speed - use defaults
+      // Get player stats from database for bidding display
       let playerStats = [];
+      if (currentRound) {
+        playerStats = await prisma.playerRoundStats.findMany({
+          where: { roundId: currentRound.id }
+        });
+      }
 
-      // NUCLEAR: Skip current trick cards for maximum speed
-      const currentTrickCards = [];
+      // REAL-TIME: Get bids from Redis first, then update playerStats with Redis data
+      const redisBids = await redisGameState.getPlayerBids(gameId);
+      console.log(`🔥🔥🔥 [GAME SERVICE] CRITICAL DEBUG - Redis bids for game ${gameId}:`, redisBids);
+      if (redisBids) {
+        console.log(`[GAME SERVICE] Using Redis bids for game ${gameId}:`, redisBids);
+        // Update playerStats with Redis bid data
+        playerStats.forEach(stats => {
+          if (redisBids[stats.seatIndex] !== null && redisBids[stats.seatIndex] !== undefined) {
+            stats.bid = redisBids[stats.seatIndex];
+          }
+        });
+      } else {
+        console.log(`[GAME SERVICE] No Redis bids found for game ${gameId}, using database only`);
+      }
 
-      // Build hands array
-      const hands = new Array(4).fill([]);
-      handSnapshots.forEach(snapshot => {
-        if (snapshot.seatIndex >= 0 && snapshot.seatIndex < 4) {
-          hands[snapshot.seatIndex] = snapshot.cards || [];
+        // Get current trick cards from database
+        let currentTrickCards = [];
+        if (currentRound) {
+          console.log(`[GAME SERVICE] Fetching current trick cards for round ${currentRound.id}, trick ${game.currentTrick || 1}`);
+          
+          const currentTrick = await prisma.trick.findFirst({
+            where: {
+              roundId: currentRound.id,
+              trickNumber: game.currentTrick || 1
+            },
+            include: {
+              cards: {
+                select: { seatIndex: true, suit: true, rank: true, playOrder: true },
+                orderBy: { playOrder: 'asc' }
+              }
+            }
+          });
+          
+          console.log(`[GAME SERVICE] Current trick query result:`, currentTrick ? {
+            id: currentTrick.id,
+            trickNumber: currentTrick.trickNumber,
+            cardsCount: currentTrick.cards?.length || 0,
+            cards: currentTrick.cards
+          } : 'No trick found');
+          
+          if (currentTrick && currentTrick.cards) {
+            currentTrickCards = currentTrick.cards;
+            console.log(`[GAME SERVICE] Loaded ${currentTrickCards.length} cards for current trick`);
+          }
         }
-      });
+
+      // REAL-TIME: Get hands from Redis first (instant)
+      let hands = await redisGameState.getPlayerHands(gameId);
+      
+      // Fallback to database if Redis miss
+      if (!hands) {
+        console.log(`[GAME SERVICE] Redis miss for hands, fetching from database for game ${gameId}`);
+        hands = new Array(4).fill([]);
+        handSnapshots.forEach(snapshot => {
+          if (snapshot.seatIndex >= 0 && snapshot.seatIndex < 4) {
+            hands[snapshot.seatIndex] = snapshot.cards || [];
+          }
+        });
+      } else {
+        console.log(`[GAME SERVICE] Using hands from Redis for game ${gameId}`);
+        console.log(`[GAME SERVICE] Redis hands:`, hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`));
+        console.log(`[GAME SERVICE] Redis hands data:`, hands);
+      }
       
       // EMERGENCY: Removed excessive logging for performance
 
       // Build players with stats
       const players = game.players.map((p, index) => {
         const stats = playerStats.find(s => s.seatIndex === p.seatIndex);
-        return {
+        const playerData = {
           id: p.userId,
           username: p.user?.username || 'Player',
           avatarUrl: p.user?.avatarUrl || null,
@@ -456,15 +524,48 @@ export class GameService {
           nil: stats?.madeNil || false,
           blindNil: stats?.madeBlindNil || false
         };
+        console.log(`[GAME SERVICE] Built player for seat ${p.seatIndex}:`, {
+          seatIndex: p.seatIndex,
+          userId: p.userId,
+          username: p.user?.username,
+          isHuman: p.isHuman,
+          type: playerData.type
+        });
+        return playerData;
       });
 
-      // Build bidding state
+      // Build bidding state - use Redis bids if available, otherwise use database
+      const bidsArray = new Array(4).fill(null);
+      
+      // Use Redis bids first (most up-to-date)
+      if (redisBids) {
+        console.log(`[GAME SERVICE] Using Redis bids for bidding object:`, redisBids);
+        for (let i = 0; i < 4; i++) {
+          bidsArray[i] = redisBids[i];
+        }
+      } else {
+        // Fallback to database bids
+        playerStats.forEach(stats => {
+          if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
+            bidsArray[stats.seatIndex] = stats.bid;
+          }
+        });
+      }
+      
       const bidding = {
-        bids: playerStats.map(s => s.bid), // Use actual database values
+        bids: bidsArray, // Properly ordered by seat index
         nilBids: {},
         currentPlayer: game.currentPlayer,
         currentBidderIndex: players.findIndex(p => p.id === game.currentPlayer)
       };
+      
+      // DEBUG: Log bidding state
+      console.log(`[GAME SERVICE] DEBUG - Bidding state for game ${gameId}:`, {
+        redisBids,
+        playerStats: playerStats.map(s => ({ seatIndex: s.seatIndex, bid: s.bid })),
+        bidsArray,
+        bidding
+      });
       
 
       // Build play state
@@ -577,9 +678,19 @@ export class GameService {
         handsCardCounts: clientState.hands.map((hand, i) => ({ seat: i, cards: hand.length }))
       });
       
+      // DEBUG: Log the actual hands being sent to client
+      console.log(`[GAME SERVICE] Hands being sent to client:`, {
+        hands: clientState.hands,
+        handsStringified: clientState.hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`)
+      });
+      
+      // REAL-TIME: Cache the state in Redis for instant future reads
+      await redisGameState.setGameState(gameId, clientState);
+      
       return clientState;
     } catch (error) {
       console.error('[GAME SERVICE] Error getting game state for client:', error);
+      console.error('[GAME SERVICE] Error stack:', error.stack);
       throw error;
     }
   }
@@ -598,6 +709,13 @@ export class GameService {
       // Build seatIndex -> userId map
       const seatToUserId = new Array(4).fill(null);
       game.players.forEach(p => { seatToUserId[p.seatIndex] = p.userId; });
+      
+      console.log(`[GAME SERVICE] Deal hands - seatToUserId mapping:`, seatToUserId);
+      console.log(`[GAME SERVICE] Deal hands - game.players:`, game.players.map(p => ({
+        seatIndex: p.seatIndex,
+        userId: p.userId,
+        isHuman: p.isHuman
+      })));
 
       // Create and shuffle a standard 52-card deck
       const suits = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES'];
@@ -617,9 +735,29 @@ export class GameService {
         const seatIndex = i % 4;
         hands[seatIndex].push(deck[i]);
       }
+      
+      console.log(`[GAME SERVICE] Deal hands - Created hands:`, {
+        deckLength: deck.length,
+        handsLengths: hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`),
+        sampleCards: hands[0].slice(0, 3) // Show first 3 cards of seat 0
+      });
 
-      // Persist RoundHandSnapshot and PlayerRoundStats for each occupied seat
-      await prisma.$transaction(async (tx) => {
+        // Set current bidder to dealer+1 (wrap 0..3) and clear currentTrick for bidding phase
+        const dealerSeatIndex = game.dealer ?? 0;
+        const bidderSeat = (dealerSeatIndex + 1) % 4;
+        const currentPlayer = seatToUserId[bidderSeat] || null;
+        
+        console.log(`[GAME SERVICE] Deal hands - Setting currentPlayer:`, {
+          gameDealer: game.dealer,
+          dealerSeatIndex,
+          bidderSeat,
+          currentPlayer,
+          seatToUserId,
+          bidderSeatUserId: seatToUserId[bidderSeat]
+        });
+
+        // Persist RoundHandSnapshot and PlayerRoundStats for each occupied seat
+        await prisma.$transaction(async (tx) => {
         for (let seatIndex = 0; seatIndex < 4; seatIndex++) {
           const userId = seatToUserId[seatIndex];
           const cards = hands[seatIndex];
@@ -656,11 +794,6 @@ export class GameService {
           }
         }
 
-        // Set current bidder to dealer+1 (wrap 0..3) and clear currentTrick for bidding phase
-        const dealerSeatIndex = game.dealer ?? 0;
-        const bidderSeat = (dealerSeatIndex + 1) % 4;
-        const currentPlayer = seatToUserId[bidderSeat] || null;
-
         // EMERGENCY: Removed excessive logging for performance
 
         await tx.game.update({
@@ -674,10 +807,30 @@ export class GameService {
         });
       });
 
+      console.log(`[GAME SERVICE] Deal hands - Database updated with currentPlayer: ${currentPlayer}`);
+
+      // REAL-TIME: Clear ALL Redis cache for this game to force fresh rebuild
+      await redisGameState.cleanupGame(gameId);
+      console.log(`[GAME SERVICE] Cleared ALL Redis cache for fresh game state rebuild`);
+      
+      // Initialize empty bids array in Redis for new round
+      await redisGameState.setPlayerBids(gameId, new Array(4).fill(null));
+      
+      // REAL-TIME: Cache hands in Redis for instant access
+      console.log(`[GAME SERVICE] Deal hands - Storing hands in Redis:`, {
+        handsLengths: hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`),
+        handsData: hands
+      });
+      await redisGameState.setPlayerHands(gameId, hands);
+      
+      // ASYNC: Sync hands to database (non-blocking)
+      await redisGameState.syncHandsToDatabase(gameId, round.id, hands);
+
       // NUCLEAR: No logging for performance
       return true;
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error('[GAME SERVICE] Error dealing initial hands:', error);
+      console.error('[GAME SERVICE] Error stack:', error.stack);
       throw error;
     }
   }

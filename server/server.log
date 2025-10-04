@@ -1,0 +1,514 @@
+
+> bux-spades-server@1.0.0 dev
+> nodemon src/index.js
+
+[33m[nodemon] 3.1.10[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node src/index.js`[39m
+[LOGGING] NODE_ENV: development
+[LOGGING] isDev: true
+[LOGGING] TEMPORARILY ENABLING ALL LOGS FOR DEBUGGING
+[SERVER] Server running on port 3000
+[SERVER] Environment: development
+[REDIS] Connection error: ConnectionTimeoutError: Connection timeout
+    at Socket.onTimeout (/Users/tombuxdao/bux-spades/server/node_modules/@redis/client/dist/lib/client/socket.js:180:46)
+    at Object.onceWrapper (node:events:621:28)
+    at Socket.emit (node:events:507:28)
+    at Socket._onTimeout (node:net:604:8)
+    at listOnTimeout (node:internal/timers:608:17)
+    at process.processTimers (node:internal/timers:543:7)
+[REDIS] Connected to Redis
+[REDIS] Ready to accept commands
+[REDIS] Successfully connected to Redis
+[GAME MANAGER] ADDING GAME game_1759606932615_p07hfrb7e TO MEMORY
+Trace: [GAME MANAGER] Stack trace for addGame call
+    at GameManager.addGame (file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:31:13)
+    at file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:110:14
+    at Array.forEach (<anonymous>)
+    at GameManager.loadAllActiveGames (file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:109:13)
+[GAME MANAGER] Added game game_1759606932615_p07hfrb7e to memory
+[GAME MANAGER] Total games in memory: 1
+[GAME MANAGER] Loaded 1 active games
+[SERVER] Loaded existing games
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+[LOGGING] NODE_ENV: development
+[LOGGING] isDev: true
+[LOGGING] TEMPORARILY ENABLING ALL LOGS FOR DEBUGGING
+[SERVER] Server running on port 3000
+[SERVER] Environment: development
+[REDIS] Connection error: ConnectionTimeoutError: Connection timeout
+    at Socket.onTimeout (/Users/tombuxdao/bux-spades/server/node_modules/@redis/client/dist/lib/client/socket.js:180:46)
+    at Object.onceWrapper (node:events:621:28)
+    at Socket.emit (node:events:507:28)
+    at Socket._onTimeout (node:net:604:8)
+    at listOnTimeout (node:internal/timers:608:17)
+    at process.processTimers (node:internal/timers:543:7)
+[SOCKET] Initializing handlers for socket aCW8qZOhSiYfSFiOAAAB
+[SOCKET] Handlers initialized for socket aCW8qZOhSiYfSFiOAAAB
+[SOCKET] User authenticated: user_1756353466780_9g9m40xew
+[SOCKET] Socket after auth - userId: user_1756353466780_9g9m40xew, authenticated: true
+[GAME JOIN] User user_1756353466780_9g9m40xew attempting to join game game_1759606932615_p07hfrb7e
+[SOCKET] Debounced join_game for game_1759606932615_p07hfrb7e on socket aCW8qZOhSiYfSFiOAAAB
+[REDIS] Connected to Redis
+[REDIS] Ready to accept commands
+[GAME SERVICE] Redis miss, fetching from database for game game_1759606932615_p07hfrb7e
+[REDIS] Successfully connected to Redis
+[SOCKET] Debounced join_game for game_1759606932615_p07hfrb7e on socket aCW8qZOhSiYfSFiOAAAB
+prisma:info Starting a postgresql pool with 9 connections.
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+[32m[nodemon] starting `node src/index.js`[39m
+[LOGGING] NODE_ENV: development
+[LOGGING] isDev: true
+[LOGGING] TEMPORARILY ENABLING ALL LOGS FOR DEBUGGING
+[SERVER] Server running on port 3000
+[SERVER] Environment: development
+[REDIS] Connection error: ConnectionTimeoutError: Connection timeout
+    at Socket.onTimeout (/Users/tombuxdao/bux-spades/server/node_modules/@redis/client/dist/lib/client/socket.js:180:46)
+    at Object.onceWrapper (node:events:621:28)
+    at Socket.emit (node:events:507:28)
+    at Socket._onTimeout (node:net:604:8)
+    at listOnTimeout (node:internal/timers:608:17)
+    at process.processTimers (node:internal/timers:543:7)
+[REDIS] Connected to Redis
+[REDIS] Ready to accept commands
+[REDIS] Successfully connected to Redis
+[GAME MANAGER] ADDING GAME game_1759606932615_p07hfrb7e TO MEMORY
+Trace: [GAME MANAGER] Stack trace for addGame call
+    at GameManager.addGame (file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:31:13)
+    at file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:110:14
+    at Array.forEach (<anonymous>)
+    at GameManager.loadAllActiveGames (file:///Users/tombuxdao/bux-spades/server/src/services/GameManager.js:109:13)
+[GAME MANAGER] Added game game_1759606932615_p07hfrb7e to memory
+[GAME MANAGER] Total games in memory: 1
+[GAME MANAGER] Loaded 1 active games
+[SERVER] Loaded existing games
+[SOCKET] Initializing handlers for socket 4UlWXdTXBKIsP9AyAAAB
+[SOCKET] Handlers initialized for socket 4UlWXdTXBKIsP9AyAAAB
+[SOCKET] User authenticated: user_1756353466780_9g9m40xew
+[SOCKET] Socket after auth - userId: user_1756353466780_9g9m40xew, authenticated: true
+prisma:info Starting a postgresql pool with 9 connections.
+[GAME JOIN] User user_1756353466780_9g9m40xew attempting to join game game_1759606932615_p07hfrb7e
+[SOCKET] Debounced join_game for game_1759606932615_p07hfrb7e on socket 4UlWXdTXBKIsP9AyAAAB
+[GAME SERVICE] Redis miss, fetching from database for game game_1759606932615_p07hfrb7e
+[SOCKET] Debounced join_game for game_1759606932615_p07hfrb7e on socket 4UlWXdTXBKIsP9AyAAAB
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+[LOBBY] User Tom [BUX$DAO] came online. Total online: 1
+🔥🔥🔥 [GAME SERVICE] CRITICAL DEBUG - Redis bids for game game_1759606932615_p07hfrb7e: [ null, null, null, 4 ]
+[GAME SERVICE] Using Redis bids for game game_1759606932615_p07hfrb7e: [ null, null, null, 4 ]
+[GAME SERVICE] Using hands from Redis for game game_1759606932615_p07hfrb7e
+[GAME SERVICE] Redis hands: [
+  'Seat 0: 13 cards',
+  'Seat 1: 13 cards',
+  'Seat 2: 13 cards',
+  'Seat 3: 13 cards'
+]
+[GAME SERVICE] Redis hands data: [
+  [
+    { suit: 'CLUBS', rank: '2' },
+    { suit: 'SPADES', rank: '6' },
+    { suit: 'DIAMONDS', rank: 'J' },
+    { suit: 'CLUBS', rank: '5' },
+    { suit: 'SPADES', rank: '3' },
+    { suit: 'DIAMONDS', rank: '5' },
+    { suit: 'HEARTS', rank: 'K' },
+    { suit: 'CLUBS', rank: 'A' },
+    { suit: 'HEARTS', rank: '3' },
+    { suit: 'DIAMONDS', rank: '8' },
+    { suit: 'SPADES', rank: '5' },
+    { suit: 'DIAMONDS', rank: '4' },
+    { suit: 'SPADES', rank: 'A' }
+  ],
+  [
+    { suit: 'HEARTS', rank: '2' },
+    { suit: 'CLUBS', rank: 'Q' },
+    { suit: 'SPADES', rank: '10' },
+    { suit: 'DIAMONDS', rank: '6' },
+    { suit: 'CLUBS', rank: '4' },
+    { suit: 'HEARTS', rank: '4' },
+    { suit: 'HEARTS', rank: '9' },
+    { suit: 'HEARTS', rank: '6' },
+    { suit: 'DIAMONDS', rank: 'K' },
+    { suit: 'CLUBS', rank: '7' },
+    { suit: 'DIAMONDS', rank: 'A' },
+    { suit: 'SPADES', rank: 'Q' },
+    { suit: 'DIAMONDS', rank: '9' }
+  ],
+  [
+    { suit: 'CLUBS', rank: '9' },
+    { suit: 'HEARTS', rank: 'J' },
+    { suit: 'HEARTS', rank: '7' },
+    { suit: 'DIAMONDS', rank: '10' },
+    { suit: 'HEARTS', rank: '10' },
+    { suit: 'DIAMONDS', rank: 'Q' },
+    { suit: 'SPADES', rank: 'J' },
+    { suit: 'CLUBS', rank: '3' },
+    { suit: 'HEARTS', rank: '5' },
+    { suit: 'SPADES', rank: '7' },
+    { suit: 'SPADES', rank: '9' },
+    { suit: 'CLUBS', rank: '8' },
+    { suit: 'DIAMONDS', rank: '3' }
+  ],
+  [
+    { suit: 'HEARTS', rank: '8' },
+    { suit: 'DIAMONDS', rank: '2' },
+    { suit: 'SPADES', rank: 'K' },
+    { suit: 'HEARTS', rank: 'Q' },
+    { suit: 'HEARTS', rank: 'A' },
+    { suit: 'DIAMONDS', rank: '7' },
+    { suit: 'CLUBS', rank: 'J' },
+    { suit: 'SPADES', rank: '2' },
+    { suit: 'CLUBS', rank: '6' },
+    { suit: 'SPADES', rank: '4' },
+    { suit: 'CLUBS', rank: '10' },
+    { suit: 'CLUBS', rank: 'K' },
+    { suit: 'SPADES', rank: '8' }
+  ]
+]
+[GAME SERVICE] Built player for seat 0: {
+  seatIndex: 0,
+  userId: 'user_1756353466780_9g9m40xew',
+  username: 'Tom [BUX$DAO]',
+  isHuman: true,
+  type: 'human'
+}
+[GAME SERVICE] Built player for seat 1: {
+  seatIndex: 1,
+  userId: 'cmgcojias00020zv2npdqdf7k',
+  username: 'Bot_bot_1_1759606942526',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Built player for seat 2: {
+  seatIndex: 2,
+  userId: 'cmgcojiu400050zv2ba87cckb',
+  username: 'Bot_bot_2_1759606943217',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Built player for seat 3: {
+  seatIndex: 3,
+  userId: 'cmgcojj3w00080zv2aaz13kwl',
+  username: 'Bot_bot_3_1759606943233',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Using Redis bids for bidding object: [ null, null, null, 4 ]
+[GAME SERVICE] DEBUG - Bidding state for game game_1759606932615_p07hfrb7e: {
+  redisBids: [ null, null, null, 4 ],
+  playerStats: [
+    { seatIndex: 0, bid: null },
+    { seatIndex: 1, bid: null },
+    { seatIndex: 2, bid: null },
+    { seatIndex: 3, bid: 4 }
+  ],
+  bidsArray: [ null, null, null, 4 ],
+  bidding: {
+    bids: [ null, null, null, 4 ],
+    nilBids: {},
+    currentPlayer: 'user_1756353466780_9g9m40xew',
+    currentBidderIndex: 0
+  }
+}
+[GAME SERVICE] Built play object: {
+  "tricks": [],
+  "trickNumber": 0,
+  "currentTrick": [],
+  "spadesBroken": false,
+  "currentPlayer": "user_1756353466780_9g9m40xew",
+  "currentPlayerIndex": 0
+}
+[GAME SERVICE] Returning client state for game game_1759606932615_p07hfrb7e: {
+  status: 'BIDDING',
+  currentPlayer: 'user_1756353466780_9g9m40xew',
+  handsLength: 4,
+  playersCount: 4,
+  handsCardCounts: [
+    { seat: 0, cards: 13 },
+    { seat: 1, cards: 13 },
+    { seat: 2, cards: 13 },
+    { seat: 3, cards: 13 }
+  ]
+}
+[GAME SERVICE] Hands being sent to client: {
+  hands: [
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ]
+  ],
+  handsStringified: [
+    'Seat 0: 13 cards',
+    'Seat 1: 13 cards',
+    'Seat 2: 13 cards',
+    'Seat 3: 13 cards'
+  ]
+}
+[GAME JOIN] User user_1756353466780_9g9m40xew joined room for game game_1759606932615_p07hfrb7e
+[GAME JOIN] User user_1756353466780_9g9m40xew successfully joined game game_1759606932615_p07hfrb7e
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+[BIDDING] User user_1756353466780_9g9m40xew making bid: 3 (nil: false, blind: false)
+[BIDDING] Processing bid: user=user_1756353466780_9g9m40xew, bid=3, nil=false, blind=false
+[GAME LOGGING] Logged bid: user=user_1756353466780_9g9m40xew, bid=3, blind=false
+[BIDDING] Updated Redis bids for game game_1759606932615_p07hfrb7e: [ 3, null, null, 4 ]
+[GAME SERVICE] updateGame called for game_1759606932615_p07hfrb7e: { updateKeys: [ 'currentPlayer' ] }
+[GAME SERVICE] Redis miss, fetching from database for game game_1759606932615_p07hfrb7e
+🔥🔥🔥 [GAME SERVICE] CRITICAL DEBUG - Redis bids for game game_1759606932615_p07hfrb7e: [ 3, null, null, 4 ]
+[GAME SERVICE] Using Redis bids for game game_1759606932615_p07hfrb7e: [ 3, null, null, 4 ]
+[GAME SERVICE] Using hands from Redis for game game_1759606932615_p07hfrb7e
+[GAME SERVICE] Redis hands: [
+  'Seat 0: 13 cards',
+  'Seat 1: 13 cards',
+  'Seat 2: 13 cards',
+  'Seat 3: 13 cards'
+]
+[GAME SERVICE] Redis hands data: [
+  [
+    { suit: 'CLUBS', rank: '2' },
+    { suit: 'SPADES', rank: '6' },
+    { suit: 'DIAMONDS', rank: 'J' },
+    { suit: 'CLUBS', rank: '5' },
+    { suit: 'SPADES', rank: '3' },
+    { suit: 'DIAMONDS', rank: '5' },
+    { suit: 'HEARTS', rank: 'K' },
+    { suit: 'CLUBS', rank: 'A' },
+    { suit: 'HEARTS', rank: '3' },
+    { suit: 'DIAMONDS', rank: '8' },
+    { suit: 'SPADES', rank: '5' },
+    { suit: 'DIAMONDS', rank: '4' },
+    { suit: 'SPADES', rank: 'A' }
+  ],
+  [
+    { suit: 'HEARTS', rank: '2' },
+    { suit: 'CLUBS', rank: 'Q' },
+    { suit: 'SPADES', rank: '10' },
+    { suit: 'DIAMONDS', rank: '6' },
+    { suit: 'CLUBS', rank: '4' },
+    { suit: 'HEARTS', rank: '4' },
+    { suit: 'HEARTS', rank: '9' },
+    { suit: 'HEARTS', rank: '6' },
+    { suit: 'DIAMONDS', rank: 'K' },
+    { suit: 'CLUBS', rank: '7' },
+    { suit: 'DIAMONDS', rank: 'A' },
+    { suit: 'SPADES', rank: 'Q' },
+    { suit: 'DIAMONDS', rank: '9' }
+  ],
+  [
+    { suit: 'CLUBS', rank: '9' },
+    { suit: 'HEARTS', rank: 'J' },
+    { suit: 'HEARTS', rank: '7' },
+    { suit: 'DIAMONDS', rank: '10' },
+    { suit: 'HEARTS', rank: '10' },
+    { suit: 'DIAMONDS', rank: 'Q' },
+    { suit: 'SPADES', rank: 'J' },
+    { suit: 'CLUBS', rank: '3' },
+    { suit: 'HEARTS', rank: '5' },
+    { suit: 'SPADES', rank: '7' },
+    { suit: 'SPADES', rank: '9' },
+    { suit: 'CLUBS', rank: '8' },
+    { suit: 'DIAMONDS', rank: '3' }
+  ],
+  [
+    { suit: 'HEARTS', rank: '8' },
+    { suit: 'DIAMONDS', rank: '2' },
+    { suit: 'SPADES', rank: 'K' },
+    { suit: 'HEARTS', rank: 'Q' },
+    { suit: 'HEARTS', rank: 'A' },
+    { suit: 'DIAMONDS', rank: '7' },
+    { suit: 'CLUBS', rank: 'J' },
+    { suit: 'SPADES', rank: '2' },
+    { suit: 'CLUBS', rank: '6' },
+    { suit: 'SPADES', rank: '4' },
+    { suit: 'CLUBS', rank: '10' },
+    { suit: 'CLUBS', rank: 'K' },
+    { suit: 'SPADES', rank: '8' }
+  ]
+]
+[GAME SERVICE] Built player for seat 0: {
+  seatIndex: 0,
+  userId: 'user_1756353466780_9g9m40xew',
+  username: 'Tom [BUX$DAO]',
+  isHuman: true,
+  type: 'human'
+}
+[GAME SERVICE] Built player for seat 1: {
+  seatIndex: 1,
+  userId: 'cmgcojias00020zv2npdqdf7k',
+  username: 'Bot_bot_1_1759606942526',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Built player for seat 2: {
+  seatIndex: 2,
+  userId: 'cmgcojiu400050zv2ba87cckb',
+  username: 'Bot_bot_2_1759606943217',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Built player for seat 3: {
+  seatIndex: 3,
+  userId: 'cmgcojj3w00080zv2aaz13kwl',
+  username: 'Bot_bot_3_1759606943233',
+  isHuman: false,
+  type: 'bot'
+}
+[GAME SERVICE] Using Redis bids for bidding object: [ 3, null, null, 4 ]
+[GAME SERVICE] DEBUG - Bidding state for game game_1759606932615_p07hfrb7e: {
+  redisBids: [ 3, null, null, 4 ],
+  playerStats: [
+    { seatIndex: 1, bid: null },
+    { seatIndex: 2, bid: null },
+    { seatIndex: 3, bid: 4 },
+    { seatIndex: 0, bid: 3 }
+  ],
+  bidsArray: [ 3, null, null, 4 ],
+  bidding: {
+    bids: [ 3, null, null, 4 ],
+    nilBids: {},
+    currentPlayer: 'user_1756353466780_9g9m40xew',
+    currentBidderIndex: 0
+  }
+}
+[GAME SERVICE] Built play object: {
+  "tricks": [],
+  "trickNumber": 0,
+  "currentTrick": [],
+  "spadesBroken": false,
+  "currentPlayer": "user_1756353466780_9g9m40xew",
+  "currentPlayerIndex": 0
+}
+[GAME SERVICE] Game updated successfully: game_1759606932615_p07hfrb7e
+[GAME SERVICE] Returning client state for game game_1759606932615_p07hfrb7e: {
+  status: 'BIDDING',
+  currentPlayer: 'user_1756353466780_9g9m40xew',
+  handsLength: 4,
+  playersCount: 4,
+  handsCardCounts: [
+    { seat: 0, cards: 13 },
+    { seat: 1, cards: 13 },
+    { seat: 2, cards: 13 },
+    { seat: 3, cards: 13 }
+  ]
+}
+[GAME SERVICE] Hands being sent to client: {
+  hands: [
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ],
+    [
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object], [Object],
+      [Object]
+    ]
+  ],
+  handsStringified: [
+    'Seat 0: 13 cards',
+    'Seat 1: 13 cards',
+    'Seat 2: 13 cards',
+    'Seat 3: 13 cards'
+  ]
+}
+[GAME SERVICE] Returning cached state from Redis for game game_1759606932615_p07hfrb7e
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl", "public"."User"."coins", "public"."User"."createdAt" FROM "public"."User" WHERE 1=1 ORDER BY "public"."User"."username" ASC OFFSET $1
+prisma:query SELECT 1
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."friendId" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."blockedId" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Friend"."id", "public"."Friend"."userId", "public"."Friend"."friendId", "public"."Friend"."createdAt", "public"."Friend"."updatedAt" FROM "public"."Friend" WHERE "public"."Friend"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."username", "public"."User"."avatarUrl" FROM "public"."User" WHERE "public"."User"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."BlockedUser"."id", "public"."BlockedUser"."userId", "public"."BlockedUser"."blockedId", "public"."BlockedUser"."createdAt", "public"."BlockedUser"."updatedAt" FROM "public"."BlockedUser" WHERE "public"."BlockedUser"."userId" = $1 OFFSET $2
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m

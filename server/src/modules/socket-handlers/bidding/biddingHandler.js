@@ -2,6 +2,7 @@ import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
+import redisGameState from '../../../services/RedisGameStateService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -73,7 +74,7 @@ class BiddingHandler {
         throw new Error('Player not found in game');
       }
 
-      // Log the bid to database
+      // Update bid in database first (synchronous)
       await this.loggingService.logBid(
         gameId,
         currentRound.id,
@@ -83,56 +84,83 @@ class BiddingHandler {
         isBlindNil
       );
 
-      // Check if all players have bid
-      const playerStats = await prisma.playerRoundStats.findMany({
-        where: { 
-          roundId: currentRound.id,
-          bid: { not: null } // Only count players who have actually bid
-        }
-      });
+      // CRITICAL: Clear game state cache FIRST so getGameStateForClient rebuilds with updated bids
+      const { redisClient } = await import('../../../config/redis.js');
+      await redisClient.del(`game:state:${gameId}`);
+      
+      // REAL-TIME: Update bid in Redis (instant)
+      let currentBids = await redisGameState.getPlayerBids(gameId) || new Array(4).fill(null);
+      currentBids[player.seatIndex] = bid;
+      await redisGameState.setPlayerBids(gameId, currentBids);
+      
+      // DEBUG: Log Redis bid update
+      console.log(`[BIDDING] Updated Redis bids for game ${gameId}:`, currentBids);
 
-      if (playerStats.length >= 4) {
-        // All players have bid, emit final bidding update then start the round
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
-        this.io.to(gameId).emit('bidding_update', {
-          gameId,
-          gameState: updatedGameState,
-          bid: {
-            userId,
-            bid,
-            isNil,
-            isBlindNil,
-            seatIndex: player.seatIndex
-          }
-        });
-        
-        // EXTREME: NO DELAYS - START IMMEDIATELY
-        this.startRound(gameId, currentRound.id);
+      // REAL-TIME: Check if all players have bid using Redis
+      const bidsComplete = currentBids.every(bid => bid !== null && bid !== undefined);
+
+        if (bidsComplete) {
+          // All players have bid, emit final bidding update then start the round
+          const updatedGameState = await GameService.getGameStateForClient(gameId);
+          this.io.to(gameId).emit('bidding_update', {
+            gameId,
+            gameState: updatedGameState,
+            bid: {
+              userId,
+              bid,
+              isNil,
+              isBlindNil,
+              seatIndex: player.seatIndex
+            }
+          });
+          
+          // EXTREME: NO DELAYS - START IMMEDIATELY
+          this.startRound(gameId, currentRound.id);
       } else {
         // Move to next player
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
         const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
         
-        await GameService.updateGame(gameId, {
-          currentPlayer: nextPlayer?.userId
+        console.log(`[BIDDING] Moving to next player:`, {
+          currentPlayerSeat: player.seatIndex,
+          nextPlayerIndex,
+          nextPlayer,
+          allPlayers: gameState.players.map(p => ({ seatIndex: p.seatIndex, userId: p.userId, username: p.user?.username }))
         });
+        
+        // REAL-TIME: Clear game state cache first, then update current player
+        await redisClient.del(`game:state:${gameId}`);
+        console.log(`[BIDDING] Cleared Redis game state cache for fresh update`);
+        
+        // Get fresh game state from database and update currentPlayer
+        const freshGameState = await GameService.getGameStateForClient(gameId);
+        if (freshGameState) {
+          freshGameState.currentPlayer = nextPlayer?.userId;
+          await redisGameState.setGameState(gameId, freshGameState);
+          console.log(`[BIDDING] Updated Redis currentPlayer to: ${nextPlayer?.userId}`);
+        }
 
-        // Emit bidding update
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
-        this.io.to(gameId).emit('bidding_update', {
-          gameId,
-          gameState: updatedGameState,
-          bid: {
-            userId,
-            bid,
-            isNil,
-            isBlindNil,
-            seatIndex: player.seatIndex
-          }
-        });
+        // ASYNC: Update current player in database (non-blocking)
+        GameService.updateGame(gameId, {
+          currentPlayer: nextPlayer?.userId
+        }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
+
+          // Emit bidding update
+          const updatedGameState = await GameService.getGameStateForClient(gameId);
+          this.io.to(gameId).emit('bidding_update', {
+            gameId,
+            gameState: updatedGameState,
+            bid: {
+              userId,
+              bid,
+              isNil,
+              isBlindNil,
+              seatIndex: player.seatIndex
+            }
+          });
 
         // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-        this.triggerBotBidIfNeeded(gameId);
+          this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
@@ -172,6 +200,11 @@ class BiddingHandler {
         currentTrick: 1
       });
 
+      // CRITICAL: Clear Redis cache to force fresh game state with PLAYING status
+      const { redisClient } = await import('../../../config/redis.js');
+      await redisClient.del(`game:state:${gameId}`);
+      console.log(`[BIDDING] Cleared Redis cache after starting round`);
+
       // Emit round started event
       const updatedGameState = await GameService.getGameStateForClient(gameId);
       this.io.to(gameId).emit('round_started', {
@@ -194,43 +227,49 @@ class BiddingHandler {
    */
   async triggerBotBidIfNeeded(gameId) {
     try {
+      console.log(`[BIDDING] triggerBotBidIfNeeded called for game ${gameId}`);
       const gameState = await GameService.getGameStateForClient(gameId);
-      if (!gameState) return;
+      if (!gameState) {
+        console.log(`[BIDDING] No game state found for game ${gameId}`);
+        return;
+      }
 
+      console.log(`[BIDDING] Current player ID: ${gameState.currentPlayer}`);
       const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-      if (!currentPlayer || currentPlayer.type !== 'bot') return;
+      console.log(`[BIDDING] Found current player:`, currentPlayer ? { 
+        id: currentPlayer.id, 
+        username: currentPlayer.username, 
+        type: currentPlayer.type, 
+        seatIndex: currentPlayer.seatIndex 
+      } : 'null');
+      
+      if (!currentPlayer || currentPlayer.type !== 'bot') {
+        console.log(`[BIDDING] Not triggering bot bid - currentPlayer is not a bot`);
+        return;
+      }
 
       console.log(`[BIDDING] Triggering bot bid for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
 
-      // Get bot's hand from database
-      const round = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
-      if (!round) return;
-
-      const handSnapshot = await prisma.roundHandSnapshot.findFirst({
-        where: {
-          roundId: round.id,
-          seatIndex: currentPlayer.seatIndex
-        }
-      });
-
-      if (!handSnapshot) {
-        console.log(`[BIDDING] No hand snapshot found for bot ${currentPlayer.username}`);
+      // Get bot's hand from Redis
+      const hands = await redisGameState.getPlayerHands(gameId);
+      if (!hands || !hands[currentPlayer.seatIndex]) {
+        console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.username}`);
         return;
       }
 
       // Calculate bot bid based on hand
-      const hand = handSnapshot.cards || [];
+      const hand = hands[currentPlayer.seatIndex];
       const numSpades = hand.filter(card => card.suit === 'SPADES').length;
       
       // Simple bot logic: bid number of spades or 2 if no spades
       const botBid = numSpades > 0 ? numSpades : 2;
       
-      // NUCLEAR: No logging for performance
+      console.log(`[BIDDING] Bot ${currentPlayer.username} bidding ${botBid} (${numSpades} spades)`);
 
       // Process bot's bid
       await this.processBid(gameId, currentPlayer.id, botBid, botBid === 0, false);
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
     }
   }
 
@@ -247,20 +286,21 @@ class BiddingHandler {
 
       console.log(`[BIDDING] Triggering bot play for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
 
-      // Get bot's hand from database
-      const round = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
-      if (!round) return;
+      // Get bot's hand from Redis (real-time updated hand)
+      const hands = await redisGameState.getPlayerHands(gameId);
+      if (!hands || !hands[currentPlayer.seatIndex]) {
+        console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.username}`);
+        return;
+      }
 
-      const handSnapshot = await prisma.roundHandSnapshot.findFirst({
-        where: { roundId: round.id, seatIndex: currentPlayer.seatIndex }
-      });
+      const hand = hands[currentPlayer.seatIndex];
+      console.log(`[BIDDING] Bot ${currentPlayer.username} (seat ${currentPlayer.seatIndex}) hand from Redis:`, hand.map(c => `${c.suit}${c.rank}`));
 
-      if (!handSnapshot) return;
-
-      const hand = handSnapshot.cards;
+      // Update the gameState with the current Redis hands before passing to bot
+      const updatedGameState = { ...gameState, hands: hands };
 
       // Get bot card choice
-      const botCard = await this.botService.playBotCard(gameState, currentPlayer.seatIndex);
+      const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
       if (botCard) {
         console.log(`[BIDDING] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
         

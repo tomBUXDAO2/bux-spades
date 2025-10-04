@@ -3,6 +3,7 @@ import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
 import { prisma } from '../../../config/database.js';
+import redisGameState from '../../../services/RedisGameStateService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -97,6 +98,47 @@ class CardPlayHandler {
         card.rank
       );
 
+      // CRITICAL: If card play was rejected, move to next player immediately
+      if (logResult.rejected) {
+        console.log(`[CARD PLAY] Card play rejected for seat ${player.seatIndex}, moving to next player`);
+        
+        // Move to next player
+        const nextPlayerIndex = (player.seatIndex + 1) % 4;
+        const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
+        
+        // Update current player in database
+        await GameService.updateGame(gameId, {
+          currentPlayer: nextPlayer?.userId || null
+        });
+
+        // Clear Redis cache to force fresh game state
+        const { redisClient } = await import('../../../config/redis.js');
+        await redisClient.del(`game:state:${gameId}`);
+        
+        // Emit update to all players
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        this.io.to(gameId).emit('card_played', {
+          gameId,
+          gameState: updatedGameState,
+          cardPlayed: {
+            userId,
+            card,
+            seatIndex: player.seatIndex,
+            rejected: true
+          }
+        });
+
+        // Trigger next player if it's a bot
+        if (nextPlayer && nextPlayer.isHuman === false) {
+          setTimeout(() => {
+            this.triggerBotPlayIfNeeded(gameId);
+          }, 500); // Small delay to let the UI update
+        }
+
+        console.log(`[CARD PLAY] Moved to next player: ${nextPlayer?.userId || 'null'}`);
+        return;
+      }
+
       // Check if trick is complete (4 cards played) - use cached count
       const trickCards = await prisma.trickCard.findMany({
         where: { trickId: logResult.actualTrickId },
@@ -151,6 +193,11 @@ class CardPlayHandler {
               currentPlayer: winningPlayer.userId
             });
 
+            // CRITICAL: Clear Redis cache to force fresh game state after trick completion
+            const { redisClient } = await import('../../../config/redis.js');
+            await redisClient.del(`game:state:${gameId}`);
+            console.log(`[CARD PLAY] Cleared Redis cache after trick completion for fresh game state`);
+
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
               where: { trickId: logResult.actualTrickId },
@@ -199,6 +246,11 @@ class CardPlayHandler {
         await GameService.updateGame(gameId, {
           currentPlayer: nextPlayer?.userId
         });
+
+        // CRITICAL: Clear Redis cache to force fresh game state with updated trick cards
+        const { redisClient } = await import('../../../config/redis.js');
+        await redisClient.del(`game:state:${gameId}`);
+        console.log(`[CARD PLAY] Cleared Redis cache after card play for fresh trick cards`);
 
         // Emit card played event
         const updatedGameState = await GameService.getGameStateForClient(gameId);
@@ -254,27 +306,71 @@ class CardPlayHandler {
    */
   async triggerBotPlayIfNeeded(gameId) {
     try {
+      console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
       const gameState = await GameService.getGameStateForClient(gameId);
-      if (!gameState) return;
+      if (!gameState) {
+        console.log(`[CARD PLAY] No game state found for game ${gameId}`);
+        return;
+      }
 
+      console.log(`[CARD PLAY] Current player ID: ${gameState.currentPlayer}`);
       const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-      if (!currentPlayer || currentPlayer.type !== 'bot') return;
+      console.log(`[CARD PLAY] Found current player:`, currentPlayer ? { 
+        id: currentPlayer.id, 
+        username: currentPlayer.username, 
+        type: currentPlayer.type, 
+        seatIndex: currentPlayer.seatIndex 
+      } : 'null');
+      
+      if (!currentPlayer || currentPlayer.type !== 'bot') {
+        console.log(`[CARD PLAY] Not triggering bot play - currentPlayer is not a bot`);
+        return;
+      }
 
-      // Get bot's hand from database
-      const round = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
-      if (!round) return;
+      // CRITICAL: Check if current trick is already full (4 cards)
+      const currentTrickCards = gameState.play?.currentTrick || [];
+      if (currentTrickCards.length >= 4) {
+        console.log(`[CARD PLAY] Current trick is full (${currentTrickCards.length} cards), skipping bot play`);
+        return;
+      }
 
-      const handSnapshot = await prisma.roundHandSnapshot.findFirst({
-        where: {
-          roundId: round.id,
-          seatIndex: currentPlayer.seatIndex
-        }
-      });
+      // CRITICAL: Check if this bot has already played in the current trick
+      const botAlreadyPlayed = currentTrickCards.some(card => card.seatIndex === currentPlayer.seatIndex);
+      if (botAlreadyPlayed) {
+        console.log(`[CARD PLAY] Bot ${currentPlayer.username} already played in current trick, skipping`);
+        return;
+      }
 
-      if (!handSnapshot) return;
+      console.log(`[CARD PLAY] Triggering bot play for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
+
+      // Get bot's hand from Redis first, then fallback to database
+      let hand = null;
+      const hands = await redisGameState.getPlayerHands(gameId);
+      if (hands && hands[currentPlayer.seatIndex]) {
+        hand = hands[currentPlayer.seatIndex];
+        console.log(`[CARD PLAY] Bot hand from Redis:`, hand.map(c => `${c.suit}${c.rank}`));
+      } else {
+        // Fallback to database
+        const round = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
+        if (!round) return;
+
+        const handSnapshot = await prisma.roundHandSnapshot.findFirst({
+          where: {
+            roundId: round.id,
+            seatIndex: currentPlayer.seatIndex
+          }
+        });
+
+        if (!handSnapshot) return;
+        hand = JSON.parse(handSnapshot.cards);
+        console.log(`[CARD PLAY] Bot hand from database:`, hand.map(c => `${c.suit}${c.rank}`));
+      }
+
+      // Update the gameState with the current hands before passing to bot
+      const updatedGameState = { ...gameState, hands: hands || [hand] };
 
       // Get bot card choice
-      const botCard = await this.botService.playBotCard(gameState, currentPlayer.seatIndex);
+      const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
       if (botCard) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
         // Process bot's card play

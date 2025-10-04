@@ -60,19 +60,28 @@ class GameStartHandler {
       this.io.to(gameId).emit('game_started', { gameId, gameState });
       this.io.to(gameId).emit('game_update', { gameId, gameState });
 
-      // Trigger bot bidding if current player is a bot
-      if (gameState.currentPlayer) {
-        const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-        if (currentPlayer && currentPlayer.type === 'bot') {
-          // Import and use BiddingHandler
-          const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-          const biddingHandler = new BiddingHandler(this.io, this.socket);
-          // Trigger immediately, no delay
-          biddingHandler.triggerBotBidIfNeeded(gameId);
+      // Wait for cards to be rendered before starting bidding
+      console.log(`[GAME START] Waiting 2 seconds for cards to render before starting bidding`);
+      setTimeout(async () => {
+        // Trigger bot bidding if current player is a bot
+        console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
+        if (gameState.currentPlayer) {
+          const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
+          console.log(`[GAME START] Found current player:`, currentPlayer);
+          if (currentPlayer && currentPlayer.type === 'bot') {
+            console.log(`[GAME START] Triggering bot bid for ${currentPlayer.username}`);
+            // Import and use BiddingHandler
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            // Trigger bot bid
+            biddingHandler.triggerBotBidIfNeeded(gameId);
+          }
+        } else {
+          console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
         }
-      }
+      }, 2000); // 2 second delay for cards to render
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error('[GAME START] Error in handleStartGame:', error);
       this.socket.emit('error', { message: 'Failed to start game' });
     }
   }
