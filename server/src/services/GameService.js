@@ -469,6 +469,7 @@ export class GameService {
       });
       
       console.log(`[GAME SERVICE] Built hands array for game ${gameId}:`, hands.map((hand, index) => ({ seat: index, cardCount: hand.length })));
+      console.log(`[GAME SERVICE] Hand snapshot data:`, handSnapshots.map(s => ({ seat: s.seatIndex, cardCount: s.cards?.length || 0, firstCard: s.cards?.[0] })));
 
       // Build players with stats
       const players = game.players.map((p, index) => {
