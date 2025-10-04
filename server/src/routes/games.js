@@ -2,6 +2,7 @@ import express from 'express';
 import { gameManager } from '../services/GameManager.js';
 import { GameService } from '../services/GameService.js';
 import { Game } from '../models/Game.js';
+import redisGameState from '../services/RedisGameStateService.js';
 
 const router = express.Router();
 
@@ -108,6 +109,29 @@ router.post('/', async (req, res) => {
     };
 
     const game = await gameManager.createGame(gameData);
+    
+    // CRITICAL: Automatically add the creator to the game
+    if (gameData.createdById && gameData.createdById !== 'system') {
+      try {
+        await GameService.joinGame(game.id, gameData.createdById);
+        console.log(`[API] Creator ${gameData.createdById} automatically added to game ${game.id}`);
+        
+        // Update Redis cache with the new player
+        try {
+          const updatedGameState = await GameService.getGameStateForClient(game.id);
+          if (updatedGameState) {
+            await redisGameState.setGameState(game.id, updatedGameState);
+            console.log(`[API] Updated Redis cache for game ${game.id} with creator`);
+          }
+        } catch (redisError) {
+          console.error(`[API] Failed to update Redis cache:`, redisError);
+          // Continue anyway - database is updated
+        }
+      } catch (error) {
+        console.error(`[API] Failed to auto-add creator to game:`, error);
+        // Continue anyway - game is created, just creator not added
+      }
+    }
     
     // Format the database game for client
     const clientGame = {
