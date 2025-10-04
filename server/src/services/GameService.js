@@ -693,6 +693,12 @@ export class GameService {
         const bidderSeat = (dealerSeatIndex + 1) % 4;
         const currentPlayer = seatToUserId[bidderSeat] || null;
 
+        console.log(`[GAME SERVICE] Setting currentPlayer for game ${gameId}:`);
+        console.log(`[GAME SERVICE] - dealerSeatIndex: ${dealerSeatIndex}`);
+        console.log(`[GAME SERVICE] - bidderSeat: ${bidderSeat}`);
+        console.log(`[GAME SERVICE] - seatToUserId:`, seatToUserId);
+        console.log(`[GAME SERVICE] - currentPlayer: ${currentPlayer}`);
+
         await tx.game.update({
           where: { id: gameId },
           data: {
