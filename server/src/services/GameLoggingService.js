@@ -12,7 +12,7 @@ export class GameLoggingService {
   static async logGameAction(gameId, action, data, userId, seatIndex) {
     try {
       // Skip logging if gameActionLog doesn't exist
-      // NUCLEAR: No logging for performance
+      console.log(`[GAME LOGGING] Skipping action ${action} for game ${gameId}:`, data);
       return null;
     } catch (error) {
       // NUCLEAR: No logging for performance
@@ -32,7 +32,7 @@ export class GameLoggingService {
    */
   static async logBid(gameId, roundId, userId, seatIndex, bid, isBlindNil = false) {
     try {
-      // NUCLEAR: No logging for performance
+      console.log(`[GAME LOGGING] logBid called: gameId=${gameId}, roundId=${roundId}, userId=${userId}, seatIndex=${seatIndex}, bid=${bid}`);
       
       // Get the game player to find team index
       const gamePlayer = await prisma.gamePlayer.findFirst({
@@ -42,7 +42,7 @@ export class GameLoggingService {
         }
       });
       
-      // NUCLEAR: No logging for performance
+      console.log(`[GAME LOGGING] Found gamePlayer:`, gamePlayer);
       const teamIndex = gamePlayer?.teamIndex || 0;
 
       // Create or update the PlayerRoundStats record with bid information
@@ -82,7 +82,7 @@ export class GameLoggingService {
 
       return playerStats;
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error('[GAME LOGGING] Error logging bid:', error);
       throw error;
     }
   }
@@ -185,21 +185,21 @@ export class GameLoggingService {
         }
       });
 
-      // EXTREME: Skip non-critical logging for real-time performance
-      // this.logGameAction(gameId, 'play_card', {
-      //   roundId,
-      //   trickId: trickRecord.id,
-      //   suit,
-      //   rank,
-      //   playOrder: calculatedPlayOrder
-      // }, userId, seatIndex).catch(err => 
-      //   console.log('[GAME LOGGING] Async action log failed:', err)
-      // );
+      // Log the action (async - don't block)
+      this.logGameAction(gameId, 'play_card', {
+        roundId,
+        trickId: trickRecord.id,
+        suit,
+        rank,
+        playOrder: calculatedPlayOrder
+      }, userId, seatIndex).catch(err => 
+        console.log('[GAME LOGGING] Async action log failed:', err)
+      );
 
-      // EXTREME: Skip hand removal for real-time performance
-      // this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
-      //   console.log('[GAME LOGGING] Async hand removal failed:', err)
-      // );
+      // Remove the played card from the player's hand (async - don't block)
+      this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
+        console.log('[GAME LOGGING] Async hand removal failed:', err)
+      );
 
       return { cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
     } catch (error) {
