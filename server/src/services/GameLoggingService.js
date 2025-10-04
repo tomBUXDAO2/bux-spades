@@ -185,21 +185,21 @@ export class GameLoggingService {
         }
       });
 
-      // Log the action (async - don't block)
-      this.logGameAction(gameId, 'play_card', {
-        roundId,
-        trickId: trickRecord.id,
-        suit,
-        rank,
-        playOrder: calculatedPlayOrder
-      }, userId, seatIndex).catch(err => 
-        console.log('[GAME LOGGING] Async action log failed:', err)
-      );
+      // EXTREME: Skip non-critical logging for real-time performance
+      // this.logGameAction(gameId, 'play_card', {
+      //   roundId,
+      //   trickId: trickRecord.id,
+      //   suit,
+      //   rank,
+      //   playOrder: calculatedPlayOrder
+      // }, userId, seatIndex).catch(err => 
+      //   console.log('[GAME LOGGING] Async action log failed:', err)
+      // );
 
-      // Remove the played card from the player's hand (async - don't block)
-      this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
-        console.log('[GAME LOGGING] Async hand removal failed:', err)
-      );
+      // EXTREME: Skip hand removal for real-time performance
+      // this.removeCardFromHand(roundId, seatIndex, suit, rank).catch(err => 
+      //   console.log('[GAME LOGGING] Async hand removal failed:', err)
+      // );
 
       return { cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
     } catch (error) {

@@ -130,8 +130,8 @@ class CardPlayHandler {
             }
           });
 
-          // Wait 500ms to show all 4 cards before completing trick
-          setTimeout(async () => {
+          // EXTREME: NO DELAYS - COMPLETE IMMEDIATELY
+          (async () => {
             // Find the winning player by seat index
             console.log(`[CARD PLAY] Looking for winning player at seat ${trickResult.winningSeatIndex}`);
             console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => ({ id: p.id, seatIndex: p.seatIndex, username: p.username })));
@@ -186,12 +186,10 @@ class CardPlayHandler {
                 currentPlayer: newGameState.currentPlayer
               });
 
-              // Trigger bot play if current player is a bot
-              setTimeout(() => {
-                this.triggerBotPlayIfNeeded(gameId);
-              }, 50); // Reduced delay for faster gameplay
+              // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+              this.triggerBotPlayIfNeeded(gameId);
             }
-          }, 500); // 500ms delay to show all 4 cards
+          })(); // 500ms delay to show all 4 cards
         }
       } else {
         // Move to next player
@@ -217,9 +215,8 @@ class CardPlayHandler {
         });
 
         // Trigger bot play if next player is a bot
-        setTimeout(() => {
-          this.triggerBotPlayIfNeeded(gameId);
-        }, 100);
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        this.triggerBotPlayIfNeeded(gameId);
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);

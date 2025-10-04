@@ -106,10 +106,8 @@ class BiddingHandler {
           }
         });
         
-        // Small delay to let UI update before starting round
-        setTimeout(() => {
-          this.startRound(gameId, currentRound.id);
-        }, 200); // Reduced delay for faster gameplay
+        // EXTREME: NO DELAYS - START IMMEDIATELY
+        this.startRound(gameId, currentRound.id);
       } else {
         // Move to next player
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
@@ -133,10 +131,8 @@ class BiddingHandler {
           }
         });
 
-        // Trigger bot bid if next player is a bot
-        setTimeout(() => {
-          this.triggerBotBidIfNeeded(gameId);
-        }, 300); // Reduced delay for faster gameplay
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
@@ -185,10 +181,8 @@ class BiddingHandler {
 
       console.log(`[BIDDING] Round started successfully`);
 
-      // Trigger bot play if current player is a bot
-      setTimeout(() => {
-        this.triggerBotPlayIfNeeded(gameId);
-      }, 100);
+      // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+      this.triggerBotPlayIfNeeded(gameId);
     } catch (error) {
       // NUCLEAR: No logging for performance
       throw error;

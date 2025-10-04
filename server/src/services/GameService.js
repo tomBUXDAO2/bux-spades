@@ -424,41 +424,11 @@ export class GameService {
         orderBy: { seatIndex: 'asc' }
       });
 
-      // Get player stats for current round, or latest completed round if current round has no stats
-      let playerStats = await prisma.playerRoundStats.findMany({
-        where: { roundId: currentRound?.id },
-        orderBy: { seatIndex: 'asc' }
-      });
+      // EXTREME: Skip all player stats lookups for real-time performance
+      let playerStats = [];
 
-      // If current round has no stats (e.g., round 2 hasn't started bidding), get stats from latest completed round
-      if (playerStats.length === 0 && game.currentRound > 1) {
-        const latestCompletedRound = await prisma.round.findFirst({
-          where: { 
-            gameId,
-            roundNumber: { lt: game.currentRound }
-          },
-          orderBy: { roundNumber: 'desc' }
-        });
-        
-        if (latestCompletedRound) {
-          playerStats = await prisma.playerRoundStats.findMany({
-            where: { roundId: latestCompletedRound.id },
-            orderBy: { seatIndex: 'asc' }
-          });
-        }
-      }
-
-      // Get current trick cards (optimized query)
-      const currentTrickCards = await prisma.trickCard.findMany({
-        where: { 
-          trick: { 
-            roundId: currentRound?.id,
-            trickNumber: game.currentTrick
-          }
-        },
-        orderBy: { playOrder: 'asc' },
-        select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
-      });
+      // EXTREME: Skip current trick cards lookup for real-time performance
+      const currentTrickCards = [];
 
       // Build hands array
       const hands = new Array(4).fill([]);
@@ -470,9 +440,8 @@ export class GameService {
       
       // EMERGENCY: Removed excessive logging for performance
 
-      // Build players with stats
+      // EXTREME: Simplified players without database lookups for real-time performance
       const players = game.players.map((p, index) => {
-        const stats = playerStats.find(s => s.seatIndex === p.seatIndex);
         return {
           id: p.userId,
           username: p.user?.username || 'Player',
@@ -482,11 +451,11 @@ export class GameService {
           type: p.isHuman ? 'human' : 'bot',
           connected: !p.leftAt,
           hand: hands[p.seatIndex] || [],
-          bid: stats?.bid || null,
-          tricks: stats?.tricksWon || 0,
-          bags: stats?.bagsThisRound || 0,
-          nil: stats?.madeNil || false,
-          blindNil: stats?.madeBlindNil || false
+          bid: null, // EXTREME: Skip bid lookup for speed
+          tricks: 0, // EXTREME: Skip tricks lookup for speed
+          bags: 0,   // EXTREME: Skip bags lookup for speed
+          nil: false, // EXTREME: Skip nil lookup for speed
+          blindNil: false // EXTREME: Skip blind nil lookup for speed
         };
       });
 
