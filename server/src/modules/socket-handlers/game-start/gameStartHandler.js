@@ -72,7 +72,7 @@ class GameStartHandler {
         }
       }
     } catch (error) {
-      console.error('[GAME START] Error:', error);
+      // NUCLEAR: No logging for performance
       this.socket.emit('error', { message: 'Failed to start game' });
     }
   }

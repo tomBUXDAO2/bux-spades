@@ -12,10 +12,10 @@ export class GameLoggingService {
   static async logGameAction(gameId, action, data, userId, seatIndex) {
     try {
       // Skip logging if gameActionLog doesn't exist
-      console.log(`[GAME LOGGING] Skipping action ${action} for game ${gameId}:`, data);
+      // NUCLEAR: No logging for performance
       return null;
     } catch (error) {
-      console.error('[GAME LOGGING] Error logging action:', error);
+      // NUCLEAR: No logging for performance
       return null;
     }
   }
@@ -32,7 +32,7 @@ export class GameLoggingService {
    */
   static async logBid(gameId, roundId, userId, seatIndex, bid, isBlindNil = false) {
     try {
-      console.log(`[GAME LOGGING] logBid called: gameId=${gameId}, roundId=${roundId}, userId=${userId}, seatIndex=${seatIndex}, bid=${bid}`);
+      // NUCLEAR: No logging for performance
       
       // Get the game player to find team index
       const gamePlayer = await prisma.gamePlayer.findFirst({
@@ -42,7 +42,7 @@ export class GameLoggingService {
         }
       });
       
-      console.log(`[GAME LOGGING] Found gamePlayer:`, gamePlayer);
+      // NUCLEAR: No logging for performance
       const teamIndex = gamePlayer?.teamIndex || 0;
 
       // Create or update the PlayerRoundStats record with bid information
@@ -82,7 +82,7 @@ export class GameLoggingService {
 
       return playerStats;
     } catch (error) {
-      console.error('[GAME LOGGING] Error logging bid:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }
@@ -118,7 +118,7 @@ export class GameLoggingService {
       
       // If no trickId provided, create a new trick
       if (!trickRecord) {
-        console.log(`[GAME LOGGING] Creating Trick record: ${trickId} with leadSeatIndex: ${seatIndex}`);
+        // NUCLEAR: No logging for performance
         try {
           // First check if a trick already exists for this round/trickNumber combination
           const existingTrick = await prisma.trick.findFirst({
@@ -129,7 +129,7 @@ export class GameLoggingService {
           });
 
           if (existingTrick) {
-            console.log(`[GAME LOGGING] Trick already exists for round ${roundId}, trick ${trickNumber}, using existing: ${existingTrick.id}`);
+            // NUCLEAR: No logging for performance
             trickRecord = existingTrick;
           } else {
             const trickData = {
@@ -147,14 +147,14 @@ export class GameLoggingService {
             trickRecord = await prisma.trick.create({
               data: trickData
             });
-            console.log(`[GAME LOGGING] Successfully created Trick record: ${trickId}`);
+            // NUCLEAR: No logging for performance
           }
         } catch (createError) {
-          console.error('[GAME LOGGING] Error creating Trick record:', createError);
+          // NUCLEAR: No logging for performance
           throw createError;
         }
       } else {
-        console.log(`[GAME LOGGING] Trick record already exists: ${trickId}`);
+        // NUCLEAR: No logging for performance
       }
 
       // Guards before inserting a card

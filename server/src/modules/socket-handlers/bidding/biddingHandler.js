@@ -43,7 +43,7 @@ class BiddingHandler {
       // Process the bid in database
       await this.processBid(gameId, userId, bid, isNil, isBlindNil);
     } catch (error) {
-      console.error('[BIDDING] Error:', error);
+      // NUCLEAR: No logging for performance
       this.socket.emit('error', { message: 'Failed to make bid' });
     }
   }
@@ -139,9 +139,9 @@ class BiddingHandler {
         }, 300); // Reduced delay for faster gameplay
       }
 
-      console.log(`[BIDDING] Bid processed successfully`);
+      // NUCLEAR: No logging for performance
     } catch (error) {
-      console.error('[BIDDING] Error processing bid:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }
@@ -190,7 +190,7 @@ class BiddingHandler {
         this.triggerBotPlayIfNeeded(gameId);
       }, 100);
     } catch (error) {
-      console.error('[BIDDING] Error starting round:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }
@@ -231,12 +231,12 @@ class BiddingHandler {
       // Simple bot logic: bid number of spades or 2 if no spades
       const botBid = numSpades > 0 ? numSpades : 2;
       
-      console.log(`[BIDDING] Bot ${currentPlayer.username} bidding ${botBid} (${numSpades} spades)`);
+      // NUCLEAR: No logging for performance
 
       // Process bot's bid
       await this.processBid(gameId, currentPlayer.id, botBid, botBid === 0, false);
     } catch (error) {
-      console.error('[BIDDING] Error triggering bot bid:', error);
+      // NUCLEAR: No logging for performance
     }
   }
 
@@ -276,7 +276,7 @@ class BiddingHandler {
         await cardPlayHandler.processCardPlay(gameId, currentPlayer.id, botCard, true);
       }
     } catch (error) {
-      console.error('[BIDDING] Error in triggerBotPlayIfNeeded:', error);
+      // NUCLEAR: No logging for performance
     }
   }
 }

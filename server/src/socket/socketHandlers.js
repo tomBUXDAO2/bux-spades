@@ -14,9 +14,8 @@ export function setupSocketHandlers(io) {
   const lobbyChatHandler = new LobbyChatHandler(io, null);
 
   io.on('connection', (socket) => {
-    console.log(`[SOCKET] Client connected: ${socket.id}`);
-    console.log(`[SOCKET] Socket user ID: ${socket.userId}`);
-    console.log(`[SOCKET] Socket authenticated: ${socket.authenticated}`);
+      // NUCLEAR: No logging for performance
+    // NUCLEAR: No logging for performance
 
     // Authenticate socket with JWT token
     socket.on('authenticate', (data) => {
@@ -170,7 +169,7 @@ export function setupSocketHandlers(io) {
 
     // Disconnect
     socket.on('disconnect', () => {
-      console.log(`[SOCKET] Client disconnected: ${socket.id}`);
+      // NUCLEAR: No logging for performance
       // Handle user going offline for lobby
       lobbyChatHandler.socket = socket;
       lobbyChatHandler.handleUserOffline();

@@ -1,15 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 
-// EMERGENCY: Remove all logging in production
-const isDev = process.env.NODE_ENV === 'development';
+// NUCLEAR: Remove ALL logging for maximum performance
 const prisma = new PrismaClient({
-  log: isDev ? ['query', 'info', 'warn', 'error'] : [],
+  log: [], // NO LOGGING AT ALL
   datasources: {
     db: {
       url: process.env.DATABASE_URL
     }
   },
-  // EMERGENCY: Optimize for production performance
+  // NUCLEAR: Maximum performance settings
   __internal: {
     engine: {
       binaryTargets: ['native']

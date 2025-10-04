@@ -3,11 +3,12 @@ const isDev = process.env.NODE_ENV === 'development';
 
 if (!isDev) {
   // Disable all console logging in production
-  console.log = () => {};
-  console.error = () => {};
-  console.warn = () => {};
-  console.info = () => {};
-  console.debug = () => {};
+  const noop = () => {};
+  console.log = noop;
+  console.error = noop;
+  console.warn = noop;
+  console.info = noop;
+  console.debug = noop;
 }
 
 export { isDev };

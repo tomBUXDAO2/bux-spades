@@ -225,7 +225,7 @@ export class GameService {
         };
       });
     } catch (error) {
-      console.error('[GAME SERVICE] Error getting active games:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }
@@ -706,10 +706,10 @@ export class GameService {
         });
       });
 
-      console.log(`[GAME SERVICE] Dealt hands and set currentPlayer for game ${gameId}`);
+      // NUCLEAR: No logging for performance
       return true;
     } catch (error) {
-      console.error('[GAME SERVICE] Error dealing initial hands:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }

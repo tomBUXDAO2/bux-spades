@@ -24,7 +24,7 @@ export class TrickCompletionService {
         orderBy: { playOrder: 'asc' }
       });
 
-      console.log(`[TRICK COMPLETION] Trick ${trickId} has ${trickCards.length} cards`);
+      // NUCLEAR: No logging for performance
 
       // Trick not complete yet
       if (trickCards.length < 4) {
@@ -33,7 +33,7 @@ export class TrickCompletionService {
 
       // Calculate winner
       const winningSeatIndex = this.calculateTrickWinner(trickCards);
-      console.log(`[TRICK COMPLETION] Winner is seat ${winningSeatIndex}`);
+      // NUCLEAR: No logging for performance
 
       // Batch trick completion operations for performance
       await prisma.$transaction(async (tx) => {
@@ -62,7 +62,7 @@ export class TrickCompletionService {
           }
         });
         
-        console.log(`[TRICK COMPLETION] Updated seat ${winningSeatIndex}: tricks ${playerTricksWon}`);
+        // NUCLEAR: No logging for performance
       });
 
       // Check if round is complete (13 tricks)
@@ -73,13 +73,13 @@ export class TrickCompletionService {
         }
       });
 
-      console.log(`[TRICK COMPLETION] Round ${roundId} has ${completedTricks}/13 tricks`);
+      // NUCLEAR: No logging for performance
 
       let isRoundComplete = false;
       let isGameComplete = false;
 
       if (completedTricks >= 13) {
-        console.log(`[TRICK COMPLETION] Round ${roundId} is complete! Calling completeRound...`);
+        // NUCLEAR: No logging for performance
         isRoundComplete = true;
         // Calculate and log round scores using new ScoringService
         const roundResult = await this.completeRound(gameId, roundId, io); // Pass io for events
@@ -87,11 +87,11 @@ export class TrickCompletionService {
         
         // If game is not complete, start a new round
         if (!isGameComplete) {
-          console.log(`[TRICK COMPLETION] Game continues - starting new round`);
+          // NUCLEAR: No logging for performance
           await this.startNewRound(gameId, io);
         }
       } else {
-        console.log(`[TRICK COMPLETION] Round ${roundId} not complete yet (${completedTricks}/13 tricks)`);
+        // NUCLEAR: No logging for performance
       }
 
       return {
@@ -101,7 +101,7 @@ export class TrickCompletionService {
         isGameComplete
       };
     } catch (error) {
-      console.error('[TRICK COMPLETION] Error checking trick:', error);
+      // NUCLEAR: No logging for performance
       throw error;
     }
   }
@@ -119,15 +119,15 @@ export class TrickCompletionService {
     // Sort by play order to get them in the correct sequence
     const sortedCards = [...trickCards].sort((a, b) => a.playOrder - b.playOrder);
     
-    console.log(`[TRICK WINNER] Cards in play order:`, sortedCards.map(c => `${c.suit}${c.rank}@${c.seatIndex}`));
+    // NUCLEAR: No logging for performance
     
     const leadCard = sortedCards[0];
     const leadSuit = leadCard.suit;
-    console.log(`[TRICK WINNER] Lead suit: ${leadSuit}`);
+    // NUCLEAR: No logging for performance
 
     // Find highest spade if any spades were played
     const spadesPlayed = sortedCards.filter(card => card.suit === 'SPADES');
-    console.log(`[TRICK WINNER] Spades played: ${spadesPlayed.length}`);
+    // NUCLEAR: No logging for performance
     
     if (spadesPlayed.length > 0) {
       const highestSpade = spadesPlayed.reduce((highest, card) => {
