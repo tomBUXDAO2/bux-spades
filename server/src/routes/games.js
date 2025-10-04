@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
     
     // CRITICAL: Update Redis cache with the new game (creator is already added by GameService.createGame)
     try {
-      const gameState = await GameService.getGameStateForClient(game.id);
+      const gameState = await GameService.getFullGameStateFromDatabase(game.id);
       if (gameState) {
         await redisGameState.setGameState(game.id, gameState);
         console.log(`[API] Updated Redis cache for game ${game.id} with creator`);

@@ -440,6 +440,68 @@ export class GameService {
     }
   }
 
+  /**
+   * Get FULL game state from database only (for populating Redis cache)
+   */
+  static async getFullGameStateFromDatabase(gameId) {
+    try {
+      const game = await this.getGame(gameId);
+      if (!game) {
+        return null;
+      }
+
+      // Get player hands from Redis or database
+      let playerHands = await redisGameState.getPlayerHands(gameId);
+      if (!playerHands) {
+        // If no hands in Redis, return empty hands (game just started)
+        playerHands = new Array(4).fill([]);
+      }
+
+      // Get current trick from Redis or database
+      let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+      if (!currentTrickCards) {
+        currentTrickCards = [];
+      }
+
+      // Get player bids from Redis or database
+      let playerBids = await redisGameState.getPlayerBids(gameId);
+      if (!playerBids) {
+        playerBids = new Array(4).fill(null);
+      }
+
+      // Format for client
+      const gameState = {
+        id: game.id,
+        status: game.status,
+        mode: game.mode,
+        format: game.format,
+        currentPlayer: game.currentPlayer,
+        currentRound: game.currentRound,
+        currentTrick: game.currentTrick,
+        dealer: game.dealer,
+        players: game.players.map(player => ({
+          id: player.userId,
+          username: player.user?.username || 'Unknown',
+          avatarUrl: player.user?.avatarUrl || null,
+          seatIndex: player.seatIndex,
+          teamIndex: player.teamIndex,
+          isHuman: player.isHuman,
+          isSpectator: player.isSpectator || false
+        })),
+        rounds: game.rounds || [],
+        playerHands: playerHands,
+        currentTrickCards: currentTrickCards,
+        playerBids: playerBids,
+        isGameComplete: game.status === 'FINISHED'
+      };
+
+      return gameState;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting full game state from database:', error);
+      return null;
+    }
+  }
+
   static async dealInitialHands(gameId) {
     try {
       console.log(`[GAME SERVICE] Dealing initial hands for game ${gameId}`);
