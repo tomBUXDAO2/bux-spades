@@ -394,7 +394,19 @@ const HomePage: React.FC = () => {
       const res = await api.post('/api/games', serverSettings);
       if (!res.ok) throw new Error('Failed to create game');
       const response = await res.json();
+      console.log('[GAME CREATION DEBUG] API Response:', response);
+      console.log('[GAME CREATION DEBUG] Response type:', typeof response);
+      console.log('[GAME CREATION DEBUG] Response.id:', response?.id);
+      console.log('[GAME CREATION DEBUG] Response keys:', Object.keys(response || {}));
       const game: GameState = response;
+      console.log('[GAME CREATION DEBUG] Game ID:', game?.id);
+      console.log('[GAME CREATION DEBUG] Game type:', typeof game);
+      console.log('[GAME CREATION DEBUG] Game keys:', Object.keys(game || {}));
+      
+      // Validate game object has required fields
+      if (!game || !game.id) {
+        throw new Error('Invalid game response from server');
+      }
       
       // Set active game id so socket auto-joins immediately on table load
       try { localStorage.setItem('activeGameId', game.id); } catch {}
