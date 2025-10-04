@@ -29,6 +29,7 @@ class RedisGameStateService {
   // REAL-TIME: Get game state from Redis (instant)
   async getGameState(gameId) {
     try {
+      if (!redisClient) return null;
       const key = this.getGameStateKey(gameId);
       const state = await redisClient.get(key);
       return state ? JSON.parse(state) : null;
@@ -41,6 +42,7 @@ class RedisGameStateService {
   // REAL-TIME: Set game state in Redis (instant)
   async setGameState(gameId, gameState) {
     try {
+      if (!redisClient) return false;
       const key = this.getGameStateKey(gameId);
       await redisClient.setEx(key, 3600, JSON.stringify(gameState)); // 1 hour TTL
       return true;
@@ -53,6 +55,7 @@ class RedisGameStateService {
   // REAL-TIME: Get player hands from Redis (instant)
   async getPlayerHands(gameId) {
     try {
+      if (!redisClient) return null;
       const key = this.getGameHandsKey(gameId);
       const hands = await redisClient.get(key);
       return hands ? JSON.parse(hands) : null;
@@ -65,6 +68,7 @@ class RedisGameStateService {
   // REAL-TIME: Set player hands in Redis (instant)
   async setPlayerHands(gameId, hands) {
     try {
+      if (!redisClient) return false;
       const key = this.getGameHandsKey(gameId);
       await redisClient.setEx(key, 3600, JSON.stringify(hands)); // 1 hour TTL
       return true;
@@ -77,6 +81,7 @@ class RedisGameStateService {
   // REAL-TIME: Get current trick from Redis (instant)
   async getCurrentTrick(gameId) {
     try {
+      if (!redisClient) return null;
       const key = this.getGameTrickKey(gameId);
       const trick = await redisClient.get(key);
       return trick ? JSON.parse(trick) : null;
@@ -89,6 +94,7 @@ class RedisGameStateService {
   // REAL-TIME: Set current trick in Redis (instant)
   async setCurrentTrick(gameId, trick) {
     try {
+      if (!redisClient) return false;
       const key = this.getGameTrickKey(gameId);
       await redisClient.setEx(key, 3600, JSON.stringify(trick)); // 1 hour TTL
       return true;
@@ -101,6 +107,7 @@ class RedisGameStateService {
   // REAL-TIME: Get player bids from Redis (instant)
   async getPlayerBids(gameId) {
     try {
+      if (!redisClient) return null;
       const key = this.getGameBidsKey(gameId);
       const bids = await redisClient.get(key);
       return bids ? JSON.parse(bids) : null;
@@ -113,6 +120,7 @@ class RedisGameStateService {
   // REAL-TIME: Set player bids in Redis (instant)
   async setPlayerBids(gameId, bids) {
     try {
+      if (!redisClient) return false;
       const key = this.getGameBidsKey(gameId);
       await redisClient.setEx(key, 3600, JSON.stringify(bids)); // 1 hour TTL
       return true;
@@ -231,6 +239,7 @@ class RedisGameStateService {
   // Clean up Redis keys when game ends
   async cleanupGame(gameId) {
     try {
+      if (!redisClient) return false;
       const keys = [
         this.getGameStateKey(gameId),
         this.getGameHandsKey(gameId),
@@ -249,6 +258,7 @@ class RedisGameStateService {
   // Health check
   async isHealthy() {
     try {
+      if (!redisClient) return false;
       await redisClient.ping();
       return true;
     } catch (error) {

@@ -19,5 +19,18 @@ export const normalizeGameState = (state: any): GameState => {
     currentTrick: state.play.currentTrick ? [...state.play.currentTrick.map((card: any) => ({...card}))] : []
   } : state.play;
   
-  return { ...state, players: normalizedPlayers, play } as GameState;
+  // Preserve bidding state from server
+  const bidding = state.bidding ? { ...state.bidding } : state.bidding;
+  
+  // DEBUG: Log bidding state received from server
+  console.log('[FRONTEND] DEBUG - Bidding state received:', {
+    rawBidding: state.bidding,
+    normalizedBidding: bidding,
+    gameId: state.id,
+    players: state.players?.map((p: any, i: number) => ({ seat: i, bid: p.bid, seatIndex: p.seatIndex })),
+    bidsArray: state.bidding?.bids,
+    bidsString: JSON.stringify(state.bidding?.bids)
+  });
+  
+  return { ...state, players: normalizedPlayers, play, bidding } as GameState;
 };

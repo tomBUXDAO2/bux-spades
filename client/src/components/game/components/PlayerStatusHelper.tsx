@@ -85,7 +85,18 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
   if (!player) return null;
 
   const actualSeatIndex = player.seatIndex;
-  const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+  
+  // DEBUG: Log what we're working with
+  console.log(`[PLAYER BID INFO] Seat ${actualSeatIndex}:`, {
+    bidding: (gameState as any).bidding,
+    players: (gameState as any).players?.map((p: any, i: number) => ({ seat: i, bid: p.bid })),
+    playerBid: player.bid
+  });
+  
+  // Try multiple sources for bid data
+  const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex] || 
+                 (gameState as any).players?.[actualSeatIndex]?.bid ||
+                 player.bid;
   const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
   
   const formatBid = (bid: number | null) => {
@@ -99,7 +110,8 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
   
   if (isPartnerGame) {
     const partnerPosition = (position + 2) % 4;
-    const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
+    const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] || 
+                      (gameState as any).players?.[partnerPosition]?.bid || 0;
     const totalBid = (rawBid ?? 0) + partnerBid;
     
     return {

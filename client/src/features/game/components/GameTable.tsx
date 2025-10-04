@@ -257,6 +257,9 @@ export default function GameTableModular({
       setTrickCompleted(true);
       setLastNonEmptyTrick(trickCards);
       
+      // Play win sound effect when trick completes
+      playWinSound();
+      
       // Wait 2 seconds before clearing trick animation
       setTimeout(() => {
         setAnimatingTrick(false);

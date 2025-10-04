@@ -1,8 +1,33 @@
 import { createClient } from 'redis';
 
-const redisClient = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379'
-});
+// Redis configuration for different environments
+const getRedisConfig = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (process.env.REDIS_URL) {
+    // Use explicit Redis URL if provided
+    return {
+      url: process.env.REDIS_URL,
+      password: process.env.REDIS_PASSWORD
+    };
+  }
+  
+  if (isProduction) {
+    // Production: Use internal Fly.io Redis
+    return {
+      url: 'redis://bux-spades-redis.internal:6379',
+      password: 'bux-spades-redis-2025'
+    };
+  } else {
+    // Local development: Use localhost Redis (if running)
+    return {
+      url: 'redis://localhost:6379',
+      password: undefined // No password for local Redis
+    };
+  }
+};
+
+const redisClient = createClient(getRedisConfig());
 
 redisClient.on('error', (err) => {
   console.error('[REDIS] Connection error:', err);

@@ -59,6 +59,13 @@ export const useSocketEventHandlers = ({
     const handleBiddingUpdate = (biddingData: any) => {
       console.log('🎮 Bidding update event received:', biddingData);
       if (biddingData && biddingData.gameId === gameId) {
+        // Play bid sound for all bids (human and bot)
+        if (biddingData.bid) {
+          import('../../../services/utils/soundUtils').then(({ playBidSound }) => {
+            playBidSound();
+          });
+        }
+        
         // Use the full gameState from the server instead of just updating bidding
         if (biddingData.gameState) {
           setGameState(normalizeGameState(biddingData.gameState));
@@ -164,6 +171,11 @@ export const useSocketEventHandlers = ({
       console.log('🎮 Game started event received:', gameData);
       if (gameData && gameData.gameId === gameId) {
         setGameState(normalizeGameState(gameData.gameState));
+        
+        // Play card dealing sound effect when cards are dealt
+        import('../../../services/utils/soundUtils').then(({ playCardDealingSound }) => {
+          playCardDealingSound();
+        });
       }
     };
 

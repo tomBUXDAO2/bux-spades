@@ -86,3 +86,37 @@ export const playWinSound = () => {
     console.log('Win audio not supported or failed to load:', error);
   }
 };
+
+// Play card dealing sound effect (13 times in quick succession)
+export const playCardDealingSound = () => {
+  try {
+    const userData = localStorage.getItem('userData');
+    let soundEnabled = true;
+    
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        soundEnabled = parsed.soundEnabled !== false;
+      } catch (error) {
+        console.log('Failed to parse user data for sound preference:', error);
+      }
+    }
+    
+    if (!soundEnabled) return;
+    
+        // Play card.wav 7 times with slightly longer intervals (150ms apart)
+        for (let i = 0; i < 7; i++) {
+          setTimeout(() => {
+            try {
+              const audio = new Audio('/sounds/card.wav');
+              audio.volume = 0.3;
+              audio.play().catch((err: any) => console.log('Card dealing audio play failed:', err));
+            } catch (error) {
+              console.log('Card dealing audio not supported:', error);
+            }
+          }, i * 150); // 150ms between each card sound
+        }
+  } catch (error) {
+    console.log('Card dealing audio not supported or failed to load:', error);
+  }
+};

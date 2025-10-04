@@ -112,6 +112,8 @@ export const BiddingOverlay: React.FC<{
   onBid: (bid: number) => void;
   onBlindNil: () => void;
   onRegularBid: () => void;
+  showLeaveConfirmation?: boolean;
+  showTrickHistory?: boolean;
 }> = ({
   gameState,
   currentPlayerId,
@@ -124,9 +126,16 @@ export const BiddingOverlay: React.FC<{
   sanitizedPlayers,
   onBid,
   onBlindNil,
-  onRegularBid
+  onRegularBid,
+  showLeaveConfirmation = false,
+  showTrickHistory = false
 }) => {
   if (gameState.status !== "BIDDING" || gameState.currentPlayer !== currentPlayerId || !dealingComplete || myPlayerIndex === -1) {
+    return null;
+  }
+
+  // Hide bidding modal if leave confirmation or trick history modal is open
+  if (showLeaveConfirmation || showTrickHistory) {
     return null;
   }
 
@@ -409,6 +418,8 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
           onBid={onBid}
           onBlindNil={onBlindNil}
           onRegularBid={onRegularBid}
+          showLeaveConfirmation={showLeaveConfirmation}
+          showTrickHistory={showTrickHistory}
         />
       ) : (
         <>
