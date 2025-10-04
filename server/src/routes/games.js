@@ -110,27 +110,16 @@ router.post('/', async (req, res) => {
 
     const game = await gameManager.createGame(gameData);
     
-    // CRITICAL: Automatically add the creator to the game
-    if (gameData.createdById && gameData.createdById !== 'system') {
-      try {
-        await GameService.joinGame(game.id, gameData.createdById);
-        console.log(`[API] Creator ${gameData.createdById} automatically added to game ${game.id}`);
-        
-        // Update Redis cache with the new player
-        try {
-          const updatedGameState = await GameService.getGameStateForClient(game.id);
-          if (updatedGameState) {
-            await redisGameState.setGameState(game.id, updatedGameState);
-            console.log(`[API] Updated Redis cache for game ${game.id} with creator`);
-          }
-        } catch (redisError) {
-          console.error(`[API] Failed to update Redis cache:`, redisError);
-          // Continue anyway - database is updated
-        }
-      } catch (error) {
-        console.error(`[API] Failed to auto-add creator to game:`, error);
-        // Continue anyway - game is created, just creator not added
+    // CRITICAL: Update Redis cache with the new game (creator is already added by GameService.createGame)
+    try {
+      const gameState = await GameService.getGameStateForClient(game.id);
+      if (gameState) {
+        await redisGameState.setGameState(game.id, gameState);
+        console.log(`[API] Updated Redis cache for game ${game.id} with creator`);
       }
+    } catch (redisError) {
+      console.error(`[API] Failed to update Redis cache:`, redisError);
+      // Continue anyway - database is updated
     }
     
     // Format the database game for client
