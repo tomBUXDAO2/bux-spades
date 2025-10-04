@@ -468,8 +468,7 @@ export class GameService {
         }
       });
       
-      console.log(`[GAME SERVICE] Built hands array for game ${gameId}:`, hands.map((hand, index) => ({ seat: index, cardCount: hand.length })));
-      console.log(`[GAME SERVICE] Hand snapshot data:`, handSnapshots.map(s => ({ seat: s.seatIndex, cardCount: s.cards?.length || 0, firstCard: s.cards?.[0] })));
+      // EMERGENCY: Removed excessive logging for performance
 
       // Build players with stats
       const players = game.players.map((p, index) => {
@@ -694,11 +693,7 @@ export class GameService {
         const bidderSeat = (dealerSeatIndex + 1) % 4;
         const currentPlayer = seatToUserId[bidderSeat] || null;
 
-        console.log(`[GAME SERVICE] Setting currentPlayer for game ${gameId}:`);
-        console.log(`[GAME SERVICE] - dealerSeatIndex: ${dealerSeatIndex}`);
-        console.log(`[GAME SERVICE] - bidderSeat: ${bidderSeat}`);
-        console.log(`[GAME SERVICE] - seatToUserId:`, seatToUserId);
-        console.log(`[GAME SERVICE] - currentPlayer: ${currentPlayer}`);
+        // EMERGENCY: Removed excessive logging for performance
 
         await tx.game.update({
           where: { id: gameId },

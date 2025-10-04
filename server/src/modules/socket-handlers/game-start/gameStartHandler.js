@@ -61,28 +61,15 @@ class GameStartHandler {
       this.io.to(gameId).emit('game_update', { gameId, gameState });
 
       // Trigger bot bidding if current player is a bot
-      console.log(`[GAME START] Game state after start:`, {
-        gameId,
-        currentPlayer: gameState.currentPlayer,
-        status: gameState.status,
-        players: gameState.players?.map(p => ({ id: p.id, username: p.username, type: p.type, seatIndex: p.seatIndex }))
-      });
-
       if (gameState.currentPlayer) {
         const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-        console.log(`[GAME START] Found current player:`, currentPlayer);
         if (currentPlayer && currentPlayer.type === 'bot') {
-          console.log(`[GAME START] Current player is bot ${currentPlayer.username}, triggering bot bid`);
           // Import and use BiddingHandler
           const { BiddingHandler } = await import('../bidding/biddingHandler.js');
           const biddingHandler = new BiddingHandler(this.io, this.socket);
           // Trigger immediately, no delay
           biddingHandler.triggerBotBidIfNeeded(gameId);
-        } else {
-          console.log(`[GAME START] Current player is human or not found:`, currentPlayer);
         }
-      } else {
-        console.log(`[GAME START] No currentPlayer set in game state!`);
       }
     } catch (error) {
       console.error('[GAME START] Error:', error);

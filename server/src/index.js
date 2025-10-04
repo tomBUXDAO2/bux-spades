@@ -1,3 +1,6 @@
+// EMERGENCY: Disable logging in production FIRST
+import './config/logging.js';
+
 import { app, server, io, PORT } from './config/server.js';
 import { gameManager } from './services/GameManager.js';
 import { setupSocketHandlers } from './socket/socketHandlers.js';

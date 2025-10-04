@@ -94,7 +94,6 @@ class BiddingHandler {
       if (playerStats.length >= 4) {
         // All players have bid, emit final bidding update then start the round
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        console.log(`[BIDDING] Final bid by ${userId}, all hands:`, updatedGameState.players.map(p => ({ id: p.id, handCount: p.hand?.length, firstCard: p.hand?.[0] })));
         this.io.to(gameId).emit('bidding_update', {
           gameId,
           gameState: updatedGameState,
@@ -122,7 +121,6 @@ class BiddingHandler {
 
         // Emit bidding update
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        console.log(`[BIDDING] After bid, player ${userId} hand:`, updatedGameState.players.find(p => p.id === userId)?.hand?.slice(0, 3));
         this.io.to(gameId).emit('bidding_update', {
           gameId,
           gameState: updatedGameState,
