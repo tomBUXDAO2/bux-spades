@@ -395,7 +395,7 @@ const HomePage: React.FC = () => {
       if (!res.ok) throw new Error('Failed to create game');
       const response = await res.json();
       console.log('[GAME CREATION DEBUG] API Response:', response);
-      console.log('[GAME CREATION DEBUG] FORCE DEPLOY TEST - New code is live!');
+      console.log('[GAME CREATION DEBUG] FORCE DEPLOY TEST - New code is live! VERSION 2');
       console.log('[GAME CREATION DEBUG] Response type:', typeof response);
       console.log('[GAME CREATION DEBUG] Response.id directly:', response.id);
       
