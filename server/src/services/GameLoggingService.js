@@ -173,31 +173,59 @@ export class GameLoggingService {
       const calculatedPlayOrder = existingCardsCount + 1;
       console.log(`[GAME LOGGING] Calculated playOrder from DB: ${calculatedPlayOrder} (${existingCardsCount} existing cards in trick ${trickRecord.id})`);
 
-      // Create the trick card record
-      const cardRecord = await prisma.trickCard.create({
-        data: {
-          trickId: trickRecord.id,
-          seatIndex,
-          suit,
-          rank,
-          playOrder: calculatedPlayOrder,
-          playedAt: new Date()
+      // Batch all database operations in a single transaction for performance
+      const results = await prisma.$transaction(async (tx) => {
+        // 1. Create the trick card record
+        const cardRecord = await tx.trickCard.create({
+          data: {
+            trickId: trickRecord.id,
+            seatIndex,
+            suit,
+            rank,
+            playOrder: calculatedPlayOrder,
+            playedAt: new Date()
+          }
+        });
+
+        // 2. Log the action (async, don't wait)
+        tx.gameAction.create({
+          data: {
+            gameId,
+            action: 'play_card',
+            data: {
+              roundId,
+              trickId: trickRecord.id,
+              suit,
+              rank,
+              playOrder: calculatedPlayOrder
+            },
+            userId,
+            seatIndex,
+            timestamp: new Date()
+          }
+        }).catch(err => console.log('[GAME LOGGING] Async action log failed:', err));
+
+        // 3. Remove the played card from the player's hand
+        const handSnapshot = await tx.roundHandSnapshot.findFirst({
+          where: { roundId, seatIndex }
+        });
+
+        if (handSnapshot && handSnapshot.hand) {
+          const hand = JSON.parse(handSnapshot.hand);
+          const updatedHand = hand.filter(card => 
+            !(card.suit === suit && card.rank === rank)
+          );
+          
+          await tx.roundHandSnapshot.update({
+            where: { id: handSnapshot.id },
+            data: { hand: JSON.stringify(updatedHand) }
+          });
         }
+
+        return { cardRecord };
       });
 
-      // Log the action
-      await this.logGameAction(gameId, 'play_card', {
-        roundId,
-        trickId: trickRecord.id,
-        suit,
-        rank,
-        playOrder: calculatedPlayOrder
-      }, userId, seatIndex);
-
-      // Remove the played card from the player's hand in RoundHandSnapshot
-      await this.removeCardFromHand(roundId, seatIndex, suit, rank);
-
-      return { cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
+      return { cardRecord: results.cardRecord, actualTrickId: trickRecord.id, playOrder: calculatedPlayOrder };
     } catch (error) {
       console.error('[GAME LOGGING] Error logging card play:', error);
       throw error;

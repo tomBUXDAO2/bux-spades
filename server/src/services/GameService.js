@@ -448,8 +448,7 @@ export class GameService {
         }
       }
 
-      // Get current trick cards
-      console.log(`[GAME SERVICE] Getting current trick cards for round ${currentRound?.id}, trickNumber: ${game.currentTrick}`);
+      // Get current trick cards (optimized query)
       const currentTrickCards = await prisma.trickCard.findMany({
         where: { 
           trick: { 
@@ -457,9 +456,9 @@ export class GameService {
             trickNumber: game.currentTrick
           }
         },
-        orderBy: { playOrder: 'asc' }
+        orderBy: { playOrder: 'asc' },
+        select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
       });
-      console.log(`[GAME SERVICE] Found ${currentTrickCards.length} cards in current trick:`, currentTrickCards.map(c => `${c.suit}${c.rank}`));
 
       // Build hands array
       const hands = new Array(4).fill([]);

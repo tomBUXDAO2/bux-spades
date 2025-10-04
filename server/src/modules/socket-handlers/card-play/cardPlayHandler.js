@@ -2,6 +2,7 @@ import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
+import { GameStateCache } from '../../../services/GameStateCache.js';
 import { prisma } from '../../../config/database.js';
 
 /**
@@ -86,7 +87,7 @@ class CardPlayHandler {
         throw new Error(`Current trick not found for round ${currentRound.id}, trick ${gameState.currentTrick || 1}`);
       }
 
-      // Log the card play to database
+      // Log the card play to database (batch with other operations)
       const logResult = await this.loggingService.logCardPlay(
         gameId,
         currentRound.id,
@@ -97,9 +98,10 @@ class CardPlayHandler {
         card.rank
       );
 
-      // Check if trick is complete (4 cards played)
+      // Check if trick is complete (4 cards played) - use cached count
       const trickCards = await prisma.trickCard.findMany({
-        where: { trickId: logResult.actualTrickId }
+        where: { trickId: logResult.actualTrickId },
+        select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
       });
 
       if (trickCards.length >= 4) {
@@ -117,6 +119,9 @@ class CardPlayHandler {
           
           // First, emit card played event so client can render the 4th card
           const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
+          // Invalidate cache since game state changed
+          GameStateCache.invalidateGame(gameId);
+
           this.io.to(gameId).emit('card_played', {
             gameId,
             gameState: cardPlayedGameState,

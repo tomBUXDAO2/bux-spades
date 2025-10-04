@@ -35,31 +35,24 @@ export class TrickCompletionService {
       const winningSeatIndex = this.calculateTrickWinner(trickCards);
       console.log(`[TRICK COMPLETION] Winner is seat ${winningSeatIndex}`);
 
-      // Update the Trick record with winner
-      await prisma.trick.update({
-        where: { id: trickId },
-        data: { winningSeatIndex }
-      });
+      // Batch trick completion operations for performance
+      await prisma.$transaction(async (tx) => {
+        // 1. Update the Trick record with winner
+        await tx.trick.update({
+          where: { id: trickId },
+          data: { winningSeatIndex }
+        });
 
-      // Update PlayerRoundStats - increment tricksWon for the winner
-      const existingStats = await prisma.playerRoundStats.findFirst({
-        where: {
-          roundId,
-          seatIndex: winningSeatIndex
-        }
-      });
-
-      if (existingStats) {
-        // Count how many tricks this player has already won in this round
-        const playerTricksWon = await prisma.trick.count({
+        // 2. Count tricks won and update stats in one operation
+        const playerTricksWon = await tx.trick.count({
           where: {
             roundId,
             winningSeatIndex: winningSeatIndex
           }
         });
         
-        // Update only tricksWon - bags will be calculated at round completion
-        await prisma.playerRoundStats.updateMany({
+        // 3. Update PlayerRoundStats - increment tricksWon for the winner
+        await tx.playerRoundStats.updateMany({
           where: {
             roundId,
             seatIndex: winningSeatIndex
@@ -68,8 +61,9 @@ export class TrickCompletionService {
             tricksWon: playerTricksWon
           }
         });
-        console.log(`[TRICK COMPLETION] Updated seat ${winningSeatIndex}: tricks ${playerTricksWon} (bid: ${existingStats.bid || 0})`);
-      }
+        
+        console.log(`[TRICK COMPLETION] Updated seat ${winningSeatIndex}: tricks ${playerTricksWon}`);
+      });
 
       // Check if round is complete (13 tricks)
       const completedTricks = await prisma.trick.count({
