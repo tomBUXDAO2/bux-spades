@@ -365,7 +365,7 @@ export class TrickCompletionService {
       console.log(`[TRICK COMPLETION] Created new round ${nextRoundNumber} with dealer seat ${nextDealerSeat}`);
       
       // Deal cards for new round
-      await GameService.dealInitialHands(gameId, newRound.id, nextDealerSeat);
+      await GameService.dealInitialHands(gameId);
 
       console.log(`[TRICK COMPLETION] New round ${nextRoundNumber} started successfully`);
       
