@@ -169,12 +169,13 @@ class GameJoinHandler {
       const botPlayer = await this.botService.createBotPlayer(gameId, seatIndex);
       console.log(`[INVITE BOT] Created bot player for seat ${seatIndex}:`, botPlayer);
       
-      // REAL-TIME: Clear Redis cache to force fresh game state
+      // CRITICAL: Update Redis cache with full game state (don't clear it!)
       const redisGameState = await import('../../../services/RedisGameStateService.js');
-      await redisGameState.default.cleanupGame(gameId);
-      
-      // Get updated game state (will rebuild cache)
-      const updatedGameState = await GameService.getGameStateForClient(gameId);
+      const updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+      if (updatedGameState) {
+        await redisGameState.default.setGameState(gameId, updatedGameState);
+        console.log(`[INVITE BOT] Updated Redis cache with full game state`);
+      }
       console.log(`[INVITE BOT] Updated game state after bot creation:`, {
         gameId,
         players: updatedGameState.players,
