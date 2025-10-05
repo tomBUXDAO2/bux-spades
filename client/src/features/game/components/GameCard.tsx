@@ -1,4 +1,5 @@
 import type { GameState } from "../../../types/game";
+import { abbreviateBotName } from '../../../utils/botUtils';
 
 interface GameCardProps {
   game: GameState;
@@ -29,7 +30,7 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
           {game.players.map((player, idx) => {
             if (!player) return null;
             const isBot = 'type' in player && player.type === 'bot';
-            const displayName = isBot ? player.username : ('name' in player ? player.name : player.username);
+            const displayName = isBot ? abbreviateBotName(player.username) : ('name' in player ? player.name : player.username);
             return (
               <span key={idx} className="text-sm text-gray-400">
                 {displayName}

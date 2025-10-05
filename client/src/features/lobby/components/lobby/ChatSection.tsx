@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import type { Player, Bot } from "../../../../types/game";
+import { abbreviateBotName } from "../../../../utils/botUtils";
 
 interface ChatMessage {
   id?: string;
@@ -290,7 +291,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     className={`text-sm font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
                     onClick={() => onOpenPlayerStats(player)}
                   >
-                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? player.username : 'Player'}
+                    {isPlayer(player) ? (player.username || player.name) : isBot(player) ? abbreviateBotName(player.username) : 'Player'}
                     {player.online && <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full"></span>}
                     {player.status === 'friend' && (
                       <img src="/friend.svg" alt="Friend" className="ml-2 w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />

@@ -5,6 +5,7 @@ import PlayerProfileDropdown from './PlayerProfileDropdown';
 import EmojiReaction from './EmojiReaction';
 import CoinDebitAnimation from './CoinDebitAnimation';
 import { getPlayerStatus, getPlayerBidInfo } from './PlayerStatusHelper';
+import { abbreviateBotName } from '../../../utils/botUtils';
 
 interface PlayerCardProps {
   gameState: GameState;
@@ -164,7 +165,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {/* Player name and status */}
           <div className={`text-center ${isSideSeat ? 'w-full' : 'ml-2'}`}>
             <div className={`font-bold text-white ${isVerySmallScreen ? 'text-xs' : 'text-sm'}`}>
-              {player.username}
+              {isBotPlayer ? abbreviateBotName(player.username) : player.username}
             </div>
             
             {/* Bid display */}

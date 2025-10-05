@@ -4,6 +4,7 @@ import type { GameState, Player, Bot } from "../../../types/game";
 import PlayerProfileDropdown from './PlayerProfileDropdown';
 import EmojiReaction from './EmojiReaction';
 import CoinDebitAnimation from './CoinDebitAnimation';
+import { abbreviateBotName } from '../../../utils/botUtils';
 
 interface GameTablePlayersProps {
   gameState: GameState;
@@ -337,7 +338,7 @@ export default function GameTablePlayers({
       }
     })();
     
-    const displayName = isHuman ? player.username : 'Bot';
+    const displayName = isHuman ? player.username : abbreviateBotName(player.username);
     const displayAvatar = isHuman ? player.avatarUrl : '/bot-avatar.jpg';
     
     // Debug avatar loading

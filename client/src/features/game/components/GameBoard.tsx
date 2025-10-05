@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getSocket } from '@/features/game/services/lib/socket';
 import type { GameState, Player, Bot, Card } from '@/types/game';
+import { abbreviateBotName } from '@/utils/botUtils';
 
 interface GameBoardProps {
   gameId: string;
@@ -147,7 +148,7 @@ export default function GameBoard({ gameId }: GameBoardProps) {
                 : "bg-gray-50"
             }`}
           >
-            <div className="font-medium">{player && (('type' in player && player.type === 'bot') ? player.username : (player.username || (player as any).name))}</div>
+            <div className="font-medium">{player && (('type' in player && player.type === 'bot') ? abbreviateBotName(player.username) : (player.username || (player as any).name))}</div>
             {game.status !== "WAITING" && (
               <>
                 <div className="text-sm text-gray-600">

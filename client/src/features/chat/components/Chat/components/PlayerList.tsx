@@ -3,6 +3,7 @@
 
 import React from 'react';
 import type { Player } from '@/types/game';
+import { abbreviateBotName } from '@/utils/botUtils';
 
 interface PlayerListProps {
   players: Player[];
@@ -84,7 +85,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
               style={{ fontSize: fontSizes.playerName }}
               onClick={() => onPlayerClick && onPlayerClick(player)}
             >
-              {player.username || player.name}
+              {isBot ? abbreviateBotName(player.username || player.name) : (player.username || player.name)}
               {isBot && <span className="text-xs text-gray-400 ml-1">(Bot)</span>}
             </div>
             <div className="text-xs text-gray-400" style={{ fontSize: fontSizes.status }}>

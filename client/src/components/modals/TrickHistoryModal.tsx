@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IoClose, IoChevronBack, IoChevronForward } from 'react-icons/io5';
+import { abbreviateBotName } from '../../utils/botUtils';
 
 interface Card {
   suit: string;
@@ -172,7 +173,11 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
 
   const getPlayerName = (playerId: string) => {
     const player = players.find(p => p?.id === playerId);
-    return player ? (player.username || player.name || 'Unknown') : 'Unknown';
+    if (!player) return 'Unknown';
+    
+    const isBot = 'type' in player && player.type === 'bot';
+    const name = player.username || player.name || 'Unknown';
+    return isBot ? abbreviateBotName(name) : name;
   };
 
   const currentRound = trickHistory[currentRoundIndex];

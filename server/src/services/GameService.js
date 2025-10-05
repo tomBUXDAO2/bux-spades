@@ -616,22 +616,22 @@ export class GameService {
 
       console.log(`[GAME SERVICE] Deal hands - Database updated with currentPlayer: ${currentPlayer}`);
 
-      // CRITICAL: Update Redis cache with full game state (don't clear it!)
-      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
-      if (fullGameState) {
-        await redisGameState.setGameState(gameId, fullGameState);
-        console.log(`[GAME SERVICE] Updated Redis cache with full game state after dealing hands`);
-      }
-      
-      // Initialize empty bids array in Redis for new round
-      await redisGameState.setPlayerBids(gameId, new Array(4).fill(null));
-      
-      // REAL-TIME: Cache hands in Redis for instant access
+      // REAL-TIME: Cache hands in Redis for instant access FIRST
       console.log(`[GAME SERVICE] Deal hands - Storing hands in Redis:`, {
         handsLengths: hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`),
         handsData: hands
       });
       await redisGameState.setPlayerHands(gameId, hands);
+      
+      // Initialize empty bids array in Redis for new round
+      await redisGameState.setPlayerBids(gameId, new Array(4).fill(null));
+
+      // CRITICAL: Update Redis cache with full game state AFTER hands are stored
+      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
+      if (fullGameState) {
+        await redisGameState.setGameState(gameId, fullGameState);
+        console.log(`[GAME SERVICE] Updated Redis cache with full game state after dealing hands`);
+      }
       
       // ASYNC: Sync hands to database (non-blocking)
       await redisGameState.syncHandsToDatabase(gameId, round.id, hands);

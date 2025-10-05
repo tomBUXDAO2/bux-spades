@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/services/lib/api';
+import { abbreviateBotName } from '@/utils/botUtils';
 
 interface PlayerStats {
   gamesPlayed: number;
@@ -163,7 +164,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             <div className="bg-slate-700 rounded-lg p-6 mb-6">
               <div className="flex items-center space-x-4 mb-4">
                 <img src={player.avatar || player.avatarUrl || '/default-avatar.png'} alt={player.username} className="w-16 h-16 rounded-full" />
-                <h3 className="text-3xl font-bold text-white">{player.username}</h3>
+                <h3 className="text-3xl font-bold text-white">{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
