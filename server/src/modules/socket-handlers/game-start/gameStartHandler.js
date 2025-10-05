@@ -11,12 +11,22 @@ class GameStartHandler {
     this.gameManager = gameManager;
     this.botService = new BotService();
     this.systemMessageHandler = new SystemMessageHandler(io, socket);
+    this.startingGames = new Set(); // Prevent concurrent game starts
   }
 
   async handleStartGame(data) {
     try {
       const { gameId, rated } = data || {};
       const userId = this.socket.userId || data.userId;
+      
+      // Prevent concurrent game starts
+      if (this.startingGames.has(gameId)) {
+        console.log(`[GAME START] Game ${gameId} is already being started, ignoring duplicate request`);
+        return;
+      }
+      
+      this.startingGames.add(gameId);
+      console.log(`[GAME START] Starting game ${gameId} (rated: ${rated})`);
       
       if (!userId) {
         this.socket.emit('error', { message: 'User not authenticated' });
@@ -90,9 +100,15 @@ class GameStartHandler {
           console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
         }
       }, 2000); // 2 second delay for cards to render
+      
+      // Remove from starting games set
+      this.startingGames.delete(gameId);
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       this.socket.emit('error', { message: 'Failed to start game' });
+      
+      // Remove from starting games set on error too
+      this.startingGames.delete(gameId);
     }
   }
 
