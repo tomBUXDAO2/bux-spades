@@ -66,15 +66,25 @@ class GameStartHandler {
         // Trigger bot bidding if current player is a bot
         console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
         if (gameState.currentPlayer) {
-          const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
-          console.log(`[GAME START] Found current player:`, currentPlayer);
-          if (currentPlayer && currentPlayer.type === 'bot') {
-            console.log(`[GAME START] Triggering bot bid for ${currentPlayer.username}`);
-            // Import and use BiddingHandler
-            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(this.io, this.socket);
-            // Trigger bot bid
-            biddingHandler.triggerBotBidIfNeeded(gameId);
+          // Get the game from database to check if current player is a bot
+          const game = await GameService.getGame(gameId);
+          if (game) {
+            const currentPlayer = game.players.find(p => p.userId === gameState.currentPlayer);
+            console.log(`[GAME START] Found current player:`, currentPlayer ? {
+              id: currentPlayer.userId,
+              username: currentPlayer.user?.username,
+              isHuman: currentPlayer.isHuman,
+              seatIndex: currentPlayer.seatIndex
+            } : 'null');
+            
+            if (currentPlayer && !currentPlayer.isHuman) {
+              console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
+              // Import and use BiddingHandler
+              const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+              const biddingHandler = new BiddingHandler(this.io, this.socket);
+              // Trigger bot bid
+              biddingHandler.triggerBotBidIfNeeded(gameId);
+            }
           }
         } else {
           console.log(`[GAME START] No current player set - cannot trigger bot bidding`);

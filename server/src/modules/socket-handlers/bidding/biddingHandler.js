@@ -228,32 +228,34 @@ class BiddingHandler {
   async triggerBotBidIfNeeded(gameId) {
     try {
       console.log(`[BIDDING] triggerBotBidIfNeeded called for game ${gameId}`);
-      const gameState = await GameService.getGameStateForClient(gameId);
-      if (!gameState) {
-        console.log(`[BIDDING] No game state found for game ${gameId}`);
+      
+      // Get the game from database to check if current player is a bot
+      const game = await GameService.getGame(gameId);
+      if (!game) {
+        console.log(`[BIDDING] No game found for game ${gameId}`);
         return;
       }
 
-      console.log(`[BIDDING] Current player ID: ${gameState.currentPlayer}`);
-      const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
+      console.log(`[BIDDING] Current player ID: ${game.currentPlayer}`);
+      const currentPlayer = game.players.find(p => p.userId === game.currentPlayer);
       console.log(`[BIDDING] Found current player:`, currentPlayer ? { 
-        id: currentPlayer.id, 
-        username: currentPlayer.username, 
-        type: currentPlayer.type, 
+        id: currentPlayer.userId, 
+        username: currentPlayer.user?.username, 
+        isHuman: currentPlayer.isHuman, 
         seatIndex: currentPlayer.seatIndex 
       } : 'null');
       
-      if (!currentPlayer || currentPlayer.type !== 'bot') {
-        console.log(`[BIDDING] Not triggering bot bid - currentPlayer is not a bot`);
+      if (!currentPlayer || currentPlayer.isHuman) {
+        console.log(`[BIDDING] Not triggering bot bid - currentPlayer is human or not found`);
         return;
       }
 
-      console.log(`[BIDDING] Triggering bot bid for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
+      console.log(`[BIDDING] Triggering bot bid for ${currentPlayer.user?.username} (seat ${currentPlayer.seatIndex})`);
 
       // Get bot's hand from Redis
       const hands = await redisGameState.getPlayerHands(gameId);
       if (!hands || !hands[currentPlayer.seatIndex]) {
-        console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.username}`);
+        console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.user?.username}`);
         return;
       }
 
@@ -264,10 +266,10 @@ class BiddingHandler {
       // Simple bot logic: bid number of spades or 2 if no spades
       const botBid = numSpades > 0 ? numSpades : 2;
       
-      console.log(`[BIDDING] Bot ${currentPlayer.username} bidding ${botBid} (${numSpades} spades)`);
+      console.log(`[BIDDING] Bot ${currentPlayer.user?.username} bidding ${botBid} (${numSpades} spades)`);
 
       // Process bot's bid
-      await this.processBid(gameId, currentPlayer.id, botBid, botBid === 0, false);
+      await this.processBid(gameId, currentPlayer.userId, botBid, botBid === 0, false);
     } catch (error) {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
     }

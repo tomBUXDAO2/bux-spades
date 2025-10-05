@@ -486,7 +486,8 @@ export class GameService {
           seatIndex: player.seatIndex,
           teamIndex: player.teamIndex,
           isHuman: player.isHuman,
-          isSpectator: player.isSpectator || false
+          isSpectator: player.isSpectator || false,
+          type: player.isHuman ? 'human' : 'bot'
         })),
         rounds: game.rounds || [],
         playerHands: playerHands,
