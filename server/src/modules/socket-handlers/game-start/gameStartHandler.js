@@ -75,6 +75,7 @@ class GameStartHandler {
       const players = await prisma.gamePlayer.findMany({ where: { gameId }, orderBy: { seatIndex: 'asc' } });
       if (!players || players.length === 0) {
         this.socket.emit('error', { message: 'Cannot start game - no players' });
+        startingGames.delete(gameId);
         return;
       }
 
@@ -93,6 +94,9 @@ class GameStartHandler {
       const gameState = await GameService.getFullGameStateFromDatabase(gameId);
       this.io.to(gameId).emit('game_started', { gameId, gameState });
       this.io.to(gameId).emit('game_update', { gameId, gameState });
+
+      // CRITICAL: Remove from starting games set IMMEDIATELY after successful completion
+      startingGames.delete(gameId);
 
       // Wait for cards to be rendered before starting bidding
       console.log(`[GAME START] Waiting 2 seconds for cards to render before starting bidding`);
@@ -124,9 +128,6 @@ class GameStartHandler {
           console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
         }
       }, 2000); // 2 second delay for cards to render
-      
-      // Remove from starting games set
-      startingGames.delete(gameId);
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       console.error('[GAME START] Error stack:', error.stack);
