@@ -178,7 +178,7 @@ class GameJoinHandler {
       }
       console.log(`[INVITE BOT] Updated game state after bot creation:`, {
         gameId,
-        players: updatedGameState.players,
+        players: updatedGameState?.players || [],
         seatIndex,
         botPlayer: botPlayer
       });
@@ -189,10 +189,13 @@ class GameJoinHandler {
         const system = new SystemMessageHandler(this.io, this.socket);
         system.handleBotAdded(gameId, botPlayer.username, seatIndex);
       } catch {}
-      this.io.to(gameId).emit('game_update', {
-        gameId,
-        gameState: updatedGameState
-      });
+      
+      if (updatedGameState) {
+        this.io.to(gameId).emit('game_update', {
+          gameId,
+          gameState: updatedGameState
+        });
+      }
       
       console.log(`[INVITE BOT] Bot successfully added to seat ${seatIndex} in game ${gameId}`);
       

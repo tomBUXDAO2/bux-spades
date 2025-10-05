@@ -124,6 +124,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
         onLeaveTable={onLeaveTable}
         // Pass socket actions
         joinGame={joinGame}
+        startGame={handleStartGame}
         // Modal states
         showStartWarning={showStartWarning}
         showBotWarning={showBotWarning}

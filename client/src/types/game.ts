@@ -27,6 +27,7 @@ export interface Player {
   tricks?: number;
   avatarUrl?: string;
   username?: string;
+  type?: 'human' | 'bot';
 }
 
 export interface Bot {

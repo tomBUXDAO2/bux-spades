@@ -30,7 +30,7 @@ export function abbreviateBotName(rawName: string, seatIndex?: number): string {
  * @returns True if the username is a bot name
  */
 export function isBotName(username: string): boolean {
-  return username && username.toLowerCase().startsWith('bot');
+  return Boolean(username && username.toLowerCase().startsWith('bot'));
 }
 
 /**

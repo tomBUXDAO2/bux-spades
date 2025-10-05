@@ -94,7 +94,12 @@ class BiddingHandler {
       console.log(`[BIDDING] Updated Redis bids for game ${gameId}:`, currentBids);
 
       // REAL-TIME: Check if all players have bid using Redis
-      const bidsComplete = currentBids.every(bid => bid !== null && bid !== undefined);
+      // Only check bids for seats that have players
+      const game = await GameService.getGame(gameId);
+      const occupiedSeats = game.players.map(p => p.seatIndex);
+      const bidsComplete = occupiedSeats.every(seatIndex => 
+        currentBids[seatIndex] !== null && currentBids[seatIndex] !== undefined
+      );
 
       if (bidsComplete) {
         // All players have bid, emit final bidding update then start the round
@@ -278,6 +283,7 @@ class BiddingHandler {
       const hands = await redisGameState.getPlayerHands(gameId);
       if (!hands || !hands[currentPlayer.seatIndex]) {
         console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.user?.username}`);
+        this.biddingBots.delete(gameId);
         return;
       }
 

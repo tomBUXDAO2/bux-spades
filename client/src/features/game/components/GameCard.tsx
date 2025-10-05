@@ -30,7 +30,7 @@ export default function GameCard({ game, onJoin, onSelect, currentUserId }: Game
           {game.players.map((player, idx) => {
             if (!player) return null;
             const isBot = 'type' in player && player.type === 'bot';
-            const displayName = isBot ? abbreviateBotName(player.username) : ('name' in player ? player.name : player.username);
+            const displayName = isBot ? abbreviateBotName(player.username || 'Bot') : (player.username || 'Player');
             return (
               <span key={idx} className="text-sm text-gray-400">
                 {displayName}

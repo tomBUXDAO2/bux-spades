@@ -2,6 +2,9 @@ import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
 import { ScoringService } from './ScoringService.js';
 
+// Global mutex to prevent concurrent database operations
+const databaseOperations = new Set();
+
 /**
  * DATABASE-FIRST GAME SERVICE
  * Single source of truth: PostgreSQL database
@@ -88,6 +91,24 @@ export class GameService {
 
   // Get complete game state from database (single source of truth)
   static async getGame(gameId) {
+    // Prevent concurrent database operations with improved retry logic
+    if (databaseOperations.has(gameId)) {
+      console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting...`);
+      // Wait longer and retry multiple times
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, 150 * (i + 1))); // 150ms, 300ms, 450ms
+        if (!databaseOperations.has(gameId)) {
+          break;
+        }
+      }
+      if (databaseOperations.has(gameId)) {
+        console.log(`[GAME SERVICE] Database operation still in progress for game ${gameId}, skipping...`);
+        return null;
+      }
+    }
+    
+    databaseOperations.add(gameId);
+    
     try {
       // Get main game record
       const game = await prisma.game.findUnique({
@@ -159,6 +180,8 @@ export class GameService {
     } catch (error) {
       console.error('[GAME SERVICE] Error getting game:', error);
       throw error;
+    } finally {
+      databaseOperations.delete(gameId);
     }
   }
 
@@ -407,7 +430,7 @@ export class GameService {
   }
 
   /**
-   * Get game state for client - Redis first, minimal database fallback
+   * Get game state for client - Redis first, database fallback
    */
   static async getGameStateForClient(gameId) {
     try {
@@ -418,9 +441,18 @@ export class GameService {
         return cachedGameState;
       }
 
-      // NUCLEAR OPTION: Skip database fallback entirely for maximum speed
-      // If Redis is down, return minimal state to prevent blocking
-      console.log(`[GAME SERVICE] Redis miss for game ${gameId} - returning minimal state to prevent blocking`);
+      // FALLBACK: If Redis is empty, get full game state from database
+      console.log(`[GAME SERVICE] Redis miss for game ${gameId} - fetching full state from database`);
+      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
+      if (fullGameState) {
+        // Cache the full state in Redis for future requests
+        await redisGameState.setGameState(gameId, fullGameState);
+        console.log(`[GAME SERVICE] Cached full game state in Redis for game ${gameId}`);
+        return fullGameState;
+      }
+
+      // Last resort: return minimal state
+      console.log(`[GAME SERVICE] No game found for ${gameId} - returning minimal state`);
       return {
         id: gameId,
         status: 'LOADING',
@@ -490,7 +522,8 @@ export class GameService {
           type: player.isHuman ? 'human' : 'bot'
         })),
         rounds: game.rounds || [],
-        playerHands: playerHands,
+        hands: playerHands, // Frontend expects 'hands', not 'playerHands'
+        playerHands: playerHands, // Keep both for compatibility
         currentTrickCards: currentTrickCards,
         playerBids: playerBids,
         isGameComplete: game.status === 'FINISHED'

@@ -165,7 +165,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {/* Player name and status */}
           <div className={`text-center ${isSideSeat ? 'w-full' : 'ml-2'}`}>
             <div className={`font-bold text-white ${isVerySmallScreen ? 'text-xs' : 'text-sm'}`}>
-              {isBotPlayer ? abbreviateBotName(player.username) : player.username}
+              {isBotPlayer ? abbreviateBotName(player.username || 'Bot') : player.username}
             </div>
             
             {/* Bid display */}

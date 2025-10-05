@@ -41,6 +41,7 @@ interface GameTableModularProps {
   gameId?: string;
   joinGame: (gameId: string, userId: string, options?: any) => void;
   onLeaveTable: () => void;
+  startGame?: (gameId: string, userId?: string) => Promise<void>;
   user?: any;
   showStartWarning?: boolean;
   showBotWarning?: boolean;
@@ -59,6 +60,7 @@ export default function GameTableModular({
   game, 
   joinGame, 
   onLeaveTable,
+  startGame: propStartGame,
   user: propUser,
   gameId,
   showStartWarning = false,
@@ -457,6 +459,12 @@ export default function GameTableModular({
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
+    // If a prop startGame function is provided, use it instead
+    if (propStartGame) {
+      await propStartGame(gameState.id, propUser?.id);
+      return;
+    }
+
     if (!socket || !gameState?.id) return;
     
     setIsStarting(true);

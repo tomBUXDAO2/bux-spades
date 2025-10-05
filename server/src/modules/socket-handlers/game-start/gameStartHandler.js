@@ -4,6 +4,9 @@ import { gameManager } from '../../../services/GameManager.js';
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
 
+// Global mutex to prevent concurrent game starts across all socket connections
+const startingGames = new Set();
+
 class GameStartHandler {
   constructor(io, socket) {
     this.io = io;
@@ -11,40 +14,55 @@ class GameStartHandler {
     this.gameManager = gameManager;
     this.botService = new BotService();
     this.systemMessageHandler = new SystemMessageHandler(io, socket);
-    this.startingGames = new Set(); // Prevent concurrent game starts
   }
 
   async handleStartGame(data) {
     const { gameId, rated } = data || {};
     const userId = this.socket.userId || data?.userId;
+
+    if (!gameId) {
+      console.error('[GAME START] No gameId provided in handleStartGame data');
+      this.socket.emit('error', { message: 'Game ID is missing' });
+      return;
+    }
+
+    // Prevent concurrent game starts
+    if (startingGames.has(gameId)) {
+      console.log(`[GAME START] Game ${gameId} is already being started, ignoring duplicate request`);
+      return;
+    }
     
+    startingGames.add(gameId);
+
     try {
-      if (!gameId) {
-        this.socket.emit('error', { message: 'Game ID is required' });
-        return;
-      }
-      
-      // Prevent concurrent game starts
-      if (this.startingGames.has(gameId)) {
-        console.log(`[GAME START] Game ${gameId} is already being started, ignoring duplicate request`);
-        return;
-      }
-      
-      this.startingGames.add(gameId);
       console.log(`[GAME START] Starting game ${gameId} (rated: ${rated})`);
-      
       if (!userId) {
         this.socket.emit('error', { message: 'User not authenticated' });
-        this.startingGames.delete(gameId);
+        startingGames.delete(gameId);
         return;
       }
-      
       console.log(`[GAME START] User ${userId} starting game ${gameId} (rated=${rated === true})`);
 
-      // Verify game exists
-      const dbGame = await GameService.getGame(gameId);
+      // Verify game exists with retry logic for database mutex conflicts
+      let dbGame = null;
+      let retries = 0;
+      const maxRetries = 5;
+      
+      while (!dbGame && retries < maxRetries) {
+        dbGame = await GameService.getGame(gameId);
+        if (!dbGame) {
+          retries++;
+          if (retries < maxRetries) {
+            console.log(`[GAME START] Game not found, retrying (${retries}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, 200 * retries)); // Exponential backoff
+          }
+        }
+      }
+      
       if (!dbGame) {
+        console.error(`[GAME START] Game ${gameId} not found after ${maxRetries} retries`);
         this.socket.emit('error', { message: 'Game not found' });
+        startingGames.delete(gameId);
         return;
       }
       
@@ -72,7 +90,7 @@ class GameStartHandler {
       this.systemMessageHandler.sendSystemMessage(gameId, '🟢 Game started');
 
       // Emit started and updated state to clients (DB-first)
-      const gameState = await GameService.getGameStateForClient(gameId);
+      const gameState = await GameService.getFullGameStateFromDatabase(gameId);
       this.io.to(gameId).emit('game_started', { gameId, gameState });
       this.io.to(gameId).emit('game_update', { gameId, gameState });
 
@@ -99,7 +117,7 @@ class GameStartHandler {
               const { BiddingHandler } = await import('../bidding/biddingHandler.js');
               const biddingHandler = new BiddingHandler(this.io, this.socket);
               // Trigger bot bid
-              biddingHandler.triggerBotBidIfNeeded(gameId);
+              await biddingHandler.triggerBotBidIfNeeded(gameId);
             }
           }
         } else {
@@ -108,13 +126,14 @@ class GameStartHandler {
       }, 2000); // 2 second delay for cards to render
       
       // Remove from starting games set
-      this.startingGames.delete(gameId);
+      startingGames.delete(gameId);
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
+      console.error('[GAME START] Error stack:', error.stack);
       this.socket.emit('error', { message: 'Failed to start game' });
       
       // Remove from starting games set on error too
-      this.startingGames.delete(gameId);
+      startingGames.delete(gameId);
     }
   }
 

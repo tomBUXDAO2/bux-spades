@@ -39,6 +39,7 @@ interface Player {
   status: 'friend' | 'blocked' | 'not_friend';
   coins?: number;
   id?: string; // Add id for API calls
+  type?: 'human' | 'bot';
 }
 
 interface PlayerStatsModalProps {
