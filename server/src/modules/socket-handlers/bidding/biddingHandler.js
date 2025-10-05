@@ -182,8 +182,10 @@ class BiddingHandler {
           }
         });
 
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY (async to avoid mutex conflict)
-        this.triggerBotBidIfNeeded(gameId);
+        // Trigger next bot bid with a small delay to ensure mutex is cleared
+        setTimeout(() => {
+          this.triggerBotBidIfNeeded(gameId);
+        }, 100);
       }
 
       // NUCLEAR: No logging for performance
