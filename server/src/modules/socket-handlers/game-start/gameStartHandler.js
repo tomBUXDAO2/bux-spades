@@ -15,9 +15,14 @@ class GameStartHandler {
   }
 
   async handleStartGame(data) {
+    const { gameId, rated } = data || {};
+    const userId = this.socket.userId || data?.userId;
+    
     try {
-      const { gameId, rated } = data || {};
-      const userId = this.socket.userId || data.userId;
+      if (!gameId) {
+        this.socket.emit('error', { message: 'Game ID is required' });
+        return;
+      }
       
       // Prevent concurrent game starts
       if (this.startingGames.has(gameId)) {
@@ -30,6 +35,7 @@ class GameStartHandler {
       
       if (!userId) {
         this.socket.emit('error', { message: 'User not authenticated' });
+        this.startingGames.delete(gameId);
         return;
       }
       
