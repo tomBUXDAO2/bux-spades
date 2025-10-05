@@ -84,10 +84,6 @@ class BiddingHandler {
         isBlindNil
       );
 
-      // CRITICAL: Clear game state cache FIRST so getGameStateForClient rebuilds with updated bids
-      const { redisClient } = await import('../../../config/redis.js');
-      await redisClient.del(`game:state:${gameId}`);
-      
       // REAL-TIME: Update bid in Redis (instant)
       let currentBids = await redisGameState.getPlayerBids(gameId) || new Array(4).fill(null);
       currentBids[player.seatIndex] = bid;
@@ -128,16 +124,20 @@ class BiddingHandler {
           allPlayers: gameState.players.map(p => ({ seatIndex: p.seatIndex, userId: p.userId, username: p.user?.username }))
         });
         
-        // REAL-TIME: Clear game state cache first, then update current player
-        await redisClient.del(`game:state:${gameId}`);
-        console.log(`[BIDDING] Cleared Redis game state cache for fresh update`);
-        
-        // Get fresh game state from database and update currentPlayer
-        const freshGameState = await GameService.getGameStateForClient(gameId);
-        if (freshGameState) {
-          freshGameState.currentPlayer = nextPlayer?.userId;
-          await redisGameState.setGameState(gameId, freshGameState);
+        // REAL-TIME: Update current player in existing cached game state
+        const currentGameState = await redisGameState.getGameState(gameId);
+        if (currentGameState) {
+          currentGameState.currentPlayer = nextPlayer?.userId;
+          await redisGameState.setGameState(gameId, currentGameState);
           console.log(`[BIDDING] Updated Redis currentPlayer to: ${nextPlayer?.userId}`);
+        } else {
+          // Fallback: get full game state from database and update
+          const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (fullGameState) {
+            fullGameState.currentPlayer = nextPlayer?.userId;
+            await redisGameState.setGameState(gameId, fullGameState);
+            console.log(`[BIDDING] Updated Redis currentPlayer to: ${nextPlayer?.userId} (from database)`);
+          }
         }
 
         // ASYNC: Update current player in database (non-blocking)
@@ -200,10 +200,21 @@ class BiddingHandler {
         currentTrick: 1
       });
 
-      // CRITICAL: Clear Redis cache to force fresh game state with PLAYING status
-      const { redisClient } = await import('../../../config/redis.js');
-      await redisClient.del(`game:state:${gameId}`);
-      console.log(`[BIDDING] Cleared Redis cache after starting round`);
+      // REAL-TIME: Update game state in Redis with PLAYING status
+      const currentGameState = await redisGameState.getGameState(gameId);
+      if (currentGameState) {
+        currentGameState.status = 'PLAYING';
+        await redisGameState.setGameState(gameId, currentGameState);
+        console.log(`[BIDDING] Updated Redis game state to PLAYING`);
+      } else {
+        // Fallback: get full game state from database and update
+        const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        if (fullGameState) {
+          fullGameState.status = 'PLAYING';
+          await redisGameState.setGameState(gameId, fullGameState);
+          console.log(`[BIDDING] Updated Redis game state to PLAYING (from database)`);
+        }
+      }
 
       // Emit round started event
       const updatedGameState = await GameService.getGameStateForClient(gameId);

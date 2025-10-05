@@ -111,9 +111,21 @@ class CardPlayHandler {
           currentPlayer: nextPlayer?.userId || null
         });
 
-        // Clear Redis cache to force fresh game state
-        const { redisClient } = await import('../../../config/redis.js');
-        await redisClient.del(`game:state:${gameId}`);
+        // REAL-TIME: Update current player in existing cached game state
+        const currentGameState = await redisGameState.getGameState(gameId);
+        if (currentGameState) {
+          currentGameState.currentPlayer = nextPlayer?.userId || null;
+          await redisGameState.setGameState(gameId, currentGameState);
+          console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId || null}`);
+        } else {
+          // Fallback: get full game state from database and update
+          const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (fullGameState) {
+            fullGameState.currentPlayer = nextPlayer?.userId || null;
+            await redisGameState.setGameState(gameId, fullGameState);
+            console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId || null} (from database)`);
+          }
+        }
         
         // Emit update to all players
         const updatedGameState = await GameService.getGameStateForClient(gameId);
@@ -193,10 +205,23 @@ class CardPlayHandler {
               currentPlayer: winningPlayer.userId
             });
 
-            // CRITICAL: Clear Redis cache to force fresh game state after trick completion
-            const { redisClient } = await import('../../../config/redis.js');
-            await redisClient.del(`game:state:${gameId}`);
-            console.log(`[CARD PLAY] Cleared Redis cache after trick completion for fresh game state`);
+            // REAL-TIME: Update game state in Redis after trick completion
+            const currentGameState = await redisGameState.getGameState(gameId);
+            if (currentGameState) {
+              currentGameState.currentTrick = gameState.currentTrick + 1;
+              currentGameState.currentPlayer = winningPlayer.userId;
+              await redisGameState.setGameState(gameId, currentGameState);
+              console.log(`[CARD PLAY] Updated Redis game state after trick completion`);
+            } else {
+              // Fallback: get full game state from database and update
+              const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+              if (fullGameState) {
+                fullGameState.currentTrick = gameState.currentTrick + 1;
+                fullGameState.currentPlayer = winningPlayer.userId;
+                await redisGameState.setGameState(gameId, fullGameState);
+                console.log(`[CARD PLAY] Updated Redis game state after trick completion (from database)`);
+              }
+            }
 
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
@@ -247,10 +272,21 @@ class CardPlayHandler {
           currentPlayer: nextPlayer?.userId
         });
 
-        // CRITICAL: Clear Redis cache to force fresh game state with updated trick cards
-        const { redisClient } = await import('../../../config/redis.js');
-        await redisClient.del(`game:state:${gameId}`);
-        console.log(`[CARD PLAY] Cleared Redis cache after card play for fresh trick cards`);
+        // REAL-TIME: Update current player in existing cached game state
+        const currentGameState = await redisGameState.getGameState(gameId);
+        if (currentGameState) {
+          currentGameState.currentPlayer = nextPlayer?.userId;
+          await redisGameState.setGameState(gameId, currentGameState);
+          console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId}`);
+        } else {
+          // Fallback: get full game state from database and update
+          const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (fullGameState) {
+            fullGameState.currentPlayer = nextPlayer?.userId;
+            await redisGameState.setGameState(gameId, fullGameState);
+            console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId} (from database)`);
+          }
+        }
 
         // Emit card played event
         const updatedGameState = await GameService.getGameStateForClient(gameId);
