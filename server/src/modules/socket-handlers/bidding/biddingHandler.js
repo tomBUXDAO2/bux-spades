@@ -14,6 +14,7 @@ class BiddingHandler {
     this.socket = socket;
     this.loggingService = GameLoggingService;
     this.botService = new BotService();
+    this.biddingBots = new Set(); // Prevent concurrent bot bidding
   }
 
   async handleMakeBid(data) {
@@ -95,25 +96,25 @@ class BiddingHandler {
       // REAL-TIME: Check if all players have bid using Redis
       const bidsComplete = currentBids.every(bid => bid !== null && bid !== undefined);
 
-        if (bidsComplete) {
-          // All players have bid, emit final bidding update then start the round
-          const updatedGameState = await GameService.getGameStateForClient(gameId);
-          this.io.to(gameId).emit('bidding_update', {
-            gameId,
-            gameState: updatedGameState,
-            bid: {
-              userId,
-              bid,
-              isNil,
-              isBlindNil,
-              seatIndex: player.seatIndex
-            }
-          });
-          
-          // EXTREME: NO DELAYS - START IMMEDIATELY
-          this.startRound(gameId, currentRound.id);
+      if (bidsComplete) {
+        // All players have bid, emit final bidding update then start the round
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        this.io.to(gameId).emit('bidding_update', {
+          gameId,
+          gameState: updatedGameState,
+          bid: {
+            userId,
+            bid,
+            isNil,
+            isBlindNil,
+            seatIndex: player.seatIndex
+          }
+        });
+        
+        // EXTREME: NO DELAYS - START IMMEDIATELY
+        this.startRound(gameId, currentRound.id);
       } else {
-        // Move to next player
+        // Move to next player FIRST
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
         const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
         
@@ -145,22 +146,22 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
-          // Emit bidding update
-          const updatedGameState = await GameService.getGameStateForClient(gameId);
-          this.io.to(gameId).emit('bidding_update', {
-            gameId,
-            gameState: updatedGameState,
-            bid: {
-              userId,
-              bid,
-              isNil,
-              isBlindNil,
-              seatIndex: player.seatIndex
-            }
-          });
+        // NOW emit bidding update with updated currentPlayer
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        this.io.to(gameId).emit('bidding_update', {
+          gameId,
+          gameState: updatedGameState,
+          bid: {
+            userId,
+            bid,
+            isNil,
+            isBlindNil,
+            seatIndex: player.seatIndex
+          }
+        });
 
         // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-          this.triggerBotBidIfNeeded(gameId);
+        this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
@@ -240,10 +241,19 @@ class BiddingHandler {
     try {
       console.log(`[BIDDING] triggerBotBidIfNeeded called for game ${gameId}`);
       
+      // Prevent concurrent bot bidding
+      if (this.biddingBots.has(gameId)) {
+        console.log(`[BIDDING] Bot bidding already in progress for game ${gameId}, ignoring duplicate request`);
+        return;
+      }
+      
+      this.biddingBots.add(gameId);
+      
       // Get the game from database to check if current player is a bot
       const game = await GameService.getGame(gameId);
       if (!game) {
         console.log(`[BIDDING] No game found for game ${gameId}`);
+        this.biddingBots.delete(gameId);
         return;
       }
 
@@ -258,6 +268,7 @@ class BiddingHandler {
       
       if (!currentPlayer || currentPlayer.isHuman) {
         console.log(`[BIDDING] Not triggering bot bid - currentPlayer is human or not found`);
+        this.biddingBots.delete(gameId);
         return;
       }
 
@@ -281,8 +292,13 @@ class BiddingHandler {
 
       // Process bot's bid
       await this.processBid(gameId, currentPlayer.userId, botBid, botBid === 0, false);
+      
+      // Remove from bidding bots set
+      this.biddingBots.delete(gameId);
     } catch (error) {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
+      // Remove from bidding bots set on error too
+      this.biddingBots.delete(gameId);
     }
   }
 
