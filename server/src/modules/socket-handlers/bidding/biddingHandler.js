@@ -182,8 +182,8 @@ class BiddingHandler {
           }
         });
 
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY AND AWAIT
-        await this.triggerBotBidIfNeeded(gameId);
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY (async to avoid mutex conflict)
+        this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
