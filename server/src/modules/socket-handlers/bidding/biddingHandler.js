@@ -153,6 +153,23 @@ class BiddingHandler {
 
         // NOW emit bidding update with updated currentPlayer
         const updatedGameState = await GameService.getGameStateForClient(gameId);
+        
+        // CRITICAL: Merge the latest bidding data into the game state
+        const latestBids = await redisGameState.getPlayerBids(gameId);
+        if (latestBids && updatedGameState) {
+          updatedGameState.bidding = {
+            bids: latestBids,
+            currentBidderIndex: nextPlayer?.seatIndex || 0,
+            currentPlayer: nextPlayer?.userId
+          };
+          
+          // Also update player bids in the players array
+          updatedGameState.players = updatedGameState.players.map(p => ({
+            ...p,
+            bid: latestBids[p.seatIndex] || null
+          }));
+        }
+        
         this.io.to(gameId).emit('bidding_update', {
           gameId,
           gameState: updatedGameState,
