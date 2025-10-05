@@ -71,19 +71,11 @@ export const useGameActions = ({
     socket.emit('play_card', { gameId, card });
   }, [socket, gameId, gameState]);
 
-  // Start game
-  const startGame = useCallback(() => {
-    if (!socket || !gameState) return;
-    
-    console.log('Starting game:', gameId);
-    socket.emit('start_game', { gameId });
-  }, [socket, gameId, gameState]);
 
   return {
     joinGame,
     leaveGame,
     makeBid,
-    playCard,
-    startGame
+    playCard
   };
 };

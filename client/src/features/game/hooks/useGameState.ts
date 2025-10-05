@@ -29,8 +29,7 @@ export function useGameState(gameId: string, userId: string) {
     joinGame,
     leaveGame,
     makeBid,
-    playCard,
-    startGame
+    playCard
   } = useGameActions({
     socket,
     gameId,
@@ -59,8 +58,7 @@ export function useGameState(gameId: string, userId: string) {
     joinGame,
     leaveGame,
     makeBid,
-    playCard,
-    startGame
+    playCard
   };
 }
 

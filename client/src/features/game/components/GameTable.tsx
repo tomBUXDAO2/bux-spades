@@ -29,7 +29,6 @@ import { rotatePlayersForCurrentView } from '../utils/playerUtils';
 import { getScaleFactor } from '../utils/scaleUtils';
 import { handleGameOver } from '../utils/gameOverUtils';
 import { handlePlayCard } from '../utils/playCardUtils';
-import { handleStartGame } from '../utils/startGameUtils';
 import { handleBid } from '../utils/bidUtils';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
@@ -42,7 +41,6 @@ interface GameTableModularProps {
   gameId?: string;
   joinGame: (gameId: string, userId: string, options?: any) => void;
   onLeaveTable: () => void;
-  startGame: (gameId: string, userId?: string) => Promise<void>;
   user?: any;
   showStartWarning?: boolean;
   showBotWarning?: boolean;
@@ -61,7 +59,6 @@ export default function GameTableModular({
   game, 
   joinGame, 
   onLeaveTable,
-  startGame,
   user: propUser,
   gameId,
   showStartWarning = false,
@@ -458,7 +455,10 @@ export default function GameTableModular({
     });
   };
   
-  const handleStartGameWrapper = async () => {
+  // Consolidated start game function
+  const startGame = async (options: { rated?: boolean } = {}) => {
+    if (!socket || !gameState?.id) return;
+    
     setIsStarting(true);
     const players = Array.isArray(gameState.players) ? gameState.players : [];
     const occupied = players.filter(Boolean).length;
@@ -472,17 +472,22 @@ export default function GameTableModular({
     }
 
     // Case 2: No empty seats but bots present → warn unrated then start on continue
-    if (hasBotPlayers) {
+    if (hasBotPlayers && !options.rated) {
       setIsStarting(false);
       setGameState((prev: any) => ({ ...prev, ui: { ...(prev?.ui || {}), showBotWarning: true } }));
       setBotWarningOpen(true);
       return;
     }
 
-    // Case 3: Full table and no bots → rated game
-    if (socket && gameState?.id) {
-      socket.emit('start_game', { gameId: gameState.id, rated: true });
-    }
+    // Case 3: Start game directly
+    socket.emit('start_game', { 
+      gameId: gameState.id, 
+      rated: options.rated || false 
+    });
+  };
+
+  const handleStartGameWrapper = async () => {
+    await startGame({ rated: true });
   };
   
   const handleLeaveTable = () => {
@@ -586,11 +591,8 @@ export default function GameTableModular({
   };
   
   const handleStartWithBots = async () => {
-    setIsStarting(true);
     setBotWarningOpen(false);
-    if (socket && gameState?.id) {
-      socket.emit('start_game', { gameId: gameState.id, rated: false });
-    }
+    startGame({ rated: false });
   };
   
   const handlePlayWithBots = async () => {
@@ -607,9 +609,7 @@ export default function GameTableModular({
     }
     setShowStartWarningModal(false);
     await new Promise(resolve => setTimeout(resolve, 500));
-    if (socket && gameState?.id) {
-      socket.emit('start_game', { gameId: gameState.id, rated: false });
-    }
+    startGame({ rated: false });
   };
   
   const handleCloseStartWarning = () => {
@@ -638,9 +638,7 @@ export default function GameTableModular({
   };
   
   const requestStart = () => {
-    if (socket) {
-      socket.emit('start_game', { gameId: gameState.id });
-    }
+    startGame({ rated: false });
   };
   
   const myIndex = gameState.players?.findIndex(p => p && p.id === propUser?.id);

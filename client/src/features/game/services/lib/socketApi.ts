@@ -73,41 +73,6 @@ export const socketApi = {
     socket.emit('create_game', { user, rules });
   },
   
-  startGame: async (socketOverride: Socket | null, gameId: string): Promise<void> => {
-    const socket = socketOverride || getSocket();
-    if (!socket) {
-      throw new Error('No socket available');
-    }
-    
-    // Wait for socket to be ready
-    try {
-      await waitForSocketReady(socket);
-    } catch (error) {
-      throw new Error('Socket connection failed: ' + error);
-    }
-    
-    return new Promise<void>((resolve, reject) => {
-      const handleUpdate = (updatedGame: any) => {
-        console.log('Received game_update in startGame:', updatedGame);
-        if (updatedGame.id === gameId && updatedGame.status === 'BIDDING') {
-          socket.off('game_update', handleUpdate);
-          resolve();
-        }
-      };
-      const handleError = (error: any) => {
-        console.error('Start game error:', error);
-        socket.off('error', handleError);
-        socket.off('game_update', handleUpdate);
-        reject(error);
-      };
-      // game_update and error handled in useSocketEventHandlers.ts
-      socket.emit('start_game', { gameId });
-      setTimeout(() => {
-        // Cleanup handled in useSocketEventHandlers.ts
-        reject('Timeout waiting for game to start');
-      }, 5000);
-    });
-  },
   
   sendChatMessage: async (socketOverride: Socket | null, gameId: string, message: any) => {
     const socket = socketOverride || getSocket();
