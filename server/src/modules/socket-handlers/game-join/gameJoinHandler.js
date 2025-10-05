@@ -152,9 +152,10 @@ class GameJoinHandler {
         return;
       }
       
-      // Check if user is in the game
+      // Check if user is in the game OR is the game creator
       const player = gameState.players.find(p => p.id === userId);
-      if (!player) {
+      const isCreator = gameState.createdById === userId;
+      if (!player && !isCreator) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;
       }

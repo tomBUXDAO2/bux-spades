@@ -66,18 +66,61 @@ class GameStartHandler {
         return;
       }
       
-      // Persist rated flag if provided
-      if (typeof rated === 'boolean') {
-        await GameService.updateGame(gameId, { isRated: rated });
-      }
-
-      // Ensure there is at least one player
-      const players = await prisma.gamePlayer.findMany({ where: { gameId }, orderBy: { seatIndex: 'asc' } });
+      // Get players and validate game start conditions
+      const players = await prisma.gamePlayer.findMany({ 
+        where: { gameId }, 
+        orderBy: { seatIndex: 'asc' },
+        include: { user: true }
+      });
+      
       if (!players || players.length === 0) {
         this.socket.emit('error', { message: 'Cannot start game - no players' });
         startingGames.delete(gameId);
         return;
       }
+
+      // Count empty seats and bot players
+      const occupiedSeats = players.filter(p => p.userId).length;
+      const emptySeats = 4 - occupiedSeats;
+      const botPlayers = players.filter(p => p.user && p.user.username && p.user.username.startsWith('Bot_'));
+      const humanPlayers = players.filter(p => p.user && p.user.username && !p.user.username.startsWith('Bot_'));
+
+      console.log(`[GAME START] Players analysis: ${occupiedSeats} occupied, ${emptySeats} empty, ${botPlayers.length} bots, ${humanPlayers.length} humans`);
+
+      // Initialize game rating status
+      let gameRated = false;
+
+      // Validation logic based on game state
+      if (emptySeats > 0) {
+        // Empty seats detected - this should not happen if frontend is working correctly
+        console.log(`[GAME START] ERROR: Empty seats detected (${emptySeats}) - frontend should have filled these`);
+        this.socket.emit('error', { 
+          message: 'Cannot start game with empty seats. Please invite bots or wait for more players.',
+          code: 'EMPTY_SEATS'
+        });
+        startingGames.delete(gameId);
+        return;
+      }
+
+      // Determine rating status
+      if (botPlayers.length > 0) {
+        // Has bots - game is unrated
+        gameRated = false;
+        console.log(`[GAME START] Bot players detected (${botPlayers.length}), game will be unrated`);
+      } else if (humanPlayers.length === 4) {
+        // All humans - game is rated
+        gameRated = true;
+        console.log(`[GAME START] All human players detected, game will be rated`);
+      }
+
+      // Override with explicit rated flag if provided
+      if (typeof rated === 'boolean') {
+        gameRated = rated;
+        console.log(`[GAME START] Rated flag explicitly set to: ${gameRated}`);
+      }
+
+      // Update game with final rated status
+      await GameService.updateGame(gameId, { isRated: gameRated });
 
       // Start the game in DB-first mode
       await GameService.startGame(gameId);
