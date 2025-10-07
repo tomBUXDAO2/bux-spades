@@ -141,13 +141,22 @@ export class GameLoggingService {
         return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
       
-      // 3) CRITICAL: Enforce suit following rules
+      // 3) CRITICAL: Enforce suit following rules (optimized for performance)
       if (existingCardsCount > 0) {
-        // Get the lead suit from the first card played
-        const leadCard = await prisma.trickCard.findFirst({
-          where: { trickId: trickRecord.id },
-          orderBy: { playOrder: 'asc' }
-        });
+        // PERFORMANCE FIX: Get lead suit from Redis instead of database
+        const currentGameState = await redisGameState.getGameState(gameId);
+        const currentTrickCards = currentGameState?.currentTrick || [];
+        
+        let leadCard = null;
+        if (currentTrickCards.length > 0) {
+          leadCard = { suit: currentTrickCards[0].suit };
+        } else {
+          // Fallback to database only if Redis is empty
+          leadCard = await prisma.trickCard.findFirst({
+            where: { trickId: trickRecord.id },
+            orderBy: { playOrder: 'asc' }
+          });
+        }
         
         if (leadCard && leadCard.suit !== suit) {
           // Player is not following suit - check if they have cards of the lead suit

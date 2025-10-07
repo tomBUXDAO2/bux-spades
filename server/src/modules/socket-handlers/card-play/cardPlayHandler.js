@@ -87,7 +87,7 @@ class CardPlayHandler {
         throw new Error(`Current trick not found for round ${currentRound.id}, trick ${gameState.currentTrick || 1}`);
       }
 
-      // Log the card play to database (batch with other operations)
+      // Log the card play to database (now optimized for performance)
       const logResult = await this.loggingService.logCardPlay(
         gameId,
         currentRound.id,
@@ -139,64 +139,6 @@ class CardPlayHandler {
           gameState.currentTrick,
           this.io // Pass io instance for round completion events
         );
-
-        if (trickResult.isComplete) {
-          console.log(`[CARD PLAY] Trick completed, winner: seat ${trickResult.winningSeatIndex}`);
-          
-          // First, emit card played event so client can render the 4th card
-          // NOTE: This will be emitted again after updateCurrentPlayer with correct currentPlayer
-          const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
-
-          this.io.to(gameId).emit('card_played', {
-            gameId,
-            gameState: cardPlayedGameState,
-            cardPlayed: {
-              userId,
-              card,
-              seatIndex: player.seatIndex,
-              isBot
-            }
-          });
-
-          // EXTREME: NO DELAYS - COMPLETE IMMEDIATELY
-          (async () => {
-            // Find the winning player by seat index
-            console.log(`[CARD PLAY] Looking for winning player at seat ${trickResult.winningSeatIndex}`);
-            console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => ({ id: p.id, seatIndex: p.seatIndex, username: p.username })));
-            
-            const winningPlayer = gameState.players.find(p => p.seatIndex === trickResult.winningSeatIndex);
-            console.log(`[CARD PLAY] Found winning player:`, winningPlayer);
-            
-            if (!winningPlayer) {
-              console.error(`[CARD PLAY] ERROR: No player found at seat ${trickResult.winningSeatIndex}`);
-              console.error(`[CARD PLAY] Available seats:`, gameState.players.map(p => p.seatIndex));
-              return;
-            }
-            
-            // CRITICAL: Use SINGLE unified system for currentPlayer updates
-            console.log(`[CARD PLAY] About to call updateCurrentPlayer with winningPlayer.userId: ${winningPlayer.userId}`);
-            await this.updateCurrentPlayer(gameId, winningPlayer.userId);
-
-            // CRITICAL: Emit card_played event with correct currentPlayer after updateCurrentPlayer
-            console.log(`[CARD PLAY] About to get corrected game state after updateCurrentPlayer`);
-            const correctedGameState = await GameService.getGameStateForClient(gameId);
-            console.log(`[CARD PLAY] Corrected game state currentPlayer: ${correctedGameState.currentPlayer}, expected: ${winningPlayer.userId}`);
-            this.io.to(gameId).emit('card_played', {
-              gameId,
-              gameState: correctedGameState,
-              cardPlayed: {
-                userId,
-                card,
-                seatIndex: player.seatIndex,
-                isBot
-              },
-              currentTrick: correctedGameState.play?.currentTrick || []
-            });
-            console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
-
-            // Get the completed trick cards before updating game state
-            const completedTrickCards = await prisma.trickCard.findMany({
-              where: { trickId: logResult.actualTrickId },
               orderBy: { playOrder: 'asc' }
             });
 
