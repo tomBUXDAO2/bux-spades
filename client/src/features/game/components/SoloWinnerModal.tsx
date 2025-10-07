@@ -3,6 +3,7 @@ import { FaTrophy } from 'react-icons/fa';
 import { getPlayerColor } from '@/features/game/services/lib/gameRules';
 import type { Player, Bot } from '@/types/game';
 import { abbreviateBotName } from '../../../utils/botUtils';
+import { playCheeringSound } from '../../../services/utils/soundUtils';
 
 interface SoloWinnerModalProps {
   isOpen: boolean;
@@ -56,6 +57,11 @@ export default function SoloWinnerModal({
     if (!isOpen) {
       setTimeRemaining(30);
       return;
+    }
+
+    // Play cheering sound when solo winner modal opens
+    if (isOpen) {
+      playCheeringSound();
     }
 
     const timer = setInterval(() => {

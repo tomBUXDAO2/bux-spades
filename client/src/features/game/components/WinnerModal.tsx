@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FaTrophy } from 'react-icons/fa';
 import type { Player, Bot } from '@/types/game';
 import { abbreviateBotName } from '../../../utils/botUtils';
+import { playCheeringSound } from '../../../services/utils/soundUtils';
 
 interface WinnerModalProps {
   isOpen: boolean;
@@ -58,6 +59,11 @@ export default function WinnerModal({
       setTimeRemaining(30);
       setShowPlayAgainPrompt(false);
       return;
+    }
+
+    // Play cheering sound when winner modal opens
+    if (isOpen) {
+      playCheeringSound();
     }
 
     const timer = setInterval(() => {

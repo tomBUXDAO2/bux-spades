@@ -142,6 +142,56 @@ export function setupSocketHandlers(io) {
     socket.on('lobby_message', (data) => lobbyChatHandler.handleLobbyMessage(data));
 
 
+    // Emoji reaction events
+    socket.on('emoji_reaction', (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      
+      const { gameId, playerId, emoji } = data;
+      if (!gameId || !playerId || !emoji) {
+        socket.emit('error', { message: 'Missing required fields' });
+        return;
+      }
+      
+      // Broadcast emoji reaction to all players in the game
+      io.to(gameId).emit('emoji_reaction', {
+        playerId: playerId,
+        emoji: emoji
+      });
+      
+      console.log(`[EMOJI] User ${socket.userId} sent emoji reaction ${emoji} to player ${playerId} in game ${gameId}`);
+    });
+    
+    socket.on('send_emoji', (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      
+      const { gameId, fromPlayerId, toPlayerId, emoji } = data;
+      if (!gameId || !fromPlayerId || !toPlayerId || !emoji) {
+        socket.emit('error', { message: 'Missing required fields' });
+        return;
+      }
+      
+      // Verify the sender matches the authenticated user
+      if (fromPlayerId !== socket.userId) {
+        socket.emit('error', { message: 'Unauthorized' });
+        return;
+      }
+      
+      // Broadcast targeted emoji to all players in the game
+      io.to(gameId).emit('send_emoji', {
+        fromPlayerId: fromPlayerId,
+        toPlayerId: toPlayerId,
+        emoji: emoji
+      });
+      
+      console.log(`[EMOJI] User ${fromPlayerId} sent emoji ${emoji} to player ${toPlayerId} in game ${gameId}`);
+    });
+
     // Friend/Block management events
     socket.on('add_friend', (data) => {
       console.log(`[SOCKET] add_friend event received from socket ${socket.id}, userId: ${socket.userId}`);

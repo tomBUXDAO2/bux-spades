@@ -321,6 +321,11 @@ export default function GameTableModular({
   };
   
   const handleEmojiReactionEvent = (data: { playerId: string; emoji: string }) => {
+    // Play sound when receiving emoji from others
+    import('../../../services/utils/soundUtils').then(({ playEmojiSound }) => {
+      playEmojiSound(data.emoji);
+    });
+    
     setEmojiReactions(prev => ({
       ...prev,
       [data.playerId]: { emoji: data.emoji, timestamp: Date.now() }
@@ -570,6 +575,11 @@ export default function GameTableModular({
   };
   
   const handleEmojiReaction = (playerId: string, emoji: string) => {
+    // Play sound for the emoji
+    import('../../../services/utils/soundUtils').then(({ playEmojiSound }) => {
+      playEmojiSound(emoji);
+    });
+    
     if (socket && gameState?.id) {
       socket.emit('emoji_reaction', {
         gameId: gameState.id,
@@ -592,6 +602,11 @@ export default function GameTableModular({
   };
   
   const handleSendEmoji = (targetPlayerId: string, emoji: string) => {
+    // Play sound for the emoji
+    import('../../../services/utils/soundUtils').then(({ playEmojiSound }) => {
+      playEmojiSound(emoji);
+    });
+    
     if (socket && gameState?.id && propUser?.id) {
       socket.emit('send_emoji', {
         gameId: gameState.id,
