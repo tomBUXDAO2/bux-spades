@@ -496,26 +496,24 @@ export class GameService {
           cachedGameState.play = cachedGameState.play || {};
           cachedGameState.play.currentTrick = currentTrickCards;
           cachedGameState.currentTrickCards = currentTrickCards;
-          console.log(`[GAME SERVICE] Using Redis trick data with ${currentTrickCards.length} cards`);
+          // Using Redis trick data
         } else {
           // No trick data in Redis, ensure empty arrays
           cachedGameState.play = cachedGameState.play || {};
           cachedGameState.play.currentTrick = [];
           cachedGameState.currentTrickCards = [];
-          console.log(`[GAME SERVICE] No trick data in Redis, using empty arrays`);
+          // No trick data in Redis, using empty arrays
         }
         
         // CRITICAL: Ensure spadesBroken flag is included from Redis cache
-        console.log(`[GAME SERVICE] Redis cached state structure:`, JSON.stringify(cachedGameState, null, 2));
         if (cachedGameState.play && cachedGameState.play.spadesBroken !== undefined) {
-          console.log(`[GAME SERVICE] Found spadesBroken in Redis cache:`, cachedGameState.play.spadesBroken);
+          // Found spadesBroken in Redis cache
         } else {
           cachedGameState.play = cachedGameState.play || {};
           cachedGameState.play.spadesBroken = false; // Default to false if not set
-          console.log(`[GAME SERVICE] Setting default spadesBroken = false`);
         }
         
-        console.log(`[GAME SERVICE] Returning cached state from Redis for game ${gameId}`);
+        // Returning cached state from Redis
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
       }

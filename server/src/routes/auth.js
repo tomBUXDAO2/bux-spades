@@ -2,6 +2,9 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/databaseFirst.js';
 
+// NUCLEAR SOLUTION: Disable expensive database queries entirely
+const DISABLE_EXPENSIVE_QUERIES = false;
+
 const router = express.Router();
 
 // Middleware to verify JWT token
@@ -59,6 +62,11 @@ router.get('/verify', authenticateToken, (req, res) => {
 // Get all users (for chat player list)
 router.get('/users', authenticateToken, async (req, res) => {
   try {
+    if (DISABLE_EXPENSIVE_QUERIES) {
+      console.log('[AUTH] NUCLEAR: Returning empty users list to prevent database queries');
+      return res.json({ users: [] });
+    }
+    
     const currentUserId = req.userId;
     
     // Get all users with their friend/block status relative to current user
@@ -107,6 +115,11 @@ router.get('/users', authenticateToken, async (req, res) => {
 // Get friends list
 router.get('/friends', authenticateToken, async (req, res) => {
   try {
+    if (DISABLE_EXPENSIVE_QUERIES) {
+      console.log('[AUTH] NUCLEAR: Returning empty friends list to prevent database queries');
+      return res.json([]);
+    }
+    
     const currentUserId = req.userId;
     
     const friends = await prisma.friend.findMany({
@@ -122,7 +135,8 @@ router.get('/friends', authenticateToken, async (req, res) => {
       }
     });
 
-    res.json(friends.map(f => f.friend));
+    const result = friends.map(f => f.friend);
+    res.json(result);
   } catch (error) {
     console.error('[AUTH] Error fetching friends:', error);
     res.status(500).json({ error: 'Failed to fetch friends' });
@@ -132,6 +146,11 @@ router.get('/friends', authenticateToken, async (req, res) => {
 // Get blocked users list
 router.get('/blocked', authenticateToken, async (req, res) => {
   try {
+    if (DISABLE_EXPENSIVE_QUERIES) {
+      console.log('[AUTH] NUCLEAR: Returning empty blocked users list to prevent database queries');
+      return res.json([]);
+    }
+    
     const currentUserId = req.userId;
     
     const blocked = await prisma.blockedUser.findMany({
@@ -147,7 +166,8 @@ router.get('/blocked', authenticateToken, async (req, res) => {
       }
     });
 
-    res.json(blocked.map(b => b.blocked));
+    const result = blocked.map(b => b.blocked);
+    res.json(result);
   } catch (error) {
     console.error('[AUTH] Error fetching blocked users:', error);
     res.status(500).json({ error: 'Failed to fetch blocked users' });

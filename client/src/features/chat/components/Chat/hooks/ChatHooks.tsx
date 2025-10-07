@@ -86,7 +86,7 @@ export const useChatHooks = ({
   // Load player statuses
   useEffect(() => {
     const loadStatuses = async () => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || chatType !== 'lobby') return;
       
       try {
         const response = await api.get('/api/auth/users');
@@ -119,7 +119,7 @@ export const useChatHooks = ({
     };
     
     loadStatuses();
-  }, [isAuthenticated, players, spectators]);
+  }, [isAuthenticated, players, spectators, chatType]);
 
   // Socket event handlers
   useEffect(() => {

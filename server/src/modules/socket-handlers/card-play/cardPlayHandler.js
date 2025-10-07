@@ -27,7 +27,7 @@ class CardPlayHandler {
         return;
       }
       
-      console.log(`[CARD PLAY] User ${userId} playing card:`, card);
+      // User playing card
       
       // Get current game state from database
       const gameState = await GameService.getGameStateForClient(gameId);
@@ -55,7 +55,7 @@ class CardPlayHandler {
    */
   async processCardPlay(gameId, userId, card, isBot = false) {
     try {
-      console.log(`[CARD PLAY] Processing card play: user=${userId}, card=${card.rank} of ${card.suit}`);
+      // Processing card play
 
       // Get current game state
       const gameState = await GameService.getGame(gameId);
@@ -128,9 +128,9 @@ class CardPlayHandler {
         select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
       });
 
-      console.log(`[CARD PLAY] Checking trick completion - trickCards.length: ${trickCards.length}`);
+      // Checking trick completion
       if (trickCards.length >= 4) {
-        console.log(`[CARD PLAY] Trick is complete, calling TrickCompletionService`);
+        // Trick is complete, calling TrickCompletionService
         // Complete the trick
         const trickResult = await TrickCompletionService.checkAndCompleteTrick(
           gameId,
@@ -315,8 +315,8 @@ class CardPlayHandler {
           console.log(`[CARD PLAY] Explicitly setting spadesBroken = true for spade card play`);
         }
         
-        console.log(`[CARD PLAY] Emitting card_played event for game ${gameId}, currentPlayer: ${updatedGameState.currentPlayer}, currentTrick:`, updatedGameState.play?.currentTrick);
-        console.log(`[CARD PLAY] Game state spadesBroken:`, updatedGameState.play?.spadesBroken);
+        // Emitting card_played event
+        // Game state updated
         this.io.to(gameId).emit('card_played', {
           gameId,
           gameState: updatedGameState,
