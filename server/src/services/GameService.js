@@ -1,6 +1,7 @@
 import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
 import { ScoringService } from './ScoringService.js';
+import { DatabaseGameEngine } from './DatabaseGameEngine.js';
 
 // Global mutex to prevent concurrent database operations
 const databaseOperations = new Set();
@@ -403,17 +404,17 @@ export class GameService {
   static async leaveGame(gameId, userId) {
     try {
       console.log(`[GAME SERVICE] User ${userId} leaving game ${gameId}`);
-
+      
       // Determine if the game is rated to decide leave strategy
       const game = await prisma.game.findUnique({ where: { id: gameId }, select: { isRated: true } });
       const isRated = !!game?.isRated;
 
       if (isRated) {
         // For rated games, keep the row for auditing; mark as left
-        await prisma.gamePlayer.updateMany({
-          where: { gameId, userId },
-          data: { leftAt: new Date() }
-        });
+      await prisma.gamePlayer.updateMany({
+        where: { gameId, userId },
+        data: { leftAt: new Date() }
+      });
       } else {
         // For unrated games, fully remove the player row
         await prisma.gamePlayer.deleteMany({
@@ -430,25 +431,112 @@ export class GameService {
   }
 
   /**
+   * Sanitize game state for a specific user - only show their own cards
+   */
+  static sanitizeGameStateForUser(gameState, userId) {
+    if (!gameState || !userId) return gameState;
+    
+    // Find the user's seat index
+    const userPlayer = gameState.players?.find(p => p && p.userId === userId);
+    if (!userPlayer) return gameState;
+    
+    const userSeatIndex = userPlayer.seatIndex;
+    
+    // Create a copy of the game state
+    const sanitizedState = JSON.parse(JSON.stringify(gameState));
+    
+    // Only show hands for the requesting user
+    if (sanitizedState.hands && Array.isArray(sanitizedState.hands)) {
+      const sanitizedHands = [[], [], [], []];
+      if (userSeatIndex >= 0 && userSeatIndex < 4) {
+        sanitizedHands[userSeatIndex] = sanitizedState.hands[userSeatIndex] || [];
+      }
+      sanitizedState.hands = sanitizedHands;
+    }
+    
+    // CRITICAL: Also sanitize playerHands array to ensure consistency
+    if (sanitizedState.playerHands && Array.isArray(sanitizedState.playerHands)) {
+      const sanitizedPlayerHands = [[], [], [], []];
+      if (userSeatIndex >= 0 && userSeatIndex < 4) {
+        sanitizedPlayerHands[userSeatIndex] = sanitizedState.playerHands[userSeatIndex] || [];
+      }
+      sanitizedState.playerHands = sanitizedPlayerHands;
+    }
+    
+    return sanitizedState;
+  }
+
+  /**
    * Get game state for client - Redis first, database fallback
    */
-  static async getGameStateForClient(gameId) {
+  static async getGameStateForClient(gameId, userId = null) {
     try {
       // REAL-TIME: Try to get game state from Redis first (instant)
       let cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
+        // CRITICAL: Always map gimmick variants to client-friendly format
+        const gimmickVariantMapping = {
+          'SUICIDE': 'SUICIDE',
+          'BID4NIL': '4 OR NIL',
+          'BID3': 'BID 3',
+          'BIDHEARTS': 'BID HEARTS',
+          'CRAZY_ACES': 'CRAZY ACES'
+        };
+        
+        if (cachedGameState.gimmickVariant) {
+          cachedGameState.gimmickVariant = gimmickVariantMapping[cachedGameState.gimmickVariant] || cachedGameState.gimmickVariant;
+        }
+        
+        if (cachedGameState.rules?.bidType) {
+          cachedGameState.rules.bidType = gimmickVariantMapping[cachedGameState.rules.bidType] || cachedGameState.rules.bidType;
+        }
+        // CRITICAL: Get current trick data from Redis and add it to the game state
+        const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+        if (currentTrickCards && currentTrickCards.length > 0) {
+          cachedGameState.play = cachedGameState.play || {};
+          cachedGameState.play.currentTrick = currentTrickCards;
+          cachedGameState.currentTrickCards = currentTrickCards;
+          console.log(`[GAME SERVICE] Using Redis trick data with ${currentTrickCards.length} cards`);
+        } else {
+          // No trick data in Redis, ensure empty arrays
+          cachedGameState.play = cachedGameState.play || {};
+          cachedGameState.play.currentTrick = [];
+          cachedGameState.currentTrickCards = [];
+          console.log(`[GAME SERVICE] No trick data in Redis, using empty arrays`);
+        }
+        
+        // CRITICAL: Ensure spadesBroken flag is included from Redis cache
+        console.log(`[GAME SERVICE] Redis cached state structure:`, JSON.stringify(cachedGameState, null, 2));
+        if (cachedGameState.play && cachedGameState.play.spadesBroken !== undefined) {
+          console.log(`[GAME SERVICE] Found spadesBroken in Redis cache:`, cachedGameState.play.spadesBroken);
+        } else {
+          cachedGameState.play = cachedGameState.play || {};
+          cachedGameState.play.spadesBroken = false; // Default to false if not set
+          console.log(`[GAME SERVICE] Setting default spadesBroken = false`);
+        }
+        
         console.log(`[GAME SERVICE] Returning cached state from Redis for game ${gameId}`);
-        return cachedGameState;
+        // CRITICAL: Sanitize game state to only show user's own cards
+        return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
       }
 
       // FALLBACK: If Redis is empty, get full game state from database
       console.log(`[GAME SERVICE] Redis miss for game ${gameId} - fetching full state from database`);
       const fullGameState = await this.getFullGameStateFromDatabase(gameId);
       if (fullGameState) {
+        // CRITICAL: Get current trick data from Redis and add it to the game state
+        const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+        if (currentTrickCards && currentTrickCards.length > 0) {
+          fullGameState.play = fullGameState.play || {};
+          fullGameState.play.currentTrick = currentTrickCards;
+          fullGameState.currentTrickCards = currentTrickCards;
+        }
+        
         // Cache the full state in Redis for future requests
         await redisGameState.setGameState(gameId, fullGameState);
         console.log(`[GAME SERVICE] Cached full game state in Redis for game ${gameId}`);
-        return fullGameState;
+        // CRITICAL: Sanitize game state to only show user's own cards
+        return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
       }
 
       // Last resort: return minimal state
@@ -463,7 +551,7 @@ export class GameService {
         rounds: [],
         playerHands: [],
         currentTrickCards: [],
-        playerBids: new Array(4).fill(null),
+        playerBids: Array.from({length: 4}, () => null),
         isGameComplete: false
       };
     } catch (error) {
@@ -482,57 +570,253 @@ export class GameService {
         return null;
       }
 
-      // Get player hands from Redis or database
+      // CRITICAL: Get player hands from Redis or database - ensure consistency
       let playerHands = await redisGameState.getPlayerHands(gameId);
-      if (!playerHands) {
-        // If no hands in Redis, return empty hands (game just started)
-        playerHands = new Array(4).fill([]);
+      if (!playerHands || !playerHands.some(hand => hand && hand.length > 0)) {
+        console.log(`[GAME SERVICE] No valid hands in Redis, calculating from database`);
+        // If no hands in Redis, calculate from database
+        playerHands = DatabaseGameEngine.computePlayerHands(game);
+        
+        // Store the calculated hands in Redis for consistency
+        if (playerHands && playerHands.some(hand => hand && hand.length > 0)) {
+          await redisGameState.setPlayerHands(gameId, playerHands);
+          console.log(`[GAME SERVICE] Stored calculated hands in Redis for consistency`);
+        }
+      } else {
+        console.log(`[GAME SERVICE] Using hands from Redis cache for consistency:`, {
+          handsLengths: playerHands.map((hand, i) => `Seat ${i}: ${hand.length} cards`)
+        });
       }
 
       // Get current trick from Redis or database
       let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
-      if (!currentTrickCards) {
-        currentTrickCards = [];
+      if (!currentTrickCards || currentTrickCards.length === 0) {
+        // If no current trick in Redis, get from database
+        const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+        if (currentRound) {
+          const currentTrick = await prisma.trick.findFirst({
+            where: { 
+              roundId: currentRound.id,
+              trickNumber: game.currentTrick
+            }
+          });
+          
+          if (currentTrick) {
+            const trickCards = await prisma.trickCard.findMany({
+              where: { trickId: currentTrick.id },
+              orderBy: { playOrder: 'asc' }
+            });
+            
+            currentTrickCards = trickCards.map(card => ({
+              suit: card.suit,
+              rank: card.rank,
+              seatIndex: card.seatIndex,
+              playerId: game.players.find(p => p.seatIndex === card.seatIndex)?.userId
+            }));
+          } else {
+            currentTrickCards = [];
+          }
+        } else {
+          currentTrickCards = [];
+        }
+      }
+
+      // Get spadesBroken flag from Redis cache
+      let spadesBroken = false;
+      try {
+        const cachedGameState = await redisGameState.getGameState(gameId);
+        if (cachedGameState && cachedGameState.play && cachedGameState.play.spadesBroken !== undefined) {
+          spadesBroken = cachedGameState.play.spadesBroken;
+          console.log(`[GAME SERVICE] Retrieved spadesBroken from Redis cache:`, spadesBroken);
+        }
+      } catch (error) {
+        console.error('[GAME SERVICE] Error getting spadesBroken from Redis:', error);
       }
 
       // Get player bids from Redis or database
       let playerBids = await redisGameState.getPlayerBids(gameId);
       if (!playerBids) {
-        playerBids = new Array(4).fill(null);
+        playerBids = Array.from({length: 4}, () => null);
       }
 
+      // Get player stats (tricks won) from database
+      let playerStats = [];
+      if (game.currentRound > 0) {
+        const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+        if (currentRound) {
+          playerStats = await prisma.playerRoundStats.findMany({
+            where: { roundId: currentRound.id },
+            orderBy: { seatIndex: 'asc' }
+          });
+        }
+      }
+
+      // Get running totals from the latest RoundScore
+      let team1TotalScore = 0;
+      let team2TotalScore = 0;
+      let team1Bags = 0;
+      let team2Bags = 0;
+      
+      const latestRoundScore = await prisma.roundScore.findFirst({
+        where: { 
+          Round: { gameId }
+        },
+        orderBy: { Round: { roundNumber: 'desc' } }
+      });
+      
+      if (latestRoundScore) {
+        team1TotalScore = latestRoundScore.team0RunningTotal || 0; // team0 becomes team1 in client
+        team2TotalScore = latestRoundScore.team1RunningTotal || 0; // team1 becomes team2 in client
+        team1Bags = latestRoundScore.team0Bags || 0;
+        team2Bags = latestRoundScore.team1Bags || 0;
+      }
+
+      // Map database enum values back to client-friendly format
+      const gimmickVariantMapping = {
+        'SUICIDE': 'SUICIDE',
+        'BID4NIL': '4 OR NIL',
+        'BID3': 'BID 3',
+        'BIDHEARTS': 'BID HEARTS',
+        'CRAZY_ACES': 'CRAZY ACES'
+      };
+      
       // Format for client
       const gameState = {
         id: game.id,
+        createdById: game.createdById, // CRITICAL: Add createdById for creator checks
         status: game.status,
         mode: game.mode,
         format: game.format,
+        gimmickVariant: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+        buyIn: game.buyIn,
+        minPoints: game.minPoints,
+        maxPoints: game.maxPoints,
+        nilAllowed: game.nilAllowed,
+        blindNilAllowed: game.blindNilAllowed,
+        specialRules: game.specialRules,
+        isLeague: game.isLeague,
+        isRated: game.isRated,
         currentPlayer: game.currentPlayer,
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,
         dealer: game.dealer,
-        players: game.players.map(player => ({
-          id: player.userId,
-          username: player.user?.username || 'Unknown',
-          avatarUrl: player.user?.avatarUrl || null,
-          seatIndex: player.seatIndex,
-          teamIndex: player.teamIndex,
-          isHuman: player.isHuman,
-          isSpectator: player.isSpectator || false,
-          type: player.isHuman ? 'human' : 'bot'
-        })),
+        players: game.players.map(player => {
+          const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
+          return {
+            id: player.userId,
+            userId: player.userId, // CRITICAL: Add userId field for player lookups
+            username: player.user?.username || 'Unknown',
+            avatarUrl: player.user?.avatarUrl || null,
+            seatIndex: player.seatIndex,
+            teamIndex: player.teamIndex,
+            isHuman: player.isHuman,
+            isSpectator: player.isSpectator || false,
+            type: player.isHuman ? 'human' : 'bot',
+            bid: playerBids[player.seatIndex] || null,
+            tricks: playerStat?.tricksWon || 0
+          };
+        }),
         rounds: game.rounds || [],
         hands: playerHands, // Frontend expects 'hands', not 'playerHands'
         playerHands: playerHands, // Keep both for compatibility
         currentTrickCards: currentTrickCards,
         playerBids: playerBids,
-        isGameComplete: game.status === 'FINISHED'
+        play: {
+          currentTrick: currentTrickCards,
+          spadesBroken: spadesBroken
+        },
+        bidding: {
+          bids: playerBids,
+          currentBidderIndex: game.players.findIndex(p => p.userId === game.currentPlayer) || 0,
+          currentPlayer: game.currentPlayer
+        },
+        isGameComplete: game.status === 'FINISHED',
+        // Include running totals for scoreboard
+        team1TotalScore: team1TotalScore,
+        team2TotalScore: team2TotalScore,
+        team1Bags: team1Bags,
+        team2Bags: team2Bags,
+        // Solo game scoring
+        gameMode: game.mode,
+        playerScores: game.mode === 'SOLO' ? await this.getPlayerScores(gameId) : [],
+        playerBags: game.mode === 'SOLO' ? await this.getPlayerBags(gameId) : [],
+        // Include rules object for client compatibility
+        rules: game.gameState?.rules || {
+          gameType: game.mode === 'SOLO' ? 'SOLO' : 'PARTNERS',
+          allowNil: game.nilAllowed,
+          allowBlindNil: game.blindNilAllowed,
+          coinAmount: game.buyIn,
+          maxPoints: game.maxPoints,
+          minPoints: game.minPoints,
+          bidType: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+          specialRules: game.specialRules || {}
+        }
       };
 
       return gameState;
     } catch (error) {
       console.error('[GAME SERVICE] Error getting full game state from database:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get player scores for solo games
+   */
+  static async getPlayerScores(gameId) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: { rounds: { include: { playerRoundStats: true } } }
+      });
+      
+      if (!game || game.mode !== 'SOLO') return [];
+      
+      const playerScores = [0, 0, 0, 0];
+      
+      // Sum up all points from all rounds
+      game.rounds.forEach(round => {
+        round.playerRoundStats.forEach(stats => {
+          if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
+            playerScores[stats.seatIndex] += stats.pointsThisRound || 0;
+          }
+        });
+      });
+      
+      return playerScores;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting player scores:', error);
+      return [0, 0, 0, 0];
+    }
+  }
+
+  /**
+   * Get player bags for solo games
+   */
+  static async getPlayerBags(gameId) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: { rounds: { include: { playerRoundStats: true } } }
+      });
+      
+      if (!game || game.mode !== 'SOLO') return [];
+      
+      const playerBags = [0, 0, 0, 0];
+      
+      // Sum up all bags from all rounds
+      game.rounds.forEach(round => {
+        round.playerRoundStats.forEach(stats => {
+          if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
+            playerBags[stats.seatIndex] += stats.bagsThisRound || 0;
+          }
+        });
+      });
+      
+      return playerBags;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting player bags:', error);
+      return [0, 0, 0, 0];
     }
   }
 
@@ -548,7 +832,7 @@ export class GameService {
       if (!round) throw new Error('Current round not found');
 
       // Build seatIndex -> userId map
-      const seatToUserId = new Array(4).fill(null);
+      const seatToUserId = Array.from({length: 4}, () => null);
       game.players.forEach(p => { seatToUserId[p.seatIndex] = p.userId; });
       
       console.log(`[GAME SERVICE] Deal hands - seatToUserId mapping:`, seatToUserId);
@@ -658,7 +942,8 @@ export class GameService {
       await redisGameState.setPlayerHands(gameId, hands);
       
       // Initialize empty bids array in Redis for new round
-      await redisGameState.setPlayerBids(gameId, new Array(4).fill(null));
+      // CRITICAL FIX: Use Array.from to create separate null values for each player
+      await redisGameState.setPlayerBids(gameId, Array.from({length: 4}, () => null));
 
       // CRITICAL: Update Redis cache with full game state AFTER hands are stored
       const fullGameState = await this.getFullGameStateFromDatabase(gameId);

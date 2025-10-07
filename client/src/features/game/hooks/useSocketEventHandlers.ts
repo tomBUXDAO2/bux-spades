@@ -86,12 +86,31 @@ export const useSocketEventHandlers = ({
       console.log('🎮 Card played event received:', cardData);
       console.log('🎮 Card played - currentTrick data:', cardData.gameState?.play?.currentTrick);
       if (cardData && cardData.gameId === gameId) {
+        // Play card sound effect for all card plays (human and bot)
+        if (cardData.cardPlayed && !cardData.cardPlayed.rejected) {
+          import('../../../services/utils/soundUtils').then(({ playCardSound }) => {
+            playCardSound();
+          });
+        }
+        
         (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
           // Use the full gameState from the server if provided
           if (cardData.gameState) {
             console.log('🎮 Card played - setting game state with currentPlayer:', cardData.gameState.currentPlayer);
-            return normalizeGameState(cardData.gameState);
+            console.log('🎮 Card played - currentTrick from event:', cardData.currentTrick);
+            
+            // CRITICAL: Ensure currentTrick data is properly integrated
+            const normalizedState = normalizeGameState(cardData.gameState);
+            if (cardData.currentTrick && Array.isArray(cardData.currentTrick)) {
+              normalizedState.play = {
+                ...normalizedState.play,
+                currentTrick: cardData.currentTrick
+              };
+              // CRITICAL: Also set currentTrickCards at top level for renderTrickCards
+              normalizedState.currentTrickCards = cardData.currentTrick;
+            }
+            return normalizedState;
           } else {
             // Fallback to partial update if gameState not provided
             return {

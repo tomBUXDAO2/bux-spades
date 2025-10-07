@@ -1,4 +1,5 @@
 import { prisma } from '../config/database.js';
+import redisGameState from './RedisGameStateService.js';
 
 export class GameLoggingService {
   /**
@@ -112,9 +113,10 @@ export class GameLoggingService {
               trickData.id = trickId;
             }
             
-            trickRecord = await prisma.trick.create({
-              data: trickData
-            });
+            // CRITICAL FIX: Do NOT create tricks in logging service
+            // Tricks should only be created by the main game logic
+            console.error(`[GAME LOGGING] ERROR: Attempted to create trick in logging service - this should not happen!`);
+            throw new Error('Trick creation attempted in logging service');
             // NUCLEAR: No logging for performance
           }
         } catch (createError) {
@@ -138,8 +140,53 @@ export class GameLoggingService {
         console.log(`[GAME LOGGING] Guard: seat ${seatIndex} already played in trick ${trickRecord.id}. Skipping insert.`);
         return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
+      
+      // 3) CRITICAL: Enforce suit following rules
+      if (existingCardsCount > 0) {
+        // Get the lead suit from the first card played
+        const leadCard = await prisma.trickCard.findFirst({
+          where: { trickId: trickRecord.id },
+          orderBy: { playOrder: 'asc' }
+        });
+        
+        if (leadCard && leadCard.suit !== suit) {
+          // Player is not following suit - check if they have cards of the lead suit
+          const playerHand = await redisGameState.getPlayerHands(gameId);
+          if (playerHand && playerHand[seatIndex]) {
+            const hasLeadSuit = playerHand[seatIndex].some(card => 
+              card.suit === leadCard.suit
+            );
+            
+            if (hasLeadSuit) {
+              console.log(`[GAME LOGGING] Guard: seat ${seatIndex} must follow suit ${leadCard.suit} but played ${suit}. Rejecting card play.`);
+              return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+            } else {
+              // Player is void in lead suit - they can play any card (spades trump or dump)
+              console.log(`[GAME LOGGING] Seat ${seatIndex} is void in lead suit ${leadCard.suit}, playing ${suit} is valid`);
+            }
+          }
+        }
+      }
       const calculatedPlayOrder = existingCardsCount + 1;
       console.log(`[GAME LOGGING] Calculated playOrder from DB: ${calculatedPlayOrder} (${existingCardsCount} existing cards in trick ${trickRecord.id})`);
+
+      // CRITICAL: Update spadesBroken flag if a spade is played
+      if (suit === 'SPADES') {
+        console.log(`[GAME LOGGING] Spade played - updating spadesBroken flag to true`);
+        try {
+          // Update Redis cache with spadesBroken = true
+          const currentGameState = await redisGameState.getGameState(gameId);
+          if (currentGameState) {
+            if (!currentGameState.play) currentGameState.play = {};
+            currentGameState.play.spadesBroken = true;
+            await redisGameState.setGameState(gameId, currentGameState);
+            console.log(`[GAME LOGGING] Updated Redis cache: spadesBroken = true`);
+            console.log(`[GAME LOGGING] Redis cache structure after spadesBroken update:`, JSON.stringify(currentGameState, null, 2));
+          }
+        } catch (error) {
+          console.error(`[GAME LOGGING] Error updating spadesBroken flag:`, error);
+        }
+      }
 
       // Create the trick card record (simplified - no transaction)
       const cardRecord = await prisma.trickCard.create({
@@ -236,6 +283,16 @@ export class GameLoggingService {
               );
               await redisClient.set(`game:hands:${round.gameId}`, JSON.stringify(hands), { EX: 3600 });
               console.log(`[GAME LOGGING] Updated Redis hands for seat ${seatIndex}`);
+              
+              // CRITICAL: Also update the main game state cache with new hands
+              const gameStateKey = `game:state:${round.gameId}`;
+              const currentGameState = await redisClient.get(gameStateKey);
+              if (currentGameState) {
+                const gameState = JSON.parse(currentGameState);
+                gameState.hands = hands; // Update hands in main game state
+                await redisClient.set(gameStateKey, JSON.stringify(gameState), { EX: 3600 });
+                console.log(`[GAME LOGGING] Updated main game state cache with new hands`);
+              }
             }
           }
         }

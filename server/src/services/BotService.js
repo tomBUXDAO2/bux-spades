@@ -166,6 +166,12 @@ class BotService {
    * Calculate intelligent bid based on game state, position, partner's bid, and cards
    */
   calculateIntelligentBid(game, seatIndex, hand) {
+    // Check if this is a WHIZ game
+    if (game.format === 'WHIZ') {
+      return this.calculateWhizBid(game, seatIndex, hand);
+    }
+    
+    // Regular game bidding logic
     // 1. Analyze hand strength
     const handAnalysis = this.analyzeHand(hand);
     
@@ -211,6 +217,117 @@ class BotService {
     
     // 9. Final bounds check
     return Math.max(0, Math.min(13, Math.round(baseBid)));
+  }
+
+  /**
+   * Calculate WHIZ bid - must bid number of spades or nil
+   */
+  calculateWhizBid(game, seatIndex, hand) {
+    console.log(`[BOT SERVICE] Calculating WHIZ bid for seat ${seatIndex}`);
+    
+    // 1. Count spades in hand
+    const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
+    console.log(`[BOT SERVICE] Spades count: ${spadesCount}`);
+    
+    // 2. Check if partner already bid nil
+    const partnerBid = this.getPartnerBid(game, seatIndex);
+    const partnerBidNil = partnerBid === 0;
+    console.log(`[BOT SERVICE] Partner bid: ${partnerBid}, is nil: ${partnerBidNil}`);
+    
+    // 3. Check nil prevention rules
+    const cannotBidNil = this.cannotBidNilInWhiz(hand, partnerBidNil);
+    console.log(`[BOT SERVICE] Cannot bid nil: ${cannotBidNil}`);
+    
+    // 4. Make decision based on WHIZ rules
+    if (spadesCount === 0) {
+      // FORCED NIL: Must bid nil if 0 spades
+      console.log(`[BOT SERVICE] FORCED NIL - bidding 0 (no spades)`);
+      return 0;
+    } else if (spadesCount >= 4) {
+      // NO NIL OPTION: Must bid spade count if 4+ spades
+      console.log(`[BOT SERVICE] NO NIL OPTION - bidding ${spadesCount} (4+ spades)`);
+      return spadesCount;
+    } else if (spadesCount >= 1 && spadesCount <= 3) {
+      // OPTIONAL NIL: Can choose nil or spade count (unless rules prevent nil)
+      if (cannotBidNil) {
+        console.log(`[BOT SERVICE] CANNOT BID NIL - bidding ${spadesCount} (rules prevent nil)`);
+        return spadesCount;
+      } else {
+        // Bot can choose - for now, prefer nil if hand is weak
+        const handAnalysis = this.analyzeHand(hand);
+        if (handAnalysis.totalStrength <= 2) {
+          console.log(`[BOT SERVICE] CHOOSING NIL - bidding 0 (weak hand, can bid nil)`);
+          return 0;
+        } else {
+          console.log(`[BOT SERVICE] CHOOSING SPADE COUNT - bidding ${spadesCount} (strong hand)`);
+          return spadesCount;
+        }
+      }
+    }
+    
+    // Fallback (should never reach here)
+    console.log(`[BOT SERVICE] FALLBACK - bidding ${spadesCount}`);
+    return spadesCount;
+  }
+
+  /**
+   * Check if bot cannot bid nil in WHIZ game based on the 6 rules
+   */
+  cannotBidNilInWhiz(hand, partnerBidNil) {
+    // Rule 1: Partner already bid nil
+    if (partnerBidNil) {
+      console.log(`[BOT SERVICE] Cannot bid nil - partner already bid nil`);
+      return true;
+    }
+    
+    // Rule 2: Hold Ace of spades
+    const hasAceOfSpades = hand.some(card => card.suit === 'SPADES' && card.rank === 'A');
+    if (hasAceOfSpades) {
+      console.log(`[BOT SERVICE] Cannot bid nil - holds Ace of spades`);
+      return true;
+    }
+    
+    // Rule 3: Hold both K and Q of spades
+    const hasKingOfSpades = hand.some(card => card.suit === 'SPADES' && card.rank === 'K');
+    const hasQueenOfSpades = hand.some(card => card.suit === 'SPADES' && card.rank === 'Q');
+    if (hasKingOfSpades && hasQueenOfSpades) {
+      console.log(`[BOT SERVICE] Cannot bid nil - holds both K and Q of spades`);
+      return true;
+    }
+    
+    // Rule 4: Hold more than 3 spades
+    const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
+    if (spadesCount > 3) {
+      console.log(`[BOT SERVICE] Cannot bid nil - holds ${spadesCount} spades (>3)`);
+      return true;
+    }
+    
+    // Rule 5: Hold an ace in another suit and only 2 or less other cards in that suit
+    const suits = ['HEARTS', 'DIAMONDS', 'CLUBS'];
+    for (const suit of suits) {
+      const suitCards = hand.filter(card => card.suit === suit);
+      const hasAce = suitCards.some(card => card.rank === 'A');
+      const otherCards = suitCards.filter(card => card.rank !== 'A').length;
+      
+      if (hasAce && otherCards <= 2) {
+        console.log(`[BOT SERVICE] Cannot bid nil - holds Ace of ${suit} with only ${otherCards} other cards`);
+        return true;
+      }
+    }
+    
+    // Rule 6: Hold a king in another suit and only 1 or less other cards in that suit
+    for (const suit of suits) {
+      const suitCards = hand.filter(card => card.suit === suit);
+      const hasKing = suitCards.some(card => card.rank === 'K');
+      const otherCards = suitCards.filter(card => card.rank !== 'K').length;
+      
+      if (hasKing && otherCards <= 1) {
+        console.log(`[BOT SERVICE] Cannot bid nil - holds King of ${suit} with only ${otherCards} other cards`);
+        return true;
+      }
+    }
+    
+    return false; // Can bid nil
   }
 
   /**
@@ -297,45 +414,87 @@ class BotService {
    * Play a card for a bot
    */
   async playBotCard(game, seatIndex) {
-    const bot = game.players[seatIndex];
-    if (!bot || bot.type !== 'bot') {
-      console.log(`[BOT SERVICE] Seat ${seatIndex} is not a bot`);
-      return null;
-    }
+    let bot = null;
+    try {
+      console.log(`[BOT SERVICE] playBotCard called for seat ${seatIndex}, game:`, {
+        currentRound: game.currentRound,
+        currentTrick: game.currentTrick,
+        playersCount: game.players?.length,
+        handsCount: game.hands?.length
+      });
+      
+      bot = game.players[seatIndex];
+      if (!bot || bot.type !== 'bot') {
+        console.log(`[BOT SERVICE] Seat ${seatIndex} is not a bot:`, bot);
+        return null;
+      }
 
-    const hand = game.hands[seatIndex] || [];
-    if (hand.length === 0) {
-      console.log(`[BOT SERVICE] Bot ${bot.username} has no cards to play`);
-      return null;
-    }
+      const hand = game.hands[seatIndex] || [];
+      if (hand.length === 0) {
+        console.log(`[BOT SERVICE] Bot ${bot.username} has no cards to play`);
+        return null;
+      }
+      
+      console.log(`[BOT SERVICE] Bot ${bot.username} has ${hand.length} cards to choose from`);
 
     let cardToPlay = null;
     
-    // Get current trick from database
-    const round = game.rounds?.find(r => r.roundNumber === game.currentRound);
-    if (!round) {
-      console.error(`[BOT SERVICE] No round found for round ${game.currentRound}`);
-      return hand[0]; // Fallback
+    // REDIS ONLY: Get current trick cards from Redis cache
+    let currentTrickCards = [];
+    const redisGameState = await import('./RedisGameStateService.js');
+    const redisTrickData = await redisGameState.default.getCurrentTrick(game.id);
+    if (redisTrickData && redisTrickData.length > 0) {
+      // Convert Redis format to database format for compatibility
+      currentTrickCards = redisTrickData.map(card => ({
+        suit: card.suit,
+        rank: card.rank,
+        seatIndex: card.seatIndex,
+        playOrder: card.playOrder || 0
+      }));
     }
 
-    const currentTrickCards = await prisma.trickCard.findMany({
-      where: {
-        trick: {
-          roundId: round.id,
-          trickNumber: game.currentTrick
-        }
-      },
-      orderBy: { playOrder: 'asc' }
-    });
+    console.log(`[BOT SERVICE] Bot ${bot.username} current trick query result:`, currentTrickCards.map(c => `${c.suit}${c.rank} (seat ${c.seatIndex})`));
 
-    // Simple bot card playing logic
+    // MANDATORY suit following logic
     if (currentTrickCards.length === 0) {
       // Leading - play lowest card of longest suit (checking spades broken)
       cardToPlay = this.getLeadCard(hand, game);
     } else {
-      // Following - follow suit if possible, otherwise play low
+      // FOLLOWING - MUST follow suit if possible, NO EXCEPTIONS
       const leadSuit = currentTrickCards[0].suit;
-      cardToPlay = this.getFollowCard(hand, leadSuit);
+      console.log(`[BOT SERVICE] Bot ${bot.username} MUST follow suit ${leadSuit}, current trick:`, currentTrickCards.map(c => `${c.suit}${c.rank}`));
+      console.log(`[BOT SERVICE] Bot ${bot.username} hand:`, hand);
+      
+      // Convert string format cards to object format if needed
+      const normalizedHand = hand.map(card => {
+        if (typeof card === 'string') {
+          const suit = card.substring(0, card.length - 1);
+          const rank = card.substring(card.length - 1);
+          return { suit, rank };
+        }
+        return card;
+      });
+
+      // MANDATORY: Find cards of the lead suit
+      const suitCards = normalizedHand.filter(card => card.suit === leadSuit);
+      console.log(`[BOT SERVICE] Bot ${bot.username} has ${suitCards.length} cards of lead suit ${leadSuit}:`, suitCards.map(c => `${c.suit}${c.rank}`));
+      
+      if (suitCards.length > 0) {
+        // MANDATORY: Play lowest card of lead suit
+        cardToPlay = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+        console.log(`[BOT SERVICE] Bot ${bot.username} MUST play ${cardToPlay.suit}${cardToPlay.rank} to follow suit`);
+      } else {
+        // Only if void in lead suit - play lowest card (prefer non-spades)
+        const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
+        if (nonSpades.length > 0) {
+          cardToPlay = nonSpades.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+          console.log(`[BOT SERVICE] Bot ${bot.username} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+        } else {
+          // Only spades left
+          cardToPlay = normalizedHand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+          console.log(`[BOT SERVICE] Bot ${bot.username} only has spades left, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+        }
+      }
     }
 
     if (!cardToPlay) {
@@ -343,15 +502,26 @@ class BotService {
     }
 
     // CRITICAL: Validate that the chosen card is actually in the bot's hand
-    const cardInHand = hand.find(card => 
-      card.suit === cardToPlay.suit && card.rank === cardToPlay.rank
-    );
+    const cardInHand = hand.find(card => {
+      if (typeof card === 'string') {
+        return card === `${cardToPlay.suit}${cardToPlay.rank}`;
+      } else {
+        return card.suit === cardToPlay.suit && card.rank === cardToPlay.rank;
+      }
+    });
     
     if (!cardInHand) {
       console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} chose card ${cardToPlay.suit}${cardToPlay.rank} but it's not in their hand!`);
-      console.error(`[BOT SERVICE] Bot's actual hand:`, hand.map(c => `${c.suit}${c.rank}`));
+      console.error(`[BOT SERVICE] Bot's actual hand:`, hand.map(c => typeof c === 'string' ? c : `${c.suit}${c.rank}`));
       // Use first available card as emergency fallback
-      cardToPlay = hand[0];
+      const firstCard = hand[0];
+      if (typeof firstCard === 'string') {
+        const suit = firstCard.substring(0, firstCard.length - 1);
+        const rank = firstCard.substring(firstCard.length - 1);
+        cardToPlay = { suit, rank };
+      } else {
+        cardToPlay = firstCard;
+      }
       if (!cardToPlay) {
         console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} has no cards at all!`);
         return null;
@@ -364,15 +534,29 @@ class BotService {
     // Just return the card choice - the handler will log it to the database
 
     return cardToPlay;
+    } catch (error) {
+      console.error(`[BOT SERVICE] ERROR in playBotCard for bot ${bot?.username || 'unknown'}:`, error);
+      return null;
+    }
   }
 
   /**
    * Get best card to lead with
    */
   getLeadCard(hand, game = null) {
+    // Convert string format cards to object format if needed
+    const normalizedHand = hand.map(card => {
+      if (typeof card === 'string') {
+        const suit = card.substring(0, card.length - 1);
+        const rank = card.substring(card.length - 1);
+        return { suit, rank };
+      }
+      return card;
+    });
+
     // Group cards by suit
     const suits = {};
-    hand.forEach(card => {
+    normalizedHand.forEach(card => {
       if (!suits[card.suit]) suits[card.suit] = [];
       suits[card.suit].push(card);
     });
@@ -467,20 +651,42 @@ class BotService {
    * Get best card to follow with
    */
   getFollowCard(hand, leadSuit) {
+    console.log(`[BOT SERVICE] getFollowCard called with leadSuit: ${leadSuit}, hand:`, hand);
+    
+    // Convert string format cards to object format if needed
+    const normalizedHand = hand.map(card => {
+      if (typeof card === 'string') {
+        const suit = card.substring(0, card.length - 1);
+        const rank = card.substring(card.length - 1);
+        return { suit, rank };
+      }
+      return card;
+    });
+
+    console.log(`[BOT SERVICE] Normalized hand:`, normalizedHand);
+
     // Try to follow suit
-    const suitCards = hand.filter(card => card.suit === leadSuit);
+    const suitCards = normalizedHand.filter(card => card.suit === leadSuit);
+    console.log(`[BOT SERVICE] Cards of lead suit ${leadSuit}:`, suitCards);
+    
     if (suitCards.length > 0) {
       // Play lowest card of lead suit
-      return suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      const lowestCard = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      console.log(`[BOT SERVICE] Following suit ${leadSuit} with ${lowestCard.suit}${lowestCard.rank}`);
+      return lowestCard;
     }
 
     // Can't follow suit - play lowest card (prefer non-spades)
-    const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+    const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
     if (nonSpades.length > 0) {
-      return nonSpades.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      const lowestCard = nonSpades.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      console.log(`[BOT SERVICE] Can't follow suit ${leadSuit}, playing ${lowestCard.suit}${lowestCard.rank}`);
+      return lowestCard;
     } else {
       // Only spades left
-      return hand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      const lowestCard = normalizedHand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+      console.log(`[BOT SERVICE] Only spades left, playing ${lowestCard.suit}${lowestCard.rank}`);
+      return lowestCard;
     }
   }
 

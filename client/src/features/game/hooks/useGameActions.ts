@@ -71,12 +71,13 @@ export const useGameActions = ({
     socket.emit('play_card', { gameId, card });
   }, [socket, gameId, gameState]);
 
-  // Start game
-  const startGame = useCallback(async () => {
+
+  // Invite bot to game
+  const inviteBot = useCallback((seatIndex: number) => {
     if (!socket || !gameState) return;
     
-    console.log('Starting game:', gameId);
-    socket.emit('start_game', { gameId, rated: false });
+    console.log('Inviting bot to seat:', seatIndex);
+    socket.emit('invite_bot', { gameId, seatIndex });
   }, [socket, gameId, gameState]);
 
   return {
@@ -84,6 +85,6 @@ export const useGameActions = ({
     leaveGame,
     makeBid,
     playCard,
-    startGame
+    inviteBot
   };
 };

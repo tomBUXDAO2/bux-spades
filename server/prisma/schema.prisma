@@ -363,6 +363,17 @@ enum GameMode {
   SOLO
 }
 
+model DiscordGame {
+  id                String    @id @default(cuid())
+  gameId            String    @unique
+  channelId         String
+  commandMessageId  String
+  createdBy         String
+  status            String    @default("WAITING")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
 enum GameStatus {
   WAITING
   BIDDING

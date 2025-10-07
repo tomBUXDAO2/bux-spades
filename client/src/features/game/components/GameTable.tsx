@@ -41,12 +41,14 @@ interface GameTableModularProps {
   gameId?: string;
   joinGame: (gameId: string, userId: string, options?: any) => void;
   onLeaveTable: () => void;
-  startGame?: (gameId: string, userId?: string) => Promise<void>;
+  startGame?: () => Promise<void>;
   user?: any;
   showStartWarning?: boolean;
   showBotWarning?: boolean;
   onCloseStartWarning?: () => void;
   onCloseBotWarning?: () => void;
+  onStartWithBots?: () => void;
+  onStartWithBotsFromWarning?: () => void;
   emptySeats?: number;
   botCount?: number;
   isSpectator?: boolean;
@@ -67,6 +69,8 @@ export default function GameTableModular({
   showBotWarning = false,
   onCloseStartWarning,
   onCloseBotWarning,
+  onStartWithBots,
+  onStartWithBotsFromWarning,
   emptySeats = 0,
   botCount = 0,
   isSpectator = false,
@@ -92,7 +96,6 @@ export default function GameTableModular({
   const [showLoser, setShowLoser] = useState(false);
   const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
-  const [showStartWarningModal, setShowStartWarningModal] = useState(false);
   const [showTrickHistory, setShowTrickHistory] = useState(false);
   const [showGameInfo, setShowGameInfo] = useState(false);
   const [botWarningOpen, setBotWarningOpen] = useState(false);
@@ -158,9 +161,17 @@ export default function GameTableModular({
   // Game calculations
   const currentPlayerId = propUser?.id;
   const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === propUser?.id) : -1;
-  const myHand = Array.isArray((gameState as any).hands) ? (gameState as any).hands[myPlayerIndex] || [] : [];
+  
+  // Get the current player's seatIndex, not array index
+  const myPlayer = gameState.players ? gameState.players.find(p => p && p.id === propUser?.id) : null;
+  const mySeatIndex = myPlayer ? myPlayer.seatIndex : -1;
+  
+  // Access hands by seatIndex, not array index - this is the correct way
+  const myHand = Array.isArray((gameState as any).hands) && mySeatIndex >= 0 ? (gameState as any).hands[mySeatIndex] || [] : [];
   const sanitizedPlayers = (gameState.players || []);
-  const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === currentPlayerId) || null;
+  
+  // CRITICAL FIX: Find the actual current player (whose turn it is), not the user
+  const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
   const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer);
   const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
@@ -261,21 +272,45 @@ export default function GameTableModular({
       
       // Wait 2 seconds before clearing trick animation
       setTimeout(() => {
+        console.log('[TRICK ANIMATION] Clearing trick animation after 2 seconds');
         setAnimatingTrick(false);
         setTrickWinner(null);
         setAnimatedTrickCards([]);
         setTrickCompleted(false);
         setLastNonEmptyTrick([]);
+        
+        // CRITICAL: Clear currentTrick from game state to prevent old cards showing
+        // This is a backup in case the server clear_table_cards event fails
+        setGameState((prevState: any) => ({
+          ...prevState,
+          play: {
+            ...prevState.play,
+            currentTrick: [] // Clear trick cards completely
+          },
+          currentTrickCards: [] // Also clear this field
+        }));
       }, 2000);
     }
   };
   
   const handleClearTableCards = () => {
+    console.log('[TRICK CLEAR] Clearing table cards from server event');
     setAnimatedTrickCards([]);
     setLastNonEmptyTrick([]);
     setTrickWinner(null);
     setAnimatingTrick(false);
     setTrickCompleted(false);
+    
+    // CRITICAL: Clear currentTrick from game state when new round starts
+    // This prevents old trick cards from showing during bidding phase
+    setGameState((prevState: any) => ({
+      ...prevState,
+      play: {
+        ...prevState.play,
+        currentTrick: [] // Clear trick cards completely
+      },
+      currentTrickCards: [] // Also clear this field
+    }));
   };
   
   const handleSocketError = (error: { message: string }) => {
@@ -427,7 +462,8 @@ export default function GameTableModular({
   // Reveal my cards and enable bidding when it's my turn in BIDDING and hands are present
   useEffect(() => {
     const hands = (gameState as any)?.hands;
-    const myHandArr = Array.isArray(hands) && myPlayerIndex >= 0 ? hands[myPlayerIndex] : null;
+    // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
+    const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
     if (
       gameState?.status === 'BIDDING' &&
       gameState?.currentPlayer === currentPlayerId &&
@@ -438,7 +474,7 @@ export default function GameTableModular({
       setDealingComplete(true);
       setCardsRevealed(true);
     }
-  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, currentPlayerId, myPlayerIndex]);
+  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, currentPlayerId, mySeatIndex]);
   
   // Game action handlers
   const handlePlayCardWrapper = (card: Card) => {
@@ -461,7 +497,7 @@ export default function GameTableModular({
   const startGame = async (options: { rated?: boolean } = {}) => {
     // If a prop startGame function is provided, use it instead
     if (propStartGame) {
-      await propStartGame(gameState.id, propUser?.id);
+      await propStartGame();
       return;
     }
 
@@ -475,7 +511,7 @@ export default function GameTableModular({
 
     // Case 1: Empty seats → warn, then fill with bots and start
     if (emptySeatCount > 0) {
-      setShowStartWarningModal(true);
+      // This should not happen since propStartGame should be used instead
       return;
     }
 
@@ -600,7 +636,11 @@ export default function GameTableModular({
   
   const handleStartWithBots = async () => {
     setBotWarningOpen(false);
-    startGame({ rated: false });
+    if (onStartWithBots) {
+      await onStartWithBots();
+    } else {
+      startGame({ rated: false });
+    }
   };
   
   const handlePlayWithBots = async () => {
@@ -615,13 +655,13 @@ export default function GameTableModular({
       await handleInviteBot(seatIndex);
       await new Promise(resolve => setTimeout(resolve, 350));
     }
-    setShowStartWarningModal(false);
+    onCloseStartWarning?.();
     await new Promise(resolve => setTimeout(resolve, 500));
     startGame({ rated: false });
   };
   
   const handleCloseStartWarning = () => {
-    setShowStartWarningModal(false);
+    onCloseStartWarning?.();
     setIsStarting(false);
   };
 
@@ -646,7 +686,11 @@ export default function GameTableModular({
   };
   
   const requestStart = () => {
-    startGame({ rated: false });
+    if (propStartGame) {
+      propStartGame();
+    } else {
+      startGame({ rated: false });
+    }
   };
   
   const myIndex = gameState.players?.findIndex(p => p && p.id === propUser?.id);
@@ -658,9 +702,16 @@ export default function GameTableModular({
   
   // Trick card rendering
   const renderTrickCards = () => {
-    let displayTrick = animatingTrick ? animatedTrickCards : ((gameState as any)?.play?.currentTrick || []);
+    // CRITICAL FIX: Prioritize currentTrickCards from gameState, then play.currentTrick, then animatedTrickCards
+    let displayTrick = [];
     
-    if (!displayTrick.length && lastNonEmptyTrick.length && gameState?.play?.currentTrick?.length > 0) {
+    if (animatingTrick && animatedTrickCards.length > 0) {
+      displayTrick = animatedTrickCards;
+    } else if ((gameState as any)?.currentTrickCards && Array.isArray((gameState as any).currentTrickCards)) {
+      displayTrick = (gameState as any).currentTrickCards;
+    } else if ((gameState as any)?.play?.currentTrick && Array.isArray((gameState as any).play.currentTrick)) {
+      displayTrick = (gameState as any).play.currentTrick;
+    } else if (lastNonEmptyTrick.length > 0) {
       displayTrick = lastNonEmptyTrick;
     }
     
@@ -687,14 +738,21 @@ export default function GameTableModular({
     
     return Array.isArray(displayTrick) ? displayTrick.map((card: any, i: number) => {
       const seatIndex = card.seatIndex ?? card.playerIndex;
-      const displayPosition = orderedPlayers.findIndex(p => p && (p.position === seatIndex || p.seatIndex === seatIndex));
+      
+      // Calculate display position based on seat index relative to current user
+      let displayPosition = -1;
+      if (mySeatIndex >= 0) {
+        displayPosition = (seatIndex - mySeatIndex + 4) % 4;
+      } else {
+        // For spectators, use seat index directly
+        displayPosition = seatIndex;
+      }
       
       console.log(`[RENDER TRICK CARDS] Card ${i}:`, card);
-      console.log(`[RENDER TRICK CARDS] seatIndex: ${seatIndex}, displayPosition: ${displayPosition}`);
-      console.log(`[RENDER TRICK CARDS] orderedPlayers:`, orderedPlayers);
+      console.log(`[RENDER TRICK CARDS] seatIndex: ${seatIndex}, mySeatIndex: ${mySeatIndex}, displayPosition: ${displayPosition}`);
       
-      if (displayPosition === -1 || displayPosition === undefined) {
-        console.log(`[RENDER TRICK CARDS] Returning null for card ${i} - displayPosition: ${displayPosition}`);
+      if (displayPosition < 0 || displayPosition > 3) {
+        console.log(`[RENDER TRICK CARDS] Returning null for card ${i} - invalid displayPosition: ${displayPosition}`);
         return null;
       }
       
@@ -743,7 +801,7 @@ export default function GameTableModular({
             {readyButtonData.text}
           </button>
         )}
-        {startGameButtonData.shouldShow && (
+        {startGameButtonData.shouldShow && !showStartWarning && !showBotWarning && (
           <button
             onClick={startGameButtonData.onClick}
             disabled={startGameButtonData.disabled}
@@ -861,6 +919,8 @@ export default function GameTableModular({
                 isBot={isBot}
                 showLeaveConfirmation={showLeaveConfirmation}
                 showTrickHistory={showTrickHistory}
+                showStartWarning={showStartWarning}
+                showBotWarning={showBotWarning}
                 onStartGame={handleStartGameWrapper}
                 onBid={handleBidWrapper}
                 onBlindNil={() => {}}
@@ -940,7 +1000,7 @@ export default function GameTableModular({
           showLeaveConfirmation={showLeaveConfirmation}
           showWinner={showWinner}
           showLoser={showLoser}
-          showStartWarningModal={showStartWarningModal}
+          showStartWarningModal={showStartWarning}
           showBotWarning={botWarningOpen}
           handSummaryData={handSummaryData}
           finalScores={finalScores}
@@ -964,7 +1024,8 @@ export default function GameTableModular({
           onLeaveTable={handleLeaveTable}
           onCancelLeave={handleCancelLeave}
           onConfirmLeave={handleConfirmLeave}
-          onStartWithBots={handleStartWithBots}
+          onStartWithBots={onStartWithBots || (() => {})}
+          onStartWithBotsFromWarning={onStartWithBotsFromWarning || (() => {})}
           onPlayWithBots={handlePlayWithBots}
           onFillSeatWithBot={handleFillSeatWithBot}
           onTimerExpire={handleTimerExpire}

@@ -9,9 +9,10 @@ interface GameTileProps {
 
 const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) => {
   const getGameTypeBrick = (game: GameState) => {
-    const type = (game as any).rules?.bidType || 'REGULAR';
+    const type = (game as any).format || (game as any).rules?.bidType || 'REGULAR';
     let color = 'bg-green-600';
     let label = 'REGULAR';
+    
     if (type === 'WHIZ') {
       color = 'bg-blue-600';
       label = 'WHIZ';
@@ -20,15 +21,27 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
       label = 'MIRROR';
     } else if (type === 'GIMMICK') {
       color = 'bg-orange-500';
-      const rawGt = (game as any).rules?.gimmickType || '';
-      const gt = String(rawGt).toUpperCase().replace(/\s+/g, '_');
-      if (gt === 'BID_4_OR_NIL') label = '4 OR NIL';
-      else if (gt === 'BID_3') label = 'BID 3';
-      else if (gt === 'BID_HEARTS') label = 'BID ♡s';
-      else if (gt === 'SUICIDE') label = 'SUICIDE';
-      else if (gt === 'CRAZY_ACES') label = 'CRAZY As';
-      else label = 'GIMMICK';
+      // Check gimmickVariant first, then bidType for backward compatibility
+      const gimmickVariant = (game as any).gimmickVariant || (game as any).rules?.gimmickType || (game as any).rules?.bidType;
+      
+      // Map database enum values to display labels - NEVER show "GIMMICK"
+      if (gimmickVariant === 'SUICIDE') label = 'SUICIDE';
+      else if (gimmickVariant === 'BID4NIL' || gimmickVariant === '4 OR NIL') label = '4 OR NIL';
+      else if (gimmickVariant === 'BID3' || gimmickVariant === 'BID 3') label = 'BID 3';
+      else if (gimmickVariant === 'BIDHEARTS' || gimmickVariant === 'BID HEARTS') label = 'BID ♡s';
+      else if (gimmickVariant === 'CRAZY_ACES' || gimmickVariant === 'CRAZY ACES') label = 'CRAZY As';
+      else label = 'UNKNOWN'; // Fallback instead of "GIMMICK"
+    } else if (['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'].includes(type)) {
+      // Handle direct gimmick variant types from bidType
+      color = 'bg-orange-500';
+      if (type === 'SUICIDE') label = 'SUICIDE';
+      else if (type === '4 OR NIL') label = '4 OR NIL';
+      else if (type === 'BID 3') label = 'BID 3';
+      else if (type === 'BID HEARTS') label = 'BID ♡s';
+      else if (type === 'CRAZY ACES') label = 'CRAZY As';
+      else label = type.toUpperCase();
     }
+    
     return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
   };
 
@@ -66,7 +79,7 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
         <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
         </svg>
-        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (((game as any).rules?.bidType) === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (((game as any).format || (game as any).rules?.bidType) === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
         {/* Special bricks moved here */}
         {getSpecialBricks(game)}
       </div>

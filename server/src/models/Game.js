@@ -23,7 +23,8 @@ export class Game {
     this.finishedAt = data.finishedAt || null;
     
     // Game state
-    this.hands = data.hands || [];
+    // CRITICAL FIX: Ensure hands is always an array of 4 separate arrays
+    this.hands = data.hands || [[], [], [], []];
     this.bidding = data.bidding || {
       currentPlayer: null,
       currentBidderIndex: 0,

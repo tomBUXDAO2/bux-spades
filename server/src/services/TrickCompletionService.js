@@ -1,6 +1,7 @@
 import { prisma } from '../config/database.js';
 import { GameService } from './GameService.js';
 import { ScoringService } from './ScoringService.js';
+import redisGameState from './RedisGameStateService.js';
 
 /**
  * DATABASE-FIRST TRICK COMPLETION SERVICE
@@ -65,6 +66,17 @@ export class TrickCompletionService {
         // NUCLEAR: No logging for performance
       });
 
+      // CRITICAL: Update Redis cache with fresh game state after trick completion
+      try {
+        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        if (freshGameState) {
+          await redisGameState.setGameState(gameId, freshGameState);
+          console.log(`[TRICK COMPLETION] Updated Redis cache with fresh game state after trick completion`);
+        }
+      } catch (error) {
+        console.error(`[TRICK COMPLETION] Error updating Redis cache after trick completion:`, error);
+      }
+
       // Check if round is complete (13 tricks)
       const completedTricks = await prisma.trick.count({
         where: {
@@ -85,11 +97,9 @@ export class TrickCompletionService {
         const roundResult = await this.completeRound(gameId, roundId, io); // Pass io for events
         isGameComplete = roundResult.isGameComplete;
         
-        // If game is not complete, start a new round
-        if (!isGameComplete) {
-          // NUCLEAR: No logging for performance
-          await this.startNewRound(gameId, io);
-        }
+        // CRITICAL: Do NOT automatically start new round - wait for client confirmation
+        // The client will send 'hand_summary_continue' event when ready to proceed
+        console.log(`[TRICK COMPLETION] Round complete, waiting for client to continue via hand_summary_continue event`);
       } else {
         // NUCLEAR: No logging for performance
       }
@@ -266,8 +276,8 @@ export class TrickCompletionService {
           team2Score: scores.team1Score, // team1 becomes team2 in client
           team1Bags: scores.team0Bags,
           team2Bags: scores.team1Bags,
-          team1TotalScore: scores.team0Score, // For now, same as round score
-          team2TotalScore: scores.team1Score, // For now, same as round score
+          team1TotalScore: updatedGameState.team1TotalScore || scores.team0Score, // Use running total from game state
+          team2TotalScore: updatedGameState.team2TotalScore || scores.team1Score, // Use running total from game state
           
           // Team breakdown data
           team1Bid: team0Bid, // team0 becomes team1 in client
@@ -289,6 +299,10 @@ export class TrickCompletionService {
           gameState: updatedGameState,
           scores: handSummaryData
         });
+        
+        // CRITICAL: Clear trick cards before showing hand summary
+        io.to(gameId).emit('clear_table_cards', { gameId });
+        console.log(`[TRICK COMPLETION] Emitted clear_table_cards event for round completion`);
         
         io.to(gameId).emit('round_complete', {
           gameId,
@@ -361,13 +375,15 @@ export class TrickCompletionService {
           status: 'BIDDING'
         }
       });
-
-      console.log(`[TRICK COMPLETION] Created new round ${nextRoundNumber} with dealer seat ${nextDealerSeat}`);
       
       // Deal cards for new round
       await GameService.dealInitialHands(gameId);
 
       console.log(`[TRICK COMPLETION] New round ${nextRoundNumber} started successfully`);
+      
+      // CRITICAL: Clear current trick data from Redis cache for new round
+      await redisGameState.setCurrentTrick(gameId, []);
+      console.log(`[TRICK COMPLETION] Cleared current trick data from Redis cache for new round`);
       
       // Emit game update to notify clients of new round
       if (io) {

@@ -51,6 +51,122 @@ class BiddingHandler {
   }
 
   /**
+   * Validate a bid based on game rules and player's hand
+   */
+  async validateBid(gameState, player, bid, isNil, isBlindNil) {
+    const gameType = gameState.format || 'REGULAR';
+    const forcedBid = gameState.gimmickVariant;
+    const specialRules = gameState.specialRules || {};
+    
+    // Get player's hand from Redis (same source as bot bidding)
+    const hands = await redisGameState.getPlayerHands(gameState.id);
+    const playerHand = hands?.[player.seatIndex] || [];
+    
+    // Count cards in hand
+    const numSpades = playerHand.filter(card => 
+      card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠'
+    ).length;
+    const numHearts = playerHand.filter(card => 
+      card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥'
+    ).length;
+    const numAces = playerHand.filter(card => card.rank === 'A').length;
+    
+    // Handle gimmick games
+    if (forcedBid) {
+      switch (forcedBid) {
+        case 'SUICIDE':
+          return await this.validateSuicideBid(gameState, player, bid, isNil, isBlindNil);
+        case 'BID4NIL':
+        case '4 OR NIL':
+          return { valid: bid === 0 || bid === 4, message: '4 or Nil game: Must bid 0 (nil) or 4' };
+        case 'BID3':
+        case 'BID 3':
+          return { valid: bid === 3, message: 'Bid 3 game: Must bid exactly 3' };
+        case 'BIDHEARTS':
+          return { valid: bid === numHearts, message: `Bid Hearts game: Must bid ${numHearts} (number of hearts)` };
+        case 'CRAZY_ACES':
+        case 'CRAZY ACES':
+          return { valid: bid === (numAces * 3), message: `Crazy Aces game: Must bid ${numAces * 3} (${numAces} aces × 3)` };
+        default:
+          return { valid: false, message: 'Invalid gimmick game type' };
+      }
+    }
+    
+    // Handle regular game types
+    switch (gameType) {
+      case 'REGULAR':
+        return { valid: bid >= 0 && bid <= 13, message: 'Regular game: Bid 0-13' };
+      case 'WHIZ':
+        const validWhizBid = bid === numSpades || bid === 0;
+        return { valid: validWhizBid, message: `Whiz game: Must bid ${numSpades} (number of spades) or nil` };
+      case 'MIRROR':
+        return { valid: bid === numSpades, message: `Mirror game: Must bid ${numSpades} (number of spades)` };
+      default:
+        return { valid: false, message: 'Invalid game type' };
+    }
+  }
+
+  /**
+   * Validate SUICIDE game bid - exactly 1 person from each team must bid nil
+   */
+  async validateSuicideBid(gameState, player, bid, isNil, isBlindNil) {
+    // Get current bids from Redis
+    const currentBids = await redisGameState.getPlayerBids(gameState.id);
+    
+    // Determine bidding order based on dealer
+    const dealer = gameState.dealer || 0;
+    const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
+    
+    // Find current bidder's position in bidding order
+    const currentBidderIndex = biddingOrder.indexOf(player.seatIndex);
+    
+    // Determine teams
+    const isTeam1 = player.seatIndex === 0 || player.seatIndex === 2;
+    const partnerSeatIndex = isTeam1 ? 
+      (player.seatIndex === 0 ? 2 : 0) : 
+      (player.seatIndex === 1 ? 3 : 1);
+    
+    // Find partner's position in bidding order
+    const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
+    
+    // Check if partner already bid
+    const partnerBid = currentBids[partnerSeatIndex];
+    const partnerBidNil = partnerBid === 0;
+    
+    // Determine if current bidder must bid nil
+    let mustBidNil = false;
+    let canBidNil = true;
+    
+    if (partnerBidderIndex < currentBidderIndex) {
+      // Partner already bid
+      if (!partnerBidNil) {
+        // Partner didn't bid nil, so current player must bid nil
+        mustBidNil = true;
+      }
+    } else {
+      // Partner hasn't bid yet, so current player can choose
+      // But they need to consider if they want to force their partner to bid nil
+      canBidNil = true;
+    }
+    
+    // Validate the bid
+    if (mustBidNil) {
+      if (bid === 0) {
+        return { valid: true, message: 'Suicide game: Valid nil bid' };
+      } else {
+        return { valid: false, message: 'Suicide game: Must bid nil since partner didn\'t bid nil' };
+      }
+    } else {
+      // Player can bid whatever they want (0-13)
+      if (bid >= 0 && bid <= 13) {
+        return { valid: true, message: 'Suicide game: Valid bid' };
+      } else {
+        return { valid: false, message: 'Suicide game: Bid must be between 0-13' };
+      }
+    }
+  }
+
+  /**
    * Process a bid - database only
    */
   async processBid(gameId, userId, bid, isNil = false, isBlindNil = false) {
@@ -75,6 +191,13 @@ class BiddingHandler {
         throw new Error('Player not found in game');
       }
 
+      // Validate the bid based on game rules
+      const validation = await this.validateBid(gameState, player, bid, isNil, isBlindNil);
+      if (!validation.valid) {
+        this.socket.emit('error', { message: validation.message });
+        return;
+      }
+
       // Update bid in database first (synchronous)
       await this.loggingService.logBid(
         gameId,
@@ -86,7 +209,7 @@ class BiddingHandler {
       );
 
       // REAL-TIME: Update bid in Redis (instant)
-      let currentBids = await redisGameState.getPlayerBids(gameId) || new Array(4).fill(null);
+      let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);
       currentBids[player.seatIndex] = bid;
       await redisGameState.setPlayerBids(gameId, currentBids);
       
@@ -127,7 +250,14 @@ class BiddingHandler {
           currentPlayerSeat: player.seatIndex,
           nextPlayerIndex,
           nextPlayer,
-          allPlayers: gameState.players.map(p => ({ seatIndex: p.seatIndex, userId: p.userId, username: p.user?.username }))
+          allPlayers: gameState.players.map(p => ({ seatIndex: p.seatIndex, userId: p.userId, username: p.user?.username, isHuman: p.isHuman }))
+        });
+        
+        console.log(`[BIDDING] Next player details:`, {
+          userId: nextPlayer?.userId,
+          isHuman: nextPlayer?.isHuman,
+          seatIndex: nextPlayer?.seatIndex,
+          username: nextPlayer?.user?.username
         });
         
         // REAL-TIME: Update current player in existing cached game state
@@ -182,10 +312,10 @@ class BiddingHandler {
           }
         });
 
-        // Trigger next bot bid with a small delay to ensure mutex is cleared
-        setTimeout(() => {
-          this.triggerBotBidIfNeeded(gameId);
-        }, 100);
+        // Clear mutex FIRST, then trigger next bot bid
+        this.biddingBots.delete(gameId);
+        console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
+        this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
@@ -229,20 +359,73 @@ class BiddingHandler {
       const currentGameState = await redisGameState.getGameState(gameId);
       if (currentGameState) {
         currentGameState.status = 'PLAYING';
+        currentGameState.currentPlayer = firstPlayer?.userId || null; // CRITICAL: Update currentPlayer in Redis
+        
+        // Preserve bidding data in Redis cache
+        const latestBids = await redisGameState.getPlayerBids(gameId);
+        if (latestBids) {
+          currentGameState.bidding = {
+            bids: latestBids,
+            currentBidderIndex: firstPlayer?.seatIndex || 0,
+            currentPlayer: firstPlayer?.userId
+          };
+          
+          // Also update player bids in the players array
+          currentGameState.players = currentGameState.players.map(p => ({
+            ...p,
+            bid: latestBids[p.seatIndex] || null
+          }));
+        }
+        
         await redisGameState.setGameState(gameId, currentGameState);
-        console.log(`[BIDDING] Updated Redis game state to PLAYING`);
+        console.log(`[BIDDING] Updated Redis game state to PLAYING with currentPlayer: ${firstPlayer?.userId}`);
       } else {
         // Fallback: get full game state from database and update
         const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
         if (fullGameState) {
           fullGameState.status = 'PLAYING';
+          fullGameState.currentPlayer = firstPlayer?.userId || null; // CRITICAL: Update currentPlayer in fallback
+          
+          // Preserve bidding data in fallback state
+          const latestBids = await redisGameState.getPlayerBids(gameId);
+          if (latestBids) {
+            fullGameState.bidding = {
+              bids: latestBids,
+              currentBidderIndex: firstPlayer?.seatIndex || 0,
+              currentPlayer: firstPlayer?.userId
+            };
+            
+            // Also update player bids in the players array
+            fullGameState.players = fullGameState.players.map(p => ({
+              ...p,
+              bid: latestBids[p.seatIndex] || null
+            }));
+          }
+          
           await redisGameState.setGameState(gameId, fullGameState);
-          console.log(`[BIDDING] Updated Redis game state to PLAYING (from database)`);
+          console.log(`[BIDDING] Updated Redis game state to PLAYING (from database) with currentPlayer: ${firstPlayer?.userId}`);
         }
       }
 
       // Emit round started event
       const updatedGameState = await GameService.getGameStateForClient(gameId);
+      
+      // CRITICAL: Preserve bidding data when transitioning to PLAYING phase
+      const latestBids = await redisGameState.getPlayerBids(gameId);
+      if (latestBids && updatedGameState) {
+        updatedGameState.bidding = {
+          bids: latestBids,
+          currentBidderIndex: firstPlayer?.seatIndex || 0,
+          currentPlayer: firstPlayer?.userId
+        };
+        
+        // Also update player bids in the players array
+        updatedGameState.players = updatedGameState.players.map(p => ({
+          ...p,
+          bid: latestBids[p.seatIndex] || null
+        }));
+      }
+      
       this.io.to(gameId).emit('round_started', {
         gameId,
         gameState: updatedGameState
@@ -273,19 +456,29 @@ class BiddingHandler {
       
       this.biddingBots.add(gameId);
       
-      // Get the game from database to check if current player is a bot
-      const game = await GameService.getGame(gameId);
-      if (!game) {
-        console.log(`[BIDDING] No game found for game ${gameId}`);
-        this.biddingBots.delete(gameId);
-        return;
+      // Get the game state from Redis first (faster and more current)
+      let gameState = await redisGameState.getGameState(gameId);
+      if (!gameState) {
+        // Fallback to database if Redis is empty
+        gameState = await GameService.getGame(gameId);
+        if (!gameState) {
+          console.log(`[BIDDING] No game found for game ${gameId}`);
+          this.biddingBots.delete(gameId);
+          return;
+        }
       }
 
-      console.log(`[BIDDING] Current player ID: ${game.currentPlayer}`);
-      const currentPlayer = game.players.find(p => p.userId === game.currentPlayer);
+      console.log(`[BIDDING] Current player ID: ${gameState.currentPlayer}`);
+      console.log(`[BIDDING] All players in game:`, gameState.players.map(p => ({ 
+        id: p.id || p.userId, 
+        username: p.username || p.user?.username, 
+        isHuman: p.isHuman, 
+        seatIndex: p.seatIndex 
+      })));
+      const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);
       console.log(`[BIDDING] Found current player:`, currentPlayer ? { 
-        id: currentPlayer.userId, 
-        username: currentPlayer.user?.username, 
+        id: currentPlayer.id || currentPlayer.userId, 
+        username: currentPlayer.username || currentPlayer.user?.username, 
         isHuman: currentPlayer.isHuman, 
         seatIndex: currentPlayer.seatIndex 
       } : 'null');
@@ -296,34 +489,151 @@ class BiddingHandler {
         return;
       }
 
-      console.log(`[BIDDING] Triggering bot bid for ${currentPlayer.user?.username} (seat ${currentPlayer.seatIndex})`);
+      const playerId = currentPlayer.userId;
+      const playerUsername = currentPlayer.username || currentPlayer.user?.username;
+      
+      console.log(`[BIDDING] Triggering bot bid for ${playerUsername} (seat ${currentPlayer.seatIndex})`);
 
       // Get bot's hand from Redis
       const hands = await redisGameState.getPlayerHands(gameId);
       if (!hands || !hands[currentPlayer.seatIndex]) {
-        console.log(`[BIDDING] No hand found in Redis for bot ${currentPlayer.user?.username}`);
+        console.log(`[BIDDING] No hand found in Redis for bot ${playerUsername}`);
         this.biddingBots.delete(gameId);
         return;
       }
 
-      // Calculate bot bid based on hand
+      // Calculate bot bid based on hand and game type
       const hand = hands[currentPlayer.seatIndex];
       const numSpades = hand.filter(card => card.suit === 'SPADES').length;
       
-      // Simple bot logic: bid number of spades or 2 if no spades
-      const botBid = numSpades > 0 ? numSpades : 2;
-      
-      console.log(`[BIDDING] Bot ${currentPlayer.user?.username} bidding ${botBid} (${numSpades} spades)`);
+      // Use BotService for proper bidding logic based on game type
+      let botBid;
+      if (gameState.format === 'WHIZ') {
+        // Get partner bid for WHIZ rules
+        const partnerBid = this.getPartnerBid(gameState, currentPlayer.seatIndex);
+        botBid = this.botService.calculateWhizBid(gameState, currentPlayer.seatIndex, hand);
+        console.log(`[BIDDING] WHIZ bot ${playerUsername} bidding ${botBid} (${numSpades} spades, partner bid: ${partnerBid})`);
+      } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
+        // SUICIDE game bot logic
+        botBid = await this.calculateSuicideBotBid(gameState, currentPlayer.seatIndex, hand);
+        console.log(`[BIDDING] SUICIDE bot ${playerUsername} bidding ${botBid}`);
+      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
+        // 4 OR NIL game bot logic
+        botBid = this.calculate4OrNilBotBid(hand);
+        console.log(`[BIDDING] 4 OR NIL bot ${playerUsername} bidding ${botBid}`);
+      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID3' || gameState.gimmickVariant === 'BID 3')) {
+        // BID 3 game bot logic - always bid 3
+        botBid = 3;
+        console.log(`[BIDDING] BID 3 bot ${playerUsername} bidding ${botBid}`);
+      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'CRAZY_ACES' || gameState.gimmickVariant === 'CRAZY ACES')) {
+        // CRAZY ACES game bot logic - bid 3 points for each ace in hand
+        const numAces = hand.filter(card => card.rank === 'A').length;
+        botBid = numAces * 3;
+        console.log(`[BIDDING] CRAZY ACES bot ${playerUsername} bidding ${botBid} (${numAces} aces × 3)`);
+      } else {
+        // Simple bot logic for other game types
+        botBid = numSpades > 0 ? numSpades : 2;
+        console.log(`[BIDDING] Bot ${playerUsername} bidding ${botBid} (${numSpades} spades)`);
+      }
 
       // Process bot's bid
-      await this.processBid(gameId, currentPlayer.userId, botBid, botBid === 0, false);
+      await this.processBid(gameId, playerId, botBid, botBid === 0, false);
       
-      // Remove from bidding bots set
+      // Remove from bidding bots set IMMEDIATELY after processing
       this.biddingBots.delete(gameId);
+      console.log(`[BIDDING] Removed game ${gameId} from bidding bots mutex`);
     } catch (error) {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
       // Remove from bidding bots set on error too
       this.biddingBots.delete(gameId);
+    }
+  }
+
+  /**
+   * Get partner's bid for WHIZ rules
+   */
+  getPartnerBid(gameState, seatIndex) {
+    const partnerSeatIndex = (seatIndex + 2) % 4; // Partner is opposite seat
+    const partner = gameState.players.find(p => p.seatIndex === partnerSeatIndex);
+    return partner?.bid || null;
+  }
+
+  /**
+   * Calculate SUICIDE bot bid - use WHIZ rules for bidders 1 & 2, team logic for bidders 3 & 4
+   */
+  async calculateSuicideBotBid(gameState, seatIndex, hand) {
+    // Get current bids from Redis
+    const currentBids = await redisGameState.getPlayerBids(gameState.id);
+    
+    // Determine bidding order based on dealer
+    const dealer = gameState.dealer || 0;
+    const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
+    
+    // Find current bot's position in bidding order
+    const currentBidderIndex = biddingOrder.indexOf(seatIndex);
+    
+    // Determine teams
+    const isTeam1 = seatIndex === 0 || seatIndex === 2;
+    const partnerSeatIndex = isTeam1 ? 
+      (seatIndex === 0 ? 2 : 0) : 
+      (seatIndex === 1 ? 3 : 1);
+    
+    // Find partner's position in bidding order
+    const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
+    
+    // Check if partner already bid
+    const partnerBid = currentBids[partnerSeatIndex];
+    const partnerBidNil = partnerBid === 0;
+    
+    if (partnerBidderIndex < currentBidderIndex) {
+      // Partner already bid
+      if (!partnerBidNil) {
+        // Partner didn't bid nil, so current bot must bid nil
+        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} must bid nil (partner didn't bid nil)`);
+        return 0;
+      } else {
+        // Partner bid nil, so current bot can bid whatever
+        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} can bid anything (partner bid nil)`);
+        // Use simple logic - bid number of spades or nil based on hand strength
+        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+        return numSpades > 0 ? numSpades : 2;
+      }
+    } else {
+      // Partner hasn't bid yet - this is bidder 1 or 2
+      // Use WHIZ rules for intelligent nil decision
+      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using WHIZ rules`);
+      return this.botService.calculateWhizBid(gameState, seatIndex, hand);
+    }
+  }
+
+  /**
+   * Calculate 4 OR NIL bot bid - must bid either 4 or nil
+   * Use same nil-prevention logic as SUICIDE: only avoid nil if have Ace of Spades
+   */
+  calculate4OrNilBotBid(hand) {
+    const hasAceSpades = hand.some(card => card.suit === 'SPADES' && card.rank === 'A');
+    
+    if (hasAceSpades) {
+      // Must bid 4 if have Ace of Spades (can't bid nil)
+      console.log(`[BIDDING] 4 OR NIL bot bidding 4 (has Ace of Spades - cannot bid nil)`);
+      return 4;
+    } else {
+      // Can bid nil, use simple logic to decide between 4 or nil
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+      const numAces = hand.filter(card => card.rank === 'A').length;
+      const numKings = hand.filter(card => card.rank === 'K').length;
+      
+      // Count high cards (A, K, Q, J)
+      const highCards = hand.filter(card => ['A', 'K', 'Q', 'J'].includes(card.rank)).length;
+      
+      // Simple decision logic
+      if (highCards >= 4 || numAces >= 2 || (numSpades >= 3 && highCards >= 2)) {
+        console.log(`[BIDDING] 4 OR NIL bot bidding 4 (strong hand: ${highCards} high cards, ${numSpades} spades, ${numAces} aces)`);
+        return 4;
+      } else {
+        console.log(`[BIDDING] 4 OR NIL bot bidding nil (weak hand: ${highCards} high cards, ${numSpades} spades, ${numAces} aces)`);
+        return 0;
+      }
     }
   }
 
@@ -335,7 +645,7 @@ class BiddingHandler {
       const gameState = await GameService.getGameStateForClient(gameId);
       if (!gameState) return;
 
-      const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
+      const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);
       if (!currentPlayer || currentPlayer.type !== 'bot') return;
 
       console.log(`[BIDDING] Triggering bot play for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
@@ -354,17 +664,28 @@ class BiddingHandler {
       const updatedGameState = { ...gameState, hands: hands };
 
       // Get bot card choice
+      console.log(`[BIDDING] Calling bot service for ${currentPlayer.username} with game state:`, {
+        currentRound: updatedGameState.currentRound,
+        currentTrick: updatedGameState.currentTrick,
+        handsLength: updatedGameState.hands?.length,
+        seatIndex: currentPlayer.seatIndex
+      });
+      
       const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
+      console.log(`[BIDDING] Bot service returned:`, botCard);
+      
       if (botCard) {
         console.log(`[BIDDING] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
         
         // Import CardPlayHandler to process the card play
         const { CardPlayHandler } = await import('../card-play/cardPlayHandler.js');
         const cardPlayHandler = new CardPlayHandler(this.io, this.socket);
-        await cardPlayHandler.processCardPlay(gameId, currentPlayer.id, botCard, true);
+        await cardPlayHandler.processCardPlay(gameId, currentPlayer.userId, botCard, true);
+      } else {
+        console.log(`[BIDDING] ERROR: Bot ${currentPlayer.username} did not return a card choice`);
       }
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error(`[BIDDING] ERROR triggering bot play:`, error);
     }
   }
 }

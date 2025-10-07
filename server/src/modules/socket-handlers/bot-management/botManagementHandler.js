@@ -34,7 +34,7 @@ class BotManagementHandler {
       }
 
       // Check if user is in the game and can manage bots
-      const player = game.players.find(p => p && p.id === userId);
+      const player = game.players.find(p => p && p.userId === userId);
       if (!player) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;
@@ -98,7 +98,7 @@ class BotManagementHandler {
       }
 
       // Check if user is in the game and can manage bots
-      const player = game.players.find(p => p && p.id === userId);
+      const player = game.players.find(p => p && p.userId === userId);
       if (!player) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;
@@ -180,7 +180,7 @@ class BotManagementHandler {
       }
 
       // Check if user is in the game and can manage bots
-      const player = game.players.find(p => p && p.id === userId);
+      const player = game.players.find(p => p && p.userId === userId);
       if (!player) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;

@@ -204,11 +204,11 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         setGameState((prevState: GameState) => ({
           ...prevState,
           ...data.gameState,
-          // Update running totals for scoreboard
-          team1TotalScore: (prevState.team1TotalScore || 0) + (data.scores?.team1Score || 0),
-          team2TotalScore: (prevState.team2TotalScore || 0) + (data.scores?.team2Score || 0),
-          team1Bags: (prevState.team1Bags || 0) + (data.scores?.team1Bags || 0),
-          team2Bags: (prevState.team2Bags || 0) + (data.scores?.team2Bags || 0)
+          // Use running totals from server (already calculated correctly)
+          team1TotalScore: data.scores?.team1TotalScore || data.gameState.team1TotalScore || 0,
+          team2TotalScore: data.scores?.team2TotalScore || data.gameState.team2TotalScore || 0,
+          team1Bags: data.scores?.team1Bags || 0,
+          team2Bags: data.scores?.team2Bags || 0
         }));
       }
       

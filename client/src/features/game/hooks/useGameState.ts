@@ -3,7 +3,7 @@ import { useGameActions } from './useGameActions';
 import { useSocketEventHandlers } from './useSocketEventHandlers';
 import type { GameState, Card } from "../../../types/game";
 
-export type GameType = 'REGULAR' | 'WHIZ' | 'SOLO' | 'MIRROR';
+import { BiddingOption } from '../../../types/game';
 
 /**
  * Modular hook to manage game state with Socket.IO
@@ -30,7 +30,7 @@ export function useGameState(gameId: string, userId: string) {
     leaveGame,
     makeBid,
     playCard,
-    startGame
+    inviteBot
   } = useGameActions({
     socket,
     gameId,
@@ -60,7 +60,8 @@ export function useGameState(gameId: string, userId: string) {
     leaveGame,
     makeBid,
     playCard,
-    startGame
+    inviteBot,
+    socket
   };
 }
 

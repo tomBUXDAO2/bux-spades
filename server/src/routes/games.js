@@ -3,6 +3,7 @@ import { gameManager } from '../services/GameManager.js';
 import { GameService } from '../services/GameService.js';
 import { Game } from '../models/Game.js';
 import redisGameState from '../services/RedisGameStateService.js';
+import { prisma } from '../config/database.js';
 
 const router = express.Router();
 
@@ -76,14 +77,47 @@ router.get('/:id', async (req, res) => {
 // Create new game
 router.post('/', async (req, res) => {
   try {
+    // Map client format codes to database format names
+    const formatMapping = {
+      'REG': 'REGULAR',
+      'WHIZ': 'WHIZ', 
+      'MIRROR': 'MIRROR',
+      'GIMMICK': 'GIMMICK'
+    };
+    
+    // Handle gimmick variants - if format is a gimmick variant, map to GIMMICK format
+    const gimmickVariants = ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'];
+    const clientFormat = req.body.format || req.body.biddingOption || 'REGULAR';
+    
+    // Map client gimmick variants to database enum values
+    const gimmickVariantMapping = {
+      'SUICIDE': 'SUICIDE',
+      '4 OR NIL': 'BID4NIL',
+      'BID 3': 'BID3',
+      'BID HEARTS': 'BIDHEARTS',
+      'CRAZY ACES': 'CRAZY_ACES'
+    };
+    
+    let dbFormat;
+    let gimmickVariant = req.body.gimmickVariant || null;
+    
+    if (gimmickVariants.includes(clientFormat)) {
+      // This is a gimmick variant - set format to GIMMICK and variant to the specific type
+      dbFormat = 'GIMMICK';
+      gimmickVariant = gimmickVariantMapping[clientFormat] || clientFormat;
+    } else {
+      // Regular format mapping
+      dbFormat = formatMapping[clientFormat] || clientFormat;
+    }
+    
     const gameData = {
       id: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       createdById: req.body.creatorId || req.body.createdById || 'system', // Use creatorId from client
       createdByUsername: req.body.creatorName || req.body.createdByUsername || 'Unknown',
       createdByAvatar: req.body.creatorImage || req.body.createdByAvatar || null,
       mode: req.body.mode || 'PARTNERS',
-      format: req.body.format || 'REGULAR', // Required field
-      gimmickVariant: req.body.gimmickVariant || null,
+      format: dbFormat, // Use mapped format
+      gimmickVariant: gimmickVariant, // Use processed gimmick variant
       maxPoints: req.body.maxPoints || 200,
       minPoints: req.body.minPoints || -100,
       buyIn: req.body.buyIn || 0,
@@ -100,7 +134,7 @@ router.post('/', async (req, res) => {
         coinAmount: 0,
         maxPoints: 200,
         minPoints: -100,
-        bidType: 'REGULAR',
+        bidType: clientFormat, // Use original client format for display
         specialRules: {
           screamer: false,
           assassin: false
@@ -239,5 +273,70 @@ router.post('/:id/leave', async (req, res) => {
     res.status(500).json({ error: 'Failed to leave game' });
   }
 });
+
+// Get trick history for a game
+router.get('/:gameId/tricks', async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    
+    // Get all rounds for this game with their tricks and trick cards
+    const rounds = await prisma.round.findMany({
+      where: { gameId },
+      include: {
+        tricks: {
+          include: {
+            cards: {
+              orderBy: { playOrder: 'asc' }
+            }
+          },
+          orderBy: { trickNumber: 'asc' }
+        }
+      },
+      orderBy: { roundNumber: 'asc' }
+    });
+
+    // Get player mapping from the game
+    const gamePlayers = await prisma.gamePlayer.findMany({
+      where: { gameId },
+      select: { userId: true, seatIndex: true }
+    });
+    
+    // Create seat index to player ID mapping
+    const seatToPlayerMap = {};
+    gamePlayers.forEach(player => {
+      seatToPlayerMap[player.seatIndex] = player.userId;
+    });
+
+    // Transform the data for the client
+    const trickHistory = rounds.map(round => ({
+      roundNumber: round.roundNumber,
+      tricks: round.tricks.map(trick => ({
+        trickNumber: trick.trickNumber,
+        leadPlayerId: seatToPlayerMap[trick.leadSeatIndex] || `seat_${trick.leadSeatIndex}`,
+        winningPlayerId: seatToPlayerMap[trick.winningSeatIndex] || `seat_${trick.winningSeatIndex}`,
+        cards: trick.cards.map(card => ({
+          suit: card.suit,
+          value: getCardValue(card.rank),
+          position: card.playOrder,
+          playerId: seatToPlayerMap[card.seatIndex] || `seat_${card.seatIndex}`
+        }))
+      }))
+    }));
+
+    res.json({ trickHistory });
+  } catch (error) {
+    console.error('[API] Error fetching trick history:', error);
+    res.status(500).json({ error: 'Failed to fetch trick history' });
+  }
+});
+
+// Helper function to get card value
+function getCardValue(rank) {
+  const values = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+    'J': 11, 'Q': 12, 'K': 13, 'A': 14
+  };
+  return values[rank] || 0;
+}
 
 export { router as gameRoutes };

@@ -63,6 +63,7 @@ interface ModalManagerProps {
   onCancelLeave: () => void;
   onConfirmLeave: () => void;
   onStartWithBots: () => void;
+  onStartWithBotsFromWarning: () => void;
   onPlayWithBots: () => void;
   onFillSeatWithBot: () => void;
   onTimerExpire: () => void;
@@ -249,6 +250,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
     onCancelLeave,
     onConfirmLeave,
     onStartWithBots,
+    onStartWithBotsFromWarning,
     onPlayWithBots,
     onFillSeatWithBot,
     onTimerExpire,
@@ -283,7 +285,10 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
         isOpen={showStartWarningModal}
         emptySeats={emptySeats}
         onClose={onCloseStartWarning}
-        onPlayWithBots={onPlayWithBots}
+        onPlayWithBots={() => {
+          console.log('[MODAL] Calling onStartWithBots from empty seats modal');
+          onStartWithBots();
+        }}
       />
 
       {/* Bot Warning Modal */}
@@ -292,7 +297,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
         botCount={botCount}
         isStarting={isStarting}
         onClose={onCloseBotWarning}
-        onStartWithBots={onStartWithBots}
+        onStartWithBots={onStartWithBotsFromWarning}
       />
 
       {/* Seat Replacement Modal */}

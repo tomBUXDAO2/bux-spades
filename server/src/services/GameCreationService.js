@@ -8,6 +8,39 @@ export class GameCreationService {
     try {
       const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Map client format codes to database format names
+      const formatMapping = {
+        'REG': 'REGULAR',
+        'WHIZ': 'WHIZ', 
+        'MIRROR': 'MIRROR',
+        'GIMMICK': 'GIMMICK'
+      };
+      
+      // Handle gimmick variants - if format is a gimmick variant, map to GIMMICK format
+      const gimmickVariants = ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'];
+      const clientFormat = gameData.format || gameData.biddingOption || 'REGULAR';
+      
+      // Map client gimmick variants to database enum values
+      const gimmickVariantMapping = {
+        'SUICIDE': 'SUICIDE',
+        '4 OR NIL': 'BID4NIL',
+        'BID 3': 'BID3',
+        'BID HEARTS': 'BIDHEARTS',
+        'CRAZY ACES': 'CRAZY_ACES'
+      };
+      
+      let dbFormat;
+      let gimmickVariant = gameData.gimmickVariant || null;
+      
+      if (gimmickVariants.includes(clientFormat)) {
+        // This is a gimmick variant - set format to GIMMICK and variant to the specific type
+        dbFormat = 'GIMMICK';
+        gimmickVariant = gimmickVariantMapping[clientFormat] || clientFormat;
+      } else {
+        // Regular format mapping
+        dbFormat = formatMapping[clientFormat] || clientFormat;
+      }
+      
       // Determine if rated based on player types
       const hasBots = gameData.players.some(p => p.type === 'bot');
       const isRated = !hasBots; // Rated only if all human players
@@ -16,8 +49,8 @@ export class GameCreationService {
         id: gameId,
         createdById: creatorId,
         mode: gameData.mode || 'PARTNERS',
-        format: gameData.format || 'REGULAR',
-        gimmickVariant: gameData.gimmickVariant || null,
+        format: dbFormat, // Use mapped format
+        gimmickVariant: gimmickVariant, // Use processed gimmick variant
         isLeague: false, // App games are not league games
         isRated,
         status: 'WAITING',
@@ -35,7 +68,7 @@ export class GameCreationService {
           coinAmount: gameData.buyIn || 0,
           maxPoints: gameData.maxPoints || 200,
           minPoints: gameData.minPoints || -100,
-          bidType: 'REGULAR',
+          bidType: clientFormat, // Use original client format for display
           specialRules: gameData.specialRules || {}
         }
       });

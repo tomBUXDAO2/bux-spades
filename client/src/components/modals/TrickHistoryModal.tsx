@@ -47,55 +47,53 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
     }
   }, [isOpen, gameId, gameState]);
 
-  const fetchTrickHistory = () => {
+  const fetchTrickHistory = async () => {
     setLoading(true);
     try {
-      console.log('[TRICK HISTORY] Getting current hand trick history from game state');
+      console.log('[TRICK HISTORY] Fetching trick history from server for game:', gameId);
       
-      if (!gameState || !gameState.play || !gameState.play.tricks) {
-        console.log('[TRICK HISTORY] No current game state or tricks available');
+      const response = await fetch(`/api/games/${gameId}/tricks`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch trick history: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('[TRICK HISTORY] Received trick history from server:', data);
+      
+      if (!data.trickHistory || data.trickHistory.length === 0) {
+        console.log('[TRICK HISTORY] No trick history available from server');
         setTrickHistory([]);
         return;
       }
       
-      const currentTricks = gameState.play.tricks;
-      console.log('[TRICK HISTORY] Current tricks:', currentTricks.length);
-      
-      if (currentTricks.length === 0) {
-        console.log('[TRICK HISTORY] No tricks played yet in current hand');
-        setTrickHistory([]);
-        return;
-      }
-      
-      // Transform current game tricks to the expected format
-      const transformedTricks = currentTricks.map((trick: any, index: number) => ({
-        trickNumber: index + 1,
-        leadPlayerId: trick.cards?.[0]?.playedBy || players[0]?.id || '',
-        winningPlayerId: players[trick.winnerIndex]?.id || '',
-        cards: (trick.cards || []).map((card: any, cardIndex: number) => ({
-          suit: normalizeSuit(card.suit),
-          value: getCardValue(card.rank),
-          position: cardIndex,
-          playerId: card.playedBy || players[card.playerIndex || 0]?.id || ''
+      // Transform the data to match the expected format
+      const transformedHistory = data.trickHistory.map((round: any) => ({
+        roundNumber: round.roundNumber,
+        tricks: round.tricks.map((trick: any) => ({
+          trickNumber: trick.trickNumber,
+          leadPlayerId: trick.leadPlayerId,
+          winningPlayerId: trick.winningPlayerId,
+          cards: trick.cards.map((card: any) => ({
+            suit: normalizeSuit(card.suit),
+            value: card.value,
+            position: card.position,
+            playerId: card.playerId
+          }))
         }))
       }));
       
-      // Create a single round with the actual current round number from game state
-      const currentRoundNumber = (gameState.round ?? gameState.currentRound ?? gameState.play?.roundNumber ?? 1) as number;
-      const currentRound = {
-        roundNumber: Math.max(1, Number(currentRoundNumber) || 1),
-        tricks: transformedTricks
-      };
+      console.log('[TRICK HISTORY] Transformed trick history:', transformedHistory);
+      setTrickHistory(transformedHistory);
       
-      console.log('[TRICK HISTORY] Transformed current hand:', currentRound);
-      setTrickHistory([currentRound]);
-      
-      // Start with the most recent trick
-      setCurrentRoundIndex(0);
-      setCurrentTrickIndex(transformedTricks.length - 1);
+      // Start with the most recent round and trick
+      if (transformedHistory.length > 0) {
+        const lastRound = transformedHistory[transformedHistory.length - 1];
+        setCurrentRoundIndex(transformedHistory.length - 1);
+        setCurrentTrickIndex(Math.max(0, lastRound.tricks.length - 1));
+      }
       
     } catch (error) {
-      console.error('[TRICK HISTORY] Failed to get current hand trick history:', error);
+      console.error('[TRICK HISTORY] Failed to fetch trick history from server:', error);
       setTrickHistory([]);
     } finally {
       setLoading(false);
@@ -232,9 +230,6 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-gray-400 text-lg mb-2">No trick history available</div>
-              <div className="text-gray-500 text-sm">
-                This game may not have any completed tricks yet, or the game hasn't been logged to the database.
-              </div>
             </div>
           </div>
         ) : (

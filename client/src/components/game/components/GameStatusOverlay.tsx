@@ -26,6 +26,8 @@ interface GameStatusOverlayProps {
   isBot: (p: Player | Bot | null) => p is Bot;
   showLeaveConfirmation?: boolean;
   showTrickHistory?: boolean;
+  showStartWarning?: boolean;
+  showBotWarning?: boolean;
   onStartGame: () => void;
   onBid: (bid: number) => void;
   onBlindNil: () => void;
@@ -140,9 +142,9 @@ export const BiddingOverlay: React.FC<{
   }
 
   // Determine game type, including all gimmick games
-  let gameType = (gameState as any).rules?.bidType || (gameState as any).rules?.gameType;
+  let gameType = (gameState as any).format || (gameState as any).rules?.bidType || (gameState as any).rules?.gameType;
   const forcedBid = (gameState as any).forcedBid;
-  const gimmickType = (gameState as any).rules?.gimmickType;
+  const gimmickType = (gameState as any).gimmickVariant || (gameState as any).rules?.gimmickType;
   
   // Handle gimmick games
   if (forcedBid === 'SUICIDE') {
@@ -188,10 +190,44 @@ export const BiddingOverlay: React.FC<{
   
   // Get partner bid for Suicide games
   let partnerBid: number | undefined;
-  if ((gameState as any).forcedBid === 'SUICIDE' && (gameState as any).bidding && (gameState as any).bidding.bids) {
+  let mustBidNil = false;
+  if (((gameState as any).forcedBid === 'SUICIDE' || (gameState as any).gimmickVariant === 'SUICIDE') && (gameState as any).bidding && (gameState as any).bidding.bids) {
     const partnerIndex = (currentPlayerIndex + 2) % 4;
     partnerBid = (gameState as any).bidding.bids[partnerIndex];
+    
+    // Check if player must bid nil (partner didn't bid nil)
+    mustBidNil = partnerBid !== undefined && partnerBid !== 0 && partnerBid !== null;
   }
+
+  // Auto-bid nil for SUICIDE games when forced
+  React.useEffect(() => {
+    if (mustBidNil && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
+      console.log('[SUICIDE] Auto-bidding nil - partner bid:', partnerBid);
+      onBid(0); // Auto-bid nil
+    }
+  }, [mustBidNil, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, partnerBid, onBid]);
+
+  // Auto-bid 3 for BID 3 games
+  React.useEffect(() => {
+    if (gimmickType === 'BID 3' || gimmickType === 'BID3') {
+      if (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
+        console.log('[BID 3] Auto-bidding 3');
+        onBid(3); // Auto-bid 3
+      }
+    }
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gameState.gimmickVariant]);
+
+  // Auto-bid 3 points per ace for CRAZY ACES games
+  React.useEffect(() => {
+    if (gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') {
+      if (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
+        const numAces = currentPlayerHand.filter(card => card.rank === 'A').length;
+        const bidAmount = numAces * 3;
+        console.log(`[CRAZY ACES] Auto-bidding ${bidAmount} (${numAces} aces × 3)`);
+        onBid(bidAmount); // Auto-bid 3 points per ace
+      }
+    }
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gimmickType, currentPlayerHand]);
 
   return (
     <>
@@ -203,7 +239,7 @@ export const BiddingOverlay: React.FC<{
       />
       
       {/* Bidding Interface */}
-      {!showBlindNilModal && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete)) && (
+      {!showBlindNilModal && !mustBidNil && !(gimmickType === 'BID 3' || gimmickType === 'BID3') && !(gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete)) && (
         <BiddingInterface
           onBid={onBid}
           gameType={gameType}
@@ -213,10 +249,11 @@ export const BiddingOverlay: React.FC<{
           currentPlayerTurn={gameState.currentPlayer}
           allowNil={gameState.rules?.allowNil}
           hasAceSpades={hasAceSpades}
-          gimmickType={(gameState as any).rules?.gimmickType}
+          gimmickType={(gameState as any).gimmickVariant || (gameState as any).rules?.gimmickType}
           partnerBid={partnerBid}
           partnerBidValue={partnerBid}
           currentPlayerHand={currentPlayerHand}
+          myPlayerIndex={myPlayerIndex}
         />
       )}
     </>
@@ -281,7 +318,7 @@ export const ForcedBidMessage: React.FC<{
   
   const forcedBid = (gameState as any)?.forcedBid;
   const safeRules = (gameState as any)?.rules || {};
-  const gameType = safeRules.bidType || (gameState as any)?.gameType;
+  const gameType = (gameState as any)?.format || safeRules.bidType || (gameState as any)?.gameType;
   
   if (forcedBid === "BIDHEARTS") {
     return (
@@ -305,14 +342,6 @@ export const ForcedBidMessage: React.FC<{
            style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
         <div className="font-bold">CRAZY ACES</div>
         <div className="text-sm mt-1">All players must bid 3 for each ace they hold</div>
-      </div>
-    );
-  } else if (gameType === "MIRROR") {
-    return (
-      <div className="px-4 py-2 bg-purple-600/80 text-white rounded-lg text-center animate-pulse pointer-events-auto"
-           style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
-        <div className="font-bold">BIDDING SPADES</div>
-        <div className="text-sm mt-1">All players must bid their number of spades</div>
       </div>
     );
   }
@@ -367,6 +396,8 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
     isBot,
     showLeaveConfirmation,
     showTrickHistory,
+    showStartWarning,
+    showBotWarning,
     onStartGame,
     onBid,
     onBlindNil,
@@ -384,7 +415,7 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
             scaleFactor={scaleFactor}
             isLeague={isLeague}
             isStarting={isStarting}
-            hideStartButton={(gameState as any)?.ui?.showBotWarning === true}
+            hideStartButton={(gameState as any)?.ui?.showBotWarning === true || showStartWarning || showBotWarning}
             showLeaveConfirmation={showLeaveConfirmation}
             showTrickHistory={showTrickHistory}
             onStartGame={onStartGame}

@@ -30,30 +30,29 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
       <div className="flex items-center gap-2 text-sm mb-2">
         {/* Game type brick */}
         {(() => {
-          const type = (gameState as any).rules?.bidType || (gameState as any).rules?.gameType || 'REGULAR';
+          const format = (gameState as any).format || 'REGULAR';
+          const gimmickVariant = (gameState as any).gimmickVariant;
           let color = 'bg-green-600';
           let label = 'REGULAR';
-          if (type === 'WHIZ') {
+          if (format === 'WHIZ') {
             color = 'bg-blue-600';
             label = 'WHIZ';
-          } else if (type === 'MIRROR') {
+          } else if (format === 'MIRROR') {
             color = 'bg-red-600';
             label = 'MIRROR';
-          } else if (type === 'GIMMICK') {
+          } else if (format === 'GIMMICK' || gimmickVariant) {
             color = 'bg-orange-500';
-            const rawGt = (gameState as any).rules?.gimmickType || (gameState as any).forcedBid || '';
-            const gt = String(rawGt).toUpperCase().replace(/\s+/g, '_');
-            if (gt === 'BID_4_OR_NIL') label = '4 OR NIL';
-            else if (gt === 'BID_3') label = 'BID 3';
-            else if (gt === 'BID_HEARTS') label = 'BID ♡s';
-            else if (gt === 'SUICIDE') label = 'SUICIDE';
-            else if (gt === 'CRAZY_ACES') label = 'CRAZY As';
-            else label = 'GIMMICK';
+            if (gimmickVariant === 'BID4NIL' || gimmickVariant === '4 OR NIL') label = '4 OR NIL';
+            else if (gimmickVariant === 'BID3' || gimmickVariant === 'BID 3') label = 'BID 3';
+            else if (gimmickVariant === 'BIDHEARTS' || gimmickVariant === 'BID HEARTS') label = 'BID ♡s';
+            else if (gimmickVariant === 'SUICIDE') label = 'SUICIDE';
+            else if (gimmickVariant === 'CRAZY_ACES' || gimmickVariant === 'CRAZY ACES') label = 'CRAZY As';
+            else label = 'UNKNOWN'; // Never show GIMMICK
           }
           return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
         })()}
         {/* Points */}
-        <span className="text-slate-300 font-medium">{gameState.minPoints}/{gameState.maxPoints}</span>
+        <span className="text-slate-300 font-medium">{(gameState as any).minPoints}/{(gameState as any).maxPoints}</span>
         {/* Nil and bn (blind nil) with inline check/cross */}
         {(gameState as any).nilAllowed && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
         {!(gameState as any).nilAllowed && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
@@ -61,16 +60,16 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
       </div>
       {/* Line 2: Buy-in, game mode, and special bricks */}
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-yellow-500 text-lg font-bold">{((gameState.buyIn ?? (gameState as any).rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
+        <span className="text-yellow-500 text-lg font-bold">{((gameState as any).buyIn ?? 100000) / 1000}k</span>
         <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
         </svg>
-        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{gameState.gameMode || (gameState.rules?.gameType === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
+        <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{(gameState as any).mode || 'PARTNERS'}</span>
         {/* Special bricks for assassin/screamer */}
-        {(gameState.specialRules?.assassin || (gameState as any).rules?.specialRules?.assassin) && (
+        {(gameState.specialRules?.assassin || (gameState as any).specialRules?.assassin) && (
           <span className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
         )}
-        {(gameState.specialRules?.screamer || (gameState as any).rules?.specialRules?.screamer) && (
+        {(gameState.specialRules?.screamer || (gameState as any).specialRules?.screamer) && (
           <span className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
         )}
       </div>

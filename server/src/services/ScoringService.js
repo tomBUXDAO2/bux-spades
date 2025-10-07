@@ -139,17 +139,41 @@ export class ScoringService {
       const bid = player.bid || 0;
       const tricksWon = player.tricksWon;
       
+      let pointsThisRound = 0;
       let bagsThisRound = 0;
       
-      // Calculate bags for this round
-      if (tricksWon > bid) {
-        bagsThisRound = tricksWon - bid;
+      // Calculate points based on bid vs tricks
+      if (bid === 0) {
+        // Nil bid
+        if (tricksWon === 0) {
+          // Made nil
+          pointsThisRound = player.isBlindNil ? 200 : 100;
+        } else {
+          // Failed nil
+          pointsThisRound = player.isBlindNil ? -200 : -100;
+        }
+      } else {
+        // Regular bid
+        if (tricksWon === bid) {
+          // Made bid exactly
+          pointsThisRound = bid * 10;
+        } else if (tricksWon > bid) {
+          // Made bid + overtricks
+          pointsThisRound = bid * 10 + (tricksWon - bid);
+          bagsThisRound = tricksWon - bid;
+        } else {
+          // Failed bid
+          pointsThisRound = -(bid * 10);
+        }
       }
 
       // Update player stats
       await prisma.playerRoundStats.update({
         where: { id: player.id },
-        data: { bagsThisRound }
+        data: { 
+          bagsThisRound,
+          pointsThisRound
+        }
       });
     }
 
@@ -159,7 +183,10 @@ export class ScoringService {
         seatIndex: p.seatIndex,
         bid: p.bid,
         tricksWon: p.tricksWon,
-        bagsThisRound: p.tricksWon > (p.bid || 0) ? p.tricksWon - (p.bid || 0) : 0
+        bagsThisRound: p.tricksWon > (p.bid || 0) ? p.tricksWon - (p.bid || 0) : 0,
+        pointsThisRound: p.tricksWon === (p.bid || 0) ? (p.bid || 0) * 10 : 
+                        p.tricksWon > (p.bid || 0) ? (p.bid || 0) * 10 + (p.tricksWon - (p.bid || 0)) :
+                        -((p.bid || 0) * 10)
       }))
     };
   }
@@ -265,8 +292,8 @@ export class ScoringService {
         // Both teams exceeded - play one more round if scores are level
         if (team0RunningTotal === team1RunningTotal) {
           console.log(`[SCORING] Both teams exceeded limits with equal scores - play one more round`);
-          return { isComplete: false };
-        }
+        return { isComplete: false };
+      }
         // Winner is whoever has most points
         const winner = team0RunningTotal > team1RunningTotal ? 'TEAM_0' : 'TEAM_1';
         return { 
@@ -275,7 +302,7 @@ export class ScoringService {
           reason: `Both teams exceeded limits, ${winner} has most points`
         };
       }
-      
+
       if (team0Exceeded) {
         return { 
           isComplete: true, 
@@ -338,8 +365,8 @@ export class ScoringService {
 
       // Create game result - only team scores for partners games
       const gameResultData = {
-        gameId,
-        winner,
+          gameId,
+          winner,
         totalRounds: game.currentRound,
         totalTricks: game.currentRound * 13, // 13 tricks per round
         meta: { reason }

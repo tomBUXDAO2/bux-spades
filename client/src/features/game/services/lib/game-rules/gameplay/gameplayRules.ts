@@ -14,9 +14,55 @@ export function isPlayableCard(
   card: Card,
   hand: Card[],
   leadSuit: Suit | null,
-  isLeadingTrick: boolean
+  isLeadingTrick: boolean,
+  specialRules?: { screamer?: boolean; assassin?: boolean },
+  spadesBroken?: boolean
 ): boolean {
-  // If leading the trick, any card is playable
+  // Handle special rules first
+  
+  // SCREAMER: Cannot play spades unless following spade lead or no other suits available
+  if (specialRules?.screamer) {
+    const isSpade = card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠';
+    if (isSpade) {
+      // Can only play spades if:
+      // 1. Following a spade lead, OR
+      // 2. No other suits available (all cards are spades)
+      const followingSpadeLead = leadSuit && (leadSuit === 'SPADES' || leadSuit === 'S' || leadSuit === '♠');
+      const allSpades = hand.every(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+      
+      if (!followingSpadeLead && !allSpades) {
+        return false;
+      }
+    }
+  }
+  
+  // ASSASSIN: Must cut and lead spades when possible
+  if (specialRules?.assassin) {
+    const isSpade = card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠';
+    
+    if (isLeadingTrick) {
+      // When leading, must lead spades if available
+      const hasSpades = hand.some(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+      if (hasSpades && !isSpade) {
+        return false;
+      }
+    } else {
+      // When not leading, must play spades if available and can't follow suit
+      if (leadSuit) {
+        const hasLeadSuit = hand.some(c => c.suit === leadSuit);
+        if (!hasLeadSuit) {
+          // Can't follow suit, must play spades if available
+          const hasSpades = hand.some(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+          if (hasSpades && !isSpade) {
+            return false;
+          }
+        }
+      }
+    }
+  }
+
+  // Standard rules
+  // If leading the trick, any card is playable (after special rule checks)
   if (isLeadingTrick) {
     return true;
   }

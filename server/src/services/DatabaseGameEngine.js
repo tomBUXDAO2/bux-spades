@@ -375,11 +375,13 @@ export class DatabaseGameEngine {
           });
 
           // Update game current trick
+          // Find the winning player's userId
+          const winningPlayer = game.players.find(p => p.seatIndex === winner);
           await tx.game.update({
             where: { id: gameId },
             data: { 
               currentTrick: nextTrickNumber,
-              currentPlayer: winner
+              currentPlayer: winningPlayer?.userId
             }
           });
 
@@ -388,7 +390,7 @@ export class DatabaseGameEngine {
       }
 
       // 4. Validate card play
-      if (!this.isValidCardPlay(gameId, seatIndex, card, currentTrick)) {
+      if (!(await this.isValidCardPlay(gameId, seatIndex, card, currentTrick))) {
         throw new Error('Invalid card play');
       }
 
@@ -481,11 +483,48 @@ export class DatabaseGameEngine {
   }
 
   /**
+   * Get a player's current hand
+   */
+  static async getPlayerHand(gameId, seatIndex) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: { rounds: { include: { tricks: { include: { cards: true } } } } }
+      });
+      
+      if (!game) return [];
+      
+      // Get dealt cards from game state
+      const gameState = game.gameState || {};
+      const dealtHand = gameState.hands?.[seatIndex] || [];
+      
+      // Get played cards from current round
+      const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+      if (!currentRound) return dealtHand;
+      
+      const playedCards = currentRound.tricks.flatMap(trick => 
+        trick.cards.filter(card => card.seatIndex === seatIndex)
+      );
+      
+      // Subtract played cards from dealt hand
+      const currentHand = dealtHand.filter(dealtCard => 
+        !playedCards.some(playedCard => 
+          playedCard.suit === dealtCard.suit && playedCard.rank === dealtCard.rank
+        )
+      );
+      
+      return currentHand;
+    } catch (error) {
+      console.error('[DATABASE GAME ENGINE] Error getting player hand:', error);
+      return [];
+    }
+  }
+
+  /**
    * Validate if card play is legal
    */
-  static isValidCardPlay(gameId, seatIndex, card, currentTrick) {
-    // This would implement spades card play validation
-    // For now, basic validation
+  static async isValidCardPlay(gameId, seatIndex, card, currentTrick) {
+    // Basic validation
     if (!currentTrick) return false;
     if (currentTrick.cards.length >= 4) return false;
     
@@ -496,8 +535,71 @@ export class DatabaseGameEngine {
     
     if (seatIndex !== expectedPlayer) return false;
     
-    // Check if player has the card (would need to compute hand)
-    // This is simplified for now
+    // Get game info for special rules validation
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      select: { specialRules: true, gameState: true }
+    });
+    
+    if (!game) return false;
+    
+    // Get player's hand to validate card play
+    const playerHand = await this.getPlayerHand(gameId, seatIndex);
+    if (!playerHand || !playerHand.some(c => c.suit === card.suit && c.rank === card.rank)) {
+      return false; // Player doesn't have this card
+    }
+    
+    // Apply special rules validation
+    const specialRules = game.specialRules || {};
+    const isLeadingTrick = currentTrick.cards.length === 0;
+    const leadSuit = isLeadingTrick ? null : currentTrick.cards[0].suit;
+    
+    // SCREAMER: Cannot play spades unless following spade lead or no other suits available
+    if (specialRules.screamer) {
+      const isSpade = card.suit === 'SPADES';
+      if (isSpade) {
+        const followingSpadeLead = leadSuit === 'SPADES';
+        const allSpades = playerHand.every(c => c.suit === 'SPADES');
+        
+        if (!followingSpadeLead && !allSpades) {
+          return false;
+        }
+      }
+    }
+    
+    // ASSASSIN: Must cut and lead spades when possible
+    if (specialRules.assassin) {
+      const isSpade = card.suit === 'SPADES';
+      
+      if (isLeadingTrick) {
+        // When leading, must lead spades if available
+        const hasSpades = playerHand.some(c => c.suit === 'SPADES');
+        if (hasSpades && !isSpade) {
+          return false;
+        }
+      } else {
+        // When not leading, must play spades if available and can't follow suit
+        if (leadSuit) {
+          const hasLeadSuit = playerHand.some(c => c.suit === leadSuit);
+          if (!hasLeadSuit) {
+            // Can't follow suit, must play spades if available
+            const hasSpades = playerHand.some(c => c.suit === 'SPADES');
+            if (hasSpades && !isSpade) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+    
+    // Standard suit following rules
+    if (leadSuit && leadSuit !== card.suit) {
+      const hasLeadSuit = playerHand.some(c => c.suit === leadSuit);
+      if (hasLeadSuit) {
+        return false; // Must follow suit
+      }
+    }
+    
     return true;
   }
 
@@ -601,29 +703,15 @@ export class DatabaseGameEngine {
         }
       });
     } else {
-      // Start next round
-      const nextRound = game.currentRound + 1;
-      const nextDealer = (game.dealer + 1) % 4;
-      
+      // CRITICAL: Do NOT automatically start next round - wait for client confirmation
+      // Just update the game status to show hand summary
       await tx.game.update({
         where: { id: gameId },
         data: {
-          currentRound: nextRound,
-          currentTrick: 1,
-          currentPlayer: nextDealer,
-          dealer: nextDealer
+          status: 'HAND_SUMMARY' // Set status to show hand summary
         }
       });
-
-      // Create new round
-      await tx.round.create({
-        data: {
-          id: `round_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          gameId,
-          roundNumber: nextRound,
-          dealerSeatIndex: nextDealer
-        }
-      });
+      console.log(`[DATABASE GAME ENGINE] Round complete, set status to HAND_SUMMARY - waiting for client to continue`);
     }
   }
 }

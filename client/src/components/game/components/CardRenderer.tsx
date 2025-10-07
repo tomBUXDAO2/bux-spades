@@ -183,6 +183,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   if (isMyTurn && Array.isArray(myHand)) {
     const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
     const spadesBroken = (gameState as any).play?.spadesBroken;
+    console.log(`[CARD RENDERER] spadesBroken check:`, { spadesBroken, gameStatePlay: (gameState as any).play, isLeading });
     if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
       effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠') : [];
       if (effectivePlayableCards.length === 0) {

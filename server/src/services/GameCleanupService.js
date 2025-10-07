@@ -66,7 +66,7 @@ export class GameCleanupService {
       let botUserIds = [];
       if (Array.isArray(game?.players)) {
         const botPlayers = game.players.filter(p => p && p.isHuman === false);
-        botUserIds = botPlayers.map(p => p.id);
+        botUserIds = botPlayers.map(p => p.userId);
       }
       // Fallback to DB if in-memory game is unavailable or incomplete
       if (botUserIds.length === 0) {

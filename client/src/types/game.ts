@@ -1,7 +1,6 @@
-export type GameType = 'REGULAR' | 'SOLO' | 'WHIZ' | 'MIRROR';
 export type GameMode = 'PARTNERS' | 'SOLO';
-export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK' | 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
-export type GamePlayOption = 'REG' | 'REGULAR' | 'WHIZ' | 'MIRROR';
+export type BiddingOption = 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+export type GimmickVariant = 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES';
 
 export type Suit = 'SPADES' | 'HEARTS' | 'DIAMONDS' | 'CLUBS';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -57,7 +56,7 @@ export interface GameState {
   playerScores?: number[];
   playerBags?: number[];
   rules: {
-    gameType: GameType;
+    gameType: BiddingOption;
     allowNil: boolean;
     allowBlindNil: boolean;
     numHands: number;
@@ -71,7 +70,7 @@ export interface GameState {
   cardPlayers?: Record<string, string>;
   team1Bags?: number;
   team2Bags?: number;
-  gameMode?: string;
+  gameMode?: GameMode;
   forcedBid?: string;
   specialRules?: { screamer?: boolean; assassin?: boolean };
   buyIn?: number;
@@ -106,7 +105,7 @@ export interface CompletedTrick {
 }
 
 export interface GameRules {
-  gameType: GameType;
+  gameType: BiddingOption;
   allowNil: boolean;
   allowBlindNil: boolean;
   minPoints: number;
@@ -122,7 +121,6 @@ export interface GameRules {
 export interface GameSettings {
   gameMode: GameMode;
   biddingOption: BiddingOption;
-  gamePlayOption: GamePlayOption;
   minPoints: number;
   maxPoints: number;
   buyIn: number;

@@ -76,7 +76,7 @@ class CardPlayHandler {
       }
 
       // Get current trick
-      const currentTrick = await prisma.trick.findFirst({
+      let currentTrick = await prisma.trick.findFirst({
         where: {
           roundId: currentRound.id,
           trickNumber: gameState.currentTrick || 1
@@ -98,36 +98,14 @@ class CardPlayHandler {
         card.rank
       );
 
-      // CRITICAL: If card play was rejected, move to next player immediately
+      // CRITICAL: If card play was rejected, KEEP TURN WITH SAME PLAYER
       if (logResult.rejected) {
-        console.log(`[CARD PLAY] Card play rejected for seat ${player.seatIndex}, moving to next player`);
+        console.log(`[CARD PLAY] Card play rejected for seat ${player.seatIndex}, keeping turn with same player`);
         
-        // Move to next player
-        const nextPlayerIndex = (player.seatIndex + 1) % 4;
-        const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
+        // DO NOT change currentPlayer - keep it with the same player
+        // The player must play a valid card
         
-        // Update current player in database
-        await GameService.updateGame(gameId, {
-          currentPlayer: nextPlayer?.userId || null
-        });
-
-        // REAL-TIME: Update current player in existing cached game state
-        const currentGameState = await redisGameState.getGameState(gameId);
-        if (currentGameState) {
-          currentGameState.currentPlayer = nextPlayer?.userId || null;
-          await redisGameState.setGameState(gameId, currentGameState);
-          console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId || null}`);
-        } else {
-          // Fallback: get full game state from database and update
-          const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
-          if (fullGameState) {
-            fullGameState.currentPlayer = nextPlayer?.userId || null;
-            await redisGameState.setGameState(gameId, fullGameState);
-            console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId || null} (from database)`);
-          }
-        }
-        
-        // Emit update to all players
+        // Emit rejection to all players
         const updatedGameState = await GameService.getGameStateForClient(gameId);
         this.io.to(gameId).emit('card_played', {
           gameId,
@@ -140,14 +118,7 @@ class CardPlayHandler {
           }
         });
 
-        // Trigger next player if it's a bot
-        if (nextPlayer && nextPlayer.isHuman === false) {
-          setTimeout(() => {
-            this.triggerBotPlayIfNeeded(gameId);
-          }, 500); // Small delay to let the UI update
-        }
-
-        console.log(`[CARD PLAY] Moved to next player: ${nextPlayer?.userId || 'null'}`);
+        console.log(`[CARD PLAY] Card rejected - turn remains with ${userId}`);
         return;
       }
 
@@ -157,7 +128,9 @@ class CardPlayHandler {
         select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
       });
 
+      console.log(`[CARD PLAY] Checking trick completion - trickCards.length: ${trickCards.length}`);
       if (trickCards.length >= 4) {
+        console.log(`[CARD PLAY] Trick is complete, calling TrickCompletionService`);
         // Complete the trick
         const trickResult = await TrickCompletionService.checkAndCompleteTrick(
           gameId,
@@ -171,6 +144,7 @@ class CardPlayHandler {
           console.log(`[CARD PLAY] Trick completed, winner: seat ${trickResult.winningSeatIndex}`);
           
           // First, emit card played event so client can render the 4th card
+          // NOTE: This will be emitted again after updateCurrentPlayer with correct currentPlayer
           const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
 
           this.io.to(gameId).emit('card_played', {
@@ -199,29 +173,26 @@ class CardPlayHandler {
               return;
             }
             
-            // Update game state
-            await GameService.updateGame(gameId, {
-              currentTrick: gameState.currentTrick + 1,
-              currentPlayer: winningPlayer.userId
-            });
+            // CRITICAL: Use SINGLE unified system for currentPlayer updates
+            console.log(`[CARD PLAY] About to call updateCurrentPlayer with winningPlayer.userId: ${winningPlayer.userId}`);
+            await this.updateCurrentPlayer(gameId, winningPlayer.userId);
 
-            // REAL-TIME: Update game state in Redis after trick completion
-            const currentGameState = await redisGameState.getGameState(gameId);
-            if (currentGameState) {
-              currentGameState.currentTrick = gameState.currentTrick + 1;
-              currentGameState.currentPlayer = winningPlayer.userId;
-              await redisGameState.setGameState(gameId, currentGameState);
-              console.log(`[CARD PLAY] Updated Redis game state after trick completion`);
-            } else {
-              // Fallback: get full game state from database and update
-              const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
-              if (fullGameState) {
-                fullGameState.currentTrick = gameState.currentTrick + 1;
-                fullGameState.currentPlayer = winningPlayer.userId;
-                await redisGameState.setGameState(gameId, fullGameState);
-                console.log(`[CARD PLAY] Updated Redis game state after trick completion (from database)`);
-              }
-            }
+            // CRITICAL: Emit card_played event with correct currentPlayer after updateCurrentPlayer
+            console.log(`[CARD PLAY] About to get corrected game state after updateCurrentPlayer`);
+            const correctedGameState = await GameService.getGameStateForClient(gameId);
+            console.log(`[CARD PLAY] Corrected game state currentPlayer: ${correctedGameState.currentPlayer}, expected: ${winningPlayer.userId}`);
+            this.io.to(gameId).emit('card_played', {
+              gameId,
+              gameState: correctedGameState,
+              cardPlayed: {
+                userId,
+                card,
+                seatIndex: player.seatIndex,
+                isBot
+              },
+              currentTrick: correctedGameState.play?.currentTrick || []
+            });
+            console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
 
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
@@ -240,18 +211,35 @@ class CardPlayHandler {
                   suit: card.suit,
                   rank: card.rank,
                   seatIndex: card.seatIndex,
-                  playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.id
+                  playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
                 }))
               }
             });
 
-            // Start next trick if round not complete
-            if (!trickResult.isRoundComplete) {
-              // Create new trick
-              await this.createNewTrick(gameId, currentRound.id, gameState.currentTrick + 1, trickResult.winningSeatIndex);
-              
-              // Emit trick started event
+            // Clear trick cards from table after animation (3 seconds delay) - only when trick is complete
+            console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
+            if (trickResult.isComplete) {
+              setTimeout(() => {
+                console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
+                this.io.to(gameId).emit('clear_table_cards', { gameId });
+                
+                // CRITICAL: Start new trick AFTER clearing table cards to prevent race condition
+                console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
+                if (!trickResult.isRoundComplete) {
+                  console.log(`[CARD PLAY] Starting new trick - round not complete, winningSeatIndex: ${trickResult.winningSeatIndex}`);
+                  this.startNewTrickAfterClear(gameId, currentRound.id, gameState.currentTrick + 1, trickResult.winningSeatIndex);
+                } else {
+                  console.log(`[CARD PLAY] Round is complete, not starting new trick`);
+                }
+              }, 3000);
+            } else {
+              console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
+            }
+            
+            // Emit trick started event (only if new trick was created)
+            if (!trickResult.isRoundComplete && !trickResult.isComplete) {
               const newGameState = await GameService.getGameStateForClient(gameId);
+              console.log(`[CARD PLAY] Trick started - newGameState.currentPlayer: ${newGameState.currentPlayer}, expected: ${gameState.players.find(p => p.seatIndex === trickResult.winningSeatIndex)?.userId}`);
               this.io.to(gameId).emit('trick_started', {
                 gameId,
                 gameState: newGameState,
@@ -263,37 +251,76 @@ class CardPlayHandler {
             }
           })(); // 500ms delay to show all 4 cards
         }
+        
+        // CRITICAL: Return here to prevent turn progression logic from running
+        // when a trick is completed
+        return;
       } else {
-        // Move to next player
+        // Simple: move to next player clockwise
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
         const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
+        console.log(`[CARD PLAY] Moving to next player clockwise: ${nextPlayer?.username} (seat ${nextPlayerIndex})`);
         
-        await GameService.updateGame(gameId, {
-          currentPlayer: nextPlayer?.userId
+        // CRITICAL: Use SINGLE unified system for currentPlayer updates
+        await this.updateCurrentPlayer(gameId, nextPlayer?.userId);
+        console.log(`[CARD PLAY] Moved to next player: ${nextPlayer?.username} (seat ${nextPlayerIndex})`);
+        
+        // Update current trick data in Redis (reuse the cards we already fetched)
+        const currentTrickCardsForRedis = await prisma.trickCard.findMany({
+          where: { trickId: logResult.actualTrickId },
+          orderBy: { playOrder: 'asc' }
         });
-
-        // REAL-TIME: Update current player in existing cached game state
-        const currentGameState = await redisGameState.getGameState(gameId);
-        if (currentGameState) {
-          currentGameState.currentPlayer = nextPlayer?.userId;
-          await redisGameState.setGameState(gameId, currentGameState);
-          console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId}`);
-        } else {
-          // Fallback: get full game state from database and update
-          const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
-          if (fullGameState) {
-            fullGameState.currentPlayer = nextPlayer?.userId;
-            await redisGameState.setGameState(gameId, fullGameState);
-            console.log(`[CARD PLAY] Updated Redis currentPlayer to: ${nextPlayer?.userId} (from database)`);
-          }
+        
+        if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
+          const formattedTrickCards = currentTrickCardsForRedis.map(card => ({
+            suit: card.suit,
+            rank: card.rank,
+            seatIndex: card.seatIndex,
+            playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+          }));
+          
+          await redisGameState.setCurrentTrick(gameId, formattedTrickCards);
+          console.log(`[CARD PLAY] Updated Redis current trick data with ${formattedTrickCards.length} cards`);
         }
 
         // Emit card played event
+        // CRITICAL: Ensure Redis cache is fully updated before getting game state
+        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay to ensure Redis update
+        
+        // CRITICAL: Update the game state cache with the new currentTrick data
+        const cachedGameState = await redisGameState.getGameState(gameId);
+        if (cachedGameState && currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
+          const formattedTrickCards = currentTrickCardsForRedis.map(card => ({
+            suit: card.suit,
+            rank: card.rank,
+            seatIndex: card.seatIndex,
+            playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+          }));
+          
+          // Update the cached game state with current trick data
+          cachedGameState.play = cachedGameState.play || {};
+          cachedGameState.play.currentTrick = formattedTrickCards;
+          cachedGameState.currentTrickCards = formattedTrickCards;
+          
+          // Save updated cache back to Redis
+          await redisGameState.setGameState(gameId, cachedGameState);
+        }
+        
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        console.log(`[CARD PLAY] Emitting card_played event for game ${gameId}, currentTrick:`, updatedGameState.play?.currentTrick);
+        
+        // CRITICAL: Ensure spadesBroken flag is included in the game state
+        if (!updatedGameState.play) updatedGameState.play = {};
+        if (card.suit === 'SPADES') {
+          updatedGameState.play.spadesBroken = true;
+          console.log(`[CARD PLAY] Explicitly setting spadesBroken = true for spade card play`);
+        }
+        
+        console.log(`[CARD PLAY] Emitting card_played event for game ${gameId}, currentPlayer: ${updatedGameState.currentPlayer}, currentTrick:`, updatedGameState.play?.currentTrick);
+        console.log(`[CARD PLAY] Game state spadesBroken:`, updatedGameState.play?.spadesBroken);
         this.io.to(gameId).emit('card_played', {
           gameId,
           gameState: updatedGameState,
+          currentTrick: updatedGameState.play?.currentTrick || [],
           cardPlayed: {
             userId,
             card,
@@ -318,6 +345,7 @@ class CardPlayHandler {
    * Create a new trick in database
    */
   async createNewTrick(gameId, roundId, trickNumber, leadSeatIndex) {
+    console.log(`[CARD PLAY] createNewTrick called - gameId: ${gameId}, roundId: ${roundId}, trickNumber: ${trickNumber}, leadSeatIndex: ${leadSeatIndex}`);
     try {
       const trick = await prisma.trick.create({
         data: {
@@ -328,6 +356,24 @@ class CardPlayHandler {
           createdAt: new Date()
         }
       });
+
+      // CRITICAL: Update game state to set currentTrick number
+      await GameService.updateGame(gameId, {
+        currentTrick: trickNumber
+      });
+      console.log(`[CARD PLAY] Updated game state: currentTrick=${trickNumber}`);
+
+      // NOTE: currentPlayer is already set by the calling code (updateCurrentPlayer)
+      // We don't need to set it again here
+      console.log(`[CARD PLAY] createNewTrick - leadSeatIndex: ${leadSeatIndex}, currentPlayer should already be set by updateCurrentPlayer`);
+
+      // CRITICAL: Clear current trick data from Redis cache
+      await redisGameState.setCurrentTrick(gameId, []);
+      console.log(`[CARD PLAY] Cleared current trick data from Redis cache`);
+
+      // CRITICAL: Update Redis cache with fresh game state after creating new trick
+      // This is already handled by updateCurrentPlayer, but ensure it's done
+      console.log(`[CARD PLAY] Redis cache should already be updated by updateCurrentPlayer`);
 
       console.log(`[CARD PLAY] Created new trick ${trick.id} for round ${roundId}`);
       return trick;
@@ -350,7 +396,7 @@ class CardPlayHandler {
       }
 
       console.log(`[CARD PLAY] Current player ID: ${gameState.currentPlayer}`);
-      const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
+      const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);
       console.log(`[CARD PLAY] Found current player:`, currentPlayer ? { 
         id: currentPlayer.id, 
         username: currentPlayer.username, 
@@ -363,15 +409,18 @@ class CardPlayHandler {
         return;
       }
 
+      // CRITICAL: Get fresh current trick data from Redis
+      const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+      console.log(`[CARD PLAY] Current trick cards from Redis:`, currentTrickCards);
+      
       // CRITICAL: Check if current trick is already full (4 cards)
-      const currentTrickCards = gameState.play?.currentTrick || [];
-      if (currentTrickCards.length >= 4) {
+      if (currentTrickCards && currentTrickCards.length >= 4) {
         console.log(`[CARD PLAY] Current trick is full (${currentTrickCards.length} cards), skipping bot play`);
         return;
       }
 
       // CRITICAL: Check if this bot has already played in the current trick
-      const botAlreadyPlayed = currentTrickCards.some(card => card.seatIndex === currentPlayer.seatIndex);
+      const botAlreadyPlayed = currentTrickCards && currentTrickCards.some(card => card.seatIndex === currentPlayer.seatIndex);
       if (botAlreadyPlayed) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} already played in current trick, skipping`);
         return;
@@ -410,10 +459,77 @@ class CardPlayHandler {
       if (botCard) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
         // Process bot's card play
-        await this.processCardPlay(gameId, currentPlayer.id, botCard, true);
+        await this.processCardPlay(gameId, currentPlayer.userId, botCard, true);
       }
     } catch (error) {
       console.error('[CARD PLAY] Error triggering bot play:', error);
+    }
+  }
+
+  /**
+   * Start new trick after clearing table cards to prevent race condition
+   */
+  async startNewTrickAfterClear(gameId, roundId, trickNumber, leadSeatIndex) {
+    try {
+      console.log(`[CARD PLAY] startNewTrickAfterClear called - gameId: ${gameId}, roundId: ${roundId}, trickNumber: ${trickNumber}, leadSeatIndex: ${leadSeatIndex}`);
+      
+      // Create new trick
+      const newTrick = await this.createNewTrick(gameId, roundId, trickNumber, leadSeatIndex);
+      console.log(`[CARD PLAY] Successfully created new trick after clear:`, newTrick.id);
+      
+      // CRITICAL: Emit trick_started event to notify clients that new trick has started
+      const updatedGameState = await GameService.getGameStateForClient(gameId);
+      this.io.to(gameId).emit('trick_started', {
+        gameId,
+        gameState: updatedGameState,
+        currentPlayer: updatedGameState.currentPlayer
+      });
+      console.log(`[CARD PLAY] Emitted trick_started for new trick ${trickNumber}`);
+      
+      // Trigger bot play if next player is a bot
+      this.triggerBotPlayIfNeeded(gameId);
+      
+    } catch (error) {
+      console.error('[CARD PLAY] Error starting new trick after clear:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * UNIFIED SYSTEM: Update currentPlayer in both database and Redis
+   * This is the ONLY place where currentPlayer should be updated
+   */
+  async updateCurrentPlayer(gameId, userId) {
+    try {
+      console.log(`[UNIFIED] Starting updateCurrentPlayer: ${userId} for game ${gameId}`);
+      
+      // 1. Update database
+      await GameService.updateGame(gameId, {
+        currentPlayer: userId
+      });
+      console.log(`[UNIFIED] Updated database currentPlayer to: ${userId}`);
+
+      // 2. CRITICAL: Update Redis cache directly - no need to fetch from database
+      const currentGameState = await redisGameState.getGameState(gameId);
+      if (currentGameState) {
+        currentGameState.currentPlayer = userId;
+        await redisGameState.setGameState(gameId, currentGameState);
+        console.log(`[UNIFIED] Updated Redis cache currentPlayer to: ${userId}`);
+        
+        // Verify the update worked
+        const verifyState = await redisGameState.getGameState(gameId);
+        console.log(`[UNIFIED] Verification - Redis cache currentPlayer: ${verifyState?.currentPlayer}`);
+        
+        // Double-check that the verification matches what we set
+        if (verifyState?.currentPlayer !== userId) {
+          console.error(`[UNIFIED] CRITICAL ERROR: Redis cache verification failed! Expected: ${userId}, Got: ${verifyState?.currentPlayer}`);
+        }
+      } else {
+        console.error(`[UNIFIED] ERROR: No game state found in Redis cache`);
+      }
+    } catch (error) {
+      console.error(`[UNIFIED] Error updating currentPlayer to ${userId}:`, error);
+      throw error;
     }
   }
 }

@@ -1,5 +1,6 @@
 import { GameService } from '../../../services/GameService.js';
 import { BotService } from '../../../services/BotService.js';
+import redisGameState from '../../../services/RedisGameStateService.js';
 
 /**
  * DATABASE-FIRST GAME JOIN HANDLER
@@ -32,7 +33,7 @@ class GameJoinHandler {
       }
 
       // Ensure requesting user is a player in game
-      const requester = (gameState.players || []).find(p => p && (p.id === userId || p.userId === userId));
+      const requester = (gameState.players || []).find(p => p && p.userId === userId);
       if (!requester) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;
@@ -95,18 +96,31 @@ class GameJoinHandler {
         return;
       }
       
-      // Get game state from database (single source of truth)
-      const gameState = await GameService.getGameStateForClient(gameId);
+      // Get game state from database (single source of truth) - sanitized for this user
+      const gameState = await GameService.getGameStateForClient(gameId, userId);
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
       }
 
       // Check if player is in the game
-      const player = gameState.players.find(p => p.id === userId);
+      const player = gameState.players.find(p => p.userId === userId);
       if (!player) {
-        this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
-        return;
+        // CRITICAL: If user is not found, check if they are the game creator
+        const game = await GameService.getGame(gameId);
+        if (game && game.createdById === userId) {
+          console.log(`[GAME JOIN] Creator ${userId} joining their own game ${gameId} - refreshing cache`);
+          // Force refresh from database to get updated player list
+          const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (freshGameState) {
+            await redisGameState.setGameState(gameId, freshGameState);
+            // Update gameState to use fresh data
+            Object.assign(gameState, freshGameState);
+          }
+        } else {
+          this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
+          return;
+        }
       }
 
       // Join the socket room
@@ -153,7 +167,7 @@ class GameJoinHandler {
       }
       
       // Check if user is in the game OR is the game creator
-      const player = gameState.players.find(p => p.id === userId);
+      const player = gameState.players.find(p => p.userId === userId);
       const isCreator = gameState.createdById === userId;
       if (!player && !isCreator) {
         this.socket.emit('error', { message: 'You are not in this game' });

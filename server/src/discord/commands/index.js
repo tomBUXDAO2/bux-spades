@@ -106,6 +106,23 @@ export const commands = [
       .setName('activegames')
       .setDescription('Show currently active games'),
     execute: getActiveGames
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('pay')
+      .setDescription('Admin command: Pay coins to a user')
+      .addUserOption(option =>
+        option.setName('user')
+          .setDescription('User to pay coins to')
+          .setRequired(true)
+      )
+      .addIntegerOption(option =>
+        option.setName('amount')
+          .setDescription('Amount of coins to pay')
+          .setRequired(true)
+          .setMinValue(1)
+      ),
+    execute: payUser
   }
 ];
 
@@ -297,19 +314,194 @@ async function getActiveGames(interaction) {
   }
 }
 
+async function payUser(interaction) {
+  try {
+    // Check if user is admin
+    const adminUserIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
+    if (!adminUserIds.includes(interaction.user.id)) {
+      return interaction.reply({ 
+        content: '❌ You do not have permission to use this command.', 
+        ephemeral: true 
+      });
+    }
+
+    const targetUser = interaction.options.getUser('user');
+    const amount = interaction.options.getInteger('amount');
+
+    // Find user by Discord ID
+    const user = await prisma.user.findUnique({
+      where: { discordId: targetUser.id }
+    });
+
+    if (!user) {
+      return interaction.reply({ 
+        content: '❌ User not found in database.', 
+        ephemeral: true 
+      });
+    }
+
+    // Update user's coins
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { 
+        coins: { increment: amount }
+      }
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('💰 Payment Processed')
+      .setDescription(`Successfully paid ${amount} coins to <@${targetUser.id}>`)
+      .addFields(
+        { name: 'Amount', value: `${amount} coins`, inline: true },
+        { name: 'Recipient', value: `<@${targetUser.id}>`, inline: true },
+        { name: 'Processed by', value: `<@${interaction.user.id}>`, inline: true }
+      )
+      .setColor(0x00ff00)
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[DISCORD] Error processing payment:', error);
+    await interaction.reply({ 
+      content: '❌ Failed to process payment.', 
+      ephemeral: true 
+    });
+  }
+}
+
 // Helper functions
 async function createDiscordGame(data) {
-  // Implementation for creating Discord command games
-  // This would create a game with all 4 players pre-assigned
-  // and marked as league/rated
+  try {
+    const gameId = `discord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create game in database
+    const game = await prisma.game.create({
+      data: {
+        id: gameId,
+        createdById: data.createdBy,
+        mode: 'PARTNERS', // Discord games are always partners
+        format: 'REGULAR', // Default format
+        gimmickVariant: null,
+        isLeague: true,
+        isRated: true,
+        status: 'WAITING',
+        minPoints: -100,
+        maxPoints: data.maxPoints || 200,
+        nilAllowed: true,
+        blindNilAllowed: false,
+        specialRules: {},
+        buyIn: 0,
+        currentRound: 1,
+        currentTrick: 0,
+        currentPlayer: null,
+        dealer: 0,
+        gameState: {
+          id: gameId,
+          status: 'WAITING',
+          mode: 'PARTNERS',
+          format: 'REGULAR',
+          isLeague: true,
+          isRated: true,
+          maxPoints: data.maxPoints || 200,
+          minPoints: -100,
+          players: [],
+          hands: [[], [], [], []],
+          currentTrickCards: [],
+          play: { currentTrick: [], spadesBroken: false },
+          bidding: { bids: [null, null, null, null], currentBidderIndex: 0, currentPlayer: null },
+          team1TotalScore: 0,
+          team2TotalScore: 0,
+          team1Bags: 0,
+          team2Bags: 0
+        },
+        createdAt: new Date()
+      }
+    });
+
+    // Create game players for each Discord user
+    for (let i = 0; i < data.players.length; i++) {
+      const discordId = data.players[i];
+      
+      // Find or create user by Discord ID
+      let user = await prisma.user.findUnique({
+        where: { discordId }
+      });
+      
+      if (!user) {
+        // Create placeholder user for Discord ID
+        user = await prisma.user.create({
+          data: {
+            discordId,
+            username: `Discord User ${discordId.slice(-4)}`,
+            avatarUrl: '/default-pfp.jpg',
+            createdAt: new Date()
+          }
+        });
+      }
+      
+      // Add player to game
+      await prisma.gamePlayer.create({
+        data: {
+          gameId: game.id,
+          userId: user.id,
+          seatIndex: i,
+          teamIndex: i % 2,
+          isHuman: true,
+          isSpectator: false,
+          joinedAt: new Date()
+        }
+      });
+    }
+
+    // Create Discord game record for tracking
+    await prisma.discordGame.create({
+      data: {
+        gameId: game.id,
+        channelId: data.channelId,
+        commandMessageId: data.commandMessageId,
+        createdBy: data.createdBy,
+        status: 'WAITING',
+        createdAt: new Date()
+      }
+    });
+
+    return game;
+  } catch (error) {
+    console.error('[DISCORD] Error creating Discord game:', error);
+    throw error;
+  }
 }
 
 async function getUserStatsFromDB(userId, format, mode) {
-  // Implementation for calculating user stats from database
-  // This would use SQL aggregations instead of stored stats
+  try {
+    // Use the DetailedStatsService to get user stats
+    const stats = await DetailedStatsService.getUserStats(userId, {
+      mode,
+      format,
+      isLeague: null
+    });
+    
+    return stats;
+  } catch (error) {
+    console.error('[DISCORD] Error getting user stats from DB:', error);
+    return null;
+  }
 }
 
 async function getLeaderboardFromDB(format, mode, limit) {
-  // Implementation for getting leaderboard from database
-  // This would use SQL aggregations for real-time stats
+  try {
+    // Use the DetailedStatsService to get leaderboard
+    const leaderboard = await DetailedStatsService.getLeaderboard({
+      mode,
+      format,
+      isLeague: null,
+      limit,
+      sortBy: 'winRate'
+    });
+    
+    return leaderboard;
+  } catch (error) {
+    console.error('[DISCORD] Error getting leaderboard from DB:', error);
+    return [];
+  }
 }

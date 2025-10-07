@@ -47,7 +47,7 @@ class GameChatHandler {
         return;
       }
 
-      const player = gameState.players.find(p => p && (p.id === userId || p.userId === userId));
+      const player = gameState.players.find(p => p && p.userId === userId);
       console.log(`[GAME CHAT] Player found:`, !!player);
       if (!player) {
         console.log(`[GAME CHAT] ERROR: Player not found in game`);
@@ -139,7 +139,7 @@ class GameChatHandler {
         return;
       }
 
-      const player = game.players.find(p => p && (p.id === userId || p.userId === userId));
+      const player = game.players.find(p => p && p.userId === userId);
       if (!player) {
         this.socket.emit('error', { message: 'You are not in this game' });
         return;

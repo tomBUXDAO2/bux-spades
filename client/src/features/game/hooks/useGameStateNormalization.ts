@@ -32,5 +32,12 @@ export const normalizeGameState = (state: any): GameState => {
     bidsString: JSON.stringify(state.bidding?.bids)
   });
   
-  return { ...state, players: normalizedPlayers, play, bidding } as GameState;
+  return { 
+    ...state, 
+    players: normalizedPlayers, 
+    play, 
+    bidding,
+    currentPlayer: state.currentPlayer, // CRITICAL: Preserve currentPlayer from server
+    currentTrickCards: state.currentTrickCards // CRITICAL: Preserve currentTrickCards for renderTrickCards
+  } as GameState;
 };
