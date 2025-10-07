@@ -50,14 +50,14 @@ export default function TestTablePageModular() {
   };
 
   // Handle starting game
-  const handleStartGame = async (gameId: string, userId?: string): Promise<void> => {
-    console.log('Start game:', gameId, userId);
+  const handleStartGame = async (): Promise<void> => {
+    console.log('Start game:', game.id, user?.id);
     // In test mode, we don't actually start a real game
   };
 
   // Handle starting game from button click
   const handleStartGameClick = () => {
-    handleStartGame(game.id, user?.id);
+    handleStartGame();
   };
 
   // Handle closing start warning

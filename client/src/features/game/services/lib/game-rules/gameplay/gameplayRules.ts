@@ -22,13 +22,13 @@ export function isPlayableCard(
   
   // SCREAMER: Cannot play spades unless following spade lead or no other suits available
   if (specialRules?.screamer) {
-    const isSpade = card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠';
+    const isSpade = card.suit === 'SPADES';
     if (isSpade) {
       // Can only play spades if:
       // 1. Following a spade lead, OR
       // 2. No other suits available (all cards are spades)
-      const followingSpadeLead = leadSuit && (leadSuit === 'SPADES' || leadSuit === 'S' || leadSuit === '♠');
-      const allSpades = hand.every(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+      const followingSpadeLead = leadSuit && leadSuit === 'SPADES';
+      const allSpades = hand.every(c => c.suit === 'SPADES');
       
       if (!followingSpadeLead && !allSpades) {
         return false;
@@ -38,11 +38,11 @@ export function isPlayableCard(
   
   // ASSASSIN: Must cut and lead spades when possible
   if (specialRules?.assassin) {
-    const isSpade = card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠';
+    const isSpade = card.suit === 'SPADES' ;
     
     if (isLeadingTrick) {
       // When leading, must lead spades if available
-      const hasSpades = hand.some(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+      const hasSpades = hand.some(c => c.suit === 'SPADES' );
       if (hasSpades && !isSpade) {
         return false;
       }
@@ -52,7 +52,7 @@ export function isPlayableCard(
         const hasLeadSuit = hand.some(c => c.suit === leadSuit);
         if (!hasLeadSuit) {
           // Can't follow suit, must play spades if available
-          const hasSpades = hand.some(c => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠');
+          const hasSpades = hand.some(c => c.suit === 'SPADES' );
           if (hasSpades && !isSpade) {
             return false;
           }

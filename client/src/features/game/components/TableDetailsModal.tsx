@@ -82,7 +82,7 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
               const buyIn = (gameState as any).rules?.coinAmount || 100000;
               const prizePot = buyIn * 4 * 0.9;
               // Check gameMode for Partners vs Solo, not gameType
-              const isPartnersMode = gameState.gameMode === 'PARTNERS' || (gameState.rules?.gameType !== 'SOLO' && !gameState.gameMode);
+              const isPartnersMode = gameState.gameMode === 'PARTNERS' || !gameState.gameMode;
               if (isPartnersMode) {
                 return `${formatCoins(prizePot / 2)} each`;
               } else {

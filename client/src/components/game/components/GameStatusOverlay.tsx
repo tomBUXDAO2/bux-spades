@@ -221,7 +221,7 @@ export const BiddingOverlay: React.FC<{
   React.useEffect(() => {
     if (gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') {
       if (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
-        const numAces = currentPlayerHand.filter(card => card.rank === 'A').length;
+        const numAces = currentPlayerHand.filter((card: any) => card.rank === 'A').length;
         const bidAmount = numAces * 3;
         console.log(`[CRAZY ACES] Auto-bidding ${bidAmount} (${numAces} aces × 3)`);
         onBid(bidAmount); // Auto-bid 3 points per ace

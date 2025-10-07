@@ -1,17 +1,17 @@
-import type { BiddingOption, Card } from "../../../../../../types/game";
+import type { BiddingOption, GameMode, Card } from "../../../../../../types/game";
 
 /**
  * Count spades in a hand
  */
 export function countSpades(hand: Card[]): number {
-  return hand.filter(card => card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠').length;
+  return hand.filter(card => card.suit === 'SPADES').length;
 }
 
 /**
  * Count hearts in a hand
  */
 export function countHearts(hand: Card[]): number {
-  return hand.filter(card => card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥').length;
+  return hand.filter(card => card.suit === 'HEARTS').length;
 }
 
 /**
@@ -24,7 +24,7 @@ export function countAces(hand: Card[]): number {
 /**
  * Determines if a player can bid nil based on the game type and their hand
  */
-export function canBidNil(gameType: BiddingOption, numSpades: number, forcedBid?: string): boolean {
+export function canBidNil(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string): boolean {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
@@ -45,12 +45,13 @@ export function canBidNil(gameType: BiddingOption, numSpades: number, forcedBid?
 
   switch (gameType) {
     case 'REGULAR':
-    case 'SOLO':
-      return true; // Regular and Solo games allow nil bids
+      return true; // Regular games allow nil bids
     case 'WHIZ':
       return numSpades === 0; // Only allow nil bid if no spades
     case 'MIRROR':
       return false; // Mirror games don't allow nil bids
+    case 'GIMMICK':
+      return false; // Gimmick games have specific rules handled above
     default:
       return false;
   }
@@ -59,7 +60,7 @@ export function canBidNil(gameType: BiddingOption, numSpades: number, forcedBid?
 /**
  * Returns the valid bid range for a player based on game type and hand
  */
-export function getValidBidRange(gameType: BiddingOption, numSpades: number, forcedBid?: string, numHearts?: number, numAces?: number): { min: number; max: number } {
+export function getValidBidRange(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number): { min: number; max: number } {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
@@ -72,7 +73,7 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, for
       case 'BIDHEARTS':
         return { min: numHearts || 0, max: numHearts || 0 }; // Must bid number of hearts
       case 'CRAZY_ACES':
-        return { min: numAces || 0, max: numAces || 0 }; // Must bid number of aces
+        return { min: (numAces || 0) * 3, max: (numAces || 0) * 3 }; // Must bid 3 points per ace
       default:
         return { min: 0, max: 13 };
     }
@@ -80,12 +81,13 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, for
 
   switch (gameType) {
     case 'REGULAR':
-    case 'SOLO':
       return { min: 0, max: 13 }; // Full range including nil
     case 'WHIZ':
       return { min: numSpades, max: numSpades }; // Must bid number of spades
     case 'MIRROR':
       return { min: numSpades, max: numSpades }; // Must bid number of spades
+    case 'GIMMICK':
+      return { min: 0, max: 13 }; // Gimmick games have specific rules handled above
     default:
       return { min: 0, max: 13 };
   }
@@ -94,7 +96,7 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, for
 /**
  * Validates if a bid is legal for the given game type and player's hand
  */
-export function isValidBid(gameType: BiddingOption, bid: number, numSpades: number, forcedBid?: string, numHearts?: number, numAces?: number): boolean {
+export function isValidBid(gameType: BiddingOption, bid: number, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number): boolean {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
@@ -107,7 +109,7 @@ export function isValidBid(gameType: BiddingOption, bid: number, numSpades: numb
       case 'BIDHEARTS':
         return bid === (numHearts || 0); // Must bid number of hearts
       case 'CRAZY_ACES':
-        return bid === (numAces || 0); // Must bid number of aces
+        return bid === (numAces || 0) * 3; // Must bid 3 points per ace
       default:
         return false;
     }
@@ -115,12 +117,13 @@ export function isValidBid(gameType: BiddingOption, bid: number, numSpades: numb
 
   switch (gameType) {
     case 'REGULAR':
-    case 'SOLO':
       return bid >= 0 && bid <= 13;
     case 'WHIZ':
       return bid === numSpades || (bid === 0 && numSpades === 0);
     case 'MIRROR':
       return bid === numSpades;
+    case 'GIMMICK':
+      return false; // Gimmick games have specific rules handled above
     default:
       return false;
   }

@@ -107,8 +107,8 @@ export const useSocketEventHandlers = ({
                 ...normalizedState.play,
                 currentTrick: cardData.currentTrick
               };
-              // CRITICAL: Also set currentTrickCards at top level for renderTrickCards
-              normalizedState.currentTrickCards = cardData.currentTrick;
+              // CRITICAL: Also set currentTrick at top level for renderTrickCards
+              normalizedState.currentTrick = cardData.currentTrick;
             }
             return normalizedState;
           } else {

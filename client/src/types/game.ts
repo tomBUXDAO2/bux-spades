@@ -55,6 +55,7 @@ export interface GameState {
   // Individual player scores for Solo mode
   playerScores?: number[];
   playerBags?: number[];
+  gimmickVariant?: GimmickVariant;
   rules: {
     gameType: BiddingOption;
     allowNil: boolean;

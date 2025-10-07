@@ -108,7 +108,6 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
     onCreateGame({
       gameMode: mode,
       biddingOption: getBiddingOption(),
-      gamePlayOption: 'REG',
       minPoints,
       maxPoints,
       buyIn,
