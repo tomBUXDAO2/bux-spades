@@ -930,6 +930,9 @@ export class GameService {
             updatedAt: new Date()
           }
         });
+      }, {
+        timeout: 10000, // Increase timeout to 10 seconds
+        isolationLevel: 'ReadCommitted'
       });
 
       console.log(`[GAME SERVICE] Deal hands - Database updated with currentPlayer: ${currentPlayer}`);
