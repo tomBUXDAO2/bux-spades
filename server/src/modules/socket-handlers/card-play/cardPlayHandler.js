@@ -284,12 +284,13 @@ class CardPlayHandler {
         }
 
         // Emit card played event
-        // CRITICAL: Ensure Redis cache is fully updated before getting game state
-        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay to ensure Redis update
         
         // CRITICAL: Update the game state cache with the new currentTrick data
-        const cachedGameState = await redisGameState.getGameState(gameId);
-        if (cachedGameState && currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
+        // PERFORMANCE FIX: Use the gameState we already have instead of fetching again
+        const updatedGameState = gameState;
+        
+        // Update current trick data in the existing game state
+        if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
           const formattedTrickCards = currentTrickCardsForRedis.map(card => ({
             suit: card.suit,
             rank: card.rank,
@@ -297,23 +298,20 @@ class CardPlayHandler {
             playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
           }));
           
-          // Update the cached game state with current trick data
-          cachedGameState.play = cachedGameState.play || {};
-          cachedGameState.play.currentTrick = formattedTrickCards;
-          cachedGameState.currentTrickCards = formattedTrickCards;
-          
-          // Save updated cache back to Redis
-          await redisGameState.setGameState(gameId, cachedGameState);
+          // Update the game state with current trick data
+          updatedGameState.play = updatedGameState.play || {};
+          updatedGameState.play.currentTrick = formattedTrickCards;
+          updatedGameState.currentTrickCards = formattedTrickCards;
         }
         
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
-        
-        // CRITICAL: Ensure spadesBroken flag is included in the game state
+        // Update spadesBroken flag if needed
         if (!updatedGameState.play) updatedGameState.play = {};
         if (card.suit === 'SPADES') {
           updatedGameState.play.spadesBroken = true;
-          console.log(`[CARD PLAY] Explicitly setting spadesBroken = true for spade card play`);
         }
+        
+        // Update Redis cache with the complete updated state (single operation)
+        await redisGameState.setGameState(gameId, updatedGameState);
         
         // Emitting card_played event
         // Game state updated
@@ -496,39 +494,17 @@ class CardPlayHandler {
   }
 
   /**
-   * UNIFIED SYSTEM: Update currentPlayer in both database and Redis
-   * This is the ONLY place where currentPlayer should be updated
+   * PERFORMANCE FIX: Simplified currentPlayer update
+   * Only update database - Redis will be updated with full game state
    */
   async updateCurrentPlayer(gameId, userId) {
     try {
-      console.log(`[UNIFIED] Starting updateCurrentPlayer: ${userId} for game ${gameId}`);
-      
-      // 1. Update database
+      // Only update database - Redis gets updated with complete game state later
       await GameService.updateGame(gameId, {
         currentPlayer: userId
       });
-      console.log(`[UNIFIED] Updated database currentPlayer to: ${userId}`);
-
-      // 2. CRITICAL: Update Redis cache directly - no need to fetch from database
-      const currentGameState = await redisGameState.getGameState(gameId);
-      if (currentGameState) {
-        currentGameState.currentPlayer = userId;
-        await redisGameState.setGameState(gameId, currentGameState);
-        console.log(`[UNIFIED] Updated Redis cache currentPlayer to: ${userId}`);
-        
-        // Verify the update worked
-        const verifyState = await redisGameState.getGameState(gameId);
-        console.log(`[UNIFIED] Verification - Redis cache currentPlayer: ${verifyState?.currentPlayer}`);
-        
-        // Double-check that the verification matches what we set
-        if (verifyState?.currentPlayer !== userId) {
-          console.error(`[UNIFIED] CRITICAL ERROR: Redis cache verification failed! Expected: ${userId}, Got: ${verifyState?.currentPlayer}`);
-        }
-      } else {
-        console.error(`[UNIFIED] ERROR: No game state found in Redis cache`);
-      }
     } catch (error) {
-      console.error(`[UNIFIED] Error updating currentPlayer to ${userId}:`, error);
+      console.error(`[CURRENT PLAYER] Error updating currentPlayer to ${userId}:`, error);
       throw error;
     }
   }

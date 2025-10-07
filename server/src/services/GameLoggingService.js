@@ -193,23 +193,7 @@ export class GameLoggingService {
       const calculatedPlayOrder = existingCardsCount + 1;
       console.log(`[GAME LOGGING] Calculated playOrder from DB: ${calculatedPlayOrder} (${existingCardsCount} existing cards in trick ${trickRecord.id})`);
 
-      // CRITICAL: Update spadesBroken flag if a spade is played
-      if (suit === 'SPADES') {
-        console.log(`[GAME LOGGING] Spade played - updating spadesBroken flag to true`);
-        try {
-          // Update Redis cache with spadesBroken = true
-          const currentGameState = await redisGameState.getGameState(gameId);
-          if (currentGameState) {
-            if (!currentGameState.play) currentGameState.play = {};
-            currentGameState.play.spadesBroken = true;
-            await redisGameState.setGameState(gameId, currentGameState);
-            console.log(`[GAME LOGGING] Updated Redis cache: spadesBroken = true`);
-            console.log(`[GAME LOGGING] Redis cache structure after spadesBroken update:`, JSON.stringify(currentGameState, null, 2));
-          }
-        } catch (error) {
-          console.error(`[GAME LOGGING] Error updating spadesBroken flag:`, error);
-        }
-      }
+      // PERFORMANCE FIX: Remove redundant spadesBroken update - handled in cardPlayHandler
 
       // Create the trick card record (simplified - no transaction)
       const cardRecord = await prisma.trickCard.create({
