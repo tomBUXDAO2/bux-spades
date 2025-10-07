@@ -1,7 +1,17 @@
 import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
 
+// PERFORMANCE: In-memory cache for lead suits to avoid database queries
+const leadSuitCache = new Map(); // trickId -> leadSuit
+
 export class GameLoggingService {
+  /**
+   * Clear lead suit cache for a trick (call when trick is complete)
+   * @param {string} trickId - The trick ID to clear from cache
+   */
+  static clearLeadSuitCache(trickId) {
+    leadSuitCache.delete(trickId);
+  }
   /**
    * Log a game action to the database
    * @param {string} gameId - The game ID
@@ -141,13 +151,26 @@ export class GameLoggingService {
         return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
       
-      // 3) CRITICAL: Enforce suit following rules
+      // 3) CRITICAL: Enforce suit following rules (optimized with cache)
       if (existingCardsCount > 0) {
-        // Get the lead suit from the first card played
-        const leadCard = await prisma.trickCard.findFirst({
-          where: { trickId: trickRecord.id },
-          orderBy: { playOrder: 'asc' }
-        });
+        // PERFORMANCE: Get lead suit from cache first, fallback to database
+        let leadCard = null;
+        let leadSuit = leadSuitCache.get(trickRecord.id);
+        
+        if (leadSuit) {
+          // Use cached lead suit
+          leadCard = { suit: leadSuit };
+        } else {
+          // Cache miss - get from database and cache it
+          leadCard = await prisma.trickCard.findFirst({
+            where: { trickId: trickRecord.id },
+            orderBy: { playOrder: 'asc' }
+          });
+          
+          if (leadCard) {
+            leadSuitCache.set(trickRecord.id, leadCard.suit);
+          }
+        }
         
         if (leadCard && leadCard.suit !== suit) {
           // Player is not following suit - check if they have cards of the lead suit

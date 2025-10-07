@@ -1,6 +1,7 @@
 import { prisma } from '../config/database.js';
 import { GameService } from './GameService.js';
 import { ScoringService } from './ScoringService.js';
+import { GameLoggingService } from './GameLoggingService.js';
 import redisGameState from './RedisGameStateService.js';
 
 /**
@@ -103,6 +104,9 @@ export class TrickCompletionService {
       } else {
         // NUCLEAR: No logging for performance
       }
+
+      // PERFORMANCE: Clear lead suit cache for completed trick
+      GameLoggingService.clearLeadSuitCache(trickId);
 
       return {
         isComplete: true,
