@@ -231,7 +231,7 @@ export default function GameTableModular({
       setDealingComplete(true);
       setBiddingReady(true);
       setCardsRevealed(true);
-      setIsStarting(false);
+      // setIsStarting(false); // Using prop from parent
     }
   };
   
