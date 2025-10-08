@@ -115,6 +115,7 @@ export default function GameTableModular({
   const [trickCompleted, setTrickCompleted] = useState(false);
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
+  const [pendingBid, setPendingBid] = useState<{ playerId: string; bid: number } | null>(null);
   
   // League states
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
@@ -441,6 +442,7 @@ export default function GameTableModular({
     setAnimatingTrick,
     setAnimatedTrickCards,
     setTrickWinner,
+    setPendingBid,
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
@@ -495,6 +497,12 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
+    // OPTIMISTIC UI: Show bid immediately
+    if (currentPlayerId) {
+      setPendingBid({ playerId: currentPlayerId, bid });
+      console.log('[OPTIMISTIC BID] Showing bid immediately:', { playerId: currentPlayerId, bid });
+    }
+    
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
       playBidSound,
       setCardsRevealed,
@@ -914,6 +922,7 @@ export default function GameTableModular({
                 isVerySmallScreen={isVerySmallScreen}
                 isMobile={isMobile}
                 windowSize={windowSize}
+                pendingBid={pendingBid}
                 scaleFactor={scaleFactor}
                 invitingBotSeat={null}
                 joinGame={joinGame}

@@ -35,6 +35,7 @@ interface GameEventHandlersProps {
   setTrickCompleted: (completed: boolean) => void;
   setLastNonEmptyTrick: (trick: Card[]) => void;
   setPendingPlayedCard: (card: Card | null) => void;
+  setPendingBid: (bid: { playerId: string; bid: number } | null) => void;
   setLeagueReady: (ready: boolean[]) => void;
   setSeatReplacement: (replacement: {
     isOpen: boolean;
@@ -92,6 +93,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
+    setPendingBid,
     setLeagueReady,
     setSeatReplacement,
     setLobbyMessages,
@@ -148,16 +150,22 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       setCountdownPlayer(null);
     };
     
+    // Clear pending bid when bidding is complete
+    const handleBiddingComplete = () => {
+      setPendingBid(null);
+      console.log('[OPTIMISTIC BID] Cleared pending bid - bidding complete');
+    };
+    
     socket.on('countdown_start', handleCountdownStart);
     socket.on('bidding_ready', handlePlayerActed);
-    socket.on('bidding_complete', handlePlayerActed);
+    socket.on('bidding_complete', handleBiddingComplete);
     socket.on('play_start', handlePlayerActed);
     socket.on('trick_completed', handlePlayerActed);
     
     return () => {
       socket.off('countdown_start', handleCountdownStart);
       socket.off('bidding_ready', handlePlayerActed);
-      socket.off('bidding_complete', handlePlayerActed);
+      socket.off('bidding_complete', handleBiddingComplete);
       socket.off('play_start', handlePlayerActed);
       socket.off('trick_completed', handlePlayerActed);
     };

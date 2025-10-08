@@ -28,6 +28,7 @@ interface GameTablePlayersProps {
   handleSendEmoji: (targetPlayerId: string, emoji: string) => void;
   emojiReactions: Record<string, { emoji: string; timestamp: number }>;
   showCoinDebit: boolean;
+  pendingBid?: { playerId: string; bid: number } | null;
   coinDebitAmount: number;
   recentChatMessages: Record<string, { message: string; timestamp: number }>;
   isPlayer: (player: any) => player is Player;
@@ -184,7 +185,13 @@ export default function GameTablePlayers({
     // Use the player's position in the players array to match the server's bidding.bids array
     // The server's bidding.bids array is indexed by the player's position in the players array (0,1,2,3)
     const actualSeatIndex = position;
-    const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    let rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    
+    // OPTIMISTIC UI: Show pending bid immediately
+    if (pendingBid && pendingBid.playerId === player.id) {
+      rawBid = pendingBid.bid;
+      console.log('[OPTIMISTIC BID] Displaying pending bid for player:', player.id, 'bid:', pendingBid.bid);
+    }
     
     
     const bidCount = rawBid !== null && rawBid !== undefined ? rawBid : 0;
