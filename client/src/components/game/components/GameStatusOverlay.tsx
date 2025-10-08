@@ -421,11 +421,11 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
             onStartGame={onStartGame}
           />
           
-          {/* Starting Game Message */}
-          {isStarting && (
+          {/* Starting Game Message - only show when no modals are open */}
+          {isStarting && !showStartWarning && !showBotWarning && !(gameState as any)?.ui?.showBotWarning && (
             <div 
-              className="px-6 py-4 bg-yellow-500 text-black font-bold rounded-lg shadow-lg transform pointer-events-auto relative z-[100010]"
-              style={{ fontSize: `${Math.floor(18 * scaleFactor)}px` }}
+              className="px-4 py-2 bg-slate-800 text-white rounded-lg shadow-lg transform pointer-events-auto relative z-[100010]"
+              style={{ fontSize: `${Math.floor(16 * scaleFactor)}px` }}
             >
               Starting Game...
             </div>
