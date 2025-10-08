@@ -420,12 +420,23 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
             showTrickHistory={showTrickHistory}
             onStartGame={onStartGame}
           />
+          
+          {/* Starting Game Message */}
+          {isStarting && (
+            <div 
+              className="px-6 py-4 bg-yellow-500 text-black font-bold rounded-lg shadow-lg transform pointer-events-auto relative z-[100010]"
+              style={{ fontSize: `${Math.floor(18 * scaleFactor)}px` }}
+            >
+              Starting Game...
+            </div>
+          )}
+          
           {/** Hide the waiting panel whenever the Start button is available to the host */}
           {!(
             !isLeague &&
             sanitizedPlayers.length >= 1 &&
             sanitizedPlayers[0]?.id === currentPlayerId
-          ) && (
+          ) && !isStarting && (
             <WaitingForPlayersMessage
               gameState={gameState}
               sanitizedPlayers={sanitizedPlayers}
