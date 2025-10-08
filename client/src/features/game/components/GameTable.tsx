@@ -528,7 +528,8 @@ export default function GameTableModular({
 
   // SIMPLE BOT BIDDING: Only trigger once per bot turn
   useEffect(() => {
-    if (!isBiddingPhase || !gameState.currentPlayer) return;
+    // CRITICAL: Check gameState.status directly to avoid race conditions
+    if (gameState.status !== 'BIDDING' || !gameState.currentPlayer) return;
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
@@ -549,7 +550,7 @@ export default function GameTableModular({
       
       return () => clearTimeout(timeoutId);
     }
-  }, [gameState.currentPlayer, isBiddingPhase, playBidSound]);
+  }, [gameState.currentPlayer, gameState.status, playBidSound]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
