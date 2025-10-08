@@ -29,8 +29,12 @@ class CardPlayHandler {
       
       // User playing card
       
-      // Get current game state from database
-      const gameState = await GameService.getGameStateForClient(gameId);
+      // Get current game state from Redis first for instant validation
+      let gameState = await redisGameState.getGameState(gameId);
+      if (!gameState) {
+        gameState = await GameService.getGameStateForClient(gameId);
+      }
+      
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -42,8 +46,50 @@ class CardPlayHandler {
         return;
       }
 
-      // Process the card play in database
-      await this.processCardPlay(gameId, userId, card, false);
+      const player = gameState.players.find(p => p && (p.id === userId || p.userId === userId));
+      if (!player) {
+        this.socket.emit('error', { message: 'Player not found' });
+        return;
+      }
+
+      // OPTIMISTIC: Emit card immediately and advance player
+      const currentTrickCards = await redisGameState.getCurrentTrick(gameId) || [];
+      const optimisticTrick = [
+        ...currentTrickCards,
+        { suit: card.suit, rank: card.rank, seatIndex: player.seatIndex, playerId: userId }
+      ];
+      
+      // Update Redis immediately
+      await redisGameState.setCurrentTrick(gameId, optimisticTrick);
+      
+      // Advance to next player immediately (optimistic)
+      const nextPlayerIndex = (player.seatIndex + 1) % 4;
+      const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
+      
+      if (nextPlayer && optimisticTrick.length < 4) {
+        gameState.currentPlayer = nextPlayer.userId;
+        await redisGameState.setGameState(gameId, gameState);
+      }
+      
+      // Emit immediately for instant feedback
+      this.io.to(gameId).emit('card_played', {
+        gameId,
+        gameState: gameState,
+        currentTrick: optimisticTrick,
+        cardPlayed: {
+          userId,
+          card,
+          seatIndex: player.seatIndex,
+          isBot: false
+        }
+      });
+      
+      console.log('[CARD PLAY] Optimistic card play emitted, processing in background');
+
+      // Process the card play in database (async, non-blocking)
+      this.processCardPlay(gameId, userId, card, false).catch(err => 
+        console.error('[CARD PLAY] Background processing error:', err)
+      );
     } catch (error) {
       console.error('[CARD PLAY] Error:', error);
       this.socket.emit('error', { message: 'Failed to play card' });
@@ -200,23 +246,27 @@ class CardPlayHandler {
               orderBy: { playOrder: 'asc' }
             });
 
-            // Emit trick complete event
-            const updatedGameState = await GameService.getGameStateForClient(gameId);
-            this.io.to(gameId).emit('trick_complete', {
-              gameId,
-              gameState: updatedGameState,
-              trickWinner: trickResult.winningSeatIndex,
-              completedTrick: {
-                cards: completedTrickCards.map(card => ({
-                  suit: card.suit,
-                  rank: card.rank,
-                  seatIndex: card.seatIndex,
-                  playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
-                }))
-              }
-            });
+            // Delay trick_complete slightly to ensure all 4 cards are visible
+            setTimeout(() => {
+              // Emit trick complete event
+              GameService.getGameStateForClient(gameId).then(updatedGameState => {
+                this.io.to(gameId).emit('trick_complete', {
+                  gameId,
+                  gameState: updatedGameState,
+                  trickWinner: trickResult.winningSeatIndex,
+                  completedTrick: {
+                    cards: completedTrickCards.map(card => ({
+                      suit: card.suit,
+                      rank: card.rank,
+                      seatIndex: card.seatIndex,
+                      playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+                    }))
+                  }
+                });
+              });
+            }, 200); // 200ms delay to ensure 4th card is visible
 
-            // Clear trick cards from table after animation (3 seconds delay) - only when trick is complete
+            // Clear trick cards from table after animation - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
               setTimeout(() => {
@@ -231,7 +281,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 800);
+              }, 600);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
@@ -453,7 +503,7 @@ class CardPlayHandler {
       // CRITICAL: Prevent same bot from playing twice in rapid succession
       const lastBotPlayTime = this.lastBotPlayTimes?.get(gameId);
       const currentTime = Date.now();
-      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 100) {
+      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 50) {
         console.log(`[CARD PLAY] Bot play too recent, skipping to prevent rapid fire`);
         return;
       }
