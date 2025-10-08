@@ -497,15 +497,16 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
-    // Check if we already have a pending bid for this player to prevent duplicates
-    if (pendingBid && pendingBid.playerId === currentPlayerId) {
-      console.log('[OPTIMISTIC BID] Already have pending bid for this player, skipping');
+    // Check if this player has already bid to prevent duplicates
+    if (playersWhoHaveBid.has(currentPlayerId!)) {
+      console.log('[OPTIMISTIC BID] Player already bid, skipping');
       return;
     }
     
     // OPTIMISTIC UI: Show bid immediately and advance to next player
     if (currentPlayerId) {
       setPendingBid({ playerId: currentPlayerId, bid });
+      setPlayersWhoHaveBid(prev => new Set([...prev, currentPlayerId]));
       console.log('[OPTIMISTIC BID] Showing bid immediately:', { playerId: currentPlayerId, bid });
       
       // OPTIMISTIC: Advance to next player immediately
@@ -530,15 +531,27 @@ export default function GameTableModular({
     });
   };
 
+  // Track which players have already bid to prevent loops
+  const [playersWhoHaveBid, setPlayersWhoHaveBid] = useState<Set<string>>(new Set());
+
+  // Reset bidding tracking when game status changes
+  useEffect(() => {
+    if (gameState.status !== 'BIDDING') {
+      setPlayersWhoHaveBid(new Set());
+      setPendingBid(null);
+      console.log('[OPTIMISTIC BID] Reset bidding tracking - game status changed to:', gameState.status);
+    }
+  }, [gameState.status]);
+
   // OPTIMISTIC BOT BIDDING: Show bot as active, delay, then bid with sound
   useEffect(() => {
     if (!gameState || gameState.status !== 'BIDDING' || !gameState.currentPlayer) return;
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
-      // Check if we already have a pending bid for this player to prevent duplicates
-      if (pendingBid && pendingBid.playerId === currentPlayer.id) {
-        console.log('[OPTIMISTIC BOT BID] Already have pending bid for this bot, skipping');
+      // Check if this player has already bid to prevent duplicates
+      if (playersWhoHaveBid.has(currentPlayer.id)) {
+        console.log('[OPTIMISTIC BOT BID] Player already bid, skipping:', currentPlayer.username);
         return;
       }
       
@@ -554,6 +567,7 @@ export default function GameTableModular({
         
         // Show bid and play sound effect
         setPendingBid({ playerId: currentPlayer.id, bid: botBid });
+        setPlayersWhoHaveBid(prev => new Set([...prev, currentPlayer.id]));
         playBidSound(); // Play bidding sound effect
         
         console.log('[OPTIMISTIC BOT BID] Bot bid with sound:', { 
@@ -580,7 +594,7 @@ export default function GameTableModular({
       // Cleanup timeout if component unmounts or effect re-runs
       return () => clearTimeout(timeoutId);
     }
-  }, [gameState?.currentPlayer, gameState?.status, playBidSound, pendingBid]);
+  }, [gameState?.currentPlayer, gameState?.status, playBidSound, playersWhoHaveBid]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {

@@ -225,6 +225,17 @@ class BiddingHandler {
       );
 
       if (bidsComplete) {
+        // VALIDATION: Ensure all 4 players have valid bids before starting
+        console.log(`[BIDDING] All players have bid, validating before starting round`);
+        console.log(`[BIDDING] Current bids:`, currentBids);
+        
+        // Double-check that all bids are valid numbers (not null/undefined)
+        const validBids = currentBids.filter(bid => bid !== null && bid !== undefined && typeof bid === 'number');
+        if (validBids.length !== 4) {
+          console.error(`[BIDDING] Invalid bid count: expected 4, got ${validBids.length}`);
+          return;
+        }
+        
         // All players have bid, emit final bidding update then start the round
         const updatedGameState = await GameService.getGameStateForClient(gameId);
         this.io.to(gameId).emit('bidding_update', {
