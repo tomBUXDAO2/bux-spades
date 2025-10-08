@@ -72,9 +72,18 @@ class CardPlayHandler {
       }
       
       // Emit immediately for instant feedback
+      const gameStateWithTrick = {
+        ...gameState,
+        play: {
+          ...gameState.play,
+          currentTrick: optimisticTrick
+        },
+        currentTrick: optimisticTrick
+      };
+      
       this.io.to(gameId).emit('card_played', {
         gameId,
-        gameState: gameState,
+        gameState: gameStateWithTrick,
         currentTrick: optimisticTrick,
         cardPlayed: {
           userId,
