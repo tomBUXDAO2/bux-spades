@@ -497,10 +497,23 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
-    // OPTIMISTIC UI: Show bid immediately
+    // OPTIMISTIC UI: Show bid immediately and advance to next player
     if (currentPlayerId) {
       setPendingBid({ playerId: currentPlayerId, bid });
       console.log('[OPTIMISTIC BID] Showing bid immediately:', { playerId: currentPlayerId, bid });
+      
+      // OPTIMISTIC: Advance to next player immediately
+      const currentPlayerIndex = gameState.players.findIndex(p => p && p.id === currentPlayerId);
+      const nextPlayerIndex = (currentPlayerIndex + 1) % 4;
+      const nextPlayer = gameState.players[nextPlayerIndex];
+      
+      if (nextPlayer) {
+        setGameState(prev => ({
+          ...prev,
+          currentPlayer: nextPlayer.id
+        }));
+        console.log('[OPTIMISTIC BID] Advanced to next player:', nextPlayer.id);
+      }
     }
     
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
@@ -531,6 +544,18 @@ export default function GameTableModular({
         spadesCount,
         handLength: hand.length
       });
+      
+      // OPTIMISTIC: Advance to next player immediately
+      const nextPlayerIndex = (playerIndex + 1) % 4;
+      const nextPlayer = gameState.players[nextPlayerIndex];
+      
+      if (nextPlayer) {
+        setGameState(prev => ({
+          ...prev,
+          currentPlayer: nextPlayer.id
+        }));
+        console.log('[OPTIMISTIC BOT BID] Advanced to next player:', nextPlayer.id);
+      }
     }
   }, [gameState?.currentPlayer, gameState?.status]);
   
