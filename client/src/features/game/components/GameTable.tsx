@@ -731,20 +731,6 @@ export default function GameTableModular({
       displayTrick = lastNonEmptyTrick;
     }
     
-    // INSTANT RENDERING: Add pending played card for immediate feedback
-    if (pendingPlayedCard && mySeatIndex >= 0) {
-      const pendingCardExists = displayTrick.some((c: any) => 
-        c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank
-      );
-      if (!pendingCardExists) {
-        displayTrick = [...displayTrick, { ...pendingPlayedCard, seatIndex: mySeatIndex }];
-      }
-    }
-    
-    if (!displayTrick.length) {
-      return null;
-    }
-    
     // Calculate table card dimensions
     const handCardDimensions = getCardDimensions(isMobile, scaleFactor);
     let tableCardWidth, tableCardHeight;
@@ -761,6 +747,21 @@ export default function GameTableModular({
     
     const positions = getTrickCardPositions();
     const { seatOrderedPlayers, mySeatIndex, referenceSeatIndex, orderedPlayers } = getOrderedPlayersForTrick(gameState, propUser?.id || '');
+    
+    // INSTANT RENDERING: Add pending played card for immediate feedback
+    if (pendingPlayedCard && mySeatIndex >= 0) {
+      const pendingCardExists = displayTrick.some((c: any) => 
+        c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank
+      );
+      if (!pendingCardExists) {
+        displayTrick = [...displayTrick, { ...pendingPlayedCard, seatIndex: mySeatIndex }];
+      }
+    }
+    
+    // Return null if no cards to display (check AFTER adding pending card)
+    if (!displayTrick.length) {
+      return null;
+    }
     
     return Array.isArray(displayTrick) ? displayTrick.map((card: any, i: number) => {
       const seatIndex = card.seatIndex ?? card.playerIndex;
