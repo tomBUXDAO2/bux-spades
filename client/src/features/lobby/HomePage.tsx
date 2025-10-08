@@ -375,6 +375,11 @@ const HomePage: React.FC = () => {
 
   const handleCreateGame = async (settings: any) => {
     setIsCreateGameModalOpen(false);
+    
+    // INSTANT FEEDBACK: Navigate immediately to loading state
+    const tempGameId = `temp_${Date.now()}`;
+    navigate(`/game/${tempGameId}`);
+    
     try {
       // Map client fields to server fields
       const serverSettings = {
@@ -391,6 +396,7 @@ const HomePage: React.FC = () => {
         creatorImage: user.avatar
       };
       
+      // Create game in background
       const res = await api.post('/api/games', serverSettings);
       if (!res.ok) throw new Error('Failed to create game');
       const response = await res.json();
@@ -418,22 +424,15 @@ const HomePage: React.FC = () => {
         }
       }
       
-      // Create a minimal game object with just the ID for navigation
-      const game = { id: gameId };
-      console.log('[GAME CREATION DEBUG] Final game object:', game);
-      
-      // Validate game object has required fields
-      if (!game || !game.id) {
-        throw new Error('Invalid game response from server');
+      // Replace temp ID with real ID in URL
+      if (gameId) {
+        navigate(`/game/${gameId}`, { replace: true });
       }
       
       // Set active game id so socket auto-joins immediately on table load
-      try { localStorage.setItem('activeGameId', game.id); } catch {}
-      
-      // Add small delay to ensure game is fully created on server
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      navigate(`/table/${game.id}`);
+      if (gameId) {
+        try { localStorage.setItem('activeGameId', gameId); } catch {}
+      }
     } catch (err) {
       console.error('Game creation error:', err);
       alert('Failed to create game');

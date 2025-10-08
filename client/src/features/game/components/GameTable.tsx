@@ -509,6 +509,7 @@ export default function GameTableModular({
 
     if (!socket || !gameState?.id) return;
     
+    // CRITICAL: Set isStarting and NEVER unset it - button should disappear forever
     setIsStarting(true);
     const players = Array.isArray(gameState.players) ? gameState.players : [];
     const occupied = players.filter(Boolean).length;
@@ -523,7 +524,7 @@ export default function GameTableModular({
 
     // Case 2: No empty seats but bots present → warn unrated then start on continue
     if (hasBotPlayers && !options.rated) {
-      setIsStarting(false);
+      // DON'T set isStarting to false - keep button hidden
       setGameState((prev: any) => ({ ...prev, ui: { ...(prev?.ui || {}), showBotWarning: true } }));
       setBotWarningOpen(true);
       return;

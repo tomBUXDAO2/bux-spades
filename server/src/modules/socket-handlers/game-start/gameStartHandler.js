@@ -142,35 +142,32 @@ class GameStartHandler {
       startingGames.delete(gameId);
 
       // Wait for cards to be rendered before starting bidding
-      console.log(`[GAME START] Waiting 2 seconds for cards to render before starting bidding`);
-      setTimeout(async () => {
-        // Trigger bot bidding if current player is a bot
-        console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
-        if (gameState.currentPlayer) {
-          // Get the game from database to check if current player is a bot
-          const game = await GameService.getGame(gameId);
-          if (game) {
-            const currentPlayer = game.players.find(p => p.userId === gameState.currentPlayer);
-            console.log(`[GAME START] Found current player:`, currentPlayer ? {
-              id: currentPlayer.userId,
-              username: currentPlayer.user?.username,
-              isHuman: currentPlayer.isHuman,
-              seatIndex: currentPlayer.seatIndex
-            } : 'null');
-            
-            if (currentPlayer && !currentPlayer.isHuman) {
-              console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
-              // Import and use BiddingHandler
-              const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-              const biddingHandler = new BiddingHandler(this.io, this.socket);
-              // Trigger bot bid
-              await biddingHandler.triggerBotBidIfNeeded(gameId);
-            }
+      // PERFORMANCE: Trigger bot bidding immediately (no delay)
+      console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
+      if (gameState.currentPlayer) {
+        // Get the game from database to check if current player is a bot
+        const game = await GameService.getGame(gameId);
+        if (game) {
+          const currentPlayer = game.players.find(p => p.userId === gameState.currentPlayer);
+          console.log(`[GAME START] Found current player:`, currentPlayer ? {
+            id: currentPlayer.userId,
+            username: currentPlayer.user?.username,
+            isHuman: currentPlayer.isHuman,
+            seatIndex: currentPlayer.seatIndex
+          } : 'null');
+          
+          if (currentPlayer && !currentPlayer.isHuman) {
+            console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
+            // Import and use BiddingHandler
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            // Trigger bot bid immediately
+            await biddingHandler.triggerBotBidIfNeeded(gameId);
           }
-        } else {
-          console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
         }
-      }, 2000); // 2 second delay for cards to render
+      } else {
+        console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
+      }
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       console.error('[GAME START] Error stack:', error.stack);

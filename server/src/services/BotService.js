@@ -695,7 +695,7 @@ class BotService {
   }
 
   /**
-   * Fill empty seats with bots
+   * Fill empty seats with bots - PARALLEL for speed
    */
   async fillEmptySeatsWithBots(game) {
     const emptySeats = [];
@@ -705,11 +705,12 @@ class BotService {
       }
     }
 
-    for (const seatIndex of emptySeats) {
-      await this.addBotToGame(game, seatIndex);
-    }
+    // PERFORMANCE: Add all bots in parallel instead of sequentially
+    await Promise.all(
+      emptySeats.map(seatIndex => this.addBotToGame(game, seatIndex))
+    );
 
-    console.log(`[BOT SERVICE] Filled ${emptySeats.length} empty seats with bots`);
+    console.log(`[BOT SERVICE] Filled ${emptySeats.length} empty seats with bots in parallel`);
     return emptySeats.length;
   }
 }

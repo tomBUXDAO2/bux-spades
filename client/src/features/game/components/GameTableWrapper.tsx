@@ -102,20 +102,16 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
     
     console.log('[DEBUG] Empty seat indexes:', emptySeatIndexes);
     
-    // Fill each empty seat with a bot
-    for (const seatIndex of emptySeatIndexes) {
+    // PERFORMANCE: Invite all bots in parallel (no delays)
+    console.log('[DEBUG] Inviting all bots in parallel...');
+    emptySeatIndexes.forEach(seatIndex => {
       console.log('[DEBUG] Inviting bot to seat:', seatIndex);
-      console.log('[DEBUG] Socket available:', !!socket);
-      console.log('[DEBUG] GameState available:', !!gameState);
-      console.log('[DEBUG] GameId:', gameState?.id);
       inviteBot(seatIndex);
-      await new Promise(resolve => setTimeout(resolve, 350));
-    }
+    });
     
-    // Wait for bots to be added, then start the game as unrated
-    console.log('[DEBUG] Waiting for bots to be added...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // PERFORMANCE: Start game immediately (server will handle bot addition completion)
     console.log('[DEBUG] Starting game with bots...');
+    await new Promise(resolve => setTimeout(resolve, 200)); // Minimal delay for socket events
     if (socket && gameState?.id) {
       socket.emit('start_game', { gameId: gameState.id, rated: false });
     }
