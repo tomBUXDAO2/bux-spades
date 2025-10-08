@@ -60,7 +60,8 @@ export default function GameTablePlayers({
   coinDebitAmount,
   recentChatMessages,
   isPlayer,
-  isBot
+  isBot,
+  pendingBid
 }: GameTablePlayersProps) {
   
   const renderPlayerPosition = (position: number) => {

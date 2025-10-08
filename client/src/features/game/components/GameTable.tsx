@@ -509,6 +509,30 @@ export default function GameTableModular({
       isBlindNil: false
     });
   };
+
+  // OPTIMISTIC BOT BIDDING: Show bot bids immediately when it's their turn
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'BIDDING' || !gameState.currentPlayer) return;
+    
+    const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
+    if (currentPlayer && currentPlayer.type === 'bot') {
+      // It's a bot's turn - show optimistic bid immediately
+      // Simple bot bid logic: 1-4 based on hand strength
+      const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
+      const hand = gameState.hands?.[playerIndex] || [];
+      const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
+      const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
+      
+      setPendingBid({ playerId: currentPlayer.id, bid: botBid });
+      console.log('[OPTIMISTIC BOT BID] Showing bot bid immediately:', { 
+        playerId: currentPlayer.id, 
+        botName: currentPlayer.username,
+        bid: botBid,
+        spadesCount,
+        handLength: hand.length
+      });
+    }
+  }, [gameState?.currentPlayer, gameState?.status]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
