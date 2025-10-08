@@ -64,25 +64,8 @@ export default function BiddingInterface({
     }
   }, [gimmickType, numHearts, onBid]);
 
-  // For BID 3 games, automatically bid 3
-  useEffect(() => {
-    if (gimmickType === "BID 3") {
-      console.log("Auto-bidding in BID 3 game: 3");
-      setIsSubmitting(true);
-      onBid(3);
-    }
-  }, [gimmickType, onBid]);
-
-  // For CRAZY ACES games, automatically bid 3 per ace
-  useEffect(() => {
-    if (gimmickType === "CRAZY ACES") {
-      const aceCount = currentPlayerHand ? currentPlayerHand.filter(card => card.rank === "A").length : 0;
-      const acesBid = aceCount > 0 ? aceCount * 3 : 0;
-      console.log("Auto-bidding in CRAZY ACES game:", acesBid, "aces:", aceCount);
-      setIsSubmitting(true);
-      onBid(acesBid);
-    }
-  }, [gimmickType, currentPlayerHand, onBid]);
+  // NOTE: BID 3 and CRAZY ACES auto-bidding is handled in GameStatusOverlay.tsx
+  // Removed duplicate useEffect hooks that were causing double bid submissions
   const handleSubmit = (bid: number) => {
     setIsSubmitting(true);
     onBid(bid);

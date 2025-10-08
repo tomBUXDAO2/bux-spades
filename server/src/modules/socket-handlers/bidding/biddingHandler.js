@@ -336,17 +336,30 @@ class BiddingHandler {
       const gameState = await GameService.getGame(gameId);
       const firstPlayer = gameState.players.find(p => p.seatIndex === (gameState.dealer + 1) % 4);
 
-      // Create the first trick record
-      const firstTrick = await prisma.trick.create({
-        data: {
+      // Check if trick already exists
+      const existingTrick = await prisma.trick.findFirst({
+        where: {
           roundId: roundId,
-          trickNumber: 1,
-          leadSeatIndex: firstPlayer?.seatIndex || 0,
-          winningSeatIndex: null // Will be set when trick is complete
+          trickNumber: 1
         }
       });
 
-      console.log(`[BIDDING] Created first trick: ${firstTrick.id} with leadSeatIndex: ${firstPlayer?.seatIndex || 0}`);
+      let firstTrick;
+      if (existingTrick) {
+        console.log(`[BIDDING] Trick already exists for round ${roundId}, using existing: ${existingTrick.id}`);
+        firstTrick = existingTrick;
+      } else {
+        // Create the first trick record
+        firstTrick = await prisma.trick.create({
+          data: {
+            roundId: roundId,
+            trickNumber: 1,
+            leadSeatIndex: firstPlayer?.seatIndex || 0,
+            winningSeatIndex: null // Will be set when trick is complete
+          }
+        });
+        console.log(`[BIDDING] Created first trick: ${firstTrick.id} with leadSeatIndex: ${firstPlayer?.seatIndex || 0}`);
+      }
 
       // Update game status and current trick
       await GameService.updateGame(gameId, {
@@ -408,28 +421,37 @@ class BiddingHandler {
       }
 
       // Emit round started event
-      const updatedGameState = await GameService.getGameStateForClient(gameId);
-      
-      // CRITICAL: Preserve bidding data when transitioning to PLAYING phase
-      const latestBids = await redisGameState.getPlayerBids(gameId);
-      if (latestBids && updatedGameState) {
-        updatedGameState.bidding = {
-          bids: latestBids,
-          currentBidderIndex: firstPlayer?.seatIndex || 0,
-          currentPlayer: firstPlayer?.userId
-        };
+      try {
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
         
-        // Also update player bids in the players array
-        updatedGameState.players = updatedGameState.players.map(p => ({
-          ...p,
-          bid: latestBids[p.seatIndex] || null
-        }));
+        // CRITICAL: Preserve bidding data when transitioning to PLAYING phase
+        const latestBids = await redisGameState.getPlayerBids(gameId);
+        if (latestBids && updatedGameState) {
+          updatedGameState.bidding = {
+            bids: latestBids,
+            currentBidderIndex: firstPlayer?.seatIndex || 0,
+            currentPlayer: firstPlayer?.userId
+          };
+          
+          // Also update player bids in the players array
+          updatedGameState.players = updatedGameState.players.map(p => ({
+            ...p,
+            bid: latestBids[p.seatIndex] || null
+          }));
+        }
+        
+        this.io.to(gameId).emit('round_started', {
+          gameId,
+          gameState: updatedGameState
+        });
+      } catch (error) {
+        console.error(`[BIDDING] Error getting game state for client:`, error);
+        // Fallback: emit minimal round started event
+        this.io.to(gameId).emit('round_started', {
+          gameId,
+          gameState: { status: 'PLAYING', currentPlayer: firstPlayer?.userId }
+        });
       }
-      
-      this.io.to(gameId).emit('round_started', {
-        gameId,
-        gameState: updatedGameState
-      });
 
       console.log(`[BIDDING] Round started successfully`);
 

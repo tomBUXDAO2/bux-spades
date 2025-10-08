@@ -175,7 +175,7 @@ export const BiddingOverlay: React.FC<{
   }
   
   // Get the current player's hand from gameState.hands array
-  const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && p.id === currentPlayerId);
+  const currentPlayerIndex = sanitizedPlayers.findIndex(p => p && (p.id === currentPlayerId || p.userId === currentPlayerId));
   const currentPlayerHand = (gameState as any).hands && (gameState as any).hands[currentPlayerIndex];
   
   // Calculate if player has Ace of Spades for Whiz games

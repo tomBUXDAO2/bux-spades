@@ -118,12 +118,14 @@ class BotService {
    */
   async makeBotBid(game, seatIndex) {
     const bot = game.players[seatIndex];
-    if (!bot || bot.type !== 'bot') {
+    if (!bot || bot.isHuman !== false) {
       console.log(`[BOT SERVICE] Seat ${seatIndex} is not a bot`);
       return;
     }
 
-    const hand = game.hands[seatIndex] || [];
+    // Handle both 'hands' and 'playerHands' properties
+    const hands = game.hands || game.playerHands || [];
+    const hand = hands[seatIndex] || [];
     let bid = 0;
 
     if (hand.length === 0) {
@@ -424,12 +426,14 @@ class BotService {
       });
       
       bot = game.players[seatIndex];
-      if (!bot || bot.type !== 'bot') {
+      if (!bot || bot.isHuman !== false) {
         console.log(`[BOT SERVICE] Seat ${seatIndex} is not a bot:`, bot);
         return null;
       }
 
-      const hand = game.hands[seatIndex] || [];
+      // CRITICAL: Handle both 'hands' and 'playerHands' properties
+      const hands = game.hands || game.playerHands || [];
+      const hand = hands[seatIndex] || [];
       if (hand.length === 0) {
         console.log(`[BOT SERVICE] Bot ${bot.username} has no cards to play`);
         return null;

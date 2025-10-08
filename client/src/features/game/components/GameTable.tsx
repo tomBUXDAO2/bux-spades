@@ -160,10 +160,11 @@ export default function GameTableModular({
   
   // Game calculations
   const currentPlayerId = propUser?.id;
-  const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && p.id === propUser?.id) : -1;
+  
+  const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && (p.id === propUser?.id || p.userId === propUser?.id)) : -1;
   
   // Get the current player's seatIndex, not array index
-  const myPlayer = gameState.players ? gameState.players.find(p => p && p.id === propUser?.id) : null;
+  const myPlayer = gameState.players ? gameState.players.find(p => p && (p.id === propUser?.id || p.userId === propUser?.id)) : null;
   const mySeatIndex = myPlayer ? myPlayer.seatIndex : -1;
   
   // Access hands by seatIndex, not array index - this is the correct way
@@ -708,7 +709,7 @@ export default function GameTableModular({
     }
   };
   
-  const myIndex = gameState.players?.findIndex(p => p && p.id === propUser?.id);
+  const myIndex = gameState.players?.findIndex(p => p && (p.id === propUser?.id || p.userId === propUser?.id));
   const allHumansReady = gameState.players?.every((p, i) => {
     if (!isPlayer(p)) return true;
     if (i === myIndex) return true;

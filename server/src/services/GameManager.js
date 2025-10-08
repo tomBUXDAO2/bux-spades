@@ -94,7 +94,7 @@ class GameManager {
     try {
       const game = this.getGame(gameId);
       if (game) {
-        await GameService.updateGame(game);
+        await GameService.updateGame(gameId, game);
         console.log(`[GAME MANAGER] Saved game ${gameId} to database`);
       }
     } catch (error) {

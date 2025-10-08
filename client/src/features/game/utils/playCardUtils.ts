@@ -52,7 +52,7 @@ export const updateLocalHand = (
   callbacks.setGameState(prev => ({
     ...prev,
     hands: prev.hands?.map((hand: any, index: any) => {
-      const myPlayerIndex = prev.players?.findIndex((p: any) => p?.id === userId);
+      const myPlayerIndex = prev.players?.findIndex((p: any) => p && (p.id === userId || p.userId === userId));
       if (index === myPlayerIndex && Array.isArray(hand)) {
         return hand.filter(c => !(c.suit === card.suit && c.rank === card.rank));
       }

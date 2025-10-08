@@ -285,11 +285,11 @@ class CardPlayHandler {
 
         // Emit card played event
         
-        // CRITICAL: Update the game state cache with the new currentTrick data
-        // PERFORMANCE FIX: Use the gameState we already have instead of fetching again
-        const updatedGameState = gameState;
+        // CRITICAL FIX: Get properly formatted game state from database
+        // DO NOT use raw gameState from getGame() as it has wrong structure
+        const updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
         
-        // Update current trick data in the existing game state
+        // Update current trick data in the game state
         if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
           const formattedTrickCards = currentTrickCardsForRedis.map(card => ({
             suit: card.suit,
@@ -394,16 +394,38 @@ class CardPlayHandler {
       }
 
       console.log(`[CARD PLAY] Current player ID: ${gameState.currentPlayer}`);
-      const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);
+      
+      // CRITICAL: Get fresh player data directly from database, not from cached game state
+      const game = await GameService.getGame(gameId);
+      if (!game) {
+        console.error(`[CARD PLAY] Game not found in database: ${gameId}`);
+        return;
+      }
+      
+      // Get fresh players from database with user data
+      const dbPlayers = await prisma.gamePlayer.findMany({
+        where: { gameId },
+        include: { user: true }
+      });
+      
+      const currentPlayer = dbPlayers.find(p => p.userId === gameState.currentPlayer);
+      
       console.log(`[CARD PLAY] Found current player:`, currentPlayer ? { 
         id: currentPlayer.id, 
-        username: currentPlayer.username, 
-        type: currentPlayer.type, 
+        username: currentPlayer.user?.username, 
+        type: currentPlayer.isHuman ? 'human' : 'bot', 
         seatIndex: currentPlayer.seatIndex 
       } : 'null');
       
-      if (!currentPlayer || currentPlayer.type !== 'bot') {
+      if (!currentPlayer || currentPlayer.isHuman !== false) {
         console.log(`[CARD PLAY] Not triggering bot play - currentPlayer is not a bot`);
+        return;
+      }
+
+      // CRITICAL: Get hands directly from Redis, not from game state
+      const hands = await redisGameState.getPlayerHands(gameId);
+      if (!hands || !Array.isArray(hands) || hands.length === 0) {
+        console.error(`[CARD PLAY] No hands found in Redis for bot service`);
         return;
       }
 
@@ -424,11 +446,24 @@ class CardPlayHandler {
         return;
       }
 
+      // CRITICAL: Prevent same bot from playing twice in rapid succession
+      const lastBotPlayTime = this.lastBotPlayTimes?.get(gameId);
+      const currentTime = Date.now();
+      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 1000) {
+        console.log(`[CARD PLAY] Bot play too recent, skipping to prevent rapid fire`);
+        return;
+      }
+      
+      // Track bot play time
+      if (!this.lastBotPlayTimes) {
+        this.lastBotPlayTimes = new Map();
+      }
+      this.lastBotPlayTimes.set(gameId, currentTime);
+
       console.log(`[CARD PLAY] Triggering bot play for ${currentPlayer.username} (seat ${currentPlayer.seatIndex})`);
 
       // Get bot's hand from Redis first, then fallback to database
       let hand = null;
-      const hands = await redisGameState.getPlayerHands(gameId);
       if (hands && hands[currentPlayer.seatIndex]) {
         hand = hands[currentPlayer.seatIndex];
         console.log(`[CARD PLAY] Bot hand from Redis:`, hand.map(c => `${c.suit}${c.rank}`));
@@ -450,7 +485,7 @@ class CardPlayHandler {
       }
 
       // Update the gameState with the current hands before passing to bot
-      const updatedGameState = { ...gameState, hands: hands || [hand] };
+      const updatedGameState = { ...gameState, hands: hands };
 
       // Get bot card choice
       const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
@@ -494,15 +529,23 @@ class CardPlayHandler {
   }
 
   /**
-   * PERFORMANCE FIX: Simplified currentPlayer update
-   * Only update database - Redis will be updated with full game state
+   * CRITICAL FIX: Update currentPlayer in both database AND Redis cache
    */
   async updateCurrentPlayer(gameId, userId) {
     try {
-      // Only update database - Redis gets updated with complete game state later
+      // Update database
       await GameService.updateGame(gameId, {
         currentPlayer: userId
       });
+      console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in database`);
+      
+      // CRITICAL: Also update Redis cache to prevent stale data
+      const cachedGameState = await redisGameState.getGameState(gameId);
+      if (cachedGameState) {
+        cachedGameState.currentPlayer = userId;
+        await redisGameState.setGameState(gameId, cachedGameState);
+        console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in Redis cache`);
+      }
     } catch (error) {
       console.error(`[CURRENT PLAYER] Error updating currentPlayer to ${userId}:`, error);
       throw error;

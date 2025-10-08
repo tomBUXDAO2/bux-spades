@@ -37,7 +37,7 @@ export const getOrderedPlayersForTrick = (
     (a, b) => (a && b ? a.position - b.position : 0)
   );
   
-  const mySeatIndex = seatOrderedPlayers.findIndex(p => p && p.id === userId);
+  const mySeatIndex = seatOrderedPlayers.findIndex(p => p && (p.id === userId || p.userId === userId));
   
   // For spectators, use seat 0 as the reference point
   const referenceSeatIndex = mySeatIndex >= 0 ? mySeatIndex : 0;

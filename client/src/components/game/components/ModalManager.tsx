@@ -320,7 +320,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           playerScores={finalPlayerScores || gameState.playerScores || [0, 0, 0, 0]}
           winningPlayer={gameState.winningPlayer || 0}
           onPlayAgain={onPlayAgain}
-          userPlayerIndex={gameState.players?.findIndex(p => p && p.id === user?.id)}
+          userPlayerIndex={gameState.players?.findIndex(p => p && (p.id === user?.id || p.userId === user?.id))}
           humanPlayerCount={(gameState.players || []).filter(p => p && !isBot(p)).length}
           onTimerExpire={onTimerExpire}
           buyIn={gameState.buyIn || (gameState.rules as any)?.coinAmount || 0}

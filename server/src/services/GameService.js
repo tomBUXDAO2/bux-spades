@@ -92,20 +92,11 @@ export class GameService {
 
   // Get complete game state from database (single source of truth)
   static async getGame(gameId) {
-    // Prevent concurrent database operations with improved retry logic
+    // Simplified mutex - just wait briefly if operation is in progress
     if (databaseOperations.has(gameId)) {
-      console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting...`);
-      // Wait longer and retry multiple times
-      for (let i = 0; i < 3; i++) {
-        await new Promise(resolve => setTimeout(resolve, 150 * (i + 1))); // 150ms, 300ms, 450ms
-        if (!databaseOperations.has(gameId)) {
-          break;
-        }
-      }
-      if (databaseOperations.has(gameId)) {
-        console.log(`[GAME SERVICE] Database operation still in progress for game ${gameId}, skipping...`);
-        return null;
-      }
+      console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting briefly...`);
+      // Wait briefly and then proceed anyway to prevent blocking
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     databaseOperations.add(gameId);
@@ -513,6 +504,26 @@ export class GameService {
           cachedGameState.play.spadesBroken = false; // Default to false if not set
         }
         
+        // CRITICAL: Ensure bidding data is included from Redis cache
+        if (!cachedGameState.bidding) {
+          const playerBids = await redisGameState.getPlayerBids(gameId);
+          if (playerBids) {
+            cachedGameState.bidding = {
+              bids: playerBids,
+              currentBidderIndex: 0,
+              currentPlayer: cachedGameState.currentPlayer
+            };
+            
+            // Also update player bids in the players array
+            if (cachedGameState.players) {
+              cachedGameState.players = cachedGameState.players.map(p => ({
+                ...p,
+                bid: playerBids[p.seatIndex] || null
+              }));
+            }
+          }
+        }
+        
         // Returning cached state from Redis
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
@@ -528,6 +539,26 @@ export class GameService {
           fullGameState.play = fullGameState.play || {};
           fullGameState.play.currentTrick = currentTrickCards;
           fullGameState.currentTrickCards = currentTrickCards;
+        }
+        
+        // CRITICAL: Ensure bidding data is included from Redis cache
+        if (!fullGameState.bidding) {
+          const playerBids = await redisGameState.getPlayerBids(gameId);
+          if (playerBids) {
+            fullGameState.bidding = {
+              bids: playerBids,
+              currentBidderIndex: 0,
+              currentPlayer: fullGameState.currentPlayer
+            };
+            
+            // Also update player bids in the players array
+            if (fullGameState.players) {
+              fullGameState.players = fullGameState.players.map(p => ({
+                ...p,
+                bid: playerBids[p.seatIndex] || null
+              }));
+            }
+          }
         }
         
         // Cache the full state in Redis for future requests

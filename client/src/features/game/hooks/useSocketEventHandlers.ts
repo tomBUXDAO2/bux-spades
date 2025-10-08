@@ -100,8 +100,14 @@ export const useSocketEventHandlers = ({
             console.log('🎮 Card played - setting game state with currentPlayer:', cardData.gameState.currentPlayer);
             console.log('🎮 Card played - currentTrick from event:', cardData.currentTrick);
             
+            // CRITICAL: Preserve bidding data from previous state
+            const gameStateWithBidding = {
+              ...cardData.gameState,
+              bidding: cardData.gameState.bidding || prevState.bidding
+            };
+            
             // CRITICAL: Ensure currentTrick data is properly integrated
-            const normalizedState = normalizeGameState(cardData.gameState);
+            const normalizedState = normalizeGameState(gameStateWithBidding);
             if (cardData.currentTrick && Array.isArray(cardData.currentTrick)) {
               normalizedState.play = {
                 ...normalizedState.play,
@@ -177,10 +183,14 @@ export const useSocketEventHandlers = ({
       if (roundData && roundData.gameId === gameId) {
         (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
-          return {
-            ...prevState,
-            ...roundData.gameState
+          
+          // CRITICAL: Preserve bidding data from previous state
+          const gameStateWithBidding = {
+            ...roundData.gameState,
+            bidding: roundData.gameState.bidding || prevState.bidding
           };
+          
+          return normalizeGameState(gameStateWithBidding);
         });
       }
     };
