@@ -29,12 +29,8 @@ class CardPlayHandler {
       
       // User playing card
       
-      // Get current game state from Redis first for instant validation
-      let gameState = await redisGameState.getGameState(gameId);
-      if (!gameState) {
-        gameState = await GameService.getGameStateForClient(gameId);
-      }
-      
+      // Get current game state from database
+      const gameState = await GameService.getGameStateForClient(gameId);
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -46,66 +42,8 @@ class CardPlayHandler {
         return;
       }
 
-      const player = gameState.players.find(p => p && (p.id === userId || p.userId === userId));
-      if (!player) {
-        this.socket.emit('error', { message: 'Player not found' });
-        return;
-      }
-
-      // OPTIMISTIC: Emit card immediately and advance player
-      const currentTrickCards = await redisGameState.getCurrentTrick(gameId) || [];
-      const optimisticTrick = [
-        ...currentTrickCards,
-        { suit: card.suit, rank: card.rank, seatIndex: player.seatIndex, playerId: userId }
-      ];
-      
-      // Update Redis immediately
-      await redisGameState.setCurrentTrick(gameId, optimisticTrick);
-      
-      // Advance to next player immediately (optimistic)
-      const nextPlayerIndex = (player.seatIndex + 1) % 4;
-      const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
-      
-      if (nextPlayer && optimisticTrick.length < 4) {
-        gameState.currentPlayer = nextPlayer.userId;
-        await redisGameState.setGameState(gameId, gameState);
-      }
-      
-      // Emit immediately for instant feedback
-      const gameStateWithTrick = {
-        ...gameState,
-        play: {
-          ...gameState.play,
-          currentTrick: optimisticTrick
-        },
-        currentTrick: optimisticTrick
-      };
-      
-      this.io.to(gameId).emit('card_played', {
-        gameId,
-        gameState: gameStateWithTrick,
-        currentTrick: optimisticTrick,
-        cardPlayed: {
-          userId,
-          card,
-          seatIndex: player.seatIndex,
-          isBot: false
-        }
-      });
-      
-      console.log('[CARD PLAY] Optimistic card play emitted, processing in background');
-
-      // CRITICAL: Trigger bot play immediately if next player is a bot
-      if (nextPlayer && nextPlayer.type === 'bot' && optimisticTrick.length < 4) {
-        console.log('[CARD PLAY] Next player is bot, triggering immediate bot play');
-        setImmediate(() => this.triggerBotPlayIfNeeded(gameId));
-      }
-
-      // Process the card play in database (async, non-blocking)
-      // This will handle trick completion and logging in the background
-      this.processCardPlay(gameId, userId, card, false).catch(err => 
-        console.error('[CARD PLAY] Background processing error:', err)
-      );
+      // Process the card play in database
+      await this.processCardPlay(gameId, userId, card, false);
     } catch (error) {
       console.error('[CARD PLAY] Error:', error);
       this.socket.emit('error', { message: 'Failed to play card' });
@@ -204,6 +142,21 @@ class CardPlayHandler {
 
         if (trickResult.isComplete) {
           console.log(`[CARD PLAY] Trick completed, winner: seat ${trickResult.winningSeatIndex}`);
+          
+          // First, emit card played event so client can render the 4th card
+          // NOTE: This will be emitted again after updateCurrentPlayer with correct currentPlayer
+          const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
+
+          this.io.to(gameId).emit('card_played', {
+            gameId,
+            gameState: cardPlayedGameState,
+            cardPlayed: {
+              userId,
+              card,
+              seatIndex: player.seatIndex,
+              isBot
+            }
+          });
 
           // EXTREME: NO DELAYS - COMPLETE IMMEDIATELY
           (async () => {
@@ -224,30 +177,46 @@ class CardPlayHandler {
             console.log(`[CARD PLAY] About to call updateCurrentPlayer with winningPlayer.userId: ${winningPlayer.userId}`);
             await this.updateCurrentPlayer(gameId, winningPlayer.userId);
 
+            // CRITICAL: Emit card_played event with correct currentPlayer after updateCurrentPlayer
+            console.log(`[CARD PLAY] About to get corrected game state after updateCurrentPlayer`);
+            const correctedGameState = await GameService.getGameStateForClient(gameId);
+            console.log(`[CARD PLAY] Corrected game state currentPlayer: ${correctedGameState.currentPlayer}, expected: ${winningPlayer.userId}`);
+            this.io.to(gameId).emit('card_played', {
+              gameId,
+              gameState: correctedGameState,
+              cardPlayed: {
+                userId,
+                card,
+                seatIndex: player.seatIndex,
+                isBot
+              },
+              currentTrick: correctedGameState.play?.currentTrick || []
+            });
+            console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
+
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
               where: { trickId: logResult.actualTrickId },
               orderBy: { playOrder: 'asc' }
             });
 
-            // Emit trick complete event immediately - cards are already on table from optimistic updates
-            GameService.getGameStateForClient(gameId).then(updatedGameState => {
-              this.io.to(gameId).emit('trick_complete', {
-                gameId,
-                gameState: updatedGameState,
-                trickWinner: trickResult.winningSeatIndex,
-                completedTrick: {
-                  cards: completedTrickCards.map(card => ({
-                    suit: card.suit,
-                    rank: card.rank,
-                    seatIndex: card.seatIndex,
-                    playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
-                  }))
-                }
-              });
+            // Emit trick complete event
+            const updatedGameState = await GameService.getGameStateForClient(gameId);
+            this.io.to(gameId).emit('trick_complete', {
+              gameId,
+              gameState: updatedGameState,
+              trickWinner: trickResult.winningSeatIndex,
+              completedTrick: {
+                cards: completedTrickCards.map(card => ({
+                  suit: card.suit,
+                  rank: card.rank,
+                  seatIndex: card.seatIndex,
+                  playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+                }))
+              }
             });
 
-            // Clear trick cards from table after animation - only when trick is complete
+            // Clear trick cards from table after animation (3 seconds delay) - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
               setTimeout(() => {
@@ -262,7 +231,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 1200);
+              }, 800);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
@@ -348,12 +317,23 @@ class CardPlayHandler {
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
-        // NOTE: card_played event already emitted optimistically in handlePlayCard
-        // No need to emit again here - just update DB and Redis
-        console.log('[CARD PLAY] DB and Redis updated, optimistic emit already sent');
+        // Emitting card_played event
+        // Game state updated
+        this.io.to(gameId).emit('card_played', {
+          gameId,
+          gameState: updatedGameState,
+          currentTrick: updatedGameState.play?.currentTrick || [],
+          cardPlayed: {
+            userId,
+            card,
+            seatIndex: player.seatIndex,
+            isBot
+          }
+        });
 
-        // Trigger bot play if next player is a bot (already handled in handlePlayCard)
-        // this.triggerBotPlayIfNeeded(gameId);
+        // Trigger bot play if next player is a bot
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        this.triggerBotPlayIfNeeded(gameId);
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);
@@ -473,7 +453,7 @@ class CardPlayHandler {
       // CRITICAL: Prevent same bot from playing twice in rapid succession
       const lastBotPlayTime = this.lastBotPlayTimes?.get(gameId);
       const currentTime = Date.now();
-      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 50) {
+      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 100) {
         console.log(`[CARD PLAY] Bot play too recent, skipping to prevent rapid fire`);
         return;
       }

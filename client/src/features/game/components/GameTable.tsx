@@ -275,9 +275,9 @@ export default function GameTableModular({
       // Play win sound effect when trick completes
       playWinSound();
       
-      // Wait 1.5 seconds before clearing trick animation (matches server delay)
+      // Wait 1 second before clearing trick animation (reduced from 2 seconds)
       setTimeout(() => {
-        console.log('[TRICK ANIMATION] Clearing trick animation after 1.5 seconds');
+        console.log('[TRICK ANIMATION] Clearing trick animation after 1 second');
         setAnimatingTrick(false);
         setTrickWinner(null);
         setAnimatedTrickCards([]);
@@ -294,7 +294,7 @@ export default function GameTableModular({
           },
           currentTrickCards: [] // Also clear this field
         }));
-      }, 1500);
+      }, 1000);
     }
   };
   
@@ -523,17 +523,12 @@ export default function GameTableModular({
     } else {
       setIsBiddingPhase(false);
       setPendingBid(null);
-      console.log('[BIDDING CLEANUP] Cleared all bidding state - game status changed to:', gameState.status);
     }
   }, [gameState.status]);
 
   // SIMPLE BOT BIDDING: Only trigger once per bot turn
   useEffect(() => {
-    // CRITICAL: Check gameState.status directly to avoid race conditions
-    if (gameState.status !== 'BIDDING' || !gameState.currentPlayer) {
-      console.log('[SIMPLE BOT BID] Skipping - status:', gameState.status, 'currentPlayer:', gameState.currentPlayer);
-      return;
-    }
+    if (!isBiddingPhase || !gameState.currentPlayer) return;
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
@@ -541,12 +536,6 @@ export default function GameTableModular({
       
       // Simple delay then bid
       const timeoutId = setTimeout(() => {
-        // Double-check status before bidding
-        if (gameState.status !== 'BIDDING') {
-          console.log('[SIMPLE BOT BID] Aborted - game status changed to:', gameState.status);
-          return;
-        }
-        
         const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
         const hand = gameState.hands?.[playerIndex] || [];
         const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
@@ -558,12 +547,9 @@ export default function GameTableModular({
         console.log('[SIMPLE BOT BID] Bot bid:', currentPlayer.username, 'bid:', botBid);
       }, 500);
       
-      return () => {
-        console.log('[SIMPLE BOT BID] Cleanup timeout for bot:', currentPlayer.username);
-        clearTimeout(timeoutId);
-      };
+      return () => clearTimeout(timeoutId);
     }
-  }, [gameState.currentPlayer, gameState.status, playBidSound]);
+  }, [gameState.currentPlayer, isBiddingPhase, playBidSound]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {

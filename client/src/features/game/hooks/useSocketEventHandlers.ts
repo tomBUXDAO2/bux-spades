@@ -116,17 +116,6 @@ export const useSocketEventHandlers = ({
               };
               // CRITICAL: Also set currentTrick at top level for renderTrickCards
               normalizedState.currentTrick = cardData.currentTrick;
-              // CRITICAL: Update hands to remove played card from hand
-              if (cardData.cardPlayed && cardData.cardPlayed.userId === userId) {
-                normalizedState.hands = normalizedState.hands?.map((hand: any, index: any) => {
-                  const myPlayerIndex = normalizedState.players?.findIndex((p: any) => p && (p.id === userId || p.userId === userId));
-                  if (index === myPlayerIndex && Array.isArray(hand)) {
-                    return hand.filter((c: any) => !(c.suit === cardData.cardPlayed.card.suit && c.rank === cardData.cardPlayed.card.rank));
-                  }
-                  return hand;
-                });
-                console.log('🎮 Removed played card from hand optimistically');
-              }
             }
             return normalizedState;
           } else {
