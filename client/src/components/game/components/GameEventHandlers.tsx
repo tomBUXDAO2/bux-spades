@@ -281,6 +281,9 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         console.log('🎮 Trick complete event received:', data);
         console.log('🎮 Trick complete - setting game state with currentPlayer:', data.gameState?.currentPlayer);
         
+        // Clear pending played card when trick completes
+        setPendingPlayedCard(null);
+        
         // Update game state if provided
         if (data.gameState) {
           setGameState((prevState: GameState) => ({

@@ -216,7 +216,7 @@ class CardPlayHandler {
               }
             });
 
-            // Clear trick cards from table after animation (600ms delay) - only when trick is complete
+            // Clear trick cards from table after animation (3 seconds delay) - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
               setTimeout(() => {
@@ -231,7 +231,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 600);
+              }, 3000);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
@@ -285,9 +285,13 @@ class CardPlayHandler {
 
         // Emit card played event
         
-        // CRITICAL FIX: Get properly formatted game state from database
-        // DO NOT use raw gameState from getGame() as it has wrong structure
-        const updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        // PERFORMANCE: Use cached game state from Redis and update incrementally
+        let updatedGameState = await redisGameState.getGameState(gameId);
+        
+        // If no Redis cache, fallback to database (should rarely happen)
+        if (!updatedGameState) {
+          updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        }
         
         // Update current trick data in the game state
         if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
@@ -449,7 +453,7 @@ class CardPlayHandler {
       // CRITICAL: Prevent same bot from playing twice in rapid succession
       const lastBotPlayTime = this.lastBotPlayTimes?.get(gameId);
       const currentTime = Date.now();
-      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 1000) {
+      if (lastBotPlayTime && (currentTime - lastBotPlayTime) < 100) {
         console.log(`[CARD PLAY] Bot play too recent, skipping to prevent rapid fire`);
         return;
       }

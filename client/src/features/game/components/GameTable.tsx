@@ -271,9 +271,9 @@ export default function GameTableModular({
       // Play win sound effect when trick completes
       playWinSound();
       
-      // Wait 600ms before clearing trick animation
+      // Wait 2 seconds before clearing trick animation
       setTimeout(() => {
-        console.log('[TRICK ANIMATION] Clearing trick animation after 600ms');
+        console.log('[TRICK ANIMATION] Clearing trick animation after 2 seconds');
         setAnimatingTrick(false);
         setTrickWinner(null);
         setAnimatedTrickCards([]);
@@ -290,7 +290,7 @@ export default function GameTableModular({
           },
           currentTrickCards: [] // Also clear this field
         }));
-      }, 600);
+      }, 2000);
     }
   };
   
@@ -729,6 +729,16 @@ export default function GameTableModular({
       displayTrick = (gameState as any).play.currentTrick;
     } else if (lastNonEmptyTrick.length > 0) {
       displayTrick = lastNonEmptyTrick;
+    }
+    
+    // INSTANT RENDERING: Add pending played card for immediate feedback
+    if (pendingPlayedCard && mySeatIndex >= 0) {
+      const pendingCardExists = displayTrick.some((c: any) => 
+        c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank
+      );
+      if (!pendingCardExists) {
+        displayTrick = [...displayTrick, { ...pendingPlayedCard, seatIndex: mySeatIndex }];
+      }
     }
     
     if (!displayTrick.length) {
