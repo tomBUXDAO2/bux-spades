@@ -497,33 +497,14 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
-    // Check if this player has already bid to prevent duplicates
-    if (playersWhoHaveBid.has(currentPlayerId!)) {
-      console.log('[OPTIMISTIC BID] Player already bid, skipping');
-      return;
-    }
+    console.log('[SIMPLE HUMAN BID] Human bid:', currentPlayerId, 'bid:', bid);
     
-    // OPTIMISTIC UI: Show bid immediately and advance to next player
+    // Simple: just show the bid and let server handle the rest
     if (currentPlayerId) {
       setPendingBid({ playerId: currentPlayerId, bid });
-      setPlayersWhoHaveBid(prev => new Set([...prev, currentPlayerId]));
-      console.log('[OPTIMISTIC BID] Showing bid immediately:', { playerId: currentPlayerId, bid });
-      
-      // OPTIMISTIC: Advance to next player immediately
-      const currentPlayerIndex = gameState.players.findIndex(p => p && p.id === currentPlayerId);
-      const nextPlayerIndex = (currentPlayerIndex + 1) % 4;
-      const nextPlayer = gameState.players[nextPlayerIndex];
-      
-      if (nextPlayer) {
-        setGameState(prev => ({
-          ...prev,
-          currentPlayer: nextPlayer.id
-        }));
-        console.log('[OPTIMISTIC BID] Advanced to next player:', nextPlayer.id);
-      }
     }
     
-    // handleBid will play the sound effect, so no duplicate
+    // Let server handle the rest
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
       playBidSound,
       setCardsRevealed,
@@ -531,70 +512,44 @@ export default function GameTableModular({
     });
   };
 
-  // Track which players have already bid to prevent loops
-  const [playersWhoHaveBid, setPlayersWhoHaveBid] = useState<Set<string>>(new Set());
+  // SIMPLIFIED BIDDING: Just track if we're in bidding phase
+  const [isBiddingPhase, setIsBiddingPhase] = useState(false);
 
-  // Reset bidding tracking when game status changes
+  // Reset when game status changes
   useEffect(() => {
-    if (gameState.status !== 'BIDDING') {
-      setPlayersWhoHaveBid(new Set());
+    if (gameState.status === 'BIDDING') {
+      setIsBiddingPhase(true);
       setPendingBid(null);
-      console.log('[OPTIMISTIC BID] Reset bidding tracking - game status changed to:', gameState.status);
+    } else {
+      setIsBiddingPhase(false);
+      setPendingBid(null);
     }
   }, [gameState.status]);
 
-  // OPTIMISTIC BOT BIDDING: Show bot as active, delay, then bid with sound
+  // SIMPLE BOT BIDDING: Only trigger once per bot turn
   useEffect(() => {
-    if (!gameState || gameState.status !== 'BIDDING' || !gameState.currentPlayer) return;
+    if (!isBiddingPhase || !gameState.currentPlayer) return;
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
-      // Check if this player has already bid to prevent duplicates
-      if (playersWhoHaveBid.has(currentPlayer.id)) {
-        console.log('[OPTIMISTIC BOT BID] Player already bid, skipping:', currentPlayer.username);
-        return;
-      }
+      console.log('[SIMPLE BOT BID] Bot turn:', currentPlayer.username);
       
-      console.log('[OPTIMISTIC BOT BID] Bot turn detected:', currentPlayer.username);
-      
-      // Delay 0.5 seconds, then show bid with sound effect
+      // Simple delay then bid
       const timeoutId = setTimeout(() => {
-        // Calculate bot bid
         const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
         const hand = gameState.hands?.[playerIndex] || [];
         const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
         const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
         
-        // Show bid and play sound effect
         setPendingBid({ playerId: currentPlayer.id, bid: botBid });
-        setPlayersWhoHaveBid(prev => new Set([...prev, currentPlayer.id]));
-        playBidSound(); // Play bidding sound effect
+        playBidSound();
         
-        console.log('[OPTIMISTIC BOT BID] Bot bid with sound:', { 
-          playerId: currentPlayer.id, 
-          botName: currentPlayer.username,
-          bid: botBid,
-          spadesCount,
-          handLength: hand.length
-        });
-        
-        // Advance to next player
-        const nextPlayerIndex = (playerIndex + 1) % 4;
-        const nextPlayer = gameState.players[nextPlayerIndex];
-        
-        if (nextPlayer) {
-          setGameState(prev => ({
-            ...prev,
-            currentPlayer: nextPlayer.id
-          }));
-          console.log('[OPTIMISTIC BOT BID] Advanced to next player:', nextPlayer.id);
-        }
-      }, 500); // 0.5 second delay
+        console.log('[SIMPLE BOT BID] Bot bid:', currentPlayer.username, 'bid:', botBid);
+      }, 500);
       
-      // Cleanup timeout if component unmounts or effect re-runs
       return () => clearTimeout(timeoutId);
     }
-  }, [gameState?.currentPlayer, gameState?.status, playBidSound, playersWhoHaveBid]);
+  }, [gameState.currentPlayer, isBiddingPhase, playBidSound]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
