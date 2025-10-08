@@ -378,7 +378,7 @@ const HomePage: React.FC = () => {
     
     // INSTANT FEEDBACK: Navigate immediately to loading state
     const tempGameId = `temp_${Date.now()}`;
-    navigate(`/game/${tempGameId}`);
+    navigate(`/table/${tempGameId}`);
     
     try {
       // Map client fields to server fields
@@ -426,7 +426,7 @@ const HomePage: React.FC = () => {
       
       // Replace temp ID with real ID in URL
       if (gameId) {
-        navigate(`/game/${gameId}`, { replace: true });
+        navigate(`/table/${gameId}`, { replace: true });
       }
       
       // Set active game id so socket auto-joins immediately on table load
