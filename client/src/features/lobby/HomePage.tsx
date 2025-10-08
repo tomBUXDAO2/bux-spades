@@ -401,7 +401,7 @@ const HomePage: React.FC = () => {
       if (!res.ok) throw new Error('Failed to create game');
       const response = await res.json();
       console.log('[GAME CREATION DEBUG] API Response:', response);
-      console.log('🔥🔥🔥 CACHE BUST - NEW CODE IS LIVE VERSION 3 🔥🔥🔥');
+      console.log('🔥🔥🔥 CACHE BUST - NEW CODE IS LIVE VERSION 4 - TABLE ROUTE FIX 🔥🔥🔥');
       console.log('[GAME CREATION DEBUG] Response type:', typeof response);
       console.log('[GAME CREATION DEBUG] Response.id directly:', response.id);
       

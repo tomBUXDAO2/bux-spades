@@ -56,6 +56,7 @@ interface GameTableModularProps {
   onRejoinGame?: () => void;
   testAnimatingTrick?: boolean;
   testTrickWinner?: number | null;
+  isStarting?: boolean;
 }
 
 export default function GameTableModular({ 
@@ -75,7 +76,8 @@ export default function GameTableModular({
   botCount = 0,
   isSpectator = false,
   testAnimatingTrick = false,
-  testTrickWinner = null
+  testTrickWinner = null,
+  isStarting = false
 }: GameTableModularProps) {
   const { socket, isAuthenticated, isReady } = useSocket();
   const windowSize = useWindowSize();
@@ -116,7 +118,8 @@ export default function GameTableModular({
   
   // League states
   const [leagueReady, setLeagueReady] = useState<boolean[]>([false, false, false, false]);
-  const [isStarting, setIsStarting] = useState(false);
+  // Use prop isStarting instead of local state
+  // const [isStarting, setIsStarting] = useState(false);
   
   // Chat states
   const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
@@ -216,7 +219,7 @@ export default function GameTableModular({
         setDealingComplete(true);
         setBiddingReady(true);
         setCardsRevealed(true);
-        setIsStarting(false);
+        // setIsStarting(false); // Using prop from parent
       }
     }
   };
@@ -510,7 +513,7 @@ export default function GameTableModular({
     if (!socket || !gameState?.id) return;
     
     // CRITICAL: Set isStarting and NEVER unset it - button should disappear forever
-    setIsStarting(true);
+    // setIsStarting(true); // Using prop from parent
     const players = Array.isArray(gameState.players) ? gameState.players : [];
     const occupied = players.filter(Boolean).length;
     const emptySeatCount = Math.max(0, 4 - occupied);
@@ -661,7 +664,7 @@ export default function GameTableModular({
   };
   
   const handlePlayWithBots = async () => {
-    setIsStarting(true);
+    // setIsStarting(true); // Using prop from parent
     const playersArr = Array.isArray(gameState.players) ? gameState.players : [];
     const emptySeatIndexes: number[] = [];
     for (let i = 0; i < 4; i++) {
@@ -679,12 +682,12 @@ export default function GameTableModular({
   
   const handleCloseStartWarning = () => {
     onCloseStartWarning?.();
-    setIsStarting(false);
+    // setIsStarting(false); // Using prop from parent
   };
 
   const handleCloseBotWarning = () => {
     setBotWarningOpen(false);
-    setIsStarting(false);
+    // setIsStarting(false); // Using prop from parent
     setGameState((prev: any) => ({ ...prev, ui: { ...(prev?.ui || {}), showBotWarning: false } }));
   };
   

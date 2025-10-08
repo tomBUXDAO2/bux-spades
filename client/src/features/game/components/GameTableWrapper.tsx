@@ -22,6 +22,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [isStartingFromEmptySeats, setIsStartingFromEmptySeats] = useState(false);
   const [hasManuallyInvitedBots, setHasManuallyInvitedBots] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   
   const {
     gameState,
@@ -51,6 +52,9 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
   // Custom start game handler that checks for empty seats
   const handleStartGame = async () => {
     if (!gameState || !user?.id) return;
+    
+    // CRITICAL: Hide start button immediately
+    setIsStarting(true);
     
     // Check for empty seats - server expects 4 seats, count missing ones
     const players = gameState.players || [];
@@ -198,6 +202,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
         emptySeats={emptySeats}
         botCount={botCount}
         isSpectator={false}
+        isStarting={isStarting}
       />
       
     </div>
