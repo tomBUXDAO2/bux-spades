@@ -520,7 +520,7 @@ export default function GameTableModular({
       // Simple bot bid logic: 1-4 based on hand strength
       const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
       const hand = gameState.hands?.[playerIndex] || [];
-      const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
+      const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
       const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
       
       setPendingBid({ playerId: currentPlayer.id, bid: botBid });
