@@ -275,9 +275,9 @@ export default function GameTableModular({
       // Play win sound effect when trick completes
       playWinSound();
       
-      // Wait 2 seconds before clearing trick animation
+      // Wait 1 second before clearing trick animation (reduced from 2 seconds)
       setTimeout(() => {
-        console.log('[TRICK ANIMATION] Clearing trick animation after 2 seconds');
+        console.log('[TRICK ANIMATION] Clearing trick animation after 1 second');
         setAnimatingTrick(false);
         setTrickWinner(null);
         setAnimatedTrickCards([]);
@@ -294,7 +294,7 @@ export default function GameTableModular({
           },
           currentTrickCards: [] // Also clear this field
         }));
-      }, 2000);
+      }, 1000);
     }
   };
   

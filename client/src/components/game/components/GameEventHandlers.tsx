@@ -282,6 +282,28 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     };
   }, [socket, onGameOver]);
 
+  // Listen for card_played event to clear pending cards immediately
+  useEffect(() => {
+    if (socket) {
+      const cardPlayedHandler = (cardData: any) => {
+        console.log('🎮 Card played event received in GameEventHandlers:', cardData);
+        
+        // CRITICAL: Clear pending played card immediately when server confirms the play
+        // This prevents cards from staying in hand if played quickly before trick completion
+        if (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) {
+          setPendingPlayedCard(null);
+          console.log('🎮 Cleared pending played card - server confirmed play for user:', user?.id);
+        }
+      };
+      
+      socket.on("card_played", cardPlayedHandler);
+      
+      return () => {
+        socket.off("card_played", cardPlayedHandler);
+      };
+    }
+  }, [socket, user?.id, setPendingPlayedCard]);
+
   // Listen for trick_complete event and animate trick
   useEffect(() => {
     if (socket) {

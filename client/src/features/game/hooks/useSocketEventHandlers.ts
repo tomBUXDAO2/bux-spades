@@ -86,6 +86,7 @@ export const useSocketEventHandlers = ({
       console.log('🎮 Card played event received:', cardData);
       console.log('🎮 Card played - currentTrick data:', cardData.gameState?.play?.currentTrick);
       if (cardData && cardData.gameId === gameId) {
+        
         // Play card sound effect for all card plays (human and bot)
         if (cardData.cardPlayed && !cardData.cardPlayed.rejected) {
           import('../../../services/utils/soundUtils').then(({ playCardSound }) => {
