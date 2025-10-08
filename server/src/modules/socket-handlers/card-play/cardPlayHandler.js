@@ -216,7 +216,7 @@ class CardPlayHandler {
               }
             });
 
-            // Clear trick cards from table after animation (3 seconds delay) - only when trick is complete
+            // Clear trick cards from table after animation (600ms delay) - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
               setTimeout(() => {
@@ -231,7 +231,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 3000);
+              }, 600);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
