@@ -495,8 +495,38 @@ class CardPlayHandler {
       const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
       if (botCard) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
-        // Process bot's card play
-        await this.processCardPlay(gameId, currentPlayer.userId, botCard, true);
+        
+        // INSTANT FEEDBACK: Emit card immediately for instant rendering
+        const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+        const optimisticTrick = [
+          ...(currentTrickCards || []),
+          { suit: botCard.suit, rank: botCard.rank, seatIndex: currentPlayer.seatIndex, playerId: currentPlayer.userId }
+        ];
+        
+        const cachedGameState = await redisGameState.getGameState(gameId);
+        if (cachedGameState) {
+          cachedGameState.play = cachedGameState.play || {};
+          cachedGameState.play.currentTrick = optimisticTrick;
+          cachedGameState.currentTrickCards = optimisticTrick;
+          
+          // Emit immediately for instant feedback
+          this.io.to(gameId).emit('card_played', {
+            gameId,
+            gameState: cachedGameState,
+            currentTrick: optimisticTrick,
+            cardPlayed: {
+              userId: currentPlayer.userId,
+              card: botCard,
+              seatIndex: currentPlayer.seatIndex,
+              isBot: true
+            }
+          });
+        }
+        
+        // Process bot's card play asynchronously (don't await)
+        this.processCardPlay(gameId, currentPlayer.userId, botCard, true).catch(err => {
+          console.error(`[CARD PLAY] Error processing bot card play:`, err);
+        });
       }
     } catch (error) {
       console.error('[CARD PLAY] Error triggering bot play:', error);
