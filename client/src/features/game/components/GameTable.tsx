@@ -516,6 +516,7 @@ export default function GameTableModular({
       }
     }
     
+    // handleBid will play the sound effect, so no duplicate
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
       playBidSound,
       setCardsRevealed,
@@ -523,41 +524,51 @@ export default function GameTableModular({
     });
   };
 
-  // OPTIMISTIC BOT BIDDING: Show bot bids immediately when it's their turn
+  // OPTIMISTIC BOT BIDDING: Show bot as active, delay, then bid with sound
   useEffect(() => {
     if (!gameState || gameState.status !== 'BIDDING' || !gameState.currentPlayer) return;
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
-      // It's a bot's turn - show optimistic bid immediately
-      // Simple bot bid logic: 1-4 based on hand strength
-      const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
-      const hand = gameState.hands?.[playerIndex] || [];
-      const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
-      const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
+      console.log('[OPTIMISTIC BOT BID] Bot turn detected:', currentPlayer.username);
       
-      setPendingBid({ playerId: currentPlayer.id, bid: botBid });
-      console.log('[OPTIMISTIC BOT BID] Showing bot bid immediately:', { 
-        playerId: currentPlayer.id, 
-        botName: currentPlayer.username,
-        bid: botBid,
-        spadesCount,
-        handLength: hand.length
-      });
+      // Delay 0.5 seconds, then show bid with sound effect
+      const timeoutId = setTimeout(() => {
+        // Calculate bot bid
+        const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
+        const hand = gameState.hands?.[playerIndex] || [];
+        const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
+        const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
+        
+        // Show bid and play sound effect
+        setPendingBid({ playerId: currentPlayer.id, bid: botBid });
+        playBidSound(); // Play bidding sound effect
+        
+        console.log('[OPTIMISTIC BOT BID] Bot bid with sound:', { 
+          playerId: currentPlayer.id, 
+          botName: currentPlayer.username,
+          bid: botBid,
+          spadesCount,
+          handLength: hand.length
+        });
+        
+        // Advance to next player
+        const nextPlayerIndex = (playerIndex + 1) % 4;
+        const nextPlayer = gameState.players[nextPlayerIndex];
+        
+        if (nextPlayer) {
+          setGameState(prev => ({
+            ...prev,
+            currentPlayer: nextPlayer.id
+          }));
+          console.log('[OPTIMISTIC BOT BID] Advanced to next player:', nextPlayer.id);
+        }
+      }, 500); // 0.5 second delay
       
-      // OPTIMISTIC: Advance to next player immediately
-      const nextPlayerIndex = (playerIndex + 1) % 4;
-      const nextPlayer = gameState.players[nextPlayerIndex];
-      
-      if (nextPlayer) {
-        setGameState(prev => ({
-          ...prev,
-          currentPlayer: nextPlayer.id
-        }));
-        console.log('[OPTIMISTIC BOT BID] Advanced to next player:', nextPlayer.id);
-      }
+      // Cleanup timeout if component unmounts or effect re-runs
+      return () => clearTimeout(timeoutId);
     }
-  }, [gameState?.currentPlayer, gameState?.status]);
+  }, [gameState?.currentPlayer, gameState?.status, playBidSound]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
