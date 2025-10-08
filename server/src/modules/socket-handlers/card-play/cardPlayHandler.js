@@ -86,7 +86,14 @@ class CardPlayHandler {
       
       console.log('[CARD PLAY] Optimistic card play emitted, processing in background');
 
+      // CRITICAL: Trigger bot play immediately if next player is a bot
+      if (nextPlayer && nextPlayer.type === 'bot' && optimisticTrick.length < 4) {
+        console.log('[CARD PLAY] Next player is bot, triggering immediate bot play');
+        setImmediate(() => this.triggerBotPlayIfNeeded(gameId));
+      }
+
       // Process the card play in database (async, non-blocking)
+      // This will handle trick completion and logging in the background
       this.processCardPlay(gameId, userId, card, false).catch(err => 
         console.error('[CARD PLAY] Background processing error:', err)
       );
@@ -188,21 +195,6 @@ class CardPlayHandler {
 
         if (trickResult.isComplete) {
           console.log(`[CARD PLAY] Trick completed, winner: seat ${trickResult.winningSeatIndex}`);
-          
-          // First, emit card played event so client can render the 4th card
-          // NOTE: This will be emitted again after updateCurrentPlayer with correct currentPlayer
-          const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
-
-          this.io.to(gameId).emit('card_played', {
-            gameId,
-            gameState: cardPlayedGameState,
-            cardPlayed: {
-              userId,
-              card,
-              seatIndex: player.seatIndex,
-              isBot
-            }
-          });
 
           // EXTREME: NO DELAYS - COMPLETE IMMEDIATELY
           (async () => {
@@ -223,48 +215,28 @@ class CardPlayHandler {
             console.log(`[CARD PLAY] About to call updateCurrentPlayer with winningPlayer.userId: ${winningPlayer.userId}`);
             await this.updateCurrentPlayer(gameId, winningPlayer.userId);
 
-            // CRITICAL: Emit card_played event with correct currentPlayer after updateCurrentPlayer
-            console.log(`[CARD PLAY] About to get corrected game state after updateCurrentPlayer`);
-            const correctedGameState = await GameService.getGameStateForClient(gameId);
-            console.log(`[CARD PLAY] Corrected game state currentPlayer: ${correctedGameState.currentPlayer}, expected: ${winningPlayer.userId}`);
-            this.io.to(gameId).emit('card_played', {
-              gameId,
-              gameState: correctedGameState,
-              cardPlayed: {
-                userId,
-                card,
-                seatIndex: player.seatIndex,
-                isBot
-              },
-              currentTrick: correctedGameState.play?.currentTrick || []
-            });
-            console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
-
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
               where: { trickId: logResult.actualTrickId },
               orderBy: { playOrder: 'asc' }
             });
 
-            // Delay trick_complete slightly to ensure all 4 cards are visible
-            setTimeout(() => {
-              // Emit trick complete event
-              GameService.getGameStateForClient(gameId).then(updatedGameState => {
-                this.io.to(gameId).emit('trick_complete', {
-                  gameId,
-                  gameState: updatedGameState,
-                  trickWinner: trickResult.winningSeatIndex,
-                  completedTrick: {
-                    cards: completedTrickCards.map(card => ({
-                      suit: card.suit,
-                      rank: card.rank,
-                      seatIndex: card.seatIndex,
-                      playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
-                    }))
-                  }
-                });
+            // Emit trick complete event immediately - cards are already on table from optimistic updates
+            GameService.getGameStateForClient(gameId).then(updatedGameState => {
+              this.io.to(gameId).emit('trick_complete', {
+                gameId,
+                gameState: updatedGameState,
+                trickWinner: trickResult.winningSeatIndex,
+                completedTrick: {
+                  cards: completedTrickCards.map(card => ({
+                    suit: card.suit,
+                    rank: card.rank,
+                    seatIndex: card.seatIndex,
+                    playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+                  }))
+                }
               });
-            }, 200); // 200ms delay to ensure 4th card is visible
+            });
 
             // Clear trick cards from table after animation - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
@@ -281,7 +253,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 600);
+              }, 1200);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
@@ -367,23 +339,12 @@ class CardPlayHandler {
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
-        // Emitting card_played event
-        // Game state updated
-        this.io.to(gameId).emit('card_played', {
-          gameId,
-          gameState: updatedGameState,
-          currentTrick: updatedGameState.play?.currentTrick || [],
-          cardPlayed: {
-            userId,
-            card,
-            seatIndex: player.seatIndex,
-            isBot
-          }
-        });
+        // NOTE: card_played event already emitted optimistically in handlePlayCard
+        // No need to emit again here - just update DB and Redis
+        console.log('[CARD PLAY] DB and Redis updated, optimistic emit already sent');
 
-        // Trigger bot play if next player is a bot
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-        this.triggerBotPlayIfNeeded(gameId);
+        // Trigger bot play if next player is a bot (already handled in handlePlayCard)
+        // this.triggerBotPlayIfNeeded(gameId);
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);
