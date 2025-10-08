@@ -15,6 +15,7 @@ export interface Card {
 
 export interface Player {
   id: string;
+  userId?: string;
   name: string;
   team: number;
   position: number;
@@ -31,6 +32,7 @@ export interface Player {
 
 export interface Bot {
   id: string;
+  userId?: string;
   username: string;
   avatar: string;
   type: 'bot';
