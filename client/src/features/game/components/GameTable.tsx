@@ -497,6 +497,12 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
+    // Check if we already have a pending bid for this player to prevent duplicates
+    if (pendingBid && pendingBid.playerId === currentPlayerId) {
+      console.log('[OPTIMISTIC BID] Already have pending bid for this player, skipping');
+      return;
+    }
+    
     // OPTIMISTIC UI: Show bid immediately and advance to next player
     if (currentPlayerId) {
       setPendingBid({ playerId: currentPlayerId, bid });
@@ -530,6 +536,12 @@ export default function GameTableModular({
     
     const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
     if (currentPlayer && currentPlayer.type === 'bot') {
+      // Check if we already have a pending bid for this player to prevent duplicates
+      if (pendingBid && pendingBid.playerId === currentPlayer.id) {
+        console.log('[OPTIMISTIC BOT BID] Already have pending bid for this bot, skipping');
+        return;
+      }
+      
       console.log('[OPTIMISTIC BOT BID] Bot turn detected:', currentPlayer.username);
       
       // Delay 0.5 seconds, then show bid with sound effect
@@ -568,7 +580,7 @@ export default function GameTableModular({
       // Cleanup timeout if component unmounts or effect re-runs
       return () => clearTimeout(timeoutId);
     }
-  }, [gameState?.currentPlayer, gameState?.status, playBidSound]);
+  }, [gameState?.currentPlayer, gameState?.status, playBidSound, pendingBid]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
