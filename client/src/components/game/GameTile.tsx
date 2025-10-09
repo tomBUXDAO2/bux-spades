@@ -100,13 +100,22 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
               <div className={className} key={seat}>
                 {player ? (
                   <div className="text-center flex flex-col items-center">
-                    <img
-                      src={(player as any).type === 'bot' ? '/bot-avatar.jpg' : ((player as any).avatarUrl || '/default-pfp.jpg')}
-                      alt=""
-                      className="w-16 h-16 rounded-full border-2 border-slate-600"
-                    />
+                    {(() => {
+                      const isBot = (player as any).isHuman === false || (player as any).type === 'bot' || String((player as any).username || '').startsWith('Bot');
+                      const avatarSrc = isBot ? '/bot-avatar.jpg' : ((player as any).avatarUrl || '/default-pfp.jpg');
+                      return (
+                        <img
+                          src={avatarSrc}
+                          alt=""
+                          className="w-16 h-16 rounded-full border-2 border-slate-600"
+                        />
+                      );
+                    })()}
                     <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                      {(player as any).type === 'bot' ? `Bot ${seat + 1}` : ((player as any).username || (player as any).name || 'Player')}
+                      {(() => {
+                        const isBot = (player as any).isHuman === false || (player as any).type === 'bot' || String((player as any).username || '').startsWith('Bot');
+                        return isBot ? `Bot ${seat + 1}` : ((player as any).username || (player as any).name || 'Player');
+                      })()}
                     </span>
                   </div>
                 ) : (
