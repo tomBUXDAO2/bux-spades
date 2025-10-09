@@ -68,9 +68,24 @@ export class TrickCompletionService {
       });
 
       // CRITICAL: Update Redis cache with fresh game state after trick completion
+      // BUT preserve playerScores for SOLO games to avoid overwriting with zeros
       try {
+        const currentCachedState = await redisGameState.getGameState(gameId);
         const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        
         if (freshGameState) {
+          // CRITICAL: For SOLO games, preserve existing playerScores from cache
+          // getFullGameStateFromDatabase returns [0,0,0,0] during active rounds
+          if (freshGameState.gameMode === 'SOLO' && currentCachedState) {
+            const hasValidCachedScores = currentCachedState.playerScores && 
+                                        currentCachedState.playerScores.some(s => s !== 0);
+            if (hasValidCachedScores) {
+              freshGameState.playerScores = currentCachedState.playerScores;
+              freshGameState.playerBags = currentCachedState.playerBags;
+              console.log(`[TRICK COMPLETION] Preserved playerScores from cache:`, freshGameState.playerScores);
+            }
+          }
+          
           await redisGameState.setGameState(gameId, freshGameState);
           console.log(`[TRICK COMPLETION] Updated Redis cache with fresh game state after trick completion`);
         }
