@@ -452,7 +452,7 @@ const HomePage: React.FC = () => {
   
   const filteredGames = Array.isArray(games) ? games.filter(game => {
     if (filter === 'waiting') return game.status === 'WAITING';
-    if (filter === 'in-progress') return game.status === 'PLAYING';
+    if (filter === 'in-progress') return game.status === 'BIDDING' || game.status === 'PLAYING';
     return game.status === 'WAITING'; // Default to waiting games
   }) : [];
 
