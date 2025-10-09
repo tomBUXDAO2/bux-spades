@@ -27,7 +27,7 @@ export const normalizeGameState = (state: any): GameState => {
     rawBidding: state.bidding,
     normalizedBidding: bidding,
     gameId: state.id,
-    players: state.players?.map((p: any, i: number) => ({ seat: i, bid: p.bid, seatIndex: p.seatIndex })),
+    players: state.players?.map((p: any, i: number) => p ? ({ seat: i, bid: p.bid, seatIndex: p.seatIndex }) : null),
     bidsArray: state.bidding?.bids,
     bidsString: JSON.stringify(state.bidding?.bids)
   });
