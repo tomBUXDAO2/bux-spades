@@ -459,10 +459,14 @@ class BotService {
 
     console.log(`[BOT SERVICE] Bot ${bot.username} current trick query result:`, currentTrickCards.map(c => `${c.suit}${c.rank} (seat ${c.seatIndex})`));
 
+    // Get special rules from game
+    const specialRules = game.specialRules || {};
+    const spadesBroken = game.play?.spadesBroken || false;
+
     // MANDATORY suit following logic
     if (currentTrickCards.length === 0) {
-      // Leading - play lowest card of longest suit (checking spades broken)
-      cardToPlay = this.getLeadCard(hand, game);
+      // Leading - apply special rules
+      cardToPlay = this.getLeadCard(hand, game, specialRules, spadesBroken);
     } else {
       // FOLLOWING - MUST follow suit if possible, NO EXCEPTIONS
       const leadSuit = currentTrickCards[0].suit;
@@ -488,15 +492,35 @@ class BotService {
         cardToPlay = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
         console.log(`[BOT SERVICE] Bot ${bot.username} MUST play ${cardToPlay.suit}${cardToPlay.rank} to follow suit`);
       } else {
-        // Only if void in lead suit - play lowest card (prefer non-spades)
-        const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
-        if (nonSpades.length > 0) {
-          cardToPlay = nonSpades.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+        // Void in lead suit - apply special rules
+        let playableCards = normalizedHand;
+        
+        // ASSASSIN: Must cut with spades when void
+        if (specialRules.assassin) {
+          const spades = normalizedHand.filter(card => card.suit === 'SPADES');
+          if (spades.length > 0) {
+            playableCards = spades;
+            console.log(`[BOT SERVICE] ASSASSIN: Bot ${bot.username} MUST cut with spades`);
+          }
+        }
+        
+        // SCREAMER: Cannot play spades unless only have spades
+        if (specialRules.screamer) {
+          const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
+          if (nonSpades.length > 0) {
+            playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+            console.log(`[BOT SERVICE] SCREAMER: Bot ${bot.username} cannot play spades, has non-spades available`);
+          }
+        }
+        
+        // Play lowest available card
+        if (playableCards.length > 0) {
+          cardToPlay = playableCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
           console.log(`[BOT SERVICE] Bot ${bot.username} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         } else {
-          // Only spades left
+          // Fallback (should not happen)
           cardToPlay = normalizedHand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-          console.log(`[BOT SERVICE] Bot ${bot.username} only has spades left, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+          console.log(`[BOT SERVICE] Bot ${bot.username} fallback, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         }
       }
     }
@@ -547,7 +571,7 @@ class BotService {
   /**
    * Get best card to lead with
    */
-  getLeadCard(hand, game = null) {
+  getLeadCard(hand, game = null, specialRules = {}, spadesBrokenParam = false) {
     // Convert string format cards to object format if needed
     const normalizedHand = hand.map(card => {
       if (typeof card === 'string') {
@@ -565,27 +589,44 @@ class BotService {
       suits[card.suit].push(card);
     });
 
-    // Check if spades are broken (if game state is available)
-    const spadesBroken = game ? this.areSpadesBroken(game) : false;
+    // Check if spades are broken
+    const spadesBroken = spadesBrokenParam || (game ? this.areSpadesBroken(game) : false);
 
-    // Find longest suit (prefer non-spades)
+    // ASSASSIN: Must lead spades if broken and have spades
+    if (specialRules.assassin && spadesBroken && suits['SPADES'] && suits['SPADES'].length > 0) {
+      const cards = suits['SPADES'].sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank));
+      console.log(`[BOT SERVICE] ASSASSIN: Bot MUST lead spades (broken), playing lowest`);
+      return cards[0];
+    }
+
+    // SCREAMER: Cannot lead spades unless only have spades
+    let availableSuits = Object.keys(suits);
+    if (specialRules.screamer) {
+      const nonSpades = availableSuits.filter(suit => suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        availableSuits = nonSpades;
+        console.log(`[BOT SERVICE] SCREAMER: Bot cannot lead spades, has non-spades available`);
+      }
+    }
+
+    // Find longest suit from available suits
     let longestSuit = null;
     let longestLength = 0;
     
-    Object.keys(suits).forEach(suit => {
+    availableSuits.forEach(suit => {
       if (suits[suit].length > longestLength) {
         longestSuit = suit;
         longestLength = suits[suit].length;
       }
     });
 
-    // NEVER lead spades unless they're broken
+    // NEVER lead spades unless they're broken (normal rule, applies to all formats)
     if (longestSuit === 'SPADES' && !spadesBroken) {
       // Find next longest non-spade suit
       let nextLongestSuit = null;
       let nextLongestLength = 0;
       
-      Object.keys(suits).forEach(suit => {
+      availableSuits.forEach(suit => {
         if (suit !== 'SPADES' && suits[suit].length > nextLongestLength) {
           nextLongestSuit = suit;
           nextLongestLength = suits[suit].length;

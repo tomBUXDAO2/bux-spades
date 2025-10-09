@@ -131,6 +131,9 @@ export const getPlayableCards = (
 ): Card[] => {
   if (!hand || hand.length === 0) return [];
   
+  const specialRules = (gameState as any).specialRules || {};
+  const spadesBroken = (gameState as any).play?.spadesBroken || false;
+  
   // If not leading, must follow suit
   if (!isLeading && gameState.play?.currentTrick && gameState.play.currentTrick.length > 0) {
     const leadSuit = getLeadSuit(gameState.play.currentTrick);
@@ -142,13 +145,54 @@ export const getPlayableCards = (
       if (leadSuitCards.length > 0) {
         return leadSuitCards;
       }
-      // If player is void in lead suit, can play any card
+      // If player is void in lead suit
       else {
-        return hand;
+        let playableCards = hand;
+        
+        // ASSASSIN: Must cut with spades when void in lead suit
+        if (specialRules.assassin) {
+          const spades = hand.filter(card => card.suit === 'SPADES');
+          if (spades.length > 0) {
+            playableCards = spades; // MUST play spades
+          }
+        }
+        
+        // SCREAMER: Cannot play spades unless only have spades
+        if (specialRules.screamer) {
+          const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+          if (nonSpades.length > 0) {
+            playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+          }
+        }
+        
+        return playableCards;
       }
     }
   }
   
-  // If leading, can play any card
+  // If leading
+  if (isLeading) {
+    let playableCards = hand;
+    
+    // ASSASSIN: Must lead spades if spades are broken and player has spades
+    if (specialRules.assassin && spadesBroken) {
+      const spades = hand.filter(card => card.suit === 'SPADES');
+      if (spades.length > 0) {
+        playableCards = spades; // MUST lead spades
+      }
+    }
+    
+    // SCREAMER: Cannot lead spades unless only have spades (spadesBroken doesn't override this)
+    if (specialRules.screamer) {
+      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+      }
+    }
+    
+    return playableCards;
+  }
+  
+  // Fallback
   return hand;
 };

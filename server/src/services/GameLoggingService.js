@@ -151,7 +151,48 @@ export class GameLoggingService {
         return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
       
-      // 3) CRITICAL: Enforce suit following rules (optimized with cache)
+      // 3) CRITICAL: Enforce suit following rules and special rules (optimized with cache)
+      
+      // Get game for special rules validation
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { specialRules: true }
+      });
+      
+      const specialRules = game?.specialRules || {};
+      
+      // Get player hand for all validations
+      const playerHand = await redisGameState.getPlayerHands(gameId);
+      const currentHand = playerHand && playerHand[seatIndex] ? playerHand[seatIndex] : [];
+      
+      // Get spades broken status
+      const cachedGameState = await redisGameState.getGameState(gameId);
+      const spadesBroken = cachedGameState?.play?.spadesBroken || false;
+      
+      // Validate leading card
+      if (existingCardsCount === 0) {
+        // Player is leading the trick
+        
+        // ASSASSIN: Must lead spades if broken and has spades
+        if (specialRules.assassin && spadesBroken && suit !== 'SPADES') {
+          const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+          if (hasSpades) {
+            console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
+            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+          }
+        }
+        
+        // SCREAMER: Cannot lead spades unless only have spades
+        if (specialRules.screamer && suit === 'SPADES') {
+          const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+          if (hasNonSpades) {
+            console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot lead spades, has non-spades. Rejecting.`);
+            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+          }
+        }
+      }
+      
+      // Validate following card
       if (existingCardsCount > 0) {
         // PERFORMANCE: Get lead suit from cache first, fallback to database
         let leadCard = null;
@@ -174,18 +215,33 @@ export class GameLoggingService {
         
         if (leadCard && leadCard.suit !== suit) {
           // Player is not following suit - check if they have cards of the lead suit
-          const playerHand = await redisGameState.getPlayerHands(gameId);
-          if (playerHand && playerHand[seatIndex]) {
-            const hasLeadSuit = playerHand[seatIndex].some(card => 
-              card.suit === leadCard.suit
-            );
+          const hasLeadSuit = currentHand.some(card => 
+            card.suit === leadCard.suit
+          );
+          
+          if (hasLeadSuit) {
+            console.log(`[GAME LOGGING] Guard: seat ${seatIndex} must follow suit ${leadCard.suit} but played ${suit}. Rejecting card play.`);
+            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+          } else {
+            // Player is void in lead suit - check special rules
+            console.log(`[GAME LOGGING] Seat ${seatIndex} is void in lead suit ${leadCard.suit}, playing ${suit} is valid`);
             
-            if (hasLeadSuit) {
-              console.log(`[GAME LOGGING] Guard: seat ${seatIndex} must follow suit ${leadCard.suit} but played ${suit}. Rejecting card play.`);
-              return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
-            } else {
-              // Player is void in lead suit - they can play any card (spades trump or dump)
-              console.log(`[GAME LOGGING] Seat ${seatIndex} is void in lead suit ${leadCard.suit}, playing ${suit} is valid`);
+            // ASSASSIN: Must cut with spades when void
+            if (specialRules.assassin && suit !== 'SPADES') {
+              const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+              if (hasSpades) {
+                console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must cut with spades but played ${suit}. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
+            }
+            
+            // SCREAMER: Cannot play spades unless only have spades
+            if (specialRules.screamer && suit === 'SPADES') {
+              const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+              if (hasNonSpades) {
+                console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot play spades, has non-spades. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
             }
           }
         }
