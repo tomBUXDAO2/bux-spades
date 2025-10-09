@@ -25,9 +25,12 @@ export const useGameStateManagement = (gameId: string, userId: string) => {
   // Auto-join game when socket is ready and we haven't attempted join yet
   useEffect(() => {
     if (isReady && socket && gameId && userId && !hasAttemptedJoin) {
-      console.log('🎮 Auto-joining game:', { gameId, userId, socketId: socket.id });
+      const spectate = (() => {
+        try { return new URL(window.location.href).searchParams.get('spectate') === '1'; } catch { return false; }
+      })();
+      console.log('🎮 Auto-joining game:', { gameId, userId, spectate, socketId: socket.id });
       setHasAttemptedJoin(true);
-      socket.emit('join_game', { gameId, userId });
+      socket.emit('join_game', { gameId, userId, spectate });
     }
   }, [isReady, socket, gameId, userId, hasAttemptedJoin]);
 
