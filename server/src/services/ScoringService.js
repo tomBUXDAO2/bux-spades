@@ -50,7 +50,7 @@ export class ScoringService {
           const previousRounds = await prisma.playerRoundStats.findMany({
             where: {
               userId: player.userId,
-              Round: { 
+              round: { 
                 gameId,
                 roundNumber: { lt: currentRound?.roundNumber || 0 }
               }
