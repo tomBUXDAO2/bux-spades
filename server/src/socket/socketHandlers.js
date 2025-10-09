@@ -7,6 +7,7 @@ import { GameChatHandler } from '../modules/socket-handlers/chat/gameChatHandler
 import { BotManagementHandler } from '../modules/socket-handlers/bot-management/botManagementHandler.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 import { FriendBlockHandler } from '../modules/socket-handlers/friends/friendBlockHandler.js';
+import redisSessionService from '../services/RedisSessionService.js';
 import jwt from 'jsonwebtoken';
 
 export function setupSocketHandlers(io) {
@@ -18,7 +19,7 @@ export function setupSocketHandlers(io) {
     // NUCLEAR: No logging for performance
 
     // Authenticate socket with JWT token
-    socket.on('authenticate', (data) => {
+    socket.on('authenticate', async (data) => {
       try {
         const { token } = data;
         if (!token) {
@@ -27,12 +28,48 @@ export function setupSocketHandlers(io) {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-        socket.userId = decoded.userId;
+        const userId = decoded.userId;
+        
+        // Check for existing session (single device login enforcement)
+        const previousSession = await redisSessionService.getUserSession(userId);
+        
+        if (previousSession && previousSession.socketId !== socket.id) {
+          console.log(`[SESSION] User ${userId} logging in from new device. Force logging out previous session ${previousSession.socketId}`);
+          
+          // Find and disconnect the old socket
+          const oldSocket = io.sockets.sockets.get(previousSession.socketId);
+          if (oldSocket) {
+            // Emit force logout event to old device
+            oldSocket.emit('force_logout', { 
+              reason: 'multiple_logins',
+              message: 'You have been logged out because you logged in from another device.'
+            });
+            // Disconnect old socket
+            oldSocket.disconnect(true);
+            console.log(`[SESSION] Disconnected old socket ${previousSession.socketId} for user ${userId}`);
+          }
+        }
+        
+        // Set up new session
+        socket.userId = userId;
         socket.authenticated = true;
         
-        console.log(`[SOCKET] User authenticated: ${decoded.userId}`);
+        // Store session in Redis with active game info
+        const sessionData = {
+          socketId: socket.id,
+          activeGameId: previousSession?.activeGameId || null
+        };
+        
+        await redisSessionService.setUserSession(userId, sessionData);
+        
+        console.log(`[SOCKET] User authenticated: ${userId}`);
         console.log(`[SOCKET] Socket after auth - userId: ${socket.userId}, authenticated: ${socket.authenticated}`);
-        socket.emit('authenticated', { userId: decoded.userId });
+        
+        // Send authentication success with active game info
+        socket.emit('authenticated', { 
+          userId: userId,
+          activeGameId: sessionData.activeGameId
+        });
 
         // Handle user coming online for lobby
         lobbyChatHandler.socket = socket;
@@ -218,11 +255,21 @@ export function setupSocketHandlers(io) {
     });
 
     // Disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       // NUCLEAR: No logging for performance
       // Handle user going offline for lobby
       lobbyChatHandler.socket = socket;
       lobbyChatHandler.handleUserOffline();
+      
+      // Clean up session if this was the active session
+      if (socket.userId) {
+        const currentSession = await redisSessionService.getUserSession(socket.userId);
+        if (currentSession && currentSession.socketId === socket.id) {
+          // Don't remove session completely - keep activeGameId for reconnection
+          // Just mark as disconnected by not updating it
+          console.log(`[SESSION] User ${socket.userId} disconnected from active session`);
+        }
+      }
     });
   });
 }

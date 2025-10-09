@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   RouterProvider,
   createBrowserRouter,
@@ -14,6 +14,7 @@ import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import { SocketProvider } from '@/features/auth/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
+import ForceLogoutModal from './components/modals/ForceLogoutModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { preloadImages } from './services/utils/imagePreloader';
@@ -105,10 +106,25 @@ const router = createBrowserRouter(
 const AppWithSocket: React.FC = () => {
   const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();
   const { showInstallPrompt, dismissPrompt } = usePWAInstall();
+  const [showForceLogoutModal, setShowForceLogoutModal] = useState(false);
   
   // Preload images on app start
   useEffect(() => {
     preloadImages();
+  }, []);
+  
+  // Listen for force logout event
+  useEffect(() => {
+    const handleForceLogout = () => {
+      console.log('[APP] Force logout event received');
+      setShowForceLogoutModal(true);
+    };
+    
+    window.addEventListener('forceLogout', handleForceLogout);
+    
+    return () => {
+      window.removeEventListener('forceLogout', handleForceLogout);
+    };
   }, []);
   
   return (
@@ -122,6 +138,13 @@ const AppWithSocket: React.FC = () => {
         }}
         onLogin={() => {
           setShowSessionInvalidatedModal(false);
+          window.location.href = '/login';
+        }}
+      />
+      <ForceLogoutModal
+        isOpen={showForceLogoutModal}
+        onClose={() => {
+          setShowForceLogoutModal(false);
           window.location.href = '/login';
         }}
       />

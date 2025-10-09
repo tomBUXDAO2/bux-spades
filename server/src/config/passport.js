@@ -51,17 +51,18 @@ passport.use(new DiscordStrategy({
     if (!user) {
       console.log('[DISCORD AUTH] Creating new user with avatar:', avatarUrl);
       
-      // Create new user (schema has no email column)
+      // Create new user with 5 million starting coins
       user = await prisma.user.create({
         data: {
           discordId: profile.id,
           username: currentNickname,
           avatarUrl: avatarUrl,
+          coins: 5000000, // Gift 5 million coins to new users
           createdAt: new Date()
         }
       });
       
-      console.log('[DISCORD AUTH] New user created:', user.id);
+      console.log('[DISCORD AUTH] New user created with 5M coins:', user.id);
     } else {
       console.log('[DISCORD AUTH] Existing user found:', user.id);
       

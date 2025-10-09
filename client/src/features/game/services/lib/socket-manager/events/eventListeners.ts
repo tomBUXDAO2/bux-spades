@@ -10,8 +10,9 @@ export interface SocketState {
 export interface SocketManagerCallbacks {
   onStateChange: (state: SocketState) => void;
   onConnect: () => void;
-  onAuthenticated: (data: { success: boolean; userId: string; games: any[] }) => void;
+  onAuthenticated: (data: { success: boolean; userId: string; games: any[]; activeGameId?: string }) => void;
   onSessionInvalidated: (data: { reason: string; message: string }) => void;
+  onForceLogout: (data: { reason: string; message: string }) => void;
   startHeartbeat: () => void;
   startConnectionQualityMonitor: () => void;
 }
@@ -150,16 +151,27 @@ export const setupSocketListeners = (
     console.error('Socket reconnection failed after all attempts');
   });
 
-  socket.on('authenticated', (data: { success: boolean; userId: string; games: any[] }) => {
+  socket.on('authenticated', (data: { success: boolean; userId: string; games: any[]; activeGameId?: string }) => {
     console.log('SOCKET AUTHENTICATED:', data);
     
     // Start heartbeat and connection monitoring for mobile devices
     callbacks.startHeartbeat();
     callbacks.startConnectionQualityMonitor();
     
+    // If server sent an activeGameId, user was in a game - redirect them there
+    if (data.activeGameId) {
+      console.log('[AUTH] User has active game:', data.activeGameId);
+      localStorage.setItem('activeGameId', data.activeGameId);
+      // Redirect to table if not already there
+      if (!window.location.pathname.includes('/table/')) {
+        console.log('[AUTH] Redirecting to active game table');
+        window.location.href = `/table/${data.activeGameId}`;
+      }
+    }
+    
     // Ensure we are in the current game room post-auth
     try {
-      const activeGameId = localStorage.getItem('activeGameId');
+      const activeGameId = data.activeGameId || localStorage.getItem('activeGameId');
       if (activeGameId && socket && socket.connected) {
         // Check if we've recently failed to join this game
         const lastFailedJoin = localStorage.getItem('lastFailedJoin');
@@ -210,6 +222,16 @@ export const setupSocketListeners = (
     window.dispatchEvent(new CustomEvent('sessionInvalidated', { detail: data }));
     
     callbacks.onSessionInvalidated(data);
+  });
+
+  // Handle force logout (when user logs in from another device)
+  socket.on('force_logout', (data: { reason: string; message: string }) => {
+    console.log('[FORCE LOGOUT] User logged in from another device:', data);
+    
+    // Dispatch custom event for App to handle
+    window.dispatchEvent(new CustomEvent('forceLogout', { detail: data }));
+    
+    callbacks.onForceLogout(data);
   });
 
   // Debug: Log all socket events

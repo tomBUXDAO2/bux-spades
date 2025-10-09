@@ -1,6 +1,7 @@
 import { GameService } from '../../../services/GameService.js';
 import { BotService } from '../../../services/BotService.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
+import redisSessionService from '../../../services/RedisSessionService.js';
 
 /**
  * DATABASE-FIRST GAME JOIN HANDLER
@@ -126,6 +127,10 @@ class GameJoinHandler {
       // Join the socket room
       this.socket.join(gameId);
       console.log(`[GAME JOIN] User ${userId} joined room for game ${gameId}`);
+
+      // Update active game in session
+      await redisSessionService.updateActiveGame(userId, gameId);
+      console.log(`[SESSION] Updated active game for user ${userId} to ${gameId}`);
 
       // Emit game_joined event with current database state
       this.socket.emit('game_joined', {

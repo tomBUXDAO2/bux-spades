@@ -119,13 +119,14 @@ export class SocketManager {
         this.notifyConnect();
         this.notifyStateChange();
       },
-      onAuthenticated: (data: { userId: string }) => {
+      onAuthenticated: (data: { userId: string; activeGameId?: string }) => {
         this.state.isAuthenticated = true;
         this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
         console.log('SOCKET STATE AFTER AUTH:', { 
           isConnected: this.state.isConnected, 
           isAuthenticated: this.state.isAuthenticated, 
-          isReady: this.state.isReady 
+          isReady: this.state.isReady,
+          activeGameId: data.activeGameId
         });
         this.notifyStateChange();
       },
@@ -136,6 +137,28 @@ export class SocketManager {
         
         // Clear session data
         this.sessionManager.clearSession();
+        
+        // Disconnect socket
+        if (this.socket) {
+          this.socket.disconnect();
+          this.socket = null;
+        }
+        
+        this.notifyStateChange();
+      },
+      onForceLogout: (_data: { reason: string; message: string }) => {
+        console.log('[SOCKET MANAGER] Force logout triggered');
+        this.state.isAuthenticated = false;
+        this.state.isReady = false;
+        this.state.error = 'Logged out from another device';
+        
+        // Clear session data
+        this.sessionManager.clearSession();
+        
+        // Clear localStorage
+        localStorage.removeItem('sessionToken');
+        localStorage.removeItem('userData');
+        localStorage.removeItem('activeGameId');
         
         // Disconnect socket
         if (this.socket) {
