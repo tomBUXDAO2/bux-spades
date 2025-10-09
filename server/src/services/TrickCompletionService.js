@@ -392,8 +392,27 @@ export class TrickCompletionService {
       // Emit game update to notify clients of new round
       if (io) {
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        io.to(gameId).emit('game_update', updatedGameState);
+        console.log(`[TRICK COMPLETION] About to emit game_update for new round ${nextRoundNumber}. Game state:`, {
+          status: updatedGameState.status,
+          currentRound: updatedGameState.currentRound,
+          currentPlayer: updatedGameState.currentPlayer,
+          players: updatedGameState.players?.length
+        });
+        
+        io.to(gameId).emit('game_update', {
+          gameId,
+          gameState: updatedGameState
+        });
+        
         console.log(`[TRICK COMPLETION] Emitted game_update for new round ${nextRoundNumber}`);
+        
+        // Also emit new_hand_started event for better client handling
+        io.to(gameId).emit('new_hand_started', {
+          gameId,
+          gameState: updatedGameState,
+          roundNumber: nextRoundNumber
+        });
+        console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);
         
         // Trigger bot bidding if current player is a bot
         if (updatedGameState.currentPlayer) {
