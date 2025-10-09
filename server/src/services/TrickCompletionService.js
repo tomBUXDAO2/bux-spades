@@ -242,7 +242,7 @@ export class TrickCompletionService {
               team1Bags: scores.team0Bags,
               team2Bags: scores.team1Bags,
               // Solo game player scores (running totals)
-              playerScores: game.mode === 'SOLO' && latestRoundScore ? [
+              playerScores: finalGameState.gameMode === 'SOLO' && latestRoundScore ? [
                 latestRoundScore.player0Running || 0,
                 latestRoundScore.player1Running || 0,
                 latestRoundScore.player2Running || 0,

@@ -143,7 +143,8 @@ export default function HandSummaryModal({
                       // Calculate round score components
                       let madeBidPoints = 0;
                       let nilPoints = 0;
-                      let bags = 0;
+                      let bagsEarned = 0;
+                      let bagScore = 0;
                       
                       if (bid === 0) {
                         // Nil bid - solo mode: 50/-50, blind nils: 100/-100
@@ -155,15 +156,23 @@ export default function HandSummaryModal({
                           madeBidPoints = bid * 10;
                         } else if (tricks > bid) {
                           madeBidPoints = bid * 10;
-                          bags = tricks - bid;
+                          bagsEarned = tricks - bid;
+                          bagScore = bagsEarned; // Overtricks add points
                         } else {
                           madeBidPoints = -(bid * 10);
                         }
                       }
                       
-                      // Get round score from server data (fallback to calculated if not available)
-                      const roundScore = (handSummaryData as any).playerRoundScores?.[index] || 
-                                       (madeBidPoints + nilPoints + (bags > 0 ? bags : 0));
+                      // Get round score from server data
+                      const roundScore = (handSummaryData as any).playerRoundScores?.[index] || 0;
+                      
+                      // Calculate bag penalty if applicable
+                      // If roundScore doesn't match madeBidPoints + nilPoints + bagScore, there was a penalty
+                      const expectedScore = madeBidPoints + nilPoints + bagScore;
+                      if (roundScore < expectedScore && bagsEarned > 0) {
+                        // Bag penalty was applied
+                        bagScore = roundScore - madeBidPoints - nilPoints;
+                      }
                       
                       return (
                         <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
@@ -190,11 +199,11 @@ export default function HandSummaryModal({
                               </span>
                             </div>
                             
-                            {/* Bags - always show */}
+                            {/* Bags - always show (includes penalty if applied) */}
                             <div className="flex justify-between text-xs">
                               <span className="text-gray-400">Bags:</span>
-                              <span className={`font-medium ${bags === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
-                                {bags === 0 ? '0' : bags}
+                              <span className={`font-medium ${bagScore === 0 ? 'text-gray-400' : bagScore > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {bagScore === 0 ? '0' : bagScore}
                               </span>
                             </div>
                             

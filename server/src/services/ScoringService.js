@@ -58,8 +58,22 @@ export class ScoringService {
             select: { bagsThisRound: true }
           });
           
-          // Sum up all previous bags
-          const totalBags = previousRounds.reduce((sum, round) => sum + (round.bagsThisRound || 0), 0);
+          // Sum up all previous bags, but check if any round had a penalty reset
+          // If a round had >= 5 bags total, the next round should start from the remainder
+          let totalBags = 0;
+          let lastPenaltyRound = -1;
+          
+          for (let i = 0; i < previousRounds.length; i++) {
+            const bags = previousRounds[i].bagsThisRound || 0;
+            totalBags += bags;
+            
+            // Check if this round would have triggered penalty (5+ bags)
+            if (totalBags >= 5) {
+              totalBags = 0; // Reset after penalty
+              lastPenaltyRound = i;
+            }
+          }
+          
           player.bagsTotal = totalBags;
           console.log(`[SCORING] Player ${player.seatIndex} has ${totalBags} total bags from previous rounds`);
         }
@@ -203,14 +217,13 @@ export class ScoringService {
       
       // Solo mode bag penalty: -50 points and reset bags to 0 when reaching 5 bags
       let finalPointsThisRound = pointsThisRound;
-      let finalBagsThisRound = bagsThisRound;
+      let finalBagsThisRound = bagsThisRound; // ALWAYS store bags from THIS round only
       
       if (totalBags >= 5) {
         finalPointsThisRound -= 50; // Apply bag penalty
-        finalBagsThisRound = 0; // Reset bags to 0
-        console.log(`[SCORING] Player ${player.seatIndex} hit 5 bags (${totalBags}), applying -50 penalty and resetting bags`);
-      } else {
-        finalBagsThisRound = totalBags; // Keep accumulating bags
+        // Note: bagsThisRound still stores the bags from THIS round
+        // The UI will show 0 total bags after penalty because previous rounds reset
+        console.log(`[SCORING] Player ${player.seatIndex} hit 5 bags (${totalBags}), applying -50 penalty. Bags this round: ${bagsThisRound}`);
       }
 
       // Update player stats with final bags
