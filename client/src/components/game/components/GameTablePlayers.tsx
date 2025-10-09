@@ -115,28 +115,33 @@ export default function GameTablePlayers({
             style={{ fontSize: isVerySmallScreen ? '10px' : '16px' }}
             onClick={async () => {
               // Use REST API to join specific seat
+              console.log(`[JOIN SEAT] Attempting to join seat ${position} in game ${gameState.id}`);
               try {
                 const { api } = await import('../../../services/lib/api');
+                console.log(`[JOIN SEAT] API imported, making request...`);
                 const res = await api.post(`/api/games/${gameState.id}/join`, {
                   id: user.id,
                   username: user.username,
                   avatar: user.avatar || user.avatarUrl,
                   seat: position
                 });
+                console.log(`[JOIN SEAT] Response status:`, res.status);
                 if (!res.ok) {
                   const error = await res.json();
-                  console.error('Failed to join seat:', error);
+                  console.error('[JOIN SEAT] Failed to join seat:', error);
                   alert('Failed to join seat: ' + (error.error || 'Unknown error'));
                 } else {
-                  console.log(`[JOIN SEAT] Successfully joined seat ${position}`);
+                  const data = await res.json();
+                  console.log(`[JOIN SEAT] ✅ Successfully joined seat ${position}`, data);
                   // Remove spectate param from URL
                   const url = new URL(window.location.href);
                   url.searchParams.delete('spectate');
                   window.history.replaceState({}, '', url.toString());
+                  console.log(`[JOIN SEAT] Removed spectate param from URL`);
                 }
               } catch (err) {
-                console.error('Error joining seat:', err);
-                alert('Failed to join seat');
+                console.error('[JOIN SEAT] Error joining seat:', err);
+                alert('Failed to join seat: ' + err);
               }
             }}
           >
