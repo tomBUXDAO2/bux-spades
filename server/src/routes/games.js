@@ -219,6 +219,11 @@ router.post('/:id/join', async (req, res) => {
           gameState
         });
         console.log(`[API] Emitted game_update to room ${gameId}`);
+        
+        // Send system message
+        const { SystemMessageHandler } = await import('../../modules/socket-handlers/chat/systemMessageHandler.js');
+        const systemHandler = new SystemMessageHandler(io, null);
+        systemHandler.handlePlayerJoined(gameId, username || 'Player');
       }
     } catch (redisError) {
       console.error(`[API] Failed to update Redis cache or emit event:`, redisError);
@@ -248,6 +253,20 @@ router.post('/:id/leave', async (req, res) => {
       return res.status(400).json({ error: 'User ID required' });
     }
 
+    // Get player username before leaving
+    let playerUsername = 'Player';
+    try {
+      const player = await prisma.gamePlayer.findFirst({
+        where: { gameId, userId },
+        include: { user: true }
+      });
+      if (player && player.user) {
+        playerUsername = player.user.username;
+      }
+    } catch (err) {
+      console.error('[API] Error getting player username:', err);
+    }
+
     // Use GameService to leave the game (handles database operations)
     await GameService.leaveGame(gameId, userId);
     
@@ -267,6 +286,11 @@ router.post('/:id/leave', async (req, res) => {
           gameState
         });
         console.log(`[API] Emitted game_update to room ${gameId} after player left`);
+        
+        // Send system message
+        const { SystemMessageHandler } = await import('../../modules/socket-handlers/chat/systemMessageHandler.js');
+        const systemHandler = new SystemMessageHandler(io, null);
+        systemHandler.handlePlayerLeft(gameId, playerUsername);
       }
     } catch (redisError) {
       console.error(`[API] Failed to update Redis cache or emit event:`, redisError);

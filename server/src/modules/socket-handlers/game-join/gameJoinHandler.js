@@ -152,6 +152,23 @@ class GameJoinHandler {
         gameState
       });
       
+      // Send system message for joins
+      try {
+        const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
+        const systemHandler = new SystemMessageHandler(this.io, this.socket);
+        
+        if (spectate) {
+          // Get username from game state or user
+          const user = await prisma.user.findUnique({ where: { id: userId } });
+          const username = user?.username || 'Someone';
+          systemHandler.sendSystemMessage(gameId, `👁️ ${username} is watching`, 'info');
+        } else if (player) {
+          systemHandler.handlePlayerJoined(gameId, player.username || 'Player');
+        }
+      } catch (err) {
+        console.error('[GAME JOIN] Error sending system message:', err);
+      }
+      
       console.log(`[GAME JOIN] User ${userId} successfully joined game ${gameId}`);
       
     } catch (error) {
@@ -249,6 +266,18 @@ class GameJoinHandler {
       const { GameService } = await import('../../../services/GameService.js');
       const { GameCleanupService } = await import('../../../services/GameCleanupService.js');
       
+      // Get player username before leaving
+      let playerUsername = 'Player';
+      try {
+        const gameState = await GameService.getGameStateForClient(gameId);
+        const player = gameState?.players?.find(p => p && p.userId === userId);
+        if (player) {
+          playerUsername = player.username;
+        }
+      } catch (err) {
+        console.error('[GAME LEAVE] Error getting player username:', err);
+      }
+      
       // Remove player from database
       await GameService.leaveGame(gameId, userId);
       console.log(`[GAME LEAVE] User ${userId} removed from database for game ${gameId}`);
@@ -292,6 +321,15 @@ class GameJoinHandler {
       if (updatedState) {
         this.io.to(gameId).emit('game_update', { gameId, gameState: updatedState });
         console.log(`[GAME LEAVE] Emitted game_update to room ${gameId}`);
+      }
+      
+      // Send system message
+      try {
+        const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
+        const systemHandler = new SystemMessageHandler(this.io, this.socket);
+        systemHandler.handlePlayerLeft(gameId, playerUsername);
+      } catch (err) {
+        console.error('[GAME LEAVE] Error sending system message:', err);
       }
 
       // Clean any orphaned bot users
