@@ -6,6 +6,14 @@ const isSoundEnabled = (): boolean => {
   if (userData) {
     try {
       const parsed = JSON.parse(userData);
+      
+      // ONE-TIME FIX: If soundEnabled is undefined or false, set it to true by default
+      if (parsed.soundEnabled === undefined) {
+        console.log(`[SOUND FIX] Setting soundEnabled to true for user ${parsed.username} (was undefined)`);
+        parsed.soundEnabled = true;
+        localStorage.setItem('userData', JSON.stringify(parsed));
+      }
+      
       const soundEnabled = parsed.soundEnabled !== false; // Default to true
       console.log(`[SOUND CHECK] User: ${parsed.username}, soundEnabled field: ${parsed.soundEnabled}, result: ${soundEnabled}`);
       if (!soundEnabled) {
