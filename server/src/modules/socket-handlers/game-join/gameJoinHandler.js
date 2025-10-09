@@ -278,11 +278,20 @@ class GameJoinHandler {
       this.socket.leave(gameId);
       console.log(`[GAME LEAVE] User ${userId} left room for game ${gameId}`);
 
+      // Update Redis cache with fresh game state from database
+      const redisGameState = (await import('../../../services/RedisGameStateService.js')).default;
+      const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+      if (freshGameState) {
+        await redisGameState.setGameState(gameId, freshGameState);
+        console.log(`[GAME LEAVE] Updated Redis cache for game ${gameId}`);
+      }
+
       // Emit to other players in the room and broadcast updated state
       const updatedState = await GameService.getGameStateForClient(gameId);
       this.io.to(gameId).emit('player_left', { gameId, userId });
       if (updatedState) {
         this.io.to(gameId).emit('game_update', { gameId, gameState: updatedState });
+        console.log(`[GAME LEAVE] Emitted game_update to room ${gameId}`);
       }
 
       // Clean any orphaned bot users
