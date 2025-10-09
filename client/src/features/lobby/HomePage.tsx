@@ -353,7 +353,9 @@ const HomePage: React.FC = () => {
         const response = await api.get('/api/games');
         if (response.ok) {
           const data = await response.json();
-          setGames(data.games || []);
+          // API returns array directly, not wrapped in object
+          const gamesArray = Array.isArray(data) ? data : (data.games || []);
+          setGames(gamesArray);
           // Reduced logging frequency - only log on first refresh or errors
         }
       } catch (error) {
