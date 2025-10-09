@@ -1,7 +1,7 @@
 // Game event handlers and socket management for GameTable
 // Handles all socket events and game state updates
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { GameState, Card, Player, Bot } from "../../../types/game";
 import type { ChatMessage } from "../../../features/chat/Chat";
 
