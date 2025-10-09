@@ -205,15 +205,23 @@ router.post('/:id/join', async (req, res) => {
 
     console.log(`[API] User ${userId} successfully joined game ${gameId} at seat ${result.seatIndex}`);
 
-    // Update Redis cache
+    // Update Redis cache and emit socket event
     try {
       const gameState = await GameService.getFullGameStateFromDatabase(gameId);
       if (gameState) {
         await redisGameState.setGameState(gameId, gameState);
         console.log(`[API] Updated Redis cache for game ${gameId}`);
+        
+        // Emit game_update to all players in the room
+        const { io } = await import('../../config/server.js');
+        io.to(gameId).emit('game_update', {
+          gameId,
+          gameState
+        });
+        console.log(`[API] Emitted game_update to room ${gameId}`);
       }
     } catch (redisError) {
-      console.error(`[API] Failed to update Redis cache:`, redisError);
+      console.error(`[API] Failed to update Redis cache or emit event:`, redisError);
       // Continue anyway - database is updated
     }
 
@@ -234,29 +242,41 @@ router.post('/:id/leave', async (req, res) => {
     const gameId = req.params.id;
     const { userId } = req.body;
 
-    const game = gameManager.getGame(gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+    console.log(`[API] User ${userId} leaving game ${gameId}`);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
     }
 
-    // Remove player
-    const playerIndex = game.players.findIndex(p => p && p.id === userId);
-    if (playerIndex !== -1) {
-      game.players[playerIndex] = null;
+    // Use GameService to leave the game (handles database operations)
+    await GameService.leaveGame(gameId, userId);
+    
+    console.log(`[API] User ${userId} successfully left game ${gameId}`);
+
+    // Update Redis cache and emit socket event
+    try {
+      const gameState = await GameService.getFullGameStateFromDatabase(gameId);
+      if (gameState) {
+        await redisGameState.setGameState(gameId, gameState);
+        console.log(`[API] Updated Redis cache for game ${gameId}`);
+        
+        // Emit game_update to all players in the room
+        const { io } = await import('../../config/server.js');
+        io.to(gameId).emit('game_update', {
+          gameId,
+          gameState
+        });
+        console.log(`[API] Emitted game_update to room ${gameId} after player left`);
+      }
+    } catch (redisError) {
+      console.error(`[API] Failed to update Redis cache or emit event:`, redisError);
+      // Continue anyway - database is updated
     }
 
-    // If no players left, delete game
-    const activePlayers = game.players.filter(p => p !== null);
-    if (activePlayers.length === 0) {
-      await gameManager.deleteGame(gameId);
-      return res.json({ message: 'Game deleted' });
-    }
-
-    await gameManager.saveGame(gameId);
-    res.json(game.toClientFormat());
+    res.json({ success: true });
   } catch (error) {
     console.error('[API] Error leaving game:', error);
-    res.status(500).json({ error: 'Failed to leave game' });
+    res.status(500).json({ error: error.message || 'Failed to leave game' });
   }
 });
 
