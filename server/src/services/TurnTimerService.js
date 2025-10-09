@@ -108,16 +108,8 @@ class TurnTimerService {
       const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
       const biddingHandler = new BiddingHandler(io, null);
       
-      // Create a mock socket with userId for the handler
-      const mockSocket = { userId: playerId };
-      biddingHandler.socket = mockSocket;
-      
-      await biddingHandler.handleBid({
-        gameId,
-        bid: autoBid,
-        isNil: false,
-        isBlindNil: false
-      });
+      // Call processBid directly (no socket needed)
+      await biddingHandler.processBid(gameId, playerId, autoBid, false, false);
 
       console.log(`[TURN TIMER] Auto-bid ${autoBid} processed for player ${playerId}`);
 
