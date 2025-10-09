@@ -69,9 +69,14 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
       <div className="flex items-center gap-2 text-sm mb-1">
         {getGameTypeBrick(game)}
         <span className="text-slate-300 font-medium">{game.minPoints}/{game.maxPoints}</span>
-        {game.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>}
-        {!game.rules?.allowNil && <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>}
-        <span className="text-slate-300 ml-2">bn <span className="align-middle">{game.rules?.allowBlindNil ? '☑️' : '❌'}</span></span>
+        {/* Use DB-backed flags sent by the API */}
+        {((game as any).nilAllowed === true) && (
+          <span className="text-slate-300 ml-2">nil <span className="align-middle">☑️</span></span>
+        )}
+        {((game as any).nilAllowed !== true) && (
+          <span className="text-slate-300 ml-2">nil <span className="align-middle">❌</span></span>
+        )}
+        <span className="text-slate-300 ml-2">bn <span className="align-middle">{(game as any).blindNilAllowed ? '☑️' : '❌'}</span></span>
       </div>
       {/* Line 2: Buy-in, game mode, and special bricks */}
       <div className="flex items-center gap-2 mb-4">
@@ -96,12 +101,12 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
                 {player ? (
                   <div className="text-center flex flex-col items-center">
                     <img
-                      src={(player as any).type === 'bot' ? ((player as any).avatarUrl || '/bot-avatar.jpg') : ((player as any).avatarUrl || '/default-pfp.jpg')}
+                      src={(player as any).type === 'bot' ? '/bot-avatar.jpg' : ((player as any).avatarUrl || '/default-pfp.jpg')}
                       alt=""
                       className="w-16 h-16 rounded-full border-2 border-slate-600"
                     />
                     <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
-                      {(player as any).type === 'bot' ? 'Bot' : ((player as any).username || (player as any).name || 'Player')}
+                      {(player as any).type === 'bot' ? `Bot ${seat + 1}` : ((player as any).username || (player as any).name || 'Player')}
                     </span>
                   </div>
                 ) : (
