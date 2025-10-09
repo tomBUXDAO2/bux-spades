@@ -347,23 +347,30 @@ export class GameService {
           orderBy: { seatIndex: 'asc' }
         });
 
+        // Check if user already in game
+        const existingPlayer = existingPlayers.find(p => p.userId === userId);
+        if (existingPlayer) {
+          throw new Error('User already in game');
+        }
+
         // Find available seat
+        const takenSeats = existingPlayers.map(p => p.seatIndex);
+        
         if (seatIndex === null) {
-          const takenSeats = existingPlayers.map(p => p.seatIndex);
+          // Auto-assign first available seat
           seatIndex = 0;
           while (takenSeats.includes(seatIndex) && seatIndex < 4) {
             seatIndex++;
+          }
+        } else {
+          // Validate requested seat is available
+          if (takenSeats.includes(seatIndex)) {
+            throw new Error(`Seat ${seatIndex} is already taken`);
           }
         }
 
         if (seatIndex >= 4) {
           throw new Error('Game is full');
-        }
-
-        // Check if user already in game
-        const existingPlayer = existingPlayers.find(p => p.userId === userId);
-        if (existingPlayer) {
-          throw new Error('User already in game');
         }
 
         // Add player
@@ -382,7 +389,11 @@ export class GameService {
       });
 
       console.log(`[GAME SERVICE] User ${userId} joined game ${gameId} in seat ${transaction.seatIndex}`);
-      return transaction;
+      return {
+        success: true,
+        seatIndex: transaction.seatIndex,
+        teamIndex: transaction.teamIndex
+      };
     } catch (error) {
       console.error('[GAME SERVICE] Error joining game:', error);
       throw error;

@@ -188,57 +188,43 @@ router.post('/', async (req, res) => {
 router.post('/:id/join', async (req, res) => {
   try {
     const gameId = req.params.id;
-    const { userId, username } = req.body;
+    const { id: userId, username, avatar, seat } = req.body;
 
-    let game = gameManager.getGame(gameId);
-    if (!game) {
-      game = await gameManager.loadGame(gameId);
+    console.log(`[API] Join request - gameId: ${gameId}, userId: ${userId}, seat: ${seat}`);
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
     }
 
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
+    // Use GameService to join the game (handles database operations)
+    const result = await GameService.joinGame(gameId, userId, seat);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Failed to join game' });
     }
 
-    // Find available seat
-    let seatIndex = -1;
-    for (let i = 0; i < 4; i++) {
-      if (!game.players[i]) {
-        seatIndex = i;
-        break;
+    console.log(`[API] User ${userId} successfully joined game ${gameId} at seat ${result.seatIndex}`);
+
+    // Update Redis cache
+    try {
+      const gameState = await GameService.getFullGameStateFromDatabase(gameId);
+      if (gameState) {
+        await redisGameState.setGameState(gameId, gameState);
+        console.log(`[API] Updated Redis cache for game ${gameId}`);
       }
+    } catch (redisError) {
+      console.error(`[API] Failed to update Redis cache:`, redisError);
+      // Continue anyway - database is updated
     }
 
-    if (seatIndex === -1) {
-      return res.status(400).json({ error: 'Game is full' });
-    }
-
-    // Add player
-    game.players[seatIndex] = {
-      id: userId,
-      username,
-      type: 'human',
-      seatIndex,
-      team: seatIndex % 2,
-      hand: [],
-      bid: null,
-      tricks: 0,
-      points: 0,
-      bags: 0,
-      nil: false,
-      blindNil: false,
-      connected: true
-    };
-
-    // If this is the first player, set them as current player
-    if (game.players.filter(p => p !== null).length === 1) {
-      game.currentPlayer = userId;
-    }
-
-    await gameManager.saveGame(gameId);
-    res.json(game.toClientFormat());
+    res.json({
+      success: true,
+      seatIndex: result.seatIndex,
+      teamIndex: result.teamIndex
+    });
   } catch (error) {
     console.error('[API] Error joining game:', error);
-    res.status(500).json({ error: 'Failed to join game' });
+    res.status(500).json({ error: error.message || 'Failed to join game' });
   }
 });
 
