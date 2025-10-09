@@ -2,6 +2,7 @@ import { GameService } from '../../../services/GameService.js';
 import { BotService } from '../../../services/BotService.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import redisSessionService from '../../../services/RedisSessionService.js';
+import { prisma } from '../../../config/database.js';
 
 /**
  * DATABASE-FIRST GAME JOIN HANDLER
