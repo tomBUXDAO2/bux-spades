@@ -54,7 +54,7 @@ const HomePage: React.FC = () => {
   const [activeChatTab, setActiveChatTab] = useState<'chat' | 'players'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [onlinePlayers, setOnlinePlayers] = useState<any[]>([]);
-  const onlineCount = Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.online).length : 0;
+  const onlineCount = Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.online || p.inGame === true).length : 0;
   const [isPlayerStatsOpen, setIsPlayerStatsOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -272,9 +272,10 @@ const HomePage: React.FC = () => {
         ]);
       }
       onlineIdsRef.current = onlineUserIds;
+      // Mark online from socket, and keep in-game users online as well
       setOnlinePlayers(prev => prev.map(player => ({
         ...player,
-        online: onlineUserIds.includes(player.id)
+        online: onlineUserIds.includes(player.id) || player.inGame === true
       })));
     };
 
@@ -356,6 +357,11 @@ const HomePage: React.FC = () => {
           // API returns array directly, not wrapped in object
           const gamesArray = Array.isArray(data) ? data : (data.games || []);
           setGames(gamesArray);
+          // Mark users in active games as inGame=true and online for display
+          setOnlinePlayers(prev => prev.map(p => {
+            const inGame = gamesArray.some((g: any) => Array.isArray(g.players) && g.players.some((gp: any) => gp && ((gp.id || gp.userId) === p.id)));
+            return { ...p, inGame, online: p.online || inGame };
+          }));
           // Reduced logging frequency - only log on first refresh or errors
         }
       } catch (error) {

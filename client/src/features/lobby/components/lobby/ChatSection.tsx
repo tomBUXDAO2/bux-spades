@@ -299,11 +299,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   </span>
                   <div className="flex gap-2 ml-auto items-center">
                     {/* Watch button when player is at a table */}
-                    {player.activeGameId && player.id !== user.id && (
+                    {(player.activeGameId || player.inGame) && player.id !== user.id && (
                       <button
                         className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs border border-slate-300 hover:bg-indigo-700"
                         title="Watch Table"
-                        onClick={() => onWatchGame(player.activeGameId as string)}
+                        onClick={() => {
+                          if (player.activeGameId) {
+                            onWatchGame(player.activeGameId as string);
+                          } else {
+                            // Fallback: dispatch event for GameId lookup handled in HomePage
+                            window.dispatchEvent(new CustomEvent('watchUserGame', { detail: { userId: player.id } }));
+                          }
+                        }}
                       >
                         Watch
                       </button>
