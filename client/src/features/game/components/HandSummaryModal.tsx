@@ -180,23 +180,21 @@ export default function HandSummaryModal({
                               <span className="text-white">({tricks}/{bid}) {madeBidPoints}</span>
                             </div>
                             
-                            {/* Nils - only show if not 0 */}
-                            {nilPoints !== 0 && (
-                              <div className="flex justify-between text-xs">
-                                <span className="text-gray-400">Nil:</span>
-                                <span className={`font-medium ${nilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                  {nilPoints}
-                                </span>
-                              </div>
-                            )}
+                            {/* Nils - always show */}
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Nils:</span>
+                              <span className={`font-medium ${nilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {nilPoints === 0 ? '0' : nilPoints}
+                              </span>
+                            </div>
                             
-                            {/* Bags - only show if not 0 */}
-                            {bags > 0 && (
-                              <div className="flex justify-between text-xs">
-                                <span className="text-gray-400">Bags:</span>
-                                <span className="font-medium text-yellow-400">{bags}</span>
-                              </div>
-                            )}
+                            {/* Bags - always show */}
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Bags:</span>
+                              <span className={`font-medium ${bags === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
+                                {bags === 0 ? '0' : bags}
+                              </span>
+                            </div>
                             
                             {/* Round Score */}
                             <div className="flex justify-between text-xs border-t border-white/10 pt-1">
