@@ -147,7 +147,8 @@ export default function HandSummaryModal({
                       
                       if (bid === 0) {
                         // Nil bid - solo mode: 50/-50, blind nils: 100/-100
-                        nilPoints = tricks === 0 ? (player.isBlindNil ? 100 : 50) : (player.isBlindNil ? -100 : -50);
+                        // For now, assume regular nil (not blind nil) since isBlindNil is not available in player data
+                        nilPoints = tricks === 0 ? 50 : -50;
                       } else {
                         // Regular bid
                         if (tricks === bid) {
@@ -160,8 +161,9 @@ export default function HandSummaryModal({
                         }
                       }
                       
-                      // Get round score from server data
-                      const roundScore = handSummaryData.playerRoundScores?.[index] || 0;
+                      // Get round score from server data (fallback to calculated if not available)
+                      const roundScore = (handSummaryData as any).playerRoundScores?.[index] || 
+                                       (madeBidPoints + nilPoints + (bags > 0 ? bags : 0));
                       
                       return (
                         <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
