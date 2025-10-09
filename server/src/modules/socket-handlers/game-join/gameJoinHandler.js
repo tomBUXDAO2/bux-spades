@@ -87,7 +87,7 @@ class GameJoinHandler {
 
   async handleJoinGame(data) {
     try {
-      const { gameId } = data;
+      const { gameId, spectate } = data || {};
       const userId = this.socket.userId || data.userId;
       
       console.log(`[GAME JOIN] User ${userId} attempting to join game ${gameId}`);
@@ -105,11 +105,15 @@ class GameJoinHandler {
       }
 
       // Check if player is in the game
-      const player = gameState.players.find(p => p.userId === userId);
+      const player = gameState.players.find(p => p.userId === userId && !p.isSpectator);
       if (!player) {
-        // CRITICAL: If user is not found, check if they are the game creator
-        const game = await GameService.getGame(gameId);
-        if (game && game.createdById === userId) {
+        // If not a seated player, allow spectating when requested
+        if (spectate) {
+          console.log(`[GAME JOIN] User ${userId} spectating game ${gameId}`);
+        } else {
+          // CRITICAL: If user is not found, check if they are the game creator
+          const game = await GameService.getGame(gameId);
+          if (game && game.createdById === userId) {
           console.log(`[GAME JOIN] Creator ${userId} joining their own game ${gameId} - refreshing cache`);
           // Force refresh from database to get updated player list
           const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
@@ -118,9 +122,10 @@ class GameJoinHandler {
             // Update gameState to use fresh data
             Object.assign(gameState, freshGameState);
           }
-        } else {
-          this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
-          return;
+          } else {
+            this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
+            return;
+          }
         }
       }
 
@@ -128,14 +133,17 @@ class GameJoinHandler {
       this.socket.join(gameId);
       console.log(`[GAME JOIN] User ${userId} joined room for game ${gameId}`);
 
-      // Update active game in session
-      await redisSessionService.updateActiveGame(userId, gameId);
+      // Update active game in session (only for seated players)
+      if (!spectate) {
+        await redisSessionService.updateActiveGame(userId, gameId);
+      }
       console.log(`[SESSION] Updated active game for user ${userId} to ${gameId}`);
 
       // Emit game_joined event with current database state
       this.socket.emit('game_joined', {
         gameId,
-        gameState
+        gameState,
+        spectate: !!spectate
       });
       
       // Also emit to the room for other players

@@ -26,8 +26,10 @@ export const useGameActions = ({
     
     setIsLoading(true);
     setError(null);
-    console.log('🎮 EMITTING join_game event:', { gameId, userId, socketId: socket.id, isConnected: socket.connected });
-    socket.emit('join_game', { gameId, userId });
+    const url = new URL(window.location.href);
+    const spectate = url.searchParams.get('spectate') === '1';
+    console.log('🎮 EMITTING join_game event:', { gameId, userId, spectate, socketId: socket.id, isConnected: socket.connected });
+    socket.emit('join_game', { gameId, userId, spectate });
     
     // Set a timeout to handle cases where game_joined event is not received
     const timeout = setTimeout(() => {

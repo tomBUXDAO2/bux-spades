@@ -201,7 +201,12 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
         onStartWithBotsFromWarning={handleStartWithBotsFromWarning}
         emptySeats={emptySeats}
         botCount={botCount}
-        isSpectator={false}
+        isSpectator={(() => {
+          try {
+            const url = new URL(window.location.href);
+            return url.searchParams.get('spectate') === '1';
+          } catch { return false; }
+        })()}
         isStarting={isStarting}
       />
       
