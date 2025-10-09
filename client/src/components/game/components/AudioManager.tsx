@@ -79,9 +79,25 @@ const initializeAudio = () => {
   }
 };
 
+// Helper function to check if sound is enabled
+const isSoundEnabled = (): boolean => {
+  const userData = localStorage.getItem('userData');
+  if (userData) {
+    try {
+      const parsed = JSON.parse(userData);
+      return parsed.soundEnabled !== false; // Default to true
+    } catch (error) {
+      return true; // Default to true if parsing fails
+    }
+  }
+  return true; // Default to true if no userData
+};
+
 // Sound utility for dealing cards
 export const playCardSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (cardAudio) {
       cardAudio.currentTime = 0;
       cardAudio.play().catch(err => console.log('Card audio play failed:', err));
@@ -99,6 +115,8 @@ export const playCardSound = () => {
 // Sound utility for bid
 export const playBidSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (bidAudio) {
       bidAudio.currentTime = 0;
       bidAudio.play().catch(err => console.log('Bid audio play failed:', err));
@@ -116,6 +134,8 @@ export const playBidSound = () => {
 // Sound utility for win
 export const playWinSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (winAudio) {
       winAudio.currentTime = 0;
       winAudio.play().catch(err => console.log('Win audio play failed:', err));
@@ -133,6 +153,8 @@ export const playWinSound = () => {
 // Sound utility for cheering (winner celebration)
 export const playCheeringSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (cheeringAudio) {
       cheeringAudio.currentTime = 0;
       cheeringAudio.play().catch(err => console.log('Cheering audio play failed:', err));
@@ -150,6 +172,8 @@ export const playCheeringSound = () => {
 // Sound utilities for emoji reactions
 export const playPositiveSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (positiveAudio) {
       positiveAudio.currentTime = 0;
       positiveAudio.play().catch(err => console.log('Positive audio play failed:', err));
@@ -165,6 +189,8 @@ export const playPositiveSound = () => {
 
 export const playNegativeSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (negativeAudio) {
       negativeAudio.currentTime = 0;
       negativeAudio.play().catch(err => console.log('Negative audio play failed:', err));
@@ -180,6 +206,8 @@ export const playNegativeSound = () => {
 
 export const playKissSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (kissAudio) {
       kissAudio.currentTime = 0;
       kissAudio.play().catch(err => console.log('Kiss audio play failed:', err));
@@ -195,6 +223,8 @@ export const playKissSound = () => {
 
 export const playFartSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (fartAudio) {
       fartAudio.currentTime = 0;
       fartAudio.play().catch(err => console.log('Fart audio play failed:', err));
@@ -210,6 +240,8 @@ export const playFartSound = () => {
 
 export const playPukeSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (pukeAudio) {
       pukeAudio.currentTime = 0;
       pukeAudio.play().catch(err => console.log('Puke audio play failed:', err));
@@ -225,6 +257,8 @@ export const playPukeSound = () => {
 
 export const playGrrrSound = () => {
   try {
+    if (!isSoundEnabled()) return;
+    
     if (grrrAudio) {
       grrrAudio.currentTime = 0;
       grrrAudio.play().catch(err => console.log('Grrr audio play failed:', err));

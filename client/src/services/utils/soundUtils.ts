@@ -1,20 +1,26 @@
 // Sound utility functions that respect user preferences
+
+// Helper function to check if sound is enabled
+const isSoundEnabled = (): boolean => {
+  const userData = localStorage.getItem('userData');
+  if (userData) {
+    try {
+      const parsed = JSON.parse(userData);
+      const soundEnabled = parsed.soundEnabled !== false; // Default to true
+      if (!soundEnabled) {
+        console.log(`[SOUND] Sound muted for user ${parsed.username}`);
+      }
+      return soundEnabled;
+    } catch (error) {
+      console.log('Failed to parse user data for sound preference:', error);
+      return true; // Default to true if parsing fails
+    }
+  }
+  return true; // Default to true if no userData
+};
 export const playCardSound = () => {
   try {
-    // Check if sound is enabled (default to true if not set)
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false; // Default to true
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).cardAudio) {
       (window as any).cardAudio.currentTime = 0;
@@ -31,19 +37,7 @@ export const playCardSound = () => {
 
 export const playBidSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).bidAudio) {
       (window as any).bidAudio.currentTime = 0;
@@ -60,19 +54,7 @@ export const playBidSound = () => {
 
 export const playWinSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).winAudio) {
       (window as any).winAudio.currentTime = 0;
@@ -89,19 +71,7 @@ export const playWinSound = () => {
 
 export const playCheeringSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).cheeringAudio) {
       (window as any).cheeringAudio.currentTime = 0;
@@ -141,19 +111,7 @@ const EMOJI_SOUND_MAP: Record<string, string> = {
 // Individual emoji sound functions
 export const playPositiveSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).positiveAudio) {
       (window as any).positiveAudio.currentTime = 0;
@@ -170,19 +128,7 @@ export const playPositiveSound = () => {
 
 export const playNegativeSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).negativeAudio) {
       (window as any).negativeAudio.currentTime = 0;
@@ -199,19 +145,7 @@ export const playNegativeSound = () => {
 
 export const playKissSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).kissAudio) {
       (window as any).kissAudio.currentTime = 0;
@@ -228,19 +162,7 @@ export const playKissSound = () => {
 
 export const playFartSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).fartAudio) {
       (window as any).fartAudio.currentTime = 0;
@@ -257,19 +179,7 @@ export const playFartSound = () => {
 
 export const playPukeSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).pukeAudio) {
       (window as any).pukeAudio.currentTime = 0;
@@ -286,19 +196,7 @@ export const playPukeSound = () => {
 
 export const playGrrrSound = () => {
   try {
-    const userData = localStorage.getItem('userData');
-    let soundEnabled = true;
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        soundEnabled = parsed.soundEnabled !== false;
-      } catch (error) {
-        console.log('Failed to parse user data for sound preference:', error);
-      }
-    }
-    
-    if (!soundEnabled) return;
+    if (!isSoundEnabled()) return;
     
     if ((window as any).grrrAudio) {
       (window as any).grrrAudio.currentTime = 0;

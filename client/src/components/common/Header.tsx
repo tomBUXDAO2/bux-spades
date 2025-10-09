@@ -7,7 +7,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
-  const { user, logout, updateProfile, updateSoundPreference } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isGameRulesOpen, setIsGameRulesOpen] = useState(false);
@@ -104,11 +104,6 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
     });
   };
 
-  const handleSoundToggle = () => {
-    if (user) {
-      updateSoundPreference(!(user as any).soundEnabled);
-    }
-  };
   return (
     <header className="bg-slate-800 border-b border-slate-700">
       <div className="container mx-auto px-4 py-3">
@@ -186,21 +181,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                   >
                     Game Rules
                   </button>
-                  <div className="px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between">
-                    <span>Sound</span>
-                    <button
-                      onClick={handleSoundToggle}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                        (user as any)?.soundEnabled !== false ? 'bg-blue-600' : 'bg-gray-600'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          (user as any)?.soundEnabled !== false ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>                  <div className="border-t border-slate-700"></div>
+                  <div className="border-t border-slate-700"></div>
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
