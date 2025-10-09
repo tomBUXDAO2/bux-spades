@@ -314,6 +314,22 @@ class CardPlayHandler {
           updatedGameState.play.spadesBroken = true;
         }
         
+        // CRITICAL: For solo games, preserve playerScores and playerBags if they exist
+        // This prevents overwriting scores when startNewRound has already set them
+        if (updatedGameState.gameMode === 'SOLO') {
+          const currentCachedState = await redisGameState.getGameState(gameId);
+          if (currentCachedState) {
+            if (currentCachedState.playerScores && currentCachedState.playerScores.some(s => s !== 0)) {
+              updatedGameState.playerScores = currentCachedState.playerScores;
+              console.log(`[CARD PLAY] Preserved playerScores from Redis:`, updatedGameState.playerScores);
+            }
+            if (currentCachedState.playerBags) {
+              updatedGameState.playerBags = currentCachedState.playerBags;
+              console.log(`[CARD PLAY] Preserved playerBags from Redis:`, updatedGameState.playerBags);
+            }
+          }
+        }
+        
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
