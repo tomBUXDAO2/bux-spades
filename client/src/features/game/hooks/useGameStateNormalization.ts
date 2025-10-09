@@ -38,6 +38,8 @@ export const normalizeGameState = (state: any): GameState => {
     play, 
     bidding,
     currentPlayer: state.currentPlayer, // CRITICAL: Preserve currentPlayer from server
-    currentTrickCards: state.currentTrickCards // CRITICAL: Preserve currentTrickCards for renderTrickCards
+    currentTrickCards: state.currentTrickCards, // CRITICAL: Preserve currentTrickCards for renderTrickCards
+    playerScores: state.playerScores, // CRITICAL: Preserve playerScores from server for solo games
+    playerBags: state.playerBags // CRITICAL: Preserve playerBags from server for solo games
   } as GameState;
 };

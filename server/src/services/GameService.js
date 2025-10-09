@@ -796,23 +796,23 @@ export class GameService {
     try {
       const game = await prisma.game.findUnique({
         where: { id: gameId },
-        include: { rounds: { include: { playerRoundStats: true } } }
+        include: { rounds: { include: { RoundScore: true } } }
       });
       
       if (!game || game.mode !== 'SOLO') return [];
       
-      const playerScores = [0, 0, 0, 0];
+      // Get the latest round score which has running totals
+      const lastRound = game.rounds[game.rounds.length - 1];
+      if (lastRound && lastRound.RoundScore) {
+        return [
+          lastRound.RoundScore.player0Running || 0,
+          lastRound.RoundScore.player1Running || 0,
+          lastRound.RoundScore.player2Running || 0,
+          lastRound.RoundScore.player3Running || 0
+        ];
+      }
       
-      // Sum up all points from all rounds
-      game.rounds.forEach(round => {
-        round.playerRoundStats.forEach(stats => {
-          if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
-            playerScores[stats.seatIndex] += stats.pointsThisRound || 0;
-          }
-        });
-      });
-      
-      return playerScores;
+      return [0, 0, 0, 0];
     } catch (error) {
       console.error('[GAME SERVICE] Error getting player scores:', error);
       return [0, 0, 0, 0];
@@ -826,7 +826,7 @@ export class GameService {
     try {
       const game = await prisma.game.findUnique({
         where: { id: gameId },
-        include: { rounds: { include: { playerRoundStats: true } } }
+        include: { rounds: { include: { playerStats: true } } }
       });
       
       if (!game || game.mode !== 'SOLO') return [];
@@ -835,7 +835,7 @@ export class GameService {
       
       // Sum up all bags from all rounds
       game.rounds.forEach(round => {
-        round.playerRoundStats.forEach(stats => {
+        round.playerStats.forEach(stats => {
           if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
             playerBags[stats.seatIndex] += stats.bagsThisRound || 0;
           }

@@ -32,8 +32,38 @@ export class ScoringService {
       // Get all player stats for this round
       const playerStats = await prisma.playerRoundStats.findMany({
         where: { roundId },
-        orderBy: { seatIndex: 'asc' }
+        orderBy: { seatIndex: 'asc' },
+        include: {
+          user: true
+        }
       });
+
+      // For solo games, calculate total bags for each player from previous rounds
+      if (!isPartners) {
+        for (const player of playerStats) {
+          // Get all previous rounds for this player to calculate total bags
+          const currentRound = await prisma.round.findUnique({
+            where: { id: roundId },
+            select: { roundNumber: true }
+          });
+          
+          const previousRounds = await prisma.playerRoundStats.findMany({
+            where: {
+              userId: player.userId,
+              Round: { 
+                gameId,
+                roundNumber: { lt: currentRound?.roundNumber || 0 }
+              }
+            },
+            select: { bagsThisRound: true }
+          });
+          
+          // Sum up all previous bags
+          const totalBags = previousRounds.reduce((sum, round) => sum + (round.bagsThisRound || 0), 0);
+          player.bagsTotal = totalBags;
+          console.log(`[SCORING] Player ${player.seatIndex} has ${totalBags} total bags from previous rounds`);
+        }
+      }
 
       if (playerStats.length !== 4) {
         throw new Error(`Expected 4 player stats, found ${playerStats.length}`);
@@ -135,6 +165,7 @@ export class ScoringService {
     console.log('[SCORING] Calculating solo scores');
     
     // Calculate individual player scores
+    const playerScores = [];
     for (const player of playerStats) {
       const bid = player.bid || 0;
       const tricksWon = player.tricksWon;
@@ -144,13 +175,13 @@ export class ScoringService {
       
       // Calculate points based on bid vs tricks
       if (bid === 0) {
-        // Nil bid
+        // Nil bid - Solo mode: 50/-50, blind nils: 100/-100
         if (tricksWon === 0) {
           // Made nil
-          pointsThisRound = player.isBlindNil ? 200 : 100;
+          pointsThisRound = player.isBlindNil ? 100 : 50;
         } else {
           // Failed nil
-          pointsThisRound = player.isBlindNil ? -200 : -100;
+          pointsThisRound = player.isBlindNil ? -100 : -50;
         }
       } else {
         // Regular bid
@@ -167,26 +198,75 @@ export class ScoringService {
         }
       }
 
-      // Update player stats
+      // Calculate total bags (previous bags + new bags this round)
+      const totalBags = (player.bagsTotal || 0) + bagsThisRound;
+      
+      // Solo mode bag penalty: -50 points and reset bags to 0 when reaching 5 bags
+      let finalPointsThisRound = pointsThisRound;
+      let finalBagsThisRound = bagsThisRound;
+      
+      if (totalBags >= 5) {
+        finalPointsThisRound -= 50; // Apply bag penalty
+        finalBagsThisRound = 0; // Reset bags to 0
+        console.log(`[SCORING] Player ${player.seatIndex} hit 5 bags (${totalBags}), applying -50 penalty and resetting bags`);
+      } else {
+        finalBagsThisRound = totalBags; // Keep accumulating bags
+      }
+
+      // Update player stats with final bags
       await prisma.playerRoundStats.update({
         where: { id: player.id },
-        data: { 
-          bagsThisRound,
-          pointsThisRound
-        }
+        data: { bagsThisRound: finalBagsThisRound }
+      });
+      
+      playerScores.push({
+        seatIndex: player.seatIndex,
+        pointsThisRound: finalPointsThisRound,
+        bagsThisRound: finalBagsThisRound
       });
     }
+    
+    // Calculate running totals from previous rounds
+    const previousScores = await prisma.roundScore.findMany({
+      where: { 
+        Round: { gameId } 
+      },
+      orderBy: { Round: { roundNumber: 'asc' } }
+    });
+    
+    // Get previous running totals
+    const lastScore = previousScores.length > 0 ? previousScores[previousScores.length - 1] : null;
+    const player0Running = (lastScore?.player0Running || 0) + playerScores[0].pointsThisRound;
+    const player1Running = (lastScore?.player1Running || 0) + playerScores[1].pointsThisRound;
+    const player2Running = (lastScore?.player2Running || 0) + playerScores[2].pointsThisRound;
+    const player3Running = (lastScore?.player3Running || 0) + playerScores[3].pointsThisRound;
+    
+    // Create RoundScore entry for solo game
+    await prisma.roundScore.create({
+      data: {
+        id: roundId, // Use roundId as the ID for easy lookup
+        roundId,
+        player0Score: playerScores[0].pointsThisRound,
+        player1Score: playerScores[1].pointsThisRound,
+        player2Score: playerScores[2].pointsThisRound,
+        player3Score: playerScores[3].pointsThisRound,
+        player0Running,
+        player1Running,
+        player2Running,
+        player3Running
+      }
+    });
 
     return {
       gameMode: 'SOLO',
-      players: playerStats.map(p => ({
+      players: playerScores.map(p => ({
         seatIndex: p.seatIndex,
-        bid: p.bid,
-        tricksWon: p.tricksWon,
-        bagsThisRound: p.tricksWon > (p.bid || 0) ? p.tricksWon - (p.bid || 0) : 0,
-        pointsThisRound: p.tricksWon === (p.bid || 0) ? (p.bid || 0) * 10 : 
-                        p.tricksWon > (p.bid || 0) ? (p.bid || 0) * 10 + (p.tricksWon - (p.bid || 0)) :
-                        -((p.bid || 0) * 10)
+        pointsThisRound: p.pointsThisRound,
+        bagsThisRound: p.bagsThisRound,
+        runningTotal: p.seatIndex === 0 ? player0Running :
+                      p.seatIndex === 1 ? player1Running :
+                      p.seatIndex === 2 ? player2Running :
+                      player3Running
       }))
     };
   }
@@ -281,7 +361,41 @@ export class ScoringService {
       console.log(`[SCORING] Team 0 total: ${team0RunningTotal}, Team 1 total: ${team1RunningTotal}`);
       console.log(`[SCORING] Game limits: min ${game.minPoints}, max ${game.maxPoints}`);
 
-      // Check if either team has exceeded min/max points
+      // For solo games, check individual player scores
+      if (game.mode === 'SOLO') {
+        const player0Running = latestRoundScore?.player0Running || 0;
+        const player1Running = latestRoundScore?.player1Running || 0;
+        const player2Running = latestRoundScore?.player2Running || 0;
+        const player3Running = latestRoundScore?.player3Running || 0;
+        
+        const playerScores = [player0Running, player1Running, player2Running, player3Running];
+        console.log(`[SCORING] Solo game - Player scores: [${playerScores.join(', ')}]`);
+        
+        const minPoints = game.minPoints || -100; // Default to -100 for solo
+        const maxPoints = game.maxPoints || 100;  // Default to 100 for solo
+        
+        // Check if any player has reached the target score
+        for (let i = 0; i < playerScores.length; i++) {
+          const playerScore = playerScores[i];
+          if (playerScore >= maxPoints || playerScore <= minPoints) {
+            const winner = `PLAYER_${i}`;
+            const reason = playerScore >= maxPoints 
+              ? `Player ${i} reached ${maxPoints} points`
+              : `Player ${i} reached ${minPoints} points`;
+            
+            console.log(`[SCORING] Solo game complete: ${reason}`);
+            return { 
+              isComplete: true, 
+              winner,
+              reason
+            };
+          }
+        }
+        
+        return { isComplete: false };
+      }
+
+      // For partners mode, check team scores
       const minPoints = game.minPoints || -500; // Default to -500 if not set
       const maxPoints = game.maxPoints || 500;  // Default to 500 if not set
       

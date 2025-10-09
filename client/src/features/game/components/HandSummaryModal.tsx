@@ -126,42 +126,91 @@ export default function HandSummaryModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md sm:max-w-lg backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 sm:p-4 shadow-xl">
+              <Dialog.Panel className="w-full max-w-sm sm:max-w-lg backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-2 sm:p-4 shadow-xl">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <h2 className="text-lg font-bold text-white text-center">Hand Summary</h2>
                 </div>
 
                 {gameState.gameMode === 'SOLO' ? (
-                  // Solo mode - individual player scores
-                  <div className="space-y-3">
+                  // Solo mode - match partners format with breakdown
+                  <div className="grid grid-cols-2 gap-3">
                     {gameState.players.map((player, index) => {
                       if (!player) return null;
                       const bid = gameState.bidding?.bids?.[index] || 0;
                       const tricks = tricksPerPlayer[index] || 0;
-                      const handTotal = tricks - bid;
                       const totalScore = handSummaryData.playerScores?.[index] || gameState.playerScores?.[index] || 0;
                       
+                      // Calculate round score components
+                      let madeBidPoints = 0;
+                      let nilPoints = 0;
+                      let bags = 0;
+                      
+                      if (bid === 0) {
+                        // Nil bid - solo mode: 50/-50, blind nils: 100/-100
+                        nilPoints = tricks === 0 ? (player.isBlindNil ? 100 : 50) : (player.isBlindNil ? -100 : -50);
+                      } else {
+                        // Regular bid
+                        if (tricks === bid) {
+                          madeBidPoints = bid * 10;
+                        } else if (tricks > bid) {
+                          madeBidPoints = bid * 10;
+                          bags = tricks - bid;
+                        } else {
+                          madeBidPoints = -(bid * 10);
+                        }
+                      }
+                      
+                      // Get round score from server data
+                      const roundScore = handSummaryData.playerRoundScores?.[index] || 0;
+                      
                       return (
-                        <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-3 border border-white/5">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <img 
-                                src={getPlayerAvatar(index)} 
-                                alt={getPlayerName(index)} 
-                                className="w-6 h-6 rounded-full object-cover" 
-                              />
-                              <span className="text-white font-semibold text-sm">{getPlayerName(index)}</span>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-white text-xs">Bid: {bid} | Made: {tricks}</div>
-                              <div className={`text-sm font-bold ${handTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {handTotal}
-                              </div>
-                            </div>
+                        <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                          <div className="flex items-center mb-2">
+                            <img 
+                              src={getPlayerAvatar(index)} 
+                              alt={getPlayerName(index)} 
+                              className="w-4 h-4 rounded-full object-cover mr-2" 
+                            />
+                            <h3 className="text-sm font-semibold text-white truncate">{getPlayerName(index)}</h3>
                           </div>
-                          <div className="text-right">
-                            <div className="text-gray-400 text-xs">Total Score</div>
-                            <div className="text-white font-bold">{totalScore}</div>
+                          <div className="space-y-1">
+                            {/* Made/Bid */}
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Made/Bid:</span>
+                              <span className="text-white">({tricks}/{bid}) {madeBidPoints}</span>
+                            </div>
+                            
+                            {/* Nils - only show if not 0 */}
+                            {nilPoints !== 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-400">Nil:</span>
+                                <span className={`font-medium ${nilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {nilPoints}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Bags - only show if not 0 */}
+                            {bags > 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-400">Bags:</span>
+                                <span className="font-medium text-yellow-400">{bags}</span>
+                              </div>
+                            )}
+                            
+                            {/* Round Score */}
+                            <div className="flex justify-between text-xs border-t border-white/10 pt-1">
+                              <span className="text-gray-400">Round:</span>
+                              <span className={`font-bold ${roundScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {roundScore}
+                              </span>
+                            </div>
+                            
+                            {/* Total Score */}
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-400">Total:</span>
+                              <span className="font-medium text-white">{totalScore}</span>
+                            </div>
                           </div>
                         </div>
                       );

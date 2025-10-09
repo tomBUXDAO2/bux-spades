@@ -44,6 +44,12 @@ export const useSocketEventHandlers = ({
 
     const handleGameUpdate = (gameData: any) => {
       if (gameData && gameData.gameId === gameId) {
+        console.log('🎮 Game update received - playerScores:', {
+          playerScores: gameData.gameState?.playerScores,
+          playerBags: gameData.gameState?.playerBags,
+          gameMode: gameData.gameState?.gameMode,
+          status: gameData.gameState?.status
+        });
         setGameState(normalizeGameState(gameData.gameState));
       }
     };

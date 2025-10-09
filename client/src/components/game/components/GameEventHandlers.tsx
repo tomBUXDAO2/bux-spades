@@ -216,7 +216,10 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
           team1TotalScore: data.scores?.team1TotalScore || data.gameState.team1TotalScore || 0,
           team2TotalScore: data.scores?.team2TotalScore || data.gameState.team2TotalScore || 0,
           team1Bags: data.scores?.team1Bags || 0,
-          team2Bags: data.scores?.team2Bags || 0
+          team2Bags: data.scores?.team2Bags || 0,
+          // Update player scores for solo games
+          playerScores: data.scores?.playerScores || data.gameState.playerScores || prevState.playerScores,
+          playerBags: data.scores?.playerBags || data.gameState.playerBags || prevState.playerBags
         }));
       }
       
@@ -256,10 +259,20 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       
       // Update game state
       if (data.gameState) {
-        setGameState((prevState: GameState) => ({
-          ...prevState,
-          ...data.gameState
-        }));
+        setGameState((prevState: GameState) => {
+          const newState = {
+            ...prevState,
+            ...data.gameState
+          };
+          
+          // For solo games, set winningPlayer from the winner
+          if (data.winner && data.winner.startsWith('PLAYER_')) {
+            const playerIndex = parseInt(data.winner.split('_')[1]);
+            newState.winningPlayer = playerIndex;
+          }
+          
+          return newState;
+        });
       }
       
       // Show winners modal
@@ -270,6 +283,12 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
           winningTeam: data.winner === 'TEAM_0' ? 1 : 2,
           playerScores: data.scores.playerScores || []
         };
+        
+        // For solo games, update winningTeam to be the player index
+        if (data.winner && data.winner.startsWith('PLAYER_')) {
+          const playerIndex = parseInt(data.winner.split('_')[1]);
+          winnerData.winningTeam = playerIndex; // Keep 0-based for solo games
+        }
         console.log('🎮 Game complete - calling onGameOver with:', winnerData);
         onGameOver(winnerData);
       }

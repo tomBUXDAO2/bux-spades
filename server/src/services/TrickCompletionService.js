@@ -225,7 +225,14 @@ export class TrickCompletionService {
               team1Score: latestRoundScore?.team0RunningTotal || 0, // team0 becomes team1 in client
               team2Score: latestRoundScore?.team1RunningTotal || 0, // team1 becomes team2 in client
               team1Bags: scores.team0Bags,
-              team2Bags: scores.team1Bags
+              team2Bags: scores.team1Bags,
+              // Solo game player scores (running totals)
+              playerScores: game.mode === 'SOLO' && latestRoundScore ? [
+                latestRoundScore.player0Running || 0,
+                latestRoundScore.player1Running || 0,
+                latestRoundScore.player2Running || 0,
+                latestRoundScore.player3Running || 0
+              ] : undefined
             }
           });
         }
@@ -274,6 +281,14 @@ export class TrickCompletionService {
           return sum;
         }, 0);
 
+        // Get the latest RoundScore for running totals
+        const latestRoundScore = await prisma.roundScore.findFirst({
+          where: { 
+            Round: { gameId }
+          },
+          orderBy: { Round: { roundNumber: 'desc' } }
+        });
+
         // Transform scores to match client expectations
         const handSummaryData = {
           team1Score: scores.team0Score, // team0 becomes team1 in client
@@ -295,7 +310,18 @@ export class TrickCompletionService {
           tricksPerPlayer: playerStats.map(p => p.tricksWon),
           playerBids: playerStats.map(p => p.bid || 0),
           playerNils: playerStats.map(p => (p.isNil || p.isBlindNil) ? (p.tricksWon === 0 ? 100 : -100) : 0),
-          playerBags: playerStats.map(p => p.bagsThisRound || 0)
+          playerBags: playerStats.map(p => p.bagsThisRound || 0),
+          
+          // Solo game player scores (running totals)
+          playerScores: latestRoundScore ? [
+            latestRoundScore.player0Running || 0,
+            latestRoundScore.player1Running || 0,
+            latestRoundScore.player2Running || 0,
+            latestRoundScore.player3Running || 0
+          ] : [0, 0, 0, 0],
+          
+          // Solo game round scores (points this round only)
+          playerRoundScores: scores.players ? scores.players.map(p => p.pointsThisRound) : [0, 0, 0, 0]
         };
         
         console.log(`[TRICK COMPLETION] Emitting round_complete with data:`, {
@@ -392,11 +418,38 @@ export class TrickCompletionService {
       // Emit game update to notify clients of new round
       if (io) {
         const updatedGameState = await GameService.getGameStateForClient(gameId);
+        
+        // CRITICAL: Get the latest player scores from RoundScore table for solo games
+        // NOTE: This MUST happen AFTER dealInitialHands because dealInitialHands overwrites Redis cache
+        if (updatedGameState.gameMode === 'SOLO') {
+          const latestRoundScore = await prisma.roundScore.findFirst({
+            where: { 
+              Round: { gameId }
+            },
+            orderBy: { Round: { roundNumber: 'desc' } }
+          });
+          
+          if (latestRoundScore) {
+            updatedGameState.playerScores = [
+              latestRoundScore.player0Running || 0,
+              latestRoundScore.player1Running || 0,
+              latestRoundScore.player2Running || 0,
+              latestRoundScore.player3Running || 0
+            ];
+            console.log(`[TRICK COMPLETION] Updated game state with player scores AFTER dealInitialHands:`, updatedGameState.playerScores);
+            
+            // CRITICAL: Update Redis cache with the new player scores so future reads have correct scores
+            await redisGameState.setGameState(gameId, updatedGameState);
+            console.log(`[TRICK COMPLETION] Updated Redis cache with new player scores for game ${gameId}`);
+          }
+        }
+        
         console.log(`[TRICK COMPLETION] About to emit game_update for new round ${nextRoundNumber}. Game state:`, {
           status: updatedGameState.status,
           currentRound: updatedGameState.currentRound,
           currentPlayer: updatedGameState.currentPlayer,
-          players: updatedGameState.players?.length
+          players: updatedGameState.players?.length,
+          playerScores: updatedGameState.playerScores
         });
         
         io.to(gameId).emit('game_update', {
