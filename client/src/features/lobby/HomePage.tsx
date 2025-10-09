@@ -76,12 +76,12 @@ const HomePage: React.FC = () => {
     } catch {}
   }, []);
 
-  // Check if user is new (has 5M coins and 0 games played)
+  // Check if user is new (has 5M coins and 0 games played or no stats yet)
   useEffect(() => {
     if (
       user &&
       user.coins === 5000000 &&
-      user.stats?.gamesPlayed === 0 &&
+      (!user.stats || user.stats?.gamesPlayed === 0) &&
       !localStorage.getItem('welcomeModalDismissed')
     ) {
       setShowWelcomeModal(true);
