@@ -133,11 +133,11 @@ export default function GameTablePlayers({
                 } else {
                   const data = await res.json();
                   console.log(`[JOIN SEAT] ✅ Successfully joined seat ${position}`, data);
-                  // Remove spectate param from URL
+                  // Remove spectate param from URL and reload to update isSpectator state
                   const url = new URL(window.location.href);
                   url.searchParams.delete('spectate');
-                  window.history.replaceState({}, '', url.toString());
-                  console.log(`[JOIN SEAT] Removed spectate param from URL`);
+                  console.log(`[JOIN SEAT] Reloading page without spectate param`);
+                  window.location.href = url.toString();
                 }
               } catch (err) {
                 console.error('[JOIN SEAT] Error joining seat:', err);
