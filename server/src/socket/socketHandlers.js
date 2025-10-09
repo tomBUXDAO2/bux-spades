@@ -54,10 +54,23 @@ export function setupSocketHandlers(io) {
         socket.userId = userId;
         socket.authenticated = true;
         
-        // Store session in Redis with active game info
+        // Validate active game exists in database before sending to client
+        let validActiveGameId = null;
+        if (previousSession?.activeGameId) {
+          const { GameService } = await import('../services/GameService.js');
+          const gameExists = await GameService.getGame(previousSession.activeGameId);
+          if (gameExists) {
+            validActiveGameId = previousSession.activeGameId;
+            console.log(`[SESSION] User ${userId} has valid active game: ${validActiveGameId}`);
+          } else {
+            console.log(`[SESSION] User ${userId} had stale active game ${previousSession.activeGameId}, clearing it`);
+          }
+        }
+        
+        // Store session in Redis with validated active game info
         const sessionData = {
           socketId: socket.id,
-          activeGameId: previousSession?.activeGameId || null
+          activeGameId: validActiveGameId
         };
         
         await redisSessionService.setUserSession(userId, sessionData);
