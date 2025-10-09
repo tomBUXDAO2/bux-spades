@@ -20,10 +20,10 @@ export class PeriodicCleanupService {
     // Run immediately on start
     this.runCleanup();
 
-    // Then run every hour
+    // Then run every 5 minutes
     this.intervalId = setInterval(() => {
       this.runCleanup();
-    }, 60 * 60 * 1000); // 1 hour
+    }, 5 * 60 * 1000); // 5 minutes
   }
 
   /**
