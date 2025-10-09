@@ -3,6 +3,7 @@ import { prisma } from '../../../config/database.js';
 import { gameManager } from '../../../services/GameManager.js';
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
+import turnTimerService from '../../../services/TurnTimerService.js';
 
 // Global mutex to prevent concurrent game starts across all socket connections
 const startingGames = new Set();
@@ -163,10 +164,13 @@ class GameStartHandler {
             const biddingHandler = new BiddingHandler(this.io, this.socket);
             // Trigger bot bid immediately
             await biddingHandler.triggerBotBidIfNeeded(gameId);
+          } else if (currentPlayer && currentPlayer.isHuman) {
+            console.log(`[GAME START] First bidder is human ${currentPlayer.user?.username}, starting turn timer`);
+            turnTimerService.startTimer(this.io, gameId, currentPlayer.userId, currentPlayer.seatIndex, 'BIDDING');
           }
         }
       } else {
-        console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
+        console.log(`[GAME START] No current player set - cannot trigger bot bidding or timer`);
       }
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);

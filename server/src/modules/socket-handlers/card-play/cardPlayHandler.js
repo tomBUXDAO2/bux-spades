@@ -4,6 +4,7 @@ import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
+import turnTimerService from '../../../services/TurnTimerService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -57,6 +58,9 @@ class CardPlayHandler {
     try {
       // Processing card play
 
+      // Clear turn timer for this game (player acted)
+      turnTimerService.clearTimer(gameId);
+
       // Get current game state
       const gameState = await GameService.getGame(gameId);
       if (!gameState) {
@@ -70,7 +74,7 @@ class CardPlayHandler {
       }
 
       // Get player info
-      const player = gameState.players.find(p => p.userId === userId);
+      const player = gameState.players.find(p => p && p.userId === userId);
       if (!player) {
         throw new Error('Player not found in game');
       }
@@ -162,14 +166,14 @@ class CardPlayHandler {
           (async () => {
             // Find the winning player by seat index
             console.log(`[CARD PLAY] Looking for winning player at seat ${trickResult.winningSeatIndex}`);
-            console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => ({ id: p.id, seatIndex: p.seatIndex, username: p.username })));
+            console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => p ? ({ id: p.id, seatIndex: p.seatIndex, username: p.username }) : null));
             
-            const winningPlayer = gameState.players.find(p => p.seatIndex === trickResult.winningSeatIndex);
+            const winningPlayer = gameState.players.find(p => p && p.seatIndex === trickResult.winningSeatIndex);
             console.log(`[CARD PLAY] Found winning player:`, winningPlayer);
             
             if (!winningPlayer) {
               console.error(`[CARD PLAY] ERROR: No player found at seat ${trickResult.winningSeatIndex}`);
-              console.error(`[CARD PLAY] Available seats:`, gameState.players.map(p => p.seatIndex));
+              console.error(`[CARD PLAY] Available seats:`, gameState.players.map(p => p ? p.seatIndex : null));
               return;
             }
             
@@ -211,7 +215,7 @@ class CardPlayHandler {
                   suit: card.suit,
                   rank: card.rank,
                   seatIndex: card.seatIndex,
-                  playerId: gameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+                  playerId: gameState.players.find(p => p && p.seatIndex === card.seatIndex)?.userId
                 }))
               }
             });
@@ -239,7 +243,7 @@ class CardPlayHandler {
             // Emit trick started event (only if new trick was created)
             if (!trickResult.isRoundComplete && !trickResult.isComplete) {
               const newGameState = await GameService.getGameStateForClient(gameId);
-              console.log(`[CARD PLAY] Trick started - newGameState.currentPlayer: ${newGameState.currentPlayer}, expected: ${gameState.players.find(p => p.seatIndex === trickResult.winningSeatIndex)?.userId}`);
+              console.log(`[CARD PLAY] Trick started - newGameState.currentPlayer: ${newGameState.currentPlayer}, expected: ${gameState.players.find(p => p && p.seatIndex === trickResult.winningSeatIndex)?.userId}`);
               this.io.to(gameId).emit('trick_started', {
                 gameId,
                 gameState: newGameState,
@@ -258,7 +262,7 @@ class CardPlayHandler {
       } else {
         // Simple: move to next player clockwise
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
-        const nextPlayer = gameState.players.find(p => p.seatIndex === nextPlayerIndex);
+        const nextPlayer = gameState.players.find(p => p && p.seatIndex === nextPlayerIndex);
         console.log(`[CARD PLAY] Moving to next player clockwise: ${nextPlayer?.username} (seat ${nextPlayerIndex})`);
         
         // CRITICAL: Use SINGLE unified system for currentPlayer updates
@@ -349,9 +353,14 @@ class CardPlayHandler {
           }
         });
 
-        // Trigger bot play if next player is a bot
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-        this.triggerBotPlayIfNeeded(gameId);
+        // Start turn timer if next player is human, otherwise trigger bot
+        if (nextPlayer && nextPlayer.isHuman) {
+          turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'PLAYING');
+        } else {
+          // Trigger bot play if next player is a bot
+          // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+          this.triggerBotPlayIfNeeded(gameId);
+        }
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);

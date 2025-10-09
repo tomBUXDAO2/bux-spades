@@ -3,6 +3,7 @@ import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
+import turnTimerService from '../../../services/TurnTimerService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -173,6 +174,9 @@ class BiddingHandler {
     try {
       console.log(`[BIDDING] Processing bid: user=${userId}, bid=${bid}, nil=${isNil}, blind=${isBlindNil}`);
 
+      // Clear turn timer for this game (player acted)
+      turnTimerService.clearTimer(gameId);
+
       // Get current game state
       const gameState = await GameService.getGame(gameId);
       if (!gameState) {
@@ -323,10 +327,17 @@ class BiddingHandler {
           }
         });
 
-        // Clear mutex FIRST, then trigger next bot bid
+        // Clear mutex FIRST, then trigger next bot bid or start timer for human
         this.biddingBots.delete(gameId);
         console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
-        this.triggerBotBidIfNeeded(gameId);
+        
+        // Start turn timer if next player is human
+        if (nextPlayer && nextPlayer.isHuman) {
+          turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'BIDDING');
+        } else {
+          // Trigger bot bid if next player is bot
+          this.triggerBotBidIfNeeded(gameId);
+        }
       }
 
       // NUCLEAR: No logging for performance
@@ -466,8 +477,13 @@ class BiddingHandler {
 
       console.log(`[BIDDING] Round started successfully`);
 
-      // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-      this.triggerBotPlayIfNeeded(gameId);
+      // Start turn timer if first player is human, otherwise trigger bot
+      if (firstPlayer && firstPlayer.isHuman) {
+        turnTimerService.startTimer(this.io, gameId, firstPlayer.userId, firstPlayer.seatIndex, 'PLAYING');
+      } else {
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        this.triggerBotPlayIfNeeded(gameId);
+      }
     } catch (error) {
       // NUCLEAR: No logging for performance
       throw error;
@@ -502,13 +518,13 @@ class BiddingHandler {
       }
 
       console.log(`[BIDDING] Current player ID: ${gameState.currentPlayer}`);
-      console.log(`[BIDDING] All players in game:`, gameState.players.map(p => ({ 
+      console.log(`[BIDDING] All players in game:`, gameState.players.map(p => p ? ({ 
         id: p.id || p.userId, 
         username: p.username || p.user?.username, 
         isHuman: p.isHuman, 
         seatIndex: p.seatIndex 
-      })));
-      const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);
+      }) : null));
+      const currentPlayer = gameState.players.find(p => p && p.userId === gameState.currentPlayer);
       console.log(`[BIDDING] Found current player:`, currentPlayer ? { 
         id: currentPlayer.id || currentPlayer.userId, 
         username: currentPlayer.username || currentPlayer.user?.username, 

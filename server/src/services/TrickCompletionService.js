@@ -3,6 +3,7 @@ import { GameService } from './GameService.js';
 import { ScoringService } from './ScoringService.js';
 import { GameLoggingService } from './GameLoggingService.js';
 import redisGameState from './RedisGameStateService.js';
+import turnTimerService from './TurnTimerService.js';
 
 /**
  * DATABASE-FIRST TRICK COMPLETION SERVICE
@@ -491,14 +492,28 @@ export class TrickCompletionService {
         console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);
         
         // Trigger bot bidding if current player is a bot
+        console.log(`[TRICK COMPLETION] Checking if bot bid needed - currentPlayer: ${updatedGameState.currentPlayer}`);
+        console.log(`[TRICK COMPLETION] Players array:`, updatedGameState.players.map(p => p ? `${p.username}(${p.userId})` : 'null'));
+        
         if (updatedGameState.currentPlayer) {
-          const currentPlayer = updatedGameState.players.find(p => p.id === updatedGameState.currentPlayer);
-          if (currentPlayer && currentPlayer.type === 'bot') {
-            console.log(`[TRICK COMPLETION] Current player is bot ${currentPlayer.username}, triggering bot bid`);
+          const currentPlayer = updatedGameState.players.find(p => p && (p.id === updatedGameState.currentPlayer || p.userId === updatedGameState.currentPlayer));
+          console.log(`[TRICK COMPLETION] Found current player:`, currentPlayer ? `${currentPlayer.username} (isHuman: ${currentPlayer.isHuman}, type: ${currentPlayer.type})` : 'NOT FOUND');
+          
+          if (currentPlayer && (currentPlayer.type === 'bot' || currentPlayer.isHuman === false)) {
+            console.log(`[TRICK COMPLETION] ✅ Current player is bot ${currentPlayer.username}, triggering bot bid`);
             const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
             const biddingHandler = new BiddingHandler(io, null);
-            biddingHandler.triggerBotBidIfNeeded(gameId);
+            await biddingHandler.triggerBotBidIfNeeded(gameId);
+            console.log(`[TRICK COMPLETION] Bot bid trigger completed`);
+          } else if (currentPlayer && currentPlayer.isHuman) {
+            console.log(`[TRICK COMPLETION] Current player is human ${currentPlayer.username}, starting turn timer`);
+            const playerSeatIndex = updatedGameState.players.findIndex(p => p && p.userId === currentPlayer.userId);
+            turnTimerService.startTimer(io, gameId, currentPlayer.userId, playerSeatIndex, 'BIDDING');
+          } else {
+            console.log(`[TRICK COMPLETION] Current player not found, not triggering bot bid or timer`);
           }
+        } else {
+          console.error(`[TRICK COMPLETION] ERROR: No currentPlayer set after starting new round!`);
         }
       }
     } catch (error) {
