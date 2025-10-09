@@ -52,6 +52,10 @@ export class PeriodicCleanupService {
       // Cleanup abandoned games (games with no human players)
       const abandonedCleaned = await GameCleanupService.cleanupAllAbandonedUnratedGames();
       
+      // Cleanup WAITING games older than 15 minutes
+      const staleWaitingCleaned = await GameCleanupService.cleanupStaleWaitingGames(15);
+      console.log(`[PERIODIC CLEANUP] Stale WAITING games cleaned: ${staleWaitingCleaned}`);
+
       // Cleanup old completed games (older than 24 hours)
       const oldCleaned = await GameCleanupService.cleanupOldCompletedUnratedGames();
       
@@ -59,7 +63,7 @@ export class PeriodicCleanupService {
       const statsAfter = await GameCleanupService.getCleanupStats();
       console.log('[PERIODIC CLEANUP] Stats after cleanup:', statsAfter);
       
-      console.log(`[PERIODIC CLEANUP] Cleanup completed: ${abandonedCleaned} abandoned games, ${oldCleaned} old games cleaned`);
+      console.log(`[PERIODIC CLEANUP] Cleanup completed: ${abandonedCleaned} abandoned, ${staleWaitingCleaned} stale waiting, ${oldCleaned} old games cleaned`);
       console.log(`[PERIODIC CLEANUP] Total cleanup candidates remaining: ${statsAfter.totalCleanupCandidates}`);
       
     } catch (error) {

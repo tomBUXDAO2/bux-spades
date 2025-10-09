@@ -367,6 +367,15 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     };
   }, [socket, onGameClosed]);
 
+  // Default handler for inactivity closure: set message and redirect
+  const defaultOnGameClosed = useCallback((data: { reason?: string; message?: string }) => {
+    try {
+      const msg = data?.message || 'Your table was closed due to inactivity.';
+      localStorage.setItem('tableClosureMessage', msg);
+    } catch {}
+    window.location.href = '/';
+  }, []);
+
   // Listen for socket errors
   useEffect(() => {
     if (!socket) return;

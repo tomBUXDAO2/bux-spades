@@ -1,5 +1,6 @@
 import { prisma } from '../config/databaseFirst.js';
 import { gameManager } from './GameManager.js';
+import { io } from '../config/server.js';
 
 export class GameCleanupService {
   /**
@@ -390,6 +391,108 @@ export class GameCleanupService {
       return result.count || orphanIds.length;
     } catch (error) {
       console.error('[GAME CLEANUP] Error deleting orphaned bot users:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Cleanup games stuck in WAITING for longer than the specified minutes
+   * Deletes the game and any bot users involved, and notifies connected clients
+   */
+  static async cleanupStaleWaitingGames(minutes = 15) {
+    try {
+      const cutoff = new Date(Date.now() - minutes * 60 * 1000);
+      console.log(`[GAME CLEANUP] Looking for WAITING games older than ${minutes} minutes (before ${cutoff.toISOString()})`);
+
+      const staleGames = await prisma.game.findMany({
+        where: {
+          status: 'WAITING',
+          createdAt: { lt: cutoff }
+        },
+        select: { id: true }
+      });
+
+      if (!staleGames.length) {
+        console.log('[GAME CLEANUP] No stale WAITING games found');
+        return 0;
+      }
+
+      console.log(`[GAME CLEANUP] Found ${staleGames.length} stale WAITING games to cleanup`);
+
+      let cleaned = 0;
+      for (const g of staleGames) {
+        const gameId = g.id;
+        try {
+          // Determine bot user IDs from DB
+          const botPlayers = await prisma.gamePlayer.findMany({
+            where: { gameId, isHuman: false },
+            select: { userId: true }
+          });
+          const botUserIds = botPlayers.map(b => b.userId);
+
+          // Notify clients first
+          try {
+            io.to(gameId).emit('game_closed', {
+              reason: 'inactivity_timeout',
+              message: 'Your table was closed due to inactivity.'
+            });
+          } catch (notifyErr) {
+            console.warn(`[GAME CLEANUP] Failed to notify clients for game ${gameId}:`, notifyErr);
+          }
+
+          // Perform full deletion similar to cleanupUnratedGame but regardless of rated
+          await prisma.$transaction(async (tx) => {
+            const rounds = await tx.round.findMany({ where: { gameId }, select: { id: true } });
+            const roundIds = rounds.map(r => r.id);
+
+            if (roundIds.length) {
+              const tricks = await tx.trick.findMany({ where: { roundId: { in: roundIds } }, select: { id: true } });
+              const trickIds = tricks.map(t => t.id);
+              if (trickIds.length) {
+                await tx.trickCard.deleteMany({ where: { trickId: { in: trickIds } } });
+              }
+              await tx.$executeRaw`
+                DELETE FROM "TrickCard" 
+                WHERE "trickId" IN (
+                  SELECT t."id" FROM "Trick" t WHERE t."roundId" = ANY(${roundIds})
+                )
+              `;
+              await tx.$executeRaw`
+                DELETE FROM "TrickCard" 
+                WHERE "trickId" LIKE 'trick_%' 
+                AND "trickId" NOT IN (SELECT id FROM "Trick")
+              `;
+              await tx.trick.deleteMany({ where: { roundId: { in: roundIds } } });
+              await tx.playerRoundStats.deleteMany({ where: { roundId: { in: roundIds } } });
+              await tx.$executeRaw`DELETE FROM "RoundHandSnapshot" WHERE "roundId" = ANY(${roundIds})`;
+              await tx.$executeRaw`DELETE FROM "PlayerRoundStats" WHERE "roundId" = ANY(${roundIds})`;
+              await tx.round.deleteMany({ where: { id: { in: roundIds } } });
+            }
+
+            await tx.gamePlayer.deleteMany({ where: { gameId } });
+            await tx.gameResult.deleteMany({ where: { gameId } });
+            await tx.game.delete({ where: { id: gameId } });
+
+            if (botUserIds.length) {
+              await tx.user.deleteMany({ where: { id: { in: botUserIds } } });
+            }
+          });
+
+          try {
+            await prisma.$executeRaw`DELETE FROM "DiscordGame" WHERE "gameId" = ${gameId}`;
+          } catch {}
+
+          gameManager.removeGame(gameId);
+          cleaned++;
+          console.log(`[GAME CLEANUP] Cleaned stale WAITING game ${gameId}`);
+        } catch (err) {
+          console.error(`[GAME CLEANUP] Error cleaning stale game ${gameId}:`, err);
+        }
+      }
+
+      return cleaned;
+    } catch (error) {
+      console.error('[GAME CLEANUP] Error finding/cleaning stale waiting games:', error);
       return 0;
     }
   }
