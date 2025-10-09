@@ -288,6 +288,24 @@ class CardPlayHandler {
         // PERFORMANCE: Use cached game state from Redis and update incrementally
         let updatedGameState = await redisGameState.getGameState(gameId);
         
+        // CRITICAL: For SOLO games, if playerScores are missing or all zeros, fetch from database
+        if (updatedGameState && updatedGameState.gameMode === 'SOLO') {
+          const hasValidScores = updatedGameState.playerScores && 
+                                updatedGameState.playerScores.some(s => s !== 0);
+          
+          if (!hasValidScores) {
+            console.log(`[CARD PLAY] WARNING: playerScores missing or all zeros, fetching from database`);
+            const freshState = await GameService.getFullGameStateFromDatabase(gameId);
+            if (freshState && freshState.playerScores) {
+              updatedGameState.playerScores = freshState.playerScores;
+              updatedGameState.playerBags = freshState.playerBags;
+              console.log(`[CARD PLAY] Restored playerScores from database:`, updatedGameState.playerScores);
+            }
+          } else {
+            console.log(`[CARD PLAY] playerScores present in Redis:`, updatedGameState.playerScores);
+          }
+        }
+        
         // If no Redis cache, fallback to database (should rarely happen)
         if (!updatedGameState) {
           updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
@@ -312,22 +330,6 @@ class CardPlayHandler {
         if (!updatedGameState.play) updatedGameState.play = {};
         if (card.suit === 'SPADES') {
           updatedGameState.play.spadesBroken = true;
-        }
-        
-        // CRITICAL: For solo games, preserve playerScores and playerBags if they exist
-        // This prevents overwriting scores when startNewRound has already set them
-        if (updatedGameState.gameMode === 'SOLO') {
-          const currentCachedState = await redisGameState.getGameState(gameId);
-          if (currentCachedState) {
-            if (currentCachedState.playerScores && currentCachedState.playerScores.some(s => s !== 0)) {
-              updatedGameState.playerScores = currentCachedState.playerScores;
-              console.log(`[CARD PLAY] Preserved playerScores from Redis:`, updatedGameState.playerScores);
-            }
-            if (currentCachedState.playerBags) {
-              updatedGameState.playerBags = currentCachedState.playerBags;
-              console.log(`[CARD PLAY] Preserved playerBags from Redis:`, updatedGameState.playerBags);
-            }
-          }
         }
         
         // Update Redis cache with the complete updated state (single operation)
