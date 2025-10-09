@@ -720,6 +720,25 @@ export class GameService {
         'CRAZY_ACES': 'CRAZY ACES'
       };
       
+      // CRITICAL: Build players array with nulls for empty seats (client expects 4-element array)
+      const playersArray = [null, null, null, null];
+      game.players.forEach(player => {
+        const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
+        playersArray[player.seatIndex] = {
+          id: player.userId,
+          userId: player.userId, // CRITICAL: Add userId field for player lookups
+          username: player.user?.username || 'Unknown',
+          avatarUrl: player.user?.avatarUrl || null,
+          seatIndex: player.seatIndex,
+          teamIndex: player.teamIndex,
+          isHuman: player.isHuman,
+          isSpectator: player.isSpectator || false,
+          type: player.isHuman ? 'human' : 'bot',
+          bid: playerBids[player.seatIndex] || null,
+          tricks: playerStat?.tricksWon || 0
+        };
+      });
+
       // Format for client
       const gameState = {
         id: game.id,
@@ -740,22 +759,7 @@ export class GameService {
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,
         dealer: game.dealer,
-        players: game.players.map(player => {
-          const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
-          return {
-            id: player.userId,
-            userId: player.userId, // CRITICAL: Add userId field for player lookups
-            username: player.user?.username || 'Unknown',
-            avatarUrl: player.user?.avatarUrl || null,
-            seatIndex: player.seatIndex,
-            teamIndex: player.teamIndex,
-            isHuman: player.isHuman,
-            isSpectator: player.isSpectator || false,
-            type: player.isHuman ? 'human' : 'bot',
-            bid: playerBids[player.seatIndex] || null,
-            tricks: playerStat?.tricksWon || 0
-          };
-        }),
+        players: playersArray,
         rounds: game.rounds || [],
         hands: playerHands, // Frontend expects 'hands', not 'playerHands'
         playerHands: playerHands, // Keep both for compatibility
