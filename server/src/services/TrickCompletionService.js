@@ -3,7 +3,6 @@ import { GameService } from './GameService.js';
 import { ScoringService } from './ScoringService.js';
 import { GameLoggingService } from './GameLoggingService.js';
 import redisGameState from './RedisGameStateService.js';
-import turnTimerService from './TurnTimerService.js';
 
 /**
  * DATABASE-FIRST TRICK COMPLETION SERVICE
@@ -508,12 +507,6 @@ export class TrickCompletionService {
           } else {
             console.log(`[TRICK COMPLETION] Current player is human or not found, not triggering bot bid`);
           }
-          // TODO: Re-enable turn timer after testing
-          // else if (currentPlayer && currentPlayer.isHuman) {
-          //   console.log(`[TRICK COMPLETION] Current player is human ${currentPlayer.username}, starting turn timer`);
-          //   const playerSeatIndex = updatedGameState.players.findIndex(p => p && p.userId === currentPlayer.userId);
-          //   turnTimerService.startTimer(io, gameId, currentPlayer.userId, playerSeatIndex, 'BIDDING');
-          // }
         } else {
           console.error(`[TRICK COMPLETION] ERROR: No currentPlayer set after starting new round!`);
         }

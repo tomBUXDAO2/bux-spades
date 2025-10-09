@@ -4,7 +4,6 @@ import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
-import turnTimerService from '../../../services/TurnTimerService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -57,9 +56,6 @@ class CardPlayHandler {
   async processCardPlay(gameId, userId, card, isBot = false) {
     try {
       // Processing card play
-
-      // Clear turn timer for this game (player acted) - disabled temporarily
-      // turnTimerService.clearTimer(gameId);
 
       // Get current game state
       const gameState = await GameService.getGame(gameId);
@@ -353,14 +349,9 @@ class CardPlayHandler {
           }
         });
 
-        // Trigger bot if next player is bot (timer disabled temporarily)
-        if (nextPlayer && !nextPlayer.isHuman) {
-          this.triggerBotPlayIfNeeded(gameId);
-        }
-        // TODO: Re-enable turn timer after testing
-        // if (nextPlayer && nextPlayer.isHuman) {
-        //   turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'PLAYING');
-        // }
+        // Trigger bot play if next player is a bot
+        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        this.triggerBotPlayIfNeeded(gameId);
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);

@@ -3,7 +3,6 @@ import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
-import turnTimerService from '../../../services/TurnTimerService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -174,9 +173,6 @@ class BiddingHandler {
     try {
       console.log(`[BIDDING] Processing bid: user=${userId}, bid=${bid}, nil=${isNil}, blind=${isBlindNil}`);
 
-      // Clear turn timer for this game (player acted) - disabled temporarily
-      // turnTimerService.clearTimer(gameId);
-
       // Get current game state
       const gameState = await GameService.getGame(gameId);
       if (!gameState) {
@@ -327,18 +323,10 @@ class BiddingHandler {
           }
         });
 
-        // Clear mutex FIRST, then trigger next bot bid or start timer for human
+        // Clear mutex FIRST, then trigger next bot bid
         this.biddingBots.delete(gameId);
         console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
-        
-        // Trigger bot bid if next player is bot (timer disabled temporarily)
-        if (nextPlayer && !nextPlayer.isHuman) {
-          this.triggerBotBidIfNeeded(gameId);
-        }
-        // TODO: Re-enable turn timer after testing
-        // if (nextPlayer && nextPlayer.isHuman) {
-        //   turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'BIDDING');
-        // }
+        this.triggerBotBidIfNeeded(gameId);
       }
 
       // NUCLEAR: No logging for performance
@@ -478,14 +466,8 @@ class BiddingHandler {
 
       console.log(`[BIDDING] Round started successfully`);
 
-      // Trigger bot if first player is bot (timer disabled temporarily)
-      if (firstPlayer && !firstPlayer.isHuman) {
-        this.triggerBotPlayIfNeeded(gameId);
-      }
-      // TODO: Re-enable turn timer after testing
-      // if (firstPlayer && firstPlayer.isHuman) {
-      //   turnTimerService.startTimer(this.io, gameId, firstPlayer.userId, firstPlayer.seatIndex, 'PLAYING');
-      // }
+      // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+      this.triggerBotPlayIfNeeded(gameId);
     } catch (error) {
       // NUCLEAR: No logging for performance
       throw error;
