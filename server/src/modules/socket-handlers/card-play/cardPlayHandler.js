@@ -58,8 +58,8 @@ class CardPlayHandler {
     try {
       // Processing card play
 
-      // Clear turn timer for this game (player acted)
-      turnTimerService.clearTimer(gameId);
+      // Clear turn timer for this game (player acted) - disabled temporarily
+      // turnTimerService.clearTimer(gameId);
 
       // Get current game state
       const gameState = await GameService.getGame(gameId);
@@ -353,14 +353,14 @@ class CardPlayHandler {
           }
         });
 
-        // Start turn timer if next player is human, otherwise trigger bot
-        if (nextPlayer && nextPlayer.isHuman) {
-          turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'PLAYING');
-        } else {
-          // Trigger bot play if next player is a bot
-          // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+        // Trigger bot if next player is bot (timer disabled temporarily)
+        if (nextPlayer && !nextPlayer.isHuman) {
           this.triggerBotPlayIfNeeded(gameId);
         }
+        // TODO: Re-enable turn timer after testing
+        // if (nextPlayer && nextPlayer.isHuman) {
+        //   turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'PLAYING');
+        // }
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);

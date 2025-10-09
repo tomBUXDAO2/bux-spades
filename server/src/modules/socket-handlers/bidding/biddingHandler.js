@@ -174,8 +174,8 @@ class BiddingHandler {
     try {
       console.log(`[BIDDING] Processing bid: user=${userId}, bid=${bid}, nil=${isNil}, blind=${isBlindNil}`);
 
-      // Clear turn timer for this game (player acted)
-      turnTimerService.clearTimer(gameId);
+      // Clear turn timer for this game (player acted) - disabled temporarily
+      // turnTimerService.clearTimer(gameId);
 
       // Get current game state
       const gameState = await GameService.getGame(gameId);
@@ -331,13 +331,14 @@ class BiddingHandler {
         this.biddingBots.delete(gameId);
         console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
         
-        // Start turn timer if next player is human
-        if (nextPlayer && nextPlayer.isHuman) {
-          turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'BIDDING');
-        } else {
-          // Trigger bot bid if next player is bot
+        // Trigger bot bid if next player is bot (timer disabled temporarily)
+        if (nextPlayer && !nextPlayer.isHuman) {
           this.triggerBotBidIfNeeded(gameId);
         }
+        // TODO: Re-enable turn timer after testing
+        // if (nextPlayer && nextPlayer.isHuman) {
+        //   turnTimerService.startTimer(this.io, gameId, nextPlayer.userId, nextPlayer.seatIndex, 'BIDDING');
+        // }
       }
 
       // NUCLEAR: No logging for performance
@@ -477,13 +478,14 @@ class BiddingHandler {
 
       console.log(`[BIDDING] Round started successfully`);
 
-      // Start turn timer if first player is human, otherwise trigger bot
-      if (firstPlayer && firstPlayer.isHuman) {
-        turnTimerService.startTimer(this.io, gameId, firstPlayer.userId, firstPlayer.seatIndex, 'PLAYING');
-      } else {
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
+      // Trigger bot if first player is bot (timer disabled temporarily)
+      if (firstPlayer && !firstPlayer.isHuman) {
         this.triggerBotPlayIfNeeded(gameId);
       }
+      // TODO: Re-enable turn timer after testing
+      // if (firstPlayer && firstPlayer.isHuman) {
+      //   turnTimerService.startTimer(this.io, gameId, firstPlayer.userId, firstPlayer.seatIndex, 'PLAYING');
+      // }
     } catch (error) {
       // NUCLEAR: No logging for performance
       throw error;

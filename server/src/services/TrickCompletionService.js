@@ -505,13 +505,15 @@ export class TrickCompletionService {
             const biddingHandler = new BiddingHandler(io, null);
             await biddingHandler.triggerBotBidIfNeeded(gameId);
             console.log(`[TRICK COMPLETION] Bot bid trigger completed`);
-          } else if (currentPlayer && currentPlayer.isHuman) {
-            console.log(`[TRICK COMPLETION] Current player is human ${currentPlayer.username}, starting turn timer`);
-            const playerSeatIndex = updatedGameState.players.findIndex(p => p && p.userId === currentPlayer.userId);
-            turnTimerService.startTimer(io, gameId, currentPlayer.userId, playerSeatIndex, 'BIDDING');
           } else {
-            console.log(`[TRICK COMPLETION] Current player not found, not triggering bot bid or timer`);
+            console.log(`[TRICK COMPLETION] Current player is human or not found, not triggering bot bid`);
           }
+          // TODO: Re-enable turn timer after testing
+          // else if (currentPlayer && currentPlayer.isHuman) {
+          //   console.log(`[TRICK COMPLETION] Current player is human ${currentPlayer.username}, starting turn timer`);
+          //   const playerSeatIndex = updatedGameState.players.findIndex(p => p && p.userId === currentPlayer.userId);
+          //   turnTimerService.startTimer(io, gameId, currentPlayer.userId, playerSeatIndex, 'BIDDING');
+          // }
         } else {
           console.error(`[TRICK COMPLETION] ERROR: No currentPlayer set after starting new round!`);
         }
