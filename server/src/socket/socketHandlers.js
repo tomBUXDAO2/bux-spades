@@ -54,14 +54,29 @@ export function setupSocketHandlers(io) {
         socket.userId = userId;
         socket.authenticated = true;
         
-        // Validate active game exists in database before sending to client
+        // Validate active game exists in database AND user is actually a player before sending to client
         let validActiveGameId = null;
         if (previousSession?.activeGameId) {
           const { GameService } = await import('../services/GameService.js');
           const gameExists = await GameService.getGame(previousSession.activeGameId);
+          
           if (gameExists) {
-            validActiveGameId = previousSession.activeGameId;
-            console.log(`[SESSION] User ${userId} has valid active game: ${validActiveGameId}`);
+            // Check if user is actually a player in this game (not left)
+            const { prisma } = await import('../config/database.js');
+            const playerInGame = await prisma.gamePlayer.findFirst({
+              where: {
+                gameId: previousSession.activeGameId,
+                userId: userId,
+                leftAt: null
+              }
+            });
+            
+            if (playerInGame) {
+              validActiveGameId = previousSession.activeGameId;
+              console.log(`[SESSION] User ${userId} has valid active game: ${validActiveGameId}`);
+            } else {
+              console.log(`[SESSION] User ${userId} is not a player in game ${previousSession.activeGameId}, clearing it`);
+            }
           } else {
             console.log(`[SESSION] User ${userId} had stale active game ${previousSession.activeGameId}, clearing it`);
           }
