@@ -104,8 +104,8 @@ class GameJoinHandler {
         return;
       }
 
-      // Check if player is in the game
-      const player = gameState.players.find(p => p.userId === userId && !p.isSpectator);
+      // Check if player is in the game (handle null players)
+      const player = gameState.players.find(p => p && p.userId === userId && !p.isSpectator);
       if (!player) {
         // If not a seated player, allow spectating when requested
         if (spectate) {
