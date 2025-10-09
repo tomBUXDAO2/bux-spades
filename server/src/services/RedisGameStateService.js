@@ -43,6 +43,13 @@ class RedisGameStateService {
   async setGameState(gameId, gameState) {
     try {
       if (!redisClient) return false;
+      
+      // CRITICAL DEBUG: Log playerScores whenever game state is written to Redis for SOLO games
+      if (gameState && gameState.gameMode === 'SOLO') {
+        console.log(`[REDIS SET] Writing game state for ${gameId} - playerScores:`, gameState.playerScores || 'UNDEFINED');
+        console.log(`[REDIS SET] Stack trace:`, new Error().stack.split('\n').slice(1, 4).join('\n'));
+      }
+      
       const key = this.getGameStateKey(gameId);
       await redisClient.setEx(key, 3600, JSON.stringify(gameState)); // 1 hour TTL
       return true;
