@@ -416,8 +416,16 @@ export default function GameTableModular({
     });
   };
   
-  const handleGameClosed = (data: { reason: string }) => {
+  const handleGameClosed = (data: { reason?: string; message?: string }) => {
     console.log('[GAME CLOSED] Game was closed:', data.reason);
+    // Set closure message for lobby to display after redirect
+    try {
+      const msg = data?.message || 'Your table was closed due to inactivity.';
+      localStorage.setItem('tableClosureMessage', msg);
+    } catch (err) {
+      console.error('[GAME CLOSED] Failed to set closure message:', err);
+    }
+    // Redirect to lobby
     window.location.href = '/';
   };
   
