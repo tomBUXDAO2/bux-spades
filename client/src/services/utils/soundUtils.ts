@@ -7,15 +7,17 @@ const isSoundEnabled = (): boolean => {
     try {
       const parsed = JSON.parse(userData);
       const soundEnabled = parsed.soundEnabled !== false; // Default to true
+      console.log(`[SOUND CHECK] User: ${parsed.username}, soundEnabled field: ${parsed.soundEnabled}, result: ${soundEnabled}`);
       if (!soundEnabled) {
         console.log(`[SOUND] Sound muted for user ${parsed.username}`);
       }
       return soundEnabled;
     } catch (error) {
-      console.log('Failed to parse user data for sound preference:', error);
+      console.log('[SOUND CHECK] Failed to parse user data for sound preference:', error);
       return true; // Default to true if parsing fails
     }
   }
+  console.log('[SOUND CHECK] No userData found, defaulting to true');
   return true; // Default to true if no userData
 };
 export const playCardSound = () => {
