@@ -116,7 +116,7 @@ export default function GameTablePlayers({
             onClick={async () => {
               // Use REST API to join specific seat
               try {
-                const api = (await import('../../../services/api')).default;
+                const { api } = await import('../../../services/lib/api');
                 const res = await api.post(`/api/games/${gameState.id}/join`, {
                   id: user.id,
                   username: user.username,
