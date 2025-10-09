@@ -20,8 +20,8 @@ gameManager.loadAllActiveGames().then(() => {
   console.error('[SERVER] Error loading games:', error);
 });
 
-// Start periodic cleanup service (temporarily disabled for debugging)
-// PeriodicCleanupService.start();
+// Start periodic cleanup service
+PeriodicCleanupService.start();
 
 // Start server
 server.listen(PORT, () => {
