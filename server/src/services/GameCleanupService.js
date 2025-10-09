@@ -432,12 +432,14 @@ export class GameCleanupService {
 
           // Notify clients first
           try {
+            console.log(`[GAME CLEANUP] 📤 Emitting game_closed event to room ${gameId}`);
             io.to(gameId).emit('game_closed', {
               reason: 'inactivity_timeout',
               message: 'Your table was closed due to inactivity.'
             });
+            console.log(`[GAME CLEANUP] ✅ game_closed event emitted successfully`);
           } catch (notifyErr) {
-            console.warn(`[GAME CLEANUP] Failed to notify clients for game ${gameId}:`, notifyErr);
+            console.warn(`[GAME CLEANUP] ❌ Failed to notify clients for game ${gameId}:`, notifyErr);
           }
 
           // Perform full deletion similar to cleanupUnratedGame but regardless of rated

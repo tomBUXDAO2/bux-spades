@@ -417,15 +417,18 @@ export default function GameTableModular({
   };
   
   const handleGameClosed = (data: { reason?: string; message?: string }) => {
-    console.log('[GAME CLOSED] Game was closed:', data.reason);
+    console.log('[GAME CLOSED] ✅ Event received! Data:', data);
     // Set closure message for lobby to display after redirect
     try {
       const msg = data?.message || 'Your table was closed due to inactivity.';
+      console.log('[GAME CLOSED] Setting localStorage message:', msg);
       localStorage.setItem('tableClosureMessage', msg);
+      console.log('[GAME CLOSED] localStorage set, value:', localStorage.getItem('tableClosureMessage'));
     } catch (err) {
       console.error('[GAME CLOSED] Failed to set closure message:', err);
     }
     // Redirect to lobby
+    console.log('[GAME CLOSED] Redirecting to lobby...');
     window.location.href = '/';
   };
   

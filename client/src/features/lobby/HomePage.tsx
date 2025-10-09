@@ -67,13 +67,20 @@ const HomePage: React.FC = () => {
 
   // Show table closure message if present (set by TablePage before redirect)
   useEffect(() => {
+    console.log('[LOBBY] Checking for tableClosureMessage in localStorage...');
     try {
       const msg = localStorage.getItem('tableClosureMessage');
+      console.log('[LOBBY] tableClosureMessage value:', msg);
       if (msg) {
+        console.log('[LOBBY] ✅ Setting closure message to display modal:', msg);
         setClosureMessage(msg);
         localStorage.removeItem('tableClosureMessage');
+      } else {
+        console.log('[LOBBY] No closure message found');
       }
-    } catch {}
+    } catch (err) {
+      console.error('[LOBBY] Error reading closure message:', err);
+    }
   }, []);
 
   // Check if user is new (has 5M coins and 0 games played or no stats yet)
