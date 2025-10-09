@@ -430,6 +430,14 @@ export class TrickCompletionService {
       await redisGameState.setCurrentTrick(gameId, []);
       console.log(`[TRICK COMPLETION] Cleared current trick data from Redis cache for new round`);
       
+      // CRITICAL: Reset spadesBroken to false for new round
+      const currentGameState = await redisGameState.getGameState(gameId);
+      if (currentGameState && currentGameState.play) {
+        currentGameState.play.spadesBroken = false;
+        await redisGameState.setGameState(gameId, currentGameState);
+        console.log(`[TRICK COMPLETION] Reset spadesBroken to false for new round ${nextRoundNumber}`);
+      }
+      
       // Emit game update to notify clients of new round
       if (io) {
         const updatedGameState = await GameService.getGameStateForClient(gameId);
