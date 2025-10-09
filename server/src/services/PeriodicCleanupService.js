@@ -20,10 +20,10 @@ export class PeriodicCleanupService {
     // Run immediately on start
     this.runCleanup();
 
-    // Then run every 2 minutes (temporary for testing - normally 1 hour)
+    // Then run every hour
     this.intervalId = setInterval(() => {
       this.runCleanup();
-    }, 2 * 60 * 1000); // 2 minutes
+    }, 60 * 60 * 1000); // 1 hour
   }
 
   /**
@@ -52,8 +52,8 @@ export class PeriodicCleanupService {
       // Cleanup abandoned games (games with no human players)
       const abandonedCleaned = await GameCleanupService.cleanupAllAbandonedUnratedGames();
       
-      // Cleanup WAITING games older than 5 minutes (temporary for testing)
-      const staleWaitingCleaned = await GameCleanupService.cleanupStaleWaitingGames(5);
+      // Cleanup WAITING games older than 15 minutes
+      const staleWaitingCleaned = await GameCleanupService.cleanupStaleWaitingGames(15);
       console.log(`[PERIODIC CLEANUP] Stale WAITING games cleaned: ${staleWaitingCleaned}`);
 
       // Cleanup old completed games (older than 24 hours)
