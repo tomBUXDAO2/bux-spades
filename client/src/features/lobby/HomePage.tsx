@@ -217,7 +217,16 @@ const HomePage: React.FC = () => {
                 (typeof u?.id === 'string' && u.id.startsWith('bot-'))
               ))
             : [];
-          setOnlinePlayers(filtered);
+          // Merge activeGameId/inGame from updatedGames
+          setOnlinePlayers(prev => {
+            const base = filtered.length ? filtered : prev;
+            return base.map(p => {
+              const g = updatedGames.find((gm: any) => Array.isArray(gm.players) && gm.players.some((gp: any) => gp && ((gp.id || gp.userId) === p.id)));
+              const activeGameId = g?.id;
+              const inGame = Boolean(activeGameId);
+              return { ...p, activeGameId, inGame, online: p.online || inGame };
+            });
+          });
         })
         .catch(err => console.error('Error fetching users:', err));
     };
