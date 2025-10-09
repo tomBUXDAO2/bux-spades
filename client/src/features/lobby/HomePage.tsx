@@ -332,6 +332,19 @@ const HomePage: React.FC = () => {
     };
     window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
 
+    // Allow players list to request a watch by userId (resolve gameId from current games list)
+    const handleWatchUserGame = (ev: any) => {
+      try {
+        const targetUserId = ev?.detail?.userId;
+        if (!targetUserId) return;
+        const targetGame = (games || []).find((g: any) => Array.isArray(g.players) && g.players.some((p: any) => p && ((p.id || p.userId) === targetUserId)));
+        if (targetGame?.id) {
+          navigate(`/table/${targetGame.id}?spectate=1`);
+        }
+      } catch {}
+    };
+    window.addEventListener('watchUserGame', handleWatchUserGame as EventListener);
+
     // Cleanup
     return () => {
       console.log('Cleaning up socket event handlers');
@@ -342,6 +355,7 @@ const HomePage: React.FC = () => {
       socket.off('friendAdded', handleFriendAdded);
             // game_joined listener removed
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+      window.removeEventListener('watchUserGame', handleWatchUserGame as EventListener);
     };
   }, [socket, isAuthenticated, user, navigate]);
 
