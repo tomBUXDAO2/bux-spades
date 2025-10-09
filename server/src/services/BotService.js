@@ -461,7 +461,11 @@ class BotService {
 
     // Get special rules from game
     const specialRules = game.specialRules || {};
-    const spadesBroken = game.play?.spadesBroken || false;
+    
+    // CRITICAL: Get spadesBroken from Redis cache for real-time accuracy
+    const cachedGameState = await redisGameState.default.getGameState(game.id);
+    const spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
+    console.log(`[BOT SERVICE] spadesBroken status: ${spadesBroken} (from ${cachedGameState?.play?.spadesBroken !== undefined ? 'Redis' : 'game state'})`);
 
     // MANDATORY suit following logic
     if (currentTrickCards.length === 0) {
