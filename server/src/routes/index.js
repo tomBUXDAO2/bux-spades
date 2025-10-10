@@ -2,7 +2,7 @@ import express from 'express';
 import { gameRoutes } from './games.js';
 import { authRoutes } from './auth.js';
 import { statsRoutes } from './stats.js';
-import { discordRoutes } from './discord.js';
+import discordRoutes from './discord.js';
 import adminRoutes from './admin.js';
 
 export function setupRoutes(app) {
@@ -15,7 +15,7 @@ export function setupRoutes(app) {
   app.use('/api/games', gameRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/stats', statsRoutes);
-  app.use('/api', discordRoutes); // Discord OAuth routes
+  app.use('/api/discord', discordRoutes); // Discord OAuth routes
   app.use('/api/admin', adminRoutes); // Admin routes
 
   // 404 handler

@@ -17,17 +17,24 @@ export const commands = [
       .setName('game')
       .setDescription('Create a REGULAR league game line')
       .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount')
-          .setRequired(true)
-      )
-      .addStringOption(option =>
         option.setName('mode')
           .setDescription('Game mode')
           .setRequired(true)
           .addChoices(
-            { name: 'Partners', value: 'PARTNERS' },
-            { name: 'Solo', value: 'SOLO' }
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+          .addChoices(
+            { name: '50k', value: 50000 },
+            { name: '100k', value: 100000 },
+            { name: '200k', value: 200000 },
+            { name: '300k', value: 300000 },
+            { name: '500k', value: 500000 }
           )
       )
       .addIntegerOption(option =>
@@ -95,17 +102,24 @@ export const commands = [
       .setName('whiz')
       .setDescription('Create a WHIZ league game line')
       .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount')
-          .setRequired(true)
-      )
-      .addStringOption(option =>
         option.setName('mode')
           .setDescription('Game mode')
           .setRequired(true)
           .addChoices(
-            { name: 'Partners', value: 'PARTNERS' },
-            { name: 'Solo', value: 'SOLO' }
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+          .addChoices(
+            { name: '50k', value: 50000 },
+            { name: '100k', value: 100000 },
+            { name: '200k', value: 200000 },
+            { name: '300k', value: 300000 },
+            { name: '500k', value: 500000 }
           )
       )
       .addIntegerOption(option =>
@@ -155,17 +169,24 @@ export const commands = [
       .setName('mirror')
       .setDescription('Create a MIRROR league game line')
       .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount')
-          .setRequired(true)
-      )
-      .addStringOption(option =>
         option.setName('mode')
           .setDescription('Game mode')
           .setRequired(true)
           .addChoices(
-            { name: 'Partners', value: 'PARTNERS' },
-            { name: 'Solo', value: 'SOLO' }
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+          .addChoices(
+            { name: '50k', value: 50000 },
+            { name: '100k', value: 100000 },
+            { name: '200k', value: 200000 },
+            { name: '300k', value: 300000 },
+            { name: '500k', value: 500000 }
           )
       )
       .addIntegerOption(option =>
@@ -215,21 +236,28 @@ export const commands = [
       .setName('gimmick')
       .setDescription('Create a GIMMICK league game line')
       .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount')
-          .setRequired(true)
-      )
-      .addStringOption(option =>
         option.setName('mode')
           .setDescription('Game mode')
           .setRequired(true)
           .addChoices(
-            { name: 'Partners', value: 'PARTNERS' },
-            { name: 'Solo', value: 'SOLO' }
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+          .addChoices(
+            { name: '50k', value: 50000 },
+            { name: '100k', value: 100000 },
+            { name: '200k', value: 200000 },
+            { name: '300k', value: 300000 },
+            { name: '500k', value: 500000 }
           )
       )
       .addStringOption(option =>
-        option.setName('variant')
+        option.setName('gimmicktype')
           .setDescription('Gimmick variant')
           .setRequired(true)
           .addChoices(
@@ -281,6 +309,96 @@ export const commands = [
           )
       ),
     execute: (interaction) => createGameLine(interaction, 'GIMMICK')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('facebookhelp')
+      .setDescription('Post Facebook connection instructions'),
+    execute: async (interaction) => {
+      const embed = new EmbedBuilder()
+        .setTitle('🔗 How to Get the LEAGUE Role')
+        .setDescription(
+          '**To access league game rooms, you need the LEAGUE role!**\n\n' +
+          '**Step 1: Connect Facebook**\n' +
+          '1️⃣ Go to **User Settings** (gear icon) in Discord\n' +
+          '2️⃣ Click **Connections** in the left sidebar\n' +
+          '3️⃣ Click **Connect** next to Facebook\n' +
+          '4️⃣ Log in to your Facebook account and authorize Discord\n\n' +
+          '**Step 2: Enable Profile Display**\n' +
+          '1️⃣ After connecting, make sure **"Display on profile"** is **ON** ✅\n' +
+          '2️⃣ This allows others to see your Facebook name on your Discord profile\n\n' +
+          '**Step 3: Get the LEAGUE Role**\n' +
+          '1️⃣ Go to **Server Settings** (right-click server name)\n' +
+          '2️⃣ Click **Linked Roles** in the left sidebar\n' +
+          '3️⃣ Click **Connect** next to the LEAGUE role requirement\n' +
+          '4️⃣ If you have Facebook connected with "Display on profile" enabled, you\'ll automatically get the role!\n\n' +
+          '**✅ You\'re all set!** You now have access to league game rooms and can use `/game`, `/whiz`, `/mirror`, and `/gimmick` commands!'
+        )
+        .setColor(0x0099ff)
+        .setTimestamp()
+        .setFooter({ text: 'Need help? Contact a moderator!' });
+
+      await interaction.reply({
+        embeds: [embed]
+      });
+    }
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('postfacebookhelp')
+      .setDescription('Post Facebook instructions to the help channel (Admin only)'),
+    execute: async (interaction) => {
+      // Check if user is admin
+      const adminIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
+      if (!adminIds.includes(interaction.user.id)) {
+        await interaction.reply({
+          content: '❌ This command is only available to administrators.',
+          ephemeral: true
+        });
+        return;
+      }
+
+      const helpChannelId = '1403960351107715073';
+      
+      const embed = new EmbedBuilder()
+        .setTitle('🔗 How to Get the LEAGUE Role')
+        .setDescription(
+          '**To access league game rooms, you need the LEAGUE role!**\n\n' +
+          '**Step 1: Connect Facebook**\n' +
+          '1️⃣ Go to **User Settings** (gear icon) in Discord\n' +
+          '2️⃣ Click **Connections** in the left sidebar\n' +
+          '3️⃣ Click **Connect** next to Facebook\n' +
+          '4️⃣ Log in to your Facebook account and authorize Discord\n\n' +
+          '**Step 2: Enable Profile Display**\n' +
+          '1️⃣ After connecting, make sure **"Display on profile"** is **ON** ✅\n' +
+          '2️⃣ This allows others to see your Facebook name on your Discord profile\n\n' +
+          '**Step 3: Get the LEAGUE Role**\n' +
+          '1️⃣ Go to **Server Settings** (right-click server name)\n' +
+          '2️⃣ Click **Linked Roles** in the left sidebar\n' +
+          '3️⃣ Click **Connect** next to the LEAGUE role requirement\n' +
+          '4️⃣ If you have Facebook connected with "Display on profile" enabled, you\'ll automatically get the role!\n\n' +
+          '**✅ You\'re all set!** You now have access to league game rooms and can use `/game`, `/whiz`, `/mirror`, and `/gimmick` commands!'
+        )
+        .setColor(0x0099ff)
+        .setTimestamp()
+        .setFooter({ text: 'Need help? Contact a moderator!' });
+
+      try {
+        const channel = await interaction.client.channels.fetch(helpChannelId);
+        await channel.send({ embeds: [embed] });
+        
+        await interaction.reply({
+          content: `✅ Successfully posted Facebook help instructions to <#${helpChannelId}>!`,
+          ephemeral: true
+        });
+      } catch (error) {
+        console.error('Error posting to help channel:', error);
+        await interaction.reply({
+          content: `❌ Failed to post to help channel. Error: ${error.message}`,
+          ephemeral: true
+        });
+      }
+    }
   },
   {
     data: new SlashCommandBuilder()
@@ -418,13 +536,20 @@ async function createGameLine(interaction, format) {
     
     const channelId = interaction.channel.id;
     const coins = interaction.options.getInteger('coins');
-    const mode = interaction.options.getString('mode');
+    const modeValue = interaction.options.getInteger('mode');
+    const mode = modeValue === 1 ? 'PARTNERS' : 'SOLO';
     const minPoints = interaction.options.getInteger('minpoints') || -100;
     const maxPoints = interaction.options.getInteger('maxpoints') || 500;
     const specialRule = interaction.options.getString('special') || 'NONE';
     
     // Gimmick variant (only for /gimmick command)
-    const gimmickVariant = format === 'GIMMICK' ? interaction.options.getString('variant') : null;
+    const gimmickVariant = format === 'GIMMICK' ? interaction.options.getString('gimmicktype') : null;
+    
+    // Debug logging for gimmick variant
+    if (format === 'GIMMICK') {
+      console.log(`[GIMMICK DEBUG] Variant received: ${gimmickVariant}`);
+      console.log(`[GIMMICK DEBUG] All options:`, interaction.options.data);
+    }
     
     // Nil settings (only for /game (REGULAR) command, others always true/false)
     let nilAllowed, blindNilAllowed;
@@ -747,6 +872,11 @@ function createGameLineEmbed(gameLineData) {
   // Build game line with bold formatting
   let gameLineText = `**${coinsDisplay} ${mode} ${maxPoints}/${minPoints} ${format}`;
   
+  // Add gimmick variant for GIMMICK games
+  if (format === 'GIMMICK' && gimmickVariant) {
+    gameLineText = `**${coinsDisplay} ${mode} ${maxPoints}/${minPoints} ${gimmickVariant}`;
+  }
+  
   // Add nil status for REGULAR games
   if (format === 'REGULAR') {
     gameLineText += `\nnil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
@@ -754,20 +884,36 @@ function createGameLineEmbed(gameLineData) {
   
   gameLineText += '**'; // Close bold
   
-  // Organize players by team
-  const redTeam = players.filter(p => p.seat === 0 || p.seat === 2);
-  const blueTeam = players.filter(p => p.seat === 1 || p.seat === 3);
-  
-  const redTeamText = redTeam.length > 0 
-    ? redTeam.map(p => `• <@${p.discordId}>`).join('\n')
-    : '• _Empty_';
-  
-  const blueTeamText = blueTeam.length > 0
-    ? blueTeam.map(p => `• <@${p.discordId}>`).join('\n')
-    : '• _Empty_';
-  
+  // Organize players by team or individual colors
+  let playersText;
   const playersNeeded = 4 - players.length;
   const playersNeededText = playersNeeded > 0 ? `\n\n**${playersNeeded} more player${playersNeeded === 1 ? '' : 's'} needed**` : '';
+  
+  if (mode === 'SOLO') {
+    // For SOLO games, show individual player colors
+    const colorEmojis = ['🔴', '🔵', '🟠', '🟢']; // Red (0), Blue (1), Orange (2), Green (3)
+    const seats = [0, 1, 2, 3];
+    
+    playersText = seats.map(seat => {
+      const player = players.find(p => p.seat === seat);
+      const emoji = colorEmojis[seat];
+      return player ? `${emoji} • <@${player.discordId}>` : `${emoji} • _Empty_`;
+    }).join('\n');
+  } else {
+    // For PARTNERS games, show teams
+    const redTeam = players.filter(p => p.seat === 0 || p.seat === 2);
+    const blueTeam = players.filter(p => p.seat === 1 || p.seat === 3);
+    
+    const redTeamText = redTeam.length > 0 
+      ? redTeam.map(p => `• <@${p.discordId}>`).join('\n')
+      : '• _Empty_';
+    
+    const blueTeamText = blueTeam.length > 0
+      ? blueTeam.map(p => `• <@${p.discordId}>`).join('\n')
+      : '• _Empty_';
+    
+    playersText = `🔴 Red Team:\n${redTeamText}\n\n🔵 Blue Team:\n${blueTeamText}`;
+  }
   
   const embed = new EmbedBuilder()
     .setTitle('🎮 GAME LINE')
@@ -776,7 +922,7 @@ function createGameLineEmbed(gameLineData) {
       { name: '👤 Host', value: `<@${gameLineData.createdBy}>`, inline: true },
       { name: '👥 Players', value: `${players.length}/4`, inline: true },
       { name: '⏰ Created', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true },
-      { name: '🎯 Current Players', value: `🔴 Red Team:\n${redTeamText}\n\n🔵 Blue Team:\n${blueTeamText}${playersNeededText}`, inline: false }
+      { name: '🎯 Current Players', value: `${playersText}${playersNeededText}`, inline: false }
     )
     .setColor(0x00ff00)
     .setTimestamp();

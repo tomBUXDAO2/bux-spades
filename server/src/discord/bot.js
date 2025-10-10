@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { commands, handleButtonInteraction } from './commands/index.js';
+import { registerRoleMetadata } from './linkedRoles.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -26,16 +27,20 @@ async function registerCommands() {
     
     const rest = new REST({ version: '10' }).setToken(token);
     
-    // First, get existing commands to log what's being replaced
-    const existingCommands = await rest.get(
-      Routes.applicationGuildCommands(clientId, guildId)
+    // First, clear all existing commands to avoid duplicates
+    console.log('[DISCORD BOT] Clearing existing commands...');
+    await rest.put(
+      Routes.applicationGuildCommands(clientId, guildId),
+      { body: [] }
     );
-    console.log(`[DISCORD BOT] Found ${existingCommands.length} existing commands:`, existingCommands.map(c => c.name));
+    
+    // Wait a moment for Discord to process the deletion
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     const commandData = commands.map(cmd => cmd.data.toJSON());
     console.log(`[DISCORD BOT] Registering ${commandData.length} new commands:`, commandData.map(c => c.name));
     
-    // PUT will replace all existing commands with the new ones
+    // Now register the new commands
     await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commandData }
@@ -73,9 +78,10 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Bot ready event
-client.on('ready', () => {
+client.on('ready', async () => {
   console.log(`[DISCORD BOT] Logged in as ${client.user.tag}`);
-  registerCommands();
+  await registerCommands();
+  await registerRoleMetadata();
 });
 
 // Start the bot

@@ -15,7 +15,7 @@ const Login: React.FC = () => {
     
     // Construct the Discord OAuth URL with client ID
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/discord/callback`);
+    const redirectUri = encodeURIComponent(`${serverUrl}/api/discord/callback`);
     const scope = encodeURIComponent('identify email');
     
     if (!clientId) {
