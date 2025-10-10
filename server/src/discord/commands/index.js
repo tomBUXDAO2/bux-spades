@@ -382,8 +382,9 @@ export async function handleButtonInteraction(interaction) {
     const gameLine = gameLines.get(gameLineId);
     
     if (!gameLine) {
+      console.log(`[DISCORD] Game line ${gameLineId} not found. Available lines:`, Array.from(gameLines.keys()));
       return interaction.reply({ 
-        content: '❌ Game line not found or has expired.', 
+        content: '❌ Game line not found or has expired. (This can happen if the server restarted. Please create a new game line.)', 
         ephemeral: true 
       });
     }

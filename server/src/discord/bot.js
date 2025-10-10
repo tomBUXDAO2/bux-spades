@@ -26,14 +26,22 @@ async function registerCommands() {
     
     const rest = new REST({ version: '10' }).setToken(token);
     
-    const commandData = commands.map(cmd => cmd.data.toJSON());
+    // First, get existing commands to log what's being replaced
+    const existingCommands = await rest.get(
+      Routes.applicationGuildCommands(clientId, guildId)
+    );
+    console.log(`[DISCORD BOT] Found ${existingCommands.length} existing commands:`, existingCommands.map(c => c.name));
     
+    const commandData = commands.map(cmd => cmd.data.toJSON());
+    console.log(`[DISCORD BOT] Registering ${commandData.length} new commands:`, commandData.map(c => c.name));
+    
+    // PUT will replace all existing commands with the new ones
     await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commandData }
     );
     
-    console.log(`[DISCORD BOT] Successfully registered ${commands.length} slash commands`);
+    console.log(`[DISCORD BOT] ✅ Successfully registered ${commands.length} slash commands`);
   } catch (error) {
     console.error('[DISCORD BOT] Error registering commands:', error);
   }
