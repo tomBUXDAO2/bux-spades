@@ -199,53 +199,62 @@ export const BiddingOverlay: React.FC<{
     mustBidNil = partnerBid !== undefined && partnerBid !== 0 && partnerBid !== null;
   }
 
-  // Check if player has already bid to prevent infinite loops
-  const myBid = (gameState as any).bidding?.bids?.[myPlayerIndex];
-  const hasBidAlready = myBid !== undefined && myBid !== null;
+  // Use ref to prevent infinite bid loops - tracks if we've already called onBid
+  const autoBidSentRef = React.useRef(false);
+  
+  // Reset the ref when the current player changes or round changes
+  React.useEffect(() => {
+    autoBidSentRef.current = false;
+  }, [gameState.currentPlayer, gameState.currentRound]);
 
   // Auto-bid for MIRROR games (must bid number of spades)
   React.useEffect(() => {
-    if (!hasBidAlready && gameType === 'MIRROR' && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
+    if (!autoBidSentRef.current && gameType === 'MIRROR' && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
       const numSpades = currentPlayerHand.filter((card: any) => card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠').length;
       console.log(`[MIRROR] Auto-bidding ${numSpades} (number of spades)`);
+      autoBidSentRef.current = true;
       onBid(numSpades);
     }
-  }, [hasBidAlready, gameType, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, currentPlayerHand, onBid]);
+  }, [gameType, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, currentPlayerHand, onBid]);
 
   // Auto-bid for BIDHEARTS games (must bid number of hearts)
   React.useEffect(() => {
-    if (!hasBidAlready && (gimmickType === 'BIDHEARTS' || gimmickType === 'BID HEARTS') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
+    if (!autoBidSentRef.current && (gimmickType === 'BIDHEARTS' || gimmickType === 'BID HEARTS') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
       const numHearts = currentPlayerHand.filter((card: any) => card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥').length;
       console.log(`[BIDHEARTS] Auto-bidding ${numHearts} (number of hearts)`);
+      autoBidSentRef.current = true;
       onBid(numHearts);
     }
-  }, [hasBidAlready, gimmickType, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, currentPlayerHand, onBid]);
+  }, [gimmickType, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, currentPlayerHand, onBid]);
 
   // Auto-bid nil for SUICIDE games when forced
   React.useEffect(() => {
-    if (!hasBidAlready && mustBidNil && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
+    if (!autoBidSentRef.current && mustBidNil && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
       console.log('[SUICIDE] Auto-bidding nil - partner bid:', partnerBid);
+      autoBidSentRef.current = true;
       onBid(0); // Auto-bid nil
     }
-  }, [hasBidAlready, mustBidNil, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, partnerBid, onBid]);
+  }, [mustBidNil, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, partnerBid, onBid]);
 
   // Auto-bid 3 for BID 3 games
   React.useEffect(() => {
-    if (!hasBidAlready && (gimmickType === 'BID 3' || gimmickType === 'BID3') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
+    if (!autoBidSentRef.current && (gimmickType === 'BID 3' || gimmickType === 'BID3') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
       console.log('[BID 3] Auto-bidding 3');
+      autoBidSentRef.current = true;
       onBid(3); // Auto-bid 3
     }
-  }, [hasBidAlready, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gimmickType]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gimmickType]);
 
   // Auto-bid 3 points per ace for CRAZY ACES games
   React.useEffect(() => {
-    if (!hasBidAlready && (gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
+    if (!autoBidSentRef.current && (gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete && currentPlayerHand) {
       const numAces = currentPlayerHand.filter((card: any) => card.rank === 'A').length;
       const bidAmount = numAces * 3;
       console.log(`[CRAZY ACES] Auto-bidding ${bidAmount} (${numAces} aces × 3)`);
+      autoBidSentRef.current = true;
       onBid(bidAmount); // Auto-bid 3 points per ace
     }
-  }, [hasBidAlready, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gimmickType, currentPlayerHand]);
+  }, [gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, onBid, gimmickType, currentPlayerHand]);
 
   return (
     <>
