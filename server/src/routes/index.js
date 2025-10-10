@@ -11,6 +11,9 @@ export function setupRoutes(app) {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Auth routes (Passport OAuth needs to be at root level)
+  app.use('/auth', authRoutes);
+  
   // API routes
   app.use('/api/games', gameRoutes);
   app.use('/api/auth', authRoutes);
