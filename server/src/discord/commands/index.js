@@ -27,14 +27,28 @@ export const commands = [
       )
       .addIntegerOption(option =>
         option.setName('coins')
-          .setDescription('Buy-in amount')
+          .setDescription('Buy-in amount (Low: 100k-900k, High: 1M-10M)')
           .setRequired(true)
           .addChoices(
-            { name: '50k', value: 50000 },
             { name: '100k', value: 100000 },
             { name: '200k', value: 200000 },
             { name: '300k', value: 300000 },
-            { name: '500k', value: 500000 }
+            { name: '400k', value: 400000 },
+            { name: '500k', value: 500000 },
+            { name: '600k', value: 600000 },
+            { name: '700k', value: 700000 },
+            { name: '800k', value: 800000 },
+            { name: '900k', value: 900000 },
+            { name: '1M', value: 1000000 },
+            { name: '2M', value: 2000000 },
+            { name: '3M', value: 3000000 },
+            { name: '4M', value: 4000000 },
+            { name: '5M', value: 5000000 },
+            { name: '6M', value: 6000000 },
+            { name: '7M', value: 7000000 },
+            { name: '8M', value: 8000000 },
+            { name: '9M', value: 9000000 },
+            { name: '10M', value: 10000000 }
           )
       )
       .addIntegerOption(option =>
@@ -112,14 +126,28 @@ export const commands = [
       )
       .addIntegerOption(option =>
         option.setName('coins')
-          .setDescription('Buy-in amount')
+          .setDescription('Buy-in amount (Low: 100k-900k, High: 1M-10M)')
           .setRequired(true)
           .addChoices(
-            { name: '50k', value: 50000 },
             { name: '100k', value: 100000 },
             { name: '200k', value: 200000 },
             { name: '300k', value: 300000 },
-            { name: '500k', value: 500000 }
+            { name: '400k', value: 400000 },
+            { name: '500k', value: 500000 },
+            { name: '600k', value: 600000 },
+            { name: '700k', value: 700000 },
+            { name: '800k', value: 800000 },
+            { name: '900k', value: 900000 },
+            { name: '1M', value: 1000000 },
+            { name: '2M', value: 2000000 },
+            { name: '3M', value: 3000000 },
+            { name: '4M', value: 4000000 },
+            { name: '5M', value: 5000000 },
+            { name: '6M', value: 6000000 },
+            { name: '7M', value: 7000000 },
+            { name: '8M', value: 8000000 },
+            { name: '9M', value: 9000000 },
+            { name: '10M', value: 10000000 }
           )
       )
       .addIntegerOption(option =>
@@ -179,14 +207,28 @@ export const commands = [
       )
       .addIntegerOption(option =>
         option.setName('coins')
-          .setDescription('Buy-in amount')
+          .setDescription('Buy-in amount (Low: 100k-900k, High: 1M-10M)')
           .setRequired(true)
           .addChoices(
-            { name: '50k', value: 50000 },
             { name: '100k', value: 100000 },
             { name: '200k', value: 200000 },
             { name: '300k', value: 300000 },
-            { name: '500k', value: 500000 }
+            { name: '400k', value: 400000 },
+            { name: '500k', value: 500000 },
+            { name: '600k', value: 600000 },
+            { name: '700k', value: 700000 },
+            { name: '800k', value: 800000 },
+            { name: '900k', value: 900000 },
+            { name: '1M', value: 1000000 },
+            { name: '2M', value: 2000000 },
+            { name: '3M', value: 3000000 },
+            { name: '4M', value: 4000000 },
+            { name: '5M', value: 5000000 },
+            { name: '6M', value: 6000000 },
+            { name: '7M', value: 7000000 },
+            { name: '8M', value: 8000000 },
+            { name: '9M', value: 9000000 },
+            { name: '10M', value: 10000000 }
           )
       )
       .addIntegerOption(option =>
@@ -246,14 +288,28 @@ export const commands = [
       )
       .addIntegerOption(option =>
         option.setName('coins')
-          .setDescription('Buy-in amount')
+          .setDescription('Buy-in amount (Low: 100k-900k, High: 1M-10M)')
           .setRequired(true)
           .addChoices(
-            { name: '50k', value: 50000 },
             { name: '100k', value: 100000 },
             { name: '200k', value: 200000 },
             { name: '300k', value: 300000 },
-            { name: '500k', value: 500000 }
+            { name: '400k', value: 400000 },
+            { name: '500k', value: 500000 },
+            { name: '600k', value: 600000 },
+            { name: '700k', value: 700000 },
+            { name: '800k', value: 800000 },
+            { name: '900k', value: 900000 },
+            { name: '1M', value: 1000000 },
+            { name: '2M', value: 2000000 },
+            { name: '3M', value: 3000000 },
+            { name: '4M', value: 4000000 },
+            { name: '5M', value: 5000000 },
+            { name: '6M', value: 6000000 },
+            { name: '7M', value: 7000000 },
+            { name: '8M', value: 8000000 },
+            { name: '9M', value: 9000000 },
+            { name: '10M', value: 10000000 }
           )
       )
       .addStringOption(option =>
@@ -533,6 +589,14 @@ async function createGameLine(interaction, format) {
   try {
     // Defer reply to prevent timeout
     await interaction.deferReply();
+    
+    // Validate user exists and has enough coins
+    const userValidation = await validateUserForGame(interaction.user.id, interaction.options.getInteger('coins'));
+    if (!userValidation.valid) {
+      return interaction.editReply({ 
+        content: userValidation.message
+      });
+    }
     
     const channelId = interaction.channel.id;
     const coins = interaction.options.getInteger('coins');
@@ -851,6 +915,46 @@ async function payUser(interaction) {
 }
 
 // Helper functions for game lines
+async function validateUserForGame(discordId, requiredCoins) {
+  try {
+    // Check if user exists in database
+    const user = await prisma.user.findUnique({
+      where: { discordId: discordId },
+      select: { id: true, coins: true, username: true }
+    });
+
+    if (!user) {
+      return {
+        valid: false,
+        message: '❌ You need to create an account first!\n\nPlease visit **https://www.bux-spades.pro** and login with Discord before creating or joining game lines.'
+      };
+    }
+
+    // Check if user has enough coins
+    if (user.coins < requiredCoins) {
+      const coinsDisplay = requiredCoins >= 1000000 
+        ? `${requiredCoins / 1000000}M` 
+        : `${requiredCoins / 1000}k`;
+      
+      return {
+        valid: false,
+        message: `❌ Insufficient coins!\n\nYou need **${coinsDisplay}** coins to join this game, but you only have **${user.coins.toLocaleString()}** coins.\n\n💡 **Options:**\n• Play games with lower coin amounts\n• Open a ticket in Discord to purchase more coins`
+      };
+    }
+
+    return {
+      valid: true,
+      user: user
+    };
+  } catch (error) {
+    console.error('[DISCORD] Error validating user:', error);
+    return {
+      valid: false,
+      message: '❌ Error checking your account. Please try again later.'
+    };
+  }
+}
+
 function validateCoins(channelId, coins) {
   if (channelId === LOW_ROOM_ID) {
     // Low room: 100k-900k in 100k increments
@@ -959,6 +1063,15 @@ function createGameLineButtons(gameLineId, isFull) {
 
 async function handleJoinGame(interaction, gameLine, gameLineId) {
   const userId = interaction.user.id;
+  
+  // Validate user exists and has enough coins
+  const userValidation = await validateUserForGame(userId, gameLine.settings.coins);
+  if (!userValidation.valid) {
+    return interaction.reply({ 
+      content: userValidation.message, 
+      ephemeral: true 
+    });
+  }
   
   // Check if already in line
   if (gameLine.players.some(p => p.discordId === userId)) {

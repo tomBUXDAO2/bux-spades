@@ -229,17 +229,14 @@ router.get('/discord/callback', async (req, res) => {
     const user = await prisma.user.upsert({
       where: { discordId: discordUser.id },
       update: {
-        username: discordUser.username,
+        username: discordUser.global_name || discordUser.username,
         avatarUrl: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
       },
       create: {
         discordId: discordUser.id,
-        username: discordUser.username,
+        username: discordUser.global_name || discordUser.username,
         avatarUrl: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
-        coins: 1000000, // Starting coins
-        level: 1,
-        wins: 0,
-        losses: 0,
+        coins: 5000000, // Starting coins
       }
     });
 
