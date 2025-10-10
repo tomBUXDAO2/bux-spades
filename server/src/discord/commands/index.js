@@ -614,7 +614,7 @@ async function createGameLine(interaction, format) {
         mode,
         format,
         minPoints,
-        maxPoints,
+      maxPoints,
         gimmickVariant,
         specialRule,
         nilAllowed,
@@ -649,10 +649,10 @@ async function createGameLine(interaction, format) {
         content: '❌ Failed to create game line. Please try again.'
       });
     } else {
-      await interaction.reply({ 
+    await interaction.reply({ 
         content: '❌ Failed to create game line. Please try again.', 
-        ephemeral: true 
-      });
+      ephemeral: true 
+    });
     }
   }
 }
@@ -1129,78 +1129,78 @@ async function createGameFromLine(gameLine) {
   
   // Sort players by seat to ensure correct order
   const sortedPlayers = [...players].sort((a, b) => a.seat - b.seat);
-  
-  // Create game in database
-  const game = await prisma.game.create({
-    data: {
-      id: gameId,
+    
+    // Create game in database
+    const game = await prisma.game.create({
+      data: {
+        id: gameId,
       createdById: gameLine.createdBy,
       mode: settings.mode,
       format: settings.format,
       gimmickVariant: settings.gimmickVariant || null,
-      isLeague: true,
-      isRated: true,
-      status: 'WAITING',
+        isLeague: true,
+        isRated: true,
+        status: 'WAITING',
       minPoints: settings.minPoints,
       maxPoints: settings.maxPoints,
       nilAllowed: settings.nilAllowed,
       blindNilAllowed: settings.blindNilAllowed,
       specialRules: settings.specialRule && settings.specialRule !== 'NONE' ? { specialRule: settings.specialRule } : null,
       buyIn: settings.coins,
-      currentRound: 1,
-      currentTrick: 0,
-      currentPlayer: null,
-      dealer: 0,
-      createdAt: new Date()
-    }
-  });
-  
+        currentRound: 1,
+        currentTrick: 0,
+        currentPlayer: null,
+        dealer: 0,
+        createdAt: new Date()
+      }
+    });
+
   // Create game players for each Discord user in their assigned seats
   for (const player of sortedPlayers) {
-    // Find or create user by Discord ID
-    let user = await prisma.user.findUnique({
+      // Find or create user by Discord ID
+      let user = await prisma.user.findUnique({
       where: { discordId: player.discordId }
-    });
-    
-    if (!user) {
-      // Create placeholder user for Discord ID
-      user = await prisma.user.create({
-        data: {
+      });
+      
+      if (!user) {
+        // Create placeholder user for Discord ID
+        user = await prisma.user.create({
+          data: {
           discordId: player.discordId,
           username: player.username,
-          avatarUrl: '/default-pfp.jpg',
+            avatarUrl: '/default-pfp.jpg',
           coins: 15000000, // Default coins
-          createdAt: new Date()
+            createdAt: new Date()
+          }
+        });
+      }
+      
+    // Add player to game in their assigned seat
+      await prisma.gamePlayer.create({
+        data: {
+          gameId: game.id,
+          userId: user.id,
+        seatIndex: player.seat,
+        teamIndex: player.seat % 2, // Seats 0,2 = team 0; seats 1,3 = team 1
+          isHuman: true,
+          isSpectator: false,
+          joinedAt: new Date()
         }
       });
     }
-    
-    // Add player to game in their assigned seat
-    await prisma.gamePlayer.create({
+
+    // Create Discord game record for tracking
+    await prisma.discordGame.create({
       data: {
         gameId: game.id,
-        userId: user.id,
-        seatIndex: player.seat,
-        teamIndex: player.seat % 2, // Seats 0,2 = team 0; seats 1,3 = team 1
-        isHuman: true,
-        isSpectator: false,
-        joinedAt: new Date()
-      }
-    });
-  }
-  
-  // Create Discord game record for tracking
-  await prisma.discordGame.create({
-    data: {
-      gameId: game.id,
       channelId: gameLine.channelId,
       commandMessageId: gameLine.messageId,
       createdBy: gameLine.createdBy,
-      status: 'WAITING',
-      createdAt: new Date()
-    }
-  });
-  
+        status: 'WAITING',
+        createdAt: new Date()
+      }
+    });
+
   console.log(`[DISCORD] Created game ${gameId} from line with players:`, sortedPlayers.map(p => `${p.username} (seat ${p.seat})`));
   
   return gameId;

@@ -175,15 +175,74 @@ router.get('/blocked', authenticateToken, async (req, res) => {
   }
 });
 
-// Discord OAuth routes using Passport.js
-router.get('/discord', passport.authenticate('discord'));
+// Discord OAuth callback (original working version)
+router.get('/discord/callback', async (req, res) => {
+  try {
+    const { code, error } = req.query;
 
-router.get('/discord/callback', 
-  passport.authenticate('discord', { failureRedirect: '/login' }),
-  async (req, res) => {
-    // User is authenticated via Passport, create JWT and redirect
-    const user = req.user;
-    
+    if (error) {
+      console.error('[DISCORD OAUTH] Authorization error:', error);
+      return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`);
+    }
+
+    if (!code) {
+      return res.status(400).send('Missing authorization code');
+    }
+
+    // Exchange code for access token
+    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: process.env.DISCORD_CLIENT_ID,
+        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: `${process.env.SERVER_URL || 'https://bux-spades-server.fly.dev'}/api/auth/discord/callback`,
+        scope: 'identify email'
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to exchange code for token');
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Get user info from Discord
+    const userResponse = await fetch('https://discord.com/api/users/@me', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const discordUser = await userResponse.json();
+
+    // Create or update user in database
+    const user = await prisma.user.upsert({
+      where: { discordId: discordUser.id },
+      update: {
+        username: discordUser.username,
+        avatarUrl: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+      },
+      create: {
+        discordId: discordUser.id,
+        username: discordUser.username,
+        avatarUrl: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+        coins: 1000000, // Starting coins
+        level: 1,
+        wins: 0,
+        losses: 0,
+      }
+    });
+
     // Create JWT token
     const jwtToken = jwt.sign(
       { userId: user.id },
@@ -193,7 +252,11 @@ router.get('/discord/callback',
 
     // Redirect to client with token
     res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback?token=${jwtToken}`);
+
+  } catch (error) {
+    console.error('[DISCORD OAUTH] Error in callback:', error);
+    res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=oauth_error`);
   }
-);
+});
 
 export { router as authRoutes };
