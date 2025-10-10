@@ -27,8 +27,14 @@ async function registerCommands() {
     
     const rest = new REST({ version: '10' }).setToken(token);
     
-    // First, clear all existing commands to avoid duplicates
-    console.log('[DISCORD BOT] Clearing existing commands...');
+    // First, clear ALL existing commands (both global and guild) to avoid duplicates
+    console.log('[DISCORD BOT] Clearing existing global commands...');
+    await rest.put(
+      Routes.applicationCommands(clientId),
+      { body: [] }
+    );
+    
+    console.log('[DISCORD BOT] Clearing existing guild commands...');
     await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: [] }
@@ -40,7 +46,7 @@ async function registerCommands() {
     const commandData = commands.map(cmd => cmd.data.toJSON());
     console.log(`[DISCORD BOT] Registering ${commandData.length} new commands:`, commandData.map(c => c.name));
     
-    // Now register the new commands
+    // Now register the new commands (guild-specific for faster updates)
     await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commandData }
