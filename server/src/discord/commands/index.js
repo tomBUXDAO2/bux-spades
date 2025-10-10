@@ -378,7 +378,10 @@ export const commands = [
 // Export button handler for interaction handling
 export async function handleButtonInteraction(interaction) {
   try {
-    const [action, gameLineId] = interaction.customId.split('_');
+    // customId format: "action_gameLineId" where gameLineId itself contains underscores
+    // So we split on first underscore only
+    const [action, ...gameLineIdParts] = interaction.customId.split('_');
+    const gameLineId = gameLineIdParts.join('_');
     const gameLine = gameLines.get(gameLineId);
     
     if (!gameLine) {
