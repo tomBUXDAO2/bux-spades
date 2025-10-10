@@ -199,7 +199,7 @@ router.get('/discord/callback', async (req, res) => {
         client_secret: process.env.DISCORD_CLIENT_SECRET,
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback`,
+        redirect_uri: `${process.env.CLIENT_URL || 'https://bux-spades-server.fly.dev'}/api/auth/discord/callback`,
       }),
     });
 
