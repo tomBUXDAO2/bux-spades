@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { gameManager } from '../services/GameManager.js';
-import { DetailedStatsService } from '../services/DetailedStatsService.js';
-import { prisma } from '../config/database.js';
+import { gameManager } from '../../services/GameManager.js';
+import { DetailedStatsService } from '../../services/DetailedStatsService.js';
+import { prisma } from '../../config/database.js';
 
 // Room IDs
 const LOW_ROOM_ID = '1404937454938619927';
