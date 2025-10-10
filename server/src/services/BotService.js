@@ -173,6 +173,65 @@ class BotService {
       return this.calculateWhizBid(game, seatIndex, hand);
     }
     
+    // Check if this is a MIRROR game
+    if (game.format === 'MIRROR') {
+      const spadesCount = hand.filter(card => card.suit === 'SPADES').length;
+      console.log(`[BOT SERVICE] MIRROR game - bidding ${spadesCount} (number of spades)`);
+      return spadesCount;
+    }
+    
+    // Check if this is a gimmick game with forced bids
+    if (game.gimmickVariant) {
+      switch (game.gimmickVariant) {
+        case 'BID3':
+        case 'BID 3':
+          console.log(`[BOT SERVICE] BID3 game - bidding 3`);
+          return 3;
+        
+        case 'BIDHEARTS':
+        case 'BID HEARTS':
+          const heartsCount = hand.filter(card => card.suit === 'HEARTS').length;
+          console.log(`[BOT SERVICE] BIDHEARTS game - bidding ${heartsCount} (number of hearts)`);
+          return heartsCount;
+        
+        case 'CRAZY_ACES':
+        case 'CRAZY ACES':
+          const acesCount = hand.filter(card => card.rank === 'A').length;
+          const acesBid = acesCount * 3;
+          console.log(`[BOT SERVICE] CRAZY_ACES game - bidding ${acesBid} (${acesCount} aces × 3)`);
+          return acesBid;
+        
+        case 'BID4NIL':
+        case '4 OR NIL':
+          // Simple logic: bid 4 if strong hand, nil if weak
+          const handAnalysis = this.analyzeHand(hand);
+          const bid4orNil = handAnalysis.totalStrength >= 4 ? 4 : 0;
+          console.log(`[BOT SERVICE] BID4NIL game - bidding ${bid4orNil} (strength: ${handAnalysis.totalStrength})`);
+          return bid4orNil;
+        
+        case 'SUICIDE':
+          // Check partner's bid
+          const partnerBid = this.getPartnerBid(game, seatIndex);
+          if (partnerBid === null || partnerBid === undefined) {
+            // First to bid in team - analyze hand to decide
+            const handAnalysis2 = this.analyzeHand(hand);
+            const suicideBid = handAnalysis2.totalStrength >= 3 ? handAnalysis2.totalStrength : 0;
+            console.log(`[BOT SERVICE] SUICIDE game (first bidder) - bidding ${suicideBid}`);
+            return suicideBid;
+          } else if (partnerBid === 0) {
+            // Partner bid nil, we must bid regular
+            const handAnalysis3 = this.analyzeHand(hand);
+            const regularBid = Math.max(1, handAnalysis3.totalStrength);
+            console.log(`[BOT SERVICE] SUICIDE game (partner nil) - bidding ${regularBid}`);
+            return regularBid;
+          } else {
+            // Partner bid regular, we must bid nil
+            console.log(`[BOT SERVICE] SUICIDE game (partner regular) - bidding 0 (nil)`);
+            return 0;
+          }
+      }
+    }
+    
     // Regular game bidding logic
     // 1. Analyze hand strength
     const handAnalysis = this.analyzeHand(hand);
