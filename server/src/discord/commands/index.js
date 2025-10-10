@@ -240,6 +240,9 @@ export async function handleButtonInteraction(interaction) {
 // Command implementations
 async function createGameLine(interaction) {
   try {
+    // Defer reply to prevent timeout
+    await interaction.deferReply();
+    
     const channelId = interaction.channel.id;
     const coins = interaction.options.getInteger('coins');
     const mode = interaction.options.getString('mode');
@@ -308,11 +311,10 @@ async function createGameLine(interaction) {
     const embed = createGameLineEmbed(gameLine);
     const buttons = createGameLineButtons(gameLineId, false);
 
-    const response = await interaction.reply({ 
+    const response = await interaction.editReply({ 
       content: '@LEAGUE',
       embeds: [embed],
-      components: [buttons],
-      fetchReply: true
+      components: [buttons]
     });
 
     // Store message ID for later updates
@@ -322,10 +324,16 @@ async function createGameLine(interaction) {
     console.log(`[DISCORD] Game line created: ${gameLineId}`);
   } catch (error) {
     console.error('[DISCORD] Error creating game line:', error);
-    await interaction.reply({ 
-      content: '❌ Failed to create game line. Please try again.', 
-      ephemeral: true 
-    });
+    if (interaction.deferred) {
+      await interaction.editReply({ 
+        content: '❌ Failed to create game line. Please try again.'
+      });
+    } else {
+      await interaction.reply({ 
+        content: '❌ Failed to create game line. Please try again.', 
+        ephemeral: true 
+      });
+    }
   }
 }
 
