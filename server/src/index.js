@@ -34,7 +34,7 @@ if (process.env.DISCORD_BOT_TOKEN) {
 }
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`[SERVER] Server running on port ${PORT}`);
   console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
 });
