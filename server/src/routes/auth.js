@@ -174,6 +174,23 @@ router.get('/blocked', authenticateToken, async (req, res) => {
   }
 });
 
+// Handle auth/callback from client domain
+router.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+  
+  if (error) {
+    return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`);
+  }
+  
+  if (!code) {
+    return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=missing_code`);
+  }
+  
+  // Redirect to server callback with the code
+  const serverUrl = process.env.SERVER_URL || 'https://bux-spades-server.fly.dev';
+  res.redirect(`${serverUrl}/api/auth/discord/callback?code=${code}`);
+});
+
 // Discord OAuth callback for standard login
 router.get('/discord/callback', async (req, res) => {
   try {

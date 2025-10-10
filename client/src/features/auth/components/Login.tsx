@@ -8,14 +8,9 @@ const Login: React.FC = () => {
   const handleDiscordLogin = () => {
     setDiscordError(false);
     
-    // Use the server URL for the OAuth redirect callback
-    const serverUrl = import.meta.env.PROD
-      ? "https://bux-spades-server.fly.dev"
-      : "http://localhost:3000";
-    
-    // Construct the Discord OAuth URL with client ID
+    // Use the original working redirect URI
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/discord/callback`);
+    const redirectUri = encodeURIComponent('https://www.bux-spades.pro/auth/callback');
     const scope = encodeURIComponent('identify email');
     
     if (!clientId) {
