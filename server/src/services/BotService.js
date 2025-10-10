@@ -632,6 +632,109 @@ class BotService {
   }
 
   /**
+   * Select a card to play (for auto-play, works for both bots and humans)
+   * This is the core logic without the isHuman check
+   */
+  async selectCardForAutoPlay(game, seatIndex) {
+    try {
+      const player = game.players[seatIndex];
+      if (!player) {
+        console.log(`[BOT SERVICE] No player at seat ${seatIndex}`);
+        return null;
+      }
+
+      // Get hand from Redis
+      const redisGameState = await import('./RedisGameStateService.js');
+      const hands = await redisGameState.default.getPlayerHands(game.id);
+      const hand = hands?.[seatIndex] || [];
+      
+      if (hand.length === 0) {
+        console.log(`[BOT SERVICE] Player at seat ${seatIndex} has no cards to play`);
+        return null;
+      }
+      
+      console.log(`[BOT SERVICE] Player at seat ${seatIndex} has ${hand.length} cards to choose from`);
+
+      let cardToPlay = null;
+      
+      // Get current trick cards from Redis
+      let currentTrickCards = [];
+      const redisTrickData = await redisGameState.default.getCurrentTrick(game.id);
+      if (redisTrickData && redisTrickData.length > 0) {
+        currentTrickCards = redisTrickData.map(card => ({
+          suit: card.suit,
+          rank: card.rank,
+          seatIndex: card.seatIndex,
+          playOrder: card.playOrder || 0
+        }));
+      }
+
+      // Get special rules and spadesBroken status
+      const specialRules = game.specialRules || {};
+      const cachedGameState = await redisGameState.default.getGameState(game.id);
+      const spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
+
+      // Card selection logic (same as playBotCard)
+      if (currentTrickCards.length === 0) {
+        // Leading
+        cardToPlay = this.getLeadCard(hand, game, specialRules, spadesBroken);
+      } else {
+        // Following - MUST follow suit if possible
+        const leadSuit = currentTrickCards[0].suit;
+        
+        // Normalize hand
+        const normalizedHand = hand.map(card => {
+          if (typeof card === 'string') {
+            const suit = card.substring(0, card.length - 1);
+            const rank = card.substring(card.length - 1);
+            return { suit, rank };
+          }
+          return card;
+        });
+
+        // Find cards of lead suit
+        const suitCards = normalizedHand.filter(card => card.suit === leadSuit);
+        
+        if (suitCards.length > 0) {
+          // MUST play lowest card of lead suit
+          cardToPlay = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+        } else {
+          // Void in lead suit - apply special rules
+          let playableCards = normalizedHand;
+          
+          if (specialRules.assassin) {
+            const spades = normalizedHand.filter(card => card.suit === 'SPADES');
+            if (spades.length > 0) {
+              playableCards = spades;
+            }
+          }
+          
+          if (specialRules.screamer) {
+            const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
+            if (nonSpades.length > 0) {
+              playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+            }
+          }
+          
+          // Play highest card to dump
+          cardToPlay = playableCards.sort((a, b) => this.getCardValue(b.rank) - this.getCardValue(a.rank))[0];
+        }
+      }
+
+      if (!cardToPlay) {
+        console.error(`[BOT SERVICE] No card selected for seat ${seatIndex}`);
+        return null;
+      }
+
+      console.log(`[BOT SERVICE] Selected card for seat ${seatIndex}: ${cardToPlay.suit}${cardToPlay.rank}`);
+      return cardToPlay;
+    } catch (error) {
+      console.error(`[BOT SERVICE] ERROR in selectCardForAutoPlay:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get best card to lead with
    */
   getLeadCard(hand, game = null, specialRules = {}, spadesBrokenParam = false) {

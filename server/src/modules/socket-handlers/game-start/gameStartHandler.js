@@ -3,6 +3,7 @@ import { prisma } from '../../../config/database.js';
 import { gameManager } from '../../../services/GameManager.js';
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
+import { playerTimerService } from '../../../services/PlayerTimerService.js';
 
 // Global mutex to prevent concurrent game starts across all socket connections
 const startingGames = new Set();
@@ -163,6 +164,17 @@ class GameStartHandler {
             const biddingHandler = new BiddingHandler(this.io, this.socket);
             // Trigger bot bid immediately
             await biddingHandler.triggerBotBidIfNeeded(gameId);
+          } else if (currentPlayer && currentPlayer.isHuman) {
+            // Start timer for first human bidder
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
+            if (shouldApplyTimer) {
+              console.log(`[GAME START] Starting timer for first human bidder ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+              playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
+            } else {
+              console.log(`[GAME START] Timer not applicable for this game format/situation`);
+            }
           }
         }
       } else {

@@ -7,12 +7,16 @@ import { setupSocketHandlers } from './socket/socketHandlers.js';
 import { setupRoutes } from './routes/index.js';
 import { PeriodicCleanupService } from './services/PeriodicCleanupService.js';
 import { startDiscordBot } from './discord/bot.js';
+import { playerTimerService } from './services/PlayerTimerService.js';
 
 // Setup routes
 setupRoutes(app);
 
 // Setup socket handlers
 setupSocketHandlers(io);
+
+// Initialize player timer service with Socket.IO instance
+playerTimerService.setIO(io);
 
 // Load existing games on startup
 gameManager.loadAllActiveGames().then(() => {
@@ -45,6 +49,9 @@ process.on('SIGINT', async () => {
   
   // Stop periodic cleanup service
   PeriodicCleanupService.stop();
+  
+  // Clear all player timers
+  playerTimerService.clearAllTimers();
   
   // Save all games before shutdown
   const games = gameManager.getAllGames();

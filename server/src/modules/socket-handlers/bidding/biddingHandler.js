@@ -3,6 +3,7 @@ import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
+import { playerTimerService } from '../../../services/PlayerTimerService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -173,6 +174,9 @@ class BiddingHandler {
     try {
       console.log(`[BIDDING] Processing bid: user=${userId}, bid=${bid}, nil=${isNil}, blind=${isBlindNil}`);
 
+      // Clear any existing timer for this game (player has acted)
+      playerTimerService.clearTimer(gameId);
+
       // Get current game state
       const gameState = await GameService.getGame(gameId);
       if (!gameState) {
@@ -323,6 +327,17 @@ class BiddingHandler {
           }
         });
 
+        // Start timer for next player if they are human and timer should apply
+        if (nextPlayer && nextPlayer.isHuman) {
+          const shouldApplyTimer = this.shouldApplyBiddingTimer(gameState);
+          if (shouldApplyTimer) {
+            console.log(`[BIDDING] Starting timer for human player ${nextPlayer.userId} (seat ${nextPlayer.seatIndex})`);
+            playerTimerService.startPlayerTimer(gameId, nextPlayer.userId, nextPlayer.seatIndex, 'bidding');
+          } else {
+            console.log(`[BIDDING] Timer not applicable for this game format/situation`);
+          }
+        }
+
         // Clear mutex FIRST, then trigger next bot bid
         this.biddingBots.delete(gameId);
         console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
@@ -455,6 +470,12 @@ class BiddingHandler {
           gameId,
           gameState: updatedGameState
         });
+
+        // Start timer for first player if they are human (card play - always apply)
+        if (firstPlayer && firstPlayer.isHuman) {
+          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (seat ${firstPlayer.seatIndex})`);
+          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
+        }
       } catch (error) {
         console.error(`[BIDDING] Error getting game state for client:`, error);
         // Fallback: emit minimal round started event
@@ -462,6 +483,12 @@ class BiddingHandler {
           gameId,
           gameState: { status: 'PLAYING', currentPlayer: firstPlayer?.userId }
         });
+
+        // Still start timer even in fallback
+        if (firstPlayer && firstPlayer.isHuman) {
+          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (fallback)`);
+          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
+        }
       }
 
       console.log(`[BIDDING] Round started successfully`);
@@ -719,6 +746,74 @@ class BiddingHandler {
       }
     } catch (error) {
       console.error(`[BIDDING] ERROR triggering bot play:`, error);
+    }
+  }
+
+  /**
+   * Determine if bidding timer should be applied for current game state
+   * @returns {boolean} - true if timer should be applied
+   */
+  shouldApplyBiddingTimer(gameState) {
+    const format = gameState.format;
+    const gimmickVariant = gameState.gimmickVariant;
+    
+    // Forced-bid formats that NEVER need timers during bidding
+    const alwaysForcedFormats = ['MIRROR', 'BID3', 'BIDHEARTS', 'CRAZY_ACES'];
+    
+    if (alwaysForcedFormats.includes(format) || alwaysForcedFormats.includes(gimmickVariant)) {
+      console.log(`[BIDDING TIMER] Format ${format || gimmickVariant} is always forced - no timer`);
+      return false;
+    }
+    
+    // SUICIDE: Check if current player's bid is forced
+    if (gimmickVariant === 'SUICIDE') {
+      const isForced = this.isSuicideBidForced(gameState);
+      console.log(`[BIDDING TIMER] SUICIDE bid is ${isForced ? 'forced' : 'not forced'}`);
+      return !isForced;
+    }
+    
+    // Apply timer for REGULAR and WHIZ
+    console.log(`[BIDDING TIMER] Format ${format} - applying timer`);
+    return true;
+  }
+
+  /**
+   * Check if current player's bid is forced in SUICIDE
+   * @returns {boolean} - true if bid is forced (partner bid non-nil)
+   */
+  isSuicideBidForced(gameState) {
+    try {
+      // Find current player
+      const currentPlayerIndex = gameState.players.findIndex(p => p.userId === gameState.currentPlayer);
+      if (currentPlayerIndex === -1) {
+        console.log(`[BIDDING TIMER] Current player not found`);
+        return false;
+      }
+
+      // Find partner (opposite seat)
+      const partnerIndex = (currentPlayerIndex + 2) % 4;
+      
+      // Get bidding state from gameState
+      const bids = gameState.bidding?.bids || [];
+      const partnerBid = bids[partnerIndex];
+      
+      console.log(`[BIDDING TIMER] SUICIDE check - current player seat ${currentPlayerIndex}, partner seat ${partnerIndex}, partner bid: ${partnerBid}`);
+      
+      // If partner hasn't bid yet, bid is not forced (they might bid nil)
+      if (partnerBid === undefined || partnerBid === null) {
+        return false;
+      }
+      
+      // If partner bid nil (0), current player can choose
+      if (partnerBid === 0) {
+        return false;
+      }
+      
+      // Partner bid non-nil, so current player MUST bid nil (forced)
+      return true;
+    } catch (error) {
+      console.error('[BIDDING TIMER] Error checking SUICIDE forced bid:', error);
+      return false;
     }
   }
 }

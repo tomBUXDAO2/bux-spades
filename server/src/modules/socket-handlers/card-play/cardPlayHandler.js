@@ -4,6 +4,7 @@ import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
+import { playerTimerService } from '../../../services/PlayerTimerService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -56,6 +57,9 @@ class CardPlayHandler {
   async processCardPlay(gameId, userId, card, isBot = false) {
     try {
       // Processing card play
+
+      // Clear any existing timer for this game (player has acted)
+      playerTimerService.clearTimer(gameId);
 
       // Get current game state
       const gameState = await GameService.getGame(gameId);
@@ -193,6 +197,12 @@ class CardPlayHandler {
               currentTrick: correctedGameState.play?.currentTrick || []
             });
             console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
+
+            // Start timer for winning player if they are human (card play - always apply)
+            if (winningPlayer && winningPlayer.isHuman) {
+              console.log(`[CARD PLAY] Starting timer for winning player ${winningPlayer.userId} (seat ${winningPlayer.seatIndex})`);
+              playerTimerService.startPlayerTimer(gameId, winningPlayer.userId, winningPlayer.seatIndex, 'playing');
+            }
 
             // Get the completed trick cards before updating game state
             const completedTrickCards = await prisma.trickCard.findMany({
@@ -348,6 +358,13 @@ class CardPlayHandler {
             isBot
           }
         });
+
+        // Start timer for next player if they are human (card play - always apply)
+        const currentPlayerForTimer = updatedGameState.players.find(p => p && p.userId === updatedGameState.currentPlayer);
+        if (currentPlayerForTimer && currentPlayerForTimer.isHuman) {
+          console.log(`[CARD PLAY] Starting timer for next player ${currentPlayerForTimer.userId} (seat ${currentPlayerForTimer.seatIndex})`);
+          playerTimerService.startPlayerTimer(gameId, currentPlayerForTimer.userId, currentPlayerForTimer.seatIndex, 'playing');
+        }
 
         // Trigger bot play if next player is a bot
         // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
