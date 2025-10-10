@@ -20,25 +20,36 @@ const client = new Client({
   ]
 });
 
-// Register slash commands
-async function registerCommands() {
-  try {
-    console.log('[DISCORD BOT] Registering slash commands...');
-    
-    const rest = new REST({ version: '10' }).setToken(token);
-    
-    const commandData = commands.map(cmd => cmd.data.toJSON());
-    console.log(`[DISCORD BOT] Registering ${commandData.length} commands:`, commandData.map(c => c.name));
-    
-    // Register commands - this will overwrite existing ones
-    await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
-      { body: commandData }
-    );
-    
-    console.log(`[DISCORD BOT] ✅ Successfully registered ${commands.length} slash commands`);
-  } catch (error) {
-    console.error('[DISCORD BOT] Error registering commands:', error);
+// Register slash commands with retry logic
+async function registerCommands(retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`[DISCORD BOT] Registering slash commands (attempt ${attempt}/${retries})...`);
+      
+      const rest = new REST({ version: '10' }).setToken(token);
+      
+      const commandData = commands.map(cmd => cmd.data.toJSON());
+      console.log(`[DISCORD BOT] Registering ${commandData.length} commands:`, commandData.map(c => c.name));
+      
+      // Register commands - this will overwrite existing ones
+      await rest.put(
+        Routes.applicationGuildCommands(clientId, guildId),
+        { body: commandData }
+      );
+      
+      console.log(`[DISCORD BOT] ✅ Successfully registered ${commands.length} slash commands`);
+      return; // Success - exit
+    } catch (error) {
+      console.error(`[DISCORD BOT] Error registering commands (attempt ${attempt}/${retries}):`, error.message);
+      
+      if (attempt < retries) {
+        const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        console.log(`[DISCORD BOT] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error('[DISCORD BOT] Failed to register commands after all retries');
+      }
+    }
   }
 }
 
