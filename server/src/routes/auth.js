@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import passport from 'passport';
 import { prisma } from '../config/databaseFirst.js';
 
 // NUCLEAR SOLUTION: Disable expensive database queries entirely
@@ -174,105 +175,15 @@ router.get('/blocked', authenticateToken, async (req, res) => {
   }
 });
 
-// Handle auth/callback from client domain
-router.get('/auth/callback', async (req, res) => {
-  const { code, error } = req.query;
-  
-  if (error) {
-    return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`);
-  }
-  
-  if (!code) {
-    return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=missing_code`);
-  }
-  
-  // Redirect to server callback with the code
-  const serverUrl = process.env.SERVER_URL || 'https://bux-spades-server.fly.dev';
-  res.redirect(`${serverUrl}/api/auth/discord/callback?code=${code}`);
-});
+// Discord OAuth routes using Passport.js
+router.get('/discord', passport.authenticate('discord'));
 
-// Discord OAuth callback for standard login
-router.get('/discord/callback', async (req, res) => {
-  try {
-    const { code, error } = req.query;
-
-    if (error) {
-      console.error('[DISCORD AUTH] Authorization error:', error);
-      return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`);
-    }
-
-    if (!code) {
-      return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=missing_code`);
-    }
-
-    // Exchange code for access token
-    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: `${process.env.CLIENT_URL || 'https://bux-spades-server.fly.dev'}/api/auth/discord/callback`,
-      }),
-    });
-
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to exchange code for token');
-    }
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    // Get user info
-    const userResponse = await fetch('https://discord.com/api/users/@me', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!userResponse.ok) {
-      throw new Error('Failed to fetch user info');
-    }
-
-    const discordUser = await userResponse.json();
-    console.log(`[DISCORD AUTH] User ${discordUser.username} (${discordUser.id}) logged in`);
-
-    // Check if user exists in database
-    let user = await prisma.user.findUnique({
-      where: { discordId: discordUser.id }
-    });
-
-    const avatarUrl = discordUser.avatar 
-      ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-      : '/default-pfp.jpg';
-
-    if (!user) {
-      // Create new user
-      user = await prisma.user.create({
-        data: {
-          discordId: discordUser.id,
-          username: discordUser.global_name || discordUser.username,
-          avatarUrl: avatarUrl,
-          coins: 1000,
-        }
-      });
-      console.log(`[DISCORD AUTH] Created new user: ${user.username}`);
-    } else {
-      // Update existing user
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          username: discordUser.global_name || discordUser.username,
-          avatarUrl: avatarUrl,
-        }
-      });
-      console.log(`[DISCORD AUTH] Updated existing user: ${user.username}`);
-    }
-
+router.get('/discord/callback', 
+  passport.authenticate('discord', { failureRedirect: '/login' }),
+  async (req, res) => {
+    // User is authenticated via Passport, create JWT and redirect
+    const user = req.user;
+    
     // Create JWT token
     const jwtToken = jwt.sign(
       { userId: user.id },
@@ -282,11 +193,7 @@ router.get('/discord/callback', async (req, res) => {
 
     // Redirect to client with token
     res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback?token=${jwtToken}`);
-
-  } catch (error) {
-    console.error('[DISCORD AUTH] Error in callback:', error);
-    res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=server_error`);
   }
-});
+);
 
 export { router as authRoutes };

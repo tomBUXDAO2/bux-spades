@@ -8,17 +8,12 @@ const Login: React.FC = () => {
   const handleDiscordLogin = () => {
     setDiscordError(false);
     
-    // Use the original working redirect URI
-    const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const redirectUri = encodeURIComponent('https://www.bux-spades.pro/auth/callback');
-    const scope = encodeURIComponent('identify email');
+    // Use Passport.js Discord auth route
+    const serverUrl = import.meta.env.PROD
+      ? "https://bux-spades-server.fly.dev"
+      : "http://localhost:3000";
     
-    if (!clientId) {
-      setError('Discord client ID not configured');
-      return;
-    }
-    
-    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    const discordAuthUrl = `${serverUrl}/auth/discord`;
     
     // Add error handling for the redirect
     try {
