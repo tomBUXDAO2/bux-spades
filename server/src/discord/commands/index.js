@@ -1,37 +1,117 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { gameManager } from '../services/GameManager.js';
 import { DetailedStatsService } from '../services/DetailedStatsService.js';
 import { prisma } from '../config/database.js';
+
+// Room IDs
+const LOW_ROOM_ID = '1404937454938619927';
+const HIGH_ROOM_ID = '1403844895445221445';
+
+// In-memory storage for game lines (before table creation)
+const gameLines = new Map();
 
 // Command registry
 export const commands = [
   {
     data: new SlashCommandBuilder()
-      .setName('creategame')
-      .setDescription('Create a new rated league game')
-      .addStringOption(option =>
-        option.setName('player2')
-          .setDescription('Discord ID of second player')
+      .setName('game')
+      .setDescription('Create a rated league game line')
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount (options depend on room)')
           .setRequired(true)
       )
       .addStringOption(option =>
-        option.setName('player3')
-          .setDescription('Discord ID of third player')
+        option.setName('mode')
+          .setDescription('Game mode')
           .setRequired(true)
+          .addChoices(
+            { name: 'Partners', value: 'PARTNERS' },
+            { name: 'Solo', value: 'SOLO' }
+          )
       )
       .addStringOption(option =>
-        option.setName('player4')
-          .setDescription('Discord ID of fourth player')
+        option.setName('format')
+          .setDescription('Game format')
           .setRequired(true)
+          .addChoices(
+            { name: 'Regular', value: 'REGULAR' },
+            { name: 'Whiz', value: 'WHIZ' },
+            { name: 'Mirror', value: 'MIRROR' },
+            { name: 'Gimmick', value: 'GIMMICK' }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points (default: -100)')
+          .setRequired(false)
+          .addChoices(
+            { name: '-250', value: -250 },
+            { name: '-200', value: -200 },
+            { name: '-150', value: -150 },
+            { name: '-100', value: -100 }
+          )
       )
       .addIntegerOption(option =>
         option.setName('maxpoints')
-          .setDescription('Maximum points to win')
+          .setDescription('Maximum points (default: 500)')
           .setRequired(false)
-          .setMinValue(100)
-          .setMaxValue(500)
+          .addChoices(
+            { name: '100', value: 100 },
+            { name: '150', value: 150 },
+            { name: '200', value: 200 },
+            { name: '250', value: 250 },
+            { name: '300', value: 300 },
+            { name: '350', value: 350 },
+            { name: '400', value: 400 },
+            { name: '450', value: 450 },
+            { name: '500', value: 500 },
+            { name: '550', value: 550 },
+            { name: '600', value: 600 },
+            { name: '650', value: 650 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('gimmick')
+          .setDescription('Gimmick variant (required if format is Gimmick)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Suicide', value: 'SUICIDE' },
+            { name: 'Bid 4 or Nil', value: 'BID4NIL' },
+            { name: 'Bid 3', value: 'BID3' },
+            { name: 'Bid Hearts', value: 'BIDHEARTS' },
+            { name: 'Crazy Aces', value: 'CRAZY_ACES' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special')
+          .setDescription('Special rules (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Screamer', value: 'SCREAMER' },
+            { name: 'Assassin', value: 'ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('nil')
+          .setDescription('Allow Nil bids (Regular only, default: On)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'On', value: 'true' },
+            { name: 'Off', value: 'false' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('blindnil')
+          .setDescription('Allow Blind Nil bids (Regular only, default: Off)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'On', value: 'true' },
+            { name: 'Off', value: 'false' }
+          )
       ),
-    execute: createGame
+    execute: createGameLine
   },
   {
     data: new SlashCommandBuilder()
@@ -126,51 +206,124 @@ export const commands = [
   }
 ];
 
-// Command implementations
-async function createGame(interaction) {
+// Export button handler for interaction handling
+export async function handleButtonInteraction(interaction) {
   try {
-    const player1Id = interaction.user.id;
-    const player2Id = interaction.options.getString('player2');
-    const player3Id = interaction.options.getString('player3');
-    const player4Id = interaction.options.getString('player4');
-    const maxPoints = interaction.options.getInteger('maxpoints') || 200;
-
-    // Validate all players are different
-    const players = [player1Id, player2Id, player3Id, player4Id];
-    if (new Set(players).size !== 4) {
+    const [action, gameLineId] = interaction.customId.split('_');
+    const gameLine = gameLines.get(gameLineId);
+    
+    if (!gameLine) {
       return interaction.reply({ 
-        content: '❌ All players must be different!', 
+        content: '❌ Game line not found or has expired.', 
         ephemeral: true 
       });
     }
 
-    // Create game via Discord command
-    const game = await createDiscordGame({
-      channelId: interaction.channel.id,
-      commandMessageId: interaction.id,
-      createdBy: player1Id,
-      players: players,
-      maxPoints,
-      isLeague: true,
-      isRated: true
+    const userId = interaction.user.id;
+
+    if (action === 'join') {
+      await handleJoinGame(interaction, gameLine, gameLineId);
+    } else if (action === 'leave') {
+      await handleLeaveGame(interaction, gameLine, gameLineId);
+    } else if (action === 'cancel') {
+      await handleCancelGame(interaction, gameLine, gameLineId);
+    }
+  } catch (error) {
+    console.error('[DISCORD] Error handling button interaction:', error);
+    await interaction.reply({ 
+      content: '❌ An error occurred. Please try again.', 
+      ephemeral: true 
+    });
+  }
+}
+
+// Command implementations
+async function createGameLine(interaction) {
+  try {
+    const channelId = interaction.channel.id;
+    const coins = interaction.options.getInteger('coins');
+    const mode = interaction.options.getString('mode');
+    const format = interaction.options.getString('format');
+    const minPoints = interaction.options.getInteger('minpoints') || -100;
+    const maxPoints = interaction.options.getInteger('maxpoints') || 500;
+    const gimmickVariant = interaction.options.getString('gimmick');
+    const specialRule = interaction.options.getString('special') || 'NONE';
+    const nilAllowed = interaction.options.getString('nil') === 'false' ? false : true;
+    const blindNilAllowed = interaction.options.getString('blindnil') === 'true' ? true : false;
+
+    // Validate coins based on room
+    const validCoins = validateCoins(channelId, coins);
+    if (!validCoins) {
+      const isLowRoom = channelId === LOW_ROOM_ID;
+      const range = isLowRoom ? '100k-900k (100k increments)' : '1M-10M (1M increments)';
+      return interaction.reply({ 
+        content: `❌ Invalid coin amount for this room. Valid range: ${range}`, 
+        ephemeral: true 
+      });
+    }
+
+    // Validate gimmick variant if format is GIMMICK
+    if (format === 'GIMMICK' && !gimmickVariant) {
+      return interaction.reply({ 
+        content: '❌ You must select a gimmick variant when using Gimmick format.', 
+        ephemeral: true 
+      });
+    }
+
+    // Validate Suicide is partners only
+    if (gimmickVariant === 'SUICIDE' && mode !== 'PARTNERS') {
+      return interaction.reply({ 
+        content: '❌ Suicide variant is only available in Partners mode.', 
+        ephemeral: true 
+      });
+    }
+
+    // Create game line
+    const gameLineId = `line_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const gameLine = {
+      id: gameLineId,
+      channelId,
+      messageId: null, // Will be set after reply
+      createdBy: interaction.user.id,
+      createdAt: new Date(),
+      settings: {
+        coins,
+        mode,
+        format,
+        minPoints,
+        maxPoints,
+        gimmickVariant,
+        specialRule,
+        nilAllowed,
+        blindNilAllowed
+      },
+      players: [
+        { discordId: interaction.user.id, username: interaction.user.username, seat: 0 } // Host in seat 0
+      ]
+    };
+
+    gameLines.set(gameLineId, gameLine);
+
+    // Create embed
+    const embed = createGameLineEmbed(gameLine);
+    const buttons = createGameLineButtons(gameLineId, false);
+
+    const response = await interaction.reply({ 
+      content: '@LEAGUE',
+      embeds: [embed],
+      components: [buttons],
+      fetchReply: true
     });
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎯 League Game Created')
-      .setDescription(`Game ID: \`${game.id}\``)
-      .addFields(
-        { name: 'Players', value: `<@${player1Id}>\n<@${player2Id}>\n<@${player3Id}>\n<@${player4Id}>`, inline: true },
-        { name: 'Max Points', value: maxPoints.toString(), inline: true },
-        { name: 'Status', value: 'Waiting for players to join table', inline: true }
-      )
-      .setColor(0x00ff00)
-      .setTimestamp();
+    // Store message ID for later updates
+    gameLine.messageId = response.id;
+    gameLines.set(gameLineId, gameLine);
 
-    await interaction.reply({ embeds: [embed] });
+    console.log(`[DISCORD] Game line created: ${gameLineId}`);
   } catch (error) {
-    console.error('[DISCORD] Error creating game:', error);
+    console.error('[DISCORD] Error creating game line:', error);
     await interaction.reply({ 
-      content: '❌ Failed to create game. Please try again.', 
+      content: '❌ Failed to create game line. Please try again.', 
       ephemeral: true 
     });
   }
@@ -369,109 +522,347 @@ async function payUser(interaction) {
   }
 }
 
-// Helper functions
-async function createDiscordGame(data) {
-  try {
-    const gameId = `discord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+// Helper functions for game lines
+function validateCoins(channelId, coins) {
+  if (channelId === LOW_ROOM_ID) {
+    // Low room: 100k-900k in 100k increments
+    return coins >= 100000 && coins <= 900000 && coins % 100000 === 0;
+  } else if (channelId === HIGH_ROOM_ID) {
+    // High room: 1M-10M in 1M increments
+    return coins >= 1000000 && coins <= 10000000 && coins % 1000000 === 0;
+  }
+  return false;
+}
+
+function createGameLineEmbed(gameLine) {
+  const { settings, players, createdAt } = gameLine;
+  const { coins, mode, format, minPoints, maxPoints, gimmickVariant, specialRule, nilAllowed, blindNilAllowed } = settings;
+  
+  // Format coins (e.g., 100000 -> 100k, 1000000 -> 1mil)
+  const coinsDisplay = coins >= 1000000 ? `${coins / 1000000}mil` : `${coins / 1000}k`;
+  
+  // Build title line
+  let titleLine = `${coinsDisplay} ${mode} ${maxPoints}/${minPoints} ${format}`;
+  if (format === 'GIMMICK' && gimmickVariant) {
+    titleLine += ` (${gimmickVariant})`;
+  }
+  if (specialRule && specialRule !== 'NONE') {
+    titleLine += ` [${specialRule}]`;
+  }
+  
+  // Nil status (only for Regular)
+  let nilStatus = '';
+  if (format === 'REGULAR') {
+    nilStatus = `nil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
+  }
+  
+  // Organize players by team
+  const redTeam = players.filter(p => p.seat === 0 || p.seat === 2);
+  const blueTeam = players.filter(p => p.seat === 1 || p.seat === 3);
+  
+  const redTeamText = redTeam.length > 0 
+    ? redTeam.map(p => `• <@${p.discordId}>`).join('\n')
+    : '• _Empty_';
+  
+  const blueTeamText = blueTeam.length > 0
+    ? blueTeam.map(p => `• <@${p.discordId}>`).join('\n')
+    : '• _Empty_';
+  
+  const playersNeeded = 4 - players.length;
+  const playersNeededText = playersNeeded > 0 ? `\n\n**${playersNeeded} more player${playersNeeded === 1 ? '' : 's'} needed**` : '';
+  
+  const embed = new EmbedBuilder()
+    .setTitle('🎮 GAME LINE')
+    .setDescription(`${titleLine}\n${nilStatus}`)
+    .addFields(
+      { name: '👤 Host', value: `<@${gameLine.createdBy}>`, inline: true },
+      { name: '👥 Players', value: `${players.length}/4`, inline: true },
+      { name: '⏰ Created', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true },
+      { name: '🎯 Current Players', value: `🔴 Red Team:\n${redTeamText}\n\n🔵 Blue Team:\n${blueTeamText}${playersNeededText}`, inline: false }
+    )
+    .setColor(0x00ff00)
+    .setTimestamp();
+
+  return embed;
+}
+
+function createGameLineButtons(gameLineId, isFull) {
+  if (isFull) {
+    return null; // No buttons when full
+  }
+  
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(`join_${gameLineId}`)
+        .setLabel('Join Game')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('✅'),
+      new ButtonBuilder()
+        .setCustomId(`leave_${gameLineId}`)
+        .setLabel('Leave Game')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('❌'),
+      new ButtonBuilder()
+        .setCustomId(`cancel_${gameLineId}`)
+        .setLabel('Cancel Game')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🚫')
+    );
+
+  return row;
+}
+
+async function handleJoinGame(interaction, gameLine, gameLineId) {
+  const userId = interaction.user.id;
+  
+  // Check if already in line
+  if (gameLine.players.some(p => p.discordId === userId)) {
+    return interaction.reply({ 
+      content: '❌ You are already in this game line.', 
+      ephemeral: true 
+    });
+  }
+  
+  // Check if line is full
+  if (gameLine.players.length >= 4) {
+    return interaction.reply({ 
+      content: '❌ This game line is already full.', 
+      ephemeral: true 
+    });
+  }
+  
+  // Assign seat based on join order: 0 (host), 2 (partner), 1 (opponent), 3 (opponent partner)
+  const seatOrder = [0, 2, 1, 3];
+  const seat = seatOrder[gameLine.players.length];
+  
+  // Add player
+  gameLine.players.push({
+    discordId: userId,
+    username: interaction.user.username,
+    seat
+  });
+  
+  gameLines.set(gameLineId, gameLine);
+  
+  // Check if line is now full
+  if (gameLine.players.length === 4) {
+    await handleLineFull(interaction, gameLine, gameLineId);
+  } else {
+    // Update embed
+    const embed = createGameLineEmbed(gameLine);
+    const buttons = createGameLineButtons(gameLineId, false);
     
-    // Create game in database
-    const game = await prisma.game.create({
-      data: {
-        id: gameId,
-        createdById: data.createdBy,
-        mode: 'PARTNERS', // Discord games are always partners
-        format: 'REGULAR', // Default format
-        gimmickVariant: null,
-        isLeague: true,
-        isRated: true,
-        status: 'WAITING',
-        minPoints: -100,
-        maxPoints: data.maxPoints || 200,
-        nilAllowed: true,
-        blindNilAllowed: false,
-        specialRules: {},
-        buyIn: 0,
-        currentRound: 1,
-        currentTrick: 0,
-        currentPlayer: null,
-        dealer: 0,
-        gameState: {
-          id: gameId,
-          status: 'WAITING',
-          mode: 'PARTNERS',
-          format: 'REGULAR',
-          isLeague: true,
-          isRated: true,
-          maxPoints: data.maxPoints || 200,
-          minPoints: -100,
-          players: [],
-          hands: [[], [], [], []],
-          currentTrickCards: [],
-          play: { currentTrick: [], spadesBroken: false },
-          bidding: { bids: [null, null, null, null], currentBidderIndex: 0, currentPlayer: null },
-          team1TotalScore: 0,
-          team2TotalScore: 0,
-          team1Bags: 0,
-          team2Bags: 0
-        },
-        createdAt: new Date()
-      }
+    await interaction.update({ 
+      embeds: [embed],
+      components: [buttons]
     });
-
-    // Create game players for each Discord user
-    for (let i = 0; i < data.players.length; i++) {
-      const discordId = data.players[i];
-      
-      // Find or create user by Discord ID
-      let user = await prisma.user.findUnique({
-        where: { discordId }
-      });
-      
-      if (!user) {
-        // Create placeholder user for Discord ID
-        user = await prisma.user.create({
-          data: {
-            discordId,
-            username: `Discord User ${discordId.slice(-4)}`,
-            avatarUrl: '/default-pfp.jpg',
-            createdAt: new Date()
-          }
-        });
-      }
-      
-      // Add player to game
-      await prisma.gamePlayer.create({
-        data: {
-          gameId: game.id,
-          userId: user.id,
-          seatIndex: i,
-          teamIndex: i % 2,
-          isHuman: true,
-          isSpectator: false,
-          joinedAt: new Date()
-        }
-      });
-    }
-
-    // Create Discord game record for tracking
-    await prisma.discordGame.create({
-      data: {
-        gameId: game.id,
-        channelId: data.channelId,
-        commandMessageId: data.commandMessageId,
-        createdBy: data.createdBy,
-        status: 'WAITING',
-        createdAt: new Date()
-      }
-    });
-
-    return game;
-  } catch (error) {
-    console.error('[DISCORD] Error creating Discord game:', error);
-    throw error;
   }
 }
 
+async function handleLeaveGame(interaction, gameLine, gameLineId) {
+  const userId = interaction.user.id;
+  
+  // Check if in line
+  const playerIndex = gameLine.players.findIndex(p => p.discordId === userId);
+  if (playerIndex === -1) {
+    return interaction.reply({ 
+      content: '❌ You are not in this game line.', 
+      ephemeral: true 
+    });
+  }
+  
+  // Can't leave if you're the host
+  if (userId === gameLine.createdBy) {
+    return interaction.reply({ 
+      content: '❌ Host cannot leave. Use Cancel Game instead.', 
+      ephemeral: true 
+    });
+  }
+  
+  // Remove player
+  gameLine.players.splice(playerIndex, 1);
+  gameLines.set(gameLineId, gameLine);
+  
+  // Update embed
+  const embed = createGameLineEmbed(gameLine);
+  const buttons = createGameLineButtons(gameLineId, false);
+  
+  await interaction.update({ 
+    embeds: [embed],
+    components: [buttons]
+  });
+}
+
+async function handleCancelGame(interaction, gameLine, gameLineId) {
+  const userId = interaction.user.id;
+  
+  // Only host or admin can cancel
+  const adminIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
+  if (userId !== gameLine.createdBy && !adminIds.includes(userId)) {
+    return interaction.reply({ 
+      content: '❌ Only the host or an admin can cancel this game line.', 
+      ephemeral: true 
+    });
+  }
+  
+  // Delete game line
+  gameLines.delete(gameLineId);
+  
+  // Update embed to show cancelled
+  const embed = new EmbedBuilder()
+    .setTitle('🚫 GAME LINE - CANCELLED')
+    .setDescription('This game line has been cancelled.')
+    .setColor(0xff0000)
+    .setTimestamp();
+  
+  await interaction.update({ 
+    embeds: [embed],
+    components: []
+  });
+}
+
+async function handleLineFull(interaction, gameLine, gameLineId) {
+  try {
+    // Update original embed to show FULL
+    const fullEmbed = new EmbedBuilder()
+      .setTitle('🎮 GAME LINE - FULL')
+      .setDescription(`${gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}`)
+      .addFields(
+        { name: '👤 Host', value: `<@${gameLine.createdBy}>`, inline: true },
+        { name: '👥 Players', value: '4/4', inline: true },
+        { name: '⏰ Created', value: `<t:${Math.floor(gameLine.createdAt.getTime() / 1000)}:R>`, inline: true }
+      )
+      .setColor(0x00ff00)
+      .setFooter({ text: 'Game created! Check the reply above for details.' })
+      .setTimestamp();
+    
+    await interaction.update({ 
+      embeds: [fullEmbed],
+      components: []
+    });
+    
+    // Create game in database
+    const gameId = await createGameFromLine(gameLine);
+    
+    // Post "Table Up!" reply
+    const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2);
+    const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3);
+    
+    const tableUpEmbed = new EmbedBuilder()
+      .setTitle('🎮 Table Up!')
+      .setDescription(
+        `${gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}\n\n` +
+        `🔴 Red Team: ${redTeam.map(p => `<@${p.discordId}>`).join(', ')}\n` +
+        `🔵 Blue Team: ${blueTeam.map(p => `<@${p.discordId}>`).join(', ')}\n\n` +
+        `Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...\n\n` +
+        `GOOD LUCK! 🍀`
+      )
+      .setColor(0x0099ff)
+      .setTimestamp();
+    
+    await interaction.followUp({ 
+      content: '@LEAGUE',
+      embeds: [tableUpEmbed]
+    });
+    
+    // Clean up game line from memory
+    gameLines.delete(gameLineId);
+    
+    console.log(`[DISCORD] Table created for game line ${gameLineId}, game ID: ${gameId}`);
+  } catch (error) {
+    console.error('[DISCORD] Error handling full line:', error);
+    await interaction.followUp({ 
+      content: '❌ Error creating game table. Please contact an admin.', 
+      ephemeral: true 
+    });
+  }
+}
+
+async function createGameFromLine(gameLine) {
+  const { settings, players } = gameLine;
+  const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Sort players by seat to ensure correct order
+  const sortedPlayers = [...players].sort((a, b) => a.seat - b.seat);
+  
+  // Create game in database
+  const game = await prisma.game.create({
+    data: {
+      id: gameId,
+      createdById: gameLine.createdBy,
+      mode: settings.mode,
+      format: settings.format,
+      gimmickVariant: settings.gimmickVariant || null,
+      isLeague: true,
+      isRated: true,
+      status: 'WAITING',
+      minPoints: settings.minPoints,
+      maxPoints: settings.maxPoints,
+      nilAllowed: settings.nilAllowed,
+      blindNilAllowed: settings.blindNilAllowed,
+      specialRules: settings.specialRule && settings.specialRule !== 'NONE' ? { specialRule: settings.specialRule } : null,
+      buyIn: settings.coins,
+      currentRound: 1,
+      currentTrick: 0,
+      currentPlayer: null,
+      dealer: 0,
+      createdAt: new Date()
+    }
+  });
+  
+  // Create game players for each Discord user in their assigned seats
+  for (const player of sortedPlayers) {
+    // Find or create user by Discord ID
+    let user = await prisma.user.findUnique({
+      where: { discordId: player.discordId }
+    });
+    
+    if (!user) {
+      // Create placeholder user for Discord ID
+      user = await prisma.user.create({
+        data: {
+          discordId: player.discordId,
+          username: player.username,
+          avatarUrl: '/default-pfp.jpg',
+          coins: 15000000, // Default coins
+          createdAt: new Date()
+        }
+      });
+    }
+    
+    // Add player to game in their assigned seat
+    await prisma.gamePlayer.create({
+      data: {
+        gameId: game.id,
+        userId: user.id,
+        seatIndex: player.seat,
+        teamIndex: player.seat % 2, // Seats 0,2 = team 0; seats 1,3 = team 1
+        isHuman: true,
+        isSpectator: false,
+        joinedAt: new Date()
+      }
+    });
+  }
+  
+  // Create Discord game record for tracking
+  await prisma.discordGame.create({
+    data: {
+      gameId: game.id,
+      channelId: gameLine.channelId,
+      commandMessageId: gameLine.messageId,
+      createdBy: gameLine.createdBy,
+      status: 'WAITING',
+      createdAt: new Date()
+    }
+  });
+  
+  console.log(`[DISCORD] Created game ${gameId} from line with players:`, sortedPlayers.map(p => `${p.username} (seat ${p.seat})`));
+  
+  return gameId;
+}
+
+// Helper functions
 async function getUserStatsFromDB(userId, format, mode) {
   try {
     // Use the DetailedStatsService to get user stats

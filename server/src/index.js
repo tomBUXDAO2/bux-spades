@@ -6,6 +6,7 @@ import { gameManager } from './services/GameManager.js';
 import { setupSocketHandlers } from './socket/socketHandlers.js';
 import { setupRoutes } from './routes/index.js';
 import { PeriodicCleanupService } from './services/PeriodicCleanupService.js';
+import { startDiscordBot } from './discord/bot.js';
 
 // Setup routes
 setupRoutes(app);
@@ -22,6 +23,15 @@ gameManager.loadAllActiveGames().then(() => {
 
 // Start periodic cleanup service
 PeriodicCleanupService.start();
+
+// Start Discord bot
+if (process.env.DISCORD_BOT_TOKEN) {
+  startDiscordBot().catch(error => {
+    console.error('[SERVER] Error starting Discord bot:', error);
+  });
+} else {
+  console.log('[SERVER] Discord bot disabled (no DISCORD_BOT_TOKEN)');
+}
 
 // Start server
 server.listen(PORT, () => {
