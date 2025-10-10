@@ -8,12 +8,21 @@ const Login: React.FC = () => {
   const handleDiscordLogin = () => {
     setDiscordError(false);
     
-    // Use Passport.js Discord auth route
+    // Original working Discord OAuth URL with client ID
+    const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
     const serverUrl = import.meta.env.PROD
       ? "https://bux-spades-server.fly.dev"
       : "http://localhost:3000";
     
-    const discordAuthUrl = `${serverUrl}/auth/discord`;
+    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/discord/callback`);
+    const scope = encodeURIComponent('identify email');
+    
+    if (!clientId) {
+      setError('Discord client ID not configured');
+      return;
+    }
+    
+    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
     
     // Add error handling for the redirect
     try {
