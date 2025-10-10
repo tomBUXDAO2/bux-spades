@@ -15,10 +15,10 @@ export const commands = [
   {
     data: new SlashCommandBuilder()
       .setName('game')
-      .setDescription('Create a rated league game line')
+      .setDescription('Create a REGULAR league game line')
       .addIntegerOption(option =>
         option.setName('coins')
-          .setDescription('Buy-in amount (options depend on room)')
+          .setDescription('Buy-in amount')
           .setRequired(true)
       )
       .addStringOption(option =>
@@ -28,17 +28,6 @@ export const commands = [
           .addChoices(
             { name: 'Partners', value: 'PARTNERS' },
             { name: 'Solo', value: 'SOLO' }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('format')
-          .setDescription('Game format')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Regular', value: 'REGULAR' },
-            { name: 'Whiz', value: 'WHIZ' },
-            { name: 'Mirror', value: 'MIRROR' },
-            { name: 'Gimmick', value: 'GIMMICK' }
           )
       )
       .addIntegerOption(option =>
@@ -72,18 +61,6 @@ export const commands = [
           )
       )
       .addStringOption(option =>
-        option.setName('gimmick')
-          .setDescription('Gimmick variant (required if format is Gimmick)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'Suicide', value: 'SUICIDE' },
-            { name: 'Bid 4 or Nil', value: 'BID4NIL' },
-            { name: 'Bid 3', value: 'BID3' },
-            { name: 'Bid Hearts', value: 'BIDHEARTS' },
-            { name: 'Crazy Aces', value: 'CRAZY_ACES' }
-          )
-      )
-      .addStringOption(option =>
         option.setName('special')
           .setDescription('Special rules (default: None)')
           .setRequired(false)
@@ -95,7 +72,7 @@ export const commands = [
       )
       .addStringOption(option =>
         option.setName('nil')
-          .setDescription('Allow Nil bids (Regular only, default: On)')
+          .setDescription('Allow Nil bids (default: On)')
           .setRequired(false)
           .addChoices(
             { name: 'On', value: 'true' },
@@ -104,14 +81,206 @@ export const commands = [
       )
       .addStringOption(option =>
         option.setName('blindnil')
-          .setDescription('Allow Blind Nil bids (Regular only, default: Off)')
+          .setDescription('Allow Blind Nil bids (default: Off)')
           .setRequired(false)
           .addChoices(
             { name: 'On', value: 'true' },
             { name: 'Off', value: 'false' }
           )
       ),
-    execute: createGameLine
+    execute: (interaction) => createGameLine(interaction, 'REGULAR')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('whiz')
+      .setDescription('Create a WHIZ league game line')
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option.setName('mode')
+          .setDescription('Game mode')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Partners', value: 'PARTNERS' },
+            { name: 'Solo', value: 'SOLO' }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points (default: -100)')
+          .setRequired(false)
+          .addChoices(
+            { name: '-250', value: -250 },
+            { name: '-200', value: -200 },
+            { name: '-150', value: -150 },
+            { name: '-100', value: -100 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('maxpoints')
+          .setDescription('Maximum points (default: 500)')
+          .setRequired(false)
+          .addChoices(
+            { name: '100', value: 100 },
+            { name: '150', value: 150 },
+            { name: '200', value: 200 },
+            { name: '250', value: 250 },
+            { name: '300', value: 300 },
+            { name: '350', value: 350 },
+            { name: '400', value: 400 },
+            { name: '450', value: 450 },
+            { name: '500', value: 500 },
+            { name: '550', value: 550 },
+            { name: '600', value: 600 },
+            { name: '650', value: 650 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special')
+          .setDescription('Special rules (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Screamer', value: 'SCREAMER' },
+            { name: 'Assassin', value: 'ASSASSIN' }
+          )
+      ),
+    execute: (interaction) => createGameLine(interaction, 'WHIZ')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('mirror')
+      .setDescription('Create a MIRROR league game line')
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option.setName('mode')
+          .setDescription('Game mode')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Partners', value: 'PARTNERS' },
+            { name: 'Solo', value: 'SOLO' }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points (default: -100)')
+          .setRequired(false)
+          .addChoices(
+            { name: '-250', value: -250 },
+            { name: '-200', value: -200 },
+            { name: '-150', value: -150 },
+            { name: '-100', value: -100 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('maxpoints')
+          .setDescription('Maximum points (default: 500)')
+          .setRequired(false)
+          .addChoices(
+            { name: '100', value: 100 },
+            { name: '150', value: 150 },
+            { name: '200', value: 200 },
+            { name: '250', value: 250 },
+            { name: '300', value: 300 },
+            { name: '350', value: 350 },
+            { name: '400', value: 400 },
+            { name: '450', value: 450 },
+            { name: '500', value: 500 },
+            { name: '550', value: 550 },
+            { name: '600', value: 600 },
+            { name: '650', value: 650 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special')
+          .setDescription('Special rules (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Screamer', value: 'SCREAMER' },
+            { name: 'Assassin', value: 'ASSASSIN' }
+          )
+      ),
+    execute: (interaction) => createGameLine(interaction, 'MIRROR')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('gimmick')
+      .setDescription('Create a GIMMICK league game line')
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option.setName('mode')
+          .setDescription('Game mode')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Partners', value: 'PARTNERS' },
+            { name: 'Solo', value: 'SOLO' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('variant')
+          .setDescription('Gimmick variant')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Suicide', value: 'SUICIDE' },
+            { name: 'Bid 4 or Nil', value: 'BID4NIL' },
+            { name: 'Bid 3', value: 'BID3' },
+            { name: 'Bid Hearts', value: 'BIDHEARTS' },
+            { name: 'Crazy Aces', value: 'CRAZY_ACES' }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points (default: -100)')
+          .setRequired(false)
+          .addChoices(
+            { name: '-250', value: -250 },
+            { name: '-200', value: -200 },
+            { name: '-150', value: -150 },
+            { name: '-100', value: -100 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('maxpoints')
+          .setDescription('Maximum points (default: 500)')
+          .setRequired(false)
+          .addChoices(
+            { name: '100', value: 100 },
+            { name: '150', value: 150 },
+            { name: '200', value: 200 },
+            { name: '250', value: 250 },
+            { name: '300', value: 300 },
+            { name: '350', value: 350 },
+            { name: '400', value: 400 },
+            { name: '450', value: 450 },
+            { name: '500', value: 500 },
+            { name: '550', value: 550 },
+            { name: '600', value: 600 },
+            { name: '650', value: 650 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special')
+          .setDescription('Special rules (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Screamer', value: 'SCREAMER' },
+            { name: 'Assassin', value: 'ASSASSIN' }
+          )
+      ),
+    execute: (interaction) => createGameLine(interaction, 'GIMMICK')
   },
   {
     data: new SlashCommandBuilder()
@@ -238,7 +407,7 @@ export async function handleButtonInteraction(interaction) {
 }
 
 // Command implementations
-async function createGameLine(interaction) {
+async function createGameLine(interaction, format) {
   try {
     // Defer reply to prevent timeout
     await interaction.deferReply();
@@ -246,13 +415,35 @@ async function createGameLine(interaction) {
     const channelId = interaction.channel.id;
     const coins = interaction.options.getInteger('coins');
     const mode = interaction.options.getString('mode');
-    const format = interaction.options.getString('format');
     const minPoints = interaction.options.getInteger('minpoints') || -100;
     const maxPoints = interaction.options.getInteger('maxpoints') || 500;
-    const gimmickVariant = interaction.options.getString('gimmick');
     const specialRule = interaction.options.getString('special') || 'NONE';
-    const nilAllowed = interaction.options.getString('nil') === 'false' ? false : true;
-    const blindNilAllowed = interaction.options.getString('blindnil') === 'true' ? true : false;
+    
+    // Gimmick variant (only for /gimmick command)
+    const gimmickVariant = format === 'GIMMICK' ? interaction.options.getString('variant') : null;
+    
+    // Nil settings (only for /game (REGULAR) command, others always true/false)
+    let nilAllowed, blindNilAllowed;
+    if (format === 'REGULAR') {
+      nilAllowed = interaction.options.getString('nil') === 'false' ? false : true;
+      blindNilAllowed = interaction.options.getString('blindnil') === 'true' ? true : false;
+    } else {
+      nilAllowed = true;  // Always on for WHIZ, MIRROR, GIMMICK
+      blindNilAllowed = false;  // Always off for WHIZ, MIRROR, GIMMICK
+    }
+
+    // Debug logging
+    console.log(`[DISCORD] Received /${interaction.commandName} command with options:`, {
+      coins,
+      mode,
+      format,
+      minPoints,
+      maxPoints,
+      gimmickVariant,
+      specialRule,
+      nilAllowed,
+      blindNilAllowed
+    });
 
     // Validate coins based on room
     const validCoins = validateCoins(channelId, coins);
@@ -312,7 +503,7 @@ async function createGameLine(interaction) {
     const buttons = createGameLineButtons(gameLineId, false);
 
     const response = await interaction.editReply({ 
-      content: '@LEAGUE',
+      content: '<@&1403953667501195284>',
       embeds: [embed],
       components: [buttons]
     });
@@ -542,27 +733,22 @@ function validateCoins(channelId, coins) {
   return false;
 }
 
-function createGameLineEmbed(gameLine) {
-  const { settings, players, createdAt } = gameLine;
+function createGameLineEmbed(gameLineData) {
+  const { settings, players, createdAt } = gameLineData;
   const { coins, mode, format, minPoints, maxPoints, gimmickVariant, specialRule, nilAllowed, blindNilAllowed } = settings;
   
   // Format coins (e.g., 100000 -> 100k, 1000000 -> 1mil)
   const coinsDisplay = coins >= 1000000 ? `${coins / 1000000}mil` : `${coins / 1000}k`;
   
-  // Build title line
-  let titleLine = `${coinsDisplay} ${mode} ${maxPoints}/${minPoints} ${format}`;
-  if (format === 'GIMMICK' && gimmickVariant) {
-    titleLine += ` (${gimmickVariant})`;
-  }
-  if (specialRule && specialRule !== 'NONE') {
-    titleLine += ` [${specialRule}]`;
+  // Build game line with bold formatting
+  let gameLineText = `**${coinsDisplay} ${mode} ${maxPoints}/${minPoints} ${format}`;
+  
+  // Add nil status for REGULAR games
+  if (format === 'REGULAR') {
+    gameLineText += `\nnil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
   }
   
-  // Nil status (only for Regular)
-  let nilStatus = '';
-  if (format === 'REGULAR') {
-    nilStatus = `nil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
-  }
+  gameLineText += '**'; // Close bold
   
   // Organize players by team
   const redTeam = players.filter(p => p.seat === 0 || p.seat === 2);
@@ -581,9 +767,9 @@ function createGameLineEmbed(gameLine) {
   
   const embed = new EmbedBuilder()
     .setTitle('🎮 GAME LINE')
-    .setDescription(`${titleLine}\n${nilStatus}`)
+    .setDescription(gameLineText)
     .addFields(
-      { name: '👤 Host', value: `<@${gameLine.createdBy}>`, inline: true },
+      { name: '👤 Host', value: `<@${gameLineData.createdBy}>`, inline: true },
       { name: '👥 Players', value: `${players.length}/4`, inline: true },
       { name: '⏰ Created', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true },
       { name: '🎯 Current Players', value: `🔴 Red Team:\n${redTeamText}\n\n🔵 Blue Team:\n${blueTeamText}${playersNeededText}`, inline: false }
@@ -770,7 +956,7 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
       .setTimestamp();
     
     await interaction.followUp({ 
-      content: '@LEAGUE',
+      content: '<@&1403953667501195284>',
       embeds: [tableUpEmbed]
     });
     
