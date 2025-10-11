@@ -58,7 +58,7 @@ interface GameEventHandlersProps {
   onSendEmoji: (data: { fromPlayerId: string; toPlayerId: string; emoji: string }) => void;
   onLobbyMessage: (msg: ChatMessage) => void;
   onGameMessage: (data: any) => void;
-  onLeagueReadyUpdate: (payload: { gameId: string; leagueReady: boolean[] }) => void;
+  onLeagueReadyUpdate: (payload: { gameId: string; readyStates: Record<string, boolean> }) => void;
   onLeagueStartDenied: (p: any) => void;
   onSeatReplacementStarted: (data: { gameId: string; seatIndex: number; expiresAt: number }) => void;
   onGameClosed: (data: { reason: string }) => void;
