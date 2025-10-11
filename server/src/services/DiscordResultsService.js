@@ -143,10 +143,11 @@ export class DiscordResultsService {
     const nilAllowed = game.nilAllowed ? '☑️' : '❌';
     const blindNilAllowed = game.blindNilAllowed ? '☑️' : '❌';
 
-    // Calculate coin distribution (1st: 2.6x, 2nd: 1x, 3rd/4th: 0.2x each)
+    // Calculate coin distribution (1st: 2.6x, 2nd: 1x, 3rd/4th: 0x)
+    // Total payout: 3.6x buy-in (10% house rake)
     const firstCoins = Math.floor(coins * 2.6);
     const secondCoins = coins;
-    const thirdFourthCoins = Math.floor(coins * 0.2);
+    const thirdFourthCoins = 0;
 
     const winner = playerScores[0];
     const runnerUp = playerScores[1];
@@ -163,7 +164,8 @@ export class DiscordResultsService {
         `<@${runnerUp.player.user.discordId}> - ${runnerUp.score}\n\n` +
         `💰 Coins Won\n2nd: ${secondCoins.toLocaleString()}k\n\n` +
         `Losers\n` +
-        `${losers.map(p => `<@${p.player.user.discordId}>`).join(', ')}`
+        `${losers.map(p => `<@${p.player.user.discordId}>`).join(', ')}\n` +
+        `💰 Coins Won\n3rd/4th: 0k each`
       )
       .setColor(0xffd700)
       .setThumbnail('https://cdn.discordapp.com/emojis/@bux-spades.png')
