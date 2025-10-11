@@ -710,6 +710,34 @@ export class GameService {
         team1Bags = latestRoundScore.team0Bags || 0;
         team2Bags = latestRoundScore.team1Bags || 0;
       }
+      
+      // Calculate total accumulated bags across all rounds
+      const allRoundScores = await prisma.roundScore.findMany({
+        where: { 
+          Round: { gameId }
+        },
+        include: { Round: true },
+        orderBy: { Round: { roundNumber: 'asc' } }
+      });
+      
+      let accumulatedTeam1Bags = 0;
+      let accumulatedTeam2Bags = 0;
+      
+      for (const roundScore of allRoundScores) {
+        accumulatedTeam1Bags += roundScore.team0Bags || 0;
+        accumulatedTeam2Bags += roundScore.team1Bags || 0;
+        
+        // Apply bag penalties when reaching 10+ bags
+        if (accumulatedTeam1Bags >= 10) {
+          accumulatedTeam1Bags -= 10; // Reset bags after penalty
+        }
+        if (accumulatedTeam2Bags >= 10) {
+          accumulatedTeam2Bags -= 10; // Reset bags after penalty
+        }
+      }
+      
+      team1Bags = accumulatedTeam1Bags;
+      team2Bags = accumulatedTeam2Bags;
 
       // Map database enum values back to client-friendly format
       const gimmickVariantMapping = {

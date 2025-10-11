@@ -634,7 +634,7 @@ export class DatabaseGameEngine {
         }
       } else {
         if (tricksWon >= bid) {
-          roundScore = bid * 10; // Made bid
+          roundScore = bid * 10 + (tricksWon - bid); // Made bid + bags (1 point each)
           bags = tricksWon - bid; // Extra tricks are bags
         } else {
           roundScore = -bid * 10; // Failed bid
@@ -650,12 +650,14 @@ export class DatabaseGameEngine {
       }
     }
 
-    // Apply bag penalties (10 points per bag over 10)
-    if (team0Bags > 10) {
-      team0Score -= (team0Bags - 10) * 10;
+    // Apply bag penalties (100 points penalty when bags reach 10+, then reset)
+    if (team0Bags >= 10) {
+      team0Score -= 100;
+      team0Bags = team0Bags - 10; // Reset bags, keeping remainder
     }
-    if (team1Bags > 10) {
-      team1Score -= (team1Bags - 10) * 10;
+    if (team1Bags >= 10) {
+      team1Score -= 100;
+      team1Bags = team1Bags - 10; // Reset bags, keeping remainder
     }
 
     // Save round score
