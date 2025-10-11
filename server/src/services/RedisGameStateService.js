@@ -111,6 +111,32 @@ class RedisGameStateService {
     }
   }
 
+  // Get player ready states from Redis
+  async getPlayerReady(gameId) {
+    try {
+      if (!redisClient) return null;
+      const key = `game:ready:${gameId}`;
+      const data = await redisClient.get(key);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('[REDIS] Error getting player ready states:', error);
+      return {};
+    }
+  }
+
+  // Set player ready states in Redis
+  async setPlayerReady(gameId, readyStates) {
+    try {
+      if (!redisClient) return false;
+      const key = `game:ready:${gameId}`;
+      await redisClient.setEx(key, 3600, JSON.stringify(readyStates)); // 1 hour TTL
+      return true;
+    } catch (error) {
+      console.error('[REDIS] Error setting player ready states:', error);
+      return false;
+    }
+  }
+
   // REAL-TIME: Get player bids from Redis (instant)
   async getPlayerBids(gameId) {
     try {

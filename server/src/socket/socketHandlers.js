@@ -5,6 +5,7 @@ import { BiddingHandler } from '../modules/socket-handlers/bidding/biddingHandle
 import { CardPlayHandler } from '../modules/socket-handlers/card-play/cardPlayHandler.js';
 import { GameChatHandler } from '../modules/socket-handlers/chat/gameChatHandler.js';
 import { BotManagementHandler } from '../modules/socket-handlers/bot-management/botManagementHandler.js';
+import ReadyHandler from '../modules/socket-handlers/ready/readyHandler.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 import { FriendBlockHandler } from '../modules/socket-handlers/friends/friendBlockHandler.js';
 import redisSessionService from '../services/RedisSessionService.js';
@@ -116,6 +117,7 @@ export function setupSocketHandlers(io) {
     const cardPlayHandler = new CardPlayHandler(io, socket);
     const gameChatHandler = new GameChatHandler(io, socket);
     const botManagementHandler = new BotManagementHandler(io, socket);
+    const readyHandler = new ReadyHandler(io, socket);
     const friendBlockHandler = new FriendBlockHandler(io, socket);
     console.log(`[SOCKET] Handlers initialized for socket ${socket.id}`);
 
@@ -140,6 +142,9 @@ export function setupSocketHandlers(io) {
     
     // Game start event
     socket.on('start_game', (data) => gameStartHandler.handleStartGame(data));
+    
+    // Ready system event
+    socket.on('toggle_ready', (data) => readyHandler.handleToggleReady(data));
     
     // Bidding events
     socket.on('make_bid', (data) => biddingHandler.handleMakeBid(data));

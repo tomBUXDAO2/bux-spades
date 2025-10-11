@@ -400,8 +400,17 @@ export default function GameTableModular({
     }, 4500);
   };
   
-  const handleLeagueReadyUpdate = (payload: { gameId: string; leagueReady: boolean[] }) => {
-    if (payload.gameId === gameState.id) setLeagueReady(payload.leagueReady);
+  const handleLeagueReadyUpdate = (payload: { gameId: string; readyStates: Record<string, boolean> }) => {
+    if (payload.gameId === gameState.id) {
+      // Convert readyStates object to array indexed by seat
+      const readyArray = [false, false, false, false];
+      gameState.players?.forEach((player, idx) => {
+        if (player && player.id) {
+          readyArray[idx] = payload.readyStates[player.id] || false;
+        }
+      });
+      setLeagueReady(readyArray);
+    }
   };
   
   const handleLeagueStartDenied = (p: any) => {
@@ -761,7 +770,7 @@ export default function GameTableModular({
   // League handlers
   const toggleReady = (ready: boolean) => {
     if (socket) {
-      socket.emit('league_ready', { gameId: gameState.id, ready });
+      socket.emit('toggle_ready', { gameId: gameState.id, ready });
     }
   };
   
@@ -920,6 +929,17 @@ export default function GameTableModular({
   useEffect(() => {
     setGameState(game);
   }, [game]);
+  
+  // Listen for ready state updates
+  useEffect(() => {
+    if (!socket) return;
+    
+    socket.on('player_ready_update', handleLeagueReadyUpdate);
+    
+    return () => {
+      socket.off('player_ready_update', handleLeagueReadyUpdate);
+    };
+  }, [socket, gameState.id]);
   
   const chatReady = Boolean(gameState?.id);
   

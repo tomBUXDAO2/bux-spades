@@ -1203,6 +1203,33 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     // Create game in database
     const gameId = await createGameFromLine(gameLine);
     
+    // Set activeGameId for all players and emit socket event to force redirect
+    const { default: redisSessionService } = await import('../../services/RedisSessionService.js');
+    const { io } = await import('../../index.js');
+    
+    for (const player of gameLine.players) {
+      // Find user by Discord ID
+      const user = await prisma.user.findUnique({
+        where: { discordId: player.discordId }
+      });
+      
+      if (user) {
+        // Update session with activeGameId
+        await redisSessionService.updateActiveGame(user.id, gameId);
+        console.log(`[DISCORD] Set activeGameId ${gameId} for user ${user.username}`);
+        
+        // Find user's socket and emit redirect event
+        const session = await redisSessionService.getUserSession(user.id);
+        if (session?.socketId) {
+          const userSocket = io.sockets.sockets.get(session.socketId);
+          if (userSocket) {
+            console.log(`[DISCORD] Emitting force_redirect_to_table to ${user.username}`);
+            userSocket.emit('force_redirect_to_table', { gameId });
+          }
+        }
+      }
+    }
+    
     // Post "Table Up!" reply
     const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2);
     const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3);

@@ -191,6 +191,12 @@ export const setupSocketListeners = (
     callbacks.onAuthenticated(data);
   });
 
+  socket.on('force_redirect_to_table', (data: { gameId: string }) => {
+    console.log('[FORCE REDIRECT] Redirecting to table:', data.gameId);
+    localStorage.setItem('activeGameId', data.gameId);
+    window.location.href = `/table/${data.gameId}`;
+  });
+
   socket.on('error', (error) => {
     console.error('Socket error:', error);
     
