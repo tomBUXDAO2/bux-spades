@@ -126,15 +126,6 @@ class GameStartHandler {
       // Start the game in DB-first mode
       await GameService.startGame(gameId);
 
-      // Handle coin deduction for rated games
-      try {
-        const { CoinService } = await import('../../../services/CoinService.js');
-        await CoinService.handleGameCoins(gameId, 'deduct');
-      } catch (coinError) {
-        console.error('[GAME START] Error handling coin deduction:', coinError);
-        // Don't throw - coin deduction failure shouldn't break game start
-      }
-
       // Deal initial hands and set current bidder/currentPlayer
       console.log(`[GAME START] About to deal initial hands for game ${gameId}`);
       await GameService.dealInitialHands(gameId);

@@ -240,7 +240,7 @@ export default function GameTableModular({
       setBiddingReady(true);
       setCardsRevealed(true);
       
-      // Trigger coin deduction animation for rated games
+      // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
       if (data.gameState?.isRated && data.gameState?.buyIn) {
         setCoinDeductionAmount(data.gameState.buyIn);
         setShowCoinDeduction(true);
@@ -292,14 +292,22 @@ export default function GameTableModular({
   };
   
   const handleGameOverWrapper = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
-    // Trigger coin credit animation for rated games if user won
+    // Trigger coin animations for rated games (actual transactions happen here)
     if (gameState.isRated && gameState.buyIn && propUser?.id) {
+      // Show deduction animation (actual deduction happens in backend)
+      setCoinDeductionAmount(gameState.buyIn);
+      setShowCoinDeduction(true);
+      setTimeout(() => setShowCoinDeduction(false), 3000);
+      
+      // Show credit animation only if user won (actual payment happens in backend)
       const userWinnings = calculateUserWinnings(data, gameState, propUser.id);
       if (userWinnings > 0) {
-        setCoinCreditAmount(userWinnings);
-        setShowCoinCredit(true);
-        // Hide animation after 3 seconds
-        setTimeout(() => setShowCoinCredit(false), 3000);
+        // Delay credit animation slightly to show after deduction
+        setTimeout(() => {
+          setCoinCreditAmount(userWinnings);
+          setShowCoinCredit(true);
+          setTimeout(() => setShowCoinCredit(false), 3000);
+        }, 1500);
       }
     }
     

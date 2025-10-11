@@ -3,11 +3,11 @@ import { prisma } from '../config/database.js';
 export class CoinService {
   
   /**
-   * Handle coin transactions for rated games
+   * Handle coin transactions for rated games at game end
+   * Deducts buy-in from all players and pays winners in one transaction
    * @param {string} gameId - The game ID
-   * @param {string} action - 'deduct' or 'pay'
    */
-  static async handleGameCoins(gameId, action = 'deduct') {
+  static async handleGameCoins(gameId) {
     try {
       // Get game details with players
       const game = await prisma.game.findUnique({
@@ -39,13 +39,10 @@ export class CoinService {
         return;
       }
 
-      if (action === 'deduct') {
-        await this.deductBuyIn(game, buyIn);
-      } else if (action === 'pay') {
-        await this.payWinners(game, buyIn);
-      }
+      // Deduct buy-in from all players AND pay winners in one transaction
+      await this.deductAndPay(game, buyIn);
 
-      console.log(`[COIN SERVICE] Successfully handled ${action} for rated game ${gameId}`);
+      console.log(`[COIN SERVICE] Successfully handled coin transactions for rated game ${gameId}`);
     } catch (error) {
       console.error(`[COIN SERVICE] Error handling coins for game ${gameId}:`, error);
       throw error;
@@ -53,49 +50,49 @@ export class CoinService {
   }
 
   /**
-   * Deduct buy-in from all human players at game start
+   * Deduct buy-in from all players and pay winners in one transaction
+   * This ensures atomicity - either all transactions succeed or none do
    */
-  static async deductBuyIn(game, buyIn) {
-    const humanPlayers = game.players.filter(p => p.isHuman);
-    
-    console.log(`[COIN SERVICE] Deducting ${buyIn} coins from ${humanPlayers.length} players`);
-    
-    // Deduct coins from all human players
-    for (const player of humanPlayers) {
-      await prisma.user.update({
-        where: { id: player.userId },
-        data: {
-          coins: { decrement: buyIn }
-        }
-      });
-      
-      console.log(`[COIN SERVICE] Deducted ${buyIn} coins from ${player.user.username}`);
-    }
-  }
-
-  /**
-   * Pay winners based on game results
-   */
-  static async payWinners(game, buyIn) {
+  static async deductAndPay(game, buyIn) {
     if (!game.result) {
-      console.error(`[COIN SERVICE] No result found for game ${gameId}`);
+      console.error(`[COIN SERVICE] No result found for game ${game.id}`);
       return;
     }
 
     const humanPlayers = game.players.filter(p => p.isHuman);
     
-    if (game.mode === 'PARTNERS') {
-      await this.payPartnersWinners(game, humanPlayers, buyIn);
-    } else {
-      await this.paySoloWinners(game, humanPlayers, buyIn);
-    }
+    console.log(`[COIN SERVICE] Processing coin transactions for ${humanPlayers.length} players`);
+    
+    // Use a database transaction to ensure atomicity
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Deduct buy-in from all human players
+      for (const player of humanPlayers) {
+        await tx.user.update({
+          where: { id: player.userId },
+          data: {
+            coins: { decrement: buyIn }
+          }
+        });
+        
+        console.log(`[COIN SERVICE] Deducted ${buyIn} coins from ${player.user.username}`);
+      }
+      
+      // Step 2: Pay winners based on game mode
+      if (game.mode === 'PARTNERS') {
+        await this.payPartnersWinnersInTx(tx, game, humanPlayers, buyIn);
+      } else {
+        await this.paySoloWinnersInTx(tx, game, humanPlayers, buyIn);
+      }
+    });
+    
+    console.log(`[COIN SERVICE] Successfully completed all coin transactions for game ${game.id}`);
   }
 
   /**
-   * Pay partners game winners
+   * Pay partners game winners within transaction
    * Winners get 1.8x buy-in each, losers lose buy-in (already deducted)
    */
-  static async payPartnersWinners(game, humanPlayers, buyIn) {
+  static async payPartnersWinnersInTx(tx, game, humanPlayers, buyIn) {
     const { result } = game;
     
     // Determine winning team
@@ -108,7 +105,7 @@ export class CoinService {
     // Pay winners
     const winners = humanPlayers.filter(p => p.teamIndex === winningTeamIndex);
     for (const winner of winners) {
-      await prisma.user.update({
+      await tx.user.update({
         where: { id: winner.userId },
         data: {
           coins: { increment: winnerPayout }
@@ -120,10 +117,10 @@ export class CoinService {
   }
 
   /**
-   * Pay solo game winners
+   * Pay solo game winners within transaction
    * 1st: 2.6x buy-in, 2nd: 1x buy-in, 3rd/4th: 0 coins
    */
-  static async paySoloWinners(game, humanPlayers, buyIn) {
+  static async paySoloWinnersInTx(tx, game, humanPlayers, buyIn) {
     const { result } = game;
     
     // Get individual player scores
@@ -143,7 +140,7 @@ export class CoinService {
     
     // Pay 1st place
     if (playerScores[0]) {
-      await prisma.user.update({
+      await tx.user.update({
         where: { id: playerScores[0].player.userId },
         data: {
           coins: { increment: firstPayout }
@@ -154,7 +151,7 @@ export class CoinService {
     
     // Pay 2nd place
     if (playerScores[1]) {
-      await prisma.user.update({
+      await tx.user.update({
         where: { id: playerScores[1].player.userId },
         data: {
           coins: { increment: secondPayout }
