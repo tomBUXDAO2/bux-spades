@@ -177,7 +177,7 @@ export default function GameTableModular({
   
   // CRITICAL FIX: Find the actual current player (whose turn it is), not the user
   const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
-  const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer);
+  const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
   const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
   const isVerySmallScreen = windowSize.height <= 349;

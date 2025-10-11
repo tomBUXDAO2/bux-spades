@@ -65,21 +65,18 @@ export const createFinalPositions = (
 
 /**
  * Rotate players for current view (main function)
- * FIXED: Players should maintain fixed positions, not rotate based on current turn
+ * Rotates players so the current user always sees themselves in the south (bottom) seat
  */
 export const rotatePlayersForCurrentView = (
   sanitizedPlayers: (Player | Bot | null)[],
-  currentPlayer: any
+  currentPlayer: any,
+  currentUserId?: string
 ): (Player | Bot | null)[] => {
-  // CRITICAL FIX: Players should maintain fixed positions based on seatIndex
-  // Don't rotate players based on whose turn it is - this was causing visual confusion
-  const positions = Array(4).fill(null);
+  // Find the current user's seat position
+  const myPlayer = sanitizedPlayers.find(p => p && (p.id === currentUserId || p.userId === currentUserId));
+  const mySeatIndex = myPlayer?.seatIndex ?? 0;
   
-  sanitizedPlayers.forEach((player) => {
-    if (player && player.seatIndex !== undefined && player.seatIndex >= 0 && player.seatIndex < 4) {
-      positions[player.seatIndex] = player;
-    }
-  });
-  
-  return positions;
+  // Rotate so current user is always in position 0 (south/bottom)
+  const rotatedPlayers = createRotatedPlayers(sanitizedPlayers, mySeatIndex);
+  return createFinalPositions(rotatedPlayers);
 };

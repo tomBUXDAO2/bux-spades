@@ -20,16 +20,42 @@ const client = new Client({
   ]
 });
 
-// Register slash commands with retry logic
+// Track rate limit cooldown
+let rateLimitedUntil = null;
+
+// Register slash commands with retry logic - only when needed
 async function registerCommands(retries = 3) {
+  // Check if we're still in rate limit cooldown
+  if (rateLimitedUntil && Date.now() < rateLimitedUntil) {
+    const remainingSeconds = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+    console.log(`[DISCORD BOT] ⏳ Skipping command registration - rate limited for ${remainingSeconds} more seconds`);
+    return;
+  }
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(`[DISCORD BOT] Registering slash commands (attempt ${attempt}/${retries})...`);
+      console.log(`[DISCORD BOT] Checking slash commands (attempt ${attempt}/${retries})...`);
       
       const rest = new REST({ version: '10' }).setToken(token);
       
+      // First, check existing commands
+      const existingCommands = await rest.get(Routes.applicationGuildCommands(clientId, guildId));
+      console.log(`[DISCORD BOT] Found ${existingCommands.length} existing commands`);
+      
       const commandData = commands.map(cmd => cmd.data.toJSON());
-      console.log(`[DISCORD BOT] Registering ${commandData.length} commands:`, commandData.map(c => c.name));
+      const commandNames = commandData.map(c => c.name);
+      
+      // Check if we need to register commands
+      const existingNames = existingCommands.map(c => c.name);
+      const needsRegistration = commandNames.length !== existingNames.length || 
+                               !commandNames.every(name => existingNames.includes(name));
+      
+      if (!needsRegistration) {
+        console.log(`[DISCORD BOT] ✅ All ${commands.length} commands already registered, skipping registration`);
+        return;
+      }
+      
+      console.log(`[DISCORD BOT] Commands need registration. Registering ${commandData.length} commands:`, commandNames);
       
       // Register commands - this will overwrite existing ones
       await rest.put(
@@ -40,7 +66,15 @@ async function registerCommands(retries = 3) {
       console.log(`[DISCORD BOT] ✅ Successfully registered ${commands.length} slash commands`);
       return; // Success - exit
     } catch (error) {
-      console.error(`[DISCORD BOT] Error registering commands (attempt ${attempt}/${retries}):`, error.message);
+      console.error(`[DISCORD BOT] Error checking/registering commands (attempt ${attempt}/${retries}):`, error.message);
+      
+      // If it's a rate limit error, don't retry and set cooldown
+      if (error.code === 30034 || error.message?.includes('rate')) {
+        // Set cooldown for 10 minutes to avoid making the problem worse
+        rateLimitedUntil = Date.now() + (10 * 60 * 1000);
+        console.error('[DISCORD BOT] ⏳ Rate limited - will not attempt registration for 10 minutes');
+        return;
+      }
       
       if (attempt < retries) {
         const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
@@ -81,7 +115,7 @@ client.on('interactionCreate', async (interaction) => {
 // Bot ready event
 client.on('ready', async () => {
   console.log(`[DISCORD BOT] Logged in as ${client.user.tag}`);
-  await registerCommands();
+  // Command registration removed - register manually using register-discord-commands.js
   await registerRoleMetadata();
 });
 
