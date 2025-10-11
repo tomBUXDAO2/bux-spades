@@ -531,6 +531,15 @@ export class ScoringService {
       });
 
       console.log(`[SCORING] Game ${gameId} completed successfully`);
+      
+      // Post Discord results for league games
+      try {
+        const { DiscordResultsService } = await import('./DiscordResultsService.js');
+        await DiscordResultsService.postGameResult(gameId);
+      } catch (discordError) {
+        console.error('[SCORING] Error posting Discord results:', discordError);
+        // Don't throw - Discord posting failure shouldn't break game completion
+      }
     } catch (error) {
       console.error('[SCORING] Error completing game:', error);
       throw error;
