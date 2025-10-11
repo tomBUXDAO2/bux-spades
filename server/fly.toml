@@ -14,7 +14,7 @@ primary_region = "lax"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 256
+  memory_mb = 512
 
 [env]
   NODE_ENV = "production"
