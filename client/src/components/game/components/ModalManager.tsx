@@ -342,7 +342,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           userTeam={getUserTeam(gameState, user?.id || '')}
           isCoinGame={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
           coinsWon={(() => {
-            if (!gameState.buyIn || !gameState.isRated) return 0;
+            if (!gameState.buyIn || !gameState.rated) return 0;
             const buyIn = gameState.buyIn;
             const userTeam = getUserTeam(gameState, user?.id || '');
             const winningTeam = (finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2;

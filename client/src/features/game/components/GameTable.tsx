@@ -241,7 +241,7 @@ export default function GameTableModular({
       setCardsRevealed(true);
       
       // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
-      if (data.gameState?.isRated && data.gameState?.buyIn) {
+      if (data.gameState?.rated && data.gameState?.buyIn) {
         setCoinDeductionAmount(data.gameState.buyIn);
         setShowCoinDeduction(true);
         // Hide animation after 3 seconds
@@ -261,7 +261,7 @@ export default function GameTableModular({
   
   // Calculate user's coin winnings based on game results
   const calculateUserWinnings = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }, gameState: any, userId: string) => {
-    if (!gameState.isRated || !gameState.buyIn) return 0;
+    if (!gameState.rated || !gameState.buyIn) return 0;
     
     const buyIn = gameState.buyIn;
     
@@ -293,7 +293,7 @@ export default function GameTableModular({
   
   const handleGameOverWrapper = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
     // Trigger coin animations for rated games (actual transactions happen here)
-    if (gameState.isRated && gameState.buyIn && propUser?.id) {
+    if (gameState.rated && gameState.buyIn && propUser?.id) {
       // Show credit animation only if user won (actual payment happens in backend)
       // NO deduction animation at end - we already showed it at start!
       const userWinnings = calculateUserWinnings(data, gameState, propUser.id);
