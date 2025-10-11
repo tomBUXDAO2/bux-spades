@@ -213,9 +213,9 @@ export default function GameTablePlayers({
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
-    // Use the player's position in the players array to match the server's bidding.bids array
-    // The server's bidding.bids array is indexed by the player's position in the players array (0,1,2,3)
-    const actualSeatIndex = position;
+    // Use the player's actual seatIndex to get the bid from the server
+    // The server's bidding.bids array is indexed by seatIndex (0,1,2,3)
+    const actualSeatIndex = player.seatIndex;
     let rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
     
     // OPTIMISTIC UI: Show pending bid immediately
