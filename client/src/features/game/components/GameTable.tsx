@@ -21,6 +21,7 @@ import GameTableHeader from '../../../components/game/components/GameTableHeader
 import GameTableScoreboard from '../../../components/game/components/GameTableScoreboard';
 import GameTablePlayers from '../../../components/game/components/GameTablePlayers';
 import CoinDebitAnimation from '../../../components/game/components/CoinDebitAnimation';
+import CoinCreditAnimation from '../../../components/game/components/CoinCreditAnimation';
 import EmojiTravel from '../../../components/game/components/EmojiTravel';
 
 // Utility imports
@@ -112,6 +113,12 @@ export default function GameTableModular({
   const [animatingTrick, setAnimatingTrick] = useState(false);
   const [animatedTrickCards, setAnimatedTrickCards] = useState<Card[]>([]);
   const [trickWinner, setTrickWinner] = useState<number | null>(null);
+  
+  // Coin animation states
+  const [showCoinDeduction, setShowCoinDeduction] = useState(false);
+  const [showCoinCredit, setShowCoinCredit] = useState(false);
+  const [coinDeductionAmount, setCoinDeductionAmount] = useState(0);
+  const [coinCreditAmount, setCoinCreditAmount] = useState(0);
   const [trickCompleted, setTrickCompleted] = useState(false);
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
@@ -232,6 +239,15 @@ export default function GameTableModular({
       setDealingComplete(true);
       setBiddingReady(true);
       setCardsRevealed(true);
+      
+      // Trigger coin deduction animation for rated games
+      if (data.gameState?.isRated && data.gameState?.buyIn) {
+        setCoinDeductionAmount(data.gameState.buyIn);
+        setShowCoinDeduction(true);
+        // Hide animation after 3 seconds
+        setTimeout(() => setShowCoinDeduction(false), 3000);
+      }
+      
       // setIsStarting(false); // Using prop from parent
     }
   };
@@ -243,7 +259,50 @@ export default function GameTableModular({
     setShowHandSummary(true);
   };
   
+  // Calculate user's coin winnings based on game results
+  const calculateUserWinnings = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }, gameState: any, userId: string) => {
+    if (!gameState.isRated || !gameState.buyIn) return 0;
+    
+    const buyIn = gameState.buyIn;
+    
+    if (gameState.gameMode === 'PARTNERS') {
+      // Find user's team
+      const userPlayer = gameState.players?.find((p: any) => p.userId === userId);
+      if (!userPlayer) return 0;
+      
+      const isUserWinner = userPlayer.teamIndex === (data.winningTeam - 1); // winningTeam is 1-based, teamIndex is 0-based
+      return isUserWinner ? Math.floor(buyIn * 1.8) : 0;
+    } else {
+      // Solo game - find user's position
+      const userPlayer = gameState.players?.find((p: any) => p.userId === userId);
+      if (!userPlayer || !data.playerScores) return 0;
+      
+      // Get all player scores with their positions
+      const playerScores = data.playerScores.map((score: number, index: number) => ({ score, index }));
+      playerScores.sort((a: any, b: any) => b.score - a.score);
+      
+      const userPosition = playerScores.findIndex((p: any) => p.index === userPlayer.seatIndex) + 1;
+      
+      switch (userPosition) {
+        case 1: return Math.floor(buyIn * 2.6); // 1st place
+        case 2: return buyIn; // 2nd place
+        default: return 0; // 3rd/4th place
+      }
+    }
+  };
+  
   const handleGameOverWrapper = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
+    // Trigger coin credit animation for rated games if user won
+    if (gameState.isRated && gameState.buyIn && propUser?.id) {
+      const userWinnings = calculateUserWinnings(data, gameState, propUser.id);
+      if (userWinnings > 0) {
+        setCoinCreditAmount(userWinnings);
+        setShowCoinCredit(true);
+        // Hide animation after 3 seconds
+        setTimeout(() => setShowCoinCredit(false), 3000);
+      }
+    }
+    
     await handleGameOver(data, gameState.id, gameState.gameMode || 'PARTNERS', {
       setFinalPlayerScores,
       setFinalScores,
@@ -1157,6 +1216,16 @@ export default function GameTableModular({
             }}
           />
         ))}
+
+        {/* Coin Animations */}
+        <CoinDebitAnimation
+          amount={coinDeductionAmount}
+          isVisible={showCoinDeduction}
+        />
+        <CoinCreditAnimation
+          amount={coinCreditAmount}
+          isVisible={showCoinCredit}
+        />
 
         {renderLeagueOverlay()}
       </div>

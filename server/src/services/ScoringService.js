@@ -532,6 +532,15 @@ export class ScoringService {
 
       console.log(`[SCORING] Game ${gameId} completed successfully`);
       
+      // Handle coin payments for rated games
+      try {
+        const { CoinService } = await import('./CoinService.js');
+        await CoinService.handleGameCoins(gameId, 'pay');
+      } catch (coinError) {
+        console.error('[SCORING] Error handling coin payments:', coinError);
+        // Don't throw - coin payment failure shouldn't break game completion
+      }
+
       // Post Discord results for league games
       try {
         const { DiscordResultsService } = await import('./DiscordResultsService.js');
