@@ -886,7 +886,7 @@ async function payUser(interaction) {
     }
 
     // Update user's coins
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: { 
         coins: { increment: amount }
@@ -895,13 +895,14 @@ async function payUser(interaction) {
 
     const embed = new EmbedBuilder()
       .setTitle('💰 Payment Processed')
-      .setDescription(`Successfully paid ${amount} coins to <@${targetUser.id}>`)
       .addFields(
-        { name: 'Amount', value: `${amount} coins`, inline: true },
+        { name: 'Amount', value: `${amount.toLocaleString()} coins`, inline: true },
         { name: 'Recipient', value: `<@${targetUser.id}>`, inline: true },
-        { name: 'Processed by', value: `<@${interaction.user.id}>`, inline: true }
+        { name: 'New Balance', value: `${updatedUser.coins.toLocaleString()} coins`, inline: true },
+        { name: 'Processed by', value: `<@${interaction.user.id}>`, inline: false }
       )
       .setColor(0x00ff00)
+      .setThumbnail(targetUser.displayAvatarURL())
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
