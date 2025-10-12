@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import type { GameState } from "../../../types/game";
 
@@ -23,6 +23,9 @@ export const useSocketEventHandlers = ({
   setError,
   setHasAttemptedJoin
 }: UseSocketEventHandlersProps) => {
+  // Add state to track last game update to prevent duplicates
+  const [lastGameUpdate, setLastGameUpdate] = React.useState<{ timestamp: number; gameState: any } | null>(null);
+  
   useEffect(() => {
     if (!socket || !isReady) return;
 
@@ -44,12 +47,30 @@ export const useSocketEventHandlers = ({
 
     const handleGameUpdate = (gameData: any) => {
       if (gameData && gameData.gameId === gameId) {
+        const now = Date.now();
+        const gameStateString = JSON.stringify(gameData.gameState);
+        
+        // Check if this is a duplicate update (same game state within 100ms)
+        if (lastGameUpdate && 
+            now - lastGameUpdate.timestamp < 100 && 
+            JSON.stringify(lastGameUpdate.gameState) === gameStateString) {
+          console.log('🎮 Duplicate game update ignored:', {
+            status: gameData.gameState?.status,
+            currentPlayer: gameData.gameState?.currentPlayer,
+            currentRound: gameData.gameState?.currentRound
+          });
+          return;
+        }
+        
         console.log('🎮 Game update received - playerScores:', {
           playerScores: gameData.gameState?.playerScores,
           playerBags: gameData.gameState?.playerBags,
           gameMode: gameData.gameState?.gameMode,
           status: gameData.gameState?.status
         });
+        
+        // Update the last game update timestamp
+        setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
         setGameState(normalizeGameState(gameData.gameState));
       }
     };
@@ -115,23 +136,35 @@ export const useSocketEventHandlers = ({
             
             // CRITICAL: Ensure currentTrick data is properly integrated
             const normalizedState = normalizeGameState(gameStateWithBidding);
-            if (cardData.currentTrick && Array.isArray(cardData.currentTrick)) {
+            
+            // Ensure currentTrick is never undefined - use data from currentTrick or gameState
+            const currentTrick = cardData.currentTrick || cardData.gameState?.play?.currentTrick || [];
+            if (Array.isArray(currentTrick)) {
               normalizedState.play = {
                 ...normalizedState.play,
-                currentTrick: cardData.currentTrick
+                currentTrick: currentTrick
               };
               // CRITICAL: Also set currentTrick at top level for renderTrickCards
-              normalizedState.currentTrick = cardData.currentTrick;
+              normalizedState.currentTrick = currentTrick;
+            } else {
+              // Fallback to empty array if currentTrick is not an array
+              normalizedState.play = {
+                ...normalizedState.play,
+                currentTrick: []
+              };
+              normalizedState.currentTrick = [];
             }
             return normalizedState;
           } else {
             // Fallback to partial update if gameState not provided
+            const currentTrick = cardData.currentTrick || prevState.play?.currentTrick || [];
             return {
               ...prevState,
               play: {
                 ...prevState.play,
-                currentTrick: cardData.currentTrick || []
-              }
+                currentTrick: Array.isArray(currentTrick) ? currentTrick : []
+              },
+              currentPlayer: cardData.currentPlayer || prevState.currentPlayer
             };
           }
         });
