@@ -77,7 +77,9 @@ export interface GameState {
   forcedBid?: string;
   specialRules?: { screamer?: boolean; assassin?: boolean };
   buyIn?: number;
-  rated?: boolean;  creatorId: string;
+  rated?: boolean;
+  isLeague?: boolean;
+  creatorId: string;
   bidding?: any;
   play?: any;
   hands?: any[];
