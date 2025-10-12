@@ -4,6 +4,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { GameState, Card, Player, Bot } from "../../../types/game";
 import type { ChatMessage } from "../../../features/chat/Chat";
+import { normalizeGameState } from "../../../features/game/hooks/useGameStateNormalization";
 
 interface GameEventHandlersProps {
   socket: any;
@@ -176,6 +177,11 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     if (!socket) return;
     
     const handleNewHandStartedEvent = (data: any) => {
+      console.log('🎮 New hand started event received:', data);
+      if (data && data.gameState) {
+        // Update game state with new hands
+        setGameState(normalizeGameState(data.gameState));
+      }
       onNewHandStarted();
     };
     
@@ -184,7 +190,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     return () => {
       socket.off('new_hand_started', handleNewHandStartedEvent);
     };
-  }, [socket, onNewHandStarted]);
+  }, [socket, onNewHandStarted, setGameState]);
 
   // game_joined handled in useSocketEventHandlers.ts
 
