@@ -847,7 +847,7 @@ export default function GameTableModular({
     if (!isPlayer(p)) return true;
     if (i === myIndex) return true;
     return !!leagueReady[i];
-  });
+  }) ?? false;
   
   // Trick card rendering
   const renderTrickCards = () => {
@@ -947,8 +947,8 @@ export default function GameTableModular({
   const renderLeagueOverlay = () => {
     if (!isLeague || gameState.status !== 'WAITING') return null;
     
-    const readyButtonData = getReadyButtonData(isHost, myIndex, gameState, leagueReady || {}, toggleReady);
-    const startGameButtonData = getStartGameButtonData(isHost, allHumansReady || false, requestStart);
+    const readyButtonData = getReadyButtonData(isHost, myIndex, gameState, leagueReady, toggleReady);
+    const startGameButtonData = getStartGameButtonData(isHost, allHumansReady, requestStart);
     const playerStatusData = getPlayerStatusData(gameState, leagueReady);
     
     const content = (
