@@ -1699,7 +1699,7 @@ async function handleTournamentButton(interaction) {
         
         const partnerInput = new TextInputBuilder()
           .setCustomId('partner_name')
-          .setLabel('Partner Name (leave blank for auto-assignment)')
+          .setLabel('Partner Name (blank = auto-assign)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
           .setPlaceholder('Enter Discord username or mention');
