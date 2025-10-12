@@ -15,12 +15,14 @@ model User {
   createdAt    DateTime           @default(now())
   coins        Int                @default(0)
   soundEnabled Boolean            @default(true)
-  blockedBy    BlockedUser[]      @relation("BlockedUser")
-  blocked      BlockedUser[]      @relation("BlockedBy")
-  friendOf     Friend[]           @relation("FriendOf")
-  friends      Friend[]           @relation("UserFriends")
+  blockedBy    BlockedUser[]             @relation("BlockedUser")
+  blocked      BlockedUser[]             @relation("BlockedBy")
+  friendOf     Friend[]                  @relation("FriendOf")
+  friends      Friend[]                  @relation("UserFriends")
   games        GamePlayer[]
   roundStats   PlayerRoundStats[]
+  tournamentRegistrations TournamentRegistration[]
+  tournamentPartners      TournamentRegistration[] @relation("TournamentPartner")
 }
 
 model UserStats {
@@ -410,4 +412,71 @@ enum StatsMode {
   ALL
   PARTNERS
   SOLO
+}
+
+model Tournament {
+  id              String                   @id @default(cuid())
+  name            String
+  mode            GameMode
+  format          GameFormat
+  gimmickVariant  GimmickVariant?
+  isRated         Boolean                  @default(true)
+  minPoints       Int?
+  maxPoints       Int?
+  nilAllowed      Boolean?                 @default(true)
+  blindNilAllowed Boolean?                 @default(false)
+  buyIn           Int?
+  startTime       DateTime
+  status          TournamentStatus         @default(REGISTRATION_OPEN)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  registrations   TournamentRegistration[]
+  matches         TournamentMatch[]
+}
+
+model TournamentRegistration {
+  id           String     @id @default(cuid())
+  tournamentId String
+  userId       String
+  partnerId    String?
+  isComplete   Boolean    @default(false)
+  registeredAt DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner      User?      @relation("TournamentPartner", fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId])
+}
+
+model TournamentMatch {
+  id           String     @id @default(cuid())
+  tournamentId String
+  round        Int
+  matchNumber  Int
+  team1Id      String?
+  team2Id      String?
+  winnerId     String?
+  gameId       String?
+  status       MatchStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, round, matchNumber])
+  @@index([tournamentId])
+}
+
+enum TournamentStatus {
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
 }

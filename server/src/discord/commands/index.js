@@ -368,6 +368,77 @@ export const commands = [
   },
   {
     data: new SlashCommandBuilder()
+      .setName('regulartournament')
+      .setDescription('Create a REGULAR tournament')
+      .addStringOption(option =>
+        option.setName('name')
+          .setDescription('Tournament name')
+          .setRequired(true)
+      )
+      .addIntegerOption(option =>
+        option.setName('mode')
+          .setDescription('Game mode')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount')
+          .setRequired(true)
+          .addChoices(
+            { name: '100k', value: 100000 },
+            { name: '200k', value: 200000 },
+            { name: '300k', value: 300000 },
+            { name: '400k', value: 400000 },
+            { name: '500k', value: 500000 },
+            { name: '600k', value: 600000 },
+            { name: '700k', value: 700000 },
+            { name: '800k', value: 800000 },
+            { name: '900k', value: 900000 },
+            { name: '1M', value: 1000000 },
+            { name: '2M', value: 2000000 },
+            { name: '3M', value: 3000000 },
+            { name: '4M', value: 4000000 },
+            { name: '5M', value: 5000000 },
+            { name: '6M', value: 6000000 },
+            { name: '7M', value: 7000000 },
+            { name: '8M', value: 8000000 },
+            { name: '9M', value: 9000000 },
+            { name: '10M', value: 10000000 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('starttime')
+          .setDescription('Start time (e.g., "2025-10-15 19:00" or "tomorrow 7pm")')
+          .setRequired(true)
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points to win (default: -100)')
+          .setRequired(false)
+      )
+      .addIntegerOption(option =>
+        option.setName('maxpoints')
+          .setDescription('Maximum points to lose (default: 500)')
+          .setRequired(false)
+      )
+      .addBooleanOption(option =>
+        option.setName('nilallowed')
+          .setDescription('Allow nil bids (default: true)')
+          .setRequired(false)
+      )
+      .addBooleanOption(option =>
+        option.setName('blindnilallowed')
+          .setDescription('Allow blind nil bids (default: false)')
+          .setRequired(false)
+      ),
+    execute: (interaction) => createTournament(interaction, 'REGULAR')
+  },
+  {
+    data: new SlashCommandBuilder()
       .setName('facebookhelp')
       .setDescription('Post Facebook connection instructions'),
     execute: async (interaction) => {
@@ -549,12 +620,38 @@ export const commands = [
   }
 ];
 
+// Export modal submit handler
+export async function handleModalSubmit(interaction) {
+  try {
+    const customId = interaction.customId;
+    
+    if (customId.startsWith('tournament_modal_')) {
+      await handleTournamentModal(interaction);
+    }
+  } catch (error) {
+    console.error('[DISCORD] Error handling modal submit:', error);
+    await interaction.reply({
+      content: '❌ An error occurred. Please try again.',
+      ephemeral: true
+    });
+  }
+}
+
 // Export button handler for interaction handling
 export async function handleButtonInteraction(interaction) {
   try {
+    const customId = interaction.customId;
+    
+    // Handle tournament buttons
+    if (customId.startsWith('register_tournament_') || customId.startsWith('cancel_registration_')) {
+      await handleTournamentButton(interaction);
+      return;
+    }
+    
+    // Handle game line buttons
     // customId format: "action_gameLineId" where gameLineId itself contains underscores
     // So we split on first underscore only
-    const [action, ...gameLineIdParts] = interaction.customId.split('_');
+    const [action, ...gameLineIdParts] = customId.split('_');
     const gameLineId = gameLineIdParts.join('_');
     const gameLine = gameLines.get(gameLineId);
     
@@ -1379,5 +1476,482 @@ async function getLeaderboardFromDB(format, mode, limit) {
   } catch (error) {
     console.error('[DISCORD] Error getting leaderboard from DB:', error);
     return [];
+  }
+}
+
+// Tournament modal handler
+async function handleTournamentModal(interaction) {
+  try {
+    const customId = interaction.customId;
+    const tournamentId = customId.split('_').pop();
+    const userId = interaction.user.id;
+    const partnerName = interaction.fields.getTextInputValue('partner_name').trim();
+    
+    // Get user
+    let user = await prisma.user.findUnique({
+      where: { discordId: userId }
+    });
+    
+    if (!user) {
+      return interaction.reply({
+        content: '❌ User not found. Please try again.',
+        ephemeral: true
+      });
+    }
+    
+    // Get tournament
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true }
+    });
+    
+    if (!tournament) {
+      return interaction.reply({
+        content: '❌ Tournament not found.',
+        ephemeral: true
+      });
+    }
+    
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      return interaction.reply({
+        content: '❌ Registration is closed for this tournament.',
+        ephemeral: true
+      });
+    }
+    
+    // Check if already registered
+    const existingRegistration = await prisma.tournamentRegistration.findUnique({
+      where: {
+        tournamentId_userId: {
+          tournamentId,
+          userId: user.id
+        }
+      }
+    });
+    
+    if (existingRegistration) {
+      return interaction.reply({
+        content: '❌ You are already registered for this tournament.',
+        ephemeral: true
+      });
+    }
+    
+    if (partnerName) {
+      // Find partner by username
+      const partner = await prisma.user.findFirst({
+        where: {
+          username: {
+            contains: partnerName,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      if (!partner) {
+        return interaction.reply({
+          content: `❌ Partner "${partnerName}" not found in the server.`,
+          ephemeral: true
+        });
+      }
+      
+      if (partner.id === user.id) {
+        return interaction.reply({
+          content: '❌ You cannot partner with yourself.',
+          ephemeral: true
+        });
+      }
+      
+      // Check if partner is already registered
+      const partnerRegistration = await prisma.tournamentRegistration.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId,
+            userId: partner.id
+          }
+        }
+      });
+      
+      if (partnerRegistration) {
+        return interaction.reply({
+          content: `❌ ${partner.username} is already registered for this tournament.`,
+          ephemeral: true
+        });
+      }
+      
+      // Register both players as a complete team
+      await prisma.tournamentRegistration.createMany({
+        data: [
+          {
+            tournamentId,
+            userId: user.id,
+            partnerId: partner.id,
+            isComplete: true
+          },
+          {
+            tournamentId,
+            userId: partner.id,
+            partnerId: user.id,
+            isComplete: true
+          }
+        ]
+      });
+      
+      await interaction.reply({
+        content: `✅ Successfully registered with ${partner.username} for the tournament!`,
+        ephemeral: true
+      });
+      
+    } else {
+      // Register without partner (will be auto-assigned later)
+      await prisma.tournamentRegistration.create({
+        data: {
+          tournamentId,
+          userId: user.id,
+          isComplete: false
+        }
+      });
+      
+      await interaction.reply({
+        content: '✅ Successfully registered for the tournament! You will be auto-assigned a partner when registration closes.',
+        ephemeral: true
+      });
+    }
+    
+    await updateTournamentEmbed(interaction, tournamentId);
+    
+  } catch (error) {
+    console.error('[TOURNAMENT] Error handling modal:', error);
+    await interaction.reply({
+      content: '❌ An error occurred. Please try again.',
+      ephemeral: true
+    });
+  }
+}
+
+// Tournament button handler
+async function handleTournamentButton(interaction) {
+  try {
+    const customId = interaction.customId;
+    const tournamentId = customId.split('_').pop();
+    const userId = interaction.user.id;
+    
+    // Get or create user
+    let user = await prisma.user.findUnique({
+      where: { discordId: userId }
+    });
+    
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          discordId: userId,
+          username: interaction.user.username,
+          avatarUrl: interaction.user.avatarURL() || '/default-pfp.jpg',
+          coins: 15000000 // Default coins
+        }
+      });
+    }
+    
+    // Get tournament
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true }
+    });
+    
+    if (!tournament) {
+      return interaction.reply({
+        content: '❌ Tournament not found.',
+        ephemeral: true
+      });
+    }
+    
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      return interaction.reply({
+        content: '❌ Registration is closed for this tournament.',
+        ephemeral: true
+      });
+    }
+    
+    if (customId.startsWith('register_tournament_')) {
+      // Check if already registered
+      const existingRegistration = await prisma.tournamentRegistration.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId,
+            userId: user.id
+          }
+        }
+      });
+      
+      if (existingRegistration) {
+        return interaction.reply({
+          content: '❌ You are already registered for this tournament.',
+          ephemeral: true
+        });
+      }
+      
+      // Show modal for partner selection (for partners tournaments)
+      if (tournament.mode === 'PARTNERS') {
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+        
+        const modal = new ModalBuilder()
+          .setCustomId(`tournament_modal_${tournamentId}`)
+          .setTitle('Tournament Registration');
+        
+        const partnerInput = new TextInputBuilder()
+          .setCustomId('partner_name')
+          .setLabel('Partner Name (leave blank for auto-assignment)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder('Enter Discord username or mention');
+        
+        const actionRow = new ActionRowBuilder().addComponents(partnerInput);
+        modal.addComponents(actionRow);
+        
+        await interaction.showModal(modal);
+      } else {
+        // Solo tournament - register directly
+        await prisma.tournamentRegistration.create({
+          data: {
+            tournamentId,
+            userId: user.id,
+            isComplete: true
+          }
+        });
+        
+        await interaction.reply({
+          content: '✅ Successfully registered for the tournament!',
+          ephemeral: true
+        });
+        
+        await updateTournamentEmbed(interaction, tournamentId);
+      }
+      
+    } else if (customId.startsWith('cancel_registration_')) {
+      // Cancel registration
+      const registration = await prisma.tournamentRegistration.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId,
+            userId: user.id
+          }
+        },
+        include: { partner: true }
+      });
+      
+      if (!registration) {
+        return interaction.reply({
+          content: '❌ You are not registered for this tournament.',
+          ephemeral: true
+        });
+      }
+      
+      // Remove both players if it's a complete team
+      if (registration.isComplete && registration.partnerId) {
+        await prisma.tournamentRegistration.deleteMany({
+          where: {
+            tournamentId,
+            OR: [
+              { userId: user.id },
+              { userId: registration.partnerId }
+            ]
+          }
+        });
+      } else {
+        await prisma.tournamentRegistration.delete({
+          where: { id: registration.id }
+        });
+      }
+      
+      await interaction.reply({
+        content: '✅ Registration cancelled.',
+        ephemeral: true
+      });
+      
+      await updateTournamentEmbed(interaction, tournamentId);
+    }
+    
+  } catch (error) {
+    console.error('[TOURNAMENT] Error handling button:', error);
+    await interaction.reply({
+      content: '❌ An error occurred. Please try again.',
+      ephemeral: true
+    });
+  }
+}
+
+// Update tournament embed with current registration stats
+async function updateTournamentEmbed(interaction, tournamentId) {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: { include: { user: true } } }
+    });
+    
+    if (!tournament) return;
+    
+    const completeTeams = tournament.registrations.filter(r => r.isComplete && r.partnerId).length;
+    const needPartner = tournament.registrations.filter(r => !r.isComplete || !r.partnerId).length;
+    
+    const embed = new EmbedBuilder()
+      .setTitle(`🏆 ${tournament.name}`)
+      .setDescription(
+        `**📅 Starts:** <t:${Math.floor(tournament.startTime.getTime() / 1000)}:F>\n` +
+        `**🎮 Mode:** ${tournament.mode}\n` +
+        `**💰 Buy-in:** ${tournament.buyIn >= 1000000 ? `${tournament.buyIn / 1000000}M` : `${tournament.buyIn / 1000}k`} coins\n` +
+        `**📊 Points:** ${tournament.minPoints} to ${tournament.maxPoints}\n` +
+        `**🎯 Format:** ${tournament.format}\n` +
+        `**🎲 Nils:** ${tournament.nilAllowed ? 'Allowed' : 'Not Allowed'}\n` +
+        `**👁️ Blind Nils:** ${tournament.blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n\n` +
+        `**Teams:** ${completeTeams}\n` +
+        `**Need a P:** ${needPartner}`
+      )
+      .setColor(0x0099ff)
+      .setTimestamp();
+    
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`register_tournament_${tournamentId}`)
+          .setLabel('Register')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`cancel_registration_${tournamentId}`)
+          .setLabel('Cancel Registration')
+          .setStyle(ButtonStyle.Danger)
+      );
+    
+    await interaction.editReply({
+      embeds: [embed],
+      components: [row]
+    });
+    
+  } catch (error) {
+    console.error('[TOURNAMENT] Error updating embed:', error);
+  }
+}
+
+// Tournament creation function
+async function createTournament(interaction, format) {
+  try {
+    // Check if user is admin
+    const adminIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
+    if (!adminIds.includes(interaction.user.id)) {
+      await interaction.reply({
+        content: '❌ This command is only available to administrators.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    // Defer reply to prevent timeout
+    await interaction.deferReply();
+
+    const name = interaction.options.getString('name');
+    const coins = interaction.options.getInteger('coins');
+    const modeValue = interaction.options.getInteger('mode');
+    const mode = modeValue === 1 ? 'PARTNERS' : 'SOLO';
+    const minPoints = interaction.options.getInteger('minpoints') || -100;
+    const maxPoints = interaction.options.getInteger('maxpoints') || 500;
+    const nilAllowed = interaction.options.getBoolean('nilallowed') ?? true;
+    const blindNilAllowed = interaction.options.getBoolean('blindnilallowed') ?? false;
+    const startTimeStr = interaction.options.getString('starttime');
+
+    // Parse start time
+    let startTime;
+    try {
+      // Try parsing various formats
+      if (startTimeStr.includes('tomorrow')) {
+        const timeMatch = startTimeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1]);
+          const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+          const ampm = timeMatch[3]?.toLowerCase();
+          
+          if (ampm === 'pm' && hours !== 12) hours += 12;
+          if (ampm === 'am' && hours === 12) hours = 0;
+          
+          startTime = new Date();
+          startTime.setDate(startTime.getDate() + 1);
+          startTime.setHours(hours, minutes, 0, 0);
+        } else {
+          throw new Error('Invalid time format');
+        }
+      } else {
+        startTime = new Date(startTimeStr);
+        if (isNaN(startTime.getTime())) {
+          throw new Error('Invalid date format');
+        }
+      }
+    } catch (error) {
+      return interaction.editReply({
+        content: '❌ Invalid start time format. Use formats like "2025-10-15 19:00" or "tomorrow 7pm"'
+      });
+    }
+
+    // Validate start time is in the future
+    if (startTime <= new Date()) {
+      return interaction.editReply({
+        content: '❌ Tournament start time must be in the future.'
+      });
+    }
+
+    // Create tournament in database
+    const tournament = await prisma.tournament.create({
+      data: {
+        name,
+        mode,
+        format,
+        isRated: true,
+        minPoints,
+        maxPoints,
+        nilAllowed,
+        blindNilAllowed,
+        buyIn: coins,
+        startTime
+      }
+    });
+
+    // Create tournament registration embed
+    const embed = new EmbedBuilder()
+      .setTitle(`🏆 ${name}`)
+      .setDescription(
+        `**📅 Starts:** <t:${Math.floor(startTime.getTime() / 1000)}:F>\n` +
+        `**🎮 Mode:** ${mode}\n` +
+        `**💰 Buy-in:** ${coins >= 1000000 ? `${coins / 1000000}M` : `${coins / 1000}k`} coins\n` +
+        `**📊 Points:** ${minPoints} to ${maxPoints}\n` +
+        `**🎯 Format:** ${format}\n` +
+        `**🎲 Nils:** ${nilAllowed ? 'Allowed' : 'Not Allowed'}\n` +
+        `**👁️ Blind Nils:** ${blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n\n` +
+        `**Teams:** 0\n` +
+        `**Need a P:** 0`
+      )
+      .setColor(0x0099ff)
+      .setTimestamp();
+
+    // Create registration buttons
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`register_tournament_${tournament.id}`)
+          .setLabel('Register')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`cancel_registration_${tournament.id}`)
+          .setLabel('Cancel Registration')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+    await interaction.editReply({
+      embeds: [embed],
+      components: [row]
+    });
+
+    console.log(`[TOURNAMENT] Created tournament: ${name} (${tournament.id})`);
+
+  } catch (error) {
+    console.error('[TOURNAMENT] Error creating tournament:', error);
+    await interaction.editReply({
+      content: '❌ Error creating tournament. Please try again.'
+    });
   }
 }

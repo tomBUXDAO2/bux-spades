@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
-import { commands, handleButtonInteraction } from './commands/index.js';
+import { commands, handleButtonInteraction, handleModalSubmit } from './commands/index.js';
 import { registerRoleMetadata } from './linkedRoles.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -99,6 +99,9 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.isButton()) {
       // Handle button interactions
       await handleButtonInteraction(interaction);
+    } else if (interaction.isModalSubmit()) {
+      // Handle modal submissions
+      await handleModalSubmit(interaction);
     }
   } catch (error) {
     console.error('[DISCORD BOT] Error handling interaction:', error);
