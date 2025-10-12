@@ -1537,19 +1537,34 @@ async function handleTournamentModal(interaction) {
     }
     
     if (partnerName) {
-      // Find partner by username
-      const partner = await prisma.user.findFirst({
-        where: {
-          username: {
-            contains: partnerName,
-            mode: 'insensitive'
+      // Extract Discord ID from mention format <@USER_ID> or <@!USER_ID>
+      let partnerDiscordId = null;
+      const mentionMatch = partnerName.match(/<@!?(\d+)>/);
+      if (mentionMatch) {
+        partnerDiscordId = mentionMatch[1];
+      }
+      
+      // Find partner by Discord ID (if mentioned) or username
+      let partner;
+      if (partnerDiscordId) {
+        partner = await prisma.user.findUnique({
+          where: { discordId: partnerDiscordId }
+        });
+      } else {
+        // Search by username
+        partner = await prisma.user.findFirst({
+          where: {
+            username: {
+              contains: partnerName,
+              mode: 'insensitive'
+            }
           }
-        }
-      });
+        });
+      }
       
       if (!partner) {
         return interaction.reply({
-          content: `❌ Partner "${partnerName}" not found in the server.`,
+          content: `❌ Partner "${partnerName}" not found in the server. Make sure they have played at least one game.`,
           ephemeral: true
         });
       }
@@ -1702,7 +1717,7 @@ async function handleTournamentButton(interaction) {
           .setLabel('Partner Name (blank = auto-assign)')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
-          .setPlaceholder('Enter Discord username or mention');
+          .setPlaceholder('Type @username or paste user mention');
         
         const actionRow = new ActionRowBuilder().addComponents(partnerInput);
         modal.addComponents(actionRow);
