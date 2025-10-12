@@ -188,7 +188,7 @@ export default function GameTableModular({
   const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
   const isVerySmallScreen = windowSize.height <= 349;
-  const isLeague = gameState.isLeague;
+  const isLeague = gameState.isLeague || false;
   const isHost = isLeague && gameState.players?.[0]?.id === propUser?.id;
   
   // Scores come from backend - no calculation needed
