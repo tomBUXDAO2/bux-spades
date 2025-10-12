@@ -146,18 +146,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     </div>
                     <p>{msg.message}</p>
                   </div>
-                  <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
-                    <img 
-                      src={msg.userAvatar || getUserAvatar(msg.userId)} 
-                      alt={msg.userName || ''} 
-                      width={32}
-                      height={32}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/default-pfp.jpg';
-                      }}
-                    />
-                  </div>
+                  {msg.userId === user.id && (
+                    <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
+                      <img 
+                        src={msg.userAvatar || getUserAvatar(msg.userId)} 
+                        alt={msg.userName || ''} 
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )
             ))}
