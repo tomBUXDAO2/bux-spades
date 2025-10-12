@@ -177,26 +177,47 @@ export class GameService {
     }
   }
 
-  // Update game in database
+  // Update game in database with retry logic to prevent games from getting stuck
   static async updateGame(gameId, updates) {
-    try {
-      console.log(`[GAME SERVICE] updateGame called for ${gameId}:`, {
-        updateKeys: Object.keys(updates)
-      });
-      
-      const result = await prisma.game.update({
-        where: { id: gameId },
-        data: {
-          ...updates,
-          updatedAt: new Date()
-        }
-      });
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`[GAME SERVICE] updateGame called for ${gameId}:`, {
+          updateKeys: Object.keys(updates)
+        });
+        
+        const result = await prisma.game.update({
+          where: { id: gameId },
+          data: {
+            ...updates,
+            updatedAt: new Date()
+          }
+        });
 
-      console.log(`[GAME SERVICE] Game updated successfully:`, result.id);
-      return result;
-    } catch (error) {
-      console.error('[GAME SERVICE] Error updating game:', error);
-      throw error;
+        console.log(`[GAME SERVICE] Game updated successfully:`, result.id);
+        return result;
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`[GAME SERVICE] Error updating game (attempt ${retryCount}/${maxRetries}):`, error);
+        
+        // Check if it's a database connection error
+        if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+          if (retryCount < maxRetries) {
+            console.log(`[GAME SERVICE] Database connection error, retrying in ${retryCount * 1000}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            continue;
+          }
+        }
+        
+        // If we've exhausted retries or it's not a connection error, throw
+        if (retryCount >= maxRetries) {
+          console.error(`[GAME SERVICE] Failed to update game after ${maxRetries} attempts`);
+          throw error;
+        }
+      }
     }
   }
 
@@ -750,9 +771,11 @@ export class GameService {
       
       // CRITICAL: Build players array with nulls for empty seats (client expects 4-element array)
       const playersArray = [null, null, null, null];
+      const spectatorsArray = [];
+      
       game.players.forEach(player => {
         const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
-        playersArray[player.seatIndex] = {
+        const playerData = {
           id: player.userId,
           userId: player.userId, // CRITICAL: Add userId field for player lookups
           username: player.user?.username || 'Unknown',
@@ -765,6 +788,12 @@ export class GameService {
           bid: playerBids[player.seatIndex] || null,
           tricks: playerStat?.tricksWon || 0
         };
+        
+        if (player.isSpectator) {
+          spectatorsArray.push(playerData);
+        } else {
+          playersArray[player.seatIndex] = playerData;
+        }
       });
 
       // Format for client
@@ -788,6 +817,7 @@ export class GameService {
         currentTrick: game.currentTrick,
         dealer: game.dealer,
         players: playersArray,
+        spectators: spectatorsArray,
         rounds: game.rounds || [],
         hands: playerHands, // Frontend expects 'hands', not 'playerHands'
         playerHands: playerHands, // Keep both for compatibility

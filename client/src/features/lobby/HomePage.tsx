@@ -724,7 +724,7 @@ const HomePage: React.FC = () => {
 
   const getUserAvatar = (userId: string): string => {
     const player = onlinePlayers.find(p => p.id === userId);
-    return player?.avatar || '/default-pfp.jpg';
+    return player?.avatarUrl || '/default-pfp.jpg';
   };
 
   return (

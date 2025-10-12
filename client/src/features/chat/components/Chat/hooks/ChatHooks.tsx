@@ -128,7 +128,12 @@ export const useChatHooks = ({
     const handleGameMessage = (data: any) => {
       const message = 'gameId' in data ? data.message : data;
       if (message && message.userId !== 'system') {
-        setMessages(prev => [...prev, message]);
+        setMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          const exists = prev.some(m => m.id === message.id);
+          if (exists) return prev;
+          return [...prev, message];
+        });
       }
     };
 

@@ -145,7 +145,7 @@ export class DatabaseGameEngine {
       currentTrick: game.currentTrick,
       currentPlayer,
       dealer: game.dealer,
-      players: game.players.map((player, index) => ({
+      players: game.players.filter(player => !player.isSpectator).map((player, index) => ({
         ...player,
         hand: playerHands[index] || [],
         position: player.seatIndex,
@@ -157,6 +157,14 @@ export class DatabaseGameEngine {
         points: 0, // TODO: Calculate from player stats
         connected: true,
         userId: player.userId, // Ensure userId is preserved
+        username: player.user?.username,
+        avatarUrl: player.user?.avatarUrl
+      })),
+      spectators: game.players.filter(player => player.isSpectator).map(player => ({
+        ...player,
+        type: player.isHuman ? 'human' : 'bot',
+        connected: true,
+        userId: player.userId,
         username: player.user?.username,
         avatarUrl: player.user?.avatarUrl
       })),

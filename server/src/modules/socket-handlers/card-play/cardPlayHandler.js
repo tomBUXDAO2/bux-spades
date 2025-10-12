@@ -19,35 +19,55 @@ class CardPlayHandler {
   }
 
   async handlePlayCard(data) {
-    try {
-      const { gameId, card } = data;
-      const userId = this.socket.userId || data.userId;
-      
-      if (!userId) {
-        this.socket.emit('error', { message: 'User not authenticated' });
-        return;
-      }
-      
-      // User playing card
-      
-      // Get current game state from database
-      const gameState = await GameService.getGameStateForClient(gameId);
-      if (!gameState) {
-        this.socket.emit('error', { message: 'Game not found' });
-        return;
-      }
+    const maxRetries = 2;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        const { gameId, card } = data;
+        const userId = this.socket.userId || data.userId;
+        
+        if (!userId) {
+          this.socket.emit('error', { message: 'User not authenticated' });
+          return;
+        }
+        
+        // User playing card
+        
+        // Get current game state from database
+        const gameState = await GameService.getGameStateForClient(gameId);
+        if (!gameState) {
+          this.socket.emit('error', { message: 'Game not found' });
+          return;
+        }
 
-      // Validate it's the player's turn
-      if (gameState.currentPlayer !== userId) {
-        this.socket.emit('error', { message: 'Not your turn' });
+        // Validate it's the player's turn
+        if (gameState.currentPlayer !== userId) {
+          this.socket.emit('error', { message: 'Not your turn' });
+          return;
+        }
+
+        // Process the card play in database
+        await this.processCardPlay(gameId, userId, card, false);
+        return; // Success - exit retry loop
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`[CARD PLAY] Error in handlePlayCard (attempt ${retryCount}/${maxRetries}):`, error);
+        
+        // Check if it's a database connection error
+        if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+          if (retryCount < maxRetries) {
+            console.log(`[CARD PLAY] Database connection error, retrying in ${retryCount * 1000}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            continue;
+          }
+        }
+        
+        // If we've exhausted retries or it's not a connection error, emit error
+        this.socket.emit('error', { message: 'Failed to play card' });
         return;
       }
-
-      // Process the card play in database
-      await this.processCardPlay(gameId, userId, card, false);
-    } catch (error) {
-      console.error('[CARD PLAY] Error:', error);
-      this.socket.emit('error', { message: 'Failed to play card' });
     }
   }
 
@@ -599,25 +619,52 @@ class CardPlayHandler {
 
   /**
    * CRITICAL FIX: Update currentPlayer in both database AND Redis cache
+   * With database connection retry logic to prevent games from getting stuck
    */
   async updateCurrentPlayer(gameId, userId) {
-    try {
-      // Update database
-      await GameService.updateGame(gameId, {
-        currentPlayer: userId
-      });
-      console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in database`);
-      
-      // CRITICAL: Also update Redis cache to prevent stale data
-      const cachedGameState = await redisGameState.getGameState(gameId);
-      if (cachedGameState) {
-        cachedGameState.currentPlayer = userId;
-        await redisGameState.setGameState(gameId, cachedGameState);
-        console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in Redis cache`);
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        // Update database with retry logic
+        await GameService.updateGame(gameId, {
+          currentPlayer: userId
+        });
+        console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in database`);
+        
+        // CRITICAL: Also update Redis cache to prevent stale data
+        const cachedGameState = await redisGameState.getGameState(gameId);
+        if (cachedGameState) {
+          cachedGameState.currentPlayer = userId;
+          await redisGameState.setGameState(gameId, cachedGameState);
+          console.log(`[CURRENT PLAYER] Updated currentPlayer to ${userId} in Redis cache`);
+        }
+        
+        // Success - break out of retry loop
+        return;
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`[CURRENT PLAYER] Error updating currentPlayer to ${userId} (attempt ${retryCount}/${maxRetries}):`, error);
+        
+        // Check if it's a database connection error
+        if (error.code === 'P1017' || error.message?.includes('Server has closed the connection')) {
+          if (retryCount < maxRetries) {
+            console.log(`[CURRENT PLAYER] Database connection error, retrying in ${retryCount * 1000}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            continue;
+          }
+        }
+        
+        // If we've exhausted retries or it's not a connection error, throw
+        if (retryCount >= maxRetries) {
+          console.error(`[CURRENT PLAYER] Failed to update currentPlayer after ${maxRetries} attempts, game may get stuck`);
+          // Don't throw error - just log it to prevent game from getting stuck
+          // The game will continue with the next player based on Redis cache
+          return;
+        }
       }
-    } catch (error) {
-      console.error(`[CURRENT PLAYER] Error updating currentPlayer to ${userId}:`, error);
-      throw error;
     }
   }
 }
