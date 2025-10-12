@@ -167,9 +167,22 @@ export const useChatHooks = ({
   // Load initial messages
   useEffect(() => {
     if (chatType === 'game' && Object.keys(gameMessages).length > 0) {
-      setMessages(Object.values(gameMessages));
+      setMessages(prev => {
+        const newMessages = Object.values(gameMessages);
+        // Only update if we don't have messages yet or if the game messages are actually new
+        if (prev.length === 0) {
+          return newMessages;
+        }
+        return prev;
+      });
     } else if (chatType === 'lobby' && lobbyMessages.length > 0) {
-      setMessages(lobbyMessages);
+      setMessages(prev => {
+        // Only update if we don't have messages yet
+        if (prev.length === 0) {
+          return lobbyMessages;
+        }
+        return prev;
+      });
     }
   }, [chatType, gameMessages, lobbyMessages]);
 

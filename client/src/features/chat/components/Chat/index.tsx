@@ -151,6 +151,7 @@ export default function ChatModular({
               onRemoveFriend={removeFriend}
               onBlockUser={blockUser}
               onUnblockUser={unblockUser}
+              currentUserId={userId}
             />
           )}
         </div>

@@ -95,7 +95,8 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               key={message.id || index}
               className="w-full text-center my-2"
             >
-              <span className="text-orange-400 flex items-center justify-center gap-1">
+              <span className="text-orange-400 italic flex items-center justify-center gap-1">
+                {message.message.includes('spectating') && <EyeIcon />}
                 {message.message}
               </span>
             </div>

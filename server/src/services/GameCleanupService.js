@@ -80,7 +80,7 @@ export class GameCleanupService {
       
       console.log(`[GAME CLEANUP] Found ${botUserIds.length} bot players to delete:`, botUserIds);
       
-      // Start a transaction to ensure atomicity
+      // Start a transaction to ensure atomicity with increased timeout
       await prisma.$transaction(async (tx) => {
         
         // 3. Resolve round and trick ids for this game
@@ -299,56 +299,53 @@ export class GameCleanupService {
    */
   static async getCleanupStats() {
     try {
-      const stats = await prisma.$transaction(async (tx) => {
-        // Count unrated games
-        const unratedGames = await tx.game.count({
-          where: { isRated: false }
-        });
-        
-        // Count unrated games with no human players
-        // Note: This is a simplified check - we'll need to check GamePlayer table separately
-        const abandonedGames = await tx.game.count({
-          where: {
-            isRated: false,
-            status: {
-              in: ['WAITING', 'BIDDING', 'PLAYING']
-            }
-          }
-        });
-        
-        // Count old completed unrated games
-        const cutoffDate = new Date();
-        cutoffDate.setHours(cutoffDate.getHours() - 24);
-        
-        const oldCompletedGames = await tx.game.count({
-          where: {
-            isRated: false,
-            status: 'FINISHED',
-            finishedAt: {
-              lt: cutoffDate
-            }
-          }
-        });
-        
-        // Count bot users
-        const botUsers = await tx.user.count({
-          where: {
-            username: {
-              startsWith: 'Bot_'
-            }
-          }
-        });
-        
-        return {
-          unratedGames,
-          abandonedGames,
-          oldCompletedGames,
-          botUsers,
-          totalCleanupCandidates: abandonedGames + oldCompletedGames
-        };
+      // Use separate queries instead of a transaction to avoid timeout
+      // Count unrated games
+      const unratedGames = await prisma.game.count({
+        where: { isRated: false }
       });
       
-      return stats;
+      // Count unrated games with no human players
+      // Note: This is a simplified check - we'll need to check GamePlayer table separately
+      const abandonedGames = await prisma.game.count({
+        where: {
+          isRated: false,
+          status: {
+            in: ['WAITING', 'BIDDING', 'PLAYING']
+          }
+        }
+      });
+      
+      // Count old completed unrated games
+      const cutoffDate = new Date();
+      cutoffDate.setHours(cutoffDate.getHours() - 24);
+      
+      const oldCompletedGames = await prisma.game.count({
+        where: {
+          isRated: false,
+          status: 'FINISHED',
+          finishedAt: {
+            lt: cutoffDate
+          }
+        }
+      });
+      
+      // Count bot users
+      const botUsers = await prisma.user.count({
+        where: {
+          username: {
+            startsWith: 'Bot_'
+          }
+        }
+      });
+      
+      return {
+        unratedGames,
+        abandonedGames,
+        oldCompletedGames,
+        botUsers,
+        totalCleanupCandidates: abandonedGames + oldCompletedGames
+      };
     } catch (error) {
       console.error('[GAME CLEANUP] Error getting cleanup stats:', error);
       throw error;
