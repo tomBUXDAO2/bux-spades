@@ -92,20 +92,24 @@ export class GameService {
 
   // Get complete game state from database (single source of truth)
   static async getGame(gameId) {
-    // Simplified mutex - just wait briefly if operation is in progress
-    if (databaseOperations.has(gameId)) {
-      console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting briefly...`);
-      // Wait briefly and then proceed anyway to prevent blocking
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    const maxRetries = 3;
+    let retryCount = 0;
     
-    databaseOperations.add(gameId);
-    
-    try {
-      // Get main game record
-      const game = await prisma.game.findUnique({
-        where: { id: gameId }
-      });
+    while (retryCount < maxRetries) {
+      try {
+        // Simplified mutex - just wait briefly if operation is in progress
+        if (databaseOperations.has(gameId)) {
+          console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting briefly...`);
+          // Wait briefly and then proceed anyway to prevent blocking
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        databaseOperations.add(gameId);
+        
+        // Get main game record
+        const game = await prisma.game.findUnique({
+          where: { id: gameId }
+        });
 
       if (!game) {
         return null;
@@ -169,11 +173,35 @@ export class GameService {
         rounds: roundsWithData,
         result
       };
-    } catch (error) {
-      console.error('[GAME SERVICE] Error getting game:', error);
-      throw error;
-    } finally {
-      databaseOperations.delete(gameId);
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`[GAME SERVICE] Error getting game (attempt ${retryCount}/${maxRetries}):`, error);
+        
+        // Always clean up on error
+        databaseOperations.delete(gameId);
+        
+        // Check if it's a database connection error (P1017, P1001, or connection closed)
+        if ((error.code === 'P1017' || error.code === 'P1001' || 
+             error.message?.includes('Server has closed the connection') ||
+             error.message?.includes('Can\'t reach database server')) && 
+            retryCount < maxRetries) {
+          console.log(`[GAME SERVICE] Database connection error, retrying in ${retryCount * 1000}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+          continue;
+        }
+        
+        // If we've exhausted retries or it's not a connection error, throw
+        if (retryCount >= maxRetries) {
+          console.error(`[GAME SERVICE] Failed to get game after ${maxRetries} attempts`);
+          throw error;
+        }
+        
+        // For non-connection errors, throw immediately
+        throw error;
+      } finally {
+        databaseOperations.delete(gameId);
+      }
     }
   }
 

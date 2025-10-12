@@ -209,7 +209,10 @@ export function setupSocketHandlers(io) {
     });
 
     // Lobby chat events
-    socket.on('lobby_message', (data) => lobbyChatHandler.handleLobbyMessage(data));
+    socket.on('lobby_message', (data) => {
+      const handler = new LobbyChatHandler(io, socket);
+      handler.handleLobbyMessage(data);
+    });
 
 
     // Emoji reaction events
