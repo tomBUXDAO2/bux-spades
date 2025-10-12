@@ -947,8 +947,8 @@ export default function GameTableModular({
   const renderLeagueOverlay = () => {
     if (!isLeague || gameState.status !== 'WAITING') return null;
     
-    const readyButtonData = getReadyButtonData(isHost, myIndex, gameState, leagueReady, toggleReady);
-    const startGameButtonData = getStartGameButtonData(isHost, allHumansReady, requestStart);
+    const readyButtonData = getReadyButtonData(isHost, myIndex, gameState, leagueReady || {}, toggleReady);
+    const startGameButtonData = getStartGameButtonData(isHost, allHumansReady || false, requestStart);
     const playerStatusData = getPlayerStatusData(gameState, leagueReady);
     
     const content = (
@@ -1078,7 +1078,7 @@ export default function GameTableModular({
                 currentPlayerId={currentPlayerId}
                 sanitizedPlayers={sanitizedPlayers}
                 scaleFactor={scaleFactor}
-                isLeague={isLeague}
+                isLeague={isLeague || false}
                 isStarting={isStarting}
                 dealingComplete={dealingComplete}
                 cardsRevealed={cardsRevealed}
