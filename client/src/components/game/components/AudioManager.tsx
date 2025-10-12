@@ -276,6 +276,40 @@ export const playGrrrSound = () => {
 export const useAudioManager = () => {
   useEffect(() => {
     initializeAudio();
+    
+    // Unlock audio on first user interaction (required by browsers)
+    const unlockAudio = () => {
+      try {
+        // Try to play and immediately pause a silent audio to unlock audio context
+        const silentAudio = new Audio('/sounds/card.wav');
+        silentAudio.volume = 0;
+        silentAudio.play().then(() => {
+          silentAudio.pause();
+          silentAudio.currentTime = 0;
+          console.log('[AUDIO] Audio unlocked by user interaction');
+        }).catch(() => {
+          // Audio unlock failed, but this is normal if already unlocked
+        });
+        
+        // Remove listener after first unlock
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+      } catch (error) {
+        console.log('[AUDIO] Audio unlock failed:', error);
+      }
+    };
+    
+    // Add listeners for various user interactions
+    document.addEventListener('click', unlockAudio, { once: false });
+    document.addEventListener('touchstart', unlockAudio, { once: false });
+    document.addEventListener('keydown', unlockAudio, { once: false });
+    
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
   }, []);
 
   return {
