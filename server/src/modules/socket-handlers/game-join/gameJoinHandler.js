@@ -140,6 +140,17 @@ class GameJoinHandler {
       }
       console.log(`[SESSION] Updated active game for user ${userId} to ${gameId}`);
 
+      // Load ready states from Redis for league games
+      let readyStates = {};
+      if (gameState.isLeague) {
+        try {
+          readyStates = await redisGameState.getPlayerReady(gameId) || {};
+          console.log(`[GAME JOIN] Loaded ready states for league game ${gameId}:`, readyStates);
+        } catch (error) {
+          console.error(`[GAME JOIN] Error loading ready states for game ${gameId}:`, error);
+        }
+      }
+
       // Emit game_joined event with current database state
       this.socket.emit('game_joined', {
         gameId,
@@ -152,6 +163,14 @@ class GameJoinHandler {
         gameId,
         gameState
       });
+
+      // Emit ready states for league games
+      if (gameState.isLeague && Object.keys(readyStates).length > 0) {
+        this.socket.emit('player_ready_update', {
+          gameId,
+          readyStates
+        });
+      }
       
       // Send system message for joins
       try {
