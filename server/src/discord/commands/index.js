@@ -1084,6 +1084,11 @@ function createGameLineEmbed(gameLineData) {
     gameLineText += `\nnil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
   }
   
+  // Add special rule if present
+  if (specialRule) {
+    gameLineText += `\n🎲 **${specialRule.toUpperCase()}**`;
+  }
+  
   gameLineText += '**'; // Close bold
   
   // Organize players by team or individual colors
@@ -1331,15 +1336,22 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2);
     const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3);
     
+    const coinsDisplay = gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`;
+    let tableUpDesc = `${coinsDisplay} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}`;
+    
+    // Add special rule if present
+    if (gameLine.settings.specialRule) {
+      tableUpDesc += `\n🎲 **${gameLine.settings.specialRule.toUpperCase()}**`;
+    }
+    
+    tableUpDesc += `\n\n🔴 Red Team: ${redTeam.map(p => `<@${p.discordId}>`).join(', ')}\n` +
+                   `🔵 Blue Team: ${blueTeam.map(p => `<@${p.discordId}>`).join(', ')}\n\n` +
+                   `Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...\n\n` +
+                   `GOOD LUCK! 🍀`;
+    
     const tableUpEmbed = new EmbedBuilder()
       .setTitle('🎮 Table Up!')
-      .setDescription(
-        `${gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}\n\n` +
-        `🔴 Red Team: ${redTeam.map(p => `<@${p.discordId}>`).join(', ')}\n` +
-        `🔵 Blue Team: ${blueTeam.map(p => `<@${p.discordId}>`).join(', ')}\n\n` +
-        `Please open your BUX Spades app, login with your Discord profile and you will be directed to your table...\n\n` +
-        `GOOD LUCK! 🍀`
-      )
+      .setDescription(tableUpDesc)
       .setColor(0x0099ff)
       .setTimestamp();
     
