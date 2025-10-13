@@ -1,10 +1,12 @@
 import { prisma } from '../../../config/databaseFirst.js';
 
 class LobbyChatHandler {
+  // CRITICAL: Static Set shared across ALL instances to track online users
+  static connectedUsers = new Set();
+  
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.connectedUsers = new Set(); // Track connected user IDs
   }
 
   async handleLobbyMessage(data) {
@@ -59,8 +61,8 @@ class LobbyChatHandler {
       const userId = this.socket.userId;
       if (!userId) return;
 
-      // Add user to connected users
-      this.connectedUsers.add(userId);
+      // Add user to connected users (static Set)
+      LobbyChatHandler.connectedUsers.add(userId);
 
       // Get user info
       const user = await prisma.user.findUnique({
@@ -70,7 +72,7 @@ class LobbyChatHandler {
 
       if (user) {
         // Broadcast updated online users list to all clients
-        const onlineUserIds = Array.from(this.connectedUsers);
+        const onlineUserIds = Array.from(LobbyChatHandler.connectedUsers);
         this.io.emit('online_users', onlineUserIds);
         console.log(`[LOBBY] User ${user.username} came online. Total online: ${onlineUserIds.length}`);
       }
@@ -86,11 +88,11 @@ class LobbyChatHandler {
       const userId = this.socket.userId;
       if (!userId) return;
 
-      // Remove user from connected users
-      this.connectedUsers.delete(userId);
+      // Remove user from connected users (static Set)
+      LobbyChatHandler.connectedUsers.delete(userId);
 
       // Broadcast updated online users list to all clients
-      const onlineUserIds = Array.from(this.connectedUsers);
+      const onlineUserIds = Array.from(LobbyChatHandler.connectedUsers);
       this.io.emit('online_users', onlineUserIds);
       console.log(`[LOBBY] User went offline. Total online: ${onlineUserIds.length}`);
 
@@ -101,7 +103,7 @@ class LobbyChatHandler {
 
   // Get current online users
   getOnlineUsers() {
-    return Array.from(this.connectedUsers);
+    return Array.from(LobbyChatHandler.connectedUsers);
   }
 }
 
