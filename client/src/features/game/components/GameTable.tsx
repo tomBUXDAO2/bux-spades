@@ -438,26 +438,39 @@ export default function GameTableModular({
     const message = 'gameId' in data ? data.message : data;
     if (!message) return;
     const senderId = message.userId as string;
-    const chat: ChatMessage = {
-      id: message.id,
-      userId: senderId,
-      userName: (message as any).userName,
-      message: message.message,
-      timestamp: message.timestamp || Date.now(),
-      isGameMessage: true,
-    };
-    setRecentChatMessages(prev => ({ ...prev, [senderId]: chat }));
-    setTimeout(() => {
-      setRecentChatMessages(prev => {
-        const current = prev[senderId];
-        if (current && current.id === chat.id) {
-          const copy = { ...prev };
-          delete copy[senderId];
-          return copy;
-        }
+    
+    // CRITICAL: Prevent duplicate speech bubbles by checking if this message ID already exists
+    setRecentChatMessages(prev => {
+      const existing = prev[senderId];
+      if (existing && existing.id === message.id) {
+        // Message already displayed, don't update
         return prev;
-      });
-    }, 4500);
+      }
+      
+      const chat: ChatMessage = {
+        id: message.id,
+        userId: senderId,
+        userName: (message as any).userName,
+        message: message.message,
+        timestamp: message.timestamp || Date.now(),
+        isGameMessage: true,
+      };
+      
+      // Clear the message after 4.5 seconds
+      setTimeout(() => {
+        setRecentChatMessages(current => {
+          const msg = current[senderId];
+          if (msg && msg.id === chat.id) {
+            const copy = { ...current };
+            delete copy[senderId];
+            return copy;
+          }
+          return current;
+        });
+      }, 4500);
+      
+      return { ...prev, [senderId]: chat };
+    });
   };
   
   const handleLeagueReadyUpdate = (payload: { gameId: string; readyStates: Record<string, boolean> }) => {
