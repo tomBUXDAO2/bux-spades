@@ -63,7 +63,15 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   const fontSizes = getFontSizes();
 
   const formatTimestamp = (timestamp: number | string) => {
-    const date = new Date(typeof timestamp === 'string' ? parseInt(timestamp) : timestamp);
+    // Handle both ISO strings (from server) and Unix timestamps (from client)
+    let date: Date;
+    if (typeof timestamp === 'string') {
+      // If it's an ISO string, parse it directly
+      date = new Date(timestamp);
+    } else {
+      // If it's a number, treat it as Unix timestamp
+      date = new Date(timestamp);
+    }
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
