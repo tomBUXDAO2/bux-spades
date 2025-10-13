@@ -40,13 +40,6 @@ const GameChat: React.FC<GameChatProps> = ({ gameId, gameState }) => {
     // Request existing messages when component mounts
     socket.emit('get_game_messages', { gameId, limit: 50 });
 
-    const handleGameMessage = (event: CustomEvent) => {
-      const { gameId: eventGameId, message } = event.detail;
-      if (eventGameId === gameId) {
-        setMessages(prev => [...prev, { ...message, type: 'user' }]);
-      }
-    };
-
     const handleGameMessages = (event: CustomEvent) => {
       const { gameId: eventGameId, messages: newMessages } = event.detail;
       if (eventGameId === gameId) {
@@ -61,12 +54,12 @@ const GameChat: React.FC<GameChatProps> = ({ gameId, gameState }) => {
       }
     };
 
-    window.addEventListener('gameMessage', handleGameMessage as EventListener);
+    // CRITICAL: Only listen to gameMessages (bulk load) and systemMessage
+    // gameMessage (individual messages) is handled by ChatHooks.tsx to prevent duplicates
     window.addEventListener('gameMessages', handleGameMessages as EventListener);
     window.addEventListener('systemMessage', handleSystemMessage as EventListener);
 
     return () => {
-      window.removeEventListener('gameMessage', handleGameMessage as EventListener);
       window.removeEventListener('gameMessages', handleGameMessages as EventListener);
       window.removeEventListener('systemMessage', handleSystemMessage as EventListener);
     };
