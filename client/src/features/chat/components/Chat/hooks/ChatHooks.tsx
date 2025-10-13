@@ -125,8 +125,10 @@ export const useChatHooks = ({
   useEffect(() => {
     if (!socket) return;
 
-    const handleGameMessage = (data: any) => {
-      const message = 'gameId' in data ? data.message : data;
+    // CRITICAL: Listen to CustomEvent, NOT socket directly to avoid duplicates
+    const handleGameMessageEvent = (event: CustomEvent) => {
+      const { gameId: evtGameId, message } = event.detail || {};
+      if (!evtGameId || evtGameId !== gameId || !message) return;
       if (message && message.userId !== 'system') {
         setMessages(prev => {
           // Check if message already exists to prevent duplicates
@@ -158,16 +160,16 @@ export const useChatHooks = ({
       setMessages(prev => [...prev, sys]);
     };
 
-    socket.on('game_message', handleGameMessage);
+    window.addEventListener('gameMessage', handleGameMessageEvent as EventListener);
     socket.on('lobby_chat_message', handleLobbyMessage);
     window.addEventListener('systemMessage', handleSystemMessageEvent as EventListener);
 
     return () => {
-      socket.off('game_message', handleGameMessage);
+      window.removeEventListener('gameMessage', handleGameMessageEvent as EventListener);
       socket.off('lobby_chat_message', handleLobbyMessage);
       window.removeEventListener('systemMessage', handleSystemMessageEvent as EventListener);
     };
-  }, [socket]);
+  }, [socket, gameId]);
 
   // Load initial messages
   useEffect(() => {

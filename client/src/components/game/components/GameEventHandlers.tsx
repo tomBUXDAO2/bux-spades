@@ -408,16 +408,19 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     };
   }, [socket, onLobbyMessage]);
 
-  // Game chat handler
+  // Game chat handler - CRITICAL: Listen to CustomEvent to avoid duplicates
   useEffect(() => {
-    if (!socket) return;
+    const handleGameMessageEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      onGameMessage(customEvent.detail);
+    };
     
-    socket.on('game_message', onGameMessage);
+    window.addEventListener('gameMessage', handleGameMessageEvent);
     
     return () => {
-      socket.off('game_message', onGameMessage);
+      window.removeEventListener('gameMessage', handleGameMessageEvent);
     };
-  }, [socket, onGameMessage]);
+  }, [onGameMessage]);
 
   // League handlers
   useEffect(() => {
