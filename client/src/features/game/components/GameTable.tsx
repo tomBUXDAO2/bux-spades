@@ -970,16 +970,15 @@ export default function GameTableModular({
             Start Game
           </button>
         )}
-        {!startGameButtonData.shouldShow && (
-          <div className="mt-1 text-xs text-slate-300 bg-slate-800/90 rounded px-3 py-2 w-[220px]">
-            {playerStatusData.map((player) => (
-              <div key={player.index} className="flex items-center gap-2 justify-start">
-                <span className={`inline-block w-2 h-2 rounded-full ${player.isReady ? 'bg-green-500' : 'bg-slate-500'}`}></span>
-                <span className="truncate">{player.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Always show player ready statuses for host */}
+        <div className="mt-1 text-xs text-slate-300 bg-slate-800/90 rounded px-3 py-2 w-[220px]">
+          {playerStatusData.map((player) => (
+            <div key={player.index} className="flex items-center gap-2 justify-start">
+              <span className={`inline-block w-2 h-2 rounded-full ${player.isReady ? 'bg-green-500' : 'bg-slate-500'}`}></span>
+              <span className="truncate">{player.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
     );
     return createPortal(content, document.body);
