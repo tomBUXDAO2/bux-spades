@@ -247,7 +247,13 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   height={cardDimensions.cardUIHeight}
                   className={`shadow-xl ${isPlayable ? 'hover:shadow-lg' : ''}`}
                   alt={`${card.rank}${card.suit}`}
-                  faceDown={!cardsRevealed && gameState.status === "BIDDING"}
+                  faceDown={
+                    // CRITICAL: During bidding, only show cards face up when:
+                    // 1. It's this player's turn (gameState.currentPlayer === currentPlayerId)
+                    // 2. AND cards have been revealed (cardsRevealed === true)
+                    // This prevents the flash of wrong cards before table rotation completes
+                    gameState.status === "BIDDING" && !(cardsRevealed && gameState.currentPlayer === currentPlayerId)
+                  }
                 />
                 {!isPlayable && gameState.currentPlayer === currentPlayerId && (
                   <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
