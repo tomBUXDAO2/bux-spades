@@ -1453,6 +1453,20 @@ async function createGameFromLine(gameLine) {
 
   console.log(`[DISCORD] Created game ${gameId} from line with players:`, sortedPlayers.map(p => `${p.username} (seat ${p.seat})`));
   
+  // CRITICAL: Populate Redis cache with initial game state so players can join immediately
+  try {
+    const { GameService } = await import('../../services/GameService.js');
+    const { default: redisGameState } = await import('../../services/RedisGameStateService.js');
+    
+    const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+    if (fullGameState) {
+      await redisGameState.setGameState(gameId, fullGameState);
+      console.log(`[DISCORD] Populated Redis cache for game ${gameId}`);
+    }
+  } catch (error) {
+    console.error(`[DISCORD] Error populating Redis cache:`, error);
+  }
+  
   return gameId;
 }
 
