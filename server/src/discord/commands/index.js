@@ -795,7 +795,8 @@ async function createGameLine(interaction, format) {
     const response = await interaction.editReply({ 
       content: '<@&1403953667501195284>',
       embeds: [embed],
-      components: [buttons]
+      components: [buttons],
+      allowedMentions: { roles: ['1403953667501195284'] }
     });
 
     // Store message ID for later updates
@@ -1357,7 +1358,8 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     
     await interaction.followUp({ 
       content: '<@&1403953667501195284>',
-      embeds: [tableUpEmbed]
+      embeds: [tableUpEmbed],
+      allowedMentions: { roles: ['1403953667501195284'] }
     });
     
     // Clean up game line from memory
