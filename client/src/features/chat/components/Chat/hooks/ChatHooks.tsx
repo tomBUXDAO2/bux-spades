@@ -213,8 +213,8 @@ export const useChatHooks = ({
         socket.emit('lobby_chat_message', message);
       }
       
-      // Add message to local state immediately
-      setMessages(prev => [...prev, message]);
+      // CRITICAL: Don't add message to local state here - it will be added when we receive it back from server
+      // This prevents duplicate messages (optimistic update + server broadcast)
     } catch (error) {
       console.error('Error sending message:', error);
     }
