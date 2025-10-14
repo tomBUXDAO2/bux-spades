@@ -28,13 +28,10 @@ export class StatsService {
         }
       };
 
-      // Get aggregated stats from PlayerRoundStats
+      // Get aggregated stats from PlayerRoundStats (only fields that exist)
       const stats = await prisma.playerRoundStats.aggregate({
         where: whereClause,
         _sum: {
-          points: true,
-          coinsWon: true,
-          coinsLost: true,
           tricksWon: true,
           bagsThisRound: true
         },
@@ -131,8 +128,8 @@ export class StatsService {
         totalGames,
         gamesWon,
         winRate,
-        totalPoints: stats._sum.points || 0,
-        totalCoins: (stats._sum.coinsWon || 0) - (stats._sum.coinsLost || 0),
+        totalPoints: 0, // Points not tracked in PlayerRoundStats
+        totalCoins: 0, // Coins not tracked in PlayerRoundStats
         nilsBid: nilStats._count.id,
         nilsMade: nilMadeStats._count.id,
         nilRate,
