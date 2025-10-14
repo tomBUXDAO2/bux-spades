@@ -126,12 +126,20 @@ export class ScoringService {
         // Individual bags: player tricks minus player bid (for stats only)
         let bagsThisRound = Math.max(0, playerTricks - playerBid);
 
-        console.log(`[SCORING] Seat ${player.seatIndex}: bid ${playerBid}, tricks ${playerTricks}, bags ${bagsThisRound}`);
+        // Check if player made nil or blind nil
+        const madeNil = playerBid === 0 && playerTricks === 0 && !player.isBlindNil;
+        const madeBlindNil = playerBid === 0 && playerTricks === 0 && player.isBlindNil;
+
+        console.log(`[SCORING] Seat ${player.seatIndex}: bid ${playerBid}, tricks ${playerTricks}, bags ${bagsThisRound}, madeNil: ${madeNil}, madeBlindNil: ${madeBlindNil}`);
 
         // Update player stats
         await prisma.playerRoundStats.update({
           where: { id: player.id },
-          data: { bagsThisRound }
+          data: { 
+            bagsThisRound,
+            madeNil,
+            madeBlindNil
+          }
         });
       }
 
@@ -226,10 +234,18 @@ export class ScoringService {
         console.log(`[SCORING] Player ${player.seatIndex} hit 5 bags (${totalBags}), applying -50 penalty. Bags this round: ${bagsThisRound}`);
       }
 
-      // Update player stats with final bags
+      // Check if player made nil or blind nil
+      const madeNil = bid === 0 && tricksWon === 0 && !player.isBlindNil;
+      const madeBlindNil = bid === 0 && tricksWon === 0 && player.isBlindNil;
+
+      // Update player stats with final bags and nil tracking
       await prisma.playerRoundStats.update({
         where: { id: player.id },
-        data: { bagsThisRound: finalBagsThisRound }
+        data: { 
+          bagsThisRound: finalBagsThisRound,
+          madeNil,
+          madeBlindNil
+        }
       });
       
       playerScores.push({
