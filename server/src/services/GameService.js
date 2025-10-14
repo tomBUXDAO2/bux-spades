@@ -316,15 +316,15 @@ export class GameService {
 
       // Delete lowest-level children first to satisfy FKs
       if (trickIds.length > 0) {
-        await prisma.trickCard.deleteMany({ where: { trickId: { in: trickIds } } });
+        await prisma.trickCard.deleteMany({ where: { trickId: { in: trickIds } } }).catch(err => console.log('[DELETE] trickCard error:', err.message));
       }
       if (roundIds.length > 0) {
-        await prisma.trick.deleteMany({ where: { roundId: { in: roundIds } } });
-        await prisma.roundBid.deleteMany({ where: { roundId: { in: roundIds } } });
-        await prisma.roundHandSnapshot.deleteMany({ where: { roundId: { in: roundIds } } });
-        await prisma.roundScore.deleteMany({ where: { roundId: { in: roundIds } } });
-        await prisma.playerRoundStats.deleteMany({ where: { roundId: { in: roundIds } } });
-        await prisma.round.deleteMany({ where: { id: { in: roundIds } } });
+        await prisma.trick.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] trick error:', err.message));
+        await prisma.roundBid.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundBid error:', err.message));
+        await prisma.roundHandSnapshot.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundHandSnapshot error:', err.message));
+        await prisma.roundScore.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundScore error:', err.message));
+        await prisma.playerRoundStats.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] playerRoundStats error:', err.message));
+        await prisma.round.deleteMany({ where: { id: { in: roundIds } } }).catch(err => console.log('[DELETE] round error:', err.message));
       }
 
       // Delete direct children of Game
@@ -1093,6 +1093,107 @@ export class GameService {
     } catch (error) {
       console.error('[GAME SERVICE] Error dealing initial hands:', error);
       console.error('[GAME SERVICE] Error stack:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a player as disconnected in the database
+   * @param {string} gameId - The game ID
+   * @param {string} userId - The user ID
+   */
+  static async markPlayerDisconnected(gameId, userId) {
+    try {
+      await prisma.gamePlayer.updateMany({
+        where: { gameId, userId },
+        data: { 
+          leftAt: new Date(),
+          // Don't remove them completely - keep them in the game for reconnection
+        }
+      });
+      console.log(`[GAME SERVICE] Marked player ${userId} as disconnected in game ${gameId}`);
+    } catch (error) {
+      console.error('[GAME SERVICE] Error marking player as disconnected:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a player as reconnected in the database
+   * @param {string} gameId - The game ID
+   * @param {string} userId - The user ID
+   */
+  static async markPlayerReconnected(gameId, userId) {
+    try {
+      await prisma.gamePlayer.updateMany({
+        where: { gameId, userId },
+        data: { 
+          leftAt: null // Remove the disconnect timestamp
+        }
+      });
+      console.log(`[GAME SERVICE] Marked player ${userId} as reconnected in game ${gameId}`);
+    } catch (error) {
+      console.error('[GAME SERVICE] Error marking player as reconnected:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a player in a specific game
+   * @param {string} gameId - The game ID
+   * @param {string} userId - The user ID
+   */
+  static async getPlayerInGame(gameId, userId) {
+    try {
+      const player = await prisma.gamePlayer.findFirst({
+        where: { gameId, userId },
+        include: { user: true }
+      });
+      return player;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting player in game:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Rotate dealer to next player
+   * @param {string} gameId - The game ID
+   */
+  static async rotateDealer(gameId) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: { players: true }
+      });
+
+      if (!game || !game.players || game.players.length === 0) {
+        console.log(`[GAME SERVICE] Cannot rotate dealer - no players found for game ${gameId}`);
+        return;
+      }
+
+      // Find current dealer
+      const currentDealer = game.players.find(p => p.seatIndex === game.dealer);
+      if (!currentDealer) {
+        console.log(`[GAME SERVICE] Current dealer not found, setting dealer to seat 0`);
+        await prisma.game.update({
+          where: { id: gameId },
+          data: { dealer: 0 }
+        });
+        return;
+      }
+
+      // Rotate to next seat (0->1->2->3->0)
+      const nextDealer = (currentDealer.seatIndex + 1) % 4;
+      
+      await prisma.game.update({
+        where: { id: gameId },
+        data: { dealer: nextDealer }
+      });
+
+      console.log(`[GAME SERVICE] Rotated dealer from seat ${currentDealer.seatIndex} to seat ${nextDealer} for game ${gameId}`);
+    } catch (error) {
+      console.error('[GAME SERVICE] Error rotating dealer:', error);
       throw error;
     }
   }

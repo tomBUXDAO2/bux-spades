@@ -85,6 +85,10 @@ class SystemMessageHandler {
     this.sendSystemMessage(gameId, `👋 ${playerName} left the game`, 'warning');
   }
 
+  handlePlayerDisconnected(gameId, playerName) {
+    this.sendSystemMessage(gameId, `⚠️ ${playerName} disconnected - will auto-play`, 'warning');
+  }
+
   handleBidMade(gameId, playerName, bid, isNil, isBlindNil) {
     let message = `🎯 ${playerName} bid `;
     if (isBlindNil) {

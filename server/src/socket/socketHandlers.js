@@ -67,14 +67,20 @@ export function setupSocketHandlers(io) {
             const playerInGame = await prisma.gamePlayer.findFirst({
               where: {
                 gameId: previousSession.activeGameId,
-                userId: userId,
-                leftAt: null
+                userId: userId
+                // Don't filter by leftAt - we want to find players even if they disconnected
               }
             });
             
             if (playerInGame) {
               validActiveGameId = previousSession.activeGameId;
               console.log(`[SESSION] User ${userId} has valid active game: ${validActiveGameId}`);
+              
+              // CRITICAL: Mark player as reconnected if they were previously disconnected
+              if (playerInGame.leftAt) {
+                console.log(`[SESSION] User ${userId} reconnecting to game ${validActiveGameId} - marking as reconnected`);
+                await GameService.markPlayerReconnected(validActiveGameId, userId);
+              }
             } else {
               console.log(`[SESSION] User ${userId} is not a player in game ${previousSession.activeGameId}, clearing it`);
             }
@@ -292,19 +298,30 @@ export function setupSocketHandlers(io) {
 
     // Disconnect
     socket.on('disconnect', async () => {
-      // NUCLEAR: No logging for performance
+      console.log(`[DISCONNECT] Socket ${socket.id} disconnected, userId: ${socket.userId}`);
+      
       // Handle user going offline for lobby
       lobbyChatHandler.socket = socket;
       lobbyChatHandler.handleUserOffline();
       
-      // Clean up session if this was the active session
+      // CRITICAL: Handle game disconnection
       if (socket.userId) {
         const currentSession = await redisSessionService.getUserSession(socket.userId);
-        if (currentSession && currentSession.socketId === socket.id) {
-          // Don't remove session completely - keep activeGameId for reconnection
-          // Just mark as disconnected by not updating it
-          console.log(`[SESSION] User ${socket.userId} disconnected from active session`);
+        if (currentSession && currentSession.socketId === socket.id && currentSession.activeGameId) {
+          console.log(`[DISCONNECT] User ${socket.userId} disconnected from active game ${currentSession.activeGameId}`);
+          
+          // Handle game disconnection
+          try {
+            const { GameDisconnectHandler } = await import('../modules/socket-handlers/game-disconnect/gameDisconnectHandler.js');
+            const gameDisconnectHandler = new GameDisconnectHandler(io, socket);
+            await gameDisconnectHandler.handlePlayerDisconnect(currentSession.activeGameId, socket.userId);
+          } catch (error) {
+            console.error('[DISCONNECT] Error handling game disconnect:', error);
+          }
         }
+        
+        // Don't remove session completely - keep activeGameId for reconnection
+        console.log(`[SESSION] User ${socket.userId} disconnected from active session`);
       }
     });
   });
