@@ -1402,7 +1402,7 @@ async function createGameFromLine(gameLine) {
         currentRound: 1,
         currentTrick: 0,
         currentPlayer: null,
-        dealer: 0,
+        dealer: Math.floor(Math.random() * 4), // Random dealer 0-3
         createdAt: new Date()
       }
     });

@@ -178,6 +178,11 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     
     const handleNewHandStartedEvent = (data: any) => {
       console.log('🎮 New hand started event received:', data);
+      // CRITICAL: Reset cardsRevealed BEFORE updating game state to prevent card flash
+      setCardsRevealed(false);
+      setDealingComplete(false);
+      setBiddingReady(false);
+      
       if (data && data.gameState) {
         // Update game state with new hands
         setGameState(normalizeGameState(data.gameState));
