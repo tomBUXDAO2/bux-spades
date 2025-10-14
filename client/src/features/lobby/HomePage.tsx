@@ -743,11 +743,7 @@ const HomePage: React.FC = () => {
 
       <main className="container mx-auto px-4 py-4 h-[calc(100vh-64px-32px)]">
         <div
-          className={
-            // Desktop: 3 columns, Tablet/Mobile: 2 columns, Mobile portrait: 1 column
-            'grid h-full ' +
-            'lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4'
-          }
+          className="grid h-full lg:grid-cols-3 grid-cols-2 gap-4"
           style={{ height: '100%' }}
         >
           {/* Games Section */}

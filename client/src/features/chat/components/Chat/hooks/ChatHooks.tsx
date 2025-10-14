@@ -80,7 +80,7 @@ export const useChatHooks = ({
   // Update scale factor when screen size changes
   useEffect(() => {
     setScaleFactor(getScaleFactor());
-    setIsMobile(screenSize.width < 900);
+    setIsMobile(screenSize.width < 800);
   }, [screenSize]);
 
   // Load player statuses

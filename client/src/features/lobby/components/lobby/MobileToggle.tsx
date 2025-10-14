@@ -6,8 +6,15 @@ interface MobileToggleProps {
 }
 
 const MobileToggle: React.FC<MobileToggleProps> = ({ mobileTab, onToggle }) => {
+  // Only show toggle for portrait mobile (screen height > width)
+  const isPortraitMobile = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+  
+  if (!isPortraitMobile) {
+    return null;
+  }
+  
   return (
-    <div className="md:hidden flex justify-center items-center py-2 px-4">
+    <div className="flex justify-center items-center py-2 px-4">
       <span className={`text-base font-bold mr-2 ${mobileTab === 'lobby' ? 'text-indigo-600' : 'text-slate-400'}`}>Lobby</span>
       <button
         className={`relative w-14 h-8 bg-slate-700 rounded-full flex items-center transition-colors duration-200 focus:outline-none`}

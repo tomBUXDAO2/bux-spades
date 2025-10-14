@@ -1,7 +1,7 @@
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Touch-friendly button sizes - EXCLUDE game table header buttons, chat header buttons, bidding modal buttons, and remove player buttons */
-  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button) {
+  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button) {
     min-height: 44px;
     min-width: 44px;
     padding: 12px 16px;
@@ -13,10 +13,7 @@
     min-width: 40px;
   }
 
-  /* Better spacing for mobile */
-  .container {
-    padding: 16px;
-  }
+  /* Better spacing for mobile - REMOVED container padding to maintain consistent layout */
 
   /* Landscape orientation optimization */
   @media (orientation: landscape) {

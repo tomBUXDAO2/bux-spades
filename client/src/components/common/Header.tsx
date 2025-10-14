@@ -136,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
             <div className="relative">
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center space-x-3 focus:outline-none"
+                className="header-button flex items-center space-x-3 focus:outline-none"
               >
                 <div className="flex items-center space-x-3">
                   <img

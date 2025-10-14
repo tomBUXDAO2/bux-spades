@@ -73,32 +73,29 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 }) => {
   return (
     <div
-      className={
-        'bg-slate-800 rounded-lg flex flex-col h-[calc(100vh-64px-32px)] p-4 ' +
-        (mobileTab !== 'chat' ? 'hidden md:flex' : 'flex')
-      }
+      className="bg-slate-800 rounded-lg flex flex-col h-[calc(100vh-64px-32px)] p-2 sm:p-4 lg:col-span-1 col-span-1 flex"
     >
       {/* Chat/Players Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-2 sm:mb-4">
+        <div className="flex items-center gap-1 sm:gap-2">
           <button
-            className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeChatTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button w-12 h-6 sm:w-20 sm:h-10 flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
             onClick={() => onSetActiveChatTab('chat')}
             aria-label="Chat"
           >
-            <img src="/chat.svg" alt="Chat" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            <img src="/chat.svg" alt="Chat" className="w-4 h-4 sm:w-6 sm:h-6" style={{ filter: 'invert(1) brightness(2)' }} />
           </button>
           <button
-            className={`w-20 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition ${activeChatTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button w-12 h-6 sm:w-20 sm:h-10 flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
             onClick={() => onSetActiveChatTab('players')}
             aria-label="Players"
           >
-            <img src="/players.svg" alt="Players" className="w-6 h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            <img src="/players.svg" alt="Players" className="w-4 h-4 sm:w-6 sm:h-6" style={{ filter: 'invert(1) brightness(2)' }} />
           </button>
         </div>
         <div className="flex items-center space-x-1">
-          <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-          <span className="text-slate-300 text-sm font-medium">{onlineCount} online</span>
+          <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></span>
+          <span className="text-slate-300 text-xs sm:text-sm font-medium">{onlineCount} online</span>
         </div>
       </div>
       {/* Tab Content */}
