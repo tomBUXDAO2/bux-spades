@@ -101,18 +101,38 @@ export class DetailedStatsService {
       }
     });
 
-    // Games won
-    const gamesWon = await prisma.gameResult.count({
+    // Games won - need to check if user was on winning team
+    // Get all game results for games the user played in
+    const userGames = await prisma.gameResult.findMany({
       where: {
         game: {
           ...gameWhere,
           players: {
             some: { userId }
           }
-        },
-        winner: userId
+        }
+      },
+      include: {
+        game: {
+          select: {
+            players: {
+              where: { userId },
+              select: { seatIndex: true }
+            }
+          }
+        }
       }
     });
+
+    // Count wins by checking if user was on winning team
+    const gamesWon = userGames.filter(result => {
+      const userSeat = result.game.players[0]?.seatIndex;
+      if (userSeat === undefined) return false;
+      
+      // TEAM_0 = seats 0 & 2, TEAM_1 = seats 1 & 3
+      const userTeam = (userSeat % 2 === 0) ? 'TEAM_0' : 'TEAM_1';
+      return result.winner === userTeam;
+    }).length;
 
     // Win rate
     const winRate = totalGames > 0 ? (gamesWon / totalGames) * 100 : 0;
