@@ -50,8 +50,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     try {
       const token = localStorage.getItem('sessionToken');
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      console.log('[ADMIN PANEL] Fetching games from:', apiUrl);
-      console.log('[ADMIN PANEL] VITE_API_URL env var:', import.meta.env.VITE_API_URL);
       const response = await fetch(`${apiUrl}/api/admin/games`, {
         headers: {
           'Authorization': `Bearer ${token}`,
