@@ -106,7 +106,7 @@ export class DetailedStatsService {
       where: {
         game: {
           ...gameWhere,
-          GamePlayer: {
+          players: {
             some: { userId }
           }
         },
