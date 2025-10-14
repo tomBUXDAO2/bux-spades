@@ -110,7 +110,7 @@ export default function BiddingInterface({
     }
     
     return (
-      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100020] pointer-events-auto`}>
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
@@ -148,7 +148,7 @@ export default function BiddingInterface({
     const hasAceSpades = currentPlayerHand ? currentPlayerHand.some(card => card.suit === "SPADES" && card.rank === "A") : false;
     
     return (
-      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100020] pointer-events-auto`}>
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
@@ -213,7 +213,7 @@ export default function BiddingInterface({
     const canBidNil = numSpades > 0 && !hasAceSpades;
     
     return (
-      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100020] pointer-events-auto`}>
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
@@ -276,7 +276,7 @@ export default function BiddingInterface({
     }
     
     return (
-      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100020] pointer-events-auto`}>
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[260px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
@@ -349,7 +349,7 @@ export default function BiddingInterface({
   // For other game types (REGULAR, SOLO), return the original bidding interface
   return (
     <>
-      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100020] pointer-events-auto`}>
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[420px] md:w-[400px] sm:w-[360px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 max-sm:p-2 shadow-xl`}>
           <div className="text-center mb-2 max-sm:mb-1">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>

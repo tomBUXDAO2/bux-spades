@@ -424,7 +424,8 @@ export default function GameTablePlayers({
                       {canRemovePlayer && (
                         <div className="absolute -bottom-2 -left-2 z-50">
                           <button
-                            className={`${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition`}
+                            className={`remove-player-button ${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border border-white shadow hover:bg-red-700 transition`}
+                            style={{ minWidth: 'unset !important', minHeight: 'unset !important', padding: '0 !important' }}
                             title={isHuman ? "Remove Player" : "Remove Bot"}
                             onClick={() => handleRemoveBot(position)}
                           >
@@ -474,8 +475,9 @@ export default function GameTablePlayers({
                     {canRemovePlayer && (
                       <div className="absolute -bottom-2 -left-2 z-50">
                     <button
-                          className={`${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border-2 border-white shadow hover:bg-red-700 transition`}
+                          className={`remove-player-button ${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border border-white shadow hover:bg-red-700 transition`}
                           title={isHuman ? "Remove Player" : "Remove Bot"}
+                          style={{ minWidth: 'unset !important', minHeight: 'unset !important', padding: '0 !important' }}
                       onClick={() => handleRemoveBot(position)}
                     >
                       <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
@@ -649,7 +651,7 @@ export default function GameTablePlayers({
               ></div>
             </div>
             {/* Speech bubble container */}
-            <div className="absolute z-50 bottom-0 right-0 mb-4" style={{ marginBottom: '15px', right: '180px' }}>
+            <div className="absolute z-50 bottom-0 right-0 mb-4" style={{ marginBottom: '15px', right: isMobile ? '120px' : '180px' }}>
               <div 
                 className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{
@@ -688,7 +690,7 @@ export default function GameTablePlayers({
               ></div>
             </div>
             {/* Speech bubble container */}
-            <div className="absolute z-50 top-0 right-0 mt-4" style={{ marginTop: '15px', right: '180px' }}>
+            <div className="absolute z-50 top-0 right-0 mt-4" style={{ marginTop: '15px', right: isMobile ? '120px' : '180px' }}>
               <div 
                 className="bg-white rounded-lg px-4 py-3 ml-[-8px]"
                 style={{

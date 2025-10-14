@@ -25,9 +25,9 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Only affect screens 600-650px wide - FORCE the sizes
-  const buttonSize = (screenWidth >= 600 && screenWidth <= 650) ? 25 : 36;
-  const iconSize = (screenWidth >= 600 && screenWidth <= 650) ? 14 : 20;
+  // Handle screens 600-740px wide - FORCE smaller sizes to prevent overlap
+  const buttonSize = (screenWidth >= 600 && screenWidth <= 740) ? 25 : 36;
+  const iconSize = (screenWidth >= 600 && screenWidth <= 740) ? 14 : 20;
   
   // Get initial sound state from localStorage
   const [isSoundEnabled, setIsSoundEnabled] = useState(() => {

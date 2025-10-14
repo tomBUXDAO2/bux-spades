@@ -2,6 +2,7 @@
 // Extracted from Chat.tsx
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 
@@ -35,6 +36,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isAuthenticated
 }) => {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const [retryCount, setRetryCount] = useState(0);
   
   // Scale down for different screen widths
@@ -92,7 +94,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div 
-      className="border-t border-gray-600"
+      className="border-t border-gray-800"
       style={{
         padding: `${8 * scale}px`
       }}
@@ -112,6 +114,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           
           {/* Emoji picker button */}
           <button
+            ref={emojiButtonRef}
             type="button"
             onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
             className="absolute top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
@@ -123,11 +126,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             😀
           </button>
           
-          {/* Emoji picker */}
-          {isEmojiPickerOpen && (
+          {/* Emoji picker - rendered via portal */}
+          {isEmojiPickerOpen && emojiButtonRef.current && createPortal(
             <div
               ref={emojiPickerRef}
-              className="absolute bottom-full right-0 mb-2 z-50"
+              className="fixed z-[99999]"
+              style={{
+                top: emojiButtonRef.current.getBoundingClientRect().top - 10,
+                left: emojiButtonRef.current.getBoundingClientRect().right - 300,
+                transform: 'translateY(-100%)'
+              }}
             >
               <Picker
                 data={data}
@@ -140,7 +148,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 emojiSize={isMobile ? 20 : 24}
                 maxFrequentRows={2}
               />
-            </div>
+            </div>,
+            document.body
           )}
         </div>
         

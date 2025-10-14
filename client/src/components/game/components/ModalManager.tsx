@@ -189,7 +189,7 @@ const LeaveTableModal: React.FC<{
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]">
       <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
         <h3 className="text-white text-lg font-bold mb-4">Leave Table?</h3>
         <p className="text-gray-300 mb-6">

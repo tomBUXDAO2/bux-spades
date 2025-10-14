@@ -191,10 +191,10 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {isBotPlayer && playerStatus.canRemove && (
             <button
               onClick={() => handleRemoveBot(position)}
-              className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors duration-200"
+              className="remove-player-button absolute -top-1 -right-1 w-3 h-3 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200"
               title="Remove Bot"
             >
-              <FaMinus className="w-3 h-3" />
+              <FaMinus className="w-2 h-2" />
             </button>
           )}
         </div>

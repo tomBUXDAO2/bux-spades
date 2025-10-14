@@ -453,7 +453,7 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
           {/* Starting Game Message - only show when no modals are open */}
           {isStarting && !showStartWarning && !showBotWarning && !(gameState as any)?.ui?.showBotWarning && (
             <div 
-              className="px-4 py-2 bg-slate-800 text-white rounded-lg shadow-lg transform pointer-events-auto relative z-[100010]"
+              className="px-4 py-2 bg-slate-800 text-white rounded-lg shadow-lg transform pointer-events-auto relative z-[99998]"
               style={{ fontSize: `${Math.floor(16 * scaleFactor)}px` }}
             >
               Starting Game...

@@ -1,7 +1,7 @@
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* Touch-friendly button sizes - EXCLUDE game table header buttons and chat header buttons */
-  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]) {
+  /* Touch-friendly button sizes - EXCLUDE game table header buttons, chat header buttons, bidding modal buttons, and remove player buttons */
+  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button) {
     min-height: 44px;
     min-width: 44px;
     padding: 12px 16px;

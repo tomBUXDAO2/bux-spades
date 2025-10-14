@@ -970,7 +970,7 @@ export default function GameTableModular({
     const playerStatusData = getPlayerStatusData(gameState, leagueReady);
     
     const content = (
-      <div className="fixed z-[100000] flex flex-col items-center gap-2 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <div className="fixed z-[99998] flex flex-col items-center gap-2 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         {readyButtonData.shouldShow && (
           <button
             onClick={readyButtonData.onClick}
@@ -1153,7 +1153,7 @@ export default function GameTableModular({
           </div>
 
           {/* Chat area - 30%, full height */}
-          <div className="w-[30%] h-full overflow-hidden">
+          <div className="w-[30%] h-full overflow-visible">
             {chatReady ? (
               <Chat 
                 gameId={gameState.id}

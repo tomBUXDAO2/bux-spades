@@ -52,7 +52,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 
   // Calculate font sizes based on scale factor
   const getFontSizes = () => {
-    const baseSize = isMobile ? 12 : 14;
+    const baseSize = isMobile ? 14 : 14;
     return {
       messageText: `${Math.floor(baseSize * scaleFactor)}px`,
       timestamp: `${Math.floor((baseSize - 2) * scaleFactor)}px`,
@@ -92,7 +92,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto flex flex-col gap-y-4 p-4" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+    <div className={`flex-1 overflow-y-auto flex flex-col p-4 ${isMobile ? 'gap-y-2' : 'gap-y-4'}`}>
       {messages.map((message, index) => {
         const isSystemMessage = message.userId === 'system';
         const isCurrentUser = currentUserId ? message.userId === currentUserId : false;
@@ -103,7 +103,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               key={message.id || index}
               className="w-full text-center my-2"
             >
-              <span className="text-orange-400 italic flex items-center justify-center gap-1">
+              <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: fontSizes.messageText }}>
                 {message.message.includes('spectating') && <EyeIcon />}
                 {message.message}
               </span>
@@ -114,10 +114,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
         return (
           <div
             key={message.id || index}
-            className={`mb-2 flex items-start ${isCurrentUser ? 'justify-end' : ''}`}
+            className={`${isMobile ? 'mb-1' : 'mb-2'} flex items-start ${isCurrentUser ? 'justify-end' : ''}`}
           >
             {!isCurrentUser && (
-              <div className={`w-8 h-8 mr-2 rounded-full overflow-hidden flex-shrink-0`}>
+              <div className={`${isMobile ? 'w-6 h-6 mr-1.5' : 'w-8 h-8 mr-2'} rounded-full overflow-hidden flex-shrink-0`}>
                 <img 
                   src={(message as any).userAvatar || GUEST_AVATAR} 
                   alt={message.userName || ''} 
@@ -130,17 +130,17 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 />
               </div>
             )}
-            <div className={`max-w-[80%] ${isCurrentUser ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
+            <div className={`max-w-[80%] ${isCurrentUser ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg ${isMobile ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
               <div className="flex justify-between items-center mb-1">
                 {!isCurrentUser && (
-                  <span className="font-medium text-xs opacity-80">{message.userName}</span>
+                  <span className="font-medium opacity-80" style={{ fontSize: fontSizes.username }}>{message.userName}</span>
                 )}
-                <span className="text-xs opacity-75 ml-auto"> {formatTimestamp(message.timestamp)}</span>
+                <span className="opacity-75 ml-auto" style={{ fontSize: fontSizes.timestamp }}> {formatTimestamp(message.timestamp)}</span>
               </div>
-              <p>{message.message}</p>
+              <p style={{ fontSize: fontSizes.messageText }}>{message.message}</p>
             </div>
             {isCurrentUser && (
-              <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
+              <div className={`${isMobile ? 'w-6 h-6 ml-1.5' : 'w-8 h-8 ml-2'} rounded-full overflow-hidden flex-shrink-0`}>
                 <img 
                   src={userAvatar || GUEST_AVATAR} 
                   alt="You" 
