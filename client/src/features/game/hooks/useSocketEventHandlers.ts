@@ -78,9 +78,17 @@ export const useSocketEventHandlers = ({
         const newState = normalizeGameState(gameData.gameState);
         
         // If new state doesn't have hands but previous state did, preserve them
+        // BUT only if the game status hasn't changed to a phase where hands should be cleared
         if (currentGameState && currentGameState.hands && !newState.hands) {
-          console.log('🎮 Preserving hands from previous state during game_update');
-          newState.hands = currentGameState.hands;
+          const statusChanged = currentGameState.status !== newState.status;
+          const isNewHandPhase = newState.status === 'BIDDING' || newState.status === 'PLAYING';
+          
+          if (!statusChanged || isNewHandPhase) {
+            console.log('🎮 Preserving hands from previous state during game_update');
+            newState.hands = currentGameState.hands;
+          } else {
+            console.log('🎮 Game status changed, not preserving hands');
+          }
         }
         
         setGameState(newState);
