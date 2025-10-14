@@ -228,7 +228,11 @@ export default function GameTableModular({
         }));
         setDealingComplete(true);
         setBiddingReady(true);
-        setCardsRevealed(true);
+        // CRITICAL FIX: When rejoining a game in progress, cards should be revealed 
+        // if it's currently this player's turn, otherwise stay face down
+        // The useEffect will handle this properly based on currentPlayer
+        const isMyTurn = data.activeGameState.currentPlayer === propUser?.id;
+        setCardsRevealed(isMyTurn || data.activeGameState.status === "PLAYING");
         // setIsStarting(false); // Using prop from parent
       }
     }
@@ -240,7 +244,9 @@ export default function GameTableModular({
       setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING", currentPlayer: data.currentPlayer }));
       setDealingComplete(true);
       setBiddingReady(true);
-      setCardsRevealed(true);
+      // CRITICAL FIX: Do NOT reveal cards for everyone immediately
+      // Let the useEffect (lines 569-583) handle revealing cards only for the current bidder
+      setCardsRevealed(false);
       
       // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
       if (data.gameState?.rated && data.gameState?.buyIn) {
@@ -570,6 +576,8 @@ export default function GameTableModular({
     const hands = (gameState as any)?.hands;
     // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
+    
+    // During BIDDING: only reveal cards for the current bidder
     if (
       gameState?.status === 'BIDDING' &&
       gameState?.currentPlayer === currentPlayerId &&
@@ -578,6 +586,11 @@ export default function GameTableModular({
       myHandArr.length > 0
     ) {
       setDealingComplete(true);
+      setCardsRevealed(true);
+    }
+    
+    // During PLAYING: reveal cards for all players
+    if (gameState?.status === 'PLAYING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
       setCardsRevealed(true);
     }
   }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, currentPlayerId, mySeatIndex]);
