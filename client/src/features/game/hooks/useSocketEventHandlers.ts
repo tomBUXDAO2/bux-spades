@@ -73,7 +73,7 @@ export const useSocketEventHandlers = ({
         setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
         
         // CRITICAL: Preserve hands from previous state if not included in update
-        setGameState((prevState: GameState) => {
+        setGameState((prevState: GameState | null) => {
           const newState = normalizeGameState(gameData.gameState);
           
           // If new state doesn't have hands but previous state did, preserve them
