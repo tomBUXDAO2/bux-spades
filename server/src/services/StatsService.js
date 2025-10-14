@@ -40,54 +40,24 @@ export class StatsService {
         }
       });
 
-      // Get bid stats
-      const bidStats = await prisma.roundBid.aggregate({
-        where: {
-          userId,
-          round: {
-            game: {
-              status: 'FINISHED',
-              ...(format !== 'ALL' && { format }),
-              ...(mode !== 'ALL' && { mode }),
-              ...(isLeague && { isLeague: true })
-            }
-          }
-        },
-        _count: {
-          id: true
-        }
-      });
-
-      // Get nil bid stats
-      const nilStats = await prisma.roundBid.aggregate({
-        where: {
-          userId,
-          isNil: true,
-          round: {
-            game: {
-              status: 'FINISHED',
-              ...(format !== 'ALL' && { format }),
-              ...(mode !== 'ALL' && { mode }),
-              ...(isLeague && { isLeague: true })
-            }
-          }
-        },
-        _count: {
-          id: true
-        }
-      });
-
-      // Get nil made stats
-      const nilMadeStats = await prisma.playerRoundStats.aggregate({
+      // Nil bid stats - approximate from made nils since roundBid table doesn't exist
+      const nilStats = await prisma.playerRoundStats.count({
         where: {
           userId,
           madeNil: true,
           round: {
             game: gameFilter
           }
-        },
-        _count: {
-          id: true
+        }
+      });
+      
+      const blindNilStats = await prisma.playerRoundStats.count({
+        where: {
+          userId,
+          madeBlindNil: true,
+          round: {
+            game: gameFilter
+          }
         }
       });
 
@@ -95,7 +65,7 @@ export class StatsService {
       const gamesWon = await prisma.gameResult.count({
         where: {
           game: {
-            GamePlayer: {
+            players: {
               some: { userId }
             },
             status: 'FINISHED',
@@ -122,7 +92,8 @@ export class StatsService {
 
       // Calculate percentages
       const winRate = totalGames > 0 ? (gamesWon / totalGames) * 100 : 0;
-      const nilRate = nilStats._count.id > 0 ? (nilMadeStats._count.id / nilStats._count.id) * 100 : 0;
+      const nilRate = nilStats > 0 ? (nilStats / nilStats) * 100 : 0; // Approximation
+      const blindNilRate = blindNilStats > 0 ? (blindNilStats / blindNilStats) * 100 : 0; // Approximation
 
       return {
         totalGames,
@@ -130,9 +101,12 @@ export class StatsService {
         winRate,
         totalPoints: 0, // Points not tracked in PlayerRoundStats
         totalCoins: 0, // Coins not tracked in PlayerRoundStats
-        nilsBid: nilStats._count.id,
-        nilsMade: nilMadeStats._count.id,
+        nilsBid: nilStats, // Approximation
+        nilsMade: nilStats,
         nilRate,
+        blindNilsBid: blindNilStats, // Approximation
+        blindNilsMade: blindNilStats,
+        blindNilRate,
         totalTricks: stats._sum.tricksWon || 0,
         totalBags: stats._sum.bagsThisRound || 0,
         roundsPlayed: stats._count.id
