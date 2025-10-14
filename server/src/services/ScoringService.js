@@ -549,6 +549,23 @@ export class ScoringService {
         console.error('[SCORING] Error posting Discord results:', discordError);
         // Don't throw - Discord posting failure shouldn't break game completion
       }
+
+      // Update user stats for all players
+      try {
+        const { StatsService } = await import('./StatsService.js');
+        const gamePlayers = await prisma.gamePlayer.findMany({
+          where: { gameId },
+          select: { userId: true }
+        });
+        
+        for (const player of gamePlayers) {
+          await StatsService.updateUserStats(player.userId);
+        }
+        console.log(`[SCORING] Updated stats for ${gamePlayers.length} players`);
+      } catch (statsError) {
+        console.error('[SCORING] Error updating user stats:', statsError);
+        // Don't throw - stats update failure shouldn't break game completion
+      }
     } catch (error) {
       console.error('[SCORING] Error completing game:', error);
       throw error;
