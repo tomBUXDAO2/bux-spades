@@ -4,7 +4,7 @@ import { prisma } from '../config/databaseFirst.js';
 
 const router = express.Router();
 
-// Get user stats with detailed breakdowns
+// Get user stats with detailed breakdowns (supports both /user/:userId and /:userId/stats)
 router.get('/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -17,6 +17,42 @@ router.get('/user/:userId', async (req, res) => {
 
     const filters = {
       mode,
+      format,
+      isLeague: league === 'true' ? true : league === 'false' ? false : null,
+      gimmickVariant: gimmick
+    };
+
+    const stats = await DetailedStatsService.getUserStats(userId, filters);
+    
+    res.json({
+      success: true,
+      data: stats,
+      filters
+    });
+
+  } catch (error) {
+    console.error('[STATS API] Error getting user stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get user stats' 
+    });
+  }
+});
+
+// Alias route for client compatibility: /api/users/:userId/stats
+router.get('/:userId/stats', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const {
+      mode = 'ALL',
+      format = 'ALL',
+      league = null,
+      gimmick = null,
+      gameMode = 'ALL' // Support both 'mode' and 'gameMode' query params
+    } = req.query;
+
+    const filters = {
+      mode: mode === 'ALL' ? gameMode : mode, // Use gameMode if mode is ALL
       format,
       isLeague: league === 'true' ? true : league === 'false' ? false : null,
       gimmickVariant: gimmick

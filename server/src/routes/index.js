@@ -17,6 +17,7 @@ export function setupRoutes(app) {
   app.use('/api/games', gameRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/stats', statsRoutes);
+  app.use('/api/users', statsRoutes); // Stats routes (handles /api/users/:userId/stats)
   app.use('/api/admin', adminRoutes); // Admin routes
 
   // 404 handler
