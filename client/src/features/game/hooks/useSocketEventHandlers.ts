@@ -7,6 +7,7 @@ interface UseSocketEventHandlersProps {
   isReady: boolean;
   gameId: string;
   userId: string;
+  gameState: GameState | null;
   setGameState: (state: GameState | null) => void;
   setIsLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -18,6 +19,7 @@ export const useSocketEventHandlers = ({
   isReady,
   gameId,
   userId,
+  gameState: currentGameState,
   setGameState,
   setIsLoading,
   setError,
@@ -73,17 +75,15 @@ export const useSocketEventHandlers = ({
         setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
         
         // CRITICAL: Preserve hands from previous state if not included in update
-        setGameState((prevState: GameState | null) => {
-          const newState = normalizeGameState(gameData.gameState);
-          
-          // If new state doesn't have hands but previous state did, preserve them
-          if (prevState && prevState.hands && !newState.hands) {
-            console.log('🎮 Preserving hands from previous state during game_update');
-            newState.hands = prevState.hands;
-          }
-          
-          return newState;
-        });
+        const newState = normalizeGameState(gameData.gameState);
+        
+        // If new state doesn't have hands but previous state did, preserve them
+        if (currentGameState && currentGameState.hands && !newState.hands) {
+          console.log('🎮 Preserving hands from previous state during game_update');
+          newState.hands = currentGameState.hands;
+        }
+        
+        setGameState(newState);
       }
     };
 

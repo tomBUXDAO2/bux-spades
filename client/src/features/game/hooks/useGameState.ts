@@ -46,6 +46,7 @@ export function useGameState(gameId: string, userId: string) {
     isReady,
     gameId,
     userId,
+    gameState,
     setGameState,
     setIsLoading,
     setError,
