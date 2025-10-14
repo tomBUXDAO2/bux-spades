@@ -1,4 +1,4 @@
-import { prisma } from '../config/database.js';
+import { prisma } from '../config/databaseFirst.js';
 
 export class StatsService {
   // Get user stats calculated from actual game data
