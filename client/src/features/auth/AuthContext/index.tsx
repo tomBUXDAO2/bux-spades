@@ -9,6 +9,7 @@ interface User {
   email: string;
   avatar: string | null;
   avatarUrl?: string; // Support both avatar and avatarUrl properties
+  discordId?: string; // Discord ID for admin authentication
   coins: number;
   isAuthenticated?: boolean;
   stats?: {
