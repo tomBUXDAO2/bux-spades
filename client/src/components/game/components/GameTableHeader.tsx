@@ -85,8 +85,8 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
           width: 'var(--button-size)',
           height: 'var(--button-size)'
         }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
+        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
       >
         <IoExitOutline style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
       </button>
@@ -108,8 +108,8 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
             width: 'var(--button-size)',
             height: 'var(--button-size)'
           }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
+          onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+          onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         >
           <IoInformationCircleOutline style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
         </button>
@@ -131,8 +131,8 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
           width: 'var(--button-size)',
           height: 'var(--button-size)'
         }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
+        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         title="View Trick History"
       >
         <svg style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,8 +157,8 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
           width: 'var(--button-size)',
           height: 'var(--button-size)'
         }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
+        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         title={isSoundEnabled ? "Mute Sound" : "Unmute Sound"}
       >
         <IoVolumeHigh style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
