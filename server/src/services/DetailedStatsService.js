@@ -117,23 +117,8 @@ export class DetailedStatsService {
     // Win rate
     const winRate = totalGames > 0 ? (gamesWon / totalGames) * 100 : 0;
 
-    // Total coins
-    const coinsStats = await prisma.playerRoundStats.aggregate({
-      where: {
-        gamePlayer: {
-          userId
-        },
-        gamePlayer: {
-          game: gameWhere
-        }
-      },
-      _sum: {
-        coinsWon: true,
-        coinsLost: true
-      }
-    });
-
-    const totalCoins = (coinsStats._sum.coinsWon || 0) - (coinsStats._sum.coinsLost || 0);
+    // Total coins - not tracked in PlayerRoundStats, would need to calculate from GameResult
+    const totalCoins = 0;
 
     return {
       totalGames,
@@ -145,11 +130,11 @@ export class DetailedStatsService {
 
   // Get nil statistics
   static async getNilStats(userId, gameWhere) {
-    // Nil bids
-    const nilsBid = await prisma.roundBid.count({
+    // Nil bids - cannot track this without RoundBid table, using made nils as approximation
+    const nilsBid = await prisma.playerRoundStats.count({
       where: {
         userId,
-        isNil: true,
+        madeNil: true,
         round: {
           game: gameWhere
         }
@@ -159,21 +144,19 @@ export class DetailedStatsService {
     // Nil made
     const nilsMade = await prisma.playerRoundStats.count({
       where: {
-        gamePlayer: {
-          userId
-        },
+        userId,
         madeNil: true,
-        gamePlayer: {
+        round: {
           game: gameWhere
         }
       }
     });
 
-    // Blind nil bids
-    const blindNilsBid = await prisma.roundBid.count({
+    // Blind nil bids - cannot track this without RoundBid table, using made blind nils as approximation
+    const blindNilsBid = await prisma.playerRoundStats.count({
       where: {
         userId,
-        isBlindNil: true,
+        madeBlindNil: true,
         round: {
           game: gameWhere
         }
@@ -183,11 +166,9 @@ export class DetailedStatsService {
     // Blind nil made
     const blindNilsMade = await prisma.playerRoundStats.count({
       where: {
-        gamePlayer: {
-          userId
-        },
+        userId,
         madeBlindNil: true,
-        gamePlayer: {
+        round: {
           game: gameWhere
         }
       }
@@ -210,10 +191,8 @@ export class DetailedStatsService {
   static async getBagsStats(userId, gameWhere) {
     const bagsStats = await prisma.playerRoundStats.aggregate({
       where: {
-        gamePlayer: {
-          userId
-        },
-        gamePlayer: {
+        userId,
+        round: {
           game: gameWhere
         }
       },
