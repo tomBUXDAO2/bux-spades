@@ -64,9 +64,35 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
         const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
         console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
         const response = await api.get(url);
-        const stats = await response.json();
-        console.log('[PLAYER STATS MODAL] Received stats:', stats);
-        setCurrentStats(stats);
+        const result = await response.json();
+        console.log('[PLAYER STATS MODAL] Received stats:', result);
+        
+        // Map API response to component interface
+        const mappedStats: PlayerStats = {
+          gamesPlayed: result.data.totalGames || 0,
+          gamesWon: result.data.gamesWon || 0,
+          totalBags: result.data.bags?.total || 0,
+          bagsPerGame: result.data.bags?.perGame || 0,
+          nilsBid: result.data.nils?.bid || 0,
+          nilsMade: result.data.nils?.made || 0,
+          blindNilsBid: result.data.blindNils?.bid || 0,
+          blindNilsMade: result.data.blindNils?.made || 0,
+          regPlayed: result.data.formatBreakdown?.regular?.played || 0,
+          regWon: result.data.formatBreakdown?.regular?.won || 0,
+          whizPlayed: result.data.formatBreakdown?.whiz?.played || 0,
+          whizWon: result.data.formatBreakdown?.whiz?.won || 0,
+          mirrorPlayed: result.data.formatBreakdown?.mirror?.played || 0,
+          mirrorWon: result.data.formatBreakdown?.mirror?.won || 0,
+          gimmickPlayed: result.data.formatBreakdown?.gimmick?.played || 0,
+          gimmickWon: result.data.formatBreakdown?.gimmick?.won || 0,
+          screamerPlayed: result.data.specialRulesBreakdown?.screamer?.played || 0,
+          screamerWon: result.data.specialRulesBreakdown?.screamer?.won || 0,
+          assassinPlayed: result.data.specialRulesBreakdown?.assassin?.played || 0,
+          assassinWon: result.data.specialRulesBreakdown?.assassin?.won || 0,
+          totalCoinsWon: result.data.totalCoins || 0,
+        };
+        
+        setCurrentStats(mappedStats);
       } catch (error) {
         console.error('Error fetching player stats:', error);
         // Fallback to original stats
