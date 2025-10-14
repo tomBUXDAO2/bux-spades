@@ -33,44 +33,40 @@ export const getCardDimensions = (
 };
 
 /**
- * Calculate card overlap offset based on screen width and scale factor
+ * Calculate card overlap offset to fill available width for 13 cards
+ * This ensures cards are properly distributed across the player hand area
  */
-export const getCardOverlapOffset = (scaleFactor: number): number => {
+export const getCardOverlapOffset = (scaleFactor: number, isMobile: boolean = false): number => {
   const width = window.innerWidth;
   
-  if (width < 600) {
-    return Math.floor(-40 * scaleFactor);
-  } else if (width >= 600 && width < 650) {
-    return Math.floor(-27 * scaleFactor);
-  } else if (width >= 650 && width < 700) {
-    return Math.floor(-40 * scaleFactor);
-  } else if (width >= 700 && width < 750) {
-    return Math.floor(-35 * scaleFactor);
-  } else if (width >= 750 && width < 800) {
-    return Math.floor(-30 * scaleFactor);
-  } else if (width >= 800 && width < 850) {
-    return Math.floor(-25 * scaleFactor);
-  } else if (width >= 850 && width < 900) {
-    return Math.floor(-20 * scaleFactor);
-  } else if (width >= 900 && width <= 1200) {
-    return Math.floor(-40 * scaleFactor);
-  } else if (width >= 1201 && width <= 1300) {
-    return Math.floor(-35 * scaleFactor);
-  } else if (width >= 1400 && width <= 1499) {
-    return Math.floor(-50 * scaleFactor);
-  } else if (width >= 1500 && width <= 1599) {
-    return Math.floor(-45 * scaleFactor);
-  } else if (width >= 1600 && width <= 1699) {
-    return Math.floor(-40 * scaleFactor);
-  } else if (width >= 1700 && width <= 1799) {
-    return Math.floor(-35 * scaleFactor);
-  } else if (width >= 1800 && width <= 1899) {
-    return Math.floor(-30 * scaleFactor);
-  } else if (width >= 1900 && width <= 1999) {
-    return Math.floor(-25 * scaleFactor);
-  } else {
-    return Math.floor(-20 * scaleFactor);
-  }
+  // Calculate available width for player hand area
+  // Use consistent percentage across all screen sizes for uniform card spacing
+  const availableWidth = width * 0.7;
+  
+  // Get card dimensions - use the ACTUAL dimensions being used in the renderer
+  const cardDimensions = getCardDimensions(isMobile, scaleFactor);
+  const cardWidth = cardDimensions.cardUIWidth;
+  
+  // For 13 cards to fill available width:
+  // Formula: availableWidth = cardWidth + (12 * visibleCardWidth)
+  // Where visibleCardWidth is how much of each subsequent card is visible
+  // Solve for visibleCardWidth: visibleCardWidth = (availableWidth - cardWidth) / 12
+  const numCards = 13;
+  const totalGaps = numCards - 1; // 12 gaps for 13 cards
+  const visibleCardWidth = (availableWidth - cardWidth) / totalGaps;
+  
+  // The overlap is the difference between card width and visible width
+  const calculatedOverlap = visibleCardWidth - cardWidth;
+  
+  // Debug logging
+  console.log(`[CARD SPACING DEBUG] Screen width: ${width}, Available width: ${availableWidth}, Card width: ${cardWidth}, Visible card width: ${visibleCardWidth}, Calculated overlap: ${calculatedOverlap}`);
+  
+  // Use the calculated overlap directly
+  const finalOverlap = Math.floor(calculatedOverlap);
+  
+  console.log(`[CARD SPACING DEBUG] Final overlap: ${finalOverlap}`);
+  
+  return finalOverlap;
 };
 
 /**
@@ -91,15 +87,19 @@ export const getCardVisibility = (
 };
 
 /**
- * Calculate spectator hand dimensions
+ * Calculate spectator hand dimensions - MUST MATCH FACE-UP CARD DIMENSIONS
  */
 export const getSpectatorHandDimensions = (
   isMobile: boolean,
   scaleFactor: number
 ): CardDimensions & { overlapOffset: number } => {
-  const cardUIWidth = Math.floor(isMobile ? 65 : 100 * scaleFactor);
-  const cardUIHeight = Math.floor(isMobile ? 90 : 140 * scaleFactor);
-  const overlapOffset = Math.floor(isMobile ? -40 : -40 * scaleFactor);
+  // Use the SAME dimensions as face-up cards
+  const cardDimensions = getCardDimensions(isMobile, scaleFactor);
+  const overlapOffset = getCardOverlapOffset(scaleFactor, isMobile);
   
-  return { cardUIWidth, cardUIHeight, overlapOffset };
+  return { 
+    cardUIWidth: cardDimensions.cardUIWidth, 
+    cardUIHeight: cardDimensions.cardUIHeight, 
+    overlapOffset 
+  };
 };

@@ -36,6 +36,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Scale down for different screen widths
+  const screenWidth = window.innerWidth;
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  const isMediumScreen = screenWidth >= 700 && screenWidth <= 750;
+  const scale = isSmallScreen ? 0.8 : isMediumScreen ? 0.85 : 1;
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -78,14 +84,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const getInputStyles = () => {
     const baseSize = isMobile ? 12 : 14;
     return {
-      fontSize: `${Math.floor(baseSize * scaleFactor)}px`,
-      padding: isMobile ? '8px' : '12px',
-      height: isMobile ? '36px' : '44px'
+      fontSize: `${Math.floor(baseSize * scaleFactor * scale)}px`,
+      padding: `${(isMobile ? 8 : 12) * scale}px`,
+      height: `${(isMobile ? 36 : 44) * scale}px`
     };
   };
 
   return (
-    <div className="border-t border-gray-600 p-2">
+    <div 
+      className="border-t border-gray-600"
+      style={{
+        padding: `${8 * scale}px`
+      }}
+    >
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <div className="flex-1 relative">
           <input
@@ -103,7 +114,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <button
             type="button"
             onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+            className="absolute top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+            style={{
+              right: `${8 * scale}px`
+            }}
             disabled={!isConnected || !isAuthenticated}
           >
             😀
@@ -133,15 +147,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="submit"
           disabled={!newMessage.trim() || !isConnected || !isAuthenticated}
-          className={`w-10 h-10 flex items-center justify-center rounded-md transition flex-shrink-0 ${
-            newMessage.trim() && isConnected && isAuthenticated
-              ? 'bg-indigo-600 hover:bg-indigo-700'
-              : 'bg-gray-600 cursor-not-allowed'
-          }`}
+          className="flex items-center justify-center rounded-md transition flex-shrink-0"
+          style={{
+            width: `${40 * scale}px`,
+            height: `${40 * scale}px`,
+            backgroundColor: newMessage.trim() && isConnected && isAuthenticated ? '#4f46e5' : '#4b5563'
+          }}
           aria-label="Send"
         >
           {/* Right-pointing paper plane icon - same as lobby chat */}
-          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <svg 
+            style={{
+              width: `${24 * scale}px`,
+              height: `${24 * scale}px`,
+              color: 'white'
+            }}
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 8-16 8 4-8z" />
           </svg>
         </button>

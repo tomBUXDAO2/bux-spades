@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IoExitOutline, IoInformationCircleOutline, IoVolumeHigh } from "react-icons/io5";
 
 interface GameTableHeaderProps {
@@ -16,6 +16,19 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
   onToggleGameInfo,
   onShowTrickHistory
 }) => {
+  // Force re-render on window resize
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Only affect screens 600-650px wide - FORCE the sizes
+  const buttonSize = (screenWidth >= 600 && screenWidth <= 650) ? 25 : 36;
+  const iconSize = (screenWidth >= 600 && screenWidth <= 650) ? 14 : 20;
+  
   // Get initial sound state from localStorage
   const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
     const userData = localStorage.getItem('userData');
@@ -48,43 +61,110 @@ const GameTableHeader: React.FC<GameTableHeaderProps> = ({
     }
   };
   return (
-    <div className="absolute top-4 left-4 z-[100001] flex items-center gap-2">
+    <div 
+      className="absolute top-4 left-4 z-[100001] flex items-center gap-2"
+      style={{
+        '--button-size': `${buttonSize}px`,
+        '--icon-size': `${iconSize}px`
+      } as React.CSSProperties}
+    >
       <button
         onClick={onLeaveTable}
-        className="p-2 bg-gray-800/90 text-white rounded-full hover:bg-gray-700 transition shadow-lg"
-        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}
+        style={{ 
+          backgroundColor: 'rgba(31, 41, 55, 0.9)',
+          color: 'white',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          transition: 'background-color 0.2s',
+          fontSize: `${Math.floor(14 * scaleFactor)}px`,
+          width: 'var(--button-size)',
+          height: 'var(--button-size)'
+        }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
       >
-        <IoExitOutline className="h-5 w-5" />
+        <IoExitOutline style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
       </button>
-      <div className="relative" ref={infoRef}>
+      <div style={{ position: 'relative' }} ref={infoRef}>
         <button
           onClick={onToggleGameInfo}
-          className="p-2 bg-gray-800/90 text-white rounded-full hover:bg-gray-700 transition shadow-lg"
-          style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}
+          style={{ 
+            backgroundColor: 'rgba(31, 41, 55, 0.9)',
+            color: 'white',
+            borderRadius: '50%',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            transition: 'background-color 0.2s',
+            fontSize: `${Math.floor(14 * scaleFactor)}px`,
+            width: 'var(--button-size)',
+            height: 'var(--button-size)'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         >
-          <IoInformationCircleOutline className="h-5 w-5" />
+          <IoInformationCircleOutline style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
         </button>
       </div>
       <button
         onClick={onShowTrickHistory}
-        className="p-2 bg-gray-800/90 text-white rounded-full hover:bg-gray-700 transition shadow-lg"
-        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}
+        style={{ 
+          backgroundColor: 'rgba(31, 41, 55, 0.9)',
+          color: 'white',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          transition: 'background-color 0.2s',
+          fontSize: `${Math.floor(14 * scaleFactor)}px`,
+          width: 'var(--button-size)',
+          height: 'var(--button-size)'
+        }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         title="View Trick History"
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       </button>
       <button
         onClick={handleSoundToggle}
-        className="relative p-2 bg-gray-800/90 text-white rounded-full hover:bg-gray-700 transition shadow-lg"
-        style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}
+        style={{ 
+          position: 'relative',
+          backgroundColor: 'rgba(31, 41, 55, 0.9)',
+          color: 'white',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          transition: 'background-color 0.2s',
+          fontSize: `${Math.floor(14 * scaleFactor)}px`,
+          width: 'var(--button-size)',
+          height: 'var(--button-size)'
+        }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 1)'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(31, 41, 55, 0.9)'}
         title={isSoundEnabled ? "Mute Sound" : "Unmute Sound"}
       >
-        <IoVolumeHigh className="h-5 w-5" />
+        <IoVolumeHigh style={{ width: 'var(--icon-size)', height: 'var(--icon-size)' }} />
         {!isSoundEnabled && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-red-600 text-lg font-bold drop-shadow-lg">✕</span>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#dc2626', fontWeight: 'bold', filter: 'drop-shadow(0 4px 3px rgba(0, 0, 0, 0.07))', fontSize: `${Math.floor(18 * scaleFactor)}px` }}>✕</span>
           </div>
         )}
       </button>

@@ -33,7 +33,19 @@ export const applyMinimumScale = (scale: number): number => {
  * Get scale factor for responsive design
  */
 export const getScaleFactor = (windowSize: WindowSize): number => {
-  // Don't scale on mobile
+  const width = windowSize.width;
+  
+  // Screens 600-650px wide: make buttons smaller
+  if (width >= 600 && width <= 650) {
+    return 0.7;
+  }
+  
+  // Scale down for screens under 768px
+  if (width < 768) {
+    return Math.max(0.5, width / 768);
+  }
+  
+  // Don't scale on mobile (under 640px)
   if (isMobileScreen(windowSize)) return 1;
   
   const baseScale = calculateBaseScale(windowSize);

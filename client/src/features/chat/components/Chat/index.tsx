@@ -101,6 +101,7 @@ export default function ChatModular({
           onToggleChatType={onToggleChatType}
           chatType={chatType}
           isMobile={isMobile}
+          scaleFactor={scaleFactor}
         />
 
         {/* Chat Content */}

@@ -197,7 +197,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   }
   
   const cardDimensions = getCardDimensions(isMobile, scaleFactor);
-  const cardOverlapOffset = getCardOverlapOffset(scaleFactor);
+  const cardOverlapOffset = getCardOverlapOffset(scaleFactor, isMobile);
   const { showAllCards, visibleCount } = getCardVisibility(sortedHand, gameState.status, dealingComplete, dealtCardCount);
 
   return (
@@ -214,6 +214,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       }}
     >
       <div className="flex items-center justify-center h-full w-full">
+        <div className="flex items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
           const isPlayable = (gameState.status === "PLAYING" &&
             gameState.currentPlayer === currentPlayerId &&
@@ -262,6 +263,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -285,13 +287,17 @@ export const SpectatorHandRenderer: React.FC<{
     <div
       className="absolute inset-x-0 flex justify-center"
       style={{
-        bottom: isMobile ? '0px' : '-40px',
-        height: isMobile ? `${Math.floor(cardUIHeight * 0.15)}px` : 'auto',
-        overflow: 'hidden',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        height: `${Math.floor((isMobile ? 111 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188)))}px`,
+        paddingTop: '0px',
+        overflow: 'visible',
         pointerEvents: 'none',
+        zIndex: 50,
       }}
     >
-      <div className="flex">
+      <div className="flex items-center justify-center h-full w-full">
+        <div className="flex items-center">
         {Array.isArray(bottomPlayerHand) && bottomPlayerHand.map((card: Card, index: number) => (
           <div
             key={`${card.suit}${card.rank}`}
@@ -300,19 +306,22 @@ export const SpectatorHandRenderer: React.FC<{
               width: `${cardUIWidth}px`,
               height: `${cardUIHeight}px`,
               marginLeft: index > 0 ? `${overlapOffset}px` : '0',
-              zIndex: index,
+              zIndex: 50 + index,
+              pointerEvents: 'auto',
+              filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
             }}
           >
             <CardImage
               card={card}
               width={cardUIWidth}
               height={cardUIHeight}
-              className="rounded-lg shadow-md"
+              className="shadow-xl"
               alt="Face down card"
               faceDown={true}
             />
           </div>
         ))}
+        </div>
       </div>
     </div>
   );
