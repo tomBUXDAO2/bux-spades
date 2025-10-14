@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useAuth } from '@/features/auth/AuthContext';
+import { isAdmin } from '@/utils/adminUtils';
 
 interface PlayerProfileDropdownProps {
   player: {
@@ -13,6 +15,7 @@ interface PlayerProfileDropdownProps {
   onShowEmojiPicker: () => void;
   onEmojiReaction: (emoji: string) => void;
   onSendEmoji?: (emoji: string) => void;
+  onOpenAdminPanel?: () => void;
   children: React.ReactNode;
   playerPosition?: number; // Add player position for positioning adjustments
 }
@@ -27,12 +30,17 @@ export default function PlayerProfileDropdown({
   onShowEmojiPicker,
   onEmojiReaction,
   onSendEmoji,
+  onOpenAdminPanel,
   children,
   playerPosition
 }: PlayerProfileDropdownProps) {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Check if user is admin
+  const userIsAdmin = isAdmin(user?.discordId);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -159,11 +167,27 @@ export default function PlayerProfileDropdown({
                   onViewStats();
                   setIsOpen(false);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
+                className={`w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center ${userIsAdmin && onOpenAdminPanel ? 'border-b border-gray-600' : ''}`}
               >
                 <span className="mr-2">📊</span>
                 My Stats
               </button>
+              
+              {/* Admin Panel - Only visible to admins */}
+              {userIsAdmin && onOpenAdminPanel && (
+                <button
+                  onClick={(e) => {
+                    console.log('Admin Panel button clicked');
+                    e.stopPropagation();
+                    onOpenAdminPanel();
+                    setIsOpen(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center font-semibold"
+                >
+                  <span className="mr-2">⚠️</span>
+                  ADMIN
+                </button>
+              )}
             </>
           ) : (
             <>

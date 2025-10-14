@@ -242,7 +242,7 @@ router.get('/discord/callback', async (req, res) => {
 
     // Create JWT token
     const jwtToken = jwt.sign(
-      { userId: user.id },
+      { userId: user.id, discordId: user.discordId },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '7d' }
     );

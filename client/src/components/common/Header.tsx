@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import GameRulesModal from '@/components/modals/GameRulesModal';
+import AdminPanel from '@/components/admin/AdminPanel';
+import { isAdmin } from '@/utils/adminUtils';
 
 interface HeaderProps {
   onOpenMyStats?: () => void;
@@ -11,7 +13,11 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isGameRulesOpen, setIsGameRulesOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Check if user is admin
+  const userIsAdmin = isAdmin(user?.discordId);
 
   const handleChangeAvatarClick = () => {
     if (fileInputRef.current) {
@@ -182,6 +188,23 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                     Game Rules
                   </button>
                   <div className="border-t border-slate-700"></div>
+                  
+                  {/* Admin Panel - Only visible to admins */}
+                  {userIsAdmin && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          setIsAdminPanelOpen(true);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 font-semibold"
+                      >
+                        ⚠️ ADMIN ONLY
+                      </button>
+                      <div className="border-t border-slate-700"></div>
+                    </>
+                  )}
+                  
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
@@ -210,6 +233,12 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
       <GameRulesModal 
         isOpen={isGameRulesOpen} 
         onClose={() => setIsGameRulesOpen(false)} 
+      />
+      
+      {/* Admin Panel */}
+      <AdminPanel
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
       />
     </header>
   );

@@ -33,6 +33,7 @@ interface GameTablePlayersProps {
   recentChatMessages: Record<string, { message: string; timestamp: number }>;
   isPlayer: (player: any) => player is Player;
   isBot: (player: any) => player is Bot;
+  onOpenAdminPanel?: () => void;
 }
 
 export default function GameTablePlayers({
@@ -61,7 +62,8 @@ export default function GameTablePlayers({
   recentChatMessages,
   isPlayer,
   isBot,
-  pendingBid
+  pendingBid,
+  onOpenAdminPanel
 }: GameTablePlayersProps) {
   
   const renderPlayerPosition = (position: number) => {
@@ -399,6 +401,7 @@ export default function GameTablePlayers({
                   onShowEmojiPicker={() => {}}
                   onEmojiReaction={(emoji) => handleEmojiReaction(player.id, emoji)}
                   onSendEmoji={(emoji) => handleSendEmoji(player.id, emoji)}
+                  onOpenAdminPanel={onOpenAdminPanel}
                   playerPosition={position}
                 >
                   <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>

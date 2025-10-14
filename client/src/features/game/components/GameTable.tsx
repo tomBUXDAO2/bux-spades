@@ -6,6 +6,7 @@ import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
 import Chat from '../../../features/chat/Chat';
 import LandscapePrompt from "../../../LandscapePrompt";
+import AdminPanel from '../../../components/admin/AdminPanel';
 
 // Extracted components
 import { useAudioManager } from '../../../components/game/components/AudioManager';
@@ -96,6 +97,7 @@ export default function GameTableModular({
   // Modal states
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [showLoser, setShowLoser] = useState(false);
   const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
@@ -960,6 +962,9 @@ export default function GameTableModular({
   const renderLeagueOverlay = () => {
     if (!isLeague || gameState.status !== 'WAITING') return null;
     
+    // Hide overlay when admin panel is open
+    if (isAdminPanelOpen) return null;
+    
     const readyButtonData = getReadyButtonData(isHost, myIndex, gameState, leagueReady, toggleReady);
     const startGameButtonData = getStartGameButtonData(isHost, allHumansReady, requestStart);
     const playerStatusData = getPlayerStatusData(gameState, leagueReady);
@@ -1082,6 +1087,7 @@ export default function GameTableModular({
                 recentChatMessages={recentChatMessages as Record<string, { message: string; timestamp: number }>}
                 isPlayer={isPlayer}
                 isBot={isBot}
+                onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
               />
 
               {/* Game Status Overlay */}
@@ -1105,6 +1111,7 @@ export default function GameTableModular({
                 showTrickHistory={showTrickHistory}
                 showStartWarning={showStartWarning}
                 showBotWarning={showBotWarning}
+                hideStartButton={isAdminPanelOpen}
                 onStartGame={handleStartGameWrapper}
                 onBid={handleBidWrapper}
                 onBlindNil={() => {}}
@@ -1241,6 +1248,12 @@ export default function GameTableModular({
         />
 
         {renderLeagueOverlay()}
+        
+        {/* Admin Panel */}
+        <AdminPanel
+          isOpen={isAdminPanelOpen}
+          onClose={() => setIsAdminPanelOpen(false)}
+        />
       </div>
     </>
   );

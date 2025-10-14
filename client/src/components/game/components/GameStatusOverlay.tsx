@@ -28,6 +28,7 @@ interface GameStatusOverlayProps {
   showTrickHistory?: boolean;
   showStartWarning?: boolean;
   showBotWarning?: boolean;
+  hideStartButton?: boolean;
   onStartGame: () => void;
   onBid: (bid: number) => void;
   onBlindNil: () => void;
@@ -425,6 +426,7 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
     showTrickHistory,
     showStartWarning,
     showBotWarning,
+    hideStartButton = false,
     onStartGame,
     onBid,
     onBlindNil,
@@ -442,7 +444,7 @@ export const GameStatusOverlay: React.FC<GameStatusOverlayProps> = (props) => {
             scaleFactor={scaleFactor}
             isLeague={isLeague}
             isStarting={isStarting}
-            hideStartButton={(gameState as any)?.ui?.showBotWarning === true || showStartWarning || showBotWarning}
+            hideStartButton={hideStartButton || (gameState as any)?.ui?.showBotWarning === true || showStartWarning || showBotWarning}
             showLeaveConfirmation={showLeaveConfirmation}
             showTrickHistory={showTrickHistory}
             onStartGame={onStartGame}
