@@ -5,24 +5,28 @@ export class StatsService {
   static async getUserStats(userId, format = 'ALL', mode = 'ALL', isLeague = false) {
     try {
       // Build where clause for filtering
-      const whereClause = {
-        userId,
-        game: {
-          status: 'FINISHED'
-        }
+      const gameFilter = {
+        status: 'FINISHED'
       };
 
       if (format !== 'ALL') {
-        whereClause.game.format = format;
+        gameFilter.format = format;
       }
 
       if (mode !== 'ALL') {
-        whereClause.game.mode = mode;
+        gameFilter.mode = mode;
       }
 
       if (isLeague) {
-        whereClause.game.isLeague = true;
+        gameFilter.isLeague = true;
       }
+
+      const whereClause = {
+        userId,
+        round: {
+          game: gameFilter
+        }
+      };
 
       // Get aggregated stats from PlayerRoundStats
       const stats = await prisma.playerRoundStats.aggregate({
@@ -81,11 +85,8 @@ export class StatsService {
         where: {
           userId,
           madeNil: true,
-          game: {
-            status: 'FINISHED',
-            ...(format !== 'ALL' && { format }),
-            ...(mode !== 'ALL' && { mode }),
-            ...(isLeague && { isLeague: true })
+          round: {
+            game: gameFilter
           }
         },
         _count: {
