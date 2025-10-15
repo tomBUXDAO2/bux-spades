@@ -468,6 +468,11 @@ class BotService {
       return partnerBid ? partnerBid.bid : null;
     }
     
+    // Try to get from gameState bidding data
+    if (game.bidding && game.bidding.bids) {
+      return game.bidding.bids[partnerSeatIndex] || null;
+    }
+    
     return null;
   }
 

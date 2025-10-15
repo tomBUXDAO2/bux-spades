@@ -43,6 +43,9 @@ export class GameLoggingService {
    */
   static async logBid(gameId, roundId, userId, seatIndex, bid, isBlindNil = false) {
     try {
+      // Determine if it's a nil bid (bid = 0)
+      const isNil = bid === 0;
+      
       // Update PlayerRoundStats with bid
       await prisma.playerRoundStats.updateMany({
         where: {
@@ -51,6 +54,7 @@ export class GameLoggingService {
         },
         data: {
           bid: bid,
+          isNil: isNil,
           isBlindNil: isBlindNil
         }
       });

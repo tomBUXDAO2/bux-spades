@@ -577,23 +577,24 @@ export default function GameTableModular({
     // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
     
-    // During BIDDING: only reveal cards for the current bidder
-    if (
-      gameState?.status === 'BIDDING' &&
-      gameState?.currentPlayer === currentPlayerId &&
-      Array.isArray(hands) &&
-      Array.isArray(myHandArr) &&
-      myHandArr.length > 0
-    ) {
-      setDealingComplete(true);
-      setCardsRevealed(true);
+    // During BIDDING: reveal cards if it's your turn OR you've already bid
+    if (gameState?.status === 'BIDDING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
+      const isMyTurn = gameState?.currentPlayer === currentPlayerId;
+      const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
+      const haveBid = myBid !== null && myBid !== undefined;
+      
+      // CRITICAL FIX: Keep cards revealed once you've bid OR when it's your turn
+      if (isMyTurn || haveBid) {
+        setDealingComplete(true);
+        setCardsRevealed(true);
+      }
     }
     
     // During PLAYING: reveal cards for all players
     if (gameState?.status === 'PLAYING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
       setCardsRevealed(true);
     }
-  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, currentPlayerId, mySeatIndex]);
+  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex]);
   
   // Game action handlers
   const handlePlayCardWrapper = (card: Card) => {
