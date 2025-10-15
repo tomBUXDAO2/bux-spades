@@ -119,9 +119,9 @@ export const useSocketEventHandlers = ({
           const newState = normalizeGameState(biddingData.gameState);
           
           // Defensive: If we have existing state and new state has nulls, preserve the old bids
-          if (gameState?.bidding?.bids && newState?.bidding?.bids) {
+          if (currentGameState?.bidding?.bids && newState?.bidding?.bids) {
             const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
-              const oldBid = gameState.bidding.bids[index];
+              const oldBid = currentGameState.bidding.bids[index];
               // If old bid exists and new bid is null, keep the old bid
               if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
                 console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null)`);
