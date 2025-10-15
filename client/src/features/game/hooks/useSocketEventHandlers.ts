@@ -115,7 +115,26 @@ export const useSocketEventHandlers = ({
         
         // Use the full gameState from the server instead of just updating bidding
         if (biddingData.gameState) {
-          setGameState(normalizeGameState(biddingData.gameState));
+          // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
+          setGameState((prevState: any) => {
+            const newState = normalizeGameState(biddingData.gameState);
+            
+            // Defensive: If previous state had bids and new state has nulls, preserve the old bids
+            if (prevState?.bidding?.bids && newState?.bidding?.bids) {
+              const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
+                const oldBid = prevState.bidding.bids[index];
+                // If old bid exists and new bid is null, keep the old bid
+                if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
+                  console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null)`);
+                  return oldBid;
+                }
+                return newBid;
+              });
+              newState.bidding.bids = preservedBids;
+            }
+            
+            return newState;
+          });
         } else {
           // Fallback to partial update if gameState not provided
           (setGameState as any)((prevState: any) => {

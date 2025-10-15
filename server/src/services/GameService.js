@@ -724,11 +724,8 @@ export class GameService {
 
       // Get player bids from Redis or database
       let playerBids = await redisGameState.getPlayerBids(gameId);
-      if (!playerBids) {
-        playerBids = Array.from({length: 4}, () => null);
-      }
-
-      // Get player stats (tricks won) from database
+      
+      // Get player stats (tricks won) and bids from database
       let playerStats = [];
       if (game.currentRound > 0) {
         const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
@@ -737,7 +734,23 @@ export class GameService {
             where: { roundId: currentRound.id },
             orderBy: { seatIndex: 'asc' }
           });
+          
+          // CRITICAL FIX: If Redis doesn't have bids, try to get them from PlayerRoundStats
+          if (!playerBids || playerBids.every(b => b === null || b === undefined)) {
+            playerBids = Array.from({length: 4}, () => null);
+            playerStats.forEach(stat => {
+              if (stat.bid !== null && stat.bid !== undefined) {
+                playerBids[stat.seatIndex] = stat.bid;
+              }
+            });
+            console.log(`[GAME SERVICE] Restored bids from PlayerRoundStats:`, playerBids);
+          }
         }
+      }
+      
+      // Final fallback: if still no bids, use empty array
+      if (!playerBids) {
+        playerBids = Array.from({length: 4}, () => null);
       }
 
       // Get running totals from the latest RoundScore
