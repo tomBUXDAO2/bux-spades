@@ -74,22 +74,11 @@ export const useSocketEventHandlers = ({
         // Update the last game update timestamp
         setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
         
-        // CRITICAL: Preserve hands from previous state if not included in update
+        // CRITICAL: NEVER preserve hands from previous state - this causes hand flashing
         const newState = normalizeGameState(gameData.gameState);
         
-        // If new state doesn't have hands but previous state did, preserve them
-        // BUT only if the game status hasn't changed to a phase where hands should be cleared
-        if (currentGameState && currentGameState.hands && !newState.hands) {
-          const statusChanged = currentGameState.status !== newState.status;
-          const isNewHandPhase = newState.status === 'BIDDING' || newState.status === 'PLAYING';
-          
-          if (!statusChanged || isNewHandPhase) {
-            console.log('🎮 Preserving hands from previous state during game_update');
-            newState.hands = currentGameState.hands;
-          } else {
-            console.log('🎮 Game status changed, not preserving hands');
-          }
-        }
+        // NEVER preserve hands - let the server send the correct hands for each player
+        // This prevents players from seeing other players' cards
         
         setGameState(newState);
       }

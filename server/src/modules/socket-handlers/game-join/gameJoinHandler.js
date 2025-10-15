@@ -68,10 +68,20 @@ class GameJoinHandler {
         const system = new SystemMessageHandler(this.io, this.socket);
         system.handleBotRemoved(gameId, target.username);
       } catch {}
-      this.io.to(gameId).emit('game_update', {
-        gameId,
-        gameState: updatedGameState
-      });
+      // CRITICAL FIX: Send personalized game state to each player
+      const room = this.io.sockets.adapter.rooms.get(gameId);
+      if (room) {
+        for (const socketId of room) {
+          const socket = this.io.sockets.sockets.get(socketId);
+          if (socket && socket.userId) {
+            const personalizedState = GameService.sanitizeGameStateForUser(updatedGameState, socket.userId);
+            socket.emit('game_update', {
+              gameId,
+              gameState: personalizedState
+            });
+          }
+        }
+      }
 
       // Clean any orphaned bot users
       try {

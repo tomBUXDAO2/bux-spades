@@ -137,7 +137,21 @@ class GameStartHandler {
       // Emit started and updated state to clients (DB-first)
       const gameState = await GameService.getFullGameStateFromDatabase(gameId);
       this.io.to(gameId).emit('game_started', { gameId, gameState });
-      this.io.to(gameId).emit('game_update', { gameId, gameState });
+      
+      // CRITICAL FIX: Send personalized game state to each player
+      const room = this.io.sockets.adapter.rooms.get(gameId);
+      if (room) {
+        for (const socketId of room) {
+          const socket = this.io.sockets.sockets.get(socketId);
+          if (socket && socket.userId) {
+            const personalizedState = GameService.sanitizeGameStateForUser(gameState, socket.userId);
+            socket.emit('game_update', {
+              gameId,
+              gameState: personalizedState
+            });
+          }
+        }
+      }
 
       // CRITICAL: Remove from starting games set IMMEDIATELY after successful completion
       startingGames.delete(gameId);

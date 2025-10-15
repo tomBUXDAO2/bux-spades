@@ -577,17 +577,22 @@ export default function GameTableModular({
     // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
     
-    // During BIDDING: reveal cards if it's your turn OR you've already bid
+    // During BIDDING: ONLY reveal cards if it's your turn AND you haven't bid yet
     if (gameState?.status === 'BIDDING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
       const isMyTurn = gameState?.currentPlayer === currentPlayerId;
       const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
       const haveBid = myBid !== null && myBid !== undefined;
       
-      // CRITICAL FIX: Once cards are revealed during bidding, NEVER flip them back
-      if ((isMyTurn || haveBid) && !cardsRevealedDuringBiddingRef.current) {
+      // FIXED: Only reveal cards when it's your turn and you haven't bid yet
+      if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current) {
         setDealingComplete(true);
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
+      }
+      
+      // CRITICAL: Set dealingComplete to true when hands exist, regardless of turn
+      if (Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
+        setDealingComplete(true);
       }
       
       // Keep cards revealed if they were revealed before
