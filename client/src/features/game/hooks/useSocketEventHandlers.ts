@@ -116,10 +116,10 @@ export const useSocketEventHandlers = ({
         // Use the full gameState from the server instead of just updating bidding
         if (biddingData.gameState) {
           // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
+          const newState = normalizeGameState(biddingData.gameState);
+          
+          // Defensive: If we have existing state and new state has nulls, preserve the old bids
           setGameState((prevState: any) => {
-            const newState = normalizeGameState(biddingData.gameState);
-            
-            // Defensive: If previous state had bids and new state has nulls, preserve the old bids
             if (prevState?.bidding?.bids && newState?.bidding?.bids) {
               const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
                 const oldBid = prevState.bidding.bids[index];
