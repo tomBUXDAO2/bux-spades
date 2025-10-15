@@ -191,3 +191,25 @@ router.post('/force-logout', authenticateToken, isAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Failed to force logout' });
   }
 });
+
+// One-time ops endpoint: allow triggering force-logout with a secret header
+// Header: x-force-logout-key: <FORCE_LOGOUT_KEY>
+router.post('/force-logout-global', async (req, res) => {
+  try {
+    const key = req.headers['x-force-logout-key'];
+    if (!process.env.FORCE_LOGOUT_KEY || key !== process.env.FORCE_LOGOUT_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await redisSessionService.clearAllSessions();
+    io.emit('force_logout', {
+      reason: 'server_update',
+      message: 'You have been logged out due to a server update. Please log in again.'
+    });
+
+    return res.json({ success: true, deletedSessions: result.deleted || 0 });
+  } catch (error) {
+    console.error('[ADMIN] Error forcing logout (global key):', error);
+    return res.status(500).json({ error: 'Failed to force logout' });
+  }
+});
