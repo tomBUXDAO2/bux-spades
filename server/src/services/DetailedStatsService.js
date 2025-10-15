@@ -150,11 +150,12 @@ export class DetailedStatsService {
 
   // Get nil statistics
   static async getNilStats(userId, gameWhere) {
-    // Nil bids - cannot track this without RoundBid table, using made nils as approximation
+    // CRITICAL FIX: Count actual nil attempts (bid = 0), not just successful nils
     const nilsBid = await prisma.playerRoundStats.count({
       where: {
         userId,
-        madeNil: true,
+        bid: 0,
+        isBlindNil: false,
         round: {
           game: gameWhere
         }
@@ -172,11 +173,11 @@ export class DetailedStatsService {
       }
     });
 
-    // Blind nil bids - cannot track this without RoundBid table, using made blind nils as approximation
+    // CRITICAL FIX: Count actual blind nil attempts (isBlindNil = true), not just successful ones
     const blindNilsBid = await prisma.playerRoundStats.count({
       where: {
         userId,
-        madeBlindNil: true,
+        isBlindNil: true,
         round: {
           game: gameWhere
         }
@@ -224,9 +225,16 @@ export class DetailedStatsService {
       }
     });
 
+    // CRITICAL FIX: Count actual games played, not rounds
+    const gamesPlayed = await prisma.gamePlayer.count({
+      where: {
+        userId,
+        game: gameWhere
+      }
+    });
+
     const totalBags = bagsStats._sum.bagsThisRound || 0;
-    const roundsPlayed = bagsStats._count.id;
-    const bagsPerGame = roundsPlayed > 0 ? totalBags / roundsPlayed : 0;
+    const bagsPerGame = gamesPlayed > 0 ? totalBags / gamesPlayed : 0;
 
     return {
       totalBags,

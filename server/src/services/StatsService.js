@@ -40,8 +40,19 @@ export class StatsService {
         }
       });
 
-      // Nil bid stats - approximate from made nils since roundBid table doesn't exist
-      const nilStats = await prisma.playerRoundStats.count({
+      // CRITICAL FIX: Count actual nil attempts (bid = 0), not just successful nils
+      const nilAttempts = await prisma.playerRoundStats.count({
+        where: {
+          userId,
+          bid: 0,
+          isBlindNil: false,
+          round: {
+            game: gameFilter
+          }
+        }
+      });
+      
+      const nilsMade = await prisma.playerRoundStats.count({
         where: {
           userId,
           madeNil: true,
@@ -51,7 +62,18 @@ export class StatsService {
         }
       });
       
-      const blindNilStats = await prisma.playerRoundStats.count({
+      // CRITICAL FIX: Count actual blind nil attempts (isBlindNil = true), not just successful ones
+      const blindNilAttempts = await prisma.playerRoundStats.count({
+        where: {
+          userId,
+          isBlindNil: true,
+          round: {
+            game: gameFilter
+          }
+        }
+      });
+      
+      const blindNilsMade = await prisma.playerRoundStats.count({
         where: {
           userId,
           madeBlindNil: true,
@@ -92,8 +114,8 @@ export class StatsService {
 
       // Calculate percentages
       const winRate = totalGames > 0 ? (gamesWon / totalGames) * 100 : 0;
-      const nilRate = nilStats > 0 ? (nilStats / nilStats) * 100 : 0; // Approximation
-      const blindNilRate = blindNilStats > 0 ? (blindNilStats / blindNilStats) * 100 : 0; // Approximation
+      const nilRate = nilAttempts > 0 ? (nilsMade / nilAttempts) * 100 : 0;
+      const blindNilRate = blindNilAttempts > 0 ? (blindNilsMade / blindNilAttempts) * 100 : 0;
 
       return {
         totalGames,
@@ -101,11 +123,11 @@ export class StatsService {
         winRate,
         totalPoints: 0, // Points not tracked in PlayerRoundStats
         totalCoins: 0, // Coins not tracked in PlayerRoundStats
-        nilsBid: nilStats, // Approximation
-        nilsMade: nilStats,
+        nilsBid: nilAttempts,
+        nilsMade: nilsMade,
         nilRate,
-        blindNilsBid: blindNilStats, // Approximation
-        blindNilsMade: blindNilStats,
+        blindNilsBid: blindNilAttempts,
+        blindNilsMade: blindNilsMade,
         blindNilRate,
         totalTricks: stats._sum.tricksWon || 0,
         totalBags: stats._sum.bagsThisRound || 0,

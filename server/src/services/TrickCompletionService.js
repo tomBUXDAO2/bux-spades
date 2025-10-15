@@ -384,7 +384,29 @@ export class TrickCompletionService {
         throw new Error(`Game ${gameId} not found`);
       }
 
-      const nextRoundNumber = game.rounds.length + 1;
+      // CRITICAL FIX: Use currentRound from Game table, not rounds.length
+      // This prevents phantom rounds from accumulating
+      const nextRoundNumber = (game.currentRound || 0) + 1;
+      
+      // CRITICAL FIX: Check if the current round has been completed before creating a new one
+      // A round is only complete if all PlayerRoundStats have non-null bids
+      if (game.currentRound && game.currentRound > 0) {
+        const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+        if (currentRound) {
+          const stats = await prisma.playerRoundStats.findMany({
+            where: { roundId: currentRound.id }
+          });
+          
+          const incompleteBids = stats.filter(s => s.bid === null);
+          if (incompleteBids.length > 0) {
+            console.error(`[TRICK COMPLETION] ERROR: Cannot start new round - current round ${game.currentRound} has ${incompleteBids.length} players with incomplete bids`);
+            throw new Error(`Current round ${game.currentRound} not complete - ${incompleteBids.length} players haven't bid yet`);
+          }
+        }
+      }
+      
+      console.log(`[TRICK COMPLETION] Creating round ${nextRoundNumber} (currentRound: ${game.currentRound}, existing rounds: ${game.rounds.length})`);
+      
       const nextDealerSeat = (game.dealer + 1) % 4;
       const firstBidderSeat = (nextDealerSeat + 1) % 4; // Player left of dealer
 
