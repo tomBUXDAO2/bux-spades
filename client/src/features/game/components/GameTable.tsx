@@ -756,6 +756,7 @@ export default function GameTableModular({
     setShowHandSummary(false);
     setHandSummaryData(null);
     if (socket && gameState.id) {
+      console.log('[HAND SUMMARY] Continuing to next round for game:', gameState.id);
       socket.emit('hand_summary_continue', { gameId: gameState.id });
     }
   };

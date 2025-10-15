@@ -10,6 +10,8 @@ import redisGameState from './RedisGameStateService.js';
  * No in-memory state management
  */
 export class TrickCompletionService {
+  // Mutex to prevent duplicate round creation
+  static startingRounds = new Set();
   /**
    * Check if a trick is complete (4 cards) and handle completion if it is
    * @param {string} gameId - The game ID
@@ -381,6 +383,14 @@ export class TrickCompletionService {
    * @param {Object} io - Socket.IO instance for emitting events
    */
   static async startNewRound(gameId, io = null) {
+    // CRITICAL: Prevent duplicate round creation with mutex
+    if (this.startingRounds.has(gameId)) {
+      console.log(`[TRICK COMPLETION] Round creation already in progress for game ${gameId}, skipping duplicate`);
+      return;
+    }
+    
+    this.startingRounds.add(gameId);
+    
     try {
       console.log(`[TRICK COMPLETION] Starting new round for game ${gameId}`);
       
@@ -397,6 +407,13 @@ export class TrickCompletionService {
       // CRITICAL FIX: Use currentRound from Game table, not rounds.length
       // This prevents phantom rounds from accumulating
       const nextRoundNumber = (game.currentRound || 0) + 1;
+      
+      // CRITICAL FIX: Check if round already exists to prevent duplicates
+      const existingRound = game.rounds.find(r => r.roundNumber === nextRoundNumber);
+      if (existingRound) {
+        console.log(`[TRICK COMPLETION] Round ${nextRoundNumber} already exists, not creating duplicate`);
+        return existingRound;
+      }
       
       // CRITICAL FIX: Check if the current round has been completed before creating a new one
       // A round is only complete if all PlayerRoundStats have non-null bids
@@ -546,6 +563,9 @@ export class TrickCompletionService {
     } catch (error) {
       console.error('[TRICK COMPLETION] Error starting new round:', error);
       throw error;
+    } finally {
+      // CRITICAL: Always release the mutex
+      this.startingRounds.delete(gameId);
     }
   }
 }
