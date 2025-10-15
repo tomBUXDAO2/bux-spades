@@ -98,6 +98,25 @@ export default function HandSummaryModal({
   const team2Bags = handSummaryData?.team2Bags || 0;
   const team2Score = handSummaryData?.team2Score || 0;
 
+  // Calculate bag penalty scores for display
+  // The server sends raw bag counts, but we need to show the bag penalty score
+  // Bag penalty: -100 points for every 10+ bags, then reset
+  // For display, we need to calculate what the bag penalty score would be
+  
+  // Calculate the bag score component (bags earned this round + any penalty)
+  // This should match the bag component of the round score
+  const team1BagScore = team1Bags; // Raw bags for now, will be updated with penalty logic
+  const team2BagScore = team2Bags; // Raw bags for now, will be updated with penalty logic
+  
+  // If we have bag penalties, calculate the actual bag score component
+  // The round score = made/bid points + nil points + bag score
+  // So bag score = round score - made/bid points - nil points
+  const team1MadeBidPoints = team1Tricks >= team1Bid ? team1Bid * 10 : -(team1Bid * 10);
+  const team2MadeBidPoints = team2Tricks >= team2Bid ? team2Bid * 10 : -(team2Bid * 10);
+  
+  const team1ActualBagScore = team1Score - team1MadeBidPoints - team1NilPoints;
+  const team2ActualBagScore = team2Score - team2MadeBidPoints - team2NilPoints;
+
   if (!isOpen) return null;
 
   return (
@@ -249,11 +268,11 @@ export default function HandSummaryModal({
                           </span>
                         </div>
                         
-                        {/* Bags - always show */}
+                        {/* Bags - always show (includes penalty if applied) */}
                         <div className="flex justify-between text-xs">
                           <span className="text-gray-400">Bags:</span>
-                          <span className={`font-medium ${team1Bags === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
-                            {team1Bags === 0 ? '0' : team1Bags}
+                          <span className={`font-medium ${team1ActualBagScore === 0 ? 'text-gray-400' : team1ActualBagScore > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                            {team1ActualBagScore === 0 ? '0' : team1ActualBagScore}
                           </span>
                         </div>
                         
@@ -308,11 +327,11 @@ export default function HandSummaryModal({
                           </span>
                         </div>
                         
-                        {/* Bags - always show */}
+                        {/* Bags - always show (includes penalty if applied) */}
                         <div className="flex justify-between text-xs">
                           <span className="text-gray-400">Bags:</span>
-                          <span className={`font-medium ${team2Bags === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
-                            {team2Bags === 0 ? '0' : team2Bags}
+                          <span className={`font-medium ${team2ActualBagScore === 0 ? 'text-gray-400' : team2ActualBagScore > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                            {team2ActualBagScore === 0 ? '0' : team2ActualBagScore}
                           </span>
                         </div>
                         
