@@ -246,3 +246,35 @@ router.delete('/emergency-delete-game/:gameId', async (req, res) => {
     return res.status(500).json({ error: 'Failed to delete game' });
   }
 });
+
+// Emergency remove all players from game to break redirect loop
+router.post('/emergency-clear-game/:gameId', async (req, res) => {
+  try {
+    const key = req.headers['x-force-logout-key'];
+    if (!process.env.FORCE_LOGOUT_KEY || key !== process.env.FORCE_LOGOUT_KEY) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { gameId } = req.params;
+    console.log(`[ADMIN] Emergency clearing players from game ${gameId}`);
+
+    // Remove all players from the game
+    await prisma.gamePlayer.deleteMany({
+      where: { gameId }
+    });
+
+    // Emit game_closed event to connected players
+    io.to(gameId).emit('game_closed', { 
+      gameId,
+      reason: 'Game cleared by admin'
+    });
+
+    // Clean up Redis cache
+    await redisGameState.cleanupGame(gameId);
+
+    return res.json({ success: true, message: `Cleared all players from game ${gameId}` });
+  } catch (error) {
+    console.error('[ADMIN] Error clearing game:', error);
+    return res.status(500).json({ error: 'Failed to clear game' });
+  }
+});

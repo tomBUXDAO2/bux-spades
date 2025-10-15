@@ -144,9 +144,20 @@ const HomePage: React.FC = () => {
               return isUserInGame && isActive;
             });
             if (activeGame) {
-              // Player is in an active game - redirect them to it
-              localStorage.setItem('activeGameId', activeGame.id);
-              navigate(`/table/${activeGame.id}`, { replace: true });
+              // CRITICAL FIX: Don't auto-redirect to broken games
+              // Only redirect if the game is actually functional
+              const isGameFunctional = activeGame.status === 'WAITING' || 
+                (activeGame.status === 'BIDDING' && activeGame.players?.length === 4) ||
+                (activeGame.status === 'PLAYING' && activeGame.players?.length === 4);
+              
+              if (isGameFunctional) {
+                localStorage.setItem('activeGameId', activeGame.id);
+                navigate(`/table/${activeGame.id}`, { replace: true });
+              } else {
+                console.log('[LEAGUE GAME CHECK] Found broken game, not redirecting:', activeGame.id);
+                // Clear the broken game from localStorage
+                localStorage.removeItem('activeGameId');
+              }
             }
           }
         }
