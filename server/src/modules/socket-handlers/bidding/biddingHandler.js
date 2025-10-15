@@ -338,10 +338,17 @@ class BiddingHandler {
           }
         }
 
-        // Clear mutex FIRST, then trigger next bot bid
+        // Clear mutex FIRST, then trigger next bot bid ONLY if next player is a bot
         this.biddingBots.delete(gameId);
-        console.log(`[BIDDING] Cleared mutex for game ${gameId} before triggering next bot`);
-        this.triggerBotBidIfNeeded(gameId);
+        console.log(`[BIDDING] Cleared mutex for game ${gameId} before checking next player`);
+        
+        // Only trigger bot bid if next player is a bot
+        if (nextPlayer && !nextPlayer.isHuman) {
+          console.log(`[BIDDING] Next player is bot, triggering bot bid`);
+          this.triggerBotBidIfNeeded(gameId);
+        } else {
+          console.log(`[BIDDING] Next player is human, not triggering bot bid`);
+        }
       }
 
       // NUCLEAR: No logging for performance
