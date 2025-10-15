@@ -61,7 +61,8 @@ export function setupSocketHandlers(io) {
           const { GameService } = await import('../services/GameService.js');
           const gameExists = await GameService.getGame(previousSession.activeGameId);
           
-          if (gameExists) {
+          // CRITICAL FIX: Don't redirect to FINISHED games
+          if (gameExists && gameExists.status !== 'FINISHED') {
             // Check if user is actually a player in this game (not left)
             const { prisma } = await import('../config/database.js');
             const playerInGame = await prisma.gamePlayer.findFirst({
@@ -84,6 +85,8 @@ export function setupSocketHandlers(io) {
             } else {
               console.log(`[SESSION] User ${userId} is not a player in game ${previousSession.activeGameId}, clearing it`);
             }
+          } else if (gameExists && gameExists.status === 'FINISHED') {
+            console.log(`[SESSION] User ${userId} had finished game ${previousSession.activeGameId}, not redirecting`);
           } else {
             console.log(`[SESSION] User ${userId} had stale active game ${previousSession.activeGameId}, clearing it`);
           }

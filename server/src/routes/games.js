@@ -271,6 +271,11 @@ router.post('/:id/leave', async (req, res) => {
     await GameService.leaveGame(gameId, userId);
     
     console.log(`[API] User ${userId} successfully left game ${gameId}`);
+    
+    // CRITICAL FIX: Clear activeGameId from user's session so they don't get redirected back
+    const redisSessionService = (await import('../services/RedisSessionService.js')).default;
+    await redisSessionService.clearActiveGame(userId);
+    console.log(`[API] Cleared activeGameId from session for user ${userId}`);
 
     // Update Redis cache and emit socket event
     try {

@@ -548,6 +548,23 @@ export class ScoringService {
 
       console.log(`[SCORING] Game ${gameId} completed successfully`);
       
+      // CRITICAL FIX: Clear activeGameId from all players' sessions so they don't get redirected back
+      try {
+        const gamePlayers = await prisma.gamePlayer.findMany({
+          where: { gameId },
+          select: { userId: true }
+        });
+        
+        const redisSessionService = (await import('./RedisSessionService.js')).default;
+        for (const player of gamePlayers) {
+          await redisSessionService.clearActiveGame(player.userId);
+          console.log(`[SCORING] Cleared activeGameId for player ${player.userId}`);
+        }
+      } catch (clearError) {
+        console.error('[SCORING] Error clearing activeGameIds:', clearError);
+        // Don't throw - this shouldn't break game completion
+      }
+      
       // Handle coin transactions for rated games (deduct + pay in one transaction)
       try {
         const { CoinService } = await import('./CoinService.js');

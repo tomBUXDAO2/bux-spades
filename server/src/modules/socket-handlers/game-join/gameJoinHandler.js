@@ -302,6 +302,11 @@ class GameJoinHandler {
       await GameService.leaveGame(gameId, userId);
       console.log(`[GAME LEAVE] User ${userId} removed from database for game ${gameId}`);
       
+      // CRITICAL FIX: Clear activeGameId from user's session so they don't get redirected back
+      const redisSessionService = (await import('../../../services/RedisSessionService.js')).default;
+      await redisSessionService.clearActiveGame(userId);
+      console.log(`[GAME LEAVE] Cleared activeGameId from session for user ${userId}`);
+      
       // Check if game should be cleaned up (unrated games with no human players)
       // Use DB-only check to avoid depending on derived state
       console.log(`[GAME LEAVE] Checking if game ${gameId} should be cleaned up...`);
