@@ -94,6 +94,9 @@ export default function GameTableModular({
   const [cardsRevealed, setCardsRevealed] = useState(false);
   const [dealtCardCount, setDealtCardCount] = useState(0);
   
+  // Ref to track if cards have been revealed during bidding (never flip back)
+  const cardsRevealedDuringBiddingRef = useRef(false);
+  
   // Modal states
   const [showHandSummary, setShowHandSummary] = useState(false);
   const [showWinner, setShowWinner] = useState(false);
@@ -228,11 +231,8 @@ export default function GameTableModular({
         }));
         setDealingComplete(true);
         setBiddingReady(true);
-        // CRITICAL FIX: When rejoining a game in progress, cards should be revealed 
-        // if it's currently this player's turn, otherwise stay face down
-        // The useEffect will handle this properly based on currentPlayer
-        const isMyTurn = data.activeGameState.currentPlayer === propUser?.id;
-        setCardsRevealed(isMyTurn || data.activeGameState.status === "PLAYING");
+        // CRITICAL FIX: Let the useEffect handle card reveal logic
+        // Don't set cardsRevealed here - let the useEffect handle it properly
         // setIsStarting(false); // Using prop from parent
       }
     }
@@ -246,7 +246,7 @@ export default function GameTableModular({
       setBiddingReady(true);
       // CRITICAL FIX: Do NOT reveal cards for everyone immediately
       // Let the useEffect (lines 569-583) handle revealing cards only for the current bidder
-      setCardsRevealed(false);
+      // Don't set cardsRevealed to false here - let the useEffect handle it
       
       // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
       if (data.gameState?.rated && data.gameState?.buyIn) {
@@ -583,15 +583,26 @@ export default function GameTableModular({
       const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
       const haveBid = myBid !== null && myBid !== undefined;
       
-      // CRITICAL FIX: Keep cards revealed once you've bid OR when it's your turn
-      if (isMyTurn || haveBid) {
+      // CRITICAL FIX: Once cards are revealed during bidding, NEVER flip them back
+      if ((isMyTurn || haveBid) && !cardsRevealedDuringBiddingRef.current) {
         setDealingComplete(true);
+        setCardsRevealed(true);
+        cardsRevealedDuringBiddingRef.current = true;
+      }
+      
+      // Keep cards revealed if they were revealed before
+      if (cardsRevealedDuringBiddingRef.current) {
         setCardsRevealed(true);
       }
     }
     
     // During PLAYING: reveal cards for all players
     if (gameState?.status === 'PLAYING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
+      setCardsRevealed(true);
+    }
+    
+    // CRITICAL: Never flip cards back to face down if they were revealed during bidding
+    if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING') {
       setCardsRevealed(true);
     }
   }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex]);
@@ -625,14 +636,26 @@ export default function GameTableModular({
   const [isBiddingPhase, setIsBiddingPhase] = useState(false);
 
   // Reset when game status changes
+  // Track previous status to detect phase transitions
+  const prevStatusRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (gameState.status === 'BIDDING') {
+    const prevStatus = prevStatusRef.current;
+    const currentStatus = gameState.status;
+    
+    if (currentStatus === 'BIDDING') {
       setIsBiddingPhase(true);
       setPendingBid(null);
+      // CRITICAL FIX: Only reset the ref when ENTERING bidding phase (not already in it)
+      if (prevStatus !== 'BIDDING') {
+        cardsRevealedDuringBiddingRef.current = false;
+      }
     } else {
       setIsBiddingPhase(false);
       setPendingBid(null);
     }
+    
+    prevStatusRef.current = currentStatus;
   }, [gameState.status]);
 
   // SIMPLE BOT BIDDING: Only trigger once per bot turn

@@ -283,14 +283,14 @@ export class TrickCompletionService {
 
         // Calculate nil points (100 for made nil, -100 for failed nil)
         const team0NilPoints = team0Players.reduce((sum, p) => {
-          if (p.isNil || p.isBlindNil) {
+          if (p.bid === 0 || p.isBlindNil) {
             return sum + (p.tricksWon === 0 ? 100 : -100);
           }
           return sum;
         }, 0);
         
         const team1NilPoints = team1Players.reduce((sum, p) => {
-          if (p.isNil || p.isBlindNil) {
+          if (p.bid === 0 || p.isBlindNil) {
             return sum + (p.tricksWon === 0 ? 100 : -100);
           }
           return sum;
@@ -324,7 +324,17 @@ export class TrickCompletionService {
           // Individual player data
           tricksPerPlayer: playerStats.map(p => p.tricksWon),
           playerBids: playerStats.map(p => p.bid || 0),
-          playerNils: playerStats.map(p => (p.isNil || p.isBlindNil) ? (p.tricksWon === 0 ? 100 : -100) : 0),
+          playerNils: playerStats.map(p => {
+            // Check if player bid nil (bid = 0) or blind nil
+            const isNilBid = p.bid === 0 && !p.isBlindNil;
+            const isBlindNilBid = p.isBlindNil;
+            
+            if (isNilBid || isBlindNilBid) {
+              // Made nil = 100 points, failed nil = -100 points
+              return p.tricksWon === 0 ? 100 : -100;
+            }
+            return 0;
+          }),
           playerBags: playerStats.map(p => p.bagsThisRound || 0),
           
           // Solo game player scores (running totals)

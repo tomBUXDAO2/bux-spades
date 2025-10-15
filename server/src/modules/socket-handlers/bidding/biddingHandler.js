@@ -338,10 +338,6 @@ class BiddingHandler {
           }
         }
 
-        // Clear mutex FIRST, then trigger next bot bid ONLY if next player is a bot
-        this.biddingBots.delete(gameId);
-        console.log(`[BIDDING] Cleared mutex for game ${gameId} before checking next player`);
-        
         // Only trigger bot bid if next player is a bot
         if (nextPlayer && !nextPlayer.isHuman) {
           console.log(`[BIDDING] Next player is bot, triggering bot bid`);
@@ -573,6 +569,16 @@ class BiddingHandler {
       const hand = hands[currentPlayer.seatIndex];
       const numSpades = hand.filter(card => card.suit === 'SPADES').length;
       
+      // CRITICAL: Get latest bids from Redis and add to gameState
+      const latestBids = await redisGameState.getPlayerBids(gameId);
+      if (latestBids) {
+        if (!gameState.bidding) {
+          gameState.bidding = {};
+        }
+        gameState.bidding.bids = latestBids;
+        console.log(`[BIDDING] Updated gameState with latest bids from Redis:`, latestBids);
+      }
+      
       // Use BotService for proper bidding logic based on game type
       let botBid;
       if (gameState.format === 'WHIZ') {
@@ -603,12 +609,12 @@ class BiddingHandler {
         console.log(`[BIDDING] Bot ${playerUsername} bidding ${botBid} (${numSpades} spades)`);
       }
 
+      // Remove from bidding bots set BEFORE processing so next bot can be triggered
+      this.biddingBots.delete(gameId);
+      console.log(`[BIDDING] Removed game ${gameId} from bidding bots mutex before processing bid`);
+      
       // Process bot's bid
       await this.processBid(gameId, playerId, botBid, botBid === 0, false);
-      
-      // Remove from bidding bots set IMMEDIATELY after processing
-      this.biddingBots.delete(gameId);
-      console.log(`[BIDDING] Removed game ${gameId} from bidding bots mutex`);
     } catch (error) {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
       // Remove from bidding bots set on error too
