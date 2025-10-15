@@ -119,22 +119,20 @@ export const useSocketEventHandlers = ({
           const newState = normalizeGameState(biddingData.gameState);
           
           // Defensive: If we have existing state and new state has nulls, preserve the old bids
-          setGameState((prevState: any) => {
-            if (prevState?.bidding?.bids && newState?.bidding?.bids) {
-              const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
-                const oldBid = prevState.bidding.bids[index];
-                // If old bid exists and new bid is null, keep the old bid
-                if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
-                  console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null)`);
-                  return oldBid;
-                }
-                return newBid;
-              });
-              newState.bidding.bids = preservedBids;
-            }
-            
-            return newState;
-          });
+          if (gameState?.bidding?.bids && newState?.bidding?.bids) {
+            const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
+              const oldBid = gameState.bidding.bids[index];
+              // If old bid exists and new bid is null, keep the old bid
+              if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
+                console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null)`);
+                return oldBid;
+              }
+              return newBid;
+            });
+            newState.bidding.bids = preservedBids;
+          }
+          
+          setGameState(newState);
         } else {
           // Fallback to partial update if gameState not provided
           (setGameState as any)((prevState: any) => {
