@@ -353,7 +353,7 @@ class BiddingHandler {
 
       // NUCLEAR: No logging for performance
     } catch (error) {
-      // NUCLEAR: No logging for performance
+      console.error('[BIDDING] Error in processBid:', error);
       throw error;
     }
   }
