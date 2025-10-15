@@ -5,6 +5,7 @@ import { GameService } from '../services/GameService.js';
 import { gameManager } from '../services/GameManager.js';
 import redisGameState from '../services/RedisGameStateService.js';
 import { io } from '../config/server.js';
+import redisSessionService from '../services/RedisSessionService.js';
 
 const router = express.Router();
 
@@ -172,3 +173,21 @@ router.delete('/games/:gameId/players/:userId', authenticateToken, isAdmin, asyn
 });
 
 export default router;
+
+// Force logout all users: clears Redis sessions and broadcasts socket event
+router.post('/force-logout', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await redisSessionService.clearAllSessions();
+
+    // Broadcast to all connected sockets
+    io.emit('force_logout', {
+      reason: 'server_update',
+      message: 'You have been logged out due to a server update. Please log in again.'
+    });
+
+    return res.json({ success: true, deletedSessions: result.deleted || 0 });
+  } catch (error) {
+    console.error('[ADMIN] Error forcing logout:', error);
+    return res.status(500).json({ error: 'Failed to force logout' });
+  }
+});

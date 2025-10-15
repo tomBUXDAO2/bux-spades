@@ -122,6 +122,43 @@ class RedisSessionService {
       return false;
     }
   }
+
+  /**
+   * Remove ALL user sessions (global logout)
+   */
+  async clearAllSessions() {
+    try {
+      if (!redisClient) return { deleted: 0 };
+
+      // Prefer SCAN to avoid blocking Redis
+      let cursor = '0';
+      let totalDeleted = 0;
+      do {
+        const scanResult = await redisClient.scan(cursor, {
+          MATCH: `${this.SESSION_PREFIX}*`,
+          COUNT: 500
+        });
+        cursor = scanResult.cursor;
+        const keys = scanResult.keys || [];
+        if (keys.length > 0) {
+          // Use UNLINK for asynchronous deletion if available, fallback to DEL
+          if (typeof redisClient.unlink === 'function') {
+            const deleted = await redisClient.unlink(keys);
+            totalDeleted += Number(deleted) || 0;
+          } else {
+            const deleted = await redisClient.del(keys);
+            totalDeleted += Number(deleted) || 0;
+          }
+        }
+      } while (cursor !== '0');
+
+      console.log(`[SESSION] Cleared all sessions. Deleted: ${totalDeleted}`);
+      return { deleted: totalDeleted };
+    } catch (error) {
+      console.error('[SESSION] Error clearing all sessions:', error);
+      return { deleted: 0, error: String(error?.message || error) };
+    }
+  }
 }
 
 // Export singleton instance
