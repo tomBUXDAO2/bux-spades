@@ -18,3 +18,4 @@ primary_region = "lax"
 
 [env]
   NODE_ENV = "production"
+  BOT_AI_V2 = "true"

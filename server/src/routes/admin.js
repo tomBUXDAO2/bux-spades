@@ -6,6 +6,7 @@ import { gameManager } from '../services/GameManager.js';
 import redisGameState from '../services/RedisGameStateService.js';
 import { io } from '../config/server.js';
 import redisSessionService from '../services/RedisSessionService.js';
+import { ForceGameDeletionService } from '../services/ForceGameDeletionService.js';
 
 const router = express.Router();
 
@@ -276,5 +277,74 @@ router.post('/emergency-clear-game/:gameId', async (req, res) => {
   } catch (error) {
     console.error('[ADMIN] Error clearing game:', error);
     return res.status(500).json({ error: 'Failed to clear game' });
+  }
+});
+
+// Force delete stuck games
+router.delete('/force-delete-game/:gameId', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    console.log(`[ADMIN] Force deleting game ${gameId}`);
+
+    // Emit game_closed event to connected players
+    io.to(gameId).emit('game_closed', { 
+      gameId,
+      reason: 'Game force deleted by admin'
+    });
+
+    // Clean up Redis cache
+    await redisGameState.cleanupGame(gameId);
+    
+    // Remove from GameManager memory
+    gameManager.removeGame(gameId);
+    
+    // Force delete from database
+    const result = await ForceGameDeletionService.forceDeleteGame(gameId);
+
+    if (result.success) {
+      console.log(`[ADMIN] Successfully force deleted game ${gameId}`);
+      res.json({ 
+        success: true, 
+        message: result.message,
+        steps: result.steps
+      });
+    } else {
+      console.error(`[ADMIN] Failed to force delete game ${gameId}:`, result.error);
+      res.status(500).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+  } catch (error) {
+    console.error('[ADMIN] Error force deleting game:', error);
+    res.status(500).json({ error: 'Failed to force delete game' });
+  }
+});
+
+// Get stuck games
+router.get('/stuck-games', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const stuckGames = await ForceGameDeletionService.findStuckGames();
+    res.json({ success: true, stuckGames });
+  } catch (error) {
+    console.error('[ADMIN] Error finding stuck games:', error);
+    res.status(500).json({ error: 'Failed to find stuck games' });
+  }
+});
+
+// Get detailed game information
+router.get('/game-details/:gameId', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const details = await ForceGameDeletionService.getGameDetails(gameId);
+    
+    if (!details.found) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    
+    res.json({ success: true, details });
+  } catch (error) {
+    console.error('[ADMIN] Error getting game details:', error);
+    res.status(500).json({ error: 'Failed to get game details' });
   }
 });

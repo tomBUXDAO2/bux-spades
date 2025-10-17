@@ -320,10 +320,12 @@ export class GameService {
       }
       if (roundIds.length > 0) {
         await prisma.trick.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] trick error:', err.message));
-        await prisma.roundBid.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundBid error:', err.message));
-        await prisma.roundHandSnapshot.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundHandSnapshot error:', err.message));
+        
+        // Use raw SQL for tables not in Prisma schema
+        await prisma.$executeRaw`DELETE FROM "RoundHandSnapshot" WHERE "roundId" = ANY(${roundIds})`.catch(err => console.log('[DELETE] roundHandSnapshot error:', err.message));
+        await prisma.$executeRaw`DELETE FROM "PlayerRoundStats" WHERE "roundId" = ANY(${roundIds})`.catch(err => console.log('[DELETE] playerRoundStats error:', err.message));
+        
         await prisma.roundScore.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] roundScore error:', err.message));
-        await prisma.playerRoundStats.deleteMany({ where: { roundId: { in: roundIds } } }).catch(err => console.log('[DELETE] playerRoundStats error:', err.message));
         await prisma.round.deleteMany({ where: { id: { in: roundIds } } }).catch(err => console.log('[DELETE] round error:', err.message));
       }
 
