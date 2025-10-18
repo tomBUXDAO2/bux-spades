@@ -115,52 +115,34 @@ export class GameService {
         return null;
       }
 
-      // Get players separately
-      const players = await prisma.gamePlayer.findMany({
+      // OPTIMIZED: Get players with user info in single query (fixes N+1 problem)
+      const playersWithUsers = await prisma.gamePlayer.findMany({
         where: { gameId },
+        include: {
+          user: {
+            select: { id: true, username: true, avatarUrl: true }
+          }
+        },
         orderBy: { seatIndex: 'asc' }
       });
 
-      // Get user info for each player
-      const playersWithUsers = await Promise.all(
-        players.map(async (player) => {
-          const user = await prisma.user.findUnique({
-            where: { id: player.userId },
-            select: { id: true, username: true, avatarUrl: true }
-          });
-          return {
-            ...player,
-            user
-          };
-        })
-      );
-
-      // Get rounds separately
+      // OPTIMIZED: Get rounds with all related data in optimized queries
       const rounds = await prisma.round.findMany({
         where: { gameId },
+        include: {
+          tricks: {
+            include: {
+              cards: {
+                orderBy: { playOrder: 'asc' }
+              }
+            },
+            orderBy: { trickNumber: 'asc' }
+          },
+          playerStats: true,
+          RoundScore: true
+        },
         orderBy: { roundNumber: 'asc' }
       });
-
-      // Get bids, tricks, and player stats for each round
-      const roundsWithData = await Promise.all(
-        rounds.map(async (round) => {
-          const [tricks, playerStats] = await Promise.all([
-            prisma.trick.findMany({ 
-              where: { roundId: round.id },
-              include: {
-                cards: true
-              }
-            }),
-            prisma.playerRoundStats.findMany({ where: { roundId: round.id } })
-          ]);
-
-          return {
-            ...round,
-            tricks,
-            playerStats
-          };
-        })
-      );
 
       // Get result if exists
       const result = await prisma.gameResult.findUnique({
@@ -170,7 +152,7 @@ export class GameService {
       return {
         ...game,
         players: playersWithUsers,
-        rounds: roundsWithData,
+        rounds: rounds, // Now includes all related data
         result
       };
         
@@ -216,16 +198,19 @@ export class GameService {
           updateKeys: Object.keys(updates)
         });
         
-        const result = await prisma.game.update({
+        // Filter out related models that can't be updated directly
+        const { players, rounds, result: gameResult, ...gameUpdates } = updates;
+        
+        const updatedGame = await prisma.game.update({
           where: { id: gameId },
           data: {
-            ...updates,
+            ...gameUpdates,
             updatedAt: new Date()
           }
         });
 
-        console.log(`[GAME SERVICE] Game updated successfully:`, result.id);
-        return result;
+        console.log(`[GAME SERVICE] Game updated successfully:`, updatedGame.id);
+        return updatedGame;
         
       } catch (error) {
         retryCount++;
@@ -586,6 +571,50 @@ export class GameService {
           }
         }
         
+        // CRITICAL: Ensure hands data is included from Redis
+        const playerHands = await redisGameState.getPlayerHands(gameId);
+        if (playerHands && playerHands.length > 0) {
+          cachedGameState.hands = playerHands;
+          cachedGameState.playerHands = playerHands; // Also set playerHands field
+          console.log(`[GAME SERVICE] Updated hands from Redis:`, playerHands.map((hand, i) => `Seat ${i}: ${hand.length} cards`));
+        }
+        
+        // CRITICAL: Always refresh player stats from database to ensure latest tricks won
+        console.log(`[GAME SERVICE] Refreshing player stats from database for game ${gameId}`);
+        const freshGameState = await this.getFullGameStateFromDatabase(gameId);
+        if (freshGameState && freshGameState.players) {
+          // Update player stats with fresh data from database
+          cachedGameState.players = freshGameState.players;
+          console.log(`[GAME SERVICE] Updated player stats from database:`, 
+            freshGameState.players.map(p => p ? `Seat ${p.seatIndex}: ${p.tricks} tricks` : 'null'));
+        }
+        
+        // CRITICAL: Also update the Redis cache with the fresh player stats
+        await redisGameState.setGameState(gameId, cachedGameState);
+        
+        // CRITICAL: Ensure players data is included from database if not in cache
+        if (!cachedGameState.players || cachedGameState.players.length === 0) {
+          const dbPlayers = await prisma.gamePlayer.findMany({
+            where: { gameId },
+            include: { user: true }
+          });
+          if (dbPlayers && dbPlayers.length > 0) {
+            cachedGameState.players = dbPlayers.map(p => ({
+              id: p.id,
+              userId: p.userId,
+              username: p.user?.username,
+              avatarUrl: p.user?.avatarUrl,
+              seatIndex: p.seatIndex,
+              teamIndex: p.teamIndex,
+              isHuman: p.isHuman,
+              isSpectator: p.isSpectator,
+              type: p.isHuman ? 'human' : 'bot',
+              bid: null,
+              tricks: 0
+            }));
+          }
+        }
+        
         // Returning cached state from Redis
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
@@ -737,6 +766,9 @@ export class GameService {
             orderBy: { seatIndex: 'asc' }
           });
           
+          console.log(`[GAME SERVICE] Retrieved player stats for round ${currentRound.id}:`, 
+            playerStats.map(stat => `Seat ${stat.seatIndex}: ${stat.tricksWon} tricks won`));
+          
           // CRITICAL FIX: If Redis doesn't have bids, try to get them from PlayerRoundStats
           if (!playerBids || playerBids.every(b => b === null || b === undefined)) {
             playerBids = Array.from({length: 4}, () => null);
@@ -818,6 +850,8 @@ export class GameService {
       
       game.players.forEach(player => {
         const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
+        const tricksWon = playerStat?.tricksWon || 0;
+        console.log(`[GAME SERVICE] Player ${player.seatIndex} (${player.user?.username}): tricks=${tricksWon}, stat=${playerStat ? 'found' : 'not found'}`);
         const playerData = {
           id: player.userId,
           userId: player.userId, // CRITICAL: Add userId field for player lookups
@@ -829,7 +863,13 @@ export class GameService {
           isSpectator: player.isSpectator || false,
           type: player.isHuman ? 'human' : 'bot',
           bid: playerBids[player.seatIndex] || null,
-          tricks: playerStat?.tricksWon || 0
+          tricks: tricksWon,
+          // CRITICAL: Ensure user object is included for client
+          user: player.user ? {
+            id: player.user.id,
+            username: player.user.username,
+            avatarUrl: player.user.avatarUrl
+          } : null
         };
         
         if (player.isSpectator) {

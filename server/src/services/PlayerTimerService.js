@@ -159,9 +159,9 @@ class PlayerTimerService {
 
       const seatIndex = player.seatIndex;
 
-      // Use BotService.selectCardForAutoPlay which works for both bots and humans
+      // Use BotService.playBotCard which has the advanced AI V2 logic
       const botService = new BotService();
-      const card = await botService.selectCardForAutoPlay(game, seatIndex);
+      const card = await botService.playBotCard(game, seatIndex);
 
       if (!card) {
         console.error(`[PLAYER TIMER] Bot logic returned no card for player at seat ${seatIndex}`);

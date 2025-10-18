@@ -22,68 +22,34 @@ export class DatabaseGameEngine {
         throw new Error(`Game ${gameId} not found`);
       }
 
-      // Get players separately
-      const players = await prisma.gamePlayer.findMany({
+      // OPTIMIZED: Get players with user info in single query (fixes N+1 problem)
+      const playersWithUsers = await prisma.gamePlayer.findMany({
         where: { gameId },
+        include: {
+          user: {
+            select: { id: true, username: true, avatarUrl: true }
+          }
+        },
         orderBy: { seatIndex: 'asc' }
       });
 
-      // Get user info for each player
-      const playersWithUsers = await Promise.all(
-        players.map(async (player) => {
-          const user = await prisma.user.findUnique({
-            where: { id: player.userId },
-            select: { id: true, username: true, avatarUrl: true }
-          });
-          return {
-            ...player,
-            user
-          };
-        })
-      );
-
-      // Get rounds separately
+      // OPTIMIZED: Get rounds with all related data in optimized queries
       const rounds = await prisma.round.findMany({
         where: { gameId },
+        include: {
+          tricks: {
+            include: {
+              cards: {
+                orderBy: { playOrder: 'asc' }
+              }
+            },
+            orderBy: { trickNumber: 'asc' }
+          },
+          playerStats: true,
+          RoundScore: true
+        },
         orderBy: { roundNumber: 'asc' }
       });
-
-      // Get bids, tricks, and player stats for each round
-      const roundsWithData = await Promise.all(
-        rounds.map(async (round) => {
-          const [bids, tricks, playerStats, score] = await Promise.all([
-            prisma.roundBid.findMany({ where: { roundId: round.id } }),
-            prisma.trick.findMany({ 
-              where: { roundId: round.id },
-              orderBy: { trickNumber: 'asc' }
-            }),
-            prisma.playerRoundStats.findMany({ where: { roundId: round.id } }),
-            prisma.roundScore.findUnique({ where: { roundId: round.id } })
-          ]);
-
-          // Get cards for each trick
-          const tricksWithCards = await Promise.all(
-            tricks.map(async (trick) => {
-              const cards = await prisma.trickCard.findMany({
-                where: { trickId: trick.id },
-                orderBy: { playOrder: 'asc' }
-              });
-              return {
-                ...trick,
-                cards
-              };
-            })
-          );
-
-          return {
-            ...round,
-            bids,
-            tricks: tricksWithCards,
-            playerStats,
-            score
-          };
-        })
-      );
 
       // Get result if exists
       const result = await prisma.gameResult.findUnique({
@@ -93,7 +59,7 @@ export class DatabaseGameEngine {
       const gameWithData = {
         ...game,
         players: playersWithUsers,
-        rounds: roundsWithData,
+        rounds: rounds, // Now includes all related data
         result
       };
 

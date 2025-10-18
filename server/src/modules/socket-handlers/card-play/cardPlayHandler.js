@@ -167,26 +167,14 @@ class CardPlayHandler {
         if (trickResult.isComplete) {
           console.log(`[CARD PLAY] Trick completed, winner: seat ${trickResult.winningSeatIndex}`);
           
-          // First, emit card played event so client can render the 4th card
-          // NOTE: This will be emitted again after updateCurrentPlayer with correct currentPlayer
-          const cardPlayedGameState = await GameService.getGameStateForClient(gameId);
-
-          this.io.to(gameId).emit('card_played', {
-            gameId,
-            gameState: cardPlayedGameState,
-            cardPlayed: {
-              userId,
-              card,
-              seatIndex: player.seatIndex,
-              isBot
-            }
-          });
+          // CRITICAL: Don't emit card_played here - let the normal flow handle it
+          // This prevents the 4th card from flickering due to double emission
 
           // EXTREME: NO DELAYS - COMPLETE IMMEDIATELY
           (async () => {
             // Find the winning player by seat index
             console.log(`[CARD PLAY] Looking for winning player at seat ${trickResult.winningSeatIndex}`);
-            console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => p ? ({ id: p.id, seatIndex: p.seatIndex, username: p.username }) : null));
+            console.log(`[CARD PLAY] Available players:`, gameState.players.map(p => p ? ({ id: p.id, seatIndex: p.seatIndex, username: p.username || p.user?.username || 'Unknown' }) : null));
             
             const winningPlayer = gameState.players.find(p => p && p.seatIndex === trickResult.winningSeatIndex);
             console.log(`[CARD PLAY] Found winning player:`, winningPlayer);
@@ -201,22 +189,9 @@ class CardPlayHandler {
             console.log(`[CARD PLAY] About to call updateCurrentPlayer with winningPlayer.userId: ${winningPlayer.userId}`);
             await this.updateCurrentPlayer(gameId, winningPlayer.userId);
 
-            // CRITICAL: Emit card_played event with correct currentPlayer after updateCurrentPlayer
-            console.log(`[CARD PLAY] About to get corrected game state after updateCurrentPlayer`);
-            const correctedGameState = await GameService.getGameStateForClient(gameId);
-            console.log(`[CARD PLAY] Corrected game state currentPlayer: ${correctedGameState.currentPlayer}, expected: ${winningPlayer.userId}`);
-            this.io.to(gameId).emit('card_played', {
-              gameId,
-              gameState: correctedGameState,
-              cardPlayed: {
-                userId,
-                card,
-                seatIndex: player.seatIndex,
-                isBot
-              },
-              currentTrick: correctedGameState.play?.currentTrick || []
-            });
-            console.log(`[CARD PLAY] Emitted corrected card_played event with currentPlayer: ${correctedGameState.currentPlayer}`);
+            // CRITICAL FIX: Don't emit card_played event for the 4th card when trick is complete
+            // This prevents the 4th card from flickering - it will be shown through trick_complete event instead
+            console.log(`[CARD PLAY] Skipping card_played event for 4th card to prevent flickering`);
 
             // Start timer for winning player if they are human (card play - always apply)
             if (winningPlayer && winningPlayer.isHuman) {
@@ -249,14 +224,17 @@ class CardPlayHandler {
             // Clear trick cards from table after animation (2 seconds delay) - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
+              // CRITICAL FIX: Clear table cards FIRST, then start new trick to prevent flickering
+              console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
+              
+              // Clear table cards first (after 2 seconds)
               setTimeout(() => {
                 console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
                 this.io.to(gameId).emit('clear_table_cards', { gameId });
                 
-                // CRITICAL: Start new trick AFTER clearing table cards to prevent race condition
-                console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
+                // THEN start new trick after table is cleared
                 if (!trickResult.isRoundComplete) {
-                  console.log(`[CARD PLAY] Starting new trick - round not complete, winningSeatIndex: ${trickResult.winningSeatIndex}`);
+                  console.log(`[CARD PLAY] Starting new trick AFTER table cleared - round not complete, winningSeatIndex: ${trickResult.winningSeatIndex}`);
                   this.startNewTrickAfterClear(gameId, currentRound.id, gameState.currentTrick + 1, trickResult.winningSeatIndex);
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
@@ -280,16 +258,22 @@ class CardPlayHandler {
               this.triggerBotPlayIfNeeded(gameId);
             }
           })(); // 500ms delay to show all 4 cards
-        }
         
         // CRITICAL: Return here to prevent turn progression logic from running
         // when a trick is completed
         return;
+        }
       } else {
         // Simple: move to next player clockwise
         const nextPlayerIndex = (player.seatIndex + 1) % 4;
         const nextPlayer = gameState.players.find(p => p && p.seatIndex === nextPlayerIndex);
         console.log(`[CARD PLAY] Moving to next player clockwise: ${nextPlayer?.username} (seat ${nextPlayerIndex})`);
+        console.log(`[CARD PLAY] Next player details:`, {
+          userId: nextPlayer?.userId,
+          username: nextPlayer?.username,
+          seatIndex: nextPlayer?.seatIndex,
+          isHuman: nextPlayer?.isHuman
+        });
         
         // CRITICAL: Use SINGLE unified system for currentPlayer updates
         await this.updateCurrentPlayer(gameId, nextPlayer?.userId);
@@ -315,30 +299,13 @@ class CardPlayHandler {
 
         // Emit card played event
         
-        // PERFORMANCE: Use cached game state from Redis and update incrementally
-        let updatedGameState = await redisGameState.getGameState(gameId);
+        // OPTIMIZED: Use optimized game state service with smart caching
+        const { OptimizedGameStateService } = await import('../../../services/OptimizedGameStateService.js');
+        let updatedGameState = await OptimizedGameStateService.getGameState(gameId, true);
         
-        // CRITICAL: For SOLO games, if playerScores are missing or all zeros, fetch from database
-        if (updatedGameState && updatedGameState.gameMode === 'SOLO') {
-          const hasValidScores = updatedGameState.playerScores && 
-                                updatedGameState.playerScores.some(s => s !== 0);
-          
-          if (!hasValidScores) {
-            console.log(`[CARD PLAY] WARNING: playerScores missing or all zeros, fetching from database`);
-            const freshState = await GameService.getFullGameStateFromDatabase(gameId);
-            if (freshState && freshState.playerScores) {
-              updatedGameState.playerScores = freshState.playerScores;
-              updatedGameState.playerBags = freshState.playerBags;
-              console.log(`[CARD PLAY] Restored playerScores from database:`, updatedGameState.playerScores);
-            }
-          } else {
-            console.log(`[CARD PLAY] playerScores present in Redis:`, updatedGameState.playerScores);
-          }
-        }
-        
-        // If no Redis cache, fallback to database (should rarely happen)
+        // If no cached state, build fresh state
         if (!updatedGameState) {
-          updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          updatedGameState = await OptimizedGameStateService.buildOptimizedGameState(gameId);
         }
         
         // Update current trick data in the game state
@@ -362,11 +329,30 @@ class CardPlayHandler {
           updatedGameState.play.spadesBroken = true;
         }
         
+        // CRITICAL: Ensure the game state has the correct current player
+        updatedGameState.currentPlayer = nextPlayer?.userId;
+        
+        // CRITICAL: Get the latest hands from Redis to ensure they're up-to-date
+        const latestHands = await redisGameState.getPlayerHands(gameId);
+        if (latestHands && latestHands.length > 0) {
+          updatedGameState.hands = latestHands;
+          updatedGameState.playerHands = latestHands;
+          console.log(`[CARD PLAY] Updated game state with latest hands from Redis`);
+        }
+        
+        // CRITICAL: Get the latest player stats from database to ensure tricks won are up-to-date
+        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        if (freshGameState && freshGameState.players) {
+          updatedGameState.players = freshGameState.players;
+          console.log(`[CARD PLAY] Updated game state with latest player stats from database`);
+        }
+        
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
         // Emitting card_played event
         // Game state updated
+        console.log(`[CARD PLAY] Emitting card_played event with currentPlayer: ${updatedGameState.currentPlayer}`);
         this.io.to(gameId).emit('card_played', {
           gameId,
           gameState: updatedGameState,
@@ -387,8 +373,13 @@ class CardPlayHandler {
         }
 
         // Trigger bot play if next player is a bot
-        // EXTREME: NO DELAYS - TRIGGER IMMEDIATELY
-        this.triggerBotPlayIfNeeded(gameId);
+        // CRITICAL: Get fresh game state after updateCurrentPlayer
+        setTimeout(async () => {
+          const freshGameState = await GameService.getGameStateForClient(gameId);
+          if (freshGameState) {
+            await this.triggerBotPlayIfNeeded(gameId);
+          }
+        }, 50); // Small delay to ensure database is updated
       }
 
       console.log(`[CARD PLAY] Card play processed successfully`);
@@ -446,20 +437,15 @@ class CardPlayHandler {
   async triggerBotPlayIfNeeded(gameId) {
     try {
       console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
-      const gameState = await GameService.getGameStateForClient(gameId);
-      if (!gameState) {
-        console.log(`[CARD PLAY] No game state found for game ${gameId}`);
+      
+      // CRITICAL: Get FRESH game state directly from database, not from cache
+      const game = await GameService.getGame(gameId);
+      if (!game) {
+        console.log(`[CARD PLAY] No game found in database: ${gameId}`);
         return;
       }
 
-      console.log(`[CARD PLAY] Current player ID: ${gameState.currentPlayer}`);
-      
-      // CRITICAL: Get fresh player data directly from database, not from cached game state
-      const game = await GameService.getGame(gameId);
-      if (!game) {
-        console.error(`[CARD PLAY] Game not found in database: ${gameId}`);
-        return;
-      }
+      console.log(`[CARD PLAY] Current player ID from database: ${game.currentPlayer}`);
       
       // Get fresh players from database with user data
       const dbPlayers = await prisma.gamePlayer.findMany({
@@ -467,7 +453,8 @@ class CardPlayHandler {
         include: { user: true }
       });
       
-      const currentPlayer = dbPlayers.find(p => p.userId === gameState.currentPlayer);
+      // CRITICAL: Use the currentPlayer from the fresh database data
+      const currentPlayer = dbPlayers.find(p => p.userId === game.currentPlayer);
       
       console.log(`[CARD PLAY] Found current player:`, currentPlayer ? { 
         id: currentPlayer.id, 
@@ -499,7 +486,9 @@ class CardPlayHandler {
       }
 
       // CRITICAL: Check if this bot has already played in the current trick
-      const botAlreadyPlayed = currentTrickCards && currentTrickCards.some(card => card.seatIndex === currentPlayer.seatIndex);
+      const botAlreadyPlayed = currentTrickCards && currentTrickCards.some(card => 
+        card.seatIndex === currentPlayer.seatIndex || card.playerId === currentPlayer.userId
+      );
       if (botAlreadyPlayed) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} already played in current trick, skipping`);
         return;
@@ -543,11 +532,15 @@ class CardPlayHandler {
         console.log(`[CARD PLAY] Bot hand from database:`, hand.map(c => `${c.suit}${c.rank}`));
       }
 
-      // Update the gameState with the current hands before passing to bot
-      const updatedGameState = { ...gameState, hands: hands };
+      // CRITICAL: Create proper game object for bot service with fresh database data
+      const gameForBot = {
+        ...game, // Use fresh game data from database
+        players: game.players, // Use the fresh players from database
+        hands: hands
+      };
 
       // Get bot card choice
-      const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
+      const botCard = await this.botService.playBotCard(gameForBot, currentPlayer.seatIndex);
       if (botCard) {
         console.log(`[CARD PLAY] Bot ${currentPlayer.username} chose card: ${botCard.suit}${botCard.rank}`);
         

@@ -52,7 +52,7 @@ export const useSocketEventHandlers = ({
         const now = Date.now();
         const gameStateString = JSON.stringify(gameData.gameState);
         
-        // Check if this is a duplicate update (same game state within 100ms)
+        // OPTIMIZED: Enhanced duplicate detection with more granular comparison
         if (lastGameUpdate && 
             now - lastGameUpdate.timestamp < 100 && 
             JSON.stringify(lastGameUpdate.gameState) === gameStateString) {
@@ -64,23 +64,21 @@ export const useSocketEventHandlers = ({
           return;
         }
         
-        console.log('🎮 Game update received - playerScores:', {
-          playerScores: gameData.gameState?.playerScores,
-          playerBags: gameData.gameState?.playerBags,
-          gameMode: gameData.gameState?.gameMode,
-          status: gameData.gameState?.status
+        // OPTIMIZED: Only log essential information to reduce console overhead
+        console.log('🎮 Game update received:', {
+          status: gameData.gameState?.status,
+          currentRound: gameData.gameState?.currentRound,
+          currentTrick: gameData.gameState?.currentTrick
         });
         
         // Update the last game update timestamp
         setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
         
-        // CRITICAL: NEVER preserve hands from previous state - this causes hand flashing
-        const newState = normalizeGameState(gameData.gameState);
-        
-        // NEVER preserve hands - let the server send the correct hands for each player
-        // This prevents players from seeing other players' cards
-        
-        setGameState(newState);
+        // OPTIMIZED: Use requestAnimationFrame for smoother updates
+        requestAnimationFrame(() => {
+          const newState = normalizeGameState(gameData.gameState);
+          setGameState(newState);
+        });
       }
     };
 
@@ -154,17 +152,23 @@ export const useSocketEventHandlers = ({
             console.log('🎮 Card played - setting game state with currentPlayer:', cardData.gameState.currentPlayer);
             console.log('🎮 Card played - currentTrick from event:', cardData.currentTrick);
             
-            // CRITICAL: Preserve bidding data from previous state
+            // CRITICAL: Use the server's game state directly - it has the correct currentPlayer
+            const serverGameState = cardData.gameState;
+            
+            // CRITICAL: Preserve bidding data and hands from previous state
             const gameStateWithBidding = {
-              ...cardData.gameState,
-              bidding: cardData.gameState.bidding || prevState.bidding
+              ...serverGameState,
+              bidding: serverGameState.bidding || prevState.bidding,
+              hands: serverGameState.hands || prevState.hands,
+              // CRITICAL: Use server players data to ensure usernames/avatars are preserved
+              players: serverGameState.players || prevState.players
             };
             
             // CRITICAL: Ensure currentTrick data is properly integrated
             const normalizedState = normalizeGameState(gameStateWithBidding);
             
             // Ensure currentTrick is never undefined - use data from currentTrick or gameState
-            const currentTrick = cardData.currentTrick || cardData.gameState?.play?.currentTrick || [];
+            const currentTrick = cardData.currentTrick || serverGameState?.play?.currentTrick || [];
             if (Array.isArray(currentTrick)) {
               normalizedState.play = {
                 ...normalizedState.play,
@@ -206,12 +210,13 @@ export const useSocketEventHandlers = ({
           if (trickData.gameState) {
             return normalizeGameState(trickData.gameState);
           } else {
-            // Fallback to partial update if gameState not provided
+            // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
+            // This prevents the 4th card from disappearing and re-rendering
             return {
               ...prevState,
               play: {
                 ...prevState.play,
-                currentTrick: [],
+                // Keep currentTrick intact for animation
                 tricks: trickData.tricks || []
               }
             };
@@ -231,14 +236,24 @@ export const useSocketEventHandlers = ({
           // Fallback to partial update if gameState not provided
           (setGameState as any)((prevState: any) => {
             if (!prevState) return prevState;
-            return {
-              ...prevState,
-              play: {
-                ...prevState.play,
-                currentTrick: [],
-                leadSuit: trickData.leadSuit
-              }
-            };
+            
+            // CRITICAL: Only update if we're actually starting a new trick
+            // Don't interfere with current trick cards
+            const isNewTrick = !prevState.play?.currentTrick || prevState.play.currentTrick.length === 0;
+            
+            if (isNewTrick) {
+              return {
+                ...prevState,
+                play: {
+                  ...prevState.play,
+                  currentTrick: [],
+                  leadSuit: trickData.leadSuit
+                }
+              };
+            } else {
+              // Don't update if we're in the middle of a trick
+              return prevState;
+            }
           });
         }
       }

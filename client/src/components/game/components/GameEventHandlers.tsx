@@ -234,8 +234,13 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         }));
       }
       
-      // Call the existing hand completed handler
-      onHandCompleted(data);
+      // CRITICAL FIX: Delay hand summary until after trick animation completes
+      // This prevents the hand summary from showing before the final trick animation finishes
+      console.log('🎮 Delaying hand summary to allow trick animation to complete');
+      setTimeout(() => {
+        console.log('🎮 Showing hand summary after delay');
+        onHandCompleted(data);
+      }, 3000); // Wait 3 seconds for trick animation to complete
     };
     
     socket.on('round_complete', roundCompletedHandler);

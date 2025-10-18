@@ -498,15 +498,24 @@ class BotService {
         return null;
       }
 
+      // CRITICAL: Handle different bot object structures
+      const botUsername = bot.username || bot.user?.username || `Bot_${seatIndex}`;
+      console.log(`[BOT SERVICE] Bot object structure:`, {
+        hasUsername: !!bot.username,
+        hasUser: !!bot.user,
+        hasUserUsername: !!bot.user?.username,
+        botUsername
+      });
+
       // CRITICAL: Handle both 'hands' and 'playerHands' properties
       const hands = game.hands || game.playerHands || [];
       const hand = hands[seatIndex] || [];
       if (hand.length === 0) {
-        console.log(`[BOT SERVICE] Bot ${bot.username} has no cards to play`);
+        console.log(`[BOT SERVICE] Bot ${botUsername} has no cards to play`);
         return null;
       }
       
-    console.log(`[BOT SERVICE] Bot ${bot.username} has ${hand.length} cards to choose from`);
+    console.log(`[BOT SERVICE] Bot ${botUsername} has ${hand.length} cards to choose from`);
 
     let cardToPlay = null;
     
@@ -524,7 +533,7 @@ class BotService {
       }));
     }
 
-    console.log(`[BOT SERVICE] Bot ${bot.username} current trick query result:`, currentTrickCards.map(c => `${c.suit}${c.rank} (seat ${c.seatIndex})`));
+    console.log(`[BOT SERVICE] Bot ${botUsername} current trick query result:`, currentTrickCards.map(c => `${c.suit}${c.rank} (seat ${c.seatIndex})`));
 
     // Get special rules from game
     const specialRules = game.specialRules || {};
@@ -552,8 +561,8 @@ class BotService {
     } else {
       // FOLLOWING - MUST follow suit if possible, NO EXCEPTIONS
       const leadSuit = currentTrickCards[0].suit;
-      console.log(`[BOT SERVICE] Bot ${bot.username} MUST follow suit ${leadSuit}, current trick:`, currentTrickCards.map(c => `${c.suit}${c.rank}`));
-      console.log(`[BOT SERVICE] Bot ${bot.username} hand:`, hand);
+      console.log(`[BOT SERVICE] Bot ${botUsername} MUST follow suit ${leadSuit}, current trick:`, currentTrickCards.map(c => `${c.suit}${c.rank}`));
+      console.log(`[BOT SERVICE] Bot ${botUsername} hand:`, hand);
       
       // Convert string format cards to object format if needed
       const normalizedHand = hand.map(card => {
@@ -567,12 +576,12 @@ class BotService {
 
       // MANDATORY: Find cards of the lead suit
       const suitCards = normalizedHand.filter(card => card.suit === leadSuit);
-      console.log(`[BOT SERVICE] Bot ${bot.username} has ${suitCards.length} cards of lead suit ${leadSuit}:`, suitCards.map(c => `${c.suit}${c.rank}`));
+      console.log(`[BOT SERVICE] Bot ${botUsername} has ${suitCards.length} cards of lead suit ${leadSuit}:`, suitCards.map(c => `${c.suit}${c.rank}`));
       
       if (suitCards.length > 0) {
         // MANDATORY: Play lowest card of lead suit
         cardToPlay = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-        console.log(`[BOT SERVICE] Bot ${bot.username} MUST play ${cardToPlay.suit}${cardToPlay.rank} to follow suit`);
+        console.log(`[BOT SERVICE] Bot ${botUsername} MUST play ${cardToPlay.suit}${cardToPlay.rank} to follow suit`);
       } else {
         // Void in lead suit - apply special rules
         let playableCards = normalizedHand;
@@ -582,7 +591,7 @@ class BotService {
           const spades = normalizedHand.filter(card => card.suit === 'SPADES');
           if (spades.length > 0) {
             playableCards = spades;
-            console.log(`[BOT SERVICE] ASSASSIN: Bot ${bot.username} MUST cut with spades`);
+            console.log(`[BOT SERVICE] ASSASSIN: Bot ${botUsername} MUST cut with spades`);
           }
         }
         
@@ -591,18 +600,18 @@ class BotService {
           const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
           if (nonSpades.length > 0) {
             playableCards = playableCards.filter(card => card.suit !== 'SPADES');
-            console.log(`[BOT SERVICE] SCREAMER: Bot ${bot.username} cannot play spades, has non-spades available`);
+            console.log(`[BOT SERVICE] SCREAMER: Bot ${botUsername} cannot play spades, has non-spades available`);
           }
         }
         
         // Play lowest available card
         if (playableCards.length > 0) {
           cardToPlay = playableCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-          console.log(`[BOT SERVICE] Bot ${bot.username} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+          console.log(`[BOT SERVICE] Bot ${botUsername} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         } else {
           // Fallback (should not happen)
           cardToPlay = normalizedHand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-          console.log(`[BOT SERVICE] Bot ${bot.username} fallback, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+          console.log(`[BOT SERVICE] Bot ${botUsername} fallback, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         }
       }
     }
@@ -621,7 +630,7 @@ class BotService {
     });
     
     if (!cardInHand) {
-      console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} chose card ${cardToPlay.suit}${cardToPlay.rank} but it's not in their hand!`);
+      console.error(`[BOT SERVICE] ERROR: Bot ${botUsername} chose card ${cardToPlay.suit}${cardToPlay.rank} but it's not in their hand!`);
       console.error(`[BOT SERVICE] Bot's actual hand:`, hand.map(c => typeof c === 'string' ? c : `${c.suit}${c.rank}`));
       // Use first available card as emergency fallback
       const firstCard = hand[0];
@@ -633,19 +642,19 @@ class BotService {
         cardToPlay = firstCard;
       }
       if (!cardToPlay) {
-        console.error(`[BOT SERVICE] ERROR: Bot ${bot.username} has no cards at all!`);
+        console.error(`[BOT SERVICE] ERROR: Bot ${botUsername} has no cards at all!`);
         return null;
       }
     }
 
-    console.log(`[BOT SERVICE] Bot ${bot.username} playing ${cardToPlay.suit}${cardToPlay.rank}`);
+    console.log(`[BOT SERVICE] Bot ${botUsername} playing ${cardToPlay.suit}${cardToPlay.rank}`);
 
     // Don't remove card from hand here - CardPlayHandler.processCardPlay() will do it
     // Just return the card choice - the handler will log it to the database
 
     return cardToPlay;
     } catch (error) {
-      console.error(`[BOT SERVICE] ERROR in playBotCard for bot ${bot?.username || 'unknown'}:`, error);
+      console.error(`[BOT SERVICE] ERROR in playBotCard for bot ${bot?.username || bot?.user?.username || 'unknown'}:`, error);
       return null;
     }
   }

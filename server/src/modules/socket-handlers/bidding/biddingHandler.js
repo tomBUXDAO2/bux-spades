@@ -296,19 +296,18 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
-        // NOW emit bidding update with updated currentPlayer
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
-        
-        // CRITICAL: Merge the latest bidding data into the game state
+        // OPTIMIZED: Use optimized game state service with incremental bidding updates
+        const { OptimizedGameStateService } = await import('../../../services/OptimizedGameStateService.js');
         const latestBids = await redisGameState.getPlayerBids(gameId);
-        if (latestBids && updatedGameState) {
-          updatedGameState.bidding = {
-            bids: latestBids,
-            currentBidderIndex: nextPlayer?.seatIndex || 0,
-            currentPlayer: nextPlayer?.userId
-          };
-          
-          // Also update player bids in the players array
+        
+        const updatedGameState = await OptimizedGameStateService.updateBiddingState(gameId, {
+          bids: latestBids,
+          currentBidderIndex: nextPlayer?.seatIndex || 0,
+          currentPlayer: nextPlayer?.userId
+        });
+        
+        // Update player bids in the players array
+        if (updatedGameState && latestBids) {
           updatedGameState.players = updatedGameState.players.map(p => ({
             ...p,
             bid: latestBids[p.seatIndex] || null
@@ -736,6 +735,13 @@ class BiddingHandler {
       // Update the gameState with the current Redis hands before passing to bot
       const updatedGameState = { ...gameState, hands: hands };
 
+      // CRITICAL: Create proper game object for bot service with players array
+      const gameForBot = {
+        ...updatedGameState,
+        players: gameState.players, // Use the fresh players from game state
+        hands: hands
+      };
+
       // Get bot card choice
       console.log(`[BIDDING] Calling bot service for ${currentPlayer.username} with game state:`, {
         currentRound: updatedGameState.currentRound,
@@ -744,7 +750,7 @@ class BiddingHandler {
         seatIndex: currentPlayer.seatIndex
       });
       
-      const botCard = await this.botService.playBotCard(updatedGameState, currentPlayer.seatIndex);
+      const botCard = await this.botService.playBotCard(gameForBot, currentPlayer.seatIndex);
       console.log(`[BIDDING] Bot service returned:`, botCard);
       
       if (botCard) {

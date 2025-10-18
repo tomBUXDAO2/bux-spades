@@ -353,8 +353,19 @@ export class GameLoggingService {
               if (currentGameState) {
                 const gameState = JSON.parse(currentGameState);
                 gameState.hands = hands; // Update hands in main game state
+                gameState.playerHands = hands; // Also update playerHands field
+                gameState.timestamp = Date.now(); // Update timestamp to ensure cache freshness
                 await redisClient.set(gameStateKey, JSON.stringify(gameState), { EX: 3600 });
                 console.log(`[GAME LOGGING] Updated main game state cache with new hands`);
+              }
+              
+              // CRITICAL: Also update the RedisGameStateService cache to ensure consistency
+              try {
+                const redisGameState = await import('./RedisGameStateService.js');
+                await redisGameState.default.setPlayerHands(round.gameId, hands);
+                console.log(`[GAME LOGGING] Updated RedisGameStateService hands cache`);
+              } catch (redisServiceError) {
+                console.error('[GAME LOGGING] Error updating RedisGameStateService:', redisServiceError);
               }
             }
           }

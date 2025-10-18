@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
-// NUCLEAR: Maximum performance database configuration
+// OPTIMIZED: High-performance database configuration with connection pooling
 const prisma = new PrismaClient({
   log: [], // NO LOGGING AT ALL
   datasources: {
@@ -8,10 +8,13 @@ const prisma = new PrismaClient({
       url: process.env.DATABASE_URL
     }
   },
-  // NUCLEAR: Maximum performance settings
+  // OPTIMIZED: Connection pooling and performance settings
   __internal: {
     engine: {
-      binaryTargets: ['native']
+      binaryTargets: ['native'],
+      connectionLimit: 20,
+      poolTimeout: 20000,
+      queryTimeout: 10000
     }
   }
 });

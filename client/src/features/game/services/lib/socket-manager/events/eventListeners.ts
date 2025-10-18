@@ -114,6 +114,14 @@ export const setupSocketListeners = (
       timestamp: new Date().toISOString()
     });
     
+    // Update state to reflect disconnect
+    callbacks.onStateChange({
+      isConnected: false,
+      isAuthenticated: false,
+      isReady: false,
+      error: `Disconnected: ${reason}`
+    });
+    
     // Let Socket.IO handle all reconnection automatically
     // No manual reconnection logic to interfere
   });

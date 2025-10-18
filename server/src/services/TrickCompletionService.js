@@ -47,52 +47,40 @@ export class TrickCompletionService {
           data: { winningSeatIndex }
         });
 
-        // 2. Count tricks won and update stats in one operation
-        const playerTricksWon = await tx.trick.count({
-          where: {
-            roundId,
-            winningSeatIndex: winningSeatIndex
-          }
-        });
-        
-        // 3. Update PlayerRoundStats - increment tricksWon for the winner
+        // OPTIMIZED: Use increment instead of expensive count query
         await tx.playerRoundStats.updateMany({
           where: {
             roundId,
             seatIndex: winningSeatIndex
           },
           data: {
-            tricksWon: playerTricksWon
+            tricksWon: { increment: 1 }
           }
         });
         
         // NUCLEAR: No logging for performance
       });
 
-      // CRITICAL: Update Redis cache with fresh game state after trick completion
-      // BUT preserve playerScores for SOLO games to avoid overwriting with zeros
+      // OPTIMIZED: Update Redis cache incrementally instead of full rebuild
       try {
-        const currentCachedState = await redisGameState.getGameState(gameId);
-        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
-        
-        if (freshGameState) {
-          // CRITICAL: For SOLO games, preserve existing playerScores from cache
-          // getFullGameStateFromDatabase returns [0,0,0,0] during active rounds
-          if (freshGameState.gameMode === 'SOLO' && currentCachedState) {
-            const hasValidCachedScores = currentCachedState.playerScores && 
-                                        currentCachedState.playerScores.some(s => s !== 0);
-            if (hasValidCachedScores) {
-              freshGameState.playerScores = currentCachedState.playerScores;
-              freshGameState.playerBags = currentCachedState.playerBags;
-              console.log(`[TRICK COMPLETION] Preserved playerScores from cache:`, freshGameState.playerScores);
-            }
-          }
-          
-          await redisGameState.setGameState(gameId, freshGameState);
-          console.log(`[TRICK COMPLETION] Updated Redis cache with fresh game state after trick completion`);
-        }
+        const { OptimizedGameStateService } = await import('./OptimizedGameStateService.js');
+        await OptimizedGameStateService.updateTrickCompletion(gameId, {
+          currentTrick: [],
+          spadesBroken: false // Reset for next trick
+        });
+        console.log(`[TRICK COMPLETION] Updated Redis cache incrementally after trick completion`);
       } catch (error) {
         console.error(`[TRICK COMPLETION] Error updating Redis cache after trick completion:`, error);
+        // Fallback to full rebuild if incremental update fails
+        try {
+          const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (freshGameState) {
+            await redisGameState.setGameState(gameId, freshGameState);
+            console.log(`[TRICK COMPLETION] Fallback: Updated Redis cache with full game state`);
+          }
+        } catch (fallbackError) {
+          console.error(`[TRICK COMPLETION] Fallback update also failed:`, fallbackError);
+        }
       }
 
       // Check if round is complete (13 tricks)
@@ -259,8 +247,19 @@ export class TrickCompletionService {
 
       // Emit round complete event if io is provided
       if (io) {
-        console.log(`[TRICK COMPLETION] Emitting round_complete event for game ${gameId}`);
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        console.log(`[TRICK COMPLETION] Delaying round_complete event to allow trick animation to complete`);
+        
+        // CRITICAL FIX: Delay round_complete event to prevent 4th card flickering on final trick
+        // This allows the trick animation to complete before the game state is updated
+        setTimeout(async () => {
+          console.log(`[TRICK COMPLETION] Emitting round_complete event for game ${gameId}`);
+          
+          // CRITICAL FIX: Clear currentTrick data before getting game state to prevent re-rendering
+          // This ensures the game state doesn't include the completed trick data
+          await redisGameState.setCurrentTrick(gameId, []);
+          console.log(`[TRICK COMPLETION] Cleared currentTrick data to prevent re-rendering`);
+          
+          const updatedGameState = await GameService.getGameStateForClient(gameId);
         
         // Get detailed round data for hand summary
         const currentRound = updatedGameState.rounds.find(r => r.roundNumber === updatedGameState.currentRound);
@@ -357,15 +356,16 @@ export class TrickCompletionService {
           scores: handSummaryData
         });
         
-        // CRITICAL: Clear trick cards before showing hand summary
-        io.to(gameId).emit('clear_table_cards', { gameId });
-        console.log(`[TRICK COMPLETION] Emitted clear_table_cards event for round completion`);
+        // CRITICAL: Don't emit clear_table_cards here - let the card play handler manage timing
+        // The card play handler will emit clear_table_cards with proper timing
+        console.log(`[TRICK COMPLETION] Skipping clear_table_cards emission - managed by card play handler`);
         
-        io.to(gameId).emit('round_complete', {
-          gameId,
-          gameState: updatedGameState,
-          scores: handSummaryData
-        });
+          io.to(gameId).emit('round_complete', {
+            gameId,
+            gameState: updatedGameState,
+            scores: handSummaryData
+          });
+        }, 3000); // Wait 3 seconds for trick animation to complete
       } else {
         console.log(`[TRICK COMPLETION] No io instance provided, cannot emit round_complete`);
       }

@@ -188,7 +188,16 @@ export default function GameTableModular({
   const sanitizedPlayers = (gameState.players || []);
   
   // CRITICAL FIX: Find the actual current player (whose turn it is), not the user
-  const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && p.id === gameState.currentPlayer) || null;
+  const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer)) || null;
+  
+  // DEBUG: Log current player detection
+  console.log('[CURRENT PLAYER DEBUG]', {
+    gameStateCurrentPlayer: gameState.currentPlayer,
+    myUserId: propUser?.id,
+    sanitizedPlayers: sanitizedPlayers.map(p => p ? { id: p.id, userId: p.userId, username: p.username, seatIndex: p.seatIndex } : null),
+    foundCurrentPlayer: currentPlayer ? { id: currentPlayer.id, userId: currentPlayer.userId, username: currentPlayer.username, seatIndex: currentPlayer.seatIndex } : null,
+    isMyTurn: gameState.currentPlayer === propUser?.id
+  });
   const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
   const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
@@ -343,39 +352,24 @@ export default function GameTableModular({
       // Play win sound effect when trick completes
       playWinSound();
       
-      // Wait 1 second before clearing trick animation (reduced from 2 seconds)
-      setTimeout(() => {
-        console.log('[TRICK ANIMATION] Clearing trick animation after 1 second');
-        setAnimatingTrick(false);
-        setTrickWinner(null);
-        setAnimatedTrickCards([]);
-        setTrickCompleted(false);
-        setLastNonEmptyTrick([]);
-        
-        // CRITICAL: Clear currentTrick from game state to prevent old cards showing
-        // This is a backup in case the server clear_table_cards event fails
-        setGameState((prevState: any) => ({
-          ...prevState,
-          play: {
-            ...prevState.play,
-            currentTrick: [] // Clear trick cards completely
-          },
-          currentTrickCards: [] // Also clear this field
-        }));
-      }, 1000);
+      // CRITICAL FIX: Don't clear trick animation here - let the server clear_table_cards event handle it
+      // This prevents the 4th card from flickering due to race conditions between client and server timers
+      console.log('[TRICK ANIMATION] Trick animation started - waiting for server clear_table_cards event');
     }
   };
   
   const handleClearTableCards = () => {
     console.log('[TRICK CLEAR] Clearing table cards from server event');
+    
+    // CRITICAL FIX: Clear all trick-related state when server says to clear table
     setAnimatedTrickCards([]);
     setLastNonEmptyTrick([]);
     setTrickWinner(null);
     setAnimatingTrick(false);
     setTrickCompleted(false);
     
-    // CRITICAL: Clear currentTrick from game state when new round starts
-    // This prevents old trick cards from showing during bidding phase
+    // CRITICAL FIX: Always clear currentTrick when server emits clear_table_cards
+    // This is the authoritative signal that the table should be cleared
     setGameState((prevState: any) => ({
       ...prevState,
       play: {
@@ -920,6 +914,20 @@ export default function GameTableModular({
       displayTrick = (gameState as any).play.currentTrick;
     } else if (lastNonEmptyTrick.length > 0) {
       displayTrick = lastNonEmptyTrick;
+    }
+    
+    // CRITICAL FIX: If we have 4 cards and the trick is complete, keep showing them until table is cleared
+    // This prevents the 4th card from flickering when trick_complete and trick_started events fire
+    if (displayTrick.length === 4 && !animatingTrick) {
+      // Keep the 4 cards visible - don't let them disappear due to state updates
+      console.log('[RENDER TRICK CARDS] Keeping 4 cards visible to prevent flickering');
+    }
+    
+    // CRITICAL FIX: If displayTrick is empty but we had 4 cards before, keep showing them
+    // This prevents the 4th card from disappearing when the trick is marked as complete
+    if (displayTrick.length === 0 && lastNonEmptyTrick.length === 4) {
+      displayTrick = lastNonEmptyTrick;
+      console.log('[RENDER TRICK CARDS] Using lastNonEmptyTrick to prevent flickering');
     }
     
     // Calculate table card dimensions
