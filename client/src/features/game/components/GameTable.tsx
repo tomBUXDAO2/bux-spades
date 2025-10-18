@@ -1,7 +1,7 @@
 // Modularized GameTable component
 // This is a simplified version that uses the extracted components
 
-import React, { useState, useEffect, useRef, memo, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
 import Chat from '../../../features/chat/Chat';
@@ -61,7 +61,7 @@ interface GameTableModularProps {
   isStarting?: boolean;
 }
 
-const GameTableModular = memo(function GameTableModular({ 
+export default function GameTableModular({ 
   game, 
   joinGame, 
   onLeaveTable,
@@ -190,17 +190,20 @@ const GameTableModular = memo(function GameTableModular({
   // CRITICAL FIX: Find the actual current player (whose turn it is), not the user
   const currentPlayer = sanitizedPlayers.find((p): p is Player | Bot => !!p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer)) || null;
   
-  // Removed debug logging for performance
-  const orderedPlayers = useMemo(() => 
-    rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id), 
-    [sanitizedPlayers, currentPlayer, propUser?.id]
-  );
-  
-  const scaleFactor = useMemo(() => getScaleFactor(windowSize), [windowSize]);
-  const isMobile = useMemo(() => windowSize.isMobile, [windowSize.isMobile]);
-  const isVerySmallScreen = useMemo(() => windowSize.height <= 349, [windowSize.height]);
-  const isLeague = useMemo(() => gameState.isLeague || false, [gameState.isLeague]);
-  const isHost = useMemo(() => isLeague && gameState.players?.[0]?.id === propUser?.id, [isLeague, gameState.players, propUser?.id]);
+  // DEBUG: Log current player detection
+  console.log('[CURRENT PLAYER DEBUG]', {
+    gameStateCurrentPlayer: gameState.currentPlayer,
+    myUserId: propUser?.id,
+    sanitizedPlayers: sanitizedPlayers.map(p => p ? { id: p.id, userId: p.userId, username: p.username, seatIndex: p.seatIndex } : null),
+    foundCurrentPlayer: currentPlayer ? { id: currentPlayer.id, userId: currentPlayer.userId, username: currentPlayer.username, seatIndex: currentPlayer.seatIndex } : null,
+    isMyTurn: gameState.currentPlayer === propUser?.id
+  });
+  const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
+  const scaleFactor = getScaleFactor(windowSize);
+  const isMobile = windowSize.isMobile;
+  const isVerySmallScreen = windowSize.height <= 349;
+  const isLeague = gameState.isLeague || false;
+  const isHost = isLeague && gameState.players?.[0]?.id === propUser?.id;
   
   // Scores come from backend - no calculation needed
   const team1Score = gameState.team1TotalScore || 0;
@@ -971,9 +974,11 @@ const GameTableModular = memo(function GameTableModular({
         displayPosition = seatIndex;
       }
       
-      // Removed excessive debug logging for performance
+      console.log(`[RENDER TRICK CARDS] Card ${i}:`, card);
+      console.log(`[RENDER TRICK CARDS] seatIndex: ${seatIndex}, mySeatIndex: ${mySeatIndex}, displayPosition: ${displayPosition}`);
       
       if (displayPosition < 0 || displayPosition > 3) {
+        console.log(`[RENDER TRICK CARDS] Returning null for card ${i} - invalid displayPosition: ${displayPosition}`);
         return null;
       }
       
@@ -1303,6 +1308,4 @@ const GameTableModular = memo(function GameTableModular({
       </div>
     </>
   );
-});
-
-export default GameTableModular;
+}

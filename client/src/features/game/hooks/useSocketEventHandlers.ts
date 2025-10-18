@@ -56,8 +56,20 @@ export const useSocketEventHandlers = ({
         if (lastGameUpdate && 
             now - lastGameUpdate.timestamp < 100 && 
             JSON.stringify(lastGameUpdate.gameState) === gameStateString) {
+          console.log('🎮 Duplicate game update ignored:', {
+            status: gameData.gameState?.status,
+            currentPlayer: gameData.gameState?.currentPlayer,
+            currentRound: gameData.gameState?.currentRound
+          });
           return;
         }
+        
+        // OPTIMIZED: Only log essential information to reduce console overhead
+        console.log('🎮 Game update received:', {
+          status: gameData.gameState?.status,
+          currentRound: gameData.gameState?.currentRound,
+          currentTrick: gameData.gameState?.currentTrick
+        });
         
         // Update the last game update timestamp
         setLastGameUpdate({ timestamp: now, gameState: gameData.gameState });
