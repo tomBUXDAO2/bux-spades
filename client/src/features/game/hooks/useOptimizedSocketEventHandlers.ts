@@ -108,7 +108,7 @@ export const useOptimizedSocketEventHandlers = ({
         setGameState(newState);
       } else {
         // Fallback to partial update if gameState not provided
-        setGameState((prevState: any) => {
+        setGameState((prevState: GameState | null) => {
           if (!prevState) return prevState;
           return {
             ...prevState,
@@ -131,7 +131,7 @@ export const useOptimizedSocketEventHandlers = ({
         });
       }
       
-      setGameState((prevState: any) => {
+      setGameState((prevState: GameState | null) => {
         if (!prevState) return prevState;
         // Use the full gameState from the server if provided
         if (cardData.gameState) {
@@ -190,7 +190,7 @@ export const useOptimizedSocketEventHandlers = ({
   const handleTrickComplete = useCallback((trickData: any) => {
     console.log('🎮 Trick complete event received:', trickData);
     if (trickData && trickData.gameId === gameId) {
-      setGameState((prevState: any) => {
+      setGameState((prevState: GameState | null) => {
         if (!prevState) return prevState;
         // Use the full gameState from the server if provided
         if (trickData.gameState) {
@@ -220,7 +220,7 @@ export const useOptimizedSocketEventHandlers = ({
         setGameState(normalizeGameState(trickData.gameState));
       } else {
         // Fallback to partial update if gameState not provided
-        setGameState((prevState: any) => {
+        setGameState((prevState: GameState | null) => {
           if (!prevState) return prevState;
           
           // CRITICAL: Only update if we're actually starting a new trick
@@ -248,7 +248,7 @@ export const useOptimizedSocketEventHandlers = ({
   const handleRoundStarted = useCallback((roundData: any) => {
     console.log('🎮 Round started event received:', roundData);
     if (roundData && roundData.gameId === gameId) {
-      setGameState((prevState: any) => {
+      setGameState((prevState: GameState | null) => {
         if (!prevState) return prevState;
         
         // CRITICAL: Preserve bidding data from previous state
