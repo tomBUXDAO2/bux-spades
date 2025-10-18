@@ -13,57 +13,44 @@ export class DatabaseGameEngine {
    */
   static async getGameState(gameId) {
     try {
-      // Get main game record
+      // OPTIMIZED: Single query with all includes to avoid N+1 problem
       const game = await prisma.game.findUnique({
-        where: { id: gameId }
+        where: { id: gameId },
+        include: {
+          players: {
+            include: {
+              user: {
+                select: { id: true, username: true, avatarUrl: true }
+              }
+            },
+            orderBy: { seatIndex: 'asc' }
+          },
+          rounds: {
+            include: {
+              tricks: {
+                include: {
+                  cards: {
+                    orderBy: { playOrder: 'asc' }
+                  }
+                },
+                orderBy: { trickNumber: 'asc' }
+              },
+              playerStats: {
+                orderBy: { seatIndex: 'asc' }
+              },
+              RoundScore: true
+            },
+            orderBy: { roundNumber: 'asc' }
+          },
+          result: true
+        }
       });
 
       if (!game) {
         throw new Error(`Game ${gameId} not found`);
       }
 
-      // OPTIMIZED: Get players with user info in single query (fixes N+1 problem)
-      const playersWithUsers = await prisma.gamePlayer.findMany({
-        where: { gameId },
-        include: {
-          user: {
-            select: { id: true, username: true, avatarUrl: true }
-          }
-        },
-        orderBy: { seatIndex: 'asc' }
-      });
-
-      // OPTIMIZED: Get rounds with all related data in optimized queries
-      const rounds = await prisma.round.findMany({
-        where: { gameId },
-        include: {
-          tricks: {
-            include: {
-              cards: {
-                orderBy: { playOrder: 'asc' }
-              }
-            },
-            orderBy: { trickNumber: 'asc' }
-          },
-          playerStats: true,
-          RoundScore: true
-        },
-        orderBy: { roundNumber: 'asc' }
-      });
-
-      // Get result if exists
-      const result = await prisma.gameResult.findUnique({
-        where: { gameId }
-      });
-
-      const gameWithData = {
-        ...game,
-        players: playersWithUsers,
-        rounds: rounds, // Now includes all related data
-        result
-      };
-
-      return this.computeGameState(gameWithData);
+      return this.computeGameState(game);
     } catch (error) {
       console.error('[DB GAME ENGINE] Error getting game state:', error);
       throw error;

@@ -83,13 +83,15 @@ export class TrickCompletionService {
         }
       }
 
-      // Check if round is complete (13 tricks)
-      const completedTricks = await prisma.trick.count({
-        where: {
-          roundId,
-          winningSeatIndex: { not: -1 } // Only count completed tricks
-        }
+      // OPTIMIZED: Use cached counter instead of expensive count query
+      // Get current round stats to check if round is complete
+      const currentRoundStats = await prisma.playerRoundStats.findMany({
+        where: { roundId },
+        select: { tricksWon: true }
       });
+      
+      const totalTricksWon = currentRoundStats.reduce((sum, stat) => sum + stat.tricksWon, 0);
+      const completedTricks = totalTricksWon;
 
       // NUCLEAR: No logging for performance
 

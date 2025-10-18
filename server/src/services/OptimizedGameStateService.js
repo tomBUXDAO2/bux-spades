@@ -1,37 +1,27 @@
 import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
-import { GameService } from './GameService.js';
 
 /**
  * OPTIMIZED GAME STATE SERVICE
- * Implements incremental updates and smart caching to prevent performance degradation
+ * Implements incremental updates and smart caching to fix performance issues
  */
 export class OptimizedGameStateService {
-  // Cache for expensive query results
-  static queryCache = new Map();
-  static CACHE_TTL = 30000; // 30 seconds
-
+  
   /**
-   * Get game state with smart caching and incremental updates
+   * Get game state with smart caching strategy
    */
   static async getGameState(gameId, useCache = true) {
-    try {
-      if (useCache) {
-        const cached = await redisGameState.getGameState(gameId);
-        if (cached && this.isCacheValid(cached)) {
-          console.log(`[OPTIMIZED GAME STATE] Using cached state for game ${gameId}`);
-          return cached;
-        }
+    if (useCache) {
+      const cached = await redisGameState.getGameState(gameId);
+      if (cached && this.isCacheValid(cached)) {
+        return cached;
       }
-
-      console.log(`[OPTIMIZED GAME STATE] Building fresh state for game ${gameId}`);
-      return await this.buildOptimizedGameState(gameId);
-    } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error getting game state:', error);
-      throw error;
     }
+    
+    // Only rebuild from DB when necessary
+    return await this.buildGameStateFromDB(gameId);
   }
-
+  
   /**
    * Update game state incrementally instead of full rebuild
    */
@@ -39,168 +29,274 @@ export class OptimizedGameStateService {
     try {
       const current = await redisGameState.getGameState(gameId);
       if (!current) {
-        console.log(`[OPTIMIZED GAME STATE] No cached state found, building fresh state for game ${gameId}`);
-        return await this.buildOptimizedGameState(gameId);
+        // If no current state, build from DB
+        const fullState = await this.buildGameStateFromDB(gameId);
+        await redisGameState.setGameState(gameId, fullState);
+        return fullState;
       }
-
+      
       const updated = { ...current, ...updates };
       await redisGameState.setGameState(gameId, updated);
-      console.log(`[OPTIMIZED GAME STATE] Updated game state incrementally for game ${gameId}`);
       return updated;
     } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error updating game state incrementally:', error);
-      throw error;
+      console.error('[OPTIMIZED GAME STATE] Error updating incrementally:', error);
+      // Fallback to full rebuild
+      const fullState = await this.buildGameStateFromDB(gameId);
+      await redisGameState.setGameState(gameId, fullState);
+      return fullState;
     }
   }
-
-  /**
-   * Build optimized game state with minimal queries
-   */
-  static async buildOptimizedGameState(gameId) {
-    const cacheKey = `game_state_${gameId}`;
-    const cached = this.queryCache.get(cacheKey);
-    
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      console.log(`[OPTIMIZED GAME STATE] Using query cache for game ${gameId}`);
-      return cached.data;
-    }
-
-    // Use optimized single query instead of multiple queries
-    const gameState = await this.getGameStateOptimized(gameId);
-    
-    // Cache the result
-    this.queryCache.set(cacheKey, { data: gameState, timestamp: Date.now() });
-    
-    // Also cache in Redis
-    await redisGameState.setGameState(gameId, gameState);
-    
-    return gameState;
-  }
-
-  /**
-   * Get game state with optimized single query
-   */
-  static async getGameStateOptimized(gameId) {
-    try {
-      // CRITICAL: Use GameService.getGameStateForClient to ensure proper formatting
-      // This ensures player data is properly formatted with usernames and avatars
-      return await GameService.getGameStateForClient(gameId);
-    } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error in optimized query:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get current round data only (for active games)
-   */
-  static async getCurrentRoundData(gameId) {
-    try {
-      const currentRound = await prisma.round.findFirst({
-        where: { gameId },
-        orderBy: { roundNumber: 'desc' },
-        include: {
-          tricks: {
-            include: {
-              cards: {
-                orderBy: { playOrder: 'asc' }
-              }
-            },
-            orderBy: { trickNumber: 'asc' }
-          },
-          playerStats: true,
-          RoundScore: true
-        }
-      });
-
-      return currentRound;
-    } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error getting current round data:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if cached data is still valid
-   */
-  static isCacheValid(cachedData) {
-    if (!cachedData || !cachedData.timestamp) {
-      return false;
-    }
-
-    const age = Date.now() - cachedData.timestamp;
-    return age < this.CACHE_TTL;
-  }
-
-  /**
-   * Clear cache for a specific game
-   */
-  static clearGameCache(gameId) {
-    const cacheKey = `game_state_${gameId}`;
-    this.queryCache.delete(cacheKey);
-    console.log(`[OPTIMIZED GAME STATE] Cleared cache for game ${gameId}`);
-  }
-
-  /**
-   * Clear all caches
-   */
-  static clearAllCaches() {
-    this.queryCache.clear();
-    console.log('[OPTIMIZED GAME STATE] Cleared all caches');
-  }
-
+  
   /**
    * Update trick completion incrementally
    */
   static async updateTrickCompletion(gameId, trickData) {
+    const updates = {
+      play: {
+        currentTrick: trickData.currentTrick || [],
+        spadesBroken: trickData.spadesBroken || false
+      }
+    };
+    
+    return await this.updateGameStateIncrementally(gameId, updates);
+  }
+  
+  /**
+   * Update player stats incrementally
+   */
+  static async updatePlayerStats(gameId, seatIndex, tricksWon) {
+    const current = await redisGameState.getGameState(gameId);
+    if (!current || !current.players) return;
+    
+    const updatedPlayers = [...current.players];
+    if (updatedPlayers[seatIndex]) {
+      updatedPlayers[seatIndex] = {
+        ...updatedPlayers[seatIndex],
+        tricks: (updatedPlayers[seatIndex].tricks || 0) + tricksWon
+      };
+    }
+    
+    const updates = { players: updatedPlayers };
+    return await this.updateGameStateIncrementally(gameId, updates);
+  }
+  
+  /**
+   * Check if cached state is still valid
+   */
+  static isCacheValid(cachedState) {
+    if (!cachedState || !cachedState.id) return false;
+    
+    // Cache is valid for 30 seconds
+    const cacheAge = Date.now() - (cachedState._cacheTimestamp || 0);
+    return cacheAge < 30000;
+  }
+  
+  /**
+   * Build game state from database with optimized queries
+   */
+  static async buildGameStateFromDB(gameId) {
     try {
-      const current = await redisGameState.getGameState(gameId);
-      if (!current) {
-        return await this.buildOptimizedGameState(gameId);
+      // OPTIMIZED: Single query with all includes to avoid N+1 problem
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        include: {
+          players: {
+            include: {
+              user: {
+                select: { id: true, username: true, avatarUrl: true }
+              }
+            },
+            orderBy: { seatIndex: 'asc' }
+          },
+          rounds: {
+            include: {
+              tricks: {
+                include: {
+                  cards: {
+                    orderBy: { playOrder: 'asc' }
+                  }
+                },
+                orderBy: { trickNumber: 'asc' }
+              },
+              playerStats: {
+                orderBy: { seatIndex: 'asc' }
+              },
+              RoundScore: true
+            },
+            orderBy: { roundNumber: 'asc' }
+          }
+        }
+      });
+
+      if (!game) return null;
+
+      // Get current trick from Redis or database
+      let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+      if (!currentTrickCards || currentTrickCards.length === 0) {
+        const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+        if (currentRound) {
+          const currentTrick = currentRound.tricks.find(t => t.trickNumber === game.currentTrick);
+          if (currentTrick) {
+            currentTrickCards = currentTrick.cards.map(card => ({
+              suit: card.suit,
+              rank: card.rank,
+              seatIndex: card.seatIndex,
+              playerId: game.players.find(p => p.seatIndex === card.seatIndex)?.userId
+            }));
+          }
+        }
       }
 
-      // Update only the specific trick data
-      const updated = {
-        ...current,
-        play: {
-          ...current.play,
-          currentTrick: trickData.currentTrick || [],
-          spadesBroken: trickData.spadesBroken || current.play?.spadesBroken || false
+      // Get player hands from Redis
+      const playerHands = await redisGameState.getPlayerHands(gameId);
+      
+      // Get player bids from Redis
+      const playerBids = await redisGameState.getPlayerBids(gameId);
+      
+      // Get spadesBroken from Redis
+      let spadesBroken = false;
+      try {
+        const cachedGameState = await redisGameState.getGameState(gameId);
+        if (cachedGameState?.play?.spadesBroken !== undefined) {
+          spadesBroken = cachedGameState.play.spadesBroken;
         }
+      } catch (error) {
+        console.error('[OPTIMIZED GAME STATE] Error getting spadesBroken from Redis:', error);
+      }
+
+      // Build players array with nulls for empty seats
+      const playersArray = [null, null, null, null];
+      const spectatorsArray = [];
+      
+      game.players.forEach(player => {
+        const playerStat = game.rounds
+          .find(r => r.roundNumber === game.currentRound)
+          ?.playerStats?.find(stat => stat.seatIndex === player.seatIndex);
+        
+        const tricksWon = playerStat?.tricksWon || 0;
+        
+        const playerData = {
+          id: player.userId,
+          userId: player.userId,
+          username: player.user?.username || 'Unknown',
+          avatarUrl: player.user?.avatarUrl || null,
+          seatIndex: player.seatIndex,
+          teamIndex: player.teamIndex,
+          isHuman: player.isHuman,
+          isSpectator: player.isSpectator || false,
+          type: player.isHuman ? 'human' : 'bot',
+          bid: playerBids[player.seatIndex] || null,
+          tricks: tricksWon,
+          user: player.user ? {
+            id: player.user.id,
+            username: player.user.username,
+            avatarUrl: player.user.avatarUrl
+          } : null
+        };
+        
+        if (player.isSpectator) {
+          spectatorsArray.push(playerData);
+        } else {
+          playersArray[player.seatIndex] = playerData;
+        }
+      });
+
+      // Get running totals from latest RoundScore
+      let team1TotalScore = 0;
+      let team2TotalScore = 0;
+      let team1Bags = 0;
+      let team2Bags = 0;
+      
+      const latestRoundScore = game.rounds
+        .filter(r => r.RoundScore)
+        .sort((a, b) => b.roundNumber - a.roundNumber)[0]?.RoundScore;
+      
+      if (latestRoundScore) {
+        team1TotalScore = latestRoundScore.team0RunningTotal || 0;
+        team2TotalScore = latestRoundScore.team1RunningTotal || 0;
+        team1Bags = latestRoundScore.team0Bags || 0;
+        team2Bags = latestRoundScore.team1Bags || 0;
+      }
+
+      // Map gimmick variants to client-friendly format
+      const gimmickVariantMapping = {
+        'SUICIDE': 'SUICIDE',
+        'BID4NIL': '4 OR NIL',
+        'BID3': 'BID 3',
+        'BIDHEARTS': 'BID HEARTS',
+        'CRAZY_ACES': 'CRAZY ACES'
       };
 
-      await redisGameState.setGameState(gameId, updated);
-      return updated;
+      const gameState = {
+        id: game.id,
+        createdById: game.createdById,
+        status: game.status,
+        mode: game.mode,
+        format: game.format,
+        gimmickVariant: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+        buyIn: game.buyIn,
+        minPoints: game.minPoints,
+        maxPoints: game.maxPoints,
+        nilAllowed: game.nilAllowed,
+        blindNilAllowed: game.blindNilAllowed,
+        specialRules: game.specialRules,
+        isLeague: game.isLeague,
+        isRated: game.isRated,
+        currentPlayer: game.currentPlayer,
+        currentRound: game.currentRound,
+        currentTrick: game.currentTrick,
+        dealer: game.dealer,
+        players: playersArray,
+        spectators: spectatorsArray,
+        rounds: game.rounds || [],
+        hands: playerHands,
+        playerHands: playerHands,
+        currentTrickCards: currentTrickCards,
+        playerBids: playerBids,
+        play: {
+          currentTrick: currentTrickCards,
+          spadesBroken: spadesBroken
+        },
+        bidding: {
+          bids: playerBids,
+          currentBidderIndex: game.players.findIndex(p => p.userId === game.currentPlayer) || 0,
+          currentPlayer: game.currentPlayer
+        },
+        isGameComplete: game.status === 'FINISHED',
+        team1TotalScore: team1TotalScore,
+        team2TotalScore: team2TotalScore,
+        team1Bags: team1Bags,
+        team2Bags: team2Bags,
+        gameMode: game.mode,
+        rules: game.gameState?.rules || {
+          gameType: game.mode === 'SOLO' ? 'SOLO' : 'PARTNERS',
+          allowNil: game.nilAllowed,
+          allowBlindNil: game.blindNilAllowed,
+          coinAmount: game.buyIn,
+          maxPoints: game.maxPoints,
+          minPoints: game.minPoints,
+          bidType: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+          specialRules: game.specialRules || {}
+        },
+        _cacheTimestamp: Date.now()
+      };
+
+      return gameState;
     } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error updating trick completion:', error);
-      throw error;
+      console.error('[OPTIMIZED GAME STATE] Error building game state from DB:', error);
+      return null;
     }
   }
-
+  
   /**
-   * Update bidding state incrementally
+   * Clear cache for a specific game
    */
-  static async updateBiddingState(gameId, biddingData) {
+  static async clearCache(gameId) {
     try {
-      const current = await redisGameState.getGameState(gameId);
-      if (!current) {
-        return await this.buildOptimizedGameState(gameId);
-      }
-
-      // Update only the bidding data
-      const updated = {
-        ...current,
-        bidding: {
-          ...current.bidding,
-          ...biddingData
-        }
-      };
-
-      await redisGameState.setGameState(gameId, updated);
-      return updated;
+      await redisGameState.cleanupGame(gameId);
+      console.log(`[OPTIMIZED GAME STATE] Cleared cache for game ${gameId}`);
     } catch (error) {
-      console.error('[OPTIMIZED GAME STATE] Error updating bidding state:', error);
-      throw error;
+      console.error('[OPTIMIZED GAME STATE] Error clearing cache:', error);
     }
   }
 }
