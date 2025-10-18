@@ -143,7 +143,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
             if (allSeatsFilled) {
               console.log('[DEBUG] All seats filled, starting game...');
               if (timeoutId) clearTimeout(timeoutId);
-              if (socket) {
+              if (socket && gameUpdateListener) {
                 socket.off('game_update', gameUpdateListener);
               }
               resolve();

@@ -53,7 +53,7 @@ export const OptimizedGameTable = memo(({
       ...game,
       // Add any expensive processing here
     };
-  }, [game.currentRound, game.currentTrick, game.status]);
+  }, [game.status]);
 
   // Memoize callback functions
   const handlePlayCard = useCallback((card: any) => {
