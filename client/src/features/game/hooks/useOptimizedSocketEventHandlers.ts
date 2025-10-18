@@ -108,12 +108,13 @@ export const useOptimizedSocketEventHandlers = ({
         setGameState(newState);
       } else {
         // Fallback to partial update if gameState not provided
-        if (currentGameState) {
-          setGameState({
-            ...currentGameState,
+        setGameState((prevState: any) => {
+          if (!prevState) return prevState;
+          return {
+            ...prevState,
             bidding: biddingData.bidding
-          });
-        }
+          };
+        });
       }
     }
   }, [gameId, currentGameState, setGameState]);
@@ -130,77 +131,83 @@ export const useOptimizedSocketEventHandlers = ({
         });
       }
       
-      // Use the full gameState from the server if provided
-      if (cardData.gameState) {
-        console.log('🎮 Card played - setting game state with currentPlayer:', cardData.gameState.currentPlayer);
-        console.log('🎮 Card played - currentTrick from event:', cardData.currentTrick);
-        
-        // CRITICAL: Use the server's game state directly - it has the correct currentPlayer
-        const serverGameState = cardData.gameState;
-        
-        // CRITICAL: Preserve bidding data and hands from previous state
-        const gameStateWithBidding = {
-          ...serverGameState,
-          bidding: serverGameState.bidding || currentGameState?.bidding,
-          hands: serverGameState.hands || currentGameState?.hands,
-          // CRITICAL: Use server players data to ensure usernames/avatars are preserved
-          players: serverGameState.players || currentGameState?.players
-        };
-        
-        // CRITICAL: Ensure currentTrick data is properly integrated
-        const normalizedState = normalizeGameState(gameStateWithBidding);
-        
-        // Ensure currentTrick is never undefined - use data from currentTrick or gameState
-        const currentTrick = cardData.currentTrick || serverGameState?.play?.currentTrick || [];
-        if (Array.isArray(currentTrick)) {
-          normalizedState.play = {
-            ...normalizedState.play,
-            currentTrick: currentTrick
+      setGameState((prevState: any) => {
+        if (!prevState) return prevState;
+        // Use the full gameState from the server if provided
+        if (cardData.gameState) {
+          console.log('🎮 Card played - setting game state with currentPlayer:', cardData.gameState.currentPlayer);
+          console.log('🎮 Card played - currentTrick from event:', cardData.currentTrick);
+          
+          // CRITICAL: Use the server's game state directly - it has the correct currentPlayer
+          const serverGameState = cardData.gameState;
+          
+          // CRITICAL: Preserve bidding data and hands from previous state
+          const gameStateWithBidding = {
+            ...serverGameState,
+            bidding: serverGameState.bidding || prevState.bidding,
+            hands: serverGameState.hands || prevState.hands,
+            // CRITICAL: Use server players data to ensure usernames/avatars are preserved
+            players: serverGameState.players || prevState.players
           };
-          // CRITICAL: Also set currentTrick at top level for renderTrickCards
-          normalizedState.currentTrick = currentTrick;
+          
+          // CRITICAL: Ensure currentTrick data is properly integrated
+          const normalizedState = normalizeGameState(gameStateWithBidding);
+          
+          // Ensure currentTrick is never undefined - use data from currentTrick or gameState
+          const currentTrick = cardData.currentTrick || serverGameState?.play?.currentTrick || [];
+          if (Array.isArray(currentTrick)) {
+            normalizedState.play = {
+              ...normalizedState.play,
+              currentTrick: currentTrick
+            };
+            // CRITICAL: Also set currentTrick at top level for renderTrickCards
+            normalizedState.currentTrick = currentTrick;
+          } else {
+            // Fallback to empty array if currentTrick is not an array
+            normalizedState.play = {
+              ...normalizedState.play,
+              currentTrick: []
+            };
+            normalizedState.currentTrick = [];
+          }
+          return normalizedState;
         } else {
-          // Fallback to empty array if currentTrick is not an array
-          normalizedState.play = {
-            ...normalizedState.play,
-            currentTrick: []
+          // Fallback to partial update if gameState not provided
+          const currentTrick = cardData.currentTrick || prevState.play?.currentTrick || [];
+          return {
+            ...prevState,
+            play: {
+              ...prevState.play,
+              currentTrick: Array.isArray(currentTrick) ? currentTrick : []
+            },
+            currentPlayer: cardData.currentPlayer || prevState.currentPlayer
           };
-          normalizedState.currentTrick = [];
         }
-        setGameState(normalizedState);
-      } else if (currentGameState) {
-        // Fallback to partial update if gameState not provided
-        const currentTrick = cardData.currentTrick || currentGameState.play?.currentTrick || [];
-        setGameState({
-          ...currentGameState,
-          play: {
-            ...currentGameState.play,
-            currentTrick: Array.isArray(currentTrick) ? currentTrick : []
-          },
-          currentPlayer: cardData.currentPlayer || currentGameState.currentPlayer
-        });
-      }
+      });
     }
   }, [gameId, setGameState]);
 
   const handleTrickComplete = useCallback((trickData: any) => {
     console.log('🎮 Trick complete event received:', trickData);
     if (trickData && trickData.gameId === gameId) {
-      // Use the full gameState from the server if provided
-      if (trickData.gameState) {
-        setGameState(normalizeGameState(trickData.gameState));
-      } else if (currentGameState) {
-        // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
-        // This prevents the 4th card from disappearing and re-rendering
-        setGameState({
-          ...currentGameState,
-          play: {
-            ...currentGameState.play,
-            // Keep currentTrick intact for animation
-            tricks: trickData.tricks || []
-          }
-        });
-      }
+      setGameState((prevState: any) => {
+        if (!prevState) return prevState;
+        // Use the full gameState from the server if provided
+        if (trickData.gameState) {
+          return normalizeGameState(trickData.gameState);
+        } else {
+          // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
+          // This prevents the 4th card from disappearing and re-rendering
+          return {
+            ...prevState,
+            play: {
+              ...prevState.play,
+              // Keep currentTrick intact for animation
+              tricks: trickData.tricks || []
+            }
+          };
+        }
+      });
     }
   }, [gameId, setGameState]);
 
@@ -213,23 +220,27 @@ export const useOptimizedSocketEventHandlers = ({
         setGameState(normalizeGameState(trickData.gameState));
       } else {
         // Fallback to partial update if gameState not provided
-        if (currentGameState) {
+        setGameState((prevState: any) => {
+          if (!prevState) return prevState;
+          
           // CRITICAL: Only update if we're actually starting a new trick
           // Don't interfere with current trick cards
-          const isNewTrick = !currentGameState.play?.currentTrick || currentGameState.play.currentTrick.length === 0;
+          const isNewTrick = !prevState.play?.currentTrick || prevState.play.currentTrick.length === 0;
           
           if (isNewTrick) {
-            setGameState({
-              ...currentGameState,
+            return {
+              ...prevState,
               play: {
-                ...currentGameState.play,
+                ...prevState.play,
                 currentTrick: [],
                 leadSuit: trickData.leadSuit
               }
-            });
+            };
+          } else {
+            // Don't update if we're in the middle of a trick
+            return prevState;
           }
-          // Don't update if we're in the middle of a trick
-        }
+        });
       }
     }
   }, [gameId, setGameState]);
@@ -237,15 +248,17 @@ export const useOptimizedSocketEventHandlers = ({
   const handleRoundStarted = useCallback((roundData: any) => {
     console.log('🎮 Round started event received:', roundData);
     if (roundData && roundData.gameId === gameId) {
-      if (currentGameState) {
+      setGameState((prevState: any) => {
+        if (!prevState) return prevState;
+        
         // CRITICAL: Preserve bidding data from previous state
         const gameStateWithBidding = {
           ...roundData.gameState,
-          bidding: roundData.gameState.bidding || currentGameState.bidding
+          bidding: roundData.gameState.bidding || prevState.bidding
         };
         
-        setGameState(normalizeGameState(gameStateWithBidding));
-      }
+        return normalizeGameState(gameStateWithBidding);
+      });
     }
   }, [gameId, setGameState]);
 

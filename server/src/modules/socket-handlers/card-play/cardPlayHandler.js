@@ -2,7 +2,6 @@ import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
 import { TrickCompletionService } from '../../../services/TrickCompletionService.js';
-import { FastGameStateService } from '../../../services/FastGameStateService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
@@ -35,9 +34,8 @@ class CardPlayHandler {
         
         // User playing card
         
-        // FAST: Get game state from cache
-        const gameState = await FastGameStateService.getGameState(gameId);
-        
+        // Get current game state from database
+        const gameState = await GameService.getGameStateForClient(gameId);
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
           return;
@@ -132,8 +130,7 @@ class CardPlayHandler {
         // The player must play a valid card
         
         // Emit rejection to all players
-        // FAST: Get game state from cache
-        const updatedGameState = await FastGameStateService.getGameState(gameId);
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
         this.io.to(gameId).emit('card_played', {
           gameId,
           gameState: updatedGameState,
@@ -209,8 +206,7 @@ class CardPlayHandler {
             });
 
             // Emit trick complete event
-            // FAST: Get game state from cache
-        const updatedGameState = await FastGameStateService.getGameState(gameId);
+            const updatedGameState = await GameService.getGameStateForClient(gameId);
             this.io.to(gameId).emit('trick_complete', {
               gameId,
               gameState: updatedGameState,
@@ -250,8 +246,7 @@ class CardPlayHandler {
             
             // Emit trick started event (only if new trick was created)
             if (!trickResult.isRoundComplete && !trickResult.isComplete) {
-              // FAST: Get game state from cache
-              const newGameState = await FastGameStateService.getGameState(gameId);
+              const newGameState = await GameService.getGameStateForClient(gameId);
               console.log(`[CARD PLAY] Trick started - newGameState.currentPlayer: ${newGameState.currentPlayer}, expected: ${gameState.players.find(p => p && p.seatIndex === trickResult.winningSeatIndex)?.userId}`);
               this.io.to(gameId).emit('trick_started', {
                 gameId,
@@ -380,8 +375,7 @@ class CardPlayHandler {
         // Trigger bot play if next player is a bot
         // CRITICAL: Get fresh game state after updateCurrentPlayer
         setTimeout(async () => {
-          // FAST: Get game state from cache
-          const freshGameState = await FastGameStateService.getGameState(gameId);
+          const freshGameState = await GameService.getGameStateForClient(gameId);
           if (freshGameState) {
             await this.triggerBotPlayIfNeeded(gameId);
           }
@@ -599,8 +593,7 @@ class CardPlayHandler {
       console.log(`[CARD PLAY] Successfully created new trick after clear:`, newTrick.id);
       
       // CRITICAL: Emit trick_started event to notify clients that new trick has started
-            // FAST: Get game state from cache
-            const updatedGameState = await FastGameStateService.getGameState(gameId);
+      const updatedGameState = await GameService.getGameStateForClient(gameId);
       this.io.to(gameId).emit('trick_started', {
         gameId,
         gameState: updatedGameState,

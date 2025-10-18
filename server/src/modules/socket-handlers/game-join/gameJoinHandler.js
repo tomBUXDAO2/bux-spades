@@ -1,6 +1,5 @@
 import { GameService } from '../../../services/GameService.js';
 import { BotService } from '../../../services/BotService.js';
-import { FastGameStateService } from '../../../services/FastGameStateService.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import redisSessionService from '../../../services/RedisSessionService.js';
 import { prisma } from '../../../config/database.js';
@@ -29,7 +28,7 @@ class GameJoinHandler {
       }
 
       // Get current game state from DB
-      const gameState = await FastGameStateService.getGameState(gameId);
+      const gameState = await GameService.getGameStateForClient(gameId);
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -63,7 +62,7 @@ class GameJoinHandler {
       });
 
       // Fetch updated state and broadcast
-      const updatedGameState = await FastGameStateService.getGameState(gameId);
+      const updatedGameState = await GameService.getGameStateForClient(gameId);
       try {
         const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
         const system = new SystemMessageHandler(this.io, this.socket);
@@ -110,7 +109,7 @@ class GameJoinHandler {
       }
       
       // Get game state from database (single source of truth) - sanitized for this user
-      const gameState = await FastGameStateService.getGameState(gameId);
+      const gameState = await GameService.getGameStateForClient(gameId, userId);
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -221,7 +220,7 @@ class GameJoinHandler {
       }
       
       // Get current game state
-      const gameState = await FastGameStateService.getGameState(gameId);
+      const gameState = await GameService.getGameStateForClient(gameId);
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -300,7 +299,7 @@ class GameJoinHandler {
       // Get player username before leaving
       let playerUsername = 'Player';
       try {
-        const gameState = await FastGameStateService.getGameState(gameId);
+        const gameState = await GameService.getGameStateForClient(gameId);
         const player = gameState?.players?.find(p => p && p.userId === userId);
         if (player) {
           playerUsername = player.username;
@@ -352,7 +351,7 @@ class GameJoinHandler {
       }
 
       // Emit to other players in the room and broadcast updated state
-        const updatedState = await FastGameStateService.getGameState(gameId);
+      const updatedState = await GameService.getGameStateForClient(gameId);
       this.io.to(gameId).emit('player_left', { gameId, userId });
       if (updatedState) {
         this.io.to(gameId).emit('game_update', { gameId, gameState: updatedState });

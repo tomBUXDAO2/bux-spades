@@ -1,5 +1,4 @@
 import { GameService } from '../../../services/GameService.js';
-import { FastGameStateService } from '../../../services/FastGameStateService.js';
 import { gameManager } from '../../../services/GameManager.js';
 import { prisma } from '../../../config/database.js';
 
@@ -34,7 +33,7 @@ class GameChatHandler {
       console.log(`[GAME CHAT] User ${userId} sending message to game ${gameId}: ${messageText}`);
       
       // Verify user is in the game by checking database state
-      const gameState = await FastGameStateService.getGameState(gameId);
+      const gameState = await GameService.getGameStateForClient(gameId);
       if (!gameState) {
         console.log(`[GAME CHAT] ERROR: Game not found in database`);
         this.socket.emit('error', { message: 'Game not found' });
