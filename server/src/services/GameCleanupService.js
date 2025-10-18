@@ -1,4 +1,4 @@
-import { prisma } from '../config/databaseFirst.js';
+import { prisma } from '../config/database.js';
 import { gameManager } from './GameManager.js';
 import { io } from '../config/server.js';
 

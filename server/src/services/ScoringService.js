@@ -1,4 +1,4 @@
-import { prisma } from '../config/databaseFirst.js';
+import { prisma } from '../config/database.js';
 
 /**
  * DATABASE-FIRST SCORING SERVICE
