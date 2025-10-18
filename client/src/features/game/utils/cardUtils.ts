@@ -59,12 +59,8 @@ export const getCardOverlapOffset = (scaleFactor: number, isMobile: boolean = fa
   const calculatedOverlap = visibleCardWidth - cardWidth;
   
   // Debug logging
-  console.log(`[CARD SPACING DEBUG] Screen width: ${width}, Available width: ${availableWidth}, Card width: ${cardWidth}, Visible card width: ${visibleCardWidth}, Calculated overlap: ${calculatedOverlap}`);
-  
   // Use the calculated overlap directly
   const finalOverlap = Math.floor(calculatedOverlap);
-  
-  console.log(`[CARD SPACING DEBUG] Final overlap: ${finalOverlap}`);
   
   return finalOverlap;
 };
