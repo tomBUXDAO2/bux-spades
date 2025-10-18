@@ -186,21 +186,25 @@ export const useOptimizedSocketEventHandlers = ({
   const handleTrickComplete = useCallback((trickData: any) => {
     console.log('🎮 Trick complete event received:', trickData);
     if (trickData && trickData.gameId === gameId) {
-      // Use the full gameState from the server if provided
-      if (trickData.gameState) {
-        setGameState(normalizeGameState(trickData.gameState));
-      } else if (currentGameState) {
-        // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
-        // This prevents the 4th card from disappearing and re-rendering
-        setGameState({
-          ...currentGameState,
-          play: {
-            ...currentGameState.play,
-            // Keep currentTrick intact for animation
-            tricks: trickData.tricks || []
-          }
-        });
-      }
+      // Use functional update to preserve current trick for animation
+      setGameState((prevState: any) => {
+        if (!prevState) return prevState;
+        // Use the full gameState from the server if provided
+        if (trickData.gameState) {
+          return normalizeGameState(trickData.gameState);
+        } else {
+          // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
+          // This prevents the 4th card from disappearing and re-rendering
+          return {
+            ...prevState,
+            play: {
+              ...prevState.play,
+              // Keep currentTrick intact for animation
+              tricks: trickData.tricks || []
+            }
+          };
+        }
+      });
     }
   }, [gameId, setGameState]);
 
