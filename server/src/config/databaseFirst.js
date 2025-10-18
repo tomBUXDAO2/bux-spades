@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
  * No hard guards - database is the single source of truth
  */
 const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
+  log: [], // NO LOGGING IN PRODUCTION - PERFORMANCE CRITICAL
 });
 
 export { prisma };
