@@ -463,7 +463,7 @@ class CardPlayHandler {
         seatIndex: currentPlayer.seatIndex 
       } : 'null');
       
-      if (!currentPlayer || currentPlayer.isHuman !== false) {
+      if (!currentPlayer || currentPlayer.isHuman === true) {
         console.log(`[CARD PLAY] Not triggering bot play - currentPlayer is not a bot`);
         return;
       }
