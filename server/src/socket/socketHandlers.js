@@ -197,7 +197,7 @@ export function setupSocketHandlers(io) {
         socket.emit('error', { message: 'Failed to start new round' });
       }
     });
-    socket.on('invite_bot', (data) => {
+    socket.on('invite_bot', async (data) => {
       console.log('[SOCKET] Received invite_bot event:', data);
       if (!socket.authenticated) {
         console.log('[SOCKET] User not authenticated for invite_bot');
@@ -205,16 +205,16 @@ export function setupSocketHandlers(io) {
         return;
       }
       console.log('[SOCKET] Calling handleInviteBot with data:', data);
-      gameJoinHandler.handleInviteBot(data);
+      await gameJoinHandler.handleInviteBot(data);
     });
-    socket.on('remove_bot_db', (data) => {
+    socket.on('remove_bot_db', async (data) => {
       console.log('[SOCKET] Received remove_bot_db event:', data);
       if (!socket.authenticated) {
         console.log('[SOCKET] User not authenticated for remove_bot_db');
         socket.emit('error', { message: 'Not authenticated' });
         return;
       }
-      gameJoinHandler.handleRemoveBot(data);
+      await gameJoinHandler.handleRemoveBot(data);
     });
 
     // Lobby chat events
