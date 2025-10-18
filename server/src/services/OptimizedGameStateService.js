@@ -81,6 +81,18 @@ export class OptimizedGameStateService {
   }
   
   /**
+   * Update bidding state incrementally
+   */
+  static async updateBiddingState(gameId, biddingData) {
+    const updates = {
+      bidding: biddingData,
+      currentPlayer: biddingData.currentPlayer
+    };
+    
+    return await this.updateGameStateIncrementally(gameId, updates);
+  }
+  
+  /**
    * Check if cached state is still valid
    */
   static isCacheValid(cachedState) {
