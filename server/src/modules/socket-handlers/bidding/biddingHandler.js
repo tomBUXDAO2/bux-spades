@@ -1,6 +1,7 @@
 import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
+import { FastGameStateService } from '../../../services/FastGameStateService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
@@ -241,7 +242,7 @@ class BiddingHandler {
         }
         
         // All players have bid, emit final bidding update then start the round
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        const updatedGameState = await FastGameStateService.getGameState(gameId);
         this.io.to(gameId).emit('bidding_update', {
           gameId,
           gameState: updatedGameState,
@@ -296,22 +297,27 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
-        // OPTIMIZED: Use optimized game state service with incremental bidding updates
-        const { OptimizedGameStateService } = await import('../../../services/OptimizedGameStateService.js');
+        // FAST: Get game state and update bids
         const latestBids = await redisGameState.getPlayerBids(gameId);
+        const updatedGameState = await FastGameStateService.getGameState(gameId);
         
-        const updatedGameState = await OptimizedGameStateService.updateBiddingState(gameId, {
-          bids: latestBids,
-          currentBidderIndex: nextPlayer?.seatIndex || 0,
-          currentPlayer: nextPlayer?.userId
-        });
-        
-        // Update player bids in the players array
+        // Update player bids in the cached state
         if (updatedGameState && latestBids) {
           updatedGameState.players = updatedGameState.players.map(p => ({
             ...p,
             bid: latestBids[p.seatIndex] || null
           }));
+          
+          // Update bidding state in cached game state
+          if (!updatedGameState.bidding) {
+            updatedGameState.bidding = {};
+          }
+          updatedGameState.bidding.bids = latestBids;
+          updatedGameState.bidding.currentBidderIndex = nextPlayer?.seatIndex || 0;
+          updatedGameState.bidding.currentPlayer = nextPlayer?.userId;
+          
+          // Save updated state back to Redis
+          await redisGameState.setGameState(gameId, updatedGameState);
         }
         
         this.io.to(gameId).emit('bidding_update', {
@@ -450,7 +456,8 @@ class BiddingHandler {
 
       // Emit round started event
       try {
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        // FAST: Get game state from cache
+        const updatedGameState = await FastGameStateService.getGameState(gameId);
         
         // CRITICAL: Preserve bidding data when transitioning to PLAYING phase
         const latestBids = await redisGameState.getPlayerBids(gameId);
@@ -466,6 +473,9 @@ class BiddingHandler {
             ...p,
             bid: latestBids[p.seatIndex] || null
           }));
+          
+          // Save updated state back to Redis
+          await redisGameState.setGameState(gameId, updatedGameState);
         }
         
         this.io.to(gameId).emit('round_started', {
@@ -714,7 +724,7 @@ class BiddingHandler {
    */
   async triggerBotPlayIfNeeded(gameId) {
     try {
-      const gameState = await GameService.getGameStateForClient(gameId);
+      const gameState = await FastGameStateService.getGameState(gameId);
       if (!gameState) return;
 
       const currentPlayer = gameState.players.find(p => p.userId === gameState.currentPlayer);

@@ -1,6 +1,6 @@
 import { useGameStateManagement } from './useGameStateManagement';
 import { useGameActions } from './useGameActions';
-import { useSocketEventHandlers } from './useSocketEventHandlers';
+import { useOptimizedSocketEventHandlers } from './useOptimizedSocketEventHandlers';
 import type { GameState, Card } from "../../../types/game";
 
 import { BiddingOption } from '../../../types/game';
@@ -41,7 +41,7 @@ export function useGameState(gameId: string, userId: string) {
     setHasAttemptedJoin
   });
 
-  useSocketEventHandlers({
+  useOptimizedSocketEventHandlers({
     socket,
     isReady,
     gameId,
