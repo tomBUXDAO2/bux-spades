@@ -106,18 +106,69 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
     
     console.log('[DEBUG] Empty seat indexes:', emptySeatIndexes);
     
-    // PERFORMANCE: Invite all bots in parallel (no delays)
+    // CRITICAL FIX: Wait for bots to actually join before starting game
     console.log('[DEBUG] Inviting all bots in parallel...');
     emptySeatIndexes.forEach(seatIndex => {
       console.log('[DEBUG] Inviting bot to seat:', seatIndex);
       inviteBot(seatIndex);
     });
     
-    // PERFORMANCE: Start game immediately (server will handle bot addition completion)
-    console.log('[DEBUG] Starting game with bots...');
-    await new Promise(resolve => setTimeout(resolve, 200)); // Minimal delay for socket events
-    if (socket && gameState?.id) {
-      socket.emit('start_game', { gameId: gameState.id, rated: false });
+    // CRITICAL FIX: Wait for bots to actually join before starting game
+    console.log('[DEBUG] Waiting for bots to join before starting game...');
+    
+    // Set up a listener for game updates to detect when bots join
+    let gameUpdateListener: ((data: any) => void) | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const waitForBots = () => {
+      return new Promise<void>((resolve) => {
+        // Set up timeout as fallback
+        timeoutId = setTimeout(() => {
+          console.log('[DEBUG] Timeout waiting for bots, starting anyway...');
+          if (gameUpdateListener && socket) {
+            socket.off('game_update', gameUpdateListener);
+          }
+          resolve();
+        }, 10000); // 10 second timeout
+        
+        // Listen for game updates to detect bot joins
+        gameUpdateListener = (data: any) => {
+          if (data.gameId === gameState.id && data.gameState) {
+            const players = Array.isArray(data.gameState.players) ? data.gameState.players : [];
+            const allSeatsFilled = players.every((player: any, index: number) => {
+              if (index < 4) return player !== null && player !== undefined;
+              return true;
+            });
+            
+            if (allSeatsFilled) {
+              console.log('[DEBUG] All seats filled, starting game...');
+              if (timeoutId) clearTimeout(timeoutId);
+              if (socket) {
+                socket.off('game_update', gameUpdateListener);
+              }
+              resolve();
+            }
+          }
+        };
+        
+        if (socket) {
+          socket.on('game_update', gameUpdateListener);
+        }
+      });
+    };
+    
+    try {
+      await waitForBots();
+      console.log('[DEBUG] Starting game with bots...');
+      if (socket && gameState?.id) {
+        socket.emit('start_game', { gameId: gameState.id, rated: false });
+      }
+    } catch (error) {
+      console.error('[DEBUG] Error waiting for bots:', error);
+      // Start anyway, server will handle
+      if (socket && gameState?.id) {
+        socket.emit('start_game', { gameId: gameState.id, rated: false });
+      }
     }
   };
 
