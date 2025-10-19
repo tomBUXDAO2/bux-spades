@@ -6,6 +6,7 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
+import { SmartCacheService } from '../../../services/SmartCacheService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -35,9 +36,9 @@ class CardPlayHandler {
         
         // User playing card
         
-        // Get current game state from database
+        // Get current game state from database (with smart caching)
         const gameState = await PerformanceMiddleware.timeOperation('getGameStateForClient', () => 
-          GameService.getGameStateForClient(gameId)
+          SmartCacheService.getGameStateForClient(gameId)
         );
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
@@ -84,9 +85,9 @@ class CardPlayHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state
+      // Get current game state (with smart caching)
       const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
-        GameService.getGame(gameId)
+        SmartCacheService.getGame(gameId)
       );
       if (!gameState) {
         throw new Error('Game not found');
@@ -126,6 +127,9 @@ class CardPlayHandler {
         card.suit,
         card.rank
       );
+      
+      // Invalidate cache since game state has changed
+      SmartCacheService.invalidateGame(gameId);
 
       // CRITICAL: If card play was rejected, KEEP TURN WITH SAME PLAYER
       if (logResult.rejected) {
@@ -443,8 +447,8 @@ class CardPlayHandler {
     try {
       console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
       
-      // CRITICAL: Get FRESH game state directly from database, not from cache
-      const game = await GameService.getGame(gameId);
+      // CRITICAL: Get FRESH game state with smart caching
+      const game = await SmartCacheService.getGame(gameId);
       if (!game) {
         console.log(`[CARD PLAY] No game found in database: ${gameId}`);
         return;
