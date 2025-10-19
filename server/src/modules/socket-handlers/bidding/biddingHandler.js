@@ -448,28 +448,46 @@ class BiddingHandler {
 
       // Emit round started event
       try {
-        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        // CRITICAL: Use database as single source of truth for bidding data
+        const gameState = await GameService.getGame(gameId);
+        const currentRound = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
         
-        // CRITICAL: Preserve bidding data when transitioning to PLAYING phase
-        const latestBids = await redisGameState.getPlayerBids(gameId);
-        if (latestBids && updatedGameState) {
-          updatedGameState.bidding = {
-            bids: latestBids,
-            currentBidderIndex: firstPlayer?.seatIndex || 0,
-            currentPlayer: firstPlayer?.userId
+        if (currentRound && currentRound.playerStats) {
+          const bids = Array.from({length: 4}, () => null);
+          currentRound.playerStats.forEach(stat => {
+            if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
+              bids[stat.seatIndex] = stat.bid;
+            }
+          });
+          
+          // Create game state with correct bidding data from database
+          const updatedGameState = {
+            ...gameState,
+            status: 'PLAYING',
+            currentPlayer: firstPlayer?.userId,
+            bidding: {
+              bids: bids,
+              currentBidderIndex: firstPlayer?.seatIndex || 0,
+              currentPlayer: firstPlayer?.userId
+            },
+            players: gameState.players.map(p => ({
+              ...p,
+              bid: bids[p.seatIndex] || null
+            }))
           };
           
-          // Also update player bids in the players array
-          updatedGameState.players = updatedGameState.players.map(p => ({
-            ...p,
-            bid: latestBids[p.seatIndex] || null
-          }));
+          this.io.to(gameId).emit('round_started', {
+            gameId,
+            gameState: updatedGameState
+          });
+        } else {
+          // Fallback if no round data
+          const updatedGameState = await GameService.getGameStateForClient(gameId);
+          this.io.to(gameId).emit('round_started', {
+            gameId,
+            gameState: updatedGameState
+          });
         }
-        
-        this.io.to(gameId).emit('round_started', {
-          gameId,
-          gameState: updatedGameState
-        });
 
         // Start timer for first player if they are human (card play - always apply)
         if (firstPlayer && firstPlayer.isHuman) {
