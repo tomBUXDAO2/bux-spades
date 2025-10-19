@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { DetailedStatsService } from '../../services/DetailedStatsService.js';
-import { prisma } from '../../config/database.js';
+import { prisma } from '../../config/databaseFirst.js';
 
 // Room IDs
 const LOW_ROOM_ID = '1404937454938619927';
