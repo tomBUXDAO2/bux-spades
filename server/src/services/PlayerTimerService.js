@@ -128,9 +128,16 @@ class PlayerTimerService {
       const seatIndex = player.seatIndex;
       console.log(`[PLAYER TIMER] Player found at seat ${seatIndex}:`, player.username || player.user?.username);
 
-      // Use the same bot logic that already works
-      const botService = new BotService();
-      const botBid = await botService.calculateUnifiedBotBid(game, seatIndex);
+      // Use simple bot logic for timeout bidding
+      const hands = await redisGameState.getPlayerHands(game.id);
+      if (!hands || !hands[seatIndex]) {
+        console.error(`[PLAYER TIMER] ❌ No hand found for player at seat ${seatIndex}`);
+        return;
+      }
+
+      const hand = hands[seatIndex];
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+      const botBid = numSpades > 0 ? numSpades : 2;
       
       console.log(`[PLAYER TIMER] 🎯 Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username}`);
 
