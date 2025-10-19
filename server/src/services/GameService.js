@@ -91,7 +91,7 @@ export class GameService {
     }
   }
 
-  // Get complete game state from database (single source of truth)
+  // Get lightweight game state from database (FAST - only essential data)
   static async getGame(gameId) {
     const maxRetries = 3;
     let retryCount = 0;
@@ -107,7 +107,7 @@ export class GameService {
         
         databaseOperations.add(gameId);
         
-        // OPTIMIZED: Single query with all includes to avoid N+1 problem
+        // LIGHTWEIGHT: Only get essential game data - no tricks, cards, or heavy data
         const game = await PerformanceMiddleware.timeOperation('getGame_database_query', () => 
           prisma.game.findUnique({
             where: { id: gameId },
@@ -121,19 +121,22 @@ export class GameService {
                 orderBy: { seatIndex: 'asc' }
               },
               rounds: {
-                include: {
-                  tricks: {
-                    include: {
-                      cards: {
-                        orderBy: { playOrder: 'asc' }
-                      }
-                    },
-                    orderBy: { trickNumber: 'asc' }
-                  },
+                select: {
+                  id: true,
+                  roundNumber: true,
+                  dealerSeatIndex: true,
+                  createdAt: true,
                   playerStats: {
+                    select: {
+                      seatIndex: true,
+                      bid: true,
+                      tricksWon: true,
+                      isBlindNil: true,
+                      madeNil: true,
+                      madeBlindNil: true
+                    },
                     orderBy: { seatIndex: 'asc' }
-                  },
-                  RoundScore: true
+                  }
                 },
                 orderBy: { roundNumber: 'asc' }
               },
