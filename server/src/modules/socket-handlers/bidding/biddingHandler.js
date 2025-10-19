@@ -448,7 +448,10 @@ class BiddingHandler {
 
       // Emit round started event
       try {
-        // CRITICAL: Use database as single source of truth for bidding data
+        // Use the proper getGameStateForClient but ensure bidding data is correct
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
+        
+        // CRITICAL: Override bidding data with database values to prevent race conditions
         const gameState = await GameService.getGame(gameId);
         const currentRound = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
         
@@ -460,34 +463,26 @@ class BiddingHandler {
             }
           });
           
-          // Create game state with correct bidding data from database
-          const updatedGameState = {
-            ...gameState,
-            status: 'PLAYING',
-            currentPlayer: firstPlayer?.userId,
-            bidding: {
-              bids: bids,
-              currentBidderIndex: firstPlayer?.seatIndex || 0,
-              currentPlayer: firstPlayer?.userId
-            },
-            players: gameState.players.map(p => ({
-              ...p,
-              bid: bids[p.seatIndex] || null
-            }))
+          // Override the bidding data with correct database values
+          updatedGameState.bidding = {
+            bids: bids,
+            currentBidderIndex: firstPlayer?.seatIndex || 0,
+            currentPlayer: firstPlayer?.userId
           };
           
-          this.io.to(gameId).emit('round_started', {
-            gameId,
-            gameState: updatedGameState
-          });
-        } else {
-          // Fallback if no round data
-          const updatedGameState = await GameService.getGameStateForClient(gameId);
-          this.io.to(gameId).emit('round_started', {
-            gameId,
-            gameState: updatedGameState
-          });
+          // Also update player bids in the players array
+          if (updatedGameState.players) {
+            updatedGameState.players = updatedGameState.players.map(p => ({
+              ...p,
+              bid: bids[p.seatIndex] || null
+            }));
+          }
         }
+        
+        this.io.to(gameId).emit('round_started', {
+          gameId,
+          gameState: updatedGameState
+        });
 
         // Start timer for first player if they are human (card play - always apply)
         if (firstPlayer && firstPlayer.isHuman) {
