@@ -115,53 +115,13 @@ class BotService {
 
   /**
    * Make a bid for a bot using intelligent logic
+   * DISABLED: Using new database-first bot bidding system instead
    */
   async makeBotBid(game, seatIndex) {
-    const bot = game.players[seatIndex];
-    if (!bot || bot.isHuman !== false) {
-      console.log(`[BOT SERVICE] Seat ${seatIndex} is not a bot`);
-      return;
-    }
-
-    // Handle both 'hands' and 'playerHands' properties
-    const hands = game.hands || game.playerHands || [];
-    const hand = hands[seatIndex] || [];
-    let bid = 0;
-
-    if (hand.length === 0) {
-      bid = 2; // Default bid if no hand
-    } else {
-      bid = this.calculateIntelligentBid(game, seatIndex, hand);
-    }
-
-    console.log(`[BOT SERVICE] Bot ${bot.username} bidding ${bid} (intelligent logic)`);
-
-    // Apply bid to game state (advances current bidder)
-    game.makeBid(bot.id, bid, bid === 0, false);
-
-    // Resolve current roundId from DB and log bid
-    const round = await prisma.round.findFirst({
-      where: { gameId: game.id },
-      orderBy: { createdAt: 'desc' }
-    });
-    if (round) {
-      try {
-        await this.loggingService.logBid(
-          game.id,
-          round.id,
-          bot.id,
-          seatIndex,
-          bid,
-          bid === 0,
-          false
-        );
-      } catch (logError) {
-        console.error('[BOT SERVICE] Error logging bid (continuing):', logError);
-        // Continue even if logging fails
-      }
-    }
-
-    return bid;
+    console.log(`[BOT SERVICE] DISABLED - Using new database-first bot bidding system instead`);
+    // This old system is disabled to prevent conflicts with the new database-first bot bidding
+    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
+    return 0;
   }
 
   /**

@@ -1,4 +1,4 @@
-import { gameManager } from '../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { GameJoinHandler } from '../modules/socket-handlers/game-join/gameJoinHandler.js';
 import { GameStartHandler } from '../modules/socket-handlers/game-start/gameStartHandler.js';
 import { BiddingHandler } from '../modules/socket-handlers/bidding/biddingHandler.js';

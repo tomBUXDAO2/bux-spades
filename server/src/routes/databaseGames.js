@@ -1,6 +1,7 @@
 import express from 'express';
 import { DatabaseGameService } from '../services/DatabaseGameService.js';
-import { DatabaseGameEngine } from '../services/DatabaseGameEngine.js';
+import { GameService } from '../services/GameService.js';
+// CONSOLIDATED: DatabaseGameEngine removed - using GameService directly
 
 const router = express.Router();
 
@@ -54,7 +55,8 @@ router.get('/:id', async (req, res) => {
     const gameId = req.params.id;
     console.log(`[DB API] Getting game: ${gameId}`);
     
-    const gameState = await DatabaseGameEngine.getGameState(gameId);
+    // CONSOLIDATED: Using GameService directly instead of DatabaseGameEngine
+    const gameState = await GameService.getGameStateForClient(gameId);
     
     if (!gameState) {
       return res.status(404).json({ error: 'Game not found' });

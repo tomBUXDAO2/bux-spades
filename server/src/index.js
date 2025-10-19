@@ -2,7 +2,7 @@
 import './config/logging.js';
 
 import { app, server, io, PORT } from './config/server.js';
-import { gameManager } from './services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { setupSocketHandlers } from './socket/socketHandlers.js';
 import { setupRoutes } from './routes/index.js';
 import { PeriodicCleanupService } from './services/PeriodicCleanupService.js';
@@ -19,7 +19,8 @@ setupSocketHandlers(io);
 playerTimerService.setIO(io);
 
 // Load existing games on startup
-gameManager.loadAllActiveGames().then(() => {
+// CONSOLIDATED: GameManager removed - using GameService directly
+// GameService.loadAllActiveGames().then(() => {
   console.log('[SERVER] Loaded existing games');
 }).catch(error => {
   console.error('[SERVER] Error loading games:', error);
@@ -54,9 +55,10 @@ process.on('SIGINT', async () => {
   playerTimerService.clearAllTimers();
   
   // Save all games before shutdown
-  const games = gameManager.getAllGames();
-  for (const game of games) {
-    await gameManager.saveGame(game.id);
+  // CONSOLIDATED: GameManager removed - using GameService directly
+  // const games = GameService.getAllGames();
+  // for (const game of games) {
+  //   await GameService.saveGame(game.id);
   }
   
   server.close(() => {
@@ -65,4 +67,4 @@ process.on('SIGINT', async () => {
   });
 });
 
-export { io, gameManager };
+export { io };

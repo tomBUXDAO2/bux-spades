@@ -1,6 +1,6 @@
 import { prisma } from '../config/database.js';
-import { gameManager } from './GameManager.js';
-import { Game } from '../models/Game.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
+// CONSOLIDATED: Game model removed - using GameService directly
 
 export class GameCreationService {
   // Create game from app (rated if all human, unrated if any bots)
@@ -45,7 +45,8 @@ export class GameCreationService {
       const hasBots = gameData.players.some(p => p.type === 'bot');
       const isRated = !hasBots; // Rated only if all human players
       
-      const game = new Game({
+      // CONSOLIDATED: Game model removed - using GameService.createGame directly
+      const gameDataForService = {
         id: gameId,
         createdById: creatorId,
         mode: gameData.mode || 'PARTNERS',
@@ -73,34 +74,9 @@ export class GameCreationService {
         }
       });
 
-      // Create in database
-      await prisma.game.create({
-        data: {
-          id: game.id,
-          createdById: game.createdById,
-          mode: game.mode,
-          format: game.format,
-          gimmickVariant: game.gimmickVariant,
-          isLeague: game.isLeague,
-          isRated: game.isRated,
-          status: game.status,
-          minPoints: game.minPoints,
-          maxPoints: game.maxPoints,
-          nilAllowed: game.nilAllowed,
-          blindNilAllowed: game.blindNilAllowed,
-          specialRules: game.specialRules,
-          buyIn: game.buyIn,
-          gameState: game,
-          currentRound: 1,
-          currentTrick: 0,
-          currentPlayer: null,
-          dealer: 0,
-          createdAt: new Date()
-        }
-      });
-
-      // Add to memory
-      gameManager.addGame(game);
+      // CONSOLIDATED: Using GameService.createGame instead of direct database operations
+      const { GameService } = await import('./GameService.js');
+      const game = await GameService.createGame(gameDataForService);
 
       console.log(`[GAME CREATION] Created app game ${gameId} (rated: ${isRated})`);
       return game;
@@ -117,7 +93,8 @@ export class GameCreationService {
       const gameId = `discord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Discord games are always rated and league
-      const game = new Game({
+      // CONSOLIDATED: Game model removed - using GameService.createGame directly
+      const gameDataForService = {
         id: gameId,
         createdById: commandData.createdBy,
         mode: 'PARTNERS', // Discord games are always partners
@@ -145,31 +122,9 @@ export class GameCreationService {
         }
       });
 
-      // Create in database
-      await prisma.game.create({
-        data: {
-          id: game.id,
-          createdById: game.createdById,
-          mode: game.mode,
-          format: game.format,
-          gimmickVariant: game.gimmickVariant,
-          isLeague: game.isLeague,
-          isRated: game.isRated,
-          status: game.status,
-          minPoints: game.minPoints,
-          maxPoints: game.maxPoints,
-          nilAllowed: game.nilAllowed,
-          blindNilAllowed: game.blindNilAllowed,
-          specialRules: game.specialRules,
-          buyIn: game.buyIn,
-          gameState: game,
-          currentRound: 1,
-          currentTrick: 0,
-          currentPlayer: null,
-          dealer: 0,
-          createdAt: new Date()
-        }
-      });
+      // CONSOLIDATED: Using GameService.createGame instead of direct database operations
+      const { GameService } = await import('./GameService.js');
+      const game = await GameService.createGame(gameDataForService);
 
       // Create DiscordGame record
       await prisma.discordGame.create({
@@ -232,10 +187,10 @@ export class GameCreationService {
       game.currentPlayer = game.players[0]?.id || null;
 
       // Add to memory
-      gameManager.addGame(game);
+      // CONSOLIDATED: GameManager removed - using GameService directly
 
       // Update database with populated players
-      await gameManager.saveGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
 
       console.log(`[GAME CREATION] Created Discord game ${gameId} with 4 players`);
       return game;

@@ -8,7 +8,7 @@ import type { Card, Suit, GameState } from "../../../../../../types/game";
 
 /**
  * Determines if a card can be played based on the game type and current state
- * TODO: Move to backend DatabaseGameEngine.js
+ * TODO: Move to backend GameService.js
  */
 export function isPlayableCard(
   card: Card,

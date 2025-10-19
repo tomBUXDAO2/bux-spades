@@ -1,10 +1,10 @@
 import { GameService } from '../../../services/GameService.js';
 import { prisma } from '../../../config/database.js';
-import { gameManager } from '../../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
-import { SmartCacheService } from '../../../services/SmartCacheService.js';
+// CONSOLIDATED: SmartCacheService removed - using GameService directly
 
 // Global mutex to prevent concurrent game starts across all socket connections
 const startingGames = new Set();
@@ -13,7 +13,7 @@ class GameStartHandler {
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.gameManager = gameManager;
+    // CONSOLIDATED: GameManager removed - using GameService directly
     this.botService = new BotService();
     this.systemMessageHandler = new SystemMessageHandler(io, socket);
   }

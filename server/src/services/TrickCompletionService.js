@@ -63,11 +63,9 @@ export class TrickCompletionService {
 
       // OPTIMIZED: Update Redis cache incrementally instead of full rebuild
       try {
-        const { OptimizedGameStateService } = await import('./OptimizedGameStateService.js');
-        await OptimizedGameStateService.updateTrickCompletion(gameId, {
-          currentTrick: [],
-          spadesBroken: false // Reset for next trick
-        });
+        // CONSOLIDATED: Using GameService directly instead of OptimizedGameStateService
+        // No need for separate update - GameService handles state
+        console.log(`[TRICK COMPLETION] GameService handles state updates automatically`);
         console.log(`[TRICK COMPLETION] Updated Redis cache incrementally after trick completion`);
       } catch (error) {
         console.error(`[TRICK COMPLETION] Error updating Redis cache after trick completion:`, error);

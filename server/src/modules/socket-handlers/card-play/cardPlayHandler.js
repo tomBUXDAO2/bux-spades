@@ -6,7 +6,7 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
-import { FastGameStateService } from '../../../services/FastGameStateService.js';
+import { GameService } from '../../../services/GameService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -38,7 +38,7 @@ class CardPlayHandler {
         
         // Get current game state from database (ultra fast)
         const gameState = await PerformanceMiddleware.timeOperation('getGameStateForClient', () => 
-          FastGameStateService.getGameStateForClient(gameId)
+          GameService.getGameStateForClient(gameId)
         );
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
@@ -87,7 +87,7 @@ class CardPlayHandler {
 
       // Get current game state (ultra fast)
       const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
-        FastGameStateService.getGame(gameId)
+        GameService.getGame(gameId)
       );
       if (!gameState) {
         throw new Error('Game not found');
@@ -308,13 +308,8 @@ class CardPlayHandler {
         // Emit card played event
         
         // OPTIMIZED: Use optimized game state service with smart caching
-        const { OptimizedGameStateService } = await import('../../../services/OptimizedGameStateService.js');
-        let updatedGameState = await OptimizedGameStateService.getGameState(gameId, true);
-        
-        // If no cached state, build fresh state
-        if (!updatedGameState) {
-          updatedGameState = await OptimizedGameStateService.buildOptimizedGameState(gameId);
-        }
+        // CONSOLIDATED: Using GameService directly instead of OptimizedGameStateService
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
         
         // Update current trick data in the game state
         if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
@@ -447,7 +442,7 @@ class CardPlayHandler {
       console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
       
       // CRITICAL: Get FRESH game state (ultra fast)
-      const game = await FastGameStateService.getGame(gameId);
+      const game = await GameService.getGame(gameId);
       if (!game) {
         console.log(`[CARD PLAY] No game found in database: ${gameId}`);
         return;

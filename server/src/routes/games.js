@@ -1,7 +1,7 @@
 import express from 'express';
-import { gameManager } from '../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { GameService } from '../services/GameService.js';
-import { Game } from '../models/Game.js';
+// CONSOLIDATED: Game model removed - using GameService directly
 import redisGameState from '../services/RedisGameStateService.js';
 import { prisma } from '../config/database.js';
 
@@ -57,11 +57,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const gameId = req.params.id;
-    let game = gameManager.getGame(gameId);
-    
-    if (!game) {
-      game = await gameManager.loadGame(gameId);
-    }
+    // CONSOLIDATED: GameManager removed - using GameService directly
+    const game = await GameService.getGame(gameId);
     
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
@@ -142,7 +139,8 @@ router.post('/', async (req, res) => {
       }
     };
 
-    const game = await gameManager.createGame(gameData);
+    // CONSOLIDATED: GameManager removed - using GameService directly
+    const game = await GameService.createGame(gameData);
     
     // CRITICAL: Update Redis cache with the new game (creator is already added by GameService.createGame)
     try {

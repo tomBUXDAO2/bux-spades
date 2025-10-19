@@ -1,10 +1,10 @@
-import { gameManager } from '../../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 
 class SystemMessageHandler {
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.gameManager = gameManager;
+    // CONSOLIDATED: GameManager removed - using GameService directly
   }
 
   // Normalize noisy bot usernames to a short label like "Bot 1"

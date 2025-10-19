@@ -103,45 +103,12 @@ class PlayerTimerService {
 
   /**
    * Auto-bid for player using bot logic
+   * DISABLED: Using new database-first bot bidding system instead
    */
   async autoBid(game, playerId) {
-    try {
-      console.log(`[PLAYER TIMER] Auto-bidding for player ${playerId}`);
-
-      const player = game.players.find(p => p.userId === playerId);
-      if (!player) {
-        console.error(`[PLAYER TIMER] Player ${playerId} not found in game`);
-        return;
-      }
-
-      const seatIndex = player.seatIndex;
-
-      // Get hand from Redis
-      const hands = await redisGameState.getPlayerHands(game.id);
-      if (!hands || !hands[seatIndex]) {
-        console.error(`[PLAYER TIMER] No hand found for player at seat ${seatIndex}`);
-        return;
-      }
-
-      const hand = hands[seatIndex];
-
-      // Calculate bid using bot logic
-      const botService = new BotService();
-      const bid = botService.calculateIntelligentBid(game, seatIndex, hand);
-
-      console.log(`[PLAYER TIMER] Auto-bid calculated: ${bid} for player ${player.username || player.user?.username}`);
-
-      // Import BiddingHandler dynamically to avoid circular dependency
-      const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
-      const biddingHandler = new BiddingHandler(this.io, null);
-      
-      // Process bid (this will advance to next player)
-      await biddingHandler.processBid(game.id, playerId, bid, bid === 0, false);
-
-      console.log(`[PLAYER TIMER] Auto-bid completed for player ${playerId}`);
-    } catch (error) {
-      console.error('[PLAYER TIMER] Error in autoBid:', error);
-    }
+    console.log(`[PLAYER TIMER] DISABLED - Using new database-first bot bidding system instead`);
+    // This old system is disabled to prevent conflicts with the new database-first bot bidding
+    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
   }
 
   /**

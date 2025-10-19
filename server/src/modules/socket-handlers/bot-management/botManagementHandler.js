@@ -1,5 +1,5 @@
 import { GameService } from '../../../services/GameService.js';
-import { gameManager } from '../../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { BotService } from '../../../services/BotService.js';
 import { BotUserService } from '../../../services/BotUserService.js';
 import { prisma } from '../../../config/database.js';
@@ -9,7 +9,7 @@ class BotManagementHandler {
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.gameManager = gameManager;
+    // CONSOLIDATED: GameManager removed - using GameService directly
     this.botService = new BotService();
     this.systemMessageHandler = new SystemMessageHandler(io, socket);
   }
@@ -27,7 +27,8 @@ class BotManagementHandler {
       console.log(`[BOT MANAGEMENT] User ${userId} adding bot to seat ${seatIndex} in game ${gameId}`);
       
       // Get game
-      const game = this.gameManager.getGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
+      const game = await GameService.getGame(gameId);
       if (!game) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -91,7 +92,8 @@ class BotManagementHandler {
       console.log(`[BOT MANAGEMENT] User ${userId} removing bot from seat ${seatIndex} in game ${gameId}`);
       
       // Get game
-      const game = this.gameManager.getGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
+      const game = await GameService.getGame(gameId);
       if (!game) {
         this.socket.emit('error', { message: 'Game not found' });
         return;
@@ -173,7 +175,8 @@ class BotManagementHandler {
       console.log(`[BOT MANAGEMENT] User ${userId} filling empty seats with bots in game ${gameId}`);
       
       // Get game
-      const game = this.gameManager.getGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
+      const game = await GameService.getGame(gameId);
       if (!game) {
         this.socket.emit('error', { message: 'Game not found' });
         return;

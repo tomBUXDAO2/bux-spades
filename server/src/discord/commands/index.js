@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { gameManager } from '../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { DetailedStatsService } from '../../services/DetailedStatsService.js';
 import { prisma } from '../../config/database.js';
 
@@ -924,7 +924,8 @@ async function getLeaderboard(interaction) {
 
 async function getActiveGames(interaction) {
   try {
-    const games = gameManager.getAllGames();
+    // CONSOLIDATED: GameManager removed - using GameService directly
+    // const games = GameService.getAllGames();
 
     if (games.length === 0) {
       return interaction.reply({ 
@@ -1455,18 +1456,13 @@ async function createGameFromLine(gameLine) {
 
   console.log(`[DISCORD] Created game ${gameId} from line with players:`, sortedPlayers.map(p => `${p.username} (seat ${p.seat})`));
   
-  // CRITICAL: Add game to GameManager memory and populate Redis cache
+  // CONSOLIDATED: GameManager removed - using GameService + Redis directly
   try {
-    const { gameManager } = await import('../../services/GameManager.js');
     const { GameService } = await import('../../services/GameService.js');
     const { default: redisGameState } = await import('../../services/RedisGameStateService.js');
     
-    // Add to GameManager memory
-    gameManager.addGame(gameId, game);
-    console.log(`[DISCORD] Added game ${gameId} to GameManager memory`);
-    
     // Populate Redis cache with initial game state
-    const fullGameState = await GameService.getFullGameStateFromDatabase(gameId);
+    const fullGameState = await GameService.getGameStateForClient(gameId);
     if (fullGameState) {
       await redisGameState.setGameState(gameId, fullGameState);
       console.log(`[DISCORD] Populated Redis cache for game ${gameId}`);

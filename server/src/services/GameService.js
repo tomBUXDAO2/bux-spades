@@ -1,7 +1,7 @@
 import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
 import { ScoringService } from './ScoringService.js';
-import { DatabaseGameEngine } from './DatabaseGameEngine.js';
+// CONSOLIDATED: DatabaseGameEngine removed - using GameService directly
 import { PerformanceMiddleware } from '../middleware/PerformanceMiddleware.js';
 
 // Global mutex to prevent concurrent database operations
@@ -677,7 +677,8 @@ export class GameService {
       if (!playerHands || !playerHands.some(hand => hand && hand.length > 0)) {
         console.log(`[GAME SERVICE] No valid hands in Redis, calculating from database`);
         // If no hands in Redis, calculate from database
-        playerHands = DatabaseGameEngine.computePlayerHands(game);
+        // CONSOLIDATED: Using GameService directly instead of DatabaseGameEngine
+        playerHands = this.computePlayerHands(game);
         
         // Store the calculated hands in Redis for consistency
         if (playerHands && playerHands.some(hand => hand && hand.length > 0)) {
@@ -1233,5 +1234,43 @@ export class GameService {
       console.error('[GAME SERVICE] Error rotating dealer:', error);
       throw error;
     }
+  }
+
+  /**
+   * Compute player hands from game data
+   */
+  static computePlayerHands(game) {
+    if (!game || !game.rounds || game.rounds.length === 0) {
+      return [];
+    }
+
+    const currentRound = game.rounds[game.rounds.length - 1];
+    if (!currentRound || !currentRound.playerStats) {
+      return [];
+    }
+
+    // Calculate hands based on dealt cards minus played cards
+    const playerHands = [];
+    for (let seatIndex = 0; seatIndex < 4; seatIndex++) {
+      const playerStat = currentRound.playerStats.find(ps => ps.seatIndex === seatIndex);
+      if (playerStat) {
+        const dealtCards = playerStat.dealtCards || [];
+        const playedCards = currentRound.tricks?.flatMap(trick => 
+          trick.cards?.filter(card => card.seatIndex === seatIndex) || []
+        ) || [];
+        
+        const remainingCards = dealtCards.filter(dealtCard => 
+          !playedCards.some(playedCard => 
+            playedCard.suit === dealtCard.suit && playedCard.rank === dealtCard.rank
+          )
+        );
+        
+        playerHands[seatIndex] = remainingCards;
+      } else {
+        playerHands[seatIndex] = [];
+      }
+    }
+
+    return playerHands;
   }
 }

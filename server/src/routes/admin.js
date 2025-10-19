@@ -2,7 +2,7 @@ import express from 'express';
 import { prisma } from '../config/databaseFirst.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { GameService } from '../services/GameService.js';
-import { gameManager } from '../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import redisGameState from '../services/RedisGameStateService.js';
 import { io } from '../config/server.js';
 import redisSessionService from '../services/RedisSessionService.js';
@@ -116,8 +116,8 @@ router.delete('/games', authenticateToken, isAdmin, async (req, res) => {
         // Clean up Redis cache
         await redisGameState.cleanupGame(gameId);
         
-        // Remove from GameManager memory
-        gameManager.removeGame(gameId);
+        // CONSOLIDATED: GameManager removed - using GameService directly
+        // CONSOLIDATED: GameManager removed - using GameService directly
         
         // Delete from database (with all related records)
         await GameService.deleteGame(gameId);
@@ -235,8 +235,8 @@ router.delete('/emergency-delete-game/:gameId', async (req, res) => {
     // Clean up Redis cache
     await redisGameState.cleanupGame(gameId);
     
-    // Remove from GameManager memory
-    gameManager.removeGame(gameId);
+    // CONSOLIDATED: GameManager removed - using GameService directly
+    // CONSOLIDATED: GameManager removed - using GameService directly
     
     // Delete from database
     await GameService.deleteGame(gameId);
@@ -295,8 +295,8 @@ router.delete('/force-delete-game/:gameId', authenticateToken, isAdmin, async (r
     // Clean up Redis cache
     await redisGameState.cleanupGame(gameId);
     
-    // Remove from GameManager memory
-    gameManager.removeGame(gameId);
+    // CONSOLIDATED: GameManager removed - using GameService directly
+    // CONSOLIDATED: GameManager removed - using GameService directly
     
     // Force delete from database
     const result = await ForceGameDeletionService.forceDeleteGame(gameId);

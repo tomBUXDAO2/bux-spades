@@ -1,6 +1,6 @@
 import { GameService } from '../../../services/GameService.js';
 import { PlayerTimerService } from '../../../services/PlayerTimerService.js';
-import { gameManager } from '../../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import redisGameState from '../../../services/RedisGameStateService.js';
 
 class GameDisconnectHandler {

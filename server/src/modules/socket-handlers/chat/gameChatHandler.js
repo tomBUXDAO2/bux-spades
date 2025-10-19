@@ -1,12 +1,12 @@
 import { GameService } from '../../../services/GameService.js';
-import { gameManager } from '../../../services/GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { prisma } from '../../../config/database.js';
 
 class GameChatHandler {
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.gameManager = gameManager;
+    // CONSOLIDATED: GameManager removed - using GameService directly
   }
 
   async handleGameMessage(data) {
@@ -133,7 +133,8 @@ class GameChatHandler {
       console.log(`[GAME CHAT] User ${userId} requesting messages for game ${gameId}`);
       
       // Verify user is in the game
-      const game = this.gameManager.getGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
+      const game = await GameService.getGame(gameId);
       if (!game) {
         this.socket.emit('error', { message: 'Game not found' });
         return;

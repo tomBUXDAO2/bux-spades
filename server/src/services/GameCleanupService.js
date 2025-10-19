@@ -1,5 +1,5 @@
 import { prisma } from '../config/database.js';
-import { gameManager } from './GameManager.js';
+// CONSOLIDATED: GameManager removed - using GameService directly
 import { io } from '../config/server.js';
 
 export class GameCleanupService {
@@ -192,7 +192,7 @@ export class GameCleanupService {
       }
       
       // Remove from memory game manager
-      gameManager.removeGame(gameId);
+      // CONSOLIDATED: GameManager removed - using GameService directly
       
       console.log(`[GAME CLEANUP] Successfully cleaned up unrated game ${gameId}`);
       
@@ -481,7 +481,7 @@ export class GameCleanupService {
             await prisma.$executeRaw`DELETE FROM "DiscordGame" WHERE "gameId" = ${gameId}`;
           } catch {}
 
-          gameManager.removeGame(gameId);
+          // CONSOLIDATED: GameManager removed - using GameService directly
           cleaned++;
           console.log(`[GAME CLEANUP] Cleaned stale WAITING game ${gameId}`);
         } catch (err) {

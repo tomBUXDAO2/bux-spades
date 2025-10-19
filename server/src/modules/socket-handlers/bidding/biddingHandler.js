@@ -4,7 +4,7 @@ import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
-import { FastGameStateService } from '../../../services/FastGameStateService.js';
+import { GameService } from '../../../services/GameService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -179,7 +179,7 @@ class BiddingHandler {
       playerTimerService.clearTimer(gameId);
 
       // Get current game state (with caching)
-      const gameState = await FastGameStateService.getGame(gameId);
+      const gameState = await GameService.getGame(gameId);
       if (!gameState) {
         throw new Error('Game not found');
       }
@@ -225,7 +225,7 @@ class BiddingHandler {
 
       // REAL-TIME: Check if all players have bid using Redis
       // Only check bids for seats that have players
-      const game = await FastGameStateService.getGame(gameId);
+      const game = await GameService.getGame(gameId);
       const occupiedSeats = game.players.map(p => p.seatIndex);
       const bidsComplete = occupiedSeats.every(seatIndex => 
         currentBids[seatIndex] !== null && currentBids[seatIndex] !== undefined
@@ -299,15 +299,9 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
-        // OPTIMIZED: Use optimized game state service with incremental bidding updates
-        const { OptimizedGameStateService } = await import('../../../services/OptimizedGameStateService.js');
+        // CONSOLIDATED: Using GameService directly instead of OptimizedGameStateService
         const latestBids = await redisGameState.getPlayerBids(gameId);
-        
-        const updatedGameState = await OptimizedGameStateService.updateBiddingState(gameId, {
-          bids: latestBids,
-          currentBidderIndex: nextPlayer?.seatIndex || 0,
-          currentPlayer: nextPlayer?.userId
-        });
+        const updatedGameState = await GameService.getGameStateForClient(gameId);
         
         // Update player bids in the players array
         if (updatedGameState && latestBids) {
@@ -581,35 +575,9 @@ class BiddingHandler {
         console.log(`[BIDDING] Updated gameState with latest bids from Redis:`, latestBids);
       }
       
-      // Use BotService for proper bidding logic based on game type
-      let botBid;
-      if (gameState.format === 'WHIZ') {
-        // Get partner bid for WHIZ rules
-        const partnerBid = this.getPartnerBid(gameState, currentPlayer.seatIndex);
-        botBid = this.botService.calculateWhizBid(gameState, currentPlayer.seatIndex, hand);
-        console.log(`[BIDDING] WHIZ bot ${playerUsername} bidding ${botBid} (${numSpades} spades, partner bid: ${partnerBid})`);
-      } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
-        // SUICIDE game bot logic
-        botBid = await this.calculateSuicideBotBid(gameState, currentPlayer.seatIndex, hand);
-        console.log(`[BIDDING] SUICIDE bot ${playerUsername} bidding ${botBid}`);
-      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
-        // 4 OR NIL game bot logic
-        botBid = this.calculate4OrNilBotBid(hand);
-        console.log(`[BIDDING] 4 OR NIL bot ${playerUsername} bidding ${botBid}`);
-      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID3' || gameState.gimmickVariant === 'BID 3')) {
-        // BID 3 game bot logic - always bid 3
-        botBid = 3;
-        console.log(`[BIDDING] BID 3 bot ${playerUsername} bidding ${botBid}`);
-      } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'CRAZY_ACES' || gameState.gimmickVariant === 'CRAZY ACES')) {
-        // CRAZY ACES game bot logic - bid 3 points for each ace in hand
-        const numAces = hand.filter(card => card.rank === 'A').length;
-        botBid = numAces * 3;
-        console.log(`[BIDDING] CRAZY ACES bot ${playerUsername} bidding ${botBid} (${numAces} aces × 3)`);
-      } else {
-        // Simple bot logic for other game types
-        botBid = numSpades > 0 ? numSpades : 2;
-        console.log(`[BIDDING] Bot ${playerUsername} bidding ${botBid} (${numSpades} spades)`);
-      }
+      // UNIFIED BOT BID CALCULATION - Single source of truth
+      const botBid = this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
+      console.log(`[BIDDING] UNIFIED bot ${playerUsername} bidding ${botBid} (${numSpades} spades, format: ${gameState.format}, variant: ${gameState.gimmickVariant})`);
 
       // Remove from bidding bots set BEFORE processing so next bot can be triggered
       this.biddingBots.delete(gameId);
@@ -621,6 +589,34 @@ class BiddingHandler {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
       // Remove from bidding bots set on error too
       this.biddingBots.delete(gameId);
+    }
+  }
+
+  /**
+   * UNIFIED BOT BID CALCULATION - Single source of truth for all bot bids
+   */
+  calculateUnifiedBotBid(gameState, seatIndex, hand, numSpades) {
+    // Handle different game formats and variants
+    if (gameState.format === 'WHIZ') {
+      // WHIZ game bot logic
+      const partnerBid = this.getPartnerBid(gameState, seatIndex);
+      return this.botService.calculateWhizBid(gameState, seatIndex, hand);
+    } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
+      // SUICIDE game bot logic
+      return this.calculateSuicideBotBid(gameState, seatIndex, hand);
+    } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
+      // 4 OR NIL game bot logic
+      return this.calculate4OrNilBotBid(hand);
+    } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID3' || gameState.gimmickVariant === 'BID 3')) {
+      // BID 3 game bot logic - always bid 3
+      return 3;
+    } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'CRAZY_ACES' || gameState.gimmickVariant === 'CRAZY ACES')) {
+      // CRAZY ACES game bot logic - bid 3 points for each ace in hand
+      const numAces = hand.filter(card => card.rank === 'A').length;
+      return numAces * 3;
+    } else {
+      // Simple bot logic for other game types
+      return numSpades > 0 ? numSpades : 2;
     }
   }
 
