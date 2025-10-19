@@ -223,15 +223,15 @@ class BiddingHandler {
       const occupiedSeats = game.players.map(p => p.seatIndex);
       
       // Get current round to check bids from database
-      const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
-      if (!currentRound || !currentRound.playerStats) {
+      const dbCurrentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+      if (!dbCurrentRound || !dbCurrentRound.playerStats) {
         console.log(`[BIDDING] No current round or player stats found`);
         return;
       }
       
       // Check if all occupied seats have bids in database
       const bidsComplete = occupiedSeats.every(seatIndex => {
-        const playerStat = currentRound.playerStats.find(stat => stat.seatIndex === seatIndex);
+        const playerStat = dbCurrentRound.playerStats.find(stat => stat.seatIndex === seatIndex);
         return playerStat && playerStat.bid !== null && playerStat.bid !== undefined;
       });
 
@@ -240,7 +240,7 @@ class BiddingHandler {
         console.log(`[BIDDING] All players have bid, validating before starting round`);
         
         // Get bids from database for validation
-        const dbBids = currentRound.playerStats.map(stat => stat.bid);
+        const dbBids = dbCurrentRound.playerStats.map(stat => stat.bid);
         console.log(`[BIDDING] Database bids:`, dbBids);
         
         // Double-check that all bids are valid numbers (not null/undefined)
