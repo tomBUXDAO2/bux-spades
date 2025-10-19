@@ -657,30 +657,6 @@ export default function GameTableModular({
     prevStatusRef.current = currentStatus;
   }, [gameState.status]);
 
-  // SIMPLE BOT BIDDING: Only trigger once per bot turn
-  useEffect(() => {
-    if (!isBiddingPhase || !gameState.currentPlayer) return;
-    
-    const currentPlayer = gameState.players.find(p => p && p.id === gameState.currentPlayer);
-    if (currentPlayer && currentPlayer.type === 'bot') {
-      console.log('[SIMPLE BOT BID] Bot turn:', currentPlayer.username);
-      
-      // Simple delay then bid
-      const timeoutId = setTimeout(() => {
-        const playerIndex = gameState.players.findIndex(p => p && p.id === currentPlayer.id);
-        const hand = gameState.hands?.[playerIndex] || [];
-        const spadesCount = hand.filter((card: any) => card.suit === 'SPADES').length;
-        const botBid = Math.min(4, Math.max(1, spadesCount + Math.floor(Math.random() * 2)));
-        
-        setPendingBid({ playerId: currentPlayer.id, bid: botBid });
-        playBidSound();
-        
-        console.log('[SIMPLE BOT BID] Bot bid:', currentPlayer.username, 'bid:', botBid);
-      }, 500);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [gameState.currentPlayer, isBiddingPhase, playBidSound]);
   
   // Consolidated start game function
   const startGame = async (options: { rated?: boolean } = {}) => {
