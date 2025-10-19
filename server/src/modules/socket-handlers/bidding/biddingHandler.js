@@ -215,6 +215,7 @@ class BiddingHandler {
       
       // Invalidate cache since game state has changed
       SmartCacheService.invalidateGame(gameId);
+      console.log(`[BIDDING] Cache invalidated for game ${gameId} after bid`);
 
       // REAL-TIME: Update bid in Redis (instant)
       let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);

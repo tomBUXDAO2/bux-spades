@@ -126,6 +126,10 @@ class GameStartHandler {
 
       // Start the game in DB-first mode
       await GameService.startGame(gameId);
+      
+      // Invalidate cache since game state has changed
+      SmartCacheService.invalidateGame(gameId);
+      console.log(`[GAME START] Cache invalidated for game ${gameId} after start`);
 
       // Deal initial hands and set current bidder/currentPlayer
       console.log(`[GAME START] About to deal initial hands for game ${gameId}`);

@@ -8,7 +8,7 @@ import redisGameState from './RedisGameStateService.js';
 export class SmartCacheService {
   static cache = new Map();
   static cacheTimestamps = new Map();
-  static CACHE_DURATION = 30000; // 30 seconds cache
+  static CACHE_DURATION = 5000; // 5 seconds cache - reduced to prevent stale data
   
   /**
    * Get cached game state or fetch fresh
@@ -119,6 +119,14 @@ export class SmartCacheService {
     this.cache.delete(`game_${gameId}`);
     this.cacheTimestamps.delete(`gameState_${gameId}`);
     this.cacheTimestamps.delete(`game_${gameId}`);
+    
+    // Also clear Redis cache to prevent stale data
+    try {
+      redisGameState.deleteGameState(gameId);
+      console.log(`[SMART CACHE] Cleared Redis cache for game ${gameId}`);
+    } catch (error) {
+      console.log(`[SMART CACHE] Failed to clear Redis cache:`, error.message);
+    }
   }
   
   /**
