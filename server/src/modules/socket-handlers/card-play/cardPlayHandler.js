@@ -6,7 +6,6 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
-import { GameService } from '../../../services/GameService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER

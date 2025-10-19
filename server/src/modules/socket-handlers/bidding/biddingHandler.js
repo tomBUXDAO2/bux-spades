@@ -4,7 +4,6 @@ import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
-import { GameService } from '../../../services/GameService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
