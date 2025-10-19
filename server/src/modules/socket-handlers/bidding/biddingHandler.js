@@ -581,7 +581,7 @@ class BiddingHandler {
       }
       
       // UNIFIED BOT BID CALCULATION - Single source of truth
-      const botBid = this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
+      const botBid = await this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
       console.log(`[BIDDING] UNIFIED bot ${playerUsername} bidding ${botBid} (${numSpades} spades, format: ${gameState.format}, variant: ${gameState.gimmickVariant})`);
 
       // CRITICAL: Check if this bot has already bid to prevent duplicate bids
@@ -608,7 +608,7 @@ class BiddingHandler {
   /**
    * UNIFIED BOT BID CALCULATION - Single source of truth for all bot bids
    */
-  calculateUnifiedBotBid(gameState, seatIndex, hand, numSpades) {
+  async calculateUnifiedBotBid(gameState, seatIndex, hand, numSpades) {
     // Handle different game formats and variants
     if (gameState.format === 'WHIZ') {
       // WHIZ game bot logic
@@ -616,7 +616,7 @@ class BiddingHandler {
       return this.botService.calculateWhizBid(gameState, seatIndex, hand);
     } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
       // SUICIDE game bot logic
-      return this.calculateSuicideBotBid(gameState, seatIndex, hand);
+      return await this.calculateSuicideBotBid(gameState, seatIndex, hand);
     } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
       // 4 OR NIL game bot logic
       return this.calculate4OrNilBotBid(hand);
