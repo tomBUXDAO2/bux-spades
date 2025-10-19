@@ -400,11 +400,19 @@ class BiddingHandler {
         currentGameState.status = 'PLAYING';
         currentGameState.currentPlayer = firstPlayer?.userId || null; // CRITICAL: Update currentPlayer in Redis
         
-        // Preserve bidding data in Redis cache
-        const latestBids = await redisGameState.getPlayerBids(gameId);
-        if (latestBids) {
+        // CRITICAL: Get bidding data from database (single source of truth)
+        const game = await GameService.getGame(gameId);
+        const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+        if (currentRound && currentRound.playerStats) {
+          const bids = Array.from({length: 4}, () => null);
+          currentRound.playerStats.forEach(stat => {
+            if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
+              bids[stat.seatIndex] = stat.bid;
+            }
+          });
+          
           currentGameState.bidding = {
-            bids: latestBids,
+            bids: bids,
             currentBidderIndex: firstPlayer?.seatIndex || 0,
             currentPlayer: firstPlayer?.userId
           };
@@ -412,8 +420,10 @@ class BiddingHandler {
           // Also update player bids in the players array
           currentGameState.players = currentGameState.players.map(p => ({
             ...p,
-            bid: latestBids[p.seatIndex] || null
+            bid: bids[p.seatIndex] || null
           }));
+          
+          console.log(`[BIDDING] Updated Redis with database bidding data:`, bids);
         }
         
         await redisGameState.setGameState(gameId, currentGameState);
@@ -425,11 +435,19 @@ class BiddingHandler {
           fullGameState.status = 'PLAYING';
           fullGameState.currentPlayer = firstPlayer?.userId || null; // CRITICAL: Update currentPlayer in fallback
           
-          // Preserve bidding data in fallback state
-          const latestBids = await redisGameState.getPlayerBids(gameId);
-          if (latestBids) {
+          // CRITICAL: Get bidding data from database (single source of truth)
+          const game = await GameService.getGame(gameId);
+          const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+          if (currentRound && currentRound.playerStats) {
+            const bids = Array.from({length: 4}, () => null);
+            currentRound.playerStats.forEach(stat => {
+              if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
+                bids[stat.seatIndex] = stat.bid;
+              }
+            });
+            
             fullGameState.bidding = {
-              bids: latestBids,
+              bids: bids,
               currentBidderIndex: firstPlayer?.seatIndex || 0,
               currentPlayer: firstPlayer?.userId
             };
@@ -437,8 +455,10 @@ class BiddingHandler {
             // Also update player bids in the players array
             fullGameState.players = fullGameState.players.map(p => ({
               ...p,
-              bid: latestBids[p.seatIndex] || null
+              bid: bids[p.seatIndex] || null
             }));
+            
+            console.log(`[BIDDING] Updated fallback with database bidding data:`, bids);
           }
           
           await redisGameState.setGameState(gameId, fullGameState);
