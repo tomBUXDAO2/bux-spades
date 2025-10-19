@@ -529,6 +529,17 @@ export const commands = [
   },
   {
     data: new SlashCommandBuilder()
+      .setName('stats')
+      .setDescription('Get league statistics for a user')
+      .addUserOption(option =>
+        option.setName('user')
+          .setDescription('User to get stats for (defaults to you)')
+          .setRequired(false)
+      ),
+    execute: getStats
+  },
+  {
+    data: new SlashCommandBuilder()
       .setName('pay')
       .setDescription('Admin command: Pay coins to a user')
       .addUserOption(option =>
@@ -747,6 +758,74 @@ async function createGameLine(interaction, format) {
 
 
 
+
+async function getStats(interaction) {
+  try {
+    const targetUser = interaction.options.getUser('user') || interaction.user;
+    
+    // Get user by Discord ID
+    const user = await prisma.user.findUnique({
+      where: { discordId: targetUser.id }
+    });
+
+    if (!user) {
+      return interaction.reply({ 
+        content: '❌ User not found in database.', 
+        ephemeral: true 
+      });
+    }
+
+    // Get league-only stats using DetailedStatsService
+    const stats = await DetailedStatsService.getUserStats(user.id, {
+      mode: 'ALL',
+      format: 'ALL',
+      isLeague: true  // Only league games
+    });
+
+    // Create embed with league stats
+    const embed = new EmbedBuilder()
+      .setTitle(`🏆 ${targetUser.username}'s League Stats`)
+      .setThumbnail(targetUser.displayAvatarURL())
+      .setColor(0x0099ff)
+      .setTimestamp();
+
+    // Main stats section
+    embed.addFields(
+      { 
+        name: '🎮 **LEAGUE STATS**', 
+        value: `**Played:** ${stats.totalGames}\n**Won:** ${stats.gamesWon}\n**Win %:** ${stats.winRate.toFixed(1)}%\n**Total bags:** ${stats.bags.total}\n**Bags per game:** ${stats.bags.perGame.toFixed(1)}`, 
+        inline: false 
+      }
+    );
+
+    // Mode breakdown if available
+    if (stats.modeBreakdown) {
+      const partners = stats.modeBreakdown.partners || { played: 0, won: 0, winRate: 0 };
+      const solo = stats.modeBreakdown.solo || { played: 0, won: 0, winRate: 0 };
+      
+      embed.addFields(
+        { 
+          name: '🤝 **Partners**', 
+          value: `Played: ${partners.played} | Won: ${partners.won} | Win %: ${partners.winRate.toFixed(1)}%`, 
+          inline: true 
+        },
+        { 
+          name: '👤 **Solo**', 
+          value: `Played: ${solo.played} | Won: ${solo.won} | Win %: ${solo.winRate.toFixed(1)}%`, 
+          inline: true 
+        }
+      );
+    }
+
+    await interaction.reply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[DISCORD] Error getting stats:', error);
+    await interaction.reply({ 
+      content: '❌ Failed to get user statistics.', 
+      ephemeral: true 
+    });
+  }
+}
 
 async function payUser(interaction) {
   try {
