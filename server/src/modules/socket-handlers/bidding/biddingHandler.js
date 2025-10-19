@@ -609,6 +609,9 @@ class BiddingHandler {
    * UNIFIED BOT BID CALCULATION - Single source of truth for all bot bids
    */
   async calculateUnifiedBotBid(gameState, seatIndex, hand, numSpades) {
+    // DEBUG: Log game format and variant
+    console.log(`[BIDDING] calculateUnifiedBotBid - format: ${gameState.format}, gimmickVariant: ${gameState.gimmickVariant}, seatIndex: ${seatIndex}`);
+    
     // Handle different game formats and variants
     if (gameState.format === 'WHIZ') {
       // WHIZ game bot logic
@@ -684,9 +687,20 @@ class BiddingHandler {
       }
     } else {
       // Partner hasn't bid yet - this is bidder 1 or 2
-      // Use WHIZ rules for intelligent nil decision
-      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using WHIZ rules`);
-      return this.botService.calculateWhizBid(gameState, seatIndex, hand);
+      // Use simple WHIZ-like logic for intelligent nil decision
+      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using simple WHIZ logic`);
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+      
+      // Simple WHIZ logic: bid nil if 0 spades, bid spades if 4+, otherwise choose
+      if (numSpades === 0) {
+        return 0; // Must bid nil
+      } else if (numSpades >= 4) {
+        return numSpades; // Must bid spades
+      } else {
+        // 1-3 spades: choose nil or spades based on hand strength
+        const hasHighCards = hand.some(card => ['A', 'K', 'Q'].includes(card.rank));
+        return hasHighCards ? numSpades : 0; // Bid spades if strong hand, nil if weak
+      }
     }
   }
 
