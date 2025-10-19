@@ -539,26 +539,8 @@ export class TrickCompletionService {
         });
         console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);
         
-        // Trigger bot bidding if current player is a bot
-        console.log(`[TRICK COMPLETION] Checking if bot bid needed - currentPlayer: ${updatedGameState.currentPlayer}`);
-        console.log(`[TRICK COMPLETION] Players array:`, updatedGameState.players.map(p => p ? `${p.username}(${p.userId})` : 'null'));
-        
-        if (updatedGameState.currentPlayer) {
-          const currentPlayer = updatedGameState.players.find(p => p && (p.id === updatedGameState.currentPlayer || p.userId === updatedGameState.currentPlayer));
-          console.log(`[TRICK COMPLETION] Found current player:`, currentPlayer ? `${currentPlayer.username} (isHuman: ${currentPlayer.isHuman}, type: ${currentPlayer.type})` : 'NOT FOUND');
-          
-          if (currentPlayer && (currentPlayer.type === 'bot' || currentPlayer.isHuman === false)) {
-            console.log(`[TRICK COMPLETION] ✅ Current player is bot ${currentPlayer.username}, triggering bot bid`);
-            const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(io, null);
-            await biddingHandler.triggerBotBidIfNeeded(gameId);
-            console.log(`[TRICK COMPLETION] Bot bid trigger completed`);
-          } else {
-            console.log(`[TRICK COMPLETION] Current player is human or not found, not triggering bot bid`);
-          }
-        } else {
-          console.error(`[TRICK COMPLETION] ERROR: No currentPlayer set after starting new round!`);
-        }
+        // Bot bidding is handled by BiddingHandler - no duplicate triggering here
+        console.log(`[TRICK COMPLETION] New round started - bot bidding will be handled by BiddingHandler`);
       }
     } catch (error) {
       console.error('[TRICK COMPLETION] Error starting new round:', error);

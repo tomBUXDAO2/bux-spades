@@ -160,43 +160,8 @@ class GameStartHandler {
       startingGames.delete(gameId);
 
       // Wait for cards to be rendered before starting bidding
-      // PERFORMANCE: Trigger bot bidding immediately (no delay)
-      console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
-      if (gameState.currentPlayer) {
-        // Get the game from database to check if current player is a bot
-        const game = await GameService.getGame(gameId);
-        if (game) {
-          const currentPlayer = game.players.find(p => p.userId === gameState.currentPlayer);
-          console.log(`[GAME START] Found current player:`, currentPlayer ? {
-            id: currentPlayer.userId,
-            username: currentPlayer.user?.username,
-            isHuman: currentPlayer.isHuman,
-            seatIndex: currentPlayer.seatIndex
-          } : 'null');
-          
-          if (currentPlayer && !currentPlayer.isHuman) {
-            console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
-            // Import and use BiddingHandler
-            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(this.io, this.socket);
-            // Trigger bot bid immediately
-            await biddingHandler.triggerBotBidIfNeeded(gameId);
-          } else if (currentPlayer && currentPlayer.isHuman) {
-            // Start timer for first human bidder
-            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(this.io, this.socket);
-            const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
-            if (shouldApplyTimer) {
-              console.log(`[GAME START] Starting timer for first human bidder ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-              playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
-            } else {
-              console.log(`[GAME START] Timer not applicable for this game format/situation`);
-            }
-          }
-        }
-      } else {
-        console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
-      }
+      // Bot bidding is handled by BiddingHandler - no duplicate triggering here
+      console.log(`[GAME START] Game started - bot bidding will be handled by BiddingHandler`);
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       console.error('[GAME START] Error stack:', error.stack);
