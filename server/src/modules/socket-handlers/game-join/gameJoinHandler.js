@@ -108,10 +108,10 @@ class GameJoinHandler {
         return;
       }
 
-      // Use FAST game state for instant loading
+      // Use regular game state service (was working correctly)
       let gameState;
       try {
-        gameState = await GameService.getFastGameStateForClient(gameId, userId);
+        gameState = await GameService.getGameStateForClient(gameId, userId);
       } catch (error) {
         console.error(`[GAME JOIN] Error getting game state for ${gameId}:`, error);
         this.socket.emit('error', { message: 'Failed to load game' });
