@@ -688,11 +688,11 @@ class BiddingHandler {
       }
     } else {
       // Partner hasn't bid yet - this is bidder 1 or 2
-      // Use simple WHIZ-like logic for intelligent nil decision
-      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using simple WHIZ logic`);
+      // Use simple logic for regular games
+      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using simple logic`);
       const numSpades = hand.filter(card => card.suit === 'SPADES').length;
       
-      // Simple WHIZ logic: bid nil if 0 spades, bid spades if 4+, otherwise choose
+      // Simple logic: bid number of spades or nil based on hand strength
       if (numSpades === 0) {
         return 0; // Must bid nil
       } else if (numSpades >= 4) {
