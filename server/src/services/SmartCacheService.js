@@ -8,7 +8,7 @@ import redisGameState from './RedisGameStateService.js';
 export class SmartCacheService {
   static cache = new Map();
   static cacheTimestamps = new Map();
-  static CACHE_DURATION = 5000; // 5 seconds cache
+  static CACHE_DURATION = 10000; // 10 seconds cache
   
   /**
    * Get cached game state or fetch fresh
@@ -26,14 +26,36 @@ export class SmartCacheService {
       }
     }
     
+    // Try Redis cache first (even more aggressive)
+    try {
+      const redisCachedState = await redisGameState.getGameState(gameId);
+      if (redisCachedState && !forceRefresh) {
+        console.log(`[SMART CACHE] Using Redis cached gameState for ${gameId}`);
+        // Also cache in memory
+        this.cache.set(cacheKey, redisCachedState);
+        this.cacheTimestamps.set(cacheKey, now);
+        return redisCachedState;
+      }
+    } catch (error) {
+      console.log(`[SMART CACHE] Redis cache miss for ${gameId}:`, error.message);
+    }
+    
     // Fetch fresh data
     console.log(`[SMART CACHE] Fetching fresh gameState for ${gameId}`);
     const { GameService } = await import('./GameService.js');
     const gameState = await GameService.getGameStateForClient(gameId);
     
-    // Cache the result
+    // Cache the result in both memory and Redis
     this.cache.set(cacheKey, gameState);
     this.cacheTimestamps.set(cacheKey, now);
+    
+    // Also cache in Redis for even longer
+    try {
+      await redisGameState.setGameState(gameId, gameState);
+      console.log(`[SMART CACHE] Cached gameState in Redis for ${gameId}`);
+    } catch (error) {
+      console.log(`[SMART CACHE] Failed to cache in Redis:`, error.message);
+    }
     
     return gameState;
   }
