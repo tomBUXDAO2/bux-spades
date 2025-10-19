@@ -165,12 +165,12 @@ class PlayerTimerService {
       const seatIndex = player.seatIndex;
       console.log(`[PLAYER TIMER] Player found at seat ${seatIndex}:`, player.username || player.user?.username);
 
-      // Use the same bot logic that already works
+      // Use the same bot logic that already works for both bots and humans
       const botService = new BotService();
-      const card = await botService.playBotCard(game, seatIndex);
+      const card = await botService.selectCardForAutoPlay(game, seatIndex);
       
       if (!card) {
-        console.error(`[PLAYER TIMER] ❌ Bot logic returned no card for player at seat ${seatIndex}`);
+        console.error(`[PLAYER TIMER] ❌ Auto-play logic returned no card for player at seat ${seatIndex}`);
         return;
       }
 
