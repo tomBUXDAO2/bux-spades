@@ -539,8 +539,21 @@ export class TrickCompletionService {
         });
         console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);
         
-        // Bot bidding is handled by BiddingHandler - no duplicate triggering here
-        console.log(`[TRICK COMPLETION] New round started - bot bidding will be handled by BiddingHandler`);
+        // CRITICAL: Trigger bot bidding for new round if current player is a bot
+        if (updatedGameState.currentPlayer) {
+          const currentPlayer = updatedGameState.players.find(p => p && (p.id === updatedGameState.currentPlayer || p.userId === updatedGameState.currentPlayer));
+          if (currentPlayer && (currentPlayer.type === 'bot' || currentPlayer.isHuman === false)) {
+            console.log(`[TRICK COMPLETION] ✅ Current player is bot ${currentPlayer.username}, triggering bot bid for new round`);
+            const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(io, null);
+            await biddingHandler.triggerBotBidIfNeeded(gameId);
+            console.log(`[TRICK COMPLETION] Bot bid trigger completed for new round`);
+          } else {
+            console.log(`[TRICK COMPLETION] Current player is human or not found, not triggering bot bid for new round`);
+          }
+        } else {
+          console.log(`[TRICK COMPLETION] No current player set - cannot trigger bot bidding for new round`);
+        }
       }
     } catch (error) {
       console.error('[TRICK COMPLETION] Error starting new round:', error);
