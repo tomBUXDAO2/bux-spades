@@ -200,6 +200,15 @@ class GameStartHandler {
           console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
         }
       }
+      
+      // CRITICAL: Start timer for card play phase if game is in PLAYING status
+      if (gameState.status === 'PLAYING' && gameState.currentPlayer) {
+        const currentPlayer = gameState.players.find(p => p && p.userId === gameState.currentPlayer);
+        if (currentPlayer && currentPlayer.isHuman) {
+          console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+          playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
+        }
+      }
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       console.error('[GAME START] Error stack:', error.stack);

@@ -185,9 +185,31 @@ class PlayerTimerService {
       const hand = hands[seatIndex];
       console.log(`[PLAYER TIMER] Player hand:`, hand);
 
-      // Use simple card selection logic for timeout
-      // Play the first valid card (simple logic)
-      const card = hand[0];
+      // Get current trick to determine what suit to follow
+      const gameState = await GameService.getGameStateForClient(game.id);
+      const currentTrick = gameState.currentTrick || [];
+      
+      let card;
+      if (currentTrick.length > 0) {
+        // Must follow suit - find a card of the same suit as the first card played
+        const leadSuit = currentTrick[0].suit;
+        const followSuitCards = hand.filter(c => c.suit === leadSuit);
+        
+        if (followSuitCards.length > 0) {
+          // Play the first card of the required suit
+          card = followSuitCards[0];
+          console.log(`[PLAYER TIMER] Must follow suit ${leadSuit}, playing ${card.rank}${card.suit}`);
+        } else {
+          // No cards of required suit, play any card
+          card = hand[0];
+          console.log(`[PLAYER TIMER] No ${leadSuit} cards, playing any card ${card.rank}${card.suit}`);
+        }
+      } else {
+        // Leading the trick, play any card
+        card = hand[0];
+        console.log(`[PLAYER TIMER] Leading trick, playing ${card.rank}${card.suit}`);
+      }
+      
       if (!card) {
         console.error(`[PLAYER TIMER] ❌ No cards available for player at seat ${seatIndex}`);
         return;
