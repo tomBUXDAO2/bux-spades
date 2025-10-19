@@ -113,16 +113,6 @@ class BotService {
     return bot;
   }
 
-  /**
-   * Make a bid for a bot using intelligent logic
-   * DISABLED: Using new database-first bot bidding system instead
-   */
-  async makeBotBid(game, seatIndex) {
-    console.log(`[BOT SERVICE] DISABLED - Using new database-first bot bidding system instead`);
-    // This old system is disabled to prevent conflicts with the new database-first bot bidding
-    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
-    return 0;
-  }
 
   /**
    * Calculate intelligent bid based on game state, position, partner's bid, and cards

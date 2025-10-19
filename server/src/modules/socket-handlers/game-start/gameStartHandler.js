@@ -207,15 +207,6 @@ class GameStartHandler {
     }
   }
 
-  /**
-   * Continue bot bidding chain until human player or bidding complete
-   * DISABLED: Using new database-first bot bidding system instead
-   */
-  async continueBotBiddingChain(gameId, game) {
-    console.log(`[BOT BIDDING CHAIN] DISABLED - Using new database-first bot bidding system instead`);
-    // This old system is disabled to prevent conflicts with the new database-first bot bidding
-    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
-  }
 }
 
 export { GameStartHandler };

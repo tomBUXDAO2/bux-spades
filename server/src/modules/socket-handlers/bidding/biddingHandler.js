@@ -584,6 +584,14 @@ class BiddingHandler {
       const botBid = this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
       console.log(`[BIDDING] UNIFIED bot ${playerUsername} bidding ${botBid} (${numSpades} spades, format: ${gameState.format}, variant: ${gameState.gimmickVariant})`);
 
+      // CRITICAL: Check if this bot has already bid to prevent duplicate bids
+      const existingBids = await redisGameState.getPlayerBids(gameId);
+      if (existingBids && existingBids[currentPlayer.seatIndex] !== null && existingBids[currentPlayer.seatIndex] !== undefined) {
+        console.log(`[BIDDING] Bot ${playerUsername} has already bid ${existingBids[currentPlayer.seatIndex]}, skipping duplicate bid`);
+        this.biddingBots.delete(gameId);
+        return;
+      }
+
       // Remove from bidding bots set BEFORE processing so next bot can be triggered
       this.biddingBots.delete(gameId);
       console.log(`[BIDDING] Removed game ${gameId} from bidding bots mutex before processing bid`);

@@ -101,15 +101,6 @@ class PlayerTimerService {
     }
   }
 
-  /**
-   * Auto-bid for player using bot logic
-   * DISABLED: Using new database-first bot bidding system instead
-   */
-  async autoBid(game, playerId) {
-    console.log(`[PLAYER TIMER] DISABLED - Using new database-first bot bidding system instead`);
-    // This old system is disabled to prevent conflicts with the new database-first bot bidding
-    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
-  }
 
   /**
    * Auto-play card for player using bot logic
