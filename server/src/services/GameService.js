@@ -571,18 +571,8 @@ export class GameService {
           console.log(`[GAME SERVICE] Updated hands from Redis:`, playerHands.map((hand, i) => `Seat ${i}: ${hand.length} cards`));
         }
         
-        // CRITICAL: Always refresh player stats from database to ensure latest tricks won
-        console.log(`[GAME SERVICE] Refreshing player stats from database for game ${gameId}`);
-        const freshGameState = await this.getFullGameStateFromDatabase(gameId);
-        if (freshGameState && freshGameState.players) {
-          // Update player stats with fresh data from database
-          cachedGameState.players = freshGameState.players;
-          console.log(`[GAME SERVICE] Updated player stats from database:`, 
-            freshGameState.players.map(p => p ? `Seat ${p.seatIndex}: ${p.tricks} tricks` : 'null'));
-        }
-        
-        // CRITICAL: Also update the Redis cache with the fresh player stats
-        await redisGameState.setGameState(gameId, cachedGameState);
+        // Use cached data as-is for performance - no database refresh needed
+        console.log(`[GAME SERVICE] Using cached game state for ${gameId} - no database refresh`);
         
         // CRITICAL: Ensure players data is included from database if not in cache
         if (!cachedGameState.players || cachedGameState.players.length === 0) {
