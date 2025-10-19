@@ -1,4 +1,5 @@
 // FIXED: Removed duplicate GameService imports
+// FIXED: Removed duplicate currentRound variable declaration
 import { GameService } from '../../../services/GameService.js';
 import { GameLoggingService } from '../../../services/GameLoggingService.js';
 import { BotService } from '../../../services/BotService.js';
