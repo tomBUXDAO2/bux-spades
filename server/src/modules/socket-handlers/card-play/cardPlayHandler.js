@@ -128,8 +128,7 @@ class CardPlayHandler {
         card.rank
       );
       
-      // Game state has changed - invalidate cache
-      FastGameStateService.invalidateGame(gameId);
+      // Game state has changed - no caching to ensure fresh data
 
       // CRITICAL: If card play was rejected, KEEP TURN WITH SAME PLAYER
       if (logResult.rejected) {

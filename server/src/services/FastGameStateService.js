@@ -13,22 +13,10 @@ export class FastGameStateService {
    */
   static async getGameStateForClient(gameId) {
     try {
-      // Try Redis first (fastest)
-      const cached = await redisGameState.getGameState(gameId);
-      if (cached) {
-        return cached;
-      }
-      
-      // Fallback to complete database query (but optimized)
+      // Always use the full GameService to ensure complete, correct data
+      // The caching was causing stale/incomplete data issues
       const { GameService } = await import('./GameService.js');
       const gameState = await GameService.getGameStateForClient(gameId);
-      
-      // Cache the result in Redis for next time
-      try {
-        await redisGameState.setGameState(gameId, gameState);
-      } catch (error) {
-        console.log('[FAST GAME STATE] Failed to cache in Redis:', error.message);
-      }
       
       return gameState;
       
@@ -39,26 +27,13 @@ export class FastGameStateService {
   }
   
   /**
-   * Get complete game data - fast with caching
+   * Get complete game data - always fresh from database
    */
   static async getGame(gameId) {
     try {
-      // Try Redis first
-      const cached = await redisGameState.getGameState(gameId);
-      if (cached) {
-        return cached;
-      }
-      
-      // Fallback to complete database query
+      // Always use the full GameService to ensure complete, correct data
       const { GameService } = await import('./GameService.js');
       const game = await GameService.getGame(gameId);
-      
-      // Cache the result in Redis for next time
-      try {
-        await redisGameState.setGameState(gameId, game);
-      } catch (error) {
-        console.log('[FAST GAME STATE] Failed to cache game in Redis:', error.message);
-      }
       
       return game;
       

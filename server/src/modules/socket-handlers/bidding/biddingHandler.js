@@ -213,8 +213,7 @@ class BiddingHandler {
         isBlindNil
       );
       
-      // Game state has changed - invalidate cache
-      FastGameStateService.invalidateGame(gameId);
+      // Game state has changed - no caching to ensure fresh data
 
       // REAL-TIME: Update bid in Redis (instant)
       let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);
