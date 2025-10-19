@@ -160,8 +160,36 @@ class GameStartHandler {
       startingGames.delete(gameId);
 
       // Wait for cards to be rendered before starting bidding
-      // Bot bidding is handled by BiddingHandler - no duplicate triggering here
-      console.log(`[GAME START] Game started - bot bidding will be handled by BiddingHandler`);
+      // CRITICAL: Trigger bot bidding for initial game start if current player is a bot
+      console.log(`[GAME START] Checking for bot bidding - currentPlayer: ${gameState.currentPlayer}`);
+      if (gameState.currentPlayer) {
+        // Get the game from database to check if current player is a bot
+        const game = await GameService.getGame(gameId);
+        if (game) {
+          const currentPlayer = game.players.find(p => p.userId === gameState.currentPlayer);
+          console.log(`[GAME START] Found current player:`, currentPlayer ? {
+            id: currentPlayer.userId,
+            username: currentPlayer.user?.username,
+            isHuman: currentPlayer.isHuman,
+            seatIndex: currentPlayer.seatIndex
+          } : 'null');
+          
+          if (currentPlayer && !currentPlayer.isHuman) {
+            console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
+            // Import and use BiddingHandler
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            // Trigger bot bid immediately
+            await biddingHandler.triggerBotBidIfNeeded(gameId);
+          } else if (currentPlayer && currentPlayer.isHuman) {
+            console.log(`[GAME START] Current player is human, not triggering bot bid`);
+          } else {
+            console.log(`[GAME START] Current player not found or invalid`);
+          }
+        } else {
+          console.log(`[GAME START] No current player set - cannot trigger bot bidding`);
+        }
+      }
     } catch (error) {
       console.error('[GAME START] Error in handleStartGame:', error);
       console.error('[GAME START] Error stack:', error.stack);
