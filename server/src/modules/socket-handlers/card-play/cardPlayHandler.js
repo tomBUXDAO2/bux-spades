@@ -6,7 +6,7 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
-import { SmartCacheService } from '../../../services/SmartCacheService.js';
+import { QueryBatcher } from '../../../services/QueryBatcher.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -36,9 +36,9 @@ class CardPlayHandler {
         
         // User playing card
         
-        // Get current game state from database
+        // Get current game state from database (with query batching)
         const gameState = await PerformanceMiddleware.timeOperation('getGameStateForClient', () => 
-          GameService.getGameStateForClient(gameId)
+          QueryBatcher.getGameStateForClient(gameId)
         );
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
@@ -85,9 +85,9 @@ class CardPlayHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state
+      // Get current game state (with query batching)
       const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
-        GameService.getGame(gameId)
+        QueryBatcher.getGame(gameId)
       );
       if (!gameState) {
         throw new Error('Game not found');
@@ -446,8 +446,8 @@ class CardPlayHandler {
     try {
       console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
       
-      // CRITICAL: Get FRESH game state directly from database, not from cache
-      const game = await GameService.getGame(gameId);
+      // CRITICAL: Get FRESH game state with query batching
+      const game = await QueryBatcher.getGame(gameId);
       if (!game) {
         console.log(`[CARD PLAY] No game found in database: ${gameId}`);
         return;

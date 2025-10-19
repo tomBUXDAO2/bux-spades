@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
-// OPTIMIZED: High-performance database configuration with connection pooling
+// ULTRA-OPTIMIZED: Maximum performance database configuration
 const prisma = new PrismaClient({
   log: [], // NO LOGGING AT ALL
   datasources: {
@@ -8,13 +8,22 @@ const prisma = new PrismaClient({
       url: process.env.DATABASE_URL
     }
   },
-  // OPTIMIZED: Connection pooling and performance settings
+  // ULTRA-OPTIMIZED: Maximum connection pooling and performance
   __internal: {
     engine: {
       binaryTargets: ['native'],
-      connectionLimit: 20,
-      poolTimeout: 20000,
-      queryTimeout: 10000
+      connectionLimit: 50, // Increased from 20
+      poolTimeout: 30000, // Increased from 20000
+      queryTimeout: 15000, // Increased from 10000
+      connectionTimeout: 10000, // Added connection timeout
+      maxConnections: 50, // Added max connections
+      minConnections: 5, // Added min connections
+      acquireTimeoutMillis: 10000, // Added acquire timeout
+      createTimeoutMillis: 10000, // Added create timeout
+      destroyTimeoutMillis: 5000, // Added destroy timeout
+      idleTimeoutMillis: 30000, // Added idle timeout
+      reapIntervalMillis: 1000, // Added reap interval
+      createRetryIntervalMillis: 200 // Added retry interval
     }
   }
 });
