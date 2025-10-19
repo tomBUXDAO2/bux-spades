@@ -105,19 +105,23 @@ export const useSocketEventHandlers = ({
           // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
           const newState = normalizeGameState(biddingData.gameState);
           
-          // Defensive: If we have existing state and new state has nulls, preserve the old bids
-          if (currentGameState?.bidding?.bids && newState?.bidding?.bids) {
-            const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
-              const oldBid = currentGameState.bidding.bids[index];
-              // If old bid exists and new bid is null, keep the old bid
-              if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
-                console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null)`);
-                return oldBid;
-              }
-              return newBid;
-            });
-            newState.bidding.bids = preservedBids;
-          }
+        // Defensive: If we have existing state and new state has nulls, preserve the old bids
+        // BUT ONLY if we're in the same round - don't preserve bids across rounds
+        if (currentGameState?.bidding?.bids && newState?.bidding?.bids && 
+            currentGameState.currentRound === newState.currentRound) {
+          const preservedBids = newState.bidding.bids.map((newBid: any, index: number) => {
+            const oldBid = currentGameState.bidding.bids[index];
+            // If old bid exists and new bid is null, keep the old bid (same round only)
+            if (oldBid !== null && oldBid !== undefined && (newBid === null || newBid === undefined)) {
+              console.log(`[BIDDING UPDATE] Preserving bid for seat ${index}: ${oldBid} (server sent null, same round)`);
+              return oldBid;
+            }
+            return newBid;
+          });
+          newState.bidding.bids = preservedBids;
+        } else if (currentGameState?.currentRound !== newState?.currentRound) {
+          console.log(`[BIDDING UPDATE] New round detected (${currentGameState?.currentRound} -> ${newState?.currentRound}), accepting server bids:`, newState.bidding.bids);
+        }
           
           setGameState(newState);
         } else {

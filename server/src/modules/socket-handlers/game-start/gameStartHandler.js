@@ -209,62 +209,12 @@ class GameStartHandler {
 
   /**
    * Continue bot bidding chain until human player or bidding complete
+   * DISABLED: Using new database-first bot bidding system instead
    */
   async continueBotBiddingChain(gameId, game) {
-    const currentBidder = game.getCurrentBidder();
-    
-    console.log(`[BOT BIDDING CHAIN] Current bidder: ${currentBidder?.id}, type: ${game.players[currentBidder?.seatIndex]?.type}, bidding complete: ${game.isBiddingComplete()}`);
-    
-    // Check if current bidder is a bot and bidding isn't complete
-    if (currentBidder && 
-        game.players[currentBidder.seatIndex]?.type === 'bot' && 
-        !game.isBiddingComplete()) {
-      
-      setTimeout(async () => {
-        try {
-          await this.botService.makeBotBid(game, currentBidder.seatIndex);
-          await GameService.updateGame(gameId, { 
-            gameState: game.toJSON(),
-            currentPlayer: game.getCurrentBidder()?.id || null
-          });
-          
-          this.io.to(gameId).emit('bidding_update', {
-            gameId,
-            gameState: game.toClientFormat(),
-            bidMade: {
-              userId: currentBidder.id,
-              bid: game.players[currentBidder.seatIndex].bid,
-              isBot: true,
-            },
-            currentBidder: game.getCurrentBidder(),
-          });
-
-          // Check if bidding is complete after bot bid
-          if (game.isBiddingComplete()) {
-            game.startPlay();
-            await GameService.updateGame(gameId, {
-              status: 'PLAYING',
-              gameState: game.toJSON()
-            });
-            this.io.to(gameId).emit('game_update', {
-              gameId,
-              gameState: game.toClientFormat(),
-              phase: 'PLAYING'
-            });
-            console.log(`[GAME START] Bidding complete for game ${gameId}, starting play phase`);
-          } else {
-            // Continue the chain if there are more bots to bid
-            // Get fresh game object from GameManager to ensure we have the latest state
-            const freshGame = this.gameManager.getGame(gameId);
-            if (freshGame) {
-              this.continueBotBiddingChain(gameId, freshGame);
-            }
-          }
-        } catch (botErr) {
-          console.error('[GAME START] Bot bidding chain error:', botErr);
-        }
-      }, 400);
-    }
+    console.log(`[BOT BIDDING CHAIN] DISABLED - Using new database-first bot bidding system instead`);
+    // This old system is disabled to prevent conflicts with the new database-first bot bidding
+    // The new system is handled by triggerBotBidIfNeeded in biddingHandler.js
   }
 }
 
