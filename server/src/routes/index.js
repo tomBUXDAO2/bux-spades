@@ -3,6 +3,7 @@ import { gameRoutes } from './games.js';
 import { authRoutes } from './auth.js';
 import { statsRoutes } from './stats.js';
 import adminRoutes from './admin.js';
+import performanceRoutes from './performance.js';
 
 export function setupRoutes(app) {
   // Health check
@@ -19,6 +20,7 @@ export function setupRoutes(app) {
   app.use('/api/stats', statsRoutes);
   app.use('/api/users', statsRoutes); // Stats routes (handles /api/users/:userId/stats)
   app.use('/api/admin', adminRoutes); // Admin routes
+  app.use('/api/performance', performanceRoutes); // Performance monitoring
 
   // 404 handler
   app.use('*', (req, res) => {

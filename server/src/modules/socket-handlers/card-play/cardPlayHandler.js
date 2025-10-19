@@ -5,6 +5,7 @@ import { TrickCompletionService } from '../../../services/TrickCompletionService
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -35,7 +36,9 @@ class CardPlayHandler {
         // User playing card
         
         // Get current game state from database
-        const gameState = await GameService.getGameStateForClient(gameId);
+        const gameState = await PerformanceMiddleware.timeOperation('getGameStateForClient', () => 
+          GameService.getGameStateForClient(gameId)
+        );
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
           return;
@@ -82,7 +85,9 @@ class CardPlayHandler {
       playerTimerService.clearTimer(gameId);
 
       // Get current game state
-      const gameState = await GameService.getGame(gameId);
+      const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
+        GameService.getGame(gameId)
+      );
       if (!gameState) {
         throw new Error('Game not found');
       }
