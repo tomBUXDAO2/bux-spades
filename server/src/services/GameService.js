@@ -622,9 +622,23 @@ export class GameService {
         }
         
         // CRITICAL: Get fresh bidding data from database (single source of truth)
-        const freshGameState = await this.getFullGameStateFromDatabase(gameId);
-        if (freshGameState && freshGameState.rounds) {
-          const currentRound = freshGameState.rounds.find(r => r.roundNumber === freshGameState.currentRound);
+        // Use a more reliable method to get current bidding data
+        try {
+          const currentRound = await prisma.round.findFirst({
+            where: {
+              gameId: gameId,
+              roundNumber: cachedGameState.currentRound
+            },
+            include: {
+              playerStats: {
+                select: {
+                  seatIndex: true,
+                  bid: true
+                }
+              }
+            }
+          });
+          
           if (currentRound && currentRound.playerStats) {
             const bids = Array.from({length: 4}, () => null);
             currentRound.playerStats.forEach(stat => {
@@ -654,6 +668,9 @@ export class GameService {
               players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
             });
           }
+        } catch (error) {
+          console.error(`[GAME SERVICE] Error getting bidding data:`, error);
+          // Fallback to existing bidding data if database query fails
         }
         
         // CRITICAL: Ensure hands data is included from Redis

@@ -621,8 +621,50 @@ class BiddingHandler {
         return hasHighCards ? numSpades : 0; // Bid spades if strong, nil if weak
       }
     } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
-      // SUICIDE game bot logic
-      return await this.calculateSuicideBotBid(gameState, seatIndex, hand);
+      // SUICIDE game bot logic - proper team-based bidding
+      console.log(`[BIDDING] SUICIDE game bot logic for seat ${seatIndex}`);
+      
+      // Get current bids from database
+      const currentBids = gameState.rounds[gameState.currentRound - 1]?.playerStats?.map(stat => stat.bid) || [null, null, null, null];
+      
+      // Determine bidding order based on dealer
+      const dealer = gameState.dealer || 0;
+      const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
+      
+      // Find current bot's position in bidding order
+      const currentBidderIndex = biddingOrder.indexOf(seatIndex);
+      
+      // Determine teams
+      const isTeam1 = seatIndex === 0 || seatIndex === 2;
+      const partnerSeatIndex = isTeam1 ? 
+        (seatIndex === 0 ? 2 : 0) : 
+        (seatIndex === 1 ? 3 : 1);
+      
+      // Find partner's position in bidding order
+      const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
+      
+      // Check if partner already bid
+      const partnerBid = currentBids[partnerSeatIndex];
+      const partnerBidNil = partnerBid === 0;
+      
+      if (partnerBidderIndex < currentBidderIndex) {
+        // Partner already bid
+        if (!partnerBidNil) {
+          // Partner didn't bid nil, so current bot MUST bid nil
+          console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} MUST bid nil (partner at seat ${partnerSeatIndex} bid ${partnerBid})`);
+          return 0;
+        } else {
+          // Partner bid nil, so current bot can bid anything
+          console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} can bid anything (partner at seat ${partnerSeatIndex} bid nil)`);
+          const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+          return numSpades > 0 ? numSpades : 2;
+        }
+      } else {
+        // Partner hasn't bid yet - this is bidder 1 or 2
+        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, can bid anything`);
+        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+        return numSpades > 0 ? numSpades : 2;
+      }
     } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
       // 4 OR NIL game bot logic
       return this.calculate4OrNilBotBid(hand);
@@ -649,63 +691,8 @@ class BiddingHandler {
   }
 
   /**
-   * Calculate SUICIDE bot bid - use WHIZ rules for bidders 1 & 2, team logic for bidders 3 & 4
+   * DELETED: calculateSuicideBotBid - conflicts with unified bidding system
    */
-  async calculateSuicideBotBid(gameState, seatIndex, hand) {
-    // Get current bids from Redis
-    const currentBids = await redisGameState.getPlayerBids(gameState.id);
-    
-    // Determine bidding order based on dealer
-    const dealer = gameState.dealer || 0;
-    const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
-    
-    // Find current bot's position in bidding order
-    const currentBidderIndex = biddingOrder.indexOf(seatIndex);
-    
-    // Determine teams
-    const isTeam1 = seatIndex === 0 || seatIndex === 2;
-    const partnerSeatIndex = isTeam1 ? 
-      (seatIndex === 0 ? 2 : 0) : 
-      (seatIndex === 1 ? 3 : 1);
-    
-    // Find partner's position in bidding order
-    const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
-    
-    // Check if partner already bid
-    const partnerBid = currentBids[partnerSeatIndex];
-    const partnerBidNil = partnerBid === 0;
-    
-    if (partnerBidderIndex < currentBidderIndex) {
-      // Partner already bid
-      if (!partnerBidNil) {
-        // Partner didn't bid nil, so current bot must bid nil
-        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} must bid nil (partner didn't bid nil)`);
-        return 0;
-      } else {
-        // Partner bid nil, so current bot can bid whatever
-        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} can bid anything (partner bid nil)`);
-        // Use simple logic - bid number of spades or nil based on hand strength
-        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-        return numSpades > 0 ? numSpades : 2;
-      }
-    } else {
-      // Partner hasn't bid yet - this is bidder 1 or 2
-      // Use simple logic for regular games
-      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, using simple logic`);
-      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-      
-      // Simple logic: bid number of spades or nil based on hand strength
-      if (numSpades === 0) {
-        return 0; // Must bid nil
-      } else if (numSpades >= 4) {
-        return numSpades; // Must bid spades
-      } else {
-        // 1-3 spades: choose nil or spades based on hand strength
-        const hasHighCards = hand.some(card => ['A', 'K', 'Q'].includes(card.rank));
-        return hasHighCards ? numSpades : 0; // Bid spades if strong hand, nil if weak
-      }
-    }
-  }
 
   /**
    * Calculate 4 OR NIL bot bid - must bid either 4 or nil
