@@ -8,7 +8,7 @@ import redisGameState from './RedisGameStateService.js';
 export class SmartCacheService {
   static cache = new Map();
   static cacheTimestamps = new Map();
-  static CACHE_DURATION = 2000; // 2 seconds cache
+  static CACHE_DURATION = 5000; // 5 seconds cache
   
   /**
    * Get cached game state or fetch fresh

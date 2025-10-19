@@ -4,6 +4,7 @@ import { gameManager } from '../../../services/GameManager.js';
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { SmartCacheService } from '../../../services/SmartCacheService.js';
 
 // Global mutex to prevent concurrent game starts across all socket connections
 const startingGames = new Set();
@@ -50,7 +51,7 @@ class GameStartHandler {
       const maxRetries = 5;
       
       while (!dbGame && retries < maxRetries) {
-        dbGame = await GameService.getGame(gameId);
+        dbGame = await SmartCacheService.getGame(gameId);
         if (!dbGame) {
           retries++;
           if (retries < maxRetries) {
