@@ -6,7 +6,7 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
-import { QueryBatcher } from '../../../services/QueryBatcher.js';
+import { FastGameStateService } from '../../../services/FastGameStateService.js';
 
 /**
  * DATABASE-FIRST CARD PLAY HANDLER
@@ -36,9 +36,9 @@ class CardPlayHandler {
         
         // User playing card
         
-        // Get current game state from database (with query batching)
+        // Get current game state from database (ultra fast)
         const gameState = await PerformanceMiddleware.timeOperation('getGameStateForClient', () => 
-          QueryBatcher.getGameStateForClient(gameId)
+          FastGameStateService.getGameStateForClient(gameId)
         );
         if (!gameState) {
           this.socket.emit('error', { message: 'Game not found' });
@@ -85,9 +85,9 @@ class CardPlayHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state (with query batching)
+      // Get current game state (ultra fast)
       const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
-        QueryBatcher.getGame(gameId)
+        FastGameStateService.getGame(gameId)
       );
       if (!gameState) {
         throw new Error('Game not found');
@@ -446,8 +446,8 @@ class CardPlayHandler {
     try {
       console.log(`[CARD PLAY] triggerBotPlayIfNeeded called for game ${gameId}`);
       
-      // CRITICAL: Get FRESH game state with query batching
-      const game = await QueryBatcher.getGame(gameId);
+      // CRITICAL: Get FRESH game state (ultra fast)
+      const game = await FastGameStateService.getGame(gameId);
       if (!game) {
         console.log(`[CARD PLAY] No game found in database: ${gameId}`);
         return;
