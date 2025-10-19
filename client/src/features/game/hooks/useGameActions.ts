@@ -20,9 +20,12 @@ export const useGameActions = ({
   setError,
   setHasAttemptedJoin
 }: UseGameActionsProps) => {
-  // Join game
+  // Join game with improved timeout and retry logic
   const joinGame = useCallback(() => {
-    if (!socket || !socket.connected) return;
+    if (!socket || !socket.connected) {
+      setError('Not connected to server');
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
@@ -31,13 +34,21 @@ export const useGameActions = ({
     console.log('🎮 EMITTING join_game event:', { gameId, userId, spectate, socketId: socket.id, isConnected: socket.connected });
     socket.emit('join_game', { gameId, userId, spectate });
     
-    // Set a timeout to handle cases where game_joined event is not received
+    // Reduced timeout to 5 seconds for better UX
     const timeout = setTimeout(() => {
       console.log('🎮 Timeout waiting for game_joined event, retrying...');
       setHasAttemptedJoin(false);
       setIsLoading(false);
-      setError('Failed to join game - timeout');
-    }, 10000); // 10 second timeout
+      setError('Connection timeout - retrying...');
+      
+      // Auto-retry after 2 seconds
+      setTimeout(() => {
+        if (socket && socket.connected) {
+          console.log('🎮 Auto-retrying game join...');
+          setHasAttemptedJoin(false);
+        }
+      }, 2000);
+    }, 5000); // 5 second timeout
     
     // Store timeout ID to clear it if game_joined is received
     (window as any).gameJoinTimeout = timeout;

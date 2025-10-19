@@ -193,7 +193,10 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
     return (
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner />
-        <p className="ml-4 text-lg">Connecting to game...</p>
+        <div className="ml-4">
+          <p className="text-lg">Connecting to game...</p>
+          <p className="text-sm text-gray-500 mt-1">If this takes too long, try refreshing the page</p>
+        </div>
       </div>
     );
   }
@@ -201,11 +204,24 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
   // Handle error state - only route to lobby for terminal errors; otherwise stay on table
   if (error) {
     const isTerminal = /not a member|game not found|deleted/i.test(error || '');
+    const isTimeout = /timeout|retrying/i.test(error || '');
+    
     if (isTerminal) {
       onLeaveTable();
       try { localStorage.removeItem('activeGameId'); } catch {}
       return null;
     }
+    
+    // For timeouts, just keep trying to load - don't show error messages
+    if (isTimeout && !lastGoodGameState) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <LoadingSpinner />
+          <p className="ml-4 text-lg">Connecting to game...</p>
+        </div>
+      );
+    }
+    
     // Non-terminal/transient error: if we have prior state, keep showing the table; otherwise light spinner
     if (!lastGoodGameState) {
       return (

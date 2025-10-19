@@ -107,9 +107,17 @@ class GameJoinHandler {
         this.socket.emit('error', { message: 'User not authenticated' });
         return;
       }
-      
-      // Get game state from database (single source of truth) - sanitized for this user
-      const gameState = await GameService.getGameStateForClient(gameId, userId);
+
+      // Use FAST game state for instant loading
+      let gameState;
+      try {
+        gameState = await GameService.getFastGameStateForClient(gameId, userId);
+      } catch (error) {
+        console.error(`[GAME JOIN] Error getting game state for ${gameId}:`, error);
+        this.socket.emit('error', { message: 'Failed to load game' });
+        return;
+      }
+
       if (!gameState) {
         this.socket.emit('error', { message: 'Game not found' });
         return;

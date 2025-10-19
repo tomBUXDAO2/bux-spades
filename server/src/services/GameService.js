@@ -604,6 +604,83 @@ export class GameService {
   }
 
   /**
+   * Get FAST game state for client - optimized for table loading
+   */
+  static async getFastGameStateForClient(gameId, userId = null) {
+    try {
+      console.log(`[GAME SERVICE] Getting FAST game state for client: ${gameId}, user: ${userId}`);
+      
+      // Try Redis cache first - this should be instant
+      const cachedGameState = await redisGameState.getGameState(gameId);
+      if (cachedGameState) {
+        console.log(`[GAME SERVICE] Using cached game state for game ${gameId} - INSTANT LOAD`);
+        
+        // Only get hands data from Redis - no database calls
+        const playerHands = await redisGameState.getPlayerHands(gameId);
+        if (playerHands && playerHands.length > 0) {
+          cachedGameState.hands = playerHands;
+        }
+        
+        return cachedGameState;
+      }
+      
+      // If no cache, do minimal database query for essential data only
+      console.log(`[GAME SERVICE] No cache, doing minimal database query for game ${gameId}`);
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: {
+          id: true,
+          status: true,
+          currentPlayer: true,
+          currentRound: true,
+          dealer: true,
+          format: true,
+          gimmickVariant: true,
+          rules: true,
+          createdAt: true,
+          players: {
+            select: {
+              seatIndex: true,
+              userId: true,
+              isHuman: true,
+              teamIndex: true,
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatar: true
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      if (!game) return null;
+      
+      // Return minimal game state for fast loading
+      return {
+        id: game.id,
+        status: game.status,
+        currentPlayer: game.currentPlayer,
+        currentRound: game.currentRound,
+        dealer: game.dealer,
+        format: game.format,
+        gimmickVariant: game.gimmickVariant,
+        rules: game.rules,
+        createdAt: game.createdAt,
+        players: game.players,
+        hands: [], // Will be loaded separately if needed
+        bidding: { bids: [null, null, null, null], currentBidderIndex: 0 },
+        play: { currentTrick: [], spadesBroken: false }
+      };
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting FAST game state for client:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get game state for client - Redis first, database fallback
    */
   static async getGameStateForClient(gameId, userId = null) {
@@ -651,22 +728,23 @@ export class GameService {
         }
         
         // CRITICAL: Get fresh bidding data from database (single source of truth)
-        // Use a more reliable method to get current bidding data
-        try {
-          const currentRound = await prisma.round.findFirst({
-            where: {
-              gameId: gameId,
-              roundNumber: cachedGameState.currentRound
-            },
-            include: {
-              playerStats: {
-                select: {
-                  seatIndex: true,
-                  bid: true
+        // OPTIMIZATION: Only fetch bidding data if we're in bidding phase
+        if (cachedGameState.status === 'BIDDING') {
+          try {
+            const currentRound = await prisma.round.findFirst({
+              where: {
+                gameId: gameId,
+                roundNumber: cachedGameState.currentRound
+              },
+              include: {
+                playerStats: {
+                  select: {
+                    seatIndex: true,
+                    bid: true
+                  }
                 }
               }
-            }
-          });
+            });
           
           if (currentRound && currentRound.playerStats) {
             const bids = Array.from({length: 4}, () => null);
@@ -697,9 +775,10 @@ export class GameService {
               players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
             });
           }
-        } catch (error) {
-          console.error(`[GAME SERVICE] Error getting bidding data:`, error);
-          // Fallback to existing bidding data if database query fails
+          } catch (error) {
+            console.error(`[GAME SERVICE] Error getting bidding data:`, error);
+            // Fallback to existing bidding data if database query fails
+          }
         }
         
         // CRITICAL: Ensure hands data is included from Redis
