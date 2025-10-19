@@ -448,36 +448,11 @@ class BiddingHandler {
 
       // Emit round started event
       try {
-        // Use the proper getGameStateForClient but ensure bidding data is correct
+        // Use the proper getGameStateForClient - it already gets bidding data from database
         const updatedGameState = await GameService.getGameStateForClient(gameId);
         
-        // CRITICAL: Override bidding data with database values to prevent race conditions
-        const gameState = await GameService.getGame(gameId);
-        const currentRound = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
-        
-        if (currentRound && currentRound.playerStats) {
-          const bids = Array.from({length: 4}, () => null);
-          currentRound.playerStats.forEach(stat => {
-            if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
-              bids[stat.seatIndex] = stat.bid;
-            }
-          });
-          
-          // Override the bidding data with correct database values
-          updatedGameState.bidding = {
-            bids: bids,
-            currentBidderIndex: firstPlayer?.seatIndex || 0,
-            currentPlayer: firstPlayer?.userId
-          };
-          
-          // Also update player bids in the players array
-          if (updatedGameState.players) {
-            updatedGameState.players = updatedGameState.players.map(p => ({
-              ...p,
-              bid: bids[p.seatIndex] || null
-            }));
-          }
-        }
+        // NO OVERRIDE - getGameStateForClient already gets correct bidding data from database
+        console.log(`[BIDDING] Using getGameStateForClient bidding data:`, updatedGameState.bidding);
         
         this.io.to(gameId).emit('round_started', {
           gameId,
@@ -639,8 +614,8 @@ class BiddingHandler {
       // SUICIDE game bot logic - proper team-based bidding
       console.log(`[BIDDING] SUICIDE game bot logic for seat ${seatIndex}`);
       
-      // Get current bids from database
-      const currentBids = gameState.rounds[gameState.currentRound - 1]?.playerStats?.map(stat => stat.bid) || [null, null, null, null];
+      // Get current bids from database - use CURRENT round, not previous
+      const currentBids = gameState.rounds[gameState.currentRound]?.playerStats?.map(stat => stat.bid) || [null, null, null, null];
       
       // Determine bidding order based on dealer
       const dealer = gameState.dealer || 0;
@@ -691,7 +666,8 @@ class BiddingHandler {
       const numAces = hand.filter(card => card.rank === 'A').length;
       return numAces * 3;
     } else {
-      // Simple bot logic for other game types
+      // Simple bot logic for other game types - INDEPENDENT of other players' bids
+      console.log(`[BIDDING] Simple bot logic - numSpades: ${numSpades}, hand: ${hand.map(c => c.suit + c.rank).join(',')}`);
       return numSpades > 0 ? numSpades : 2;
     }
   }
