@@ -217,11 +217,16 @@ class BiddingHandler {
 
       // REAL-TIME: Update bid in Redis (instant)
       let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);
+      console.log(`[BIDDING] Before updating Redis - current bids:`, currentBids);
       currentBids[player.seatIndex] = bid;
       await redisGameState.setPlayerBids(gameId, currentBids);
       
       // DEBUG: Log Redis bid update
       console.log(`[BIDDING] Updated Redis bids for game ${gameId}:`, currentBids);
+      
+      // VERIFY: Double-check that the bid was actually stored in Redis
+      const verifyBids = await redisGameState.getPlayerBids(gameId);
+      console.log(`[BIDDING] Verification - Redis bids after update:`, verifyBids);
 
       // REAL-TIME: Check if all players have bid using Redis
       // Only check bids for seats that have players
