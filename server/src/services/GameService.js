@@ -560,6 +560,13 @@ export class GameService {
                 bid: playerBids[p.seatIndex] || null
               }));
             }
+            
+            console.log(`[GAME SERVICE] Updated bidding from Redis:`, {
+              gameId,
+              playerBids,
+              bidding: cachedGameState.bidding,
+              players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
+            });
           }
         }
         
@@ -664,10 +671,45 @@ export class GameService {
 
   /**
    * Get FULL game state from database only (for populating Redis cache)
+   * OPTIMIZED: Reduced database queries and improved performance
    */
   static async getFullGameStateFromDatabase(gameId) {
     try {
-      const game = await this.getGame(gameId);
+      // OPTIMIZED: Use single query with all includes to avoid N+1 problem
+      const game = await PerformanceMiddleware.timeOperation('getFullGameStateFromDatabase', () => 
+        prisma.game.findUnique({
+          where: { id: gameId },
+          include: {
+            players: {
+              include: {
+                user: {
+                  select: { id: true, username: true, avatarUrl: true }
+                }
+              },
+              orderBy: { seatIndex: 'asc' }
+            },
+            rounds: {
+              include: {
+                tricks: {
+                  include: {
+                    cards: {
+                      orderBy: { playOrder: 'asc' }
+                    }
+                  },
+                  orderBy: { trickNumber: 'asc' }
+                },
+                playerStats: {
+                  orderBy: { seatIndex: 'asc' }
+                },
+                RoundScore: true
+              },
+              orderBy: { roundNumber: 'asc' }
+            },
+            result: true
+          }
+        })
+      );
+      
       if (!game) {
         return null;
       }
@@ -691,26 +733,15 @@ export class GameService {
         });
       }
 
-      // Get current trick from Redis or database
+      // OPTIMIZED: Get current trick from Redis or use data already loaded
       let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
       if (!currentTrickCards || currentTrickCards.length === 0) {
-        // If no current trick in Redis, get from database
+        // OPTIMIZED: Use data already loaded instead of additional database queries
         const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
-        if (currentRound) {
-          const currentTrick = await prisma.trick.findFirst({
-            where: { 
-              roundId: currentRound.id,
-              trickNumber: game.currentTrick
-            }
-          });
-          
-          if (currentTrick) {
-            const trickCards = await prisma.trickCard.findMany({
-              where: { trickId: currentTrick.id },
-              orderBy: { playOrder: 'asc' }
-            });
-            
-            currentTrickCards = trickCards.map(card => ({
+        if (currentRound && currentRound.tricks) {
+          const currentTrick = currentRound.tricks.find(t => t.trickNumber === game.currentTrick);
+          if (currentTrick && currentTrick.cards) {
+            currentTrickCards = currentTrick.cards.map(card => ({
               suit: card.suit,
               rank: card.rank,
               seatIndex: card.seatIndex,

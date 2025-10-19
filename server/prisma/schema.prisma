@@ -177,6 +177,12 @@ model Game {
   players         GamePlayer[]
   result          GameResult?
   rounds          Round[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([status, createdAt])
+  @@index([currentPlayer])
+  @@index([isRated, status])
 }
 
 model GamePlayer {
@@ -194,6 +200,8 @@ model GamePlayer {
 
   @@unique([gameId, seatIndex])
   @@index([userId])
+  @@index([gameId])
+  @@index([gameId, seatIndex])
 }
 
 model Round {
@@ -210,6 +218,7 @@ model Round {
 
   @@unique([gameId, roundNumber])
   @@index([gameId])
+  @@index([gameId, roundNumber])
 }
 
 model Trick {
