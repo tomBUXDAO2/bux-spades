@@ -215,34 +215,36 @@ class BiddingHandler {
       
       // Game state has changed - no caching to ensure fresh data
 
-      // REAL-TIME: Update bid in Redis (instant)
-      let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);
-      console.log(`[BIDDING] Before updating Redis - current bids:`, currentBids);
-      currentBids[player.seatIndex] = bid;
-      await redisGameState.setPlayerBids(gameId, currentBids);
-      
-      // DEBUG: Log Redis bid update
-      console.log(`[BIDDING] Updated Redis bids for game ${gameId}:`, currentBids);
-      
-      // VERIFY: Double-check that the bid was actually stored in Redis
-      const verifyBids = await redisGameState.getPlayerBids(gameId);
-      console.log(`[BIDDING] Verification - Redis bids after update:`, verifyBids);
+      // Database is single source of truth - no Redis bidding updates
+      console.log(`[BIDDING] Bid logged to database - no Redis updates needed`);
 
-      // REAL-TIME: Check if all players have bid using Redis
-      // Only check bids for seats that have players
+      // Check if all players have bid using database
       const game = await GameService.getGame(gameId);
       const occupiedSeats = game.players.map(p => p.seatIndex);
-      const bidsComplete = occupiedSeats.every(seatIndex => 
-        currentBids[seatIndex] !== null && currentBids[seatIndex] !== undefined
-      );
+      
+      // Get current round to check bids from database
+      const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+      if (!currentRound || !currentRound.playerStats) {
+        console.log(`[BIDDING] No current round or player stats found`);
+        return;
+      }
+      
+      // Check if all occupied seats have bids in database
+      const bidsComplete = occupiedSeats.every(seatIndex => {
+        const playerStat = currentRound.playerStats.find(stat => stat.seatIndex === seatIndex);
+        return playerStat && playerStat.bid !== null && playerStat.bid !== undefined;
+      });
 
       if (bidsComplete) {
         // VALIDATION: Ensure all 4 players have valid bids before starting
         console.log(`[BIDDING] All players have bid, validating before starting round`);
-        console.log(`[BIDDING] Current bids:`, currentBids);
+        
+        // Get bids from database for validation
+        const dbBids = currentRound.playerStats.map(stat => stat.bid);
+        console.log(`[BIDDING] Database bids:`, dbBids);
         
         // Double-check that all bids are valid numbers (not null/undefined)
-        const validBids = currentBids.filter(bid => bid !== null && bid !== undefined && typeof bid === 'number');
+        const validBids = dbBids.filter(bid => bid !== null && bid !== undefined && typeof bid === 'number');
         if (validBids.length !== 4) {
           console.error(`[BIDDING] Invalid bid count: expected 4, got ${validBids.length}`);
           return;
@@ -308,12 +310,23 @@ class BiddingHandler {
         const latestBids = await redisGameState.getPlayerBids(gameId);
         const updatedGameState = await GameService.getGameStateForClient(gameId);
         
-        // Update player bids in the players array
+        // CRITICAL: Force update bidding data from Redis to ensure consistency
         if (updatedGameState && latestBids) {
+          // Update bidding object with latest Redis data
+          updatedGameState.bidding = {
+            ...updatedGameState.bidding,
+            bids: latestBids,
+            currentBidderIndex: updatedGameState.bidding?.currentBidderIndex || 0,
+            currentPlayer: updatedGameState.currentPlayer
+          };
+          
+          // Update player bids in the players array
           updatedGameState.players = updatedGameState.players.map(p => ({
             ...p,
             bid: latestBids[p.seatIndex] || null
           }));
+          
+          console.log(`[BIDDING] Forced bidding consistency - Redis bids:`, latestBids, `GameState bids:`, updatedGameState.bidding.bids);
         }
         
         this.io.to(gameId).emit('bidding_update', {
@@ -580,10 +593,6 @@ class BiddingHandler {
         console.log(`[BIDDING] Updated gameState with latest bids from Redis:`, latestBids);
       }
       
-      // UNIFIED BOT BID CALCULATION - Single source of truth
-      const botBid = await this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
-      console.log(`[BIDDING] UNIFIED bot ${playerUsername} bidding ${botBid} (${numSpades} spades, format: ${gameState.format}, variant: ${gameState.gimmickVariant})`);
-
       // CRITICAL: Check if this bot has already bid to prevent duplicate bids
       const existingBids = await redisGameState.getPlayerBids(gameId);
       if (existingBids && existingBids[currentPlayer.seatIndex] !== null && existingBids[currentPlayer.seatIndex] !== undefined) {
@@ -591,6 +600,10 @@ class BiddingHandler {
         this.biddingBots.delete(gameId);
         return;
       }
+
+      // UNIFIED BOT BID CALCULATION - Single source of truth
+      const botBid = await this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
+      console.log(`[BIDDING] UNIFIED bot ${playerUsername} bidding ${botBid} (${numSpades} spades, format: ${gameState.format}, variant: ${gameState.gimmickVariant})`);
 
       // Remove from bidding bots set BEFORE processing so next bot can be triggered
       this.biddingBots.delete(gameId);

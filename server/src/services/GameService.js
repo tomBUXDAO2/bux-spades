@@ -621,32 +621,39 @@ export class GameService {
           cachedGameState.play.spadesBroken = false; // Default to false if not set
         }
         
-        // CRITICAL: Always update bidding data from Redis cache to ensure persistence
-        const playerBids = await redisGameState.getPlayerBids(gameId);
-        console.log(`[GAME SERVICE] Retrieved playerBids from Redis for ${gameId}:`, playerBids);
-        if (playerBids) {
-          cachedGameState.bidding = {
-            bids: playerBids,
-            currentBidderIndex: 0,
-            currentPlayer: cachedGameState.currentPlayer
-          };
-          
-          // Also update player bids in the players array
-          if (cachedGameState.players) {
-            cachedGameState.players = cachedGameState.players.map(p => ({
-              ...p,
-              bid: playerBids[p.seatIndex] || null
-            }));
+        // CRITICAL: Get fresh bidding data from database (single source of truth)
+        const freshGameState = await this.getFullGameStateFromDatabase(gameId);
+        if (freshGameState && freshGameState.rounds) {
+          const currentRound = freshGameState.rounds.find(r => r.roundNumber === freshGameState.currentRound);
+          if (currentRound && currentRound.playerStats) {
+            const bids = Array.from({length: 4}, () => null);
+            currentRound.playerStats.forEach(stat => {
+              if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
+                bids[stat.seatIndex] = stat.bid;
+              }
+            });
+            
+            cachedGameState.bidding = {
+              bids: bids,
+              currentBidderIndex: 0,
+              currentPlayer: cachedGameState.currentPlayer
+            };
+            
+            // Also update player bids in the players array
+            if (cachedGameState.players) {
+              cachedGameState.players = cachedGameState.players.map(p => ({
+                ...p,
+                bid: bids[p.seatIndex] || null
+              }));
+            }
+            
+            console.log(`[GAME SERVICE] Updated bidding from database:`, {
+              gameId,
+              bids,
+              bidding: cachedGameState.bidding,
+              players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
+            });
           }
-          
-          console.log(`[GAME SERVICE] Updated bidding from Redis:`, {
-            gameId,
-            playerBids,
-            bidding: cachedGameState.bidding,
-            players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
-          });
-        } else {
-          console.log(`[GAME SERVICE] No playerBids found in Redis for ${gameId}`);
         }
         
         // CRITICAL: Ensure hands data is included from Redis
@@ -700,24 +707,31 @@ export class GameService {
           fullGameState.currentTrickCards = currentTrickCards;
         }
         
-        // CRITICAL: Ensure bidding data is included from Redis cache
-        if (!fullGameState.bidding) {
-          const playerBids = await redisGameState.getPlayerBids(gameId);
-          if (playerBids) {
-            fullGameState.bidding = {
-              bids: playerBids,
-              currentBidderIndex: 0,
-              currentPlayer: fullGameState.currentPlayer
-            };
-            
-            // Also update player bids in the players array
-            if (fullGameState.players) {
-              fullGameState.players = fullGameState.players.map(p => ({
-                ...p,
-                bid: playerBids[p.seatIndex] || null
-              }));
+        // CRITICAL: Get bidding data from database (single source of truth)
+        const currentRound = fullGameState.rounds.find(r => r.roundNumber === fullGameState.currentRound);
+        if (currentRound && currentRound.playerStats) {
+          const bids = Array.from({length: 4}, () => null);
+          currentRound.playerStats.forEach(stat => {
+            if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
+              bids[stat.seatIndex] = stat.bid;
             }
+          });
+          
+          fullGameState.bidding = {
+            bids: bids,
+            currentBidderIndex: 0,
+            currentPlayer: fullGameState.currentPlayer
+          };
+          
+          // Also update player bids in the players array
+          if (fullGameState.players) {
+            fullGameState.players = fullGameState.players.map(p => ({
+              ...p,
+              bid: bids[p.seatIndex] || null
+            }));
           }
+          
+          console.log(`[GAME SERVICE] Database bidding data - bids:`, bids);
         }
         
         // Cache the full state in Redis for future requests
