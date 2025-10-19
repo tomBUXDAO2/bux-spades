@@ -9,7 +9,7 @@ import redisGameState from './RedisGameStateService.js';
 export class FastGameStateService {
   
   /**
-   * Get minimal game state for client - ultra fast
+   * Get complete game state for client - fast with caching
    */
   static async getGameStateForClient(gameId) {
     try {
@@ -19,46 +19,18 @@ export class FastGameStateService {
         return cached;
       }
       
-      // Fallback to minimal database query
-      const game = await prisma.game.findUnique({
-        where: { id: gameId },
-        select: {
-          id: true,
-          status: true,
-          currentPlayer: true,
-          currentRound: true,
-          currentTrick: true,
-          players: {
-            select: {
-              userId: true,
-              seatIndex: true,
-              isHuman: true,
-              user: {
-                select: { id: true, username: true, avatarUrl: true }
-              }
-            },
-            orderBy: { seatIndex: 'asc' }
-          }
-        }
-      });
+      // Fallback to complete database query (but optimized)
+      const { GameService } = await import('./GameService.js');
+      const gameState = await GameService.getGameStateForClient(gameId);
       
-      if (!game) {
-        return null;
+      // Cache the result in Redis for next time
+      try {
+        await redisGameState.setGameState(gameId, gameState);
+      } catch (error) {
+        console.log('[FAST GAME STATE] Failed to cache in Redis:', error.message);
       }
       
-      // Return minimal state
-      return {
-        id: game.id,
-        status: game.status,
-        currentPlayer: game.currentPlayer,
-        currentRound: game.currentRound,
-        currentTrick: game.currentTrick,
-        players: game.players,
-        play: {
-          currentTrick: [],
-          spadesBroken: false
-        }
-      };
+      return gameState;
       
     } catch (error) {
       console.error('[FAST GAME STATE] Error:', error);
@@ -67,7 +39,7 @@ export class FastGameStateService {
   }
   
   /**
-   * Get minimal game data - ultra fast
+   * Get complete game data - fast with caching
    */
   static async getGame(gameId) {
     try {
@@ -77,34 +49,34 @@ export class FastGameStateService {
         return cached;
       }
       
-      // Fallback to minimal database query
-      const game = await prisma.game.findUnique({
-        where: { id: gameId },
-        select: {
-          id: true,
-          status: true,
-          currentPlayer: true,
-          currentRound: true,
-          currentTrick: true,
-          players: {
-            select: {
-              userId: true,
-              seatIndex: true,
-              isHuman: true,
-              user: {
-                select: { id: true, username: true, avatarUrl: true }
-              }
-            },
-            orderBy: { seatIndex: 'asc' }
-          }
-        }
-      });
+      // Fallback to complete database query
+      const { GameService } = await import('./GameService.js');
+      const game = await GameService.getGame(gameId);
+      
+      // Cache the result in Redis for next time
+      try {
+        await redisGameState.setGameState(gameId, game);
+      } catch (error) {
+        console.log('[FAST GAME STATE] Failed to cache game in Redis:', error.message);
+      }
       
       return game;
       
     } catch (error) {
       console.error('[FAST GAME STATE] Error:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Invalidate cache when game state changes
+   */
+  static async invalidateGame(gameId) {
+    try {
+      await redisGameState.deleteGameState(gameId);
+      console.log(`[FAST GAME STATE] Cache invalidated for game ${gameId}`);
+    } catch (error) {
+      console.log(`[FAST GAME STATE] Failed to invalidate cache:`, error.message);
     }
   }
 }
