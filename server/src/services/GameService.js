@@ -2,6 +2,7 @@ import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
 import { ScoringService } from './ScoringService.js';
 import { DatabaseGameEngine } from './DatabaseGameEngine.js';
+import { PerformanceMiddleware } from '../middleware/PerformanceMiddleware.js';
 
 // Global mutex to prevent concurrent database operations
 const databaseOperations = new Set();
@@ -107,37 +108,39 @@ export class GameService {
         databaseOperations.add(gameId);
         
         // OPTIMIZED: Single query with all includes to avoid N+1 problem
-        const game = await prisma.game.findUnique({
-          where: { id: gameId },
-          include: {
-            players: {
-              include: {
-                user: {
-                  select: { id: true, username: true, avatarUrl: true }
-                }
+        const game = await PerformanceMiddleware.timeOperation('getGame_database_query', () => 
+          prisma.game.findUnique({
+            where: { id: gameId },
+            include: {
+              players: {
+                include: {
+                  user: {
+                    select: { id: true, username: true, avatarUrl: true }
+                  }
+                },
+                orderBy: { seatIndex: 'asc' }
               },
-              orderBy: { seatIndex: 'asc' }
-            },
-            rounds: {
-              include: {
-                tricks: {
-                  include: {
-                    cards: {
-                      orderBy: { playOrder: 'asc' }
-                    }
+              rounds: {
+                include: {
+                  tricks: {
+                    include: {
+                      cards: {
+                        orderBy: { playOrder: 'asc' }
+                      }
+                    },
+                    orderBy: { trickNumber: 'asc' }
                   },
-                  orderBy: { trickNumber: 'asc' }
+                  playerStats: {
+                    orderBy: { seatIndex: 'asc' }
+                  },
+                  RoundScore: true
                 },
-                playerStats: {
-                  orderBy: { seatIndex: 'asc' }
-                },
-                RoundScore: true
+                orderBy: { roundNumber: 'asc' }
               },
-              orderBy: { roundNumber: 'asc' }
-            },
-            result: true
-          }
-        });
+              result: true
+            }
+          })
+        );
 
         if (!game) {
           return null;
