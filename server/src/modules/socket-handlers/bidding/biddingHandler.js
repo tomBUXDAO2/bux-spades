@@ -178,8 +178,8 @@ class BiddingHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state (with smart caching)
-      const gameState = await SmartCacheService.getGame(gameId);
+      // Get current game state
+      const gameState = await GameService.getGame(gameId);
       if (!gameState) {
         throw new Error('Game not found');
       }
@@ -213,9 +213,7 @@ class BiddingHandler {
         isBlindNil
       );
       
-      // Invalidate cache since game state has changed
-      SmartCacheService.invalidateGame(gameId);
-      console.log(`[BIDDING] Cache invalidated for game ${gameId} after bid`);
+      // Game state has changed - no caching to avoid stale data
 
       // REAL-TIME: Update bid in Redis (instant)
       let currentBids = await redisGameState.getPlayerBids(gameId) || Array.from({length: 4}, () => null);
@@ -227,7 +225,7 @@ class BiddingHandler {
 
       // REAL-TIME: Check if all players have bid using Redis
       // Only check bids for seats that have players
-      const game = await SmartCacheService.getGame(gameId);
+      const game = await GameService.getGame(gameId);
       const occupiedSeats = game.players.map(p => p.seatIndex);
       const bidsComplete = occupiedSeats.every(seatIndex => 
         currentBids[seatIndex] !== null && currentBids[seatIndex] !== undefined

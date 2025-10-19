@@ -51,7 +51,7 @@ class GameStartHandler {
       const maxRetries = 5;
       
       while (!dbGame && retries < maxRetries) {
-        dbGame = await SmartCacheService.getGame(gameId);
+        dbGame = await GameService.getGame(gameId);
         if (!dbGame) {
           retries++;
           if (retries < maxRetries) {
@@ -127,9 +127,7 @@ class GameStartHandler {
       // Start the game in DB-first mode
       await GameService.startGame(gameId);
       
-      // Invalidate cache since game state has changed
-      SmartCacheService.invalidateGame(gameId);
-      console.log(`[GAME START] Cache invalidated for game ${gameId} after start`);
+      // Game state has changed - no caching to avoid stale data
 
       // Deal initial hands and set current bidder/currentPlayer
       console.log(`[GAME START] About to deal initial hands for game ${gameId}`);
