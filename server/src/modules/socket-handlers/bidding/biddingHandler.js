@@ -331,6 +331,8 @@ class BiddingHandler {
           } else {
             console.log(`[BIDDING] Timer not applicable for this game format/situation`);
           }
+        } else if (nextPlayer && !nextPlayer.isHuman) {
+          console.log(`[BIDDING] Next player is bot - NO TIMER needed, bot will bid immediately`);
         }
 
         // Only trigger bot bid if next player is a bot
