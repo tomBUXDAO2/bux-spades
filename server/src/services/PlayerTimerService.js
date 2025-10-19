@@ -103,10 +103,45 @@ class PlayerTimerService {
 
   /**
    * Auto-bid for player using bot logic
-   * DELETED: No longer needed - bots bid immediately
    */
   async autoBid(game, playerId) {
-    console.log(`[PLAYER TIMER] Auto-bid DELETED - bots bid immediately, no timeout needed`);
+    try {
+      console.log(`[PLAYER TIMER] Auto-bidding for player ${playerId}`);
+
+      const player = game.players.find(p => p.userId === playerId);
+      if (!player) {
+        console.error(`[PLAYER TIMER] Player ${playerId} not found in game`);
+        return;
+      }
+
+      const seatIndex = player.seatIndex;
+
+      // Get player's hand from Redis
+      const hands = await redisGameState.getPlayerHands(game.id);
+      if (!hands || !hands[seatIndex]) {
+        console.error(`[PLAYER TIMER] No hand found for player at seat ${seatIndex}`);
+        return;
+      }
+
+      const hand = hands[seatIndex];
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+
+      // Use simple bot logic for timeout bidding
+      const botBid = numSpades > 0 ? numSpades : 2;
+      
+      console.log(`[PLAYER TIMER] Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username} (${numSpades} spades)`);
+
+      // Import BiddingHandler dynamically to avoid circular dependency
+      const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
+      const biddingHandler = new BiddingHandler(this.io, null);
+      
+      // Process bid (this will advance to next player)
+      await biddingHandler.processBid(game.id, playerId, botBid, botBid === 0, false);
+
+      console.log(`[PLAYER TIMER] Auto-bid completed for player ${playerId}`);
+    } catch (error) {
+      console.error('[PLAYER TIMER] Error in autoBid:', error);
+    }
   }
 
   /**
@@ -126,6 +161,7 @@ class PlayerTimerService {
 
       // Use BotService.playBotCard which has the advanced AI V2 logic
       const botService = new BotService();
+      console.log(`[PLAYER TIMER] Calling BotService.playBotCard for seat ${seatIndex}`);
       const card = await botService.playBotCard(game, seatIndex);
 
       if (!card) {
@@ -139,8 +175,10 @@ class PlayerTimerService {
       const { CardPlayHandler } = await import('../modules/socket-handlers/card-play/cardPlayHandler.js');
       const cardPlayHandler = new CardPlayHandler(this.io, null);
       
+      console.log(`[PLAYER TIMER] Calling processCardPlay with card:`, card);
       // Process card play (this will advance to next player)
       await cardPlayHandler.processCardPlay(game.id, playerId, card, false);
+      console.log(`[PLAYER TIMER] processCardPlay completed successfully`);
 
       console.log(`[PLAYER TIMER] Auto-play completed for player ${playerId}`);
     } catch (error) {
