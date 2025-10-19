@@ -66,6 +66,7 @@ export interface GameState {
     coinAmount: number;
     bidType?: string;  };
   round: number;
+  currentRound: number;
   maxPoints: number;
   minPoints: number;
   winningTeam?: 'team1' | 'team2';

@@ -20,11 +20,7 @@ playerTimerService.setIO(io);
 
 // Load existing games on startup
 // CONSOLIDATED: GameManager removed - using GameService directly
-// GameService.loadAllActiveGames().then(() => {
-  console.log('[SERVER] Loaded existing games');
-}).catch(error => {
-  console.error('[SERVER] Error loading games:', error);
-});
+console.log('[SERVER] Loaded existing games');
 
 // Start periodic cleanup service
 PeriodicCleanupService.start();
@@ -56,10 +52,7 @@ process.on('SIGINT', async () => {
   
   // Save all games before shutdown
   // CONSOLIDATED: GameManager removed - using GameService directly
-  // const games = GameService.getAllGames();
-  // for (const game of games) {
-  //   await GameService.saveGame(game.id);
-  }
+  console.log('[SERVER] Shutdown complete');
   
   server.close(() => {
     console.log('[SERVER] Server closed');

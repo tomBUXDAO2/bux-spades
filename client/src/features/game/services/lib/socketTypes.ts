@@ -82,6 +82,7 @@ export interface GameState {
   }[];
   currentTrick: Card[];
   currentPlayer: string;
+  currentRound: number;
   bids: Record<string, number>;
   scores: {
     team1: number;
