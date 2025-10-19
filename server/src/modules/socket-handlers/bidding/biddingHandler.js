@@ -609,8 +609,9 @@ class BiddingHandler {
    * UNIFIED BOT BID CALCULATION - Single source of truth for all bot bids
    */
   async calculateUnifiedBotBid(gameState, seatIndex, hand, numSpades) {
-    // DEBUG: Log game format and variant
-    console.log(`[BIDDING] calculateUnifiedBotBid - format: ${gameState.format}, gimmickVariant: ${gameState.gimmickVariant}, seatIndex: ${seatIndex}`);
+    // DEBUG: Log game format and variant with full object
+    console.log(`[BIDDING] calculateUnifiedBotBid - format: "${gameState.format}", gimmickVariant: "${gameState.gimmickVariant}", seatIndex: ${seatIndex}`);
+    console.log(`[BIDDING] Full gameState object:`, JSON.stringify(gameState, null, 2));
     
     // Handle different game formats and variants
     if (gameState.format === 'WHIZ') {
