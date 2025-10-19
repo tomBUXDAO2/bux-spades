@@ -30,18 +30,18 @@ class PlayerTimerService {
    */
   startPlayerTimer(gameId, playerId, playerIndex, phase) {
     if (!this.io) {
-      console.error('[PLAYER TIMER] Socket.IO not initialized');
+      console.error('[PLAYER TIMER] ❌ Socket.IO not initialized');
       return;
     }
 
-    console.log(`[PLAYER TIMER] Starting timer for player ${playerId} (seat ${playerIndex}) in ${phase} phase`);
+    console.log(`[PLAYER TIMER] 🕐 STARTING TIMER for player ${playerId} (seat ${playerIndex}) in ${phase} phase`);
 
     // Clear any existing timer for this game
     this.clearTimer(gameId);
 
     // Phase 1: 10 second grace period (no visual)
     const graceTimeout = setTimeout(() => {
-      console.log(`[PLAYER TIMER] Grace period ended, starting countdown for player ${playerId}`);
+      console.log(`[PLAYER TIMER] ⏰ Grace period ended, starting countdown for player ${playerId}`);
       
       // Emit countdown_start to show visual timer
       this.io.to(gameId).emit('countdown_start', {
@@ -53,7 +53,7 @@ class PlayerTimerService {
 
     // Phase 2: Auto-action after 20 seconds total
     const actionTimeout = setTimeout(async () => {
-      console.log(`[PLAYER TIMER] Timer expired for player ${playerId}, triggering auto-action`);
+      console.log(`[PLAYER TIMER] ⏰ TIMER EXPIRED for player ${playerId}, triggering auto-action`);
       await this.handleTimeout(gameId, playerId, phase);
     }, 20000);
 
@@ -63,6 +63,10 @@ class PlayerTimerService {
       playerId,
       phase
     });
+    
+    console.log(`[PLAYER TIMER] ✅ Timer set successfully for player ${playerId} - will trigger in 20 seconds`);
+    console.log(`[PLAYER TIMER] Active timers count: ${this.activeTimers.size}`);
+    console.log(`[PLAYER TIMER] Current active timers:`, Array.from(this.activeTimers.keys()));
   }
 
   /**
@@ -212,10 +216,12 @@ class PlayerTimerService {
   clearTimer(gameId) {
     const timers = this.activeTimers.get(gameId);
     if (timers) {
-      console.log(`[PLAYER TIMER] Clearing timer for game ${gameId}`);
+      console.log(`[PLAYER TIMER] 🗑️ CLEARING TIMER for game ${gameId} - player ${timers.playerId}, phase ${timers.phase}`);
       clearTimeout(timers.graceTimeout);
       clearTimeout(timers.actionTimeout);
       this.activeTimers.delete(gameId);
+    } else {
+      console.log(`[PLAYER TIMER] No timer found to clear for game ${gameId}`);
     }
   }
 
