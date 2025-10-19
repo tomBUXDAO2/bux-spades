@@ -128,21 +128,11 @@ class PlayerTimerService {
       const seatIndex = player.seatIndex;
       console.log(`[PLAYER TIMER] Player found at seat ${seatIndex}:`, player.username || player.user?.username);
 
-      // Get player's hand from Redis
-      const hands = await redisGameState.getPlayerHands(game.id);
-      if (!hands || !hands[seatIndex]) {
-        console.error(`[PLAYER TIMER] ❌ No hand found for player at seat ${seatIndex}`);
-        return;
-      }
-
-      const hand = hands[seatIndex];
-      console.log(`[PLAYER TIMER] Player hand for bidding:`, hand);
-      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-
-      // Use simple bot logic for timeout bidding
-      const botBid = numSpades > 0 ? numSpades : 2;
+      // Use the same bot logic that already works
+      const botService = new BotService();
+      const botBid = await botService.calculateUnifiedBotBid(game, seatIndex);
       
-      console.log(`[PLAYER TIMER] 🎯 Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username} (${numSpades} spades)`);
+      console.log(`[PLAYER TIMER] 🎯 Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username}`);
 
       // Import BiddingHandler dynamically to avoid circular dependency
       const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
@@ -175,43 +165,12 @@ class PlayerTimerService {
       const seatIndex = player.seatIndex;
       console.log(`[PLAYER TIMER] Player found at seat ${seatIndex}:`, player.username || player.user?.username);
 
-      // Get player's hand from Redis
-      const hands = await redisGameState.getPlayerHands(game.id);
-      if (!hands || !hands[seatIndex]) {
-        console.error(`[PLAYER TIMER] ❌ No hand found for player at seat ${seatIndex}`);
-        return;
-      }
-
-      const hand = hands[seatIndex];
-      console.log(`[PLAYER TIMER] Player hand:`, hand);
-
-      // Get current trick to determine what suit to follow
-      const gameState = await GameService.getGameStateForClient(game.id);
-      const currentTrick = gameState.currentTrick || [];
-      
-      let card;
-      if (currentTrick.length > 0) {
-        // Must follow suit - find a card of the same suit as the first card played
-        const leadSuit = currentTrick[0].suit;
-        const followSuitCards = hand.filter(c => c.suit === leadSuit);
-        
-        if (followSuitCards.length > 0) {
-          // Play the first card of the required suit
-          card = followSuitCards[0];
-          console.log(`[PLAYER TIMER] Must follow suit ${leadSuit}, playing ${card.rank}${card.suit}`);
-        } else {
-          // No cards of required suit, play any card
-          card = hand[0];
-          console.log(`[PLAYER TIMER] No ${leadSuit} cards, playing any card ${card.rank}${card.suit}`);
-        }
-      } else {
-        // Leading the trick, play any card
-        card = hand[0];
-        console.log(`[PLAYER TIMER] Leading trick, playing ${card.rank}${card.suit}`);
-      }
+      // Use the same bot logic that already works
+      const botService = new BotService();
+      const card = await botService.playBotCard(game, seatIndex);
       
       if (!card) {
-        console.error(`[PLAYER TIMER] ❌ No cards available for player at seat ${seatIndex}`);
+        console.error(`[PLAYER TIMER] ❌ Bot logic returned no card for player at seat ${seatIndex}`);
         return;
       }
 

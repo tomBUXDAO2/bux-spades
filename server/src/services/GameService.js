@@ -575,6 +575,35 @@ export class GameService {
   }
 
   /**
+   * Get current trick cards from database
+   */
+  static async getCurrentTrick(gameId) {
+    try {
+      const currentTrick = await prisma.trickCard.findMany({
+        where: {
+          trick: {
+            gameId: gameId,
+            isComplete: false
+          }
+        },
+        orderBy: {
+          playOrder: 'asc'
+        },
+        select: {
+          suit: true,
+          rank: true,
+          seatIndex: true
+        }
+      });
+      
+      return currentTrick;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting current trick:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get game state for client - Redis first, database fallback
    */
   static async getGameStateForClient(gameId, userId = null) {
