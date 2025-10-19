@@ -81,6 +81,7 @@ export const createMockGame = (): GameState => {
       bidType: 'REGULAR'
     },
     round: 1,
+    currentRound: 1,
     maxPoints: 500,
     minPoints: -500,
     team1TotalScore: 0,
