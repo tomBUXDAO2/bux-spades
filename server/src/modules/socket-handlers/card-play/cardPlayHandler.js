@@ -85,9 +85,9 @@ class CardPlayHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state (ultra fast)
-      const gameState = await PerformanceMiddleware.timeOperation('getGame', () => 
-        GameService.getGame(gameId)
+      // Get current game state (ultra fast for card play)
+      const gameState = await PerformanceMiddleware.timeOperation('getGameForAction', () => 
+        GameService.getGameForAction(gameId)
       );
       if (!gameState) {
         throw new Error('Game not found');

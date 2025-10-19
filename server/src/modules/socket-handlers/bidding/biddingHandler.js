@@ -178,8 +178,8 @@ class BiddingHandler {
       // Clear any existing timer for this game (player has acted)
       playerTimerService.clearTimer(gameId);
 
-      // Get current game state (with caching)
-      const gameState = await GameService.getGame(gameId);
+      // Get current game state (ultra fast for bidding)
+      const gameState = await GameService.getGameForAction(gameId);
       if (!gameState) {
         throw new Error('Game not found');
       }

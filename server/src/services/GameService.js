@@ -91,6 +91,81 @@ export class GameService {
     }
   }
 
+  // Get ultra-lightweight game state for bidding/card play (ULTRA FAST)
+  static async getGameForAction(gameId) {
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        // Simplified mutex - just wait briefly if operation is in progress
+        if (databaseOperations.has(gameId)) {
+          console.log(`[GAME SERVICE] Database operation already in progress for game ${gameId}, waiting briefly...`);
+          // Wait briefly and then proceed anyway to prevent blocking
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        databaseOperations.add(gameId);
+        
+        // ULTRA LIGHTWEIGHT: Only get absolute essentials for bidding/card play
+        const game = await PerformanceMiddleware.timeOperation('getGameForAction_database_query', () => 
+          prisma.game.findUnique({
+            where: { id: gameId },
+            select: {
+              id: true,
+              status: true,
+              currentPlayer: true,
+              currentRound: true,
+              currentTrick: true,
+              dealer: true,
+              format: true,
+              gimmickVariant: true,
+              players: {
+                select: {
+                  id: true,
+                  userId: true,
+                  seatIndex: true,
+                  teamIndex: true,
+                  isHuman: true
+                },
+                orderBy: { seatIndex: 'asc' }
+              },
+              rounds: {
+                where: { roundNumber: { gte: 1 } },
+                select: {
+                  id: true,
+                  roundNumber: true,
+                  dealerSeatIndex: true
+                },
+                orderBy: { roundNumber: 'desc' },
+                take: 1
+              }
+            }
+          })
+        );
+
+        if (!game) {
+          return null;
+        }
+
+        return game;
+        
+      } catch (error) {
+        retryCount++;
+        console.error(`[GAME SERVICE] Error getting game for action (attempt ${retryCount}/${maxRetries}):`, error);
+        
+        if (retryCount >= maxRetries) {
+          throw error;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
+      } finally {
+        databaseOperations.delete(gameId);
+      }
+    }
+  }
+
   // Get lightweight game state from database (FAST - only essential data)
   static async getGame(gameId) {
     const maxRetries = 3;
