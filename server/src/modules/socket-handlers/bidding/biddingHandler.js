@@ -307,28 +307,8 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
-        // CONSOLIDATED: Using GameService directly instead of OptimizedGameStateService
-        const latestBids = await redisGameState.getPlayerBids(gameId);
+        // Get updated game state from database (single source of truth)
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        
-        // CRITICAL: Force update bidding data from Redis to ensure consistency
-        if (updatedGameState && latestBids) {
-          // Update bidding object with latest Redis data
-          updatedGameState.bidding = {
-            ...updatedGameState.bidding,
-            bids: latestBids,
-            currentBidderIndex: updatedGameState.bidding?.currentBidderIndex || 0,
-            currentPlayer: updatedGameState.currentPlayer
-          };
-          
-          // Update player bids in the players array
-          updatedGameState.players = updatedGameState.players.map(p => ({
-            ...p,
-            bid: latestBids[p.seatIndex] || null
-          }));
-          
-          console.log(`[BIDDING] Forced bidding consistency - Redis bids:`, latestBids, `GameState bids:`, updatedGameState.bidding.bids);
-        }
         
         this.io.to(gameId).emit('bidding_update', {
           gameId,
