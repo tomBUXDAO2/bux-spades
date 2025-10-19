@@ -297,6 +297,17 @@ export const useSocketEventHandlers = ({
 
     const handleSocketError = (error: any) => {
       console.log('🎮 Socket error in useGameState:', error);
+      
+      // Don't treat "not in game" errors as fatal - just redirect to lobby
+      if (error.message && error.message.includes('not in this game')) {
+        console.log('🎮 User not in game, redirecting to lobby');
+        setError('You are not in this game. Redirecting to lobby...');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+        return;
+      }
+      
       setError(error.message || 'Socket connection error');
       setIsLoading(false);
     };

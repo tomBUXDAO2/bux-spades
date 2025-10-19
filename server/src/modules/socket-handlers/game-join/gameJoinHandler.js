@@ -142,6 +142,9 @@ class GameJoinHandler {
             Object.assign(gameState, freshGameState);
           }
           } else {
+            console.log(`[GAME JOIN] User ${userId} not in game ${gameId}, clearing active game from session`);
+            // Clear the invalid active game from session instead of erroring
+            await redisSessionService.updateActiveGame(userId, null);
             this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
             return;
           }
