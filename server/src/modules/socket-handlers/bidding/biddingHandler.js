@@ -609,9 +609,17 @@ class BiddingHandler {
     
     // Handle different game formats and variants
     if (gameState.format === 'WHIZ') {
-      // WHIZ game bot logic
-      const partnerBid = this.getPartnerBid(gameState, seatIndex);
-      return this.botService.calculateWhizBid(gameState, seatIndex, hand);
+      // WHIZ game bot logic - must bid spades or nil
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+      if (numSpades === 0) {
+        return 0; // Must bid nil if no spades
+      } else if (numSpades >= 4) {
+        return numSpades; // Must bid spades if 4+
+      } else {
+        // 1-3 spades: choose nil or spades based on hand strength
+        const hasHighCards = hand.some(card => ['A', 'K', 'Q'].includes(card.rank));
+        return hasHighCards ? numSpades : 0; // Bid spades if strong, nil if weak
+      }
     } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
       // SUICIDE game bot logic
       return await this.calculateSuicideBotBid(gameState, seatIndex, hand);

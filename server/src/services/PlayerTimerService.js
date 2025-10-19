@@ -101,6 +101,37 @@ class PlayerTimerService {
     }
   }
 
+  /**
+   * Auto-bid for player using bot logic
+   */
+  async autoBid(game, playerId) {
+    try {
+      console.log(`[PLAYER TIMER] Auto-bidding for player ${playerId}`);
+      
+      // Get player's hand from Redis
+      const hands = await redisGameState.getPlayerHands(game.id);
+      if (!hands || !hands[game.players.find(p => p.userId === playerId)?.seatIndex]) {
+        console.log(`[PLAYER TIMER] No hand found for auto-bid`);
+        return;
+      }
+      
+      const player = game.players.find(p => p.userId === playerId);
+      const hand = hands[player.seatIndex];
+      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+      
+      // Simple bot logic for timeout bidding
+      const bid = numSpades > 0 ? numSpades : 2;
+      
+      // Use the bidding handler to process the bid
+      const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
+      const biddingHandler = new BiddingHandler(null, null);
+      await biddingHandler.processBid(game.id, playerId, bid, false, false);
+      
+      console.log(`[PLAYER TIMER] Auto-bid ${bid} processed for player ${playerId}`);
+    } catch (error) {
+      console.error('[PLAYER TIMER] Error in autoBid:', error);
+    }
+  }
 
   /**
    * Auto-play card for player using bot logic
