@@ -49,9 +49,31 @@ export const getLeadSuit = (trick: Card[] | undefined): Suit | null => {
  * Check if spades have been broken in the game
  */
 export const hasSpadeBeenPlayed = (game: GameState): boolean => {
-  // Use only the server's spadesBroken flag
+  // RACE CONDITION FIX: Check both the server's spadesBroken flag AND actual card data
   const spadesBroken = (game as any).play?.spadesBroken || false;
-  return spadesBroken;
+  
+  // If spadesBroken flag is true, return true
+  if (spadesBroken) {
+    return true;
+  }
+  
+  // RACE CONDITION FIX: Also check completed tricks for spades
+  if (game.play?.completedTricks) {
+    for (const trick of game.play.completedTricks) {
+      if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
+        return true;
+      }
+    }
+  }
+  
+  // RACE CONDITION FIX: Also check current trick for spades
+  if (game.play?.currentTrick) {
+    if (game.play.currentTrick.some((card: any) => card.suit === 'SPADES')) {
+      return true;
+    }
+  }
+  
+  return false;
 };
 
 /**
@@ -126,13 +148,13 @@ export const getUserTeam = (gameState: GameState, userId: string): number => {
 export const getPlayableCards = (
   gameState: GameState, 
   hand: Card[], 
-  isLeading: boolean, 
+  isLeading: boolean,
   trickCompleted: boolean
 ): Card[] => {
   if (!hand || hand.length === 0) return [];
   
   const specialRules = (gameState as any).specialRules || {};
-  const spadesBroken = (gameState as any).play?.spadesBroken || false;
+  const spadesBroken = hasSpadeBeenPlayed(gameState);
   
   // If not leading, must follow suit
   if (!isLeading && gameState.play?.currentTrick && gameState.play.currentTrick.length > 0) {

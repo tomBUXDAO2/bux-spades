@@ -183,8 +183,36 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   if (isMyTurn && Array.isArray(myHand)) {
     const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
     const spadesBroken = (gameState as any).play?.spadesBroken;
-    console.log(`[CARD RENDERER] spadesBroken check:`, { spadesBroken, gameStatePlay: (gameState as any).play, isLeading });
-    if (isLeading && !spadesBroken && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
+    
+    // RACE CONDITION FIX: Check if spades have been played in the current round
+    // by looking at completed tricks and current trick, not just the spadesBroken flag
+    let spadesActuallyPlayed = spadesBroken;
+    if (!spadesActuallyPlayed && gameState.play?.completedTricks) {
+      // Check completed tricks for spades
+      for (const trick of gameState.play.completedTricks) {
+        if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
+          spadesActuallyPlayed = true;
+          break;
+        }
+      }
+    }
+    if (!spadesActuallyPlayed && gameState.play?.currentTrick) {
+      // Check current trick for spades
+      if (gameState.play.currentTrick.some((card: any) => card.suit === 'SPADES')) {
+        spadesActuallyPlayed = true;
+      }
+    }
+    
+    console.log(`[CARD RENDERER] spadesBroken check:`, { 
+      spadesBroken, 
+      spadesActuallyPlayed,
+      gameStatePlay: (gameState as any).play, 
+      isLeading,
+      completedTricks: gameState.play?.completedTricks?.length,
+      currentTrickLength: gameState.play?.currentTrick?.length
+    });
+    
+    if (isLeading && !spadesActuallyPlayed && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
       effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠') : [];
       if (effectivePlayableCards.length === 0) {
         effectivePlayableCards = myHand; // Only spades left
