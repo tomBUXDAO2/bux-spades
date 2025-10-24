@@ -182,48 +182,19 @@ class GameStartHandler {
             // Trigger bot bid immediately
             await biddingHandler.triggerBotBidIfNeeded(gameId);
           } else if (currentPlayer && currentPlayer.isHuman) {
-            console.log(`[GAME START] Current player is human, checking if bots should bid first`);
-            // Check if there are bots in the game that should bid first
-            const bots = game.players.filter(p => !p.isHuman);
-            if (bots.length > 0) {
-              console.log(`[GAME START] Found ${bots.length} bots, triggering bot bidding first`);
-              // Import and use BiddingHandler
-              const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-              const biddingHandler = new BiddingHandler(this.io, this.socket);
-              // Trigger bot bid immediately
-              await biddingHandler.triggerBotBidIfNeeded(gameId);
+            console.log(`[GAME START] Current player is human, starting timer for bidding`);
+            // Start timer for human player
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
+            if (shouldApplyTimer) {
+              console.log(`[GAME START] Starting timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+              playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
             } else {
-              console.log(`[GAME START] No bots found, starting timer for human player`);
-              // Start timer for human player
-              const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-              const biddingHandler = new BiddingHandler(this.io, this.socket);
-              const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
-              if (shouldApplyTimer) {
-                console.log(`[GAME START] Starting timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-                playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
-              } else {
-                console.log(`[GAME START] Timer not applicable for this game format/situation`);
-              }
+              console.log(`[GAME START] Timer not applicable for this game format/situation`);
             }
           } else {
             console.log(`[GAME START] Current player not found or invalid`);
-          }
-        }
-      } else {
-        // CRITICAL FIX: If no current player is set, find the first bot and trigger bidding
-        console.log(`[GAME START] No current player set, finding first bot to start bidding`);
-        const game = await GameService.getGame(gameId);
-        if (game) {
-          const firstBot = game.players.find(p => !p.isHuman);
-          if (firstBot) {
-            console.log(`[GAME START] Found first bot ${firstBot.user?.username}, triggering bot bid`);
-            // Import and use BiddingHandler
-            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(this.io, this.socket);
-            // Trigger bot bid immediately
-            await biddingHandler.triggerBotBidIfNeeded(gameId);
-          } else {
-            console.log(`[GAME START] No bots found in game`);
           }
         } else {
           console.log(`[GAME START] No current player set - cannot trigger bot bidding`);

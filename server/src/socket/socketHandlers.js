@@ -191,21 +191,6 @@ export function setupSocketHandlers(io) {
         const { TrickCompletionService } = await import('../services/TrickCompletionService.js');
         await TrickCompletionService.startNewRound(gameId, io);
         
-        // CRITICAL: Start timer for first player after hand summary closes and new round is ready
-        const { GameService } = await import('../services/GameService.js');
-        const { PlayerTimerService } = await import('../services/PlayerTimerService.js');
-        const playerTimerService = new PlayerTimerService();
-        playerTimerService.setIO(io);
-        
-        const gameState = await GameService.getGameStateForClient(gameId);
-        if (gameState && gameState.currentPlayer) {
-          const currentPlayer = gameState.players.find(p => p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer));
-          if (currentPlayer && currentPlayer.isHuman) {
-            console.log(`[SOCKET] Starting timer for first player after hand summary closed: ${currentPlayer.userId}`);
-            playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
-          }
-        }
-        
         console.log(`[SOCKET] Started new round for game ${gameId}`);
       } catch (error) {
         console.error('[SOCKET] Error handling hand_summary_continue:', error);

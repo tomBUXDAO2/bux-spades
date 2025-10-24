@@ -127,7 +127,6 @@ export default function GameTableModular({
   const [trickCompleted, setTrickCompleted] = useState(false);
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
-  const [cardBeingPlayed, setCardBeingPlayed] = useState<Card | null>(null);
   const [pendingBid, setPendingBid] = useState<{ playerId: string; bid: number } | null>(null);
   
   // League states
@@ -542,7 +541,6 @@ export default function GameTableModular({
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
-    setCardBeingPlayed,
     setLeagueReady,
     setSeatReplacement,
     setLobbyMessages,
@@ -613,8 +611,7 @@ export default function GameTableModular({
     handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
       setGameState,
       setPendingPlayedCard,
-      playCardSound,
-      setCardBeingPlayed
+      playCardSound
     });
   };
   
@@ -1167,7 +1164,6 @@ export default function GameTableModular({
                     dealtCardCount={dealtCardCount}
                     currentTrick={(gameState as any)?.play?.currentTrick || []}
                     trickCompleted={trickCompleted}
-                    cardBeingPlayed={cardBeingPlayed}
                     onPlayCard={handlePlayCardWrapper}
                     isPlayer={isPlayer}
                     isBot={isBot}

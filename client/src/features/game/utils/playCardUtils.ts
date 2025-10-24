@@ -8,7 +8,6 @@ export interface PlayCardCallbacks {
   setGameState: (updater: (prev: GameState) => GameState) => void;
   setPendingPlayedCard: (card: Card) => void;
   playCardSound: () => void;
-  setCardBeingPlayed: (card: Card | null) => void;
 }
 
 /**
@@ -91,12 +90,6 @@ export const handlePlayCard = (
   callbacks: PlayCardCallbacks
 ) => {
   if (!validatePlayCard(card, currentPlayerId, currentPlayer, gameState)) return;
-  
-  // CRITICAL: Lock hand cards immediately to prevent hover interference
-  callbacks.setCardBeingPlayed(card);
-  
-  // REMOVED: Optimistic next player movement was causing bot bidding issues
-  // The server will handle player transitions properly
   
   callbacks.playCardSound();
   updateLocalHand(card, currentPlayerId!, callbacks);
