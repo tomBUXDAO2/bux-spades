@@ -1118,6 +1118,7 @@ export class GameService {
           type: player.isHuman ? 'human' : 'bot',
           bid: playerBids[player.seatIndex] || null,
           tricks: tricksWon,
+          isBlindNil: playerStat?.isBlindNil || false, // Include blind nil information
           // CRITICAL: Ensure user object is included for client
           user: player.user ? {
             id: player.user.id,

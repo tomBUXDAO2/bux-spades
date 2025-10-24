@@ -307,8 +307,18 @@ class BiddingHandler {
           currentPlayer: nextPlayer?.userId
         }).catch(err => console.error('[BIDDING] Async currentPlayer update failed:', err));
 
+        // CRITICAL FIX: Ensure currentPlayer is properly updated before emitting event
+        // Wait a moment for database update to be committed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Get updated game state from database (single source of truth)
         const updatedGameState = await GameService.getGameStateForClient(gameId);
+        
+        // CRITICAL FIX: Force currentPlayer to be correct in the emitted game state
+        if (updatedGameState) {
+          updatedGameState.currentPlayer = nextPlayer?.userId;
+          console.log(`[BIDDING] Forcing currentPlayer in emitted gameState to: ${nextPlayer?.userId}`);
+        }
         
         this.io.to(gameId).emit('bidding_update', {
           gameId,

@@ -105,6 +105,11 @@ export const useSocketEventHandlers = ({
           // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
           const newState = normalizeGameState(biddingData.gameState);
           
+          // CRITICAL FIX: Log the currentPlayer from server to debug the issue
+          console.log('[BIDDING UPDATE] Server currentPlayer:', biddingData.gameState.currentPlayer);
+          console.log('[BIDDING UPDATE] My userId:', userId);
+          console.log('[BIDDING UPDATE] Is my turn?', biddingData.gameState.currentPlayer === userId);
+          
         // Defensive: If we have existing state and new state has nulls, preserve the old bids
         // BUT ONLY if we're in the same round - don't preserve bids across rounds
         if (currentGameState?.bidding?.bids && newState?.bidding?.bids && 
@@ -134,6 +139,15 @@ export const useSocketEventHandlers = ({
             };
           });
         }
+      }
+    };
+
+    const handleRoundStarted = (roundData: any) => {
+      console.log('🎮 Round started event received:', roundData);
+      if (roundData && roundData.gameId === gameId && roundData.gameState) {
+        console.log('🎮 Round started - setting game state with currentPlayer:', roundData.gameState.currentPlayer);
+        const newState = normalizeGameState(roundData.gameState);
+        setGameState(newState);
       }
     };
 
@@ -263,24 +277,6 @@ export const useSocketEventHandlers = ({
       }
     };
 
-    const handleRoundStarted = (roundData: any) => {
-      console.log('🎮 Round started event received:', roundData);
-      if (roundData && roundData.gameId === gameId) {
-        (setGameState as any)((prevState: any) => {
-          if (!prevState) return prevState;
-          
-          // CRITICAL: Preserve bidding data from previous state
-          const gameStateWithBidding = {
-            ...roundData.gameState,
-            bidding: roundData.gameState.bidding || prevState.bidding
-          };
-          
-          return normalizeGameState(gameStateWithBidding);
-        });
-      }
-    };
-
-
     const handleGameStarted = (gameData: any) => {
       console.log('🎮 Game started event received:', gameData);
       if (gameData && gameData.gameId === gameId) {
@@ -326,11 +322,11 @@ export const useSocketEventHandlers = ({
     if (socket) {
       socket.on('game_joined', handleGameJoined);
       socket.on('game_update', handleGameUpdate);
-      socket.on('bidding_update', handleBiddingUpdate);
-      socket.on('card_played', handleCardPlayed);
+    socket.on('bidding_update', handleBiddingUpdate);
+    socket.on('round_started', handleRoundStarted);
+    socket.on('card_played', handleCardPlayed);
       // Trick completion handled in GameEventHandlers.tsx
       socket.on('trick_started', handleTrickStarted);
-      socket.on('round_started', handleRoundStarted);
       socket.on('game_started', handleGameStarted);
       // Game completion handled in GameEventHandlers.tsx
       socket.on('game_deleted', handleGameDeleted);
@@ -342,11 +338,11 @@ export const useSocketEventHandlers = ({
       if (socket) {
         socket.off('game_joined', handleGameJoined);
         socket.off('game_update', handleGameUpdate);
-        socket.off('bidding_update', handleBiddingUpdate);
-        socket.off('card_played', handleCardPlayed);
+      socket.off('bidding_update', handleBiddingUpdate);
+      socket.off('round_started', handleRoundStarted);
+      socket.off('card_played', handleCardPlayed);
         // Trick completion handled in GameEventHandlers.tsx
         socket.off('trick_started', handleTrickStarted);
-        socket.off('round_started', handleRoundStarted);
         socket.off('game_started', handleGameStarted);
         // Game completion handled in GameEventHandlers.tsx
         socket.off('game_deleted', handleGameDeleted);

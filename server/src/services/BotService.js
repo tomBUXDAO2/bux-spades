@@ -273,7 +273,8 @@ class BotService {
         currentRound: game.currentRound,
         currentTrick: game.currentTrick,
         playersCount: game.players?.length,
-        handsCount: game.hands?.length
+        handsCount: game.hands?.length,
+        specialRules: game.specialRules
       });
       
       bot = game.players[seatIndex];
@@ -321,6 +322,7 @@ class BotService {
 
     // Get special rules from game
     const specialRules = game.specialRules || {};
+    console.log(`[BOT SERVICE] Special rules for bot ${botUsername}:`, specialRules);
     
     // CRITICAL: Get spadesBroken from Redis cache for real-time accuracy
     const cachedGameState = await redisGameState.default.getGameState(game.id);
@@ -374,8 +376,12 @@ class BotService {
         if (specialRules.assassin) {
           const spades = normalizedHand.filter(card => card.suit === 'SPADES');
           if (spades.length > 0) {
-            playableCards = spades;
-            console.log(`[BOT SERVICE] ASSASSIN: Bot ${botUsername} MUST cut with spades`);
+            playableCards = spades; // CRITICAL: ONLY spades are playable
+            console.log(`[BOT SERVICE] ASSASSIN: Bot ${botUsername} MUST cut with spades, available:`, spades.map(c => `${c.suit}${c.rank}`));
+          } else {
+            console.log(`[BOT SERVICE] ASSASSIN: Bot ${botUsername} has no spades to cut with!`);
+            // If no spades, bot cannot play any card (this should never happen in a valid game)
+            playableCards = [];
           }
         }
         
@@ -393,15 +399,35 @@ class BotService {
           cardToPlay = playableCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
           console.log(`[BOT SERVICE] Bot ${botUsername} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         } else {
-          // Fallback (should not happen)
+          // CRITICAL: If special rules left no valid cards, ignore special rules and play any card
+          console.error(`[BOT SERVICE] ERROR: Special rules left bot ${botUsername} with no valid cards! Ignoring special rules.`);
           cardToPlay = normalizedHand.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-          console.log(`[BOT SERVICE] Bot ${botUsername} fallback, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+          console.log(`[BOT SERVICE] Bot ${botUsername} emergency fallback, playing ${cardToPlay.suit}${cardToPlay.rank}`);
         }
       }
     }
 
     if (!cardToPlay) {
       cardToPlay = hand[0]; // Fallback
+    }
+
+    // CRITICAL: Final validation - ensure card is legal for Assassin mode
+    if (specialRules.assassin && currentTrickCards.length > 0) {
+      const leadSuit = currentTrickCards[0].suit;
+      const hasLeadSuit = normalizedHand.some(card => card.suit === leadSuit);
+      
+      if (!hasLeadSuit && cardToPlay.suit !== 'SPADES') {
+        console.error(`[BOT SERVICE] ASSASSIN VALIDATION FAILED: Bot ${botUsername} is void in ${leadSuit} but chose ${cardToPlay.suit}${cardToPlay.rank} instead of spades!`);
+        // Force bot to play a spade
+        const spades = normalizedHand.filter(card => card.suit === 'SPADES');
+        if (spades.length > 0) {
+          cardToPlay = spades.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
+          console.log(`[BOT SERVICE] ASSASSIN CORRECTION: Bot ${botUsername} forced to play ${cardToPlay.suit}${cardToPlay.rank}`);
+        } else {
+          console.error(`[BOT SERVICE] ASSASSIN ERROR: Bot ${botUsername} has no spades to cut with!`);
+          return null;
+        }
+      }
     }
 
     // CRITICAL: Validate that the chosen card is actually in the bot's hand
@@ -430,6 +456,7 @@ class BotService {
         return null;
       }
     }
+
 
     console.log(`[BOT SERVICE] Bot ${botUsername} playing ${cardToPlay.suit}${cardToPlay.rank}`);
 
@@ -607,7 +634,8 @@ class BotService {
       isLast,
       partnerHasPlayed,
       partnerCard,
-      scenario
+      scenario,
+      specialRules: game.specialRules || {} // CRITICAL: Include special rules for Assassin/Screamer enforcement
     };
   }
 
@@ -728,9 +756,20 @@ class BotService {
   }
 
   playNormalPressure(ctx) {
-    const { hand, isLeading, leadSuit, partnerHasPlayed, partnerCard } = ctx;
+    const { hand, isLeading, leadSuit, partnerHasPlayed, partnerCard, specialRules, spadesBroken } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
+      // ASSASSIN: Must lead spades if broken and have spades
+      if (specialRules.assassin && spadesBroken) {
+        const spades = suits['SPADES'] || [];
+        if (spades.length > 0) {
+          console.log(`[BOT SERVICE][AI_V2] ASSASSIN: Bot MUST lead spades (broken), available:`, spades.map(c => `${c.suit}${c.rank}`));
+          return this.sortByRankAsc(spades)[0]; // Play lowest spade
+        } else {
+          console.log(`[BOT SERVICE][AI_V2] ASSASSIN: Bot has no spades to lead with!`);
+        }
+      }
+      
       // Lead safe low from longest non-spade; avoid leading easy overtake
       let bestSuit = null; let bestLen = 0;
       ['HEARTS','DIAMONDS','CLUBS'].forEach(s => { const len=(suits[s]||[]).length; if (len>bestLen){bestLen=len; bestSuit=s;} });
@@ -749,7 +788,31 @@ class BotService {
       const win = this.minimalWinningFollowing(ctx, hand);
       return win || this.sortByRankAsc(leadCards)[0];
     }
-    // Void: dump highest losers (shed risk), avoid cutting unless necessary
+    // Void: apply special rules first
+    
+    // ASSASSIN: Must cut with spades when void
+    if (specialRules.assassin) {
+      const spades = hand.filter(c => c.suit === 'SPADES');
+      if (spades.length > 0) {
+        console.log(`[BOT SERVICE][AI_V2] ASSASSIN: Bot MUST cut with spades, available:`, spades.map(c => `${c.suit}${c.rank}`));
+        return this.sortByRankAsc(spades)[0]; // Play lowest spade
+      } else {
+        console.log(`[BOT SERVICE][AI_V2] ASSASSIN: Bot has no spades to cut with!`);
+        // If no spades, play any card (should never happen in valid game)
+        return this.sortByRankDesc(hand)[0];
+      }
+    }
+    
+    // SCREAMER: Cannot play spades unless only have spades
+    if (specialRules.screamer) {
+      const nonSpades = hand.filter(c => c.suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        console.log(`[BOT SERVICE][AI_V2] SCREAMER: Bot cannot play spades, has non-spades available`);
+        return this.sortByRankDesc(nonSpades)[0];
+      }
+    }
+    
+    // Default void behavior: dump highest losers (shed risk), avoid cutting unless necessary
     const nonSp = hand.filter(c => c.suit !== 'SPADES');
     const dumpPool = nonSp.length ? nonSp : hand;
     return this.sortByRankDesc(dumpPool)[0];

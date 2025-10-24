@@ -219,6 +219,7 @@ export default function GameTablePlayers({
     // The server's bidding.bids array is indexed by seatIndex (0,1,2,3)
     const actualSeatIndex = player.seatIndex;
     let rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    const isBlindNil = (gameState as any).players?.[actualSeatIndex]?.isBlindNil || player.isBlindNil || false;
     
     // OPTIMISTIC UI: Show pending bid immediately
     if (pendingBid && pendingBid.playerId === player.id) {
@@ -232,9 +233,10 @@ export default function GameTablePlayers({
     
     let madeStatus = null;
     const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
-    const formatBid = (bid: number | null) => {
+    const formatBid = (bid: number | null, isBlindNil: boolean = false) => {
       if (bid === null || bid === undefined) return "0";
       if (bid === -1) return "bn";
+      if (bid === 0 && isBlindNil) return "bn";
       if (bid === 0) return "n";
       return bid.toString();
     };
@@ -532,7 +534,7 @@ export default function GameTablePlayers({
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), color: 'black' }}>/</span>
                 <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
-                  {hasBid ? formatBid(bidCount) : "0"}
+                  {hasBid ? formatBid(bidCount, isBlindNil) : "0"}
                 </span>
                 <span style={{ fontSize: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), minWidth: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), textAlign: 'center' }}>
                   {madeStatus}

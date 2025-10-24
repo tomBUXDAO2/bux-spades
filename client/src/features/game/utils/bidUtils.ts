@@ -43,9 +43,16 @@ export const emitBidEvent = (
   bid: number,
   gameId: string,
   currentPlayerId: string,
-  socket: any
+  socket: any,
+  isBlindNil: boolean = false
 ) => {
-  const payload = { gameId, userId: currentPlayerId, bid };
+  const payload = { 
+    gameId, 
+    userId: currentPlayerId, 
+    bid, 
+    isNil: bid === 0,
+    isBlindNil 
+  };
   socket?.emit("make_bid", payload);
 };
 
@@ -74,6 +81,6 @@ export const handleBid = (
   if (!validateBidConditions(bid, currentPlayerId, currentPlayer, gameState)) return;
   
   callbacks.playBidSound();
-  emitBidEvent(bid, gameState.id, currentPlayerId!, socket);
+  emitBidEvent(bid, gameState.id, currentPlayerId!, socket, callbacks.isBlindNil);
   handlePostBidActions(callbacks);
 };

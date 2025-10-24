@@ -108,6 +108,11 @@ export default function GameTableModular({
   const [showGameInfo, setShowGameInfo] = useState(false);
   const [botWarningOpen, setBotWarningOpen] = useState(false);
   
+  // Blind nil states
+  const [showBlindNilModal, setShowBlindNilModal] = useState(false);
+  const [isBlindNil, setIsBlindNil] = useState(false);
+  const [blindNilDismissed, setBlindNilDismissed] = useState(false);
+  
   // Game data
   const [handSummaryData, setHandSummaryData] = useState<any>(null);
   const [finalScores, setFinalScores] = useState<{ team1Score: number; team2Score: number } | null>(null);
@@ -571,14 +576,36 @@ export default function GameTableModular({
     // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
     
-    // During BIDDING: ONLY reveal cards if it's your turn AND you haven't bid yet
+    // During BIDDING: Handle blind nil flow
     if (gameState?.status === 'BIDDING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
       const isMyTurn = gameState?.currentPlayer === currentPlayerId;
       const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
       const haveBid = myBid !== null && myBid !== undefined;
+      const allowBlindNil = (gameState as any)?.rules?.allowBlindNil || (gameState as any)?.blindNilAllowed;
       
-      // FIXED: Only reveal cards when it's your turn and you haven't bid yet
-      if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current) {
+      // DEBUG: Log blind nil conditions
+      console.log('[BLIND NIL DEBUG]', {
+        isMyTurn,
+        haveBid,
+        cardsRevealedDuringBidding: cardsRevealedDuringBiddingRef.current,
+        allowBlindNil,
+        blindNilDismissed,
+        showBlindNilModal,
+        gameStateRules: (gameState as any)?.rules,
+        gameStateBlindNilAllowed: (gameState as any)?.blindNilAllowed
+      });
+      
+      // BLIND NIL LOGIC: Show blind nil modal before revealing cards
+      if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && allowBlindNil && !blindNilDismissed) {
+        console.log('[BLIND NIL] Showing blind nil modal');
+        setDealingComplete(true);
+        setShowBlindNilModal(true);
+        // Don't reveal cards yet - wait for blind nil decision
+        return;
+      }
+      
+      // FIXED: Only reveal cards when it's your turn and you haven't bid yet (and not showing blind nil modal)
+      if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && !showBlindNilModal) {
         setDealingComplete(true);
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
@@ -604,15 +631,43 @@ export default function GameTableModular({
     if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING') {
       setCardsRevealed(true);
     }
-  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex]);
+  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex, showBlindNilModal, blindNilDismissed]);
   
   // Game action handlers
+  const [isPlayingCard, setIsPlayingCard] = useState(false);
+  
+  // Reset playing card flag when game state changes
+  useEffect(() => {
+    setIsPlayingCard(false);
+  }, [gameState?.currentPlayer, gameState?.status]);
+
+  // Reset blind nil state when game state changes
+  useEffect(() => {
+    if (gameState?.status !== 'BIDDING') {
+      setShowBlindNilModal(false);
+      setIsBlindNil(false);
+      setBlindNilDismissed(false);
+    }
+  }, [gameState?.status]);
+  
   const handlePlayCardWrapper = (card: Card) => {
+    // Prevent multiple rapid card plays
+    if (isPlayingCard) {
+      console.log('[GAME TABLE] Card play blocked - already playing a card');
+      return;
+    }
+    
+    setIsPlayingCard(true);
     handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
       setGameState,
       setPendingPlayedCard,
       playCardSound
     });
+    
+    // Reset the flag after a delay
+    setTimeout(() => {
+      setIsPlayingCard(false);
+    }, 1000);
   };
   
   const handleBidWrapper = (bid: number) => {
@@ -627,8 +682,32 @@ export default function GameTableModular({
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
       playBidSound,
       setCardsRevealed,
-      isBlindNil: false
+      isBlindNil: isBlindNil
     });
+  };
+
+  // Blind nil handlers
+  const handleBlindNil = () => {
+    console.log('[BLIND NIL] Player chose blind nil');
+    setIsBlindNil(true);
+    setShowBlindNilModal(false);
+    setCardsRevealed(true);
+    cardsRevealedDuringBiddingRef.current = true;
+    
+    // Submit blind nil bid (bid 0 with blind nil flag)
+    handleBid(0, currentPlayerId, currentPlayer, gameState, socket, {
+      playBidSound,
+      setCardsRevealed: () => setCardsRevealed(true),
+      isBlindNil: true
+    });
+  };
+
+  const handleRegularBid = () => {
+    console.log('[BLIND NIL] Player chose regular bidding');
+    setBlindNilDismissed(true);
+    setShowBlindNilModal(false);
+    setCardsRevealed(true);
+    cardsRevealedDuringBiddingRef.current = true;
   };
 
   // SIMPLIFIED BIDDING: Just track if we're in bidding phase
@@ -1127,9 +1206,9 @@ export default function GameTableModular({
                 isStarting={isStarting}
                 dealingComplete={dealingComplete}
                 cardsRevealed={cardsRevealed}
-                showBlindNilModal={false}
-                isBlindNil={false}
-                blindNilDismissed={false}
+                showBlindNilModal={showBlindNilModal}
+                isBlindNil={isBlindNil}
+                blindNilDismissed={blindNilDismissed}
                 myPlayerIndex={myPlayerIndex}
                 currentPlayer={currentPlayer}
                 isPlayer={isPlayer}
@@ -1141,8 +1220,8 @@ export default function GameTableModular({
                 hideStartButton={isAdminPanelOpen}
                 onStartGame={handleStartGameWrapper}
                 onBid={handleBidWrapper}
-                onBlindNil={() => {}}
-                onRegularBid={() => {}}
+                onBlindNil={handleBlindNil}
+                onRegularBid={handleRegularBid}
               />
             </div>
 
@@ -1167,6 +1246,7 @@ export default function GameTableModular({
                     onPlayCard={handlePlayCardWrapper}
                     isPlayer={isPlayer}
                     isBot={isBot}
+                    isPlayingCard={isPlayingCard}
                   />
                 ) : (
                   <SpectatorHandRenderer

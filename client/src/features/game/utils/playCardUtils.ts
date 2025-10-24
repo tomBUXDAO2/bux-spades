@@ -4,6 +4,10 @@
 import type { Card } from "../../../types/game";
 import type { GameState } from "../../../types/game";
 
+// Debounce mechanism to prevent multiple rapid card plays
+let lastCardPlayTime = 0;
+const CARD_PLAY_DEBOUNCE_MS = 500; // 500ms debounce
+
 export interface PlayCardCallbacks {
   setGameState: (updater: (prev: GameState) => GameState) => void;
   setPendingPlayedCard: (card: Card) => void;
@@ -23,6 +27,14 @@ export const validatePlayCard = (
     console.error('Cannot play card: No current player or player ID');
     return false;
   }
+  
+  // Debounce check - prevent rapid card plays
+  const now = Date.now();
+  if (now - lastCardPlayTime < CARD_PLAY_DEBOUNCE_MS) {
+    console.log('[CLIENT] Card play debounced - too soon after last play');
+    return false;
+  }
+  lastCardPlayTime = now;
   
   // Basic UI state check only - backend will validate turn
   console.log('[CLIENT] handlePlayCard called:', { 

@@ -152,9 +152,15 @@ export default function HandSummaryModal({
                       let bagScore = 0;
                       
                       if (bid === 0) {
-                        // Nil bid - solo mode: 50/-50, blind nils: 100/-100
-                        // For now, assume regular nil (not blind nil) since isBlindNil is not available in player data
-                        nilPoints = tricks === 0 ? 50 : -50;
+                        // Nil bid - check if it's blind nil
+                        const isBlindNil = (gameState as any).players?.[index]?.isBlindNil || player.isBlindNil || false;
+                        if (isBlindNil) {
+                          // Blind nil: 200/-200
+                          nilPoints = tricks === 0 ? 200 : -200;
+                        } else {
+                          // Regular nil: 100/-100
+                          nilPoints = tricks === 0 ? 100 : -100;
+                        }
                       } else {
                         // Regular bid
                         if (tricks === bid) {

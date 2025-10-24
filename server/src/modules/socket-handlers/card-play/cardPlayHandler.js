@@ -151,6 +151,21 @@ class CardPlayHandler {
         });
 
         console.log(`[CARD PLAY] Card rejected - turn remains with ${userId}`);
+        
+        // CRITICAL FIX: If this is a bot and the card was rejected, force bot to retry
+        if (isBot) {
+          console.log(`[CARD PLAY] Bot card rejected - forcing bot retry for seat ${player.seatIndex}`);
+          // Add a small delay to prevent rapid retries
+          setTimeout(async () => {
+            try {
+              const { triggerBotPlayIfNeeded } = await import('../card-play/cardPlayHandler.js');
+              await triggerBotPlayIfNeeded(gameId);
+            } catch (error) {
+              console.error(`[CARD PLAY] Error triggering bot retry:`, error);
+            }
+          }, 100);
+        }
+        
         return;
       }
 
@@ -236,14 +251,25 @@ class CardPlayHandler {
               console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
               
               // Clear table cards first (after 2 seconds)
-              setTimeout(() => {
+              setTimeout(async () => {
                 console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
                 this.io.to(gameId).emit('clear_table_cards', { gameId });
                 
                 // THEN start new trick after table is cleared
                 if (!trickResult.isRoundComplete) {
+                  // CRITICAL FIX: Check if game still exists before creating new trick
+                  const gameStillExists = await GameService.getGame(gameId);
+                  if (!gameStillExists) {
+                    console.log(`[CARD PLAY] Game ${gameId} no longer exists, skipping new trick creation`);
+                    return;
+                  }
+                  
                   console.log(`[CARD PLAY] Starting new trick AFTER table cleared - round not complete, winningSeatIndex: ${trickResult.winningSeatIndex}`);
-                  this.startNewTrickAfterClear(gameId, currentRound.id, gameState.currentTrick + 1, trickResult.winningSeatIndex);
+                  try {
+                    await this.startNewTrickAfterClear(gameId, currentRound.id, gameState.currentTrick + 1, trickResult.winningSeatIndex);
+                  } catch (error) {
+                    console.log(`[CARD PLAY] Error creating new trick (game may be cleaned up): ${error.message}`);
+                  }
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
@@ -410,6 +436,16 @@ class CardPlayHandler {
   async createNewTrick(gameId, roundId, trickNumber, leadSeatIndex) {
     console.log(`[CARD PLAY] createNewTrick called - gameId: ${gameId}, roundId: ${roundId}, trickNumber: ${trickNumber}, leadSeatIndex: ${leadSeatIndex}`);
     try {
+      // CRITICAL FIX: Check if round still exists before creating trick
+      const roundExists = await prisma.round.findUnique({
+        where: { id: roundId }
+      });
+      
+      if (!roundExists) {
+        console.log(`[CARD PLAY] Round ${roundId} no longer exists, skipping trick creation`);
+        throw new Error(`Round ${roundId} no longer exists`);
+      }
+      
       const trick = await prisma.trick.create({
         data: {
           roundId,

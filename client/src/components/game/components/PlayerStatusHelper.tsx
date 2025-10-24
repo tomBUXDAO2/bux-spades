@@ -97,10 +97,12 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
   const rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex] || 
                  (gameState as any).players?.[actualSeatIndex]?.bid ||
                  player.bid;
+  const isBlindNil = (gameState as any).players?.[actualSeatIndex]?.isBlindNil || player.isBlindNil || false;
   const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
   
-  const formatBid = (bid: number | null) => {
+  const formatBid = (bid: number | null, isBlindNil: boolean = false) => {
     if (bid === null || bid === undefined) return '?';
+    if (bid === 0 && isBlindNil) return 'Blind Nil';
     if (bid === 0) return 'Nil';
     if (bid === -1) return 'Blind Nil';
     return bid.toString();
@@ -116,7 +118,7 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
     
     return {
       rawBid,
-      formattedBid: formatBid(rawBid),
+      formattedBid: formatBid(rawBid, isBlindNil),
       totalBid,
       tricksLeft,
       isPartnerGame: true
@@ -125,7 +127,7 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
 
   return {
     rawBid,
-    formattedBid: formatBid(rawBid),
+    formattedBid: formatBid(rawBid, isBlindNil),
     tricksLeft,
     isPartnerGame: false
   };

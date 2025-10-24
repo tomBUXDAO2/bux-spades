@@ -20,6 +20,7 @@ interface CardRendererProps {
   onPlayCard: (card: Card) => void;
   isPlayer: (p: Player | Bot | null) => p is Player;
   isBot: (p: Player | Bot | null) => p is Bot;
+  isPlayingCard?: boolean;
 }
 
 // Optimized card image component - no loading states during gameplay
@@ -168,7 +169,8 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   dealtCardCount,
   currentTrick,
   trickCompleted,
-  onPlayCard
+  onPlayCard,
+  isPlayingCard = false
 }) => {
   if (!myHand || myHand.length === 0) return null;
   
@@ -244,16 +246,16 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       <div className="flex items-center justify-center h-full w-full">
         <div className="flex items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
-          const isPlayable = (gameState.status === "PLAYING" &&
+          const isPlayable = !isPlayingCard && ((gameState.status === "PLAYING" &&
             gameState.currentPlayer === currentPlayerId &&
             Array.isArray(effectivePlayableCards) && effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
-            (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
+            (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId));
           const isVisible = index < visibleCount;
           
           return (
             <div
               key={`${card.suit}${card.rank}`}
-              className={`relative transition-opacity duration-300 ${isPlayable ? 'cursor-pointer hover:z-20 hover:-translate-y-3 hover:shadow-lg' : 'cursor-not-allowed'} ${!isPlayable && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+              className={`relative transition-all duration-300 ${isPlayable && !isPlayingCard ? 'cursor-pointer hover:z-20 hover:shadow-lg hover:-translate-y-3' : 'cursor-not-allowed'} ${(!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
               style={{
                 width: `${cardDimensions.cardUIWidth}px`,
                 height: `${cardDimensions.cardUIHeight}px`,
@@ -263,10 +265,23 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 opacity: isVisible ? 1 : 0,
                 filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
               }}
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (isPlayable && gameState.status === "PLAYING") {
-                  onPlayCard(card);
+                  // Add a small delay to prevent rapid clicks
+                  setTimeout(() => {
+                    onPlayCard(card);
+                  }, 50);
                 }
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onMouseUp={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
               <div className="relative p-0 m-0" style={{ padding: 0, margin: 0, lineHeight: 0, boxSizing: 'border-box' }}>
