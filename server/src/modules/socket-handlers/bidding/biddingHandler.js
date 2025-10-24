@@ -595,12 +595,75 @@ class BiddingHandler {
       this.biddingBots.delete(gameId);
       console.log(`[BIDDING] Removed game ${gameId} from bidding bots mutex before processing bid`);
       
-      // Process bot's bid
-      await this.processBid(gameId, playerId, botBid, botBid === 0, false);
+      // Process bot's bid with timeout protection
+      try {
+        await Promise.race([
+          this.processBid(gameId, playerId, botBid, botBid === 0, false),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Bot bid timeout')), 3000))
+        ]);
+        console.log(`[BIDDING] Bot bid completed successfully for ${playerUsername}`);
+      } catch (error) {
+        console.error(`[BIDDING] Bot bid failed or timed out for ${playerUsername}:`, error);
+        // Force advance to next player if bot bid fails
+        await this.forceAdvanceToNextPlayer(gameId);
+      }
     } catch (error) {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
       // Remove from bidding bots set on error too
       this.biddingBots.delete(gameId);
+    }
+  }
+
+  /**
+   * Force advance to next player when bot bidding fails
+   */
+  async forceAdvanceToNextPlayer(gameId) {
+    try {
+      console.log(`[BIDDING] Force advancing to next player for game ${gameId}`);
+      
+      // Get current game state
+      const gameState = await redisGameState.getGameState(gameId);
+      if (!gameState) {
+        console.log(`[BIDDING] No game state found for force advance`);
+        return;
+      }
+
+      // Find current player index
+      const currentPlayerIndex = gameState.players.findIndex(p => p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer));
+      if (currentPlayerIndex === -1) {
+        console.log(`[BIDDING] Current player not found for force advance`);
+        return;
+      }
+
+      // Move to next player
+      const nextPlayerIndex = (currentPlayerIndex + 1) % 4;
+      const nextPlayer = gameState.players[nextPlayerIndex];
+      if (!nextPlayer) {
+        console.log(`[BIDDING] Next player not found for force advance`);
+        return;
+      }
+
+      const nextPlayerId = nextPlayer.id || nextPlayer.userId;
+      console.log(`[BIDDING] Force advancing from player ${gameState.currentPlayer} to ${nextPlayerId}`);
+
+      // Update game state
+      gameState.currentPlayer = nextPlayerId;
+      await redisGameState.setGameState(gameId, gameState);
+
+      // Emit game update
+      this.io.to(gameId).emit('game_update', {
+        gameId,
+        gameState: gameState
+      });
+
+      // Trigger bot bidding for next player if it's a bot
+      if (!nextPlayer.isHuman) {
+        console.log(`[BIDDING] Next player is bot, triggering bot bid`);
+        setTimeout(() => this.triggerBotBidIfNeeded(gameId), 100);
+      }
+
+    } catch (error) {
+      console.error('[BIDDING] Error in forceAdvanceToNextPlayer:', error);
     }
   }
 
