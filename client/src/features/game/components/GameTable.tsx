@@ -608,26 +608,13 @@ export default function GameTableModular({
     }
   }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex]);
   
-  // Helper function to get next player ID
-  const getNextPlayerId = () => {
-    if (!gameState.players || gameState.players.length !== 4) return null;
-    
-    const currentPlayerIndex = gameState.players.findIndex(p => p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer));
-    if (currentPlayerIndex === -1) return null;
-    
-    const nextPlayerIndex = (currentPlayerIndex + 1) % 4;
-    const nextPlayer = gameState.players[nextPlayerIndex];
-    return nextPlayer ? (nextPlayer.id || nextPlayer.userId) : null;
-  };
-
   // Game action handlers
   const handlePlayCardWrapper = (card: Card) => {
     handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
       setGameState,
       setPendingPlayedCard,
       playCardSound,
-      setCardBeingPlayed,
-      getNextPlayerId
+      setCardBeingPlayed
     });
   };
   

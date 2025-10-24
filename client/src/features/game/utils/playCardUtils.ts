@@ -9,7 +9,6 @@ export interface PlayCardCallbacks {
   setPendingPlayedCard: (card: Card) => void;
   playCardSound: () => void;
   setCardBeingPlayed: (card: Card | null) => void;
-  getNextPlayerId: () => string | null;
 }
 
 /**
@@ -96,15 +95,8 @@ export const handlePlayCard = (
   // CRITICAL: Lock hand cards immediately to prevent hover interference
   callbacks.setCardBeingPlayed(card);
   
-  // OPTIMISTIC: Move to next player immediately for faster gameplay
-  const nextPlayerId = callbacks.getNextPlayerId();
-  if (nextPlayerId) {
-    callbacks.setGameState(prev => ({
-      ...prev,
-      currentPlayer: nextPlayerId
-    }));
-    console.log('[OPTIMISTIC PLAY] Moved to next player:', nextPlayerId);
-  }
+  // REMOVED: Optimistic next player movement was causing bot bidding issues
+  // The server will handle player transitions properly
   
   callbacks.playCardSound();
   updateLocalHand(card, currentPlayerId!, callbacks);
