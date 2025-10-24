@@ -1404,7 +1404,11 @@ async function createGameFromLine(gameLine) {
       maxPoints: settings.maxPoints,
       nilAllowed: settings.nilAllowed,
       blindNilAllowed: settings.blindNilAllowed,
-      specialRules: settings.specialRule && settings.specialRule !== 'NONE' ? { specialRule: settings.specialRule } : null,
+      specialRules: settings.specialRule && settings.specialRule !== 'NONE' ? 
+        { 
+          screamer: settings.specialRule === 'SCREAMER',
+          assassin: settings.specialRule === 'ASSASSIN'
+        } : null,
       buyIn: settings.coins,
         currentRound: 1,
         currentTrick: 0,
