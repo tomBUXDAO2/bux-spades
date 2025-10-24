@@ -397,4 +397,104 @@ export class DetailedStatsService {
       throw error;
     }
   }
+
+  // Get leaderboard data
+  static async getLeaderboard(filters = {}) {
+    try {
+      const {
+        mode = 'ALL',
+        format = 'ALL', 
+        isLeague = null,
+        limit = 10,
+        sortBy = 'winRate'
+      } = filters;
+
+      // Build where clause for game filtering
+      const gameWhere = {
+        status: 'FINISHED'
+      };
+
+      if (mode !== 'ALL') {
+        gameWhere.mode = mode;
+      }
+
+      if (format !== 'ALL') {
+        gameWhere.format = format;
+      }
+
+      if (isLeague !== null) {
+        gameWhere.isLeague = isLeague;
+      }
+
+      // Get all users who have played games matching the criteria
+      const usersWithGames = await prisma.user.findMany({
+        where: {
+          games: {
+            some: {
+              game: {
+                ...gameWhere
+              }
+            }
+          }
+        },
+        include: {
+          games: {
+            where: {
+              game: {
+                ...gameWhere
+              }
+            },
+            include: {
+              game: true
+            }
+          }
+        }
+      });
+
+      // Calculate stats for each user
+      const leaderboardData = [];
+      
+      for (const user of usersWithGames) {
+        const userStats = await this.getUserStats(user.id, filters);
+        
+        if (userStats.totalGames > 0) {
+          leaderboardData.push({
+            user: {
+              id: user.id,
+              username: user.username,
+              discordId: user.discordId
+            },
+            totalGames: userStats.totalGames,
+            gamesWon: userStats.gamesWon,
+            winRate: userStats.winRate,
+            nils: userStats.nils,
+            bags: userStats.bags
+          });
+        }
+      }
+
+      // Sort by the specified criteria
+      leaderboardData.sort((a, b) => {
+        switch (sortBy) {
+          case 'gamesPlayed':
+            return b.totalGames - a.totalGames;
+          case 'gamesWon':
+            return b.gamesWon - a.gamesWon;
+          case 'winRate':
+            return b.winRate - a.winRate;
+          case 'nilMadeRate':
+            return b.nils.rate - a.nils.rate;
+          case 'bagsPerGame':
+            return b.bags.perGame - a.bags.perGame;
+          default:
+            return b.winRate - a.winRate;
+        }
+      });
+
+      return leaderboardData.slice(0, limit);
+    } catch (error) {
+      console.error('[DetailedStatsService] Error getting leaderboard:', error);
+      throw error;
+    }
+  }
 }

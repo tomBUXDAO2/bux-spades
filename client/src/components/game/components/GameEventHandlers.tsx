@@ -36,6 +36,7 @@ interface GameEventHandlersProps {
   setTrickCompleted: (completed: boolean) => void;
   setLastNonEmptyTrick: (trick: Card[]) => void;
   setPendingPlayedCard: (card: Card | null) => void;
+  setCardBeingPlayed: (card: Card | null) => void;
   setPendingBid: (bid: { playerId: string; bid: number } | null) => void;
   setLeagueReady: (ready: boolean[]) => void;
   setSeatReplacement: (replacement: {
@@ -327,7 +328,8 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         // This prevents cards from staying in hand if played quickly before trick completion
         if (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) {
           setPendingPlayedCard(null);
-          console.log('🎮 Cleared pending played card - server confirmed play for user:', user?.id);
+          setCardBeingPlayed(null); // Also clear the card being played state
+          console.log('🎮 Cleared pending played card and card being played - server confirmed play for user:', user?.id);
         }
       };
       

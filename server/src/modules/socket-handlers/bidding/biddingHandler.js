@@ -479,11 +479,9 @@ class BiddingHandler {
           gameState: updatedGameState
         });
 
-        // Start timer for first player if they are human (card play - always apply)
-        if (firstPlayer && firstPlayer.isHuman) {
-          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (seat ${firstPlayer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
-        }
+        // CRITICAL: Do NOT start timer immediately - wait for hand summary to close
+        // The timer will be started when the client sends 'hand_summary_continue' event
+        console.log(`[BIDDING] Round started - timer will be started after hand summary closes`);
       } catch (error) {
         console.error(`[BIDDING] Error getting game state for client:`, error);
         // Fallback: emit minimal round started event
@@ -492,11 +490,8 @@ class BiddingHandler {
           gameState: { status: 'PLAYING', currentPlayer: firstPlayer?.userId }
         });
 
-        // Still start timer even in fallback
-        if (firstPlayer && firstPlayer.isHuman) {
-          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (fallback)`);
-          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
-        }
+        // CRITICAL: Do NOT start timer in fallback either - wait for hand summary to close
+        console.log(`[BIDDING] Round started (fallback) - timer will be started after hand summary closes`);
       }
 
       console.log(`[BIDDING] Round started successfully`);

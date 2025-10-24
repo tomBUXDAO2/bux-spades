@@ -691,9 +691,25 @@ export class GameService {
    */
   static async getGameStateForClient(gameId, userId = null) {
     try {
+      // CRITICAL FIX: Always check database first for currentPlayer to prevent null issues
+      const dbGameState = await this.getFullGameStateFromDatabase(gameId);
+      if (!dbGameState) {
+        console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
+        return null;
+      }
+
       // REAL-TIME: Try to get game state from Redis first (instant)
       let cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
+        // CRITICAL: Ensure currentPlayer is always from database (single source of truth)
+        cachedGameState.currentPlayer = dbGameState.currentPlayer;
+        cachedGameState.status = dbGameState.status;
+        cachedGameState.currentRound = dbGameState.currentRound;
+        cachedGameState.currentTrick = dbGameState.currentTrick;
+        
+        // CRITICAL: Update Redis cache with corrected currentPlayer to prevent future null issues
+        await redisGameState.setGameState(gameId, cachedGameState);
+        console.log(`[GAME SERVICE] Updated Redis cache with corrected currentPlayer: ${dbGameState.currentPlayer}`);
         // CRITICAL: Always map gimmick variants to client-friendly format
         const gimmickVariantMapping = {
           'SUICIDE': 'SUICIDE',
@@ -826,9 +842,9 @@ export class GameService {
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
       }
 
-      // FALLBACK: If Redis is empty, get full game state from database
-      console.log(`[GAME SERVICE] Redis miss for game ${gameId} - fetching full state from database`);
-      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
+      // FALLBACK: Use database state directly (already fetched above)
+      console.log(`[GAME SERVICE] Redis miss for game ${gameId} - using database state`);
+      const fullGameState = dbGameState;
       if (fullGameState) {
         // CRITICAL: Get current trick data from Redis and add it to the game state
         const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
@@ -867,7 +883,7 @@ export class GameService {
         
         // Cache the full state in Redis for future requests
         await redisGameState.setGameState(gameId, fullGameState);
-        console.log(`[GAME SERVICE] Cached full game state in Redis for game ${gameId}`);
+        console.log(`[GAME SERVICE] Cached full game state in Redis for game ${gameId} with currentPlayer: ${fullGameState.currentPlayer}`);
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
       }

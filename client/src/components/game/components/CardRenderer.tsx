@@ -17,6 +17,7 @@ interface CardRendererProps {
   dealtCardCount: number;
   currentTrick: Card[];
   trickCompleted: boolean;
+  cardBeingPlayed: Card | null;
   onPlayCard: (card: Card) => void;
   isPlayer: (p: Player | Bot | null) => p is Player;
   isBot: (p: Player | Bot | null) => p is Bot;
@@ -168,6 +169,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   dealtCardCount,
   currentTrick,
   trickCompleted,
+  cardBeingPlayed,
   onPlayCard
 }) => {
   if (!myHand || myHand.length === 0) return null;
@@ -244,10 +246,14 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       <div className="flex items-center justify-center h-full w-full">
         <div className="flex items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
-          const isPlayable = (gameState.status === "PLAYING" &&
+          // CRITICAL: Lock all hand cards when a card is being played to prevent hover interference
+          const isCardBeingPlayed = cardBeingPlayed !== null;
+          const isPlayable = !isCardBeingPlayed && (
+            (gameState.status === "PLAYING" &&
             gameState.currentPlayer === currentPlayerId &&
             Array.isArray(effectivePlayableCards) && effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
-            (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId);
+            (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId)
+          );
           const isVisible = index < visibleCount;
           
           return (

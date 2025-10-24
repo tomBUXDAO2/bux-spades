@@ -127,6 +127,7 @@ export default function GameTableModular({
   const [trickCompleted, setTrickCompleted] = useState(false);
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
+  const [cardBeingPlayed, setCardBeingPlayed] = useState<Card | null>(null);
   const [pendingBid, setPendingBid] = useState<{ playerId: string; bid: number } | null>(null);
   
   // League states
@@ -541,6 +542,7 @@ export default function GameTableModular({
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
+    setCardBeingPlayed,
     setLeagueReady,
     setSeatReplacement,
     setLobbyMessages,
@@ -606,12 +608,26 @@ export default function GameTableModular({
     }
   }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex]);
   
+  // Helper function to get next player ID
+  const getNextPlayerId = () => {
+    if (!gameState.players || gameState.players.length !== 4) return null;
+    
+    const currentPlayerIndex = gameState.players.findIndex(p => p && (p.id === gameState.currentPlayer || p.userId === gameState.currentPlayer));
+    if (currentPlayerIndex === -1) return null;
+    
+    const nextPlayerIndex = (currentPlayerIndex + 1) % 4;
+    const nextPlayer = gameState.players[nextPlayerIndex];
+    return nextPlayer ? (nextPlayer.id || nextPlayer.userId) : null;
+  };
+
   // Game action handlers
   const handlePlayCardWrapper = (card: Card) => {
     handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
       setGameState,
       setPendingPlayedCard,
-      playCardSound
+      playCardSound,
+      setCardBeingPlayed,
+      getNextPlayerId
     });
   };
   
@@ -1164,6 +1180,7 @@ export default function GameTableModular({
                     dealtCardCount={dealtCardCount}
                     currentTrick={(gameState as any)?.play?.currentTrick || []}
                     trickCompleted={trickCompleted}
+                    cardBeingPlayed={cardBeingPlayed}
                     onPlayCard={handlePlayCardWrapper}
                     isPlayer={isPlayer}
                     isBot={isBot}

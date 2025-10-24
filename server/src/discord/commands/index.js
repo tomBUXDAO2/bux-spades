@@ -540,6 +540,24 @@ export const commands = [
   },
   {
     data: new SlashCommandBuilder()
+      .setName('leaderboard')
+      .setDescription('Show league leaderboard')
+      .addStringOption(option =>
+        option.setName('sort')
+          .setDescription('Sort by')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Games Played', value: 'gamesPlayed' },
+            { name: 'Games Won', value: 'gamesWon' },
+            { name: 'Win %', value: 'winRate' },
+            { name: 'Nil Made %', value: 'nilMadeRate' },
+            { name: 'Bags per Game', value: 'bagsPerGame' }
+          )
+      ),
+    execute: getLeaderboard
+  },
+  {
+    data: new SlashCommandBuilder()
       .setName('pay')
       .setDescription('Admin command: Pay coins to a user')
       .addUserOption(option =>
@@ -761,7 +779,12 @@ async function createGameLine(interaction, format) {
 
 async function getStats(interaction) {
   try {
+    // Defer reply immediately to prevent timeout
+    await interaction.deferReply();
+    
     const targetUser = interaction.options.getUser('user') || interaction.user;
+    
+    console.log(`[DISCORD] Getting stats for user: ${targetUser.username} (${targetUser.id})`);
     
     // Get user by Discord ID
     const user = await prisma.user.findUnique({
@@ -769,11 +792,12 @@ async function getStats(interaction) {
     });
 
     if (!user) {
-      return interaction.reply({ 
-        content: '❌ User not found in database.', 
-        ephemeral: true 
+      return interaction.editReply({ 
+        content: '❌ User not found in database.' 
       });
     }
+
+    console.log(`[DISCORD] Found user in database: ${user.username} (${user.id})`);
 
     // Get league-only stats using DetailedStatsService
     const stats = await DetailedStatsService.getUserStats(user.id, {
@@ -781,10 +805,12 @@ async function getStats(interaction) {
       format: 'ALL',
       isLeague: true  // Only league games
     });
+    
+    console.log(`[DISCORD] Stats retrieved: ${stats.totalGames} games, ${stats.gamesWon} wins`);
 
     // Create embed with league stats
     const embed = new EmbedBuilder()
-      .setTitle(`🏆 ${targetUser.username}'s League Stats`)
+      .setTitle(`🏆 ${targetUser.displayName || targetUser.username}'s League Stats`)
       .setThumbnail(targetUser.displayAvatarURL())
       .setColor(0x0099ff)
       .setTimestamp();
@@ -792,8 +818,8 @@ async function getStats(interaction) {
     // Main stats section
     embed.addFields(
       { 
-        name: '🎮 **LEAGUE STATS**', 
-        value: `**Played:** ${stats.totalGames}\n**Won:** ${stats.gamesWon}\n**Win %:** ${stats.winRate.toFixed(1)}%\n**Total bags:** ${stats.bags.total}\n**Bags per game:** ${stats.bags.perGame.toFixed(1)}`, 
+        name: '**Played:** ' + stats.totalGames + '\n**Won:** ' + stats.gamesWon + '\n**Win %:** ' + stats.winRate.toFixed(1) + '%\n**Total bags:** ' + stats.bags.total + '\n**Bags per game:** ' + stats.bags.perGame.toFixed(1), 
+        value: '', 
         inline: false 
       }
     );
@@ -817,13 +843,124 @@ async function getStats(interaction) {
       );
     }
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('[DISCORD] Error getting stats:', error);
-    await interaction.reply({ 
-      content: '❌ Failed to get user statistics.', 
-      ephemeral: true 
+    
+    if (!interaction.deferred) {
+      await interaction.reply({ 
+        content: '❌ Failed to get user statistics.', 
+        ephemeral: true 
+      });
+    } else {
+      await interaction.editReply({ 
+        content: '❌ Failed to get user statistics.' 
+      });
+    }
+  }
+}
+
+async function getLeaderboard(interaction) {
+  try {
+    // Defer reply immediately to prevent timeout
+    await interaction.deferReply();
+    
+    const sortBy = interaction.options.getString('sort') || 'winRate';
+    
+    console.log(`[DISCORD] Getting leaderboard sorted by: ${sortBy}`);
+    
+    // Get leaderboard using DetailedStatsService
+    const leaderboard = await DetailedStatsService.getLeaderboard({
+      mode: 'ALL',
+      format: 'ALL',
+      isLeague: true,  // Only league games
+      limit: 10,
+      sortBy: sortBy
     });
+    
+    console.log(`[DISCORD] Leaderboard retrieved: ${leaderboard.length} users`);
+    
+    // Create embed with leaderboard
+    const embed = new EmbedBuilder()
+      .setTitle(`🏆 League Leaderboard`)
+      .setDescription(`Sorted by: **${getSortDisplayName(sortBy)}**`)
+      .setColor(0x0099ff)
+      .setTimestamp();
+    
+    if (leaderboard.length === 0) {
+      embed.addFields({
+        name: 'No Data',
+        value: 'No league games found.',
+        inline: false
+      });
+    } else {
+      // Format leaderboard entries
+      const leaderboardText = leaderboard.map((entry, index) => {
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        
+        let displayValue = '';
+        switch (sortBy) {
+          case 'gamesPlayed':
+            displayValue = `${entry.totalGames} games`;
+            break;
+          case 'gamesWon':
+            displayValue = `${entry.gamesWon} wins`;
+            break;
+          case 'winRate':
+            displayValue = `${entry.winRate.toFixed(1)}%`;
+            break;
+          case 'nilMadeRate':
+            displayValue = `${entry.nils.rate.toFixed(1)}%`;
+            break;
+          case 'bagsPerGame':
+            displayValue = `${entry.bags.perGame.toFixed(1)}`;
+            break;
+          default:
+            displayValue = `${entry.winRate.toFixed(1)}%`;
+        }
+        
+        return `${medal} **${entry.user.username}** - ${displayValue}`;
+      }).join('\n');
+      
+      embed.addFields({
+        name: 'Top 10 Players',
+        value: leaderboardText,
+        inline: false
+      });
+    }
+    
+    await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[DISCORD] Error getting leaderboard:', error);
+    
+    if (!interaction.deferred) {
+      await interaction.reply({ 
+        content: '❌ Failed to get leaderboard.', 
+        ephemeral: true 
+      });
+    } else {
+      await interaction.editReply({ 
+        content: '❌ Failed to get leaderboard.' 
+      });
+    }
+  }
+}
+
+function getSortDisplayName(sortBy) {
+  switch (sortBy) {
+    case 'gamesPlayed':
+      return 'Games Played';
+    case 'gamesWon':
+      return 'Games Won';
+    case 'winRate':
+      return 'Win %';
+    case 'nilMadeRate':
+      return 'Nil Made %';
+    case 'bagsPerGame':
+      return 'Bags per Game';
+    default:
+      return 'Win %';
   }
 }
 

@@ -6,6 +6,11 @@ import { PrismaClient } from '@prisma/client';
  */
 const prisma = new PrismaClient({
   log: [], // NO LOGGING IN PRODUCTION - PERFORMANCE CRITICAL
+  datasources: {
+    db: {
+      url: process.env.NEW_DATABASE_URL || process.env.DATABASE_URL
+    }
+  }
 });
 
 export { prisma };
