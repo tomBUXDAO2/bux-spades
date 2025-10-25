@@ -28,6 +28,7 @@ export interface Player {
   avatarUrl?: string;
   username?: string;
   type?: 'human' | 'bot';
+  isBlindNil?: boolean;
 }
 
 export interface Bot {
@@ -43,6 +44,7 @@ export interface Bot {
   tricks?: number;
   isDealer?: boolean;
   team?: number;
+  isBlindNil?: boolean;
 }
 
 export interface GameState {
