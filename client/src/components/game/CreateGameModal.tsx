@@ -20,12 +20,19 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
   
   React.useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setScreenHeight(window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Detect portrait mode
+  const isPortrait = screenHeight > screenWidth;
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
@@ -210,14 +217,14 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
                 <label className="font-bold text-yellow-500" style={{ fontSize: `${16 * textScale}px` }}>Coins</label>
                 <div className="flex items-center" style={{ gap: `${10 * paddingScale}px` }}>
-                  <button onClick={() => handleBuyInChange(-1)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${36 * iconScale}px`, height: `${36 * iconScale}px`, fontSize: `${16 * textScale}px` }}>-</button>
+                  <button onClick={() => handleBuyInChange(-1)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${28 * iconScale}px` : `${36 * iconScale}px`, height: isPortrait ? `${28 * iconScale}px` : `${36 * iconScale}px`, fontSize: `${16 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }}>-</button>
                   <span className="text-center flex items-center justify-center bg-slate-100 text-slate-800 rounded font-semibold" style={{ gap: `${4 * paddingScale}px`, padding: `${6 * paddingScale}px ${10 * paddingScale}px`, fontSize: `${16 * textScale}px`, width: `${72 * iconScale}px` }}>
                     <svg className="text-yellow-500" fill="currentColor" viewBox="0 0 20 20" style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
                     </svg>
                     {formatCoins(buyIn)}
                   </span>
-                  <button onClick={() => handleBuyInChange(1)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${36 * iconScale}px`, height: `${36 * iconScale}px`, fontSize: `${16 * textScale}px` }}>+</button>
+                  <button onClick={() => handleBuyInChange(1)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${28 * iconScale}px` : `${36 * iconScale}px`, height: isPortrait ? `${28 * iconScale}px` : `${36 * iconScale}px`, fontSize: `${16 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }}>+</button>
                 </div>
                 {/* Prize display */}
                 <div className="font-medium text-indigo-300 text-center" style={{ fontSize: `${12 * textScale}px` }}>
@@ -240,7 +247,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 <div className="flex items-center" style={{ gap: `${16 * paddingScale}px` }}>
                   <div className="flex items-center" style={{ gap: `${6 * paddingScale}px` }}>
                     <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Min:</label>
-                    <button onClick={() => handlePointsChange('min', -50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={minPoints <= -250}>-</button>
+                    <button onClick={() => handlePointsChange('min', -50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, height: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, fontSize: `${14 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }} disabled={minPoints <= -250}>-</button>
                     <input
                       type="text"
                       value={minPoints}
@@ -248,11 +255,11 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                       className="text-center bg-slate-100 text-slate-800 rounded font-semibold"
                       style={{ width: `${56 * iconScale}px`, padding: `${4 * paddingScale}px ${6 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     />
-                    <button onClick={() => handlePointsChange('min', 50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={minPoints >= -100}>+</button>
+                    <button onClick={() => handlePointsChange('min', 50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, height: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, fontSize: `${14 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }} disabled={minPoints >= -100}>+</button>
                   </div>
                   <div className="flex items-center" style={{ gap: `${6 * paddingScale}px` }}>
                     <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Max:</label>
-                    <button onClick={() => handlePointsChange('max', -50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={maxPoints <= 100}>-</button>
+                    <button onClick={() => handlePointsChange('max', -50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, height: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, fontSize: `${14 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }} disabled={maxPoints <= 100}>-</button>
                     <input
                       type="text"
                       value={maxPoints}
@@ -260,7 +267,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                       className="text-center bg-slate-100 text-slate-800 rounded font-semibold"
                       style={{ width: `${56 * iconScale}px`, padding: `${4 * paddingScale}px ${6 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     />
-                    <button onClick={() => handlePointsChange('max', 50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={maxPoints >= 650}>+</button>
+                    <button onClick={() => handlePointsChange('max', 50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, height: isPortrait ? `${22 * iconScale}px` : `${28 * iconScale}px`, fontSize: `${14 * textScale}px`, padding: 0, minWidth: 0, minHeight: 0 }} disabled={maxPoints >= 650}>+</button>
                   </div>
                 </div>
               </div>
@@ -447,9 +454,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 isMobile ? 'text-lg' : 'text-2xl'
               }`}>Coins</label>
             <div className="flex items-center gap-4 justify-center">
-                <button onClick={() => handleBuyInChange(-1)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                  isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                }`}>-</button>
+                <button onClick={() => handleBuyInChange(-1)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '28px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '28px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }}>-</button>
                 <span className={`text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded-md px-2 py-1 font-semibold ${
                   isMobile ? 'w-16 text-sm' : 'w-20'
                 }`}>
@@ -460,9 +465,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 </svg>
                 {formatCoins(buyIn)}
               </span>
-                <button onClick={() => handleBuyInChange(1)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                  isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                }`}>+</button>
+                <button onClick={() => handleBuyInChange(1)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '28px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '28px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }}>+</button>
             </div>
             {/* Prize display */}
               <div className={`mt-2 font-medium text-indigo-300 text-center ${
@@ -494,9 +497,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     isMobile ? 'text-sm' : ''
                   }`}>Min Points</label>
                 <div className="flex gap-2 items-center justify-center">
-                    <button onClick={() => handlePointsChange('min', -50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                    }`} disabled={minPoints <= -250}>-</button>
+                    <button onClick={() => handlePointsChange('min', -50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }} disabled={minPoints <= -250}>-</button>
                   <input
                     type="text"
                     value={minPoints}
@@ -505,9 +506,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                         isMobile ? 'w-12 text-sm' : 'w-16'
                       }`}
                   />
-                    <button onClick={() => handlePointsChange('min', 50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                    }`} disabled={minPoints >= -100}>+</button>
+                    <button onClick={() => handlePointsChange('min', 50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }} disabled={minPoints >= -100}>+</button>
                 </div>
               </div>
               <div className="flex flex-col items-center w-1/2">
@@ -515,9 +514,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     isMobile ? 'text-sm' : ''
                   }`}>Max Points</label>
                 <div className="flex gap-2 items-center justify-center">
-                    <button onClick={() => handlePointsChange('max', -50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                    }`} disabled={maxPoints <= 100}>-</button>
+                    <button onClick={() => handlePointsChange('max', -50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }} disabled={maxPoints <= 100}>-</button>
                   <input
                     type="text"
                     value={maxPoints}
@@ -526,9 +523,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                         isMobile ? 'w-12 text-sm' : 'w-16'
                       }`}
                   />
-                    <button onClick={() => handlePointsChange('max', 50)} className={`flex items-center justify-center bg-slate-600 text-slate-200 rounded-full ${
-                      isMobile ? 'w-7 h-7' : 'w-8 h-8'
-                    }`} disabled={maxPoints >= 650}>+</button>
+                    <button onClick={() => handlePointsChange('max', 50)} className="game-control-button bg-slate-600 text-slate-200 rounded-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), height: isPortrait ? '22px' : (isMobile ? '28px' : '32px'), padding: 0, minWidth: 0, minHeight: 0 }} disabled={maxPoints >= 650}>+</button>
                 </div>
               </div>
             </div>

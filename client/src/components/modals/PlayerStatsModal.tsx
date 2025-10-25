@@ -54,12 +54,19 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
   
   useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setScreenHeight(window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Detect portrait mode
+  const isPortrait = screenHeight > screenWidth;
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
@@ -156,11 +163,12 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: `${16 * paddingScale}px` }}>
-      <div className="bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
+      <div className="bg-slate-800 rounded-lg max-w-6xl w-full overflow-y-auto" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
         {/* Header */}
         <div className="flex justify-between items-center border-b border-slate-600" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${16 * paddingScale}px`, paddingRight: `${16 * paddingScale}px` }}>
-          <h2 className="font-bold text-white" style={{ fontSize: `${24 * textScale}px` }}>Player Stats</h2>
+          {!isPortrait && <h2 className="font-bold text-white" style={{ fontSize: `${24 * textScale}px` }}>Player Stats</h2>}
+          {isPortrait && <div></div>}
           
           {/* Radio buttons and close button */}
           <div className="flex items-center" style={{ gap: `${16 * paddingScale}px` }}>
@@ -212,15 +220,14 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           </div>
         </div>
 
-        {/* Content - Two columns with equal height */}
-        <div className="grid grid-cols-2" style={{ gap: `${24 * paddingScale}px`, padding: `${24 * paddingScale}px` }}>
-          {/* Left Column */}
-          <div className="flex flex-col">
-            {/* Player Profile Card */}
-            <div className="bg-slate-700 rounded-lg mb-6" style={{ padding: `${24 * paddingScale}px` }}>
+        {/* Content - Different layouts for portrait and landscape */}
+        {isPortrait ? (
+          <div className="flex flex-col" style={{ gap: `${12 * paddingScale}px`, padding: `${12 * paddingScale}px` }}>
+            {/* 1. Main - Player Profile Card */}
+            <div className="bg-slate-700 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
               <div className="flex items-center mb-4" style={{ gap: `${16 * paddingScale}px` }}>
                 <img src={player.avatar || player.avatarUrl || '/default-avatar.png'} alt={player.username} className="rounded-full" style={{ width: `${64 * iconScale}px`, height: `${64 * iconScale}px` }} />
-                <h3 className="font-bold text-white" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
+                <h3 className="font-bold text-white" style={{ fontSize: `${18 * textScale}px` }}>{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
               </div>
               <div style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
                 <div className="flex items-center justify-between">
@@ -256,8 +263,74 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
               </div>
             </div>
 
-            {/* Nil Stats */}
-            <div className="bg-slate-700 rounded-lg flex-1" style={{ padding: `${24 * paddingScale}px` }}>
+            {/* 2. Game Mode Breakdown */}
+            <div className="bg-slate-700 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
+              <h3 className="font-bold text-white mb-4" style={{ fontSize: `${18 * textScale}px` }}>Game Mode Breakdown</h3>
+              <div className="text-slate-300 text-right mb-6" style={{ fontSize: `${18 * textScale}px` }}>
+                <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
+                <span>(win %)</span>
+              </div>
+              <div style={{ gap: `${24 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Regular</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.regular}</span>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.regPlayed ? Math.round(((stats.regWon || 0) / stats.regPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Whiz</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.whiz}</span>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.whizPlayed ? Math.round(((stats.whizWon || 0) / stats.whizPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Mirrors</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.mirrors}</span>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Gimmick</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.gimmick}</span>
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.gimmickPlayed ? Math.round(((stats.gimmickWon || 0) / stats.gimmickPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Special Rules */}
+            <div className="bg-slate-700 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-white" style={{ fontSize: `${20 * textScale}px` }}>Special Rules</h3>
+                <div className="text-slate-300 text-right" style={{ fontSize: `${18 * textScale}px` }}>
+                  <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
+                  <span>(win %)</span>
+                </div>
+              </div>
+              <div style={{ gap: `${12 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Screamer</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.screamer}</span>
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Assassin</span>
+                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.assassin}</span>
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.assassinPlayed ? Math.round(((stats.assassinWon || 0) / stats.assassinPlayed) * 100) : 0}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Nil Stats */}
+            <div className="bg-slate-700 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
               <h3 className="font-bold text-white mb-4" style={{ fontSize: `${24 * textScale}px` }}>Nil Stats</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-white">
@@ -298,76 +371,163 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
               </div>
             </div>
           </div>
-
-          {/* Right Column */}
-          <div className="flex flex-col">
-            {/* Game Mode Breakdown */}
-            <div className="bg-slate-700 rounded-lg mb-6 flex-1" style={{ padding: `${24 * paddingScale}px` }}>
-              <h3 className="font-bold text-white mb-4" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>Game Mode Breakdown</h3>
-              <div className="text-slate-300 text-right mb-6" style={{ fontSize: `${18 * textScale}px` }}>
-                <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
-                <span>(win %)</span>
+        ) : (
+          <div className="grid grid-cols-2" style={{ gap: `${24 * paddingScale}px`, padding: `${24 * paddingScale}px` }}>
+            {/* Left Column */}
+            <div className="flex flex-col">
+              {/* Player Profile Card */}
+              <div className="bg-slate-700 rounded-lg mb-6" style={{ padding: `${24 * paddingScale}px` }}>
+                <div className="flex items-center mb-4" style={{ gap: `${16 * paddingScale}px` }}>
+                  <img src={player.avatar || player.avatarUrl || '/default-avatar.png'} alt={player.username} className="rounded-full" style={{ width: `${64 * iconScale}px`, height: `${64 * iconScale}px` }} />
+                  <h3 className="font-bold text-white" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
+                </div>
+                <div style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <span className="text-yellow-400" style={{ fontSize: `${24 * textScale}px` }}>⭐</span>
+                      <span className="font-bold text-yellow-400" style={{ fontSize: `${24 * textScale}px` }}>{Math.round((stats.gamesWon / stats.gamesPlayed) * 100)}% Win</span>
+                    </div>
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <svg className="text-yellow-500" fill="currentColor" viewBox="0 0 20 20" style={{ width: `${24 * iconScale}px`, height: `${24 * iconScale}px` }}>
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="font-bold text-yellow-400" style={{ fontSize: `${24 * textScale}px` }}>{Number(displayCoins).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2" style={{ gap: `${16 * paddingScale}px` }}>
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <span className="text-blue-400" style={{ fontSize: `${20 * textScale}px` }}>🏁</span>
+                      <span className="text-blue-400" style={{ fontSize: `${20 * textScale}px` }}>{stats.gamesPlayed} Played</span>
+                    </div>
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <span className="text-purple-400" style={{ fontSize: `${20 * textScale}px` }}>🏆</span>
+                      <span className="text-purple-400" style={{ fontSize: `${20 * textScale}px` }}>{stats.gamesWon} Won</span>
+                    </div>
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <span className="text-green-400" style={{ fontSize: `${20 * textScale}px` }}>🎒</span>
+                      <span className="text-green-400" style={{ fontSize: `${20 * textScale}px` }}>{stats.totalBags} Bags</span>
+                    </div>
+                    <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                      <span className="text-orange-400" style={{ fontSize: `${20 * textScale}px` }}>✅</span>
+                      <span className="text-orange-400" style={{ fontSize: `${20 * textScale}px` }}>{(stats.bagsPerGame || 0).toFixed(1)} Bags/G</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style={{ gap: `${24 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Regular</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.regular}</span>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.regPlayed ? Math.round(((stats.regWon || 0) / stats.regPlayed) * 100) : 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Whiz</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.whiz}</span>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.whizPlayed ? Math.round(((stats.whizWon || 0) / stats.whizPlayed) * 100) : 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Mirrors</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.mirrors}</span>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Gimmick</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.gimmick}</span>
-                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.gimmickPlayed ? Math.round(((stats.gimmickWon || 0) / stats.gimmickPlayed) * 100) : 0}%</span>
-                  </div>
+
+              {/* Nil Stats */}
+              <div className="bg-slate-700 rounded-lg flex-1" style={{ padding: `${24 * paddingScale}px` }}>
+                <h3 className="font-bold text-white mb-4" style={{ fontSize: `${24 * textScale}px` }}>Nil Stats</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-white">
+                    <thead>
+                      <tr className="border-b border-slate-500">
+                        <th className="text-left" style={{ padding: `${8 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Type</th>
+                        <th className="text-center" style={{ padding: `${8 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Bid</th>
+                        <th className="text-center" style={{ padding: `${8 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Made</th>
+                        <th className="text-center" style={{ padding: `${8 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>%</th>
+                        <th className="text-center" style={{ padding: `${8 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-slate-600">
+                        <td style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Nil</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>{stats.nilsBid}</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>{stats.nilsMade}</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>
+                          {stats.nilsBid > 0 ? Math.round((stats.nilsMade / stats.nilsBid) * 100) : 0}%
+                        </td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>
+                          {formatSigned((stats.nilsMade * 100) + ((stats.nilsBid - stats.nilsMade) * -100))}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>Blind Nil</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>{stats.blindNilsBid}</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>{stats.blindNilsMade}</td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>
+                          {stats.blindNilsBid > 0 ? Math.round((stats.blindNilsMade / stats.blindNilsBid) * 100) : 0}%
+                        </td>
+                        <td className="text-center" style={{ padding: `${12 * paddingScale}px 0`, fontSize: `${18 * textScale}px` }}>
+                          {formatSigned((stats.blindNilsMade * 200) + ((stats.blindNilsBid - stats.blindNilsMade) * -200))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
 
-            {/* Special Rules */}
-            <div className="bg-slate-700 rounded-lg" style={{ padding: `${16 * paddingScale}px` }}>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-bold text-white" style={{ fontSize: `${20 * textScale}px` }}>Special Rules</h3>
-                <div className="text-slate-300 text-right" style={{ fontSize: `${18 * textScale}px` }}>
+            {/* Right Column */}
+            <div className="flex flex-col">
+              {/* Game Mode Breakdown */}
+              <div className="bg-slate-700 rounded-lg mb-6 flex-1" style={{ padding: `${24 * paddingScale}px` }}>
+                <h3 className="font-bold text-white mb-4" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>Game Mode Breakdown</h3>
+                <div className="text-slate-300 text-right mb-6" style={{ fontSize: `${18 * textScale}px` }}>
                   <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
                   <span>(win %)</span>
                 </div>
-              </div>
-              <div style={{ gap: `${12 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Screamer</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.screamer}</span>
-                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
+                <div style={{ gap: `${24 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Regular</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.regular}</span>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.regPlayed ? Math.round(((stats.regWon || 0) / stats.regPlayed) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Whiz</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.whiz}</span>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.whizPlayed ? Math.round(((stats.whizWon || 0) / stats.whizPlayed) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Mirrors</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.mirrors}</span>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.mirrorPlayed ? Math.round(((stats.mirrorWon || 0) / stats.mirrorPlayed) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>Gimmick</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{gameModeBreakdown.gimmick}</span>
+                      <span className="text-white" style={{ fontSize: `${20 * textScale}px` }}>{stats.gimmickPlayed ? Math.round(((stats.gimmickWon || 0) / stats.gimmickPlayed) * 100) : 0}%</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Assassin</span>
-                  <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
-                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.assassin}</span>
-                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.assassinPlayed ? Math.round(((stats.assassinWon || 0) / stats.assassinPlayed) * 100) : 0}%</span>
+              </div>
+
+              {/* Special Rules */}
+              <div className="bg-slate-700 rounded-lg" style={{ padding: `${16 * paddingScale}px` }}>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-white" style={{ fontSize: `${20 * textScale}px` }}>Special Rules</h3>
+                  <div className="text-slate-300 text-right" style={{ fontSize: `${18 * textScale}px` }}>
+                    <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
+                    <span>(win %)</span>
+                  </div>
+                </div>
+                <div style={{ gap: `${12 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Screamer</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.screamer}</span>
+                      <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.screamerPlayed ? Math.round(((stats.screamerWon || 0) / stats.screamerPlayed) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>Assassin</span>
+                    <div className="flex" style={{ gap: `${32 * paddingScale}px` }}>
+                      <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{specialRules.assassin}</span>
+                      <span className="text-white" style={{ fontSize: `${18 * textScale}px` }}>{stats.assassinPlayed ? Math.round(((stats.assassinWon || 0) / stats.assassinPlayed) * 100) : 0}%</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

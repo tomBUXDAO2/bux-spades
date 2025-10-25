@@ -17,19 +17,18 @@ const MobileToggle: React.FC<MobileToggleProps> = ({ mobileTab, onToggle }) => {
   
   return (
     <div className="flex justify-center items-center pt-4 pb-1 px-4">
-      <span className={`text-sm font-bold mr-2 ${mobileTab === 'lobby' ? 'text-indigo-600' : 'text-slate-400'}`}>Lobby</span>
-      <button
-        className={`relative w-12 bg-slate-700 rounded-full transition-colors duration-200 focus:outline-none`}
-        style={{ height: '26px' }}
+      <span className={`text-sm font-bold mr-2 ${mobileTab === 'lobby' ? 'text-white' : 'text-slate-400'}`}>Lobby</span>
+      <div
+        className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
         onClick={onToggle}
-        aria-label="Toggle Lobby/Chat"
+        style={{ userSelect: 'none' }}
       >
-        <span
-          className={`absolute left-0 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${mobileTab === 'chat' ? 'translate-x-7' : ''}`}
-          style={{ top: '3px' }}
-        ></span>
-      </button>
-      <span className={`text-sm font-bold ml-2 ${mobileTab === 'chat' ? 'text-indigo-600' : 'text-slate-400'}`}>Chat</span>
+        <div
+          className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mobileTab === 'chat' ? 'translate-x-8' : ''}`}
+          style={{ transform: mobileTab === 'chat' ? 'translateX(32px)' : 'translateX(0)' }}
+        ></div>
+      </div>
+      <span className={`text-sm font-bold ml-2 ${mobileTab === 'chat' ? 'text-white' : 'text-slate-400'}`}>Chat</span>
     </div>
   );
 };

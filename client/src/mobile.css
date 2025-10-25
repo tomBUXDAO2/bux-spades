@@ -1,10 +1,17 @@
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* Touch-friendly button sizes - EXCLUDE game table header buttons, chat header buttons, bidding modal buttons, and remove player buttons */
-  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button) {
+  /* Touch-friendly button sizes - EXCLUDE game table header buttons, chat header buttons, bidding modal buttons, remove player buttons, and game control buttons */
+  button:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button):not(.game-control-button), .btn:not([style*="--button-size"]):not([style*="width:"]):not([style*="height:"]):not(.bidding-number-button):not(.bidding-bottom-button):not(.remove-player-button):not(.lobby-button):not(.header-button):not(.game-control-button) {
     min-height: 44px;
     min-width: 44px;
     padding: 12px 16px;
+  }
+
+  /* Override for game control buttons */
+  .game-control-button {
+    min-height: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
   }
 
   /* Larger touch targets for cards */

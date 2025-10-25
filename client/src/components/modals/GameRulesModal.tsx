@@ -10,12 +10,19 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
   
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
   
   useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setScreenHeight(window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Detect portrait mode
+  const isPortrait = screenHeight > screenWidth;
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
@@ -32,11 +39,11 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: `${16 * paddingScale}px` }}>
-      <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
+      <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full overflow-hidden" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-700" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${24 * paddingScale}px`, paddingRight: `${24 * paddingScale}px` }}>
-          <h2 className="font-bold text-slate-200" style={{ fontSize: `${24 * textScale}px` }}>Game Rules</h2>
+        <div className="flex items-center justify-between border-b border-slate-700" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px`, paddingRight: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
+          <h2 className="font-bold text-slate-200" style={{ fontSize: isPortrait ? `${18 * textScale}px` : `${24 * textScale}px` }}>Game Rules</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-200 transition-colors"
@@ -56,9 +63,9 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
-            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
+            style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px`, height: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Rules</span>
@@ -71,9 +78,9 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
-            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
+            style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px`, height: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <span>Game Types</span>
@@ -86,9 +93,9 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
-            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
+            style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px`, height: isPortrait ? `${16 * iconScale}px` : `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             <span>Scoring</span>
@@ -96,7 +103,7 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[60vh]" style={{ padding: `${24 * paddingScale}px` }}>
+        <div className="overflow-y-auto max-h-[60vh]" style={{ padding: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
           {activeTab === 'rules' && (
             <div className="text-slate-200" style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: `${14 * textScale}px` }}>

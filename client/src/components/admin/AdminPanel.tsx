@@ -39,12 +39,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
   
   useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setScreenHeight(window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Detect portrait mode
+  const isPortrait = screenHeight > screenWidth;
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
@@ -198,13 +205,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       />
 
       {/* Admin Panel */}
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ padding: `${16 * paddingScale}px` }}>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
         <div 
-          className="bg-slate-900 rounded-lg shadow-2xl border border-red-500/50 w-full max-w-4xl max-h-[90vh] overflow-hidden"
+          className="bg-slate-900 rounded-lg shadow-2xl border border-red-500/50 w-full max-w-4xl overflow-hidden"
+          style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-between" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${24 * paddingScale}px`, paddingRight: `${24 * paddingScale}px` }}>
+          <div className="bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-between" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px`, paddingRight: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
             <div className="flex items-center" style={{ gap: `${12 * paddingScale}px` }}>
               <span style={{ fontSize: `${24 * textScale}px` }}>⚠️</span>
               <h2 className="font-bold text-white" style={{ fontSize: `${20 * textScale}px` }}>ADMIN PANEL</h2>
@@ -227,7 +235,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                   ? 'bg-slate-800 text-white border-b-2 border-red-500'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
-              style={{ padding: `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
+              style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${14 * textScale}px` }}
             >
               🎮 Manage Games
             </button>
@@ -238,7 +246,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                   ? 'bg-slate-800 text-white border-b-2 border-red-500'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
-              style={{ padding: `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
+              style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${14 * textScale}px` }}
             >
               🏆 Tournaments
             </button>
@@ -249,17 +257,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                   ? 'bg-slate-800 text-white border-b-2 border-red-500'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
-              style={{ padding: `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
+              style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${12 * paddingScale}px ${24 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${14 * textScale}px` }}
             >
               📅 Daily Events
             </button>
           </div>
 
           {/* Content */}
-          <div className="overflow-y-auto max-h-[calc(90vh-140px)]" style={{ padding: `${24 * paddingScale}px` }}>
+          <div className="overflow-y-auto max-h-[calc(90vh-140px)]" style={{ padding: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
             {activeTab === 'games' && (
               <div>
-                <div className="flex justify-between items-center mb-4">
+                <div className={isPortrait ? "flex flex-col mb-4" : "flex justify-between items-center mb-4"} style={{ gap: isPortrait ? `${12 * paddingScale}px` : '0' }}>
                   <div>
                     <h3 className="font-semibold text-white" style={{ fontSize: `${18 * textScale}px` }}>Manage Stuck Games</h3>
                     <p className="text-slate-400" style={{ fontSize: `${14 * textScale}px` }}>
