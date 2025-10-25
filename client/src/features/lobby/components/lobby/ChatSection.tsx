@@ -339,8 +339,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     {/* Watch button when player is at a table */}
                     {(player.activeGameId || player.inGame) && player.id !== user.id && (
                       <button
-                        className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white border border-slate-300 hover:bg-indigo-700"
-                        style={{ fontSize: `${12 * textScale}px` }}
+                        className="flex items-center justify-center rounded-full bg-indigo-600 text-white border border-slate-300 hover:bg-indigo-700"
+                        style={{ fontSize: `${12 * textScale}px`, height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), paddingLeft: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))), paddingRight: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))) }}
                         title="Watch Table"
                         onClick={() => {
                           if (player.activeGameId) {
