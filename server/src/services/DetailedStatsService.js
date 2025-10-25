@@ -117,7 +117,7 @@ export class DetailedStatsService {
           select: {
             players: {
               where: { userId },
-              select: { seatIndex: true }
+              select: { seatIndex: true, userId: true }
             }
           }
         }
@@ -126,12 +126,26 @@ export class DetailedStatsService {
 
     // Count wins by checking if user was on winning team
     const gamesWon = userGames.filter(result => {
-      const userSeat = result.game.players[0]?.seatIndex;
-      if (userSeat === undefined) return false;
+      // Get user's seat from the players array (should only have one entry since filtered by userId)
+      const userPlayer = result.game.players.find(p => p.userId === userId);
+      if (!userPlayer) {
+        console.error(`[STATS] No player found for user ${userId} in game result ${result.id}`);
+        return false;
+      }
+      
+      const userSeat = userPlayer.seatIndex;
+      if (userSeat === undefined || userSeat === null) {
+        console.error(`[STATS] Invalid seatIndex for user ${userId} in game result ${result.id}`);
+        return false;
+      }
       
       // TEAM_0 = seats 0 & 2, TEAM_1 = seats 1 & 3
       const userTeam = (userSeat % 2 === 0) ? 'TEAM_0' : 'TEAM_1';
-      return result.winner === userTeam;
+      const isWinner = result.winner === userTeam;
+      
+      console.log(`[STATS] Game ${result.gameId}: User ${userId} seat ${userSeat} team ${userTeam}, winner ${result.winner}, isWinner: ${isWinner}`);
+      
+      return isWinner;
     }).length;
 
     // Win rate

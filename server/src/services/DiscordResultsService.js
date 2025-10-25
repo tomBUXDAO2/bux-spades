@@ -125,13 +125,17 @@ export class DiscordResultsService {
     const winnerCoins = Math.floor(coins * 1.8);
     const loserCoins = coins;
 
+    // Format coin amounts properly (divide by 1000 before adding 'k')
+    const winnerCoinsFormatted = Math.floor(winnerCoins / 1000);
+    const loserCoinsFormatted = Math.floor(loserCoins / 1000);
+
     const embed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(
         `${gameLineText}\n\n` +
         `🥇 Winners\n` +
         `${winnerTeam.map(p => `<@${p.user.discordId}>`).join(', ')} - ${winnerScore}\n\n` +
-        `💰 Coins Won\n${winnerCoins.toLocaleString()}k each\n\n` +
+        `💰 Coins Won\n${winnerCoinsFormatted.toLocaleString()}k each\n\n` +
         `🥈 Losers\n` +
         `${loserTeam.map(p => `<@${p.user.discordId}>`).join(', ')} - ${loserScore}`
       )
@@ -197,6 +201,10 @@ export class DiscordResultsService {
     const secondCoins = coins;
     const thirdFourthCoins = 0;
 
+    // Format coin amounts properly (divide by 1000 before adding 'k')
+    const firstCoinsFormatted = Math.floor(firstCoins / 1000);
+    const secondCoinsFormatted = Math.floor(secondCoins / 1000);
+
     const winner = playerScores[0];
     const runnerUp = playerScores[1];
     const losers = playerScores.slice(2);
@@ -207,10 +215,10 @@ export class DiscordResultsService {
         `${gameLineText}\n\n` +
         `🥇 Winner\n` +
         `<@${winner.player.user.discordId}> - ${winner.score}\n\n` +
-        `💰 Coins Won\n1st: ${firstCoins.toLocaleString()}k\n\n` +
+        `💰 Coins Won\n1st: ${firstCoinsFormatted.toLocaleString()}k\n\n` +
         `🥈 Runner up\n` +
         `<@${runnerUp.player.user.discordId}> - ${runnerUp.score}\n\n` +
-        `💰 Coins Won\n2nd: ${secondCoins.toLocaleString()}k\n\n` +
+        `💰 Coins Won\n2nd: ${secondCoinsFormatted.toLocaleString()}k\n\n` +
         `Losers\n` +
         `${losers.map(p => `<@${p.player.user.discordId}>`).join(', ')}\n` +
         `💰 Coins Won\n3rd/4th: 0k each`
