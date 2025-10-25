@@ -704,9 +704,10 @@ export class GameService {
             console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
             return null;
           }
-          // Use full state instead of cached state
-          cachedGameState = fullGameState;
-        } else {
+          // Use full state instead of cached state and return it immediately
+          console.log(`[GAME SERVICE] Using full database state for ${gameId}`);
+          return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
+        }
         
         // CRITICAL: Ensure currentPlayer is always from database (single source of truth)
         cachedGameState.currentPlayer = lightweightState.currentPlayer;
@@ -842,7 +843,6 @@ export class GameService {
               tricks: 0
             }));
           }
-        }
         }
         
         // Returning cached state from Redis
