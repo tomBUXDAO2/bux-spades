@@ -139,7 +139,6 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               alt="BUX"
               className="h-8 w-auto" 
             />
-            <span className="text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 23 : (isExtraLargeScreen ? 23.5 : 24)))}px` }}>Spades</span>
           </div>
           
           <div className="flex items-center space-x-6">

@@ -91,11 +91,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
   const inputScale = isSmallScreen ? 0.8 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.9 : (isExtraLargeScreen ? 0.95 : 1)));
   
+  // Detect portrait mode for height adjustment
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const mobileToggleHeight = isPortrait ? 46 : 0; // Approximately 46px for MobileToggle in portrait
+  
   return (
     <div
       className="bg-slate-800 rounded-lg flex flex-col lg:col-span-1 col-span-1 flex"
       style={{ 
-        height: isSmallScreen ? 'calc(100vh - 64px - 16px)' : (isMediumScreen ? 'calc(100vh - 64px - 24px)' : (isLargeScreen ? 'calc(100vh - 64px - 28px)' : (isExtraLargeScreen ? 'calc(100vh - 64px - 16px)' : 'calc(100vh - 64px - 32px)'))),
+        height: isSmallScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : (isMediumScreen ? `calc(100vh - 64px - 24px - ${mobileToggleHeight}px)` : (isLargeScreen ? `calc(100vh - 64px - 28px - ${mobileToggleHeight}px)` : (isExtraLargeScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : `calc(100vh - 64px - 32px - ${mobileToggleHeight}px)`))),
         padding: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : (screenWidth >= 640 ? '16px' : '8px'))))
       }}
     >

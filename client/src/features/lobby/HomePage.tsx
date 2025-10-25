@@ -16,6 +16,7 @@ import type { GameState, Player, Bot } from "../../types/game";
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '@/features/auth/SocketContext';
 import { api } from '@/services/lib/api';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 interface ChatMessage {
   id?: string;
@@ -39,6 +40,7 @@ function isBot(p: any): p is Bot {
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const { socket, isAuthenticated } = useSocket();
+  const { isLandscape } = useWindowSize();
   
   // Detect screen width for responsive padding
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
@@ -57,6 +59,9 @@ const HomePage: React.FC = () => {
   const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
   // Apply extra large padding for 750-799px screens
   const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  
+  // Determine if we're in portrait mode
+  const isPortrait = !isLandscape;
   
   if (!user) {
     console.log('HomePage - No user, showing loading');
@@ -773,47 +778,55 @@ const HomePage: React.FC = () => {
 
       <main className="container mx-auto h-[calc(100vh-64px-32px)]" style={{ paddingTop: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingBottom: isSmallScreen ? '0px' : (isMediumScreen ? '8px' : (isLargeScreen ? '12px' : (isExtraLargeScreen ? '8px' : '16px'))), paddingLeft: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingRight: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}>
         <div
-          className="grid h-full lg:grid-cols-3 grid-cols-2"
+          className={isPortrait ? "h-full" : "grid h-full lg:grid-cols-3 grid-cols-2"}
           style={{ height: '100%', gap: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}
         >
-          {/* Games Section */}
-          <GamesSection
-            games={games}
-            filteredGames={filteredGames}
-            isLoading={isLoading}
-            filter={filter}
-            mobileTab={mobileTab}
-            onFilterChange={setFilter}
-            onCreateGame={() => setIsCreateGameModalOpen(true)}
-            onJoinGame={handleJoinGame}
-            onWatchGame={handleWatchGame}
-          />
+          {/* Games Section - Show in portrait only when lobby tab is active */}
+          {(!isPortrait || mobileTab === 'lobby') && (
+            <div className={isPortrait ? "w-full h-full" : ""}>
+              <GamesSection
+                games={games}
+                filteredGames={filteredGames}
+                isLoading={isLoading}
+                filter={filter}
+                mobileTab={mobileTab}
+                onFilterChange={setFilter}
+                onCreateGame={() => setIsCreateGameModalOpen(true)}
+                onJoinGame={handleJoinGame}
+                onWatchGame={handleWatchGame}
+              />
+            </div>
+          )}
 
-          {/* Chat Section */}
-          <ChatSection
-            mobileTab={mobileTab}
-            activeChatTab={activeChatTab}
-            onlineCount={onlineCount}
-            chatMessages={chatMessages}
-            newMessage={newMessage}
-            showEmojiPicker={showEmojiPicker}
-            onlinePlayers={onlinePlayers}
-            playerFilter={playerFilter}
-            user={user}
-            chatContainerRef={chatContainerRef}
-            inputRef={inputRef}
-            onSetActiveChatTab={setActiveChatTab}
-            onSetNewMessage={setNewMessage}
-            onSetShowEmojiPicker={setShowEmojiPicker}
-            onSetPlayerFilter={setPlayerFilter}
-            onSendMessage={handleSendMessage}
-            onSelectEmoji={handleSelectEmoji}
-            onOpenPlayerStats={handleOpenPlayerStats}
-            onWatchGame={handleWatchGame}
-            onSetConfirmModal={(modal) => setConfirmModal(modal)}
-            formatTime={formatTime}
-            getUserAvatar={getUserAvatar}
-          />
+          {/* Chat Section - Show in portrait only when chat tab is active */}
+          {(!isPortrait || mobileTab === 'chat') && (
+            <div className={isPortrait ? "w-full h-full" : ""}>
+              <ChatSection
+                mobileTab={mobileTab}
+                activeChatTab={activeChatTab}
+                onlineCount={onlineCount}
+                chatMessages={chatMessages}
+                newMessage={newMessage}
+                showEmojiPicker={showEmojiPicker}
+                onlinePlayers={onlinePlayers}
+                playerFilter={playerFilter}
+                user={user}
+                chatContainerRef={chatContainerRef}
+                inputRef={inputRef}
+                onSetActiveChatTab={setActiveChatTab}
+                onSetNewMessage={setNewMessage}
+                onSetShowEmojiPicker={setShowEmojiPicker}
+                onSetPlayerFilter={setPlayerFilter}
+                onSendMessage={handleSendMessage}
+                onSelectEmoji={handleSelectEmoji}
+                onOpenPlayerStats={handleOpenPlayerStats}
+                onWatchGame={handleWatchGame}
+                onSetConfirmModal={(modal) => setConfirmModal(modal)}
+                formatTime={formatTime}
+                getUserAvatar={getUserAvatar}
+              />
+            </div>
+          )}
         </div>
       </main>
 
