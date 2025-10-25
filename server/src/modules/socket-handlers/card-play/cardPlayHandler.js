@@ -376,6 +376,13 @@ class CardPlayHandler {
           console.log(`[CARD PLAY] Updated game state with latest player stats from database`);
         }
         
+        // CRITICAL: Preserve spadesBroken flag after database update
+        if (card.suit === 'SPADES') {
+          updatedGameState.play = updatedGameState.play || {};
+          updatedGameState.play.spadesBroken = true;
+          console.log(`[CARD PLAY] Preserved spadesBroken = true after database update`);
+        }
+        
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
