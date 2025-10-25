@@ -811,7 +811,7 @@ async function getStats(interaction) {
     // Format coin balance
     const coinBalance = user.coins || 0;
     const coinText = coinBalance >= 1000000 
-      ? `${(coinBalance / 1000000).toFixed(1)}M` 
+      ? `${(coinBalance / 1000000).toFixed(2)}M` 
       : `${(coinBalance / 1000).toFixed(0)}k`;
 
     // Create embed with league stats
