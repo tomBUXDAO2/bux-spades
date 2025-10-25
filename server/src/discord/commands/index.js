@@ -1367,8 +1367,15 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     const redTeam = gameLine.players.filter(p => p.seat === 0 || p.seat === 2);
     const blueTeam = gameLine.players.filter(p => p.seat === 1 || p.seat === 3);
     
-    const coinsDisplay = gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`;
-    let tableUpDesc = `${coinsDisplay} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}`;
+    // Reuse gameLineText from above, but without bold formatting
+    let tableUpDesc = `${coinsDisplay} ${settings.mode} ${settings.maxPoints}/${settings.minPoints}`;
+    
+    // Add format (GIMMICK variant or REGULAR)
+    if (settings.format === 'GIMMICK' && settings.gimmickVariant) {
+      tableUpDesc += ` ${settings.gimmickVariant}`;
+    } else {
+      tableUpDesc += ` ${settings.format}`;
+    }
     
     // Add special rule if present
     if (gameLine.settings.specialRule) {
