@@ -691,25 +691,25 @@ export class GameService {
    */
   static async getGameStateForClient(gameId, userId = null) {
     try {
-      // CRITICAL FIX: Always check database first for currentPlayer to prevent null issues
-      const dbGameState = await this.getFullGameStateFromDatabase(gameId);
-      if (!dbGameState) {
-        console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
-        return null;
-      }
-
       // REAL-TIME: Try to get game state from Redis first (instant)
       let cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
+        // PERFORMANCE FIX: Only fetch lightweight data from database instead of full state
+        const lightweightState = await this.getLightweightGameState(gameId);
+        if (!lightweightState) {
+          console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
+          return null;
+        }
+        
         // CRITICAL: Ensure currentPlayer is always from database (single source of truth)
-        cachedGameState.currentPlayer = dbGameState.currentPlayer;
-        cachedGameState.status = dbGameState.status;
-        cachedGameState.currentRound = dbGameState.currentRound;
-        cachedGameState.currentTrick = dbGameState.currentTrick;
+        cachedGameState.currentPlayer = lightweightState.currentPlayer;
+        cachedGameState.status = lightweightState.status;
+        cachedGameState.currentRound = lightweightState.currentRound;
+        cachedGameState.currentTrick = lightweightState.currentTrick;
         
         // CRITICAL: Update Redis cache with corrected currentPlayer to prevent future null issues
         await redisGameState.setGameState(gameId, cachedGameState);
-        console.log(`[GAME SERVICE] Updated Redis cache with corrected currentPlayer: ${dbGameState.currentPlayer}`);
+        console.log(`[GAME SERVICE] Updated Redis cache with corrected currentPlayer: ${lightweightState.currentPlayer}`);
         // CRITICAL: Always map gimmick variants to client-friendly format
         const gimmickVariantMapping = {
           'SUICIDE': 'SUICIDE',
@@ -842,9 +842,9 @@ export class GameService {
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
       }
 
-      // FALLBACK: Use database state directly (already fetched above)
+      // FALLBACK: Use database state directly
       console.log(`[GAME SERVICE] Redis miss for game ${gameId} - using database state`);
-      const fullGameState = dbGameState;
+      const fullGameState = await this.getFullGameStateFromDatabase(gameId);
       if (fullGameState) {
         // CRITICAL: Get current trick data from Redis and add it to the game state
         const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
@@ -906,6 +906,28 @@ export class GameService {
     } catch (error) {
       console.error('[GAME SERVICE] Error getting game state for client:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get lightweight game state with only essential fields (for performance)
+   */
+  static async getLightweightGameState(gameId) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: {
+          id: true,
+          currentPlayer: true,
+          status: true,
+          currentRound: true,
+          currentTrick: true
+        }
+      });
+      return game;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error getting lightweight game state:', error);
+      return null;
     }
   }
 

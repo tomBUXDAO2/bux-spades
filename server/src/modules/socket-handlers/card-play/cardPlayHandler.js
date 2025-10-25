@@ -313,11 +313,8 @@ class CardPlayHandler {
         await this.updateCurrentPlayer(gameId, nextPlayer?.userId);
         console.log(`[CARD PLAY] Moved to next player: ${nextPlayer?.username} (seat ${nextPlayerIndex})`);
         
-        // Update current trick data in Redis (reuse the cards we already fetched)
-        const currentTrickCardsForRedis = await prisma.trickCard.findMany({
-          where: { trickId: logResult.actualTrickId },
-          orderBy: { playOrder: 'asc' }
-        });
+        // Update current trick data in Redis (reuse the cards we already fetched at line 173)
+        const currentTrickCardsForRedis = trickCards;
         
         if (currentTrickCardsForRedis && currentTrickCardsForRedis.length > 0) {
           const formattedTrickCards = currentTrickCardsForRedis.map(card => ({
@@ -367,13 +364,6 @@ class CardPlayHandler {
           updatedGameState.hands = latestHands;
           updatedGameState.playerHands = latestHands;
           console.log(`[CARD PLAY] Updated game state with latest hands from Redis`);
-        }
-        
-        // CRITICAL: Get the latest player stats from database to ensure tricks won are up-to-date
-        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
-        if (freshGameState && freshGameState.players) {
-          updatedGameState.players = freshGameState.players;
-          console.log(`[CARD PLAY] Updated game state with latest player stats from database`);
         }
         
         // CRITICAL: Preserve spadesBroken flag after database update
