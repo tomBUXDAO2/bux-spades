@@ -252,17 +252,30 @@ export default function GameTablePlayers({
       const teamBid = bidCount + partnerBid;
       const teamMade = madeCount + partnerMade;
       
-      // Nil bid: show cross if they take a trick, tick if they make it through
-      if (bidCount === 0) {
+      // Check if either player bid nil
+      const playerBidNil = bidCount === 0;
+      const partnerBidNil = partnerBid === 0;
+      
+      if (playerBidNil) {
+        // This player bid nil
         if (madeCount > 0) {
-          madeStatus = '❌'; // Failed nil
-        } else if (tricksLeft === 0) {
-          madeStatus = '✅'; // Successful nil (hand complete)
+          madeStatus = '❌'; // Failed nil - won a trick
+        } else {
+          // Nil bidder stays blank unless they win a trick
+          madeStatus = null;
+        }
+      } else if (partnerBidNil) {
+        // Partner bid nil, this player has regular bid
+        // Stay blank until team bid is definitely made or failed (including tricks nil wins)
+        if (teamMade >= teamBid) {
+          madeStatus = '✅'; // Team made their bid (including any tricks nil won)
+        } else if (teamMade + tricksLeft < teamBid) {
+          madeStatus = '❌'; // Team cannot make their bid
         } else {
           madeStatus = null; // Still in progress
         }
       } else {
-        // Non-nil: tick if teamMade >= teamBid, cross if teamMade < teamBid
+        // Neither player bid nil - standard team logic
         if (teamBid > 0) {
           if (teamMade >= teamBid) {
             madeStatus = '✅'; // Team made their bid
@@ -278,13 +291,12 @@ export default function GameTablePlayers({
     } else if (isSoloGame) {
       // Solo game logic (individual player)
       if (bidCount === 0) {
-        // Nil bid
+        // Nil bid - only show cross if they win a trick
         if (madeCount > 0) {
           madeStatus = '❌'; // Failed nil
-        } else if (tricksLeft === 0) {
-          madeStatus = '✅'; // Successful nil
         } else {
-          madeStatus = null; // Still in progress
+          // Nil stays blank (no tick even when successful)
+          madeStatus = null;
         }
       } else if (bidCount > 0) {
         // Regular bid
