@@ -48,9 +48,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.7 : 1;
-  const iconScale = isSmallScreen ? 0.7 : 1;
-  const paddingScale = isSmallScreen ? 0.6 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  const textScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  const iconScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  const paddingScale = isSmallScreen ? 0.6 : (isMediumScreen ? 0.7 : (isLargeScreen ? 0.85 : (isExtraLargeScreen ? 0.9 : 1)));
 
   // Fetch games when panel opens
   useEffect(() => {
@@ -264,14 +270,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                     <button
                       onClick={fetchGames}
                       disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-white"
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-white flex items-center justify-center"
                       style={{ padding: `${4 * paddingScale}px ${12 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     >
                       {loading ? 'Loading...' : 'Refresh'}
                     </button>
                     <button
                       onClick={handleSelectAll}
-                      className="bg-gray-600 hover:bg-gray-700 rounded text-white"
+                      className="bg-gray-600 hover:bg-gray-700 rounded text-white flex items-center justify-center"
                       style={{ padding: `${4 * paddingScale}px ${12 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     >
                       {selectedGames.size === games.length ? 'Deselect All' : 'Select All'}
@@ -279,7 +285,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                     <button
                       onClick={handleDeleteSelected}
                       disabled={selectedGames.size === 0 || loading}
-                      className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white"
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-white flex items-center justify-center"
                       style={{ padding: `${4 * paddingScale}px ${12 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     >
                       Delete Selected ({selectedGames.size})

@@ -19,9 +19,15 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.7 : 1;
-  const iconScale = isSmallScreen ? 0.7 : 1;
-  const paddingScale = isSmallScreen ? 0.6 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  const textScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  const iconScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  const paddingScale = isSmallScreen ? 0.6 : (isMediumScreen ? 0.7 : (isLargeScreen ? 0.85 : (isExtraLargeScreen ? 0.9 : 1)));
 
   if (!isOpen) return null;
 

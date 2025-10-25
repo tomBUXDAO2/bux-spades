@@ -27,7 +27,13 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.85 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
   
   // Check if user is admin
   const userIsAdmin = isAdmin(user?.discordId);
@@ -133,7 +139,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               alt="BUX"
               className="h-8 w-auto" 
             />
-            <span className="text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 20 : 24}px` }}>Spades</span>
+            <span className="text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 23 : (isExtraLargeScreen ? 23.5 : 24)))}px` }}>Spades</span>
           </div>
           
           <div className="flex items-center space-x-6">

@@ -36,14 +36,20 @@ const GamesSection: React.FC<GamesSectionProps> = ({
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.85 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
   
   return (
     <div
       className="space-y-2 sm:space-y-4 overflow-y-auto h-full lg:col-span-2 col-span-1 block p-2 sm:p-0"
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 18 : (screenWidth >= 640 ? 24 : 20)}px` }}>Available Games</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 18 : (isMediumScreen ? 20 : (isLargeScreen ? 22 : (isExtraLargeScreen ? 23 : (screenWidth >= 640 ? 24 : 20))))}px` }}>Available Games</h2>
         <button
           onClick={onCreateGame}
           className="lobby-button px-2 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"

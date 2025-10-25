@@ -51,6 +51,12 @@ const HomePage: React.FC = () => {
   
   // Apply reduced padding for 600-649px screens
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  // Apply medium padding for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large padding for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large padding for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
   
   if (!user) {
     console.log('HomePage - No user, showing loading');
@@ -765,10 +771,10 @@ const HomePage: React.FC = () => {
         onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
       />
 
-      <main className="container mx-auto h-[calc(100vh-64px-32px)]" style={{ paddingTop: isSmallScreen ? '8px' : '16px', paddingBottom: isSmallScreen ? '0px' : '16px', paddingLeft: isSmallScreen ? '8px' : '16px', paddingRight: isSmallScreen ? '8px' : '16px' }}>
+      <main className="container mx-auto h-[calc(100vh-64px-32px)]" style={{ paddingTop: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingBottom: isSmallScreen ? '0px' : (isMediumScreen ? '8px' : (isLargeScreen ? '12px' : (isExtraLargeScreen ? '8px' : '16px'))), paddingLeft: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingRight: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}>
         <div
           className="grid h-full lg:grid-cols-3 grid-cols-2"
-          style={{ height: '100%', gap: isSmallScreen ? '8px' : '16px' }}
+          style={{ height: '100%', gap: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}
         >
           {/* Games Section */}
           <GamesSection

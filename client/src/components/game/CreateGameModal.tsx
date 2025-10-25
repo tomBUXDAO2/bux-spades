@@ -29,9 +29,13 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.85 : 1;
-  const iconScale = isSmallScreen ? 0.85 : 1;
-  const paddingScale = isSmallScreen ? 0.7 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : 1));
+  const iconScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : 1));
+  const paddingScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.8 : (isLargeScreen ? 0.9 : 1));
   
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
@@ -146,7 +150,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   };
 
   // Determine if we should use landscape layout
-  const useLandscapeLayout = isMobile && isLandscape;
+  // Use landscape for mobile landscape OR for screens 900px and above
+  const useLandscapeLayout = (isMobile && isLandscape) || screenWidth >= 900;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: `${16 * paddingScale}px` }}>
@@ -159,7 +164,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
       }`} style={{ padding: `${16 * paddingScale}px` }}>
         <h2 className={`font-bold text-slate-200 mb-4 text-center ${
           useLandscapeLayout ? 'text-lg' : isMobile ? 'text-xl' : 'text-2xl'
-        }`} style={{ fontSize: `${isSmallScreen ? 18 : (useLandscapeLayout ? 18 : isMobile ? 20 : 24)}px` }}>
+        }`} style={{ fontSize: `${isSmallScreen ? 18 : (isMediumScreen ? 19 : (isLargeScreen ? 20 : (useLandscapeLayout ? 18 : isMobile ? 20 : 24)))}px` }}>
           {useLandscapeLayout ? (
             <div className="flex items-center justify-center" style={{ gap: `${16 * paddingScale}px` }}>
               <span>Create Game</span>

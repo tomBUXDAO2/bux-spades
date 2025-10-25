@@ -82,33 +82,41 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.85 : 1;
-  const inputScale = isSmallScreen ? 0.8 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  const inputScale = isSmallScreen ? 0.8 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.9 : (isExtraLargeScreen ? 0.95 : 1)));
   
   return (
     <div
       className="bg-slate-800 rounded-lg flex flex-col lg:col-span-1 col-span-1 flex"
       style={{ 
-        height: isSmallScreen ? 'calc(100vh - 64px - 16px)' : 'calc(100vh - 64px - 32px)',
-        padding: isSmallScreen ? '8px' : (screenWidth >= 640 ? '16px' : '8px')
+        height: isSmallScreen ? 'calc(100vh - 64px - 16px)' : (isMediumScreen ? 'calc(100vh - 64px - 24px)' : (isLargeScreen ? 'calc(100vh - 64px - 28px)' : (isExtraLargeScreen ? 'calc(100vh - 64px - 16px)' : 'calc(100vh - 64px - 32px)'))),
+        padding: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : (screenWidth >= 640 ? '16px' : '8px'))))
       }}
     >
       {/* Chat/Players Header */}
       <div className="flex items-center justify-between mb-2 sm:mb-4">
         <div className="flex items-center gap-1 sm:gap-2">
           <button
-            className={`lobby-button w-12 h-6 sm:w-20 sm:h-10 flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
             onClick={() => onSetActiveChatTab('chat')}
             aria-label="Chat"
+            style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
           >
-            <img src="/chat.svg" alt="Chat" className="w-4 h-4 sm:w-6 sm:h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            <img src="/chat.svg" alt="Chat" className="" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), filter: 'invert(1) brightness(2)' }} />
           </button>
           <button
-            className={`lobby-button w-12 h-6 sm:w-20 sm:h-10 flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
             onClick={() => onSetActiveChatTab('players')}
             aria-label="Players"
+            style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
           >
-            <img src="/players.svg" alt="Players" className="w-4 h-4 sm:w-6 sm:h-6" style={{ filter: 'invert(1) brightness(2)' }} />
+            <img src="/players.svg" alt="Players" className="" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), filter: 'invert(1) brightness(2)' }} />
           </button>
         </div>
         <div className="flex items-center space-x-1">
@@ -231,10 +239,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       ) : (
         <>
           {/* Friends summary row */}
-          <div className="bg-indigo-900 rounded mb-2 flex flex-col justify-center" style={{ minHeight: isSmallScreen ? '48px' : '64px', padding: isSmallScreen ? '8px 12px' : '8px 24px' }}>
-            <div className="flex items-center justify-between" style={{ height: isSmallScreen ? '24px' : '32px' }}>
-              <span className="flex items-center gap-2 text-slate-200 font-bold" style={{ fontSize: `${18 * textScale}px` }}>
-                <img src="/friend.svg" alt="Friends" style={{ width: isSmallScreen ? '24px' : '32px', height: isSmallScreen ? '24px' : '32px', filter: 'invert(1) brightness(2)' }} />
+          <div className="bg-indigo-900 rounded mb-2 flex flex-col justify-center" style={{ minHeight: isSmallScreen ? '48px' : (isMediumScreen ? '56px' : (isLargeScreen ? '60px' : (isExtraLargeScreen ? '56px' : '64px'))), padding: isSmallScreen ? '8px 12px' : (isMediumScreen ? '8px 16px' : (isLargeScreen ? '8px 20px' : (isExtraLargeScreen ? '8px 16px' : '8px 24px'))) }}>
+            <div className="flex items-center justify-between" style={{ height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))) }}>
+              <span className="flex items-center gap-2 text-slate-200 font-bold" style={{ fontSize: `${isSmallScreen ? 16 : (isMediumScreen ? 17 : (isLargeScreen ? 17.5 : (isExtraLargeScreen ? 17 : 18))) * textScale}px` }}>
+                <img src="/friend.svg" alt="Friends" style={{ width: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))), filter: 'invert(1) brightness(2)' }} />
                 Friends: {Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.status === 'friend').length : 0}
               </span>
               <span className="flex items-center gap-1 text-slate-300 font-medium" style={{ fontSize: `${14 * textScale}px` }}>
@@ -359,18 +367,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                         player.status === 'friend' ? (
                           <>
                             <button className="flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
-                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
+                              style={{ width: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))) }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'remove_friend' });
                               }}>
-                              <img src="/remove-friend.svg" alt="Remove Friend" style={{ width: isSmallScreen ? '16px' : '20px', height: isSmallScreen ? '16px' : '20px', filter: 'invert(1) brightness(2)' }} />
+                              <img src="/remove-friend.svg" alt="Remove Friend" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '19px' : (isExtraLargeScreen ? '19.5px' : '20px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '19px' : (isExtraLargeScreen ? '19.5px' : '20px'))), filter: 'invert(1) brightness(2)' }} />
                             </button>
                             <button className="flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
-                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
+                              style={{ width: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))) }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'block_user' });
                               }}>
-                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : '28px', height: isSmallScreen ? '20px' : '28px' }}>
+                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : (isMediumScreen ? '24px' : (isLargeScreen ? '26px' : (isExtraLargeScreen ? '27px' : '28px'))), height: isSmallScreen ? '20px' : (isMediumScreen ? '24px' : (isLargeScreen ? '26px' : (isExtraLargeScreen ? '27px' : '28px'))) }}>
                                 <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                 <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
                               </svg>
@@ -379,18 +387,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                         ) : (
                           <>
                             <button className="flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
-                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
+                              style={{ width: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))) }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'add_friend' });
                               }}>
-                              <img src="/add-friend.svg" alt="Add Friend" style={{ width: isSmallScreen ? '16px' : '20px', height: isSmallScreen ? '16px' : '20px', filter: 'invert(1) brightness(2)' }} />
+                              <img src="/add-friend.svg" alt="Add Friend" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '19px' : (isExtraLargeScreen ? '19.5px' : '20px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '19px' : (isExtraLargeScreen ? '19.5px' : '20px'))), filter: 'invert(1) brightness(2)' }} />
                             </button>
                             <button className="flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
-                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
+                              style={{ width: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))) }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'block_user' });
                               }}>
-                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : '28px', height: isSmallScreen ? '20px' : '28px' }}>
+                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : (isMediumScreen ? '24px' : (isLargeScreen ? '26px' : (isExtraLargeScreen ? '27px' : '28px'))), height: isSmallScreen ? '20px' : (isMediumScreen ? '24px' : (isLargeScreen ? '26px' : (isExtraLargeScreen ? '27px' : '28px'))) }}>
                                 <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                 <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
                               </svg>

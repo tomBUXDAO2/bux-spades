@@ -63,9 +63,19 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   
   // Apply scaling for 600-649px screens (landscape)
   const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
-  const textScale = isSmallScreen ? 0.7 : 1;
-  const iconScale = isSmallScreen ? 0.7 : 1;
-  const paddingScale = isSmallScreen ? 0.6 : 1;
+  // Apply medium scaling for 650-699px screens
+  const isMediumScreen = screenWidth >= 650 && screenWidth <= 699;
+  // Apply large scaling for 700-749px screens
+  const isLargeScreen = screenWidth >= 700 && screenWidth <= 749;
+  // Apply extra large scaling for 750-799px screens
+  const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
+  // Apply larger scaling for 800-849px screens
+  const isLargerScreen = screenWidth >= 800 && screenWidth <= 849;
+  // Apply even larger scaling for 850-899px screens
+  const isEvenLargerScreen = screenWidth >= 850 && screenWidth <= 899;
+  const textScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : (isLargerScreen ? 0.99 : (isEvenLargerScreen ? 0.995 : 1)))));
+  const iconScale = isSmallScreen ? 0.7 : (isMediumScreen ? 0.85 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : (isLargerScreen ? 0.99 : (isEvenLargerScreen ? 0.995 : 1)))));
+  const paddingScale = isSmallScreen ? 0.6 : (isMediumScreen ? 0.7 : (isLargeScreen ? 0.85 : (isExtraLargeScreen ? 0.9 : (isLargerScreen ? 0.95 : (isEvenLargerScreen ? 0.97 : 1)))));
 
   const formatSigned = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 
@@ -210,7 +220,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
             <div className="bg-slate-700 rounded-lg mb-6" style={{ padding: `${24 * paddingScale}px` }}>
               <div className="flex items-center mb-4" style={{ gap: `${16 * paddingScale}px` }}>
                 <img src={player.avatar || player.avatarUrl || '/default-avatar.png'} alt={player.username} className="rounded-full" style={{ width: `${64 * iconScale}px`, height: `${64 * iconScale}px` }} />
-                <h3 className="font-bold text-white" style={{ fontSize: `${30 * textScale}px` }}>{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
+                <h3 className="font-bold text-white" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>{player.type === 'bot' ? abbreviateBotName(player.username) : player.username}</h3>
               </div>
               <div style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
                 <div className="flex items-center justify-between">
@@ -293,7 +303,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
           <div className="flex flex-col">
             {/* Game Mode Breakdown */}
             <div className="bg-slate-700 rounded-lg mb-6 flex-1" style={{ padding: `${24 * paddingScale}px` }}>
-              <h3 className="font-bold text-white mb-4" style={{ fontSize: `${30 * textScale}px` }}>Game Mode Breakdown</h3>
+              <h3 className="font-bold text-white mb-4" style={{ fontSize: `${isSmallScreen ? 20 : (isMediumScreen ? 22 : (isLargeScreen ? 24 : (isExtraLargeScreen ? 23 : (isLargerScreen ? 27 : (isEvenLargerScreen ? 28 : 30)))))}px` }}>Game Mode Breakdown</h3>
               <div className="text-slate-300 text-right mb-6" style={{ fontSize: `${18 * textScale}px` }}>
                 <span style={{ marginRight: `${16 * paddingScale}px` }}>(won/played)</span>
                 <span>(win %)</span>
