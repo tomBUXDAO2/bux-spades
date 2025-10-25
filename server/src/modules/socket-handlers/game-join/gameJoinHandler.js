@@ -129,6 +129,44 @@ class GameJoinHandler {
         // If not a seated player, allow spectating when requested
         if (spectate) {
           console.log(`[GAME JOIN] User ${userId} spectating game ${gameId}`);
+          
+          // Check if already a spectator in database
+          const existingSpectator = await prisma.gamePlayer.findFirst({
+            where: {
+              gameId,
+              userId,
+              isSpectator: true
+            }
+          });
+          
+          // Add spectator to database if not already present
+          if (!existingSpectator) {
+            try {
+              await prisma.gamePlayer.create({
+                data: {
+                  gameId,
+                  userId,
+                  seatIndex: null,
+                  teamIndex: null,
+                  isHuman: true,
+                  isSpectator: true,
+                  joinedAt: new Date()
+                }
+              });
+              console.log(`[GAME JOIN] Added ${userId} as spectator to game ${gameId} in database`);
+              
+              // Refresh game state to include new spectator
+              const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+              if (freshGameState) {
+                await redisGameState.setGameState(gameId, freshGameState);
+                Object.assign(gameState, freshGameState);
+                console.log(`[GAME JOIN] Refreshed game state with new spectator`);
+              }
+            } catch (error) {
+              console.error(`[GAME JOIN] Error adding spectator to database:`, error);
+              // Continue anyway - they can still spectate via socket
+            }
+          }
         } else {
           // CRITICAL: If user is not found, check if they are the game creator
           const game = await GameService.getGame(gameId);
