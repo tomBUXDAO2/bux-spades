@@ -697,9 +697,16 @@ export class GameService {
         // PERFORMANCE FIX: Only fetch lightweight data from database instead of full state
         const lightweightState = await this.getLightweightGameState(gameId);
         if (!lightweightState) {
-          console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
-          return null;
-        }
+          console.log(`[GAME SERVICE] Lightweight query failed for ${gameId}, falling back to full database query`);
+          // Fall back to full database query if lightweight fails
+          const fullGameState = await this.getFullGameStateFromDatabase(gameId);
+          if (!fullGameState) {
+            console.log(`[GAME SERVICE] No game found in database for ${gameId}`);
+            return null;
+          }
+          // Use full state instead of cached state
+          cachedGameState = fullGameState;
+        } else {
         
         // CRITICAL: Ensure currentPlayer is always from database (single source of truth)
         cachedGameState.currentPlayer = lightweightState.currentPlayer;
@@ -835,6 +842,7 @@ export class GameService {
               tricks: 0
             }));
           }
+        }
         }
         
         // Returning cached state from Redis
