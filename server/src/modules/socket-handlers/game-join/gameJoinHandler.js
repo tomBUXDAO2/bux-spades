@@ -121,8 +121,8 @@ class GameJoinHandler {
       }
 
       if (!gameState) {
-        console.log(`[GAME JOIN] No game state returned for ${gameId}`);
-        this.socket.emit('error', { message: 'Game not found' });
+        console.log(`[GAME JOIN] No game state returned for ${gameId} - game may not exist or be corrupted`);
+        this.socket.emit('error', { message: 'Game not found or corrupted. Please try creating a new game.' });
         return;
       }
 

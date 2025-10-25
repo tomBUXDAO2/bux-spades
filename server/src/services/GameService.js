@@ -83,6 +83,18 @@ export class GameService {
 
       console.log(`[GAME SERVICE] Created game ${gameData.id} with creator ${gameData.createdById} in seat 0`);
       
+      // CRITICAL FIX: Immediately cache the game state in Redis for instant access
+      try {
+        const fullGameState = await this.getFullGameStateFromDatabase(gameData.id);
+        if (fullGameState) {
+          await redisGameState.setGameState(gameData.id, fullGameState);
+          console.log(`[GAME SERVICE] Cached newly created game ${gameData.id} in Redis`);
+        }
+      } catch (cacheError) {
+        console.error(`[GAME SERVICE] Error caching newly created game ${gameData.id}:`, cacheError);
+        // Don't throw - game creation should succeed even if caching fails
+      }
+      
       // Return the database game object (no in-memory Game object)
       return dbGame;
     } catch (error) {
@@ -860,6 +872,7 @@ export class GameService {
       console.log(`[GAME SERVICE] Redis miss for game ${gameId} - using database state`);
       const fullGameState = await this.getFullGameStateFromDatabase(gameId);
       if (fullGameState) {
+        console.log(`[GAME SERVICE] Found game ${gameId} in database, status: ${fullGameState.status}`);
         // CRITICAL: Get current trick data from Redis and add it to the game state
         const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
         if (currentTrickCards && currentTrickCards.length > 0) {
@@ -902,21 +915,9 @@ export class GameService {
         return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
       }
 
-      // Last resort: return minimal state
-      console.log(`[GAME SERVICE] No game found for ${gameId} - returning minimal state`);
-      return {
-        id: gameId,
-        status: 'LOADING',
-        currentPlayer: null,
-        currentRound: 1,
-        currentTrick: 1,
-        players: [],
-        rounds: [],
-        playerHands: [],
-        currentTrickCards: [],
-        playerBids: Array.from({length: 4}, () => null),
-        isGameComplete: false
-      };
+      // Last resort: return null to trigger proper error handling
+      console.log(`[GAME SERVICE] No game found for ${gameId} - returning null to trigger error handling`);
+      return null;
     } catch (error) {
       console.error('[GAME SERVICE] Error getting game state for client:', error);
       throw error;
