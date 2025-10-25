@@ -62,11 +62,27 @@ export class TrickCompletionService {
       });
 
       // OPTIMIZED: Update Redis cache incrementally instead of full rebuild
+      // Get current round stats once (used for both Redis update and round completion check)
+      const currentRoundStats = await prisma.playerRoundStats.findMany({
+        where: { roundId },
+        select: { seatIndex: true, tricksWon: true }
+      });
+      
       try {
-        // CONSOLIDATED: Using GameService directly instead of OptimizedGameStateService
-        // No need for separate update - GameService handles state
-        console.log(`[TRICK COMPLETION] GameService handles state updates automatically`);
-        console.log(`[TRICK COMPLETION] Updated Redis cache incrementally after trick completion`);
+        // Update player tricks in Redis cache
+        const currentGameState = await redisGameState.getGameState(gameId);
+        if (currentGameState && currentGameState.players) {
+          // Update tricks for each player
+          currentGameState.players.forEach(player => {
+            const stat = currentRoundStats.find(s => s.seatIndex === player.seatIndex);
+            if (stat) {
+              player.tricks = stat.tricksWon;
+            }
+          });
+          
+          await redisGameState.setGameState(gameId, currentGameState);
+          console.log(`[TRICK COMPLETION] Updated player tricks in Redis cache`);
+        }
       } catch (error) {
         console.error(`[TRICK COMPLETION] Error updating Redis cache after trick completion:`, error);
         // Fallback to full rebuild if incremental update fails
@@ -81,13 +97,7 @@ export class TrickCompletionService {
         }
       }
 
-      // OPTIMIZED: Use cached counter instead of expensive count query
-      // Get current round stats to check if round is complete
-      const currentRoundStats = await prisma.playerRoundStats.findMany({
-        where: { roundId },
-        select: { tricksWon: true }
-      });
-      
+      // Check if round is complete using the same stats
       const totalTricksWon = currentRoundStats.reduce((sum, stat) => sum + stat.tricksWon, 0);
       const completedTricks = totalTricksWon;
 
