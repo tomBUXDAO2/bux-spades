@@ -808,6 +808,12 @@ async function getStats(interaction) {
     
     console.log(`[DISCORD] Stats retrieved: ${stats.totalGames} games, ${stats.gamesWon} wins`);
 
+    // Format coin balance
+    const coinBalance = user.coins || 0;
+    const coinText = coinBalance >= 1000000 
+      ? `${(coinBalance / 1000000).toFixed(1)}M` 
+      : `${(coinBalance / 1000).toFixed(0)}k`;
+
     // Create embed with league stats
     const embed = new EmbedBuilder()
       .setTitle(`🏆 ${targetUser.displayName || targetUser.username}'s League Stats`)
@@ -815,10 +821,10 @@ async function getStats(interaction) {
       .setColor(0x0099ff)
       .setTimestamp();
 
-    // Main stats section
+    // Main stats section with coin balance at top
     embed.addFields(
       { 
-        name: '**Played:** ' + stats.totalGames + '\n**Won:** ' + stats.gamesWon + '\n**Win %:** ' + stats.winRate.toFixed(1) + '%\n**Total bags:** ' + stats.bags.total + '\n**Bags per game:** ' + stats.bags.perGame.toFixed(1), 
+        name: '💰 **Coin Balance:** ' + coinText + '\n**Played:** ' + stats.totalGames + '\n**Won:** ' + stats.gamesWon + '\n**Win %:** ' + stats.winRate.toFixed(1) + '%\n**Total bags:** ' + stats.bags.total + '\n**Bags per game:** ' + stats.bags.perGame.toFixed(1), 
         value: '', 
         inline: false 
       }
