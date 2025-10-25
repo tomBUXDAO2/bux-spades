@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface GameRulesModalProps {
   isOpen: boolean;
@@ -7,20 +7,35 @@ interface GameRulesModalProps {
 
 const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<'rules' | 'gameTypes' | 'scoring'>('rules');
+  
+  // Detect screen width for responsive sizing
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Apply scaling for 600-649px screens (landscape)
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  const textScale = isSmallScreen ? 0.7 : 1;
+  const iconScale = isSmallScreen ? 0.7 : 1;
+  const paddingScale = isSmallScreen ? 0.6 : 1;
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: `${16 * paddingScale}px` }}>
+      <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <h2 className="text-2xl font-bold text-slate-200">Game Rules</h2>
+        <div className="flex items-center justify-between border-b border-slate-700" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${24 * paddingScale}px`, paddingRight: `${24 * paddingScale}px` }}>
+          <h2 className="font-bold text-slate-200" style={{ fontSize: `${24 * textScale}px` }}>Game Rules</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${24 * iconScale}px`, height: `${24 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -30,13 +45,14 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
         <div className="flex border-b border-slate-700">
           <button
             onClick={() => setActiveTab('rules')}
-            className={`flex-1 px-6 py-4 text-base font-medium transition-colors flex items-center justify-center space-x-2 ${
+            className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'rules'
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
+            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span>Rules</span>
@@ -44,13 +60,14 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
           
           <button
             onClick={() => setActiveTab('gameTypes')}
-            className={`flex-1 px-6 py-4 text-base font-medium transition-colors flex items-center justify-center space-x-2 ${
+            className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'gameTypes'
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
+            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             <span>Game Types</span>
@@ -58,13 +75,14 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
           
           <button
             onClick={() => setActiveTab('scoring')}
-            className={`flex-1 px-6 py-4 text-base font-medium transition-colors flex items-center justify-center space-x-2 ${
+            className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'scoring'
                 ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
             }`}
+            style={{ padding: `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${20 * iconScale}px`, height: `${20 * iconScale}px` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             <span>Scoring</span>
@@ -72,65 +90,65 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <div className="overflow-y-auto max-h-[60vh]" style={{ padding: `${24 * paddingScale}px` }}>
           {activeTab === 'rules' && (
-            <div className="space-y-4 text-slate-200">
-              <p>
+            <div className="text-slate-200" style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 Spades is a game played with 4 players and can be played either solo or more commonly with a partner. 
                 Spades are the trump suit (as the name suggests).
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 The object of the game is to reach the target score before the other team/players. 
                 The target score is decided at the start by whoever creates the game.
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 Each round the players are all dealt 13 cards and they must then declare their bid for the round 
                 (the number of tricks out of 13 that they think they can win).
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 After all players have bid, the trick phase begins. All players play 1 card in clockwise order. 
                 Players must follow suit if they can and the highest card played wins the trick. If a player has 
                 no cards in the lead suit he can choose to discard a card in another suit or 'cut' by playing a spade. 
                 Spades beat all other suits but if more than 1 player plays a spade then the highest spade wins.
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 The winner of the trick is then the first to act on the next trick.
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 Once all 13 tricks have been played, the scores are totalled and (if the game is not over) a new hand begins.
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 In partners games the 2 players play as a team and they must make their total team bid between them 
                 but it does not matter how many tricks they win individually.
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 Players can also choose to bid 'nil' which means they have to avoid winning any tricks but they 
                 receive a big bonus if they achieve that (and a big forfeit if they don't).
               </p>
               
-              <p>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 The game is over as soon as 1 team or player surpasses the target score or drops below the minimum point score.
               </p>
               
               {/* Table Talk Warning */}
-              <div className="mt-8 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <svg className="w-6 h-6 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-red-900/20 border border-red-500/30 rounded-lg" style={{ marginTop: `${32 * paddingScale}px`, padding: `${16 * paddingScale}px` }}>
+                <div className="flex items-start" style={{ gap: `${12 * paddingScale}px` }}>
+                  <svg className="text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: `${24 * iconScale}px`, height: `${24 * iconScale}px`, marginTop: `${2 * paddingScale}px` }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                   <div>
-                    <h3 className="font-semibold text-red-400 mb-2">TABLE TALK WARNING</h3>
-                    <p className="text-red-200">
+                    <h3 className="font-semibold text-red-400 mb-2" style={{ fontSize: `${16 * textScale}px` }}>TABLE TALK WARNING</h3>
+                    <p className="text-red-200" style={{ fontSize: `${14 * textScale}px` }}>
                       'TABLE TALK' IS STRICTLY FORBIDDEN IN SPADES. PLAYERS MUST NOT REVEAL TO THEIR PARTNER ANY INFORMATION ABOUT THE CARDS THEY HOLD OR WHICH CARDS THEY WANT THEIR PARTNER TO PLAY.
                     </p>
-                    <p className="text-red-200 mt-2">
+                    <p className="text-red-200 mt-2" style={{ fontSize: `${14 * textScale}px` }}>
                       ANYONE FOUND TO BE DOING THIS IN CHAT OR COMMUNICATING WITH THEIR PARTNER BY ANY OTHER MEANS WILL BE REMOVED AND BANNED FROM THE PLATFORM.
                     </p>
                   </div>
@@ -140,84 +158,84 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
           )}
 
           {activeTab === 'gameTypes' && (
-            <div className="space-y-4 text-slate-200">
-              <div className="space-y-3">
+            <div className="text-slate-200" style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ gap: `${12 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
                 <div>
-                  <h3 className="font-semibold text-blue-400">Regular</h3>
-                  <p>Players can bid whatever they like from 0-13</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Regular</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players can bid whatever they like from 0-13</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">No Nils</h3>
-                  <p>Nil bids are forbidden and the minimum bid is 1</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>No Nils</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Nil bids are forbidden and the minimum bid is 1</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Blind Nil</h3>
-                  <p>Before seeing their cards players can choose to bid nil without seeing their hand for a chance to win x2 nil bonus</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Blind Nil</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Before seeing their cards players can choose to bid nil without seeing their hand for a chance to win x2 nil bonus</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Whiz</h3>
-                  <p>Players can only bid the number of spades in their hand or nil</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Whiz</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players can only bid the number of spades in their hand or nil</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Mirror</h3>
-                  <p>Players are forced to bid the number of spades in their hand</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Mirror</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players are forced to bid the number of spades in their hand</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Suicide (Partners Only)</h3>
-                  <p>1 partner from each team MUST bid nil</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Suicide (Partners Only)</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>1 partner from each team MUST bid nil</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Screamer</h3>
-                  <p>Players are not allowed to play a spade if they have other suits available</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Screamer</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players are not allowed to play a spade if they have other suits available</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-blue-400">Assassin</h3>
-                  <p>Players MUST play a spade if they can</p>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Assassin</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players MUST play a spade if they can</p>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'scoring' && (
-            <div className="space-y-4 text-slate-200">
-              <p>
+            <div className="text-slate-200" style={{ gap: `${16 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
+              <p style={{ fontSize: `${14 * textScale}px` }}>
                 At the end of each round, team/player scores are calculated as follows...
               </p>
               
-              <div className="space-y-3">
+              <div style={{ gap: `${12 * paddingScale}px`, display: 'flex', flexDirection: 'column' }}>
                 <div>
-                  <h3 className="font-semibold text-green-400">Successful Bids</h3>
-                  <p>+10 points for every trick bid if the bid was successful</p>
+                  <h3 className="font-semibold text-green-400" style={{ fontSize: `${16 * textScale}px` }}>Successful Bids</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>+10 points for every trick bid if the bid was successful</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-red-400">Failed Bids</h3>
-                  <p>-10 points for every trick bid if the bid was not made</p>
+                  <h3 className="font-semibold text-red-400" style={{ fontSize: `${16 * textScale}px` }}>Failed Bids</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>-10 points for every trick bid if the bid was not made</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-green-400">Nil Bids</h3>
-                  <p>+100 points for a successful nil bid</p>
-                  <p className="text-red-400">-100 points for unsuccessful nil bid</p>
+                  <h3 className="font-semibold text-green-400" style={{ fontSize: `${16 * textScale}px` }}>Nil Bids</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>+100 points for a successful nil bid</p>
+                  <p className="text-red-400" style={{ fontSize: `${14 * textScale}px` }}>-100 points for unsuccessful nil bid</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-green-400">Blind Nil Bids</h3>
-                  <p>+200 points for successful blind nil bid</p>
-                  <p className="text-red-400">-200 points for unsuccessful blind nil bid</p>
+                  <h3 className="font-semibold text-green-400" style={{ fontSize: `${16 * textScale}px` }}>Blind Nil Bids</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>+200 points for successful blind nil bid</p>
+                  <p className="text-red-400" style={{ fontSize: `${14 * textScale}px` }}>-200 points for unsuccessful blind nil bid</p>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-yellow-400">Bags</h3>
-                  <p>+1 point for every extra trick won over the bid amount (these are known as 'bags')</p>
-                  <p className="text-red-400">-100 points for reaching 10 bags</p>
+                  <h3 className="font-semibold text-yellow-400" style={{ fontSize: `${16 * textScale}px` }}>Bags</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>+1 point for every extra trick won over the bid amount (these are known as 'bags')</p>
+                  <p className="text-red-400" style={{ fontSize: `${14 * textScale}px` }}>-100 points for reaching 10 bags</p>
                 </div>
               </div>
             </div>

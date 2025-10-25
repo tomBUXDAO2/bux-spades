@@ -39,6 +39,19 @@ function isBot(p: any): p is Bot {
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const { socket, isAuthenticated } = useSocket();
+  
+  // Detect screen width for responsive padding
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Apply reduced padding for 600-649px screens
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  
   if (!user) {
     console.log('HomePage - No user, showing loading');
     return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="text-white text-2xl">Loading...</div></div>;
@@ -752,10 +765,10 @@ const HomePage: React.FC = () => {
         onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
       />
 
-      <main className="container mx-auto px-4 py-4 h-[calc(100vh-64px-32px)]">
+      <main className="container mx-auto h-[calc(100vh-64px-32px)]" style={{ paddingTop: isSmallScreen ? '8px' : '16px', paddingBottom: isSmallScreen ? '0px' : '16px', paddingLeft: isSmallScreen ? '8px' : '16px', paddingRight: isSmallScreen ? '8px' : '16px' }}>
         <div
-          className="grid h-full lg:grid-cols-3 grid-cols-2 gap-4"
-          style={{ height: '100%' }}
+          className="grid h-full lg:grid-cols-3 grid-cols-2"
+          style={{ height: '100%', gap: isSmallScreen ? '8px' : '16px' }}
         >
           {/* Games Section */}
           <GamesSection

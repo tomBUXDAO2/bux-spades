@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import GameRulesModal from '@/components/modals/GameRulesModal';
 import AdminPanel from '@/components/admin/AdminPanel';
@@ -15,6 +15,19 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   const [isGameRulesOpen, setIsGameRulesOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Detect screen width for responsive sizing
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Apply scaling for 600-649px screens (landscape)
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  const textScale = isSmallScreen ? 0.85 : 1;
   
   // Check if user is admin
   const userIsAdmin = isAdmin(user?.discordId);
@@ -120,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               alt="BUX"
               className="h-8 w-auto" 
             />
-            <span className="text-2xl font-bold text-slate-200">Spades</span>
+            <span className="text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 20 : 24}px` }}>Spades</span>
           </div>
           
           <div className="flex items-center space-x-6">
@@ -129,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-slate-200 font-medium">{user?.coins?.toLocaleString() || '0'}</span>
+              <span className="text-slate-200 font-medium" style={{ fontSize: `${14 * textScale}px` }}>{user?.coins?.toLocaleString() || '0'}</span>
             </div>
 
             {/* User Profile */}
@@ -144,7 +157,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                     alt="Profile"
                     className="w-8 h-8 rounded-full bg-slate-700"
                   />
-                  <span className="text-slate-200 font-medium hidden sm:inline">{user?.username || 'Loading...'}</span>
+                  <span className="text-slate-200 font-medium hidden sm:inline" style={{ fontSize: `${14 * textScale}px` }}>{user?.username || 'Loading...'}</span>
                 </div>
                 <svg
                   className={`w-5 h-5 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}

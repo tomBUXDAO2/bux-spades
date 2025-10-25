@@ -18,6 +18,21 @@ const formatCoins = (value: number) => {
 const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCreateGame }) => {
   const { isMobile, isLandscape } = useWindowSize();
   
+  // Detect screen width for responsive sizing
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  
+  React.useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Apply scaling for 600-649px screens (landscape)
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  const textScale = isSmallScreen ? 0.85 : 1;
+  const iconScale = isSmallScreen ? 0.85 : 1;
+  const paddingScale = isSmallScreen ? 0.7 : 1;
+  
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
@@ -134,26 +149,26 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   const useLandscapeLayout = isMobile && isLandscape;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: `${16 * paddingScale}px` }}>
       <div className={`bg-slate-800 rounded-lg border border-white/20 flex flex-col items-center justify-center w-full ${
         useLandscapeLayout 
-          ? 'max-w-4xl max-h-[95vh] overflow-y-auto p-4'
+          ? 'max-w-4xl max-h-[95vh] overflow-y-auto'
           : isMobile 
-            ? 'max-w-sm max-h-[90vh] overflow-y-auto p-3' 
-            : 'max-w-md p-4'
-      }`}>
+            ? 'max-w-sm max-h-[90vh] overflow-y-auto' 
+            : 'max-w-md'
+      }`} style={{ padding: `${16 * paddingScale}px` }}>
         <h2 className={`font-bold text-slate-200 mb-4 text-center ${
           useLandscapeLayout ? 'text-lg' : isMobile ? 'text-xl' : 'text-2xl'
-        }`}>
+        }`} style={{ fontSize: `${isSmallScreen ? 18 : (useLandscapeLayout ? 18 : isMobile ? 20 : 24)}px` }}>
           {useLandscapeLayout ? (
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center" style={{ gap: `${16 * paddingScale}px` }}>
               <span>Create Game</span>
-              <div className="flex items-center gap-2">
-                <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'} text-sm`}>Partners</span>
+              <div className="flex items-center" style={{ gap: `${12 * paddingScale}px` }}>
+                <span className={`font-semibold ${mode === 'PARTNERS' ? 'text-white' : 'text-slate-400'}`} style={{ fontSize: `${16 * textScale}px` }}>Partners</span>
                 <div
-                  className="relative inline-flex items-center w-12 h-6 bg-slate-700 rounded-full cursor-pointer"
+                  className="relative inline-flex items-center bg-slate-700 rounded-full cursor-pointer"
                   onClick={() => setMode(mode === 'PARTNERS' ? 'SOLO' : 'PARTNERS')}
-                  style={{ userSelect: 'none' }}
+                  style={{ userSelect: 'none', width: `${56 * iconScale}px`, height: `${28 * iconScale}px` }}
                 >
                   <input
                     type="checkbox"
@@ -163,11 +178,17 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                     readOnly
                   />
                   <div
-                    className={`absolute top-1 left-1 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mode === 'SOLO' ? 'translate-x-6' : ''}`}
-                    style={{ transform: mode === 'SOLO' ? 'translateX(24px)' : 'translateX(0)' }}
+                    className={`absolute bg-indigo-600 rounded-full shadow-md transition-transform duration-200`}
+                    style={{ 
+                      top: `${4 * paddingScale}px`, 
+                      left: `${4 * paddingScale}px`, 
+                      width: `${20 * iconScale}px`, 
+                      height: `${20 * iconScale}px`,
+                      transform: mode === 'SOLO' ? `translateX(${28 * iconScale}px)` : 'translateX(0)' 
+                    }}
                   ></div>
                 </div>
-                <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'} text-sm`}>Solo</span>
+                <span className={`font-semibold ${mode === 'SOLO' ? 'text-white' : 'text-slate-400'}`} style={{ fontSize: `${16 * textScale}px` }}>Solo</span>
               </div>
             </div>
           ) : (
@@ -177,24 +198,24 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
         
         {useLandscapeLayout ? (
           // Landscape layout - two column arrangement
-          <div className="w-full flex gap-8">
+          <div className="w-full flex" style={{ gap: `${32 * paddingScale}px` }}>
             {/* Left Column */}
-            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+            <div className="flex-1 flex flex-col items-center justify-center" style={{ gap: `${16 * paddingScale}px` }}>
               {/* Coins */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="font-bold text-yellow-500 text-sm">Coins</label>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleBuyInChange(-1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-sm">-</button>
-                  <span className="text-center flex items-center justify-center gap-1 bg-slate-100 text-slate-800 rounded px-2 py-1 font-semibold text-sm w-16">
-                    <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="font-bold text-yellow-500" style={{ fontSize: `${16 * textScale}px` }}>Coins</label>
+                <div className="flex items-center" style={{ gap: `${10 * paddingScale}px` }}>
+                  <button onClick={() => handleBuyInChange(-1)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${36 * iconScale}px`, height: `${36 * iconScale}px`, fontSize: `${16 * textScale}px` }}>-</button>
+                  <span className="text-center flex items-center justify-center bg-slate-100 text-slate-800 rounded font-semibold" style={{ gap: `${4 * paddingScale}px`, padding: `${6 * paddingScale}px ${10 * paddingScale}px`, fontSize: `${16 * textScale}px`, width: `${72 * iconScale}px` }}>
+                    <svg className="text-yellow-500" fill="currentColor" viewBox="0 0 20 20" style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}>
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
                     </svg>
                     {formatCoins(buyIn)}
                   </span>
-                  <button onClick={() => handleBuyInChange(1)} className="w-8 h-8 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-sm">+</button>
+                  <button onClick={() => handleBuyInChange(1)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${36 * iconScale}px`, height: `${36 * iconScale}px`, fontSize: `${16 * textScale}px` }}>+</button>
                 </div>
                 {/* Prize display */}
-                <div className="text-xs font-medium text-indigo-300 text-center">
+                <div className="font-medium text-indigo-300 text-center" style={{ fontSize: `${12 * textScale}px` }}>
                   {(() => {
                     const prizePot = buyIn * 4 * 0.9;
                     if (mode === 'PARTNERS') {
@@ -209,93 +230,99 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </div>
 
               {/* Min and Max Points */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="text-slate-300 text-sm font-medium">Points Range</label>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <label className="text-slate-300 text-xs">Min:</label>
-                    <button onClick={() => handlePointsChange('min', -50)} className="w-6 h-6 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-xs" disabled={minPoints <= -250}>-</button>
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="text-slate-300 font-medium" style={{ fontSize: `${16 * textScale}px` }}>Points Range</label>
+                <div className="flex items-center" style={{ gap: `${16 * paddingScale}px` }}>
+                  <div className="flex items-center" style={{ gap: `${6 * paddingScale}px` }}>
+                    <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Min:</label>
+                    <button onClick={() => handlePointsChange('min', -50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={minPoints <= -250}>-</button>
                     <input
                       type="text"
                       value={minPoints}
                       readOnly
-                      className="w-12 text-center bg-slate-100 text-slate-800 rounded px-1 py-0.5 font-semibold text-xs"
+                      className="text-center bg-slate-100 text-slate-800 rounded font-semibold"
+                      style={{ width: `${56 * iconScale}px`, padding: `${4 * paddingScale}px ${6 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     />
-                    <button onClick={() => handlePointsChange('min', 50)} className="w-6 h-6 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-xs" disabled={minPoints >= -100}>+</button>
+                    <button onClick={() => handlePointsChange('min', 50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={minPoints >= -100}>+</button>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-slate-300 text-xs">Max:</label>
-                    <button onClick={() => handlePointsChange('max', -50)} className="w-6 h-6 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-xs" disabled={maxPoints <= 100}>-</button>
+                  <div className="flex items-center" style={{ gap: `${6 * paddingScale}px` }}>
+                    <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Max:</label>
+                    <button onClick={() => handlePointsChange('max', -50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={maxPoints <= 100}>-</button>
                     <input
                       type="text"
                       value={maxPoints}
                       readOnly
-                      className="w-12 text-center bg-slate-100 text-slate-800 rounded px-1 py-0.5 font-semibold text-xs"
+                      className="text-center bg-slate-100 text-slate-800 rounded font-semibold"
+                      style={{ width: `${56 * iconScale}px`, padding: `${4 * paddingScale}px ${6 * paddingScale}px`, fontSize: `${14 * textScale}px` }}
                     />
-                    <button onClick={() => handlePointsChange('max', 50)} className="w-6 h-6 flex items-center justify-center bg-slate-600 text-slate-200 rounded-full text-xs" disabled={maxPoints >= 650}>+</button>
+                    <button onClick={() => handlePointsChange('max', 50)} className="flex items-center justify-center bg-slate-600 text-slate-200 rounded-full" style={{ width: `${28 * iconScale}px`, height: `${28 * iconScale}px`, fontSize: `${14 * textScale}px` }} disabled={maxPoints >= 650}>+</button>
                   </div>
                 </div>
               </div>
 
               {/* Special Rules */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="font-bold text-pink-400 text-sm">Special Rules</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center space-x-2">
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="font-bold text-pink-400" style={{ fontSize: `${16 * textScale}px` }}>Special Rules</label>
+                <div className="flex" style={{ gap: `${16 * paddingScale}px` }}>
+                  <label className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
                     <input
                       type="checkbox"
                       checked={specialRule === 'screamer'}
                       onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
                       className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                      style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}
                     />
-                    <span className="text-slate-300 text-sm"> Screamer</span>
+                    <span className="text-slate-300" style={{ fontSize: `${16 * textScale}px` }}> Screamer</span>
                   </label>
-                  <label className="flex items-center space-x-2">
+                  <label className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
                     <input
                       type="checkbox"
                       checked={specialRule === 'assassin'}
                       onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
                       className="form-checkbox bg-slate-700 text-indigo-600 rounded"
+                      style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}
                     />
-                    <span className="text-slate-300 text-sm">⚔️ Assassin</span>
+                    <span className="text-slate-300" style={{ fontSize: `${16 * textScale}px` }}>⚔️ Assassin</span>
                   </label>
                 </div>
               </div>
             </div>
 
             {/* Right Column */}
-            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+            <div className="flex-1 flex flex-col items-center justify-center" style={{ gap: `${16 * paddingScale}px` }}>
               {/* Game Type Radio Buttons */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="text-slate-300 text-sm font-medium">Game Type</label>
-                <div className="flex gap-2">
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="text-slate-300 font-medium" style={{ fontSize: `${16 * textScale}px` }}>Game Type</label>
+                <div className="flex" style={{ gap: `${10 * paddingScale}px` }}>
                   {['REG', 'WHIZ', 'MIRROR', 'GIMMICK'].map((opt) => (
-                    <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                    <label key={opt} className="flex items-center cursor-pointer" style={{ gap: `${6 * paddingScale}px` }}>
                       <input
                         type="radio"
                         name="gameType"
                         value={opt}
                         checked={gameType === opt}
                         onChange={() => handleGameTypeChange(opt as 'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
+                        style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}
                       />
-                      <span className="text-slate-200 text-sm">{opt}</span>
+                      <span className="text-slate-200" style={{ fontSize: `${14 * textScale}px` }}>{opt}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
               {/* Gimmick Dropdown */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="text-slate-300 text-sm font-medium">Gimmick</label>
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="text-slate-300 font-medium" style={{ fontSize: `${16 * textScale}px` }}>Gimmick</label>
                 <select
                   value={gimmickType}
                   onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
                   disabled={gameType !== 'GIMMICK'}
-                  className={`px-3 py-1 rounded text-slate-800 font-semibold text-sm ${
+                  className={`rounded text-slate-800 font-semibold ${
                     gameType === 'GIMMICK' 
                       ? 'bg-slate-100 cursor-pointer' 
                       : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                   }`}
+                  style={{ padding: `${6 * paddingScale}px ${14 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
                 >
                   {getGimmickOptions().map((option) => (
                     <option key={option} value={option}>
@@ -306,52 +333,66 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               </div>
 
               {/* Nil and Blind Nil toggles */}
-              <div className="flex flex-col items-center space-y-2">
-                <label className="text-slate-300 text-sm font-medium">Nil Options</label>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-200 text-sm">Nil:</span>
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <label className="text-slate-300 font-medium" style={{ fontSize: `${16 * textScale}px` }}>Nil Options</label>
+                <div className="flex" style={{ gap: `${16 * paddingScale}px` }}>
+                  <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                    <span className="text-slate-200" style={{ fontSize: `${14 * textScale}px` }}>Nil:</span>
                     <div
-                      className={`relative inline-flex items-center w-10 h-5 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
+                      className={`relative inline-flex items-center bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' ? 'cursor-not-allowed opacity-50' : ''}`}
                       onClick={() => gameType === 'REG' && handleNilToggle(!allowNil)}
-                      style={{ userSelect: 'none' }}
+                      style={{ userSelect: 'none', width: `${48 * iconScale}px`, height: `${24 * iconScale}px` }}
                     >
                       <div
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowNil ? 'translate-x-5' : ''}`}
-                        style={{ transform: allowNil ? 'translateX(20px)' : 'translateX(0)' }}
+                        className={`absolute bg-indigo-600 rounded-full shadow-md transition-transform duration-200`}
+                        style={{ 
+                          top: `${4 * paddingScale}px`, 
+                          left: `${4 * paddingScale}px`, 
+                          width: `${16 * iconScale}px`, 
+                          height: `${16 * iconScale}px`,
+                          transform: allowNil ? `translateX(${24 * iconScale}px)` : 'translateX(0)' 
+                        }}
                       ></div>
                     </div>
-                    <span className={`text-xs ${allowNil ? 'text-white' : 'text-slate-400'}`}>{allowNil ? 'On' : 'Off'}</span>
+                    <span className={`${allowNil ? 'text-white' : 'text-slate-400'}`} style={{ fontSize: `${14 * textScale}px` }}>{allowNil ? 'On' : 'Off'}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-200 text-sm">Blind Nil:</span>
+                  <div className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                    <span className="text-slate-200" style={{ fontSize: `${14 * textScale}px` }}>Blind Nil:</span>
                     <div
-                      className={`relative inline-flex items-center w-10 h-5 bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
+                      className={`relative inline-flex items-center bg-slate-700 rounded-full cursor-pointer ${gameType !== 'REG' || !allowNil ? 'cursor-not-allowed opacity-50' : ''}`}
                       onClick={() => !(gameType !== 'REG' || !allowNil) && handleBlindNilToggle(!allowBlindNil)}
-                      style={{ userSelect: 'none' }}
+                      style={{ userSelect: 'none', width: `${48 * iconScale}px`, height: `${24 * iconScale}px` }}
                     >
                       <div
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${allowBlindNil ? 'translate-x-5' : ''}`}
-                        style={{ transform: allowBlindNil ? 'translateX(20px)' : 'translateX(0)' }}
+                        className={`absolute bg-indigo-600 rounded-full shadow-md transition-transform duration-200`}
+                        style={{ 
+                          top: `${4 * paddingScale}px`, 
+                          left: `${4 * paddingScale}px`, 
+                          width: `${16 * iconScale}px`, 
+                          height: `${16 * iconScale}px`,
+                          transform: allowBlindNil ? `translateX(${24 * iconScale}px)` : 'translateX(0)' 
+                        }}
                       ></div>
                     </div>
-                    <span className={`text-xs ${allowBlindNil ? 'text-white' : 'text-slate-400'}`}>{allowBlindNil ? 'On' : 'Off'}</span>
+                    <span className={`${allowBlindNil ? 'text-white' : 'text-slate-400'}`} style={{ fontSize: `${14 * textScale}px` }}>{allowBlindNil ? 'On' : 'Off'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col items-center space-y-2">
-                <div className="flex gap-3">
+              <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
+                <div className="flex" style={{ gap: `${12 * paddingScale}px` }}>
               <button
                 onClick={onClose}
-                    className="px-4 py-2 text-slate-300 hover:text-slate-100 transition-colors text-sm"
+                    className="text-slate-300 hover:text-slate-100 transition-colors"
+                    style={{ padding: `${6 * paddingScale}px ${16 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md transition-colors text-sm"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+                    style={{ padding: `${6 * paddingScale}px ${16 * paddingScale}px`, fontSize: `${16 * textScale}px` }}
               >
                     Create Game
               </button>

@@ -71,9 +71,27 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   formatTime,
   getUserAvatar
 }) => {
+  // Detect screen width for responsive sizing
+  const [screenWidth, setScreenWidth] = React.useState(window.innerWidth);
+  
+  React.useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Apply scaling for 600-649px screens (landscape)
+  const isSmallScreen = screenWidth >= 600 && screenWidth <= 649;
+  const textScale = isSmallScreen ? 0.85 : 1;
+  const inputScale = isSmallScreen ? 0.8 : 1;
+  
   return (
     <div
-      className="bg-slate-800 rounded-lg flex flex-col h-[calc(100vh-64px-32px)] p-2 sm:p-4 lg:col-span-1 col-span-1 flex"
+      className="bg-slate-800 rounded-lg flex flex-col lg:col-span-1 col-span-1 flex"
+      style={{ 
+        height: isSmallScreen ? 'calc(100vh - 64px - 16px)' : 'calc(100vh - 64px - 32px)',
+        padding: isSmallScreen ? '8px' : (screenWidth >= 640 ? '16px' : '8px')
+      }}
     >
       {/* Chat/Players Header */}
       <div className="flex items-center justify-between mb-2 sm:mb-4">
@@ -95,7 +113,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
         <div className="flex items-center space-x-1">
           <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></span>
-          <span className="text-slate-300 text-xs sm:text-sm font-medium">{onlineCount} online</span>
+          <span className="text-slate-300 text-xs sm:text-sm font-medium" style={{ fontSize: `${14 * textScale}px` }}>{onlineCount} online</span>
         </div>
       </div>
       {/* Tab Content */}
@@ -111,7 +129,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   key={msg.id || index}
                   className="w-full text-center my-2"
                 >
-                  <span className="text-orange-400 italic flex items-center justify-center gap-1">
+                  <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: `${14 * textScale}px` }}>
                     {msg.message}
                   </span>
                 </div>
@@ -137,11 +155,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   <div className={`max-w-[80%] ${msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
                     <div className="flex justify-between items-center mb-1">
                       {msg.userId !== user.id && (
-                        <span className="font-medium text-xs opacity-80">{msg.userName}</span>
+                        <span className="font-medium text-xs opacity-80" style={{ fontSize: `${12 * textScale}px` }}>{msg.userName}</span>
                       )}
-                      <span className="text-xs opacity-75 ml-auto"> {formatTime(msg.timestamp)}</span>
+                      <span className="text-xs opacity-75 ml-auto" style={{ fontSize: `${12 * textScale}px` }}> {formatTime(msg.timestamp)}</span>
                     </div>
-                    <p>{msg.message}</p>
+                    <p style={{ fontSize: `${14 * textScale}px` }}>{msg.message}</p>
                   </div>
                   {msg.userId === user.id && (
                     <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
@@ -161,7 +179,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               )
             ))}
             {chatMessages.length === 0 && (
-              <div className="text-center text-slate-400 py-4">
+              <div className="text-center text-slate-400 py-4" style={{ fontSize: `${14 * textScale}px` }}>
                 No messages yet. Start the conversation!
               </div>
             )}
@@ -174,6 +192,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 onChange={(e) => onSetNewMessage(e.target.value)}
                 placeholder="Type a message..."
                 className="flex-1 min-w-0 bg-slate-700 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+                style={{ fontSize: `${14 * inputScale}px` }}
                 ref={inputRef}
               />
               {/* Emoji Picker Button */}
@@ -181,10 +200,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 <button
                   type="button"
                   className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-slate-600 transition"
+                  style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
                   onClick={() => onSetShowEmojiPicker(!showEmojiPicker)}
                   tabIndex={-1}
                 >
-                  <span role="img" aria-label="emoji" className="text-2xl">😊</span>
+                  <span role="img" aria-label="emoji" style={{ fontSize: `${24 * inputScale}px` }}>😊</span>
                 </button>
                 {/* Emoji Picker Dropdown */}
                 {showEmojiPicker && (
@@ -196,11 +216,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               {/* Send Button as Icon (right-pointing) */}
               <button
                 type="submit"
-                className="w-10 h-10 flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 transition flex-shrink-0"
+                className="flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 transition flex-shrink-0"
+                style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
                 aria-label="Send"
               >
                 {/* Right-pointing paper plane icon */}
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ width: `${24 * inputScale}px`, height: `${24 * inputScale}px` }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 8-16 8 4-8z" />
                 </svg>
               </button>
@@ -210,19 +231,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       ) : (
         <>
           {/* Friends summary row */}
-          <div className="bg-indigo-900 rounded mb-2 px-6 py-2 flex flex-col justify-center" style={{ minHeight: '64px' }}>
-            <div className="flex items-center justify-between h-8">
-              <span className="flex items-center gap-2 text-slate-200 text-lg font-bold">
-                <img src="/friend.svg" alt="Friends" className="w-8 h-8" style={{ filter: 'invert(1) brightness(2)' }} />
+          <div className="bg-indigo-900 rounded mb-2 flex flex-col justify-center" style={{ minHeight: isSmallScreen ? '48px' : '64px', padding: isSmallScreen ? '8px 12px' : '8px 24px' }}>
+            <div className="flex items-center justify-between" style={{ height: isSmallScreen ? '24px' : '32px' }}>
+              <span className="flex items-center gap-2 text-slate-200 font-bold" style={{ fontSize: `${18 * textScale}px` }}>
+                <img src="/friend.svg" alt="Friends" style={{ width: isSmallScreen ? '24px' : '32px', height: isSmallScreen ? '24px' : '32px', filter: 'invert(1) brightness(2)' }} />
                 Friends: {Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.status === 'friend').length : 0}
               </span>
-              <span className="flex items-center gap-1 text-slate-300 text-sm font-medium">
+              <span className="flex items-center gap-1 text-slate-300 font-medium" style={{ fontSize: `${14 * textScale}px` }}>
                 <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
                 {Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.status === 'friend' && p.online).length : 0} Online
               </span>
             </div>
             <div className="flex items-center gap-4 mt-2">
-              <label className="flex items-center gap-1 cursor-pointer text-slate-300 text-sm">
+              <label className="flex items-center gap-1 cursor-pointer text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>
                 <input
                   type="radio"
                   name="playerFilter"
@@ -233,7 +254,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 />
                 All
               </label>
-              <label className="flex items-center gap-1 cursor-pointer text-slate-300 text-sm">
+              <label className="flex items-center gap-1 cursor-pointer text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>
                 <input
                   type="radio"
                   name="playerFilter"
@@ -244,7 +265,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 />
                 Friends
               </label>
-              <label className="flex items-center gap-1 cursor-pointer text-slate-300 text-sm">
+              <label className="flex items-center gap-1 cursor-pointer text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>
                 <input
                   type="radio"
                   name="playerFilter"
@@ -292,7 +313,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
                   <img src={isPlayer(player) ? (player.avatarUrl || '/default-pfp.jpg') : isBot(player) ? (player.avatar || '/bot-avatar.jpg') : '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
                   <span
-                    className={`text-sm font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
+                    className={`font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
+                    style={{ fontSize: `${14 * textScale}px` }}
                     onClick={() => onOpenPlayerStats(player)}
                   >
                     {isPlayer(player) ? (player.username || player.name) : isBot(player) ? abbreviateBotName(player.username) : 'Player'}
@@ -305,7 +327,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     {/* Watch button when player is at a table */}
                     {(player.activeGameId || player.inGame) && player.id !== user.id && (
                       <button
-                        className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs border border-slate-300 hover:bg-indigo-700"
+                        className="px-2 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white border border-slate-300 hover:bg-indigo-700"
+                        style={{ fontSize: `${12 * textScale}px` }}
                         title="Watch Table"
                         onClick={() => {
                           if (player.activeGameId) {
@@ -321,9 +344,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     )}
                     {/* Hide action buttons for self */}
                     {player.id !== user.id && (
-                      player.status === 'blocked' ? (
+                        player.status === 'blocked' ? (
                         <>
-                          <span className="text-slate-400 text-xs mr-2 flex items-center h-8">unblock?</span>
+                          <span className="text-slate-400 mr-2 flex items-center h-8" style={{ fontSize: `${12 * textScale}px` }}>unblock?</span>
                           <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Unblock"
                             onClick={() => onSetConfirmModal({ open: true, player, action: 'unblock_user' })}>
                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
@@ -335,17 +358,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       ) : (
                         player.status === 'friend' ? (
                           <>
-                            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
+                            <button className="flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
+                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'remove_friend' });
                               }}>
-                              <img src="/remove-friend.svg" alt="Remove Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
+                              <img src="/remove-friend.svg" alt="Remove Friend" style={{ width: isSmallScreen ? '16px' : '20px', height: isSmallScreen ? '16px' : '20px', filter: 'invert(1) brightness(2)' }} />
                             </button>
-                            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                            <button className="flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'block_user' });
                               }}>
-                              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : '28px', height: isSmallScreen ? '20px' : '28px' }}>
                                 <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                 <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
                               </svg>
@@ -353,17 +378,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                           </>
                         ) : (
                           <>
-                            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
+                            <button className="flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
+                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'add_friend' });
                               }}>
-                              <img src="/add-friend.svg" alt="Add Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
+                              <img src="/add-friend.svg" alt="Add Friend" style={{ width: isSmallScreen ? '16px' : '20px', height: isSmallScreen ? '16px' : '20px', filter: 'invert(1) brightness(2)' }} />
                             </button>
-                            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                            <button className="flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+                              style={{ width: isSmallScreen ? '28px' : '32px', height: isSmallScreen ? '28px' : '32px' }}
                               onClick={() => {
                                 onSetConfirmModal({ open: true, player, action: 'block_user' });
                               }}>
-                              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" style={{ width: isSmallScreen ? '20px' : '28px', height: isSmallScreen ? '20px' : '28px' }}>
                                 <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
                                 <path d="M4 4L20 20M20 4L4 20" stroke="white" strokeWidth="2.5" />
                               </svg>
@@ -375,10 +402,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   </div>
                 </div>
               )) : (
-                <div className="text-center text-slate-400 py-4">No players found.</div>
+                <div className="text-center text-slate-400 py-4" style={{ fontSize: `${14 * textScale}px` }}>No players found.</div>
               )}
             {Array.isArray(onlinePlayers) && onlinePlayers.length === 0 && (
-              <div className="text-center text-slate-400 py-4">No players found.</div>
+              <div className="text-center text-slate-400 py-4" style={{ fontSize: `${14 * textScale}px` }}>No players found.</div>
             )}
           </div>
         </>
