@@ -111,7 +111,9 @@ class GameJoinHandler {
       // Use regular game state service (was working correctly)
       let gameState;
       try {
+        console.log(`[GAME JOIN] Calling getGameStateForClient for ${gameId}`);
         gameState = await GameService.getGameStateForClient(gameId, userId);
+        console.log(`[GAME JOIN] getGameStateForClient returned for ${gameId}, status: ${gameState?.status}`);
       } catch (error) {
         console.error(`[GAME JOIN] Error getting game state for ${gameId}:`, error);
         this.socket.emit('error', { message: 'Failed to load game' });
@@ -119,6 +121,7 @@ class GameJoinHandler {
       }
 
       if (!gameState) {
+        console.log(`[GAME JOIN] No game state returned for ${gameId}`);
         this.socket.emit('error', { message: 'Game not found' });
         return;
       }
@@ -211,11 +214,13 @@ class GameJoinHandler {
       }
 
       // Emit game_joined event with current database state
+      console.log(`[GAME JOIN] Emitting game_joined event for user ${userId} in game ${gameId}`);
       this.socket.emit('game_joined', {
         gameId,
         gameState,
         spectate: !!spectate
       });
+      console.log(`[GAME JOIN] game_joined event emitted successfully for ${gameId}`);
       
       // Also emit to the room for other players
       this.io.to(gameId).emit('game_joined', {

@@ -694,6 +694,12 @@ export class GameService {
       // REAL-TIME: Try to get game state from Redis first (instant)
       let cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
+        // CRITICAL FIX: For WAITING games, skip all database queries - just return cached state
+        if (cachedGameState.status === 'WAITING') {
+          console.log(`[GAME SERVICE] Game ${gameId} is WAITING, returning cached state without database queries`);
+          return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
+        }
+        
         // PERFORMANCE FIX: Only fetch lightweight data from database instead of full state
         const lightweightState = await this.getLightweightGameState(gameId);
         if (!lightweightState) {
