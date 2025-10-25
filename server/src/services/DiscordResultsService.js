@@ -94,8 +94,32 @@ export class DiscordResultsService {
     const coinText = coins >= 1000000 ? `${coins / 1000000}mil` : `${coins / 1000}k`;
     const maxPoints = game.maxPoints || 0;
     const minPoints = game.minPoints || 0;
-    const nilAllowed = game.nilAllowed ? '☑️' : '❌';
-    const blindNilAllowed = game.blindNilAllowed ? '☑️' : '❌';
+    
+    // Build game line text matching the original format
+    let gameLineText = `${coinText} PARTNERS ${maxPoints}/${minPoints}`;
+    
+    // Add format (GIMMICK variant or REGULAR)
+    if (game.format === 'GIMMICK' && game.gimmickVariant) {
+      gameLineText += ` ${game.gimmickVariant}`;
+    } else {
+      gameLineText += ` ${game.format}`;
+      // Add nil status for REGULAR games
+      if (game.format === 'REGULAR') {
+        const nilAllowed = game.nilAllowed ? '☑️' : '❌';
+        const blindNilAllowed = game.blindNilAllowed ? '☑️' : '❌';
+        gameLineText += `\nnil ${nilAllowed} bn ${blindNilAllowed}`;
+      }
+    }
+    
+    // Add special rules if present
+    if (game.specialRules) {
+      const specialRulesObj = typeof game.specialRules === 'string' ? JSON.parse(game.specialRules) : game.specialRules;
+      if (specialRulesObj.screamer) {
+        gameLineText += `\n🎲 SCREAMER`;
+      } else if (specialRulesObj.assassin) {
+        gameLineText += `\n🎲 ASSASSIN`;
+      }
+    }
 
     // Calculate coin winnings (winners get 1.8x buy-in each, losers lose buy-in)
     const winnerCoins = Math.floor(coins * 1.8);
@@ -104,7 +128,7 @@ export class DiscordResultsService {
     const embed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(
-        `${coinText} PARTNERS ${maxPoints}/${minPoints} REG nil ${nilAllowed} bn ${blindNilAllowed}\n\n` +
+        `${gameLineText}\n\n` +
         `🥇 Winners\n` +
         `${winnerTeam.map(p => `<@${p.user.discordId}>`).join(', ')} - ${winnerScore}\n\n` +
         `💰 Coins Won\n${winnerCoins.toLocaleString()}k each\n\n` +
@@ -140,8 +164,32 @@ export class DiscordResultsService {
     const coinText = coins >= 1000000 ? `${coins / 1000000}mil` : `${coins / 1000}k`;
     const maxPoints = game.maxPoints || 0;
     const minPoints = game.minPoints || 0;
-    const nilAllowed = game.nilAllowed ? '☑️' : '❌';
-    const blindNilAllowed = game.blindNilAllowed ? '☑️' : '❌';
+    
+    // Build game line text matching the original format
+    let gameLineText = `${coinText} SOLO ${maxPoints}/${minPoints}`;
+    
+    // Add format (GIMMICK variant or REGULAR)
+    if (game.format === 'GIMMICK' && game.gimmickVariant) {
+      gameLineText += ` ${game.gimmickVariant}`;
+    } else {
+      gameLineText += ` ${game.format}`;
+      // Add nil status for REGULAR games
+      if (game.format === 'REGULAR') {
+        const nilAllowed = game.nilAllowed ? '☑️' : '❌';
+        const blindNilAllowed = game.blindNilAllowed ? '☑️' : '❌';
+        gameLineText += `\nnil ${nilAllowed} bn ${blindNilAllowed}`;
+      }
+    }
+    
+    // Add special rules if present
+    if (game.specialRules) {
+      const specialRulesObj = typeof game.specialRules === 'string' ? JSON.parse(game.specialRules) : game.specialRules;
+      if (specialRulesObj.screamer) {
+        gameLineText += `\n🎲 SCREAMER`;
+      } else if (specialRulesObj.assassin) {
+        gameLineText += `\n🎲 ASSASSIN`;
+      }
+    }
 
     // Calculate coin distribution (1st: 2.6x, 2nd: 1x, 3rd/4th: 0x)
     // Total payout: 3.6x buy-in (10% house rake)
@@ -156,7 +204,7 @@ export class DiscordResultsService {
     const embed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(
-        `${coinText} SOLO ${maxPoints}/${minPoints} REG nil ${nilAllowed} bn ${blindNilAllowed}\n\n` +
+        `${gameLineText}\n\n` +
         `🥇 Winner\n` +
         `<@${winner.player.user.discordId}> - ${winner.score}\n\n` +
         `💰 Coins Won\n1st: ${firstCoins.toLocaleString()}k\n\n` +

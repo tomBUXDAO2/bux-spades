@@ -1292,10 +1292,33 @@ async function handleCancelGame(interaction, gameLine, gameLineId) {
 
 async function handleLineFull(interaction, gameLine, gameLineId) {
   try {
+    // Build game line text matching the original format
+    const { settings } = gameLine;
+    const coinsDisplay = settings.coins >= 1000000 ? `${settings.coins / 1000000}mil` : `${settings.coins / 1000}k`;
+    let gameLineText = `${coinsDisplay} ${settings.mode} ${settings.maxPoints}/${settings.minPoints}`;
+    
+    // Add format (GIMMICK variant or REGULAR)
+    if (settings.format === 'GIMMICK' && settings.gimmickVariant) {
+      gameLineText += ` ${settings.gimmickVariant}`;
+    } else {
+      gameLineText += ` ${settings.format}`;
+      // Add nil status for REGULAR games
+      if (settings.format === 'REGULAR') {
+        const nilAllowed = settings.nilAllowed ? '☑️' : '❌';
+        const blindNilAllowed = settings.blindNilAllowed ? '☑️' : '❌';
+        gameLineText += `\nnil ${nilAllowed} bn ${blindNilAllowed}`;
+      }
+    }
+    
+    // Add special rule if present
+    if (settings.specialRule) {
+      gameLineText += `\n🎲 ${settings.specialRule.toUpperCase()}`;
+    }
+    
     // Update original embed to show FULL
     const fullEmbed = new EmbedBuilder()
       .setTitle('🎮 GAME LINE - FULL')
-      .setDescription(`${gameLine.settings.coins >= 1000000 ? `${gameLine.settings.coins / 1000000}mil` : `${gameLine.settings.coins / 1000}k`} ${gameLine.settings.mode} ${gameLine.settings.maxPoints}/${gameLine.settings.minPoints} ${gameLine.settings.format}`)
+      .setDescription(gameLineText)
       .addFields(
         { name: '👤 Host', value: `<@${gameLine.createdBy}>`, inline: true },
         { name: '👥 Players', value: '4/4', inline: true },
