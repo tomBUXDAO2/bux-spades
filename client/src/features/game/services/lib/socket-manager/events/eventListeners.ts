@@ -167,13 +167,26 @@ export const setupSocketListeners = (
     callbacks.startConnectionQualityMonitor();
     
     // If server sent an activeGameId, user was in a game - redirect them there
+    // CRITICAL FIX: Only redirect if user is actually a player (not spectator)
     if (data.activeGameId) {
       console.log('[AUTH] User has active game:', data.activeGameId);
-      localStorage.setItem('activeGameId', data.activeGameId);
-      // Redirect to table if not already there
-      if (!window.location.pathname.includes('/table/')) {
-        console.log('[AUTH] Redirecting to active game table');
-        window.location.href = `/table/${data.activeGameId}`;
+      
+      // Check if user is a player (not spectator) by looking at the games data
+      const userGame = data.games?.find((game: any) => game.id === data.activeGameId);
+      const isPlayer = userGame?.players?.some((p: any) => p && p.id === data.userId && !p.isSpectator);
+      
+      if (isPlayer) {
+        console.log('[AUTH] User is a player, redirecting to active game table');
+        localStorage.setItem('activeGameId', data.activeGameId);
+        // Redirect to table if not already there
+        if (!window.location.pathname.includes('/table/')) {
+          console.log('[AUTH] Redirecting to active game table');
+          window.location.href = `/table/${data.activeGameId}`;
+        }
+      } else {
+        console.log('[AUTH] User is a spectator, not redirecting to table');
+        // Clear activeGameId for spectators to prevent future redirects
+        localStorage.removeItem('activeGameId');
       }
     }
     

@@ -350,18 +350,58 @@ class GameJoinHandler {
       const { GameService } = await import('../../../services/GameService.js');
       const { GameCleanupService } = await import('../../../services/GameCleanupService.js');
       
-      // Get player username before leaving
+      // Get player info and check if they're a spectator
       let playerUsername = 'Player';
+      let isSpectator = false;
       try {
         const gameState = await GameService.getGameStateForClient(gameId);
         const player = gameState?.players?.find(p => p && p.userId === userId);
         if (player) {
           playerUsername = player.username;
+          isSpectator = player.isSpectator || false;
         }
       } catch (err) {
-        console.error('[GAME LEAVE] Error getting player username:', err);
+        console.error('[GAME LEAVE] Error getting player info:', err);
       }
       
+      // CRITICAL FIX: Handle spectators differently - remove from DB and clear session
+      if (isSpectator) {
+        console.log(`[GAME LEAVE] User ${userId} is a spectator, removing from database and clearing session`);
+        
+        // Remove spectator from database
+        await prisma.gamePlayer.deleteMany({
+          where: {
+            gameId: gameId,
+            userId: userId,
+            isSpectator: true
+          }
+        });
+        
+        // CRITICAL: Clear activeGameId from user's session so they don't get redirected back
+        const redisSessionService = (await import('../../../services/RedisSessionService.js')).default;
+        await redisSessionService.clearActiveGame(userId);
+        console.log(`[GAME LEAVE] Cleared activeGameId from session for spectator ${userId}`);
+        
+        // Leave the socket room
+        this.socket.leave(gameId);
+        console.log(`[GAME LEAVE] Spectator ${userId} left room for game ${gameId}`);
+        
+        // Emit spectator left event
+        this.io.to(gameId).emit('spectator_left', { gameId, userId });
+        
+        // Send system message for spectator leaving
+        try {
+          const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
+          const systemHandler = new SystemMessageHandler(this.io, this.socket);
+          systemHandler.sendSystemMessage(gameId, `👁️ ${playerUsername} stopped watching`, 'info');
+        } catch (err) {
+          console.error('[GAME LEAVE] Error sending spectator system message:', err);
+        }
+        
+        return; // Exit early for spectators
+      }
+      
+      // Handle regular players (non-spectators)
       // Remove player from database
       await GameService.leaveGame(gameId, userId);
       console.log(`[GAME LEAVE] User ${userId} removed from database for game ${gameId}`);

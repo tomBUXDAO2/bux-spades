@@ -161,9 +161,9 @@ const HomePage: React.FC = () => {
             localStorage.setItem('activeGameId', userLeagueGame.id);
             navigate(`/table/${userLeagueGame.id}`, { replace: true });
           } else {
-            // If no league game, check for any active game where this user is a player
+            // If no league game, check for any active game where this user is a player (not spectator)
             const activeGame = allGames.find((game: any) => {
-              const isUserInGame = game.players?.some((p: any) => p && p.id === user.id);
+              const isUserInGame = game.players?.some((p: any) => p && p.id === user.id && !p.isSpectator);
               const isActive = game.status === 'WAITING' || game.status === 'BIDDING' || game.status === 'PLAYING';
               return isUserInGame && isActive;
             });
@@ -207,7 +207,7 @@ const HomePage: React.FC = () => {
           
           const userLeagueGame = allGames.find((game: any) => {
             const isLeagueGame = game.league;
-            const isUserInGame = game.players?.some((player: any) => player && player.id === user.id);
+            const isUserInGame = game.players?.some((player: any) => player && player.id === user.id && !player.isSpectator);
             const isWaiting = game.status === 'WAITING';
             
             
