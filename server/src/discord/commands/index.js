@@ -317,7 +317,7 @@ export const commands = [
           .setDescription('Gimmick variant')
           .setRequired(true)
           .addChoices(
-            { name: 'Suicide', value: 'SUICIDE' },
+            { name: 'Suicide (Partners only)', value: 'SUICIDE' },
             { name: 'Bid 4 or Nil', value: 'BID4NIL' },
             { name: 'Bid 3', value: 'BID3' },
             { name: 'Bid Hearts', value: 'BIDHEARTS' },
