@@ -329,11 +329,11 @@ const commands = [
         type: 3, // STRING
         required: true,
         choices: [
-          { name: 'Low Card', value: 'LOW_CARD' },
-          { name: 'High Card', value: 'HIGH_CARD' },
-          { name: 'Joker', value: 'JOKER' },
-          { name: 'Follow Suit', value: 'FOLLOW_SUIT' },
-          { name: 'No Trump', value: 'NO_TRUMP' }
+          { name: 'Suicide', value: 'SUICIDE' },
+          { name: 'Bid 4 or Nil', value: 'BID4NIL' },
+          { name: 'Bid 3', value: 'BID3' },
+          { name: 'Bid Hearts', value: 'BIDHEARTS' },
+          { name: 'Crazy Aces', value: 'CRAZY_ACES' }
         ]
       },
       {
