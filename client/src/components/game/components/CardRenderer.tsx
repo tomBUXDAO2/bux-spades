@@ -214,14 +214,9 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       currentTrickLength: gameState.play?.currentTrick?.length
     });
     
-    if (isLeading && !spadesActuallyPlayed && Array.isArray(myHand) && myHand.some(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠')) {
-      effectivePlayableCards = Array.isArray(myHand) ? myHand.filter(c => (c.suit as any) !== 'SPADES' && (c.suit as any) !== 'S' && (c.suit as any) !== '♠') : [];
-      if (effectivePlayableCards.length === 0) {
-        effectivePlayableCards = myHand; // Only spades left
-      }
-    } else {
-      effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted);
-    }
+    // CRITICAL FIX: Always use getPlayableCards for proper rule validation
+    // The previous logic was incorrectly overriding SCREAMER and other special rules
+    effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted);
   } else if (Array.isArray(playableCards)) {
     effectivePlayableCards = playableCards;
   }
