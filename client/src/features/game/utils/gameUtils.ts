@@ -149,16 +149,20 @@ export const getPlayableCards = (
   gameState: GameState, 
   hand: Card[], 
   isLeading: boolean,
-  trickCompleted: boolean
+  trickCompleted: boolean,
+  currentTrickOverride?: Card[]
 ): Card[] => {
   if (!hand || hand.length === 0) return [];
   
   const specialRules = (gameState as any).specialRules || {};
   const spadesBroken = hasSpadeBeenPlayed(gameState);
   
+  // CRITICAL FIX: Use currentTrick override if provided, otherwise fall back to gameState
+  const currentTrick = currentTrickOverride || gameState.play?.currentTrick;
+  
   // If not leading, must follow suit
-  if (!isLeading && gameState.play?.currentTrick && gameState.play.currentTrick.length > 0) {
-    const leadSuit = getLeadSuit(gameState.play.currentTrick);
+  if (!isLeading && currentTrick && currentTrick.length > 0) {
+    const leadSuit = getLeadSuit(currentTrick);
     if (leadSuit) {
       // Check if player has cards in the lead suit
       const leadSuitCards = hand.filter(card => card.suit === leadSuit);

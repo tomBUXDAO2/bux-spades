@@ -221,7 +221,10 @@ class BiddingHandler {
 
       // Check if all players have bid using database
       const game = await GameService.getGame(gameId);
-      const occupiedSeats = game.players.map(p => p.seatIndex);
+      // CRITICAL FIX: Only include actual players (not spectators) in occupied seats
+      const occupiedSeats = game.players
+        .filter(p => !p.isSpectator && p.seatIndex !== null)
+        .map(p => p.seatIndex);
       
       // Get current round to check bids from database
       const dbCurrentRound = game.rounds.find(r => r.roundNumber === game.currentRound);

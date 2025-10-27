@@ -176,7 +176,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   
   const sortedHand = sortCards(myHand);
   const isLeadingTrick = currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0;
-  const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted) : [];
+  const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted, currentTrick) : [];
   
   const isMyTurn = (gameState.status === "PLAYING" || gameState.status === "BIDDING") && gameState.currentPlayer === currentPlayerId;
   
