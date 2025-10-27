@@ -172,6 +172,7 @@ class CardPlayHandler {
       // Check if trick is complete (4 cards played) - use cached count
       const trickCards = await prisma.trickCard.findMany({
         where: { trickId: logResult.actualTrickId },
+        orderBy: { playOrder: 'asc' },
         select: { id: true, seatIndex: true, suit: true, rank: true, playOrder: true }
       });
 
