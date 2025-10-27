@@ -595,8 +595,8 @@ class BotService {
     const partnerSeat = (seatIndex + 2) % 4;
     const partner = game.players[partnerSeat];
     const bidsArray = game.bidding?.bids || []; // seat-indexed when available
-    const myBid = bidsArray?.[seatIndex] ?? (game.bids?.find(b => b.userId === game.players[seatIndex]?.id)?.bid ?? null);
-    const partnerBid = bidsArray?.[partnerSeat] ?? (game.bids?.find(b => b.userId === partner?.id)?.bid ?? null);
+    const myBid = bidsArray?.[seatIndex] ?? game.players[seatIndex]?.bid ?? (game.bids?.find(b => b.userId === game.players[seatIndex]?.id)?.bid ?? null);
+    const partnerBid = bidsArray?.[partnerSeat] ?? partner?.bid ?? (game.bids?.find(b => b.userId === partner?.id)?.bid ?? null);
     const oppSeats = [0,1,2,3].filter(s => s !== seatIndex && s !== partnerSeat);
     const oppBids = oppSeats.map(s => bidsArray?.[s] ?? null);
     const tableBidTotal = [myBid, partnerBid, ...oppBids].reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
