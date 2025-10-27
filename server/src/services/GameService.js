@@ -753,18 +753,45 @@ export class GameService {
           cachedGameState.rules.bidType = gimmickVariantMapping[cachedGameState.rules.bidType] || cachedGameState.rules.bidType;
         }
         // CRITICAL: Get current trick data from Redis and add it to the game state
-        const currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+        let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
+        if (!currentTrickCards || currentTrickCards.length === 0) {
+          // FALLBACK: If Redis doesn't have trick data, get it from database
+          const trickCards = await prisma.trickCard.findMany({
+            where: {
+              trick: {
+                gameId: gameId,
+                isComplete: false
+              }
+            },
+            orderBy: { playOrder: 'asc' },
+            select: {
+              suit: true,
+              rank: true,
+              seatIndex: true
+            }
+          });
+          
+          if (trickCards && trickCards.length > 0) {
+            currentTrickCards = trickCards.map(card => ({
+              suit: card.suit,
+              rank: card.rank,
+              seatIndex: card.seatIndex,
+              playerId: cachedGameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+            }));
+            // Also store in Redis for future requests
+            await redisGameState.setCurrentTrick(gameId, currentTrickCards);
+          }
+        }
+        
         if (currentTrickCards && currentTrickCards.length > 0) {
           cachedGameState.play = cachedGameState.play || {};
           cachedGameState.play.currentTrick = currentTrickCards;
           cachedGameState.currentTrickCards = currentTrickCards;
-          // Using Redis trick data
         } else {
-          // No trick data in Redis, ensure empty arrays
+          // No trick data in Redis or database, ensure empty arrays
           cachedGameState.play = cachedGameState.play || {};
           cachedGameState.play.currentTrick = [];
           cachedGameState.currentTrickCards = [];
-          // No trick data in Redis, using empty arrays
         }
         
         // CRITICAL: Ensure spadesBroken flag is included from Redis cache
