@@ -756,23 +756,11 @@ export class GameService {
         let currentTrickCards = await redisGameState.getCurrentTrick(gameId);
         if (!currentTrickCards || currentTrickCards.length === 0) {
           // FALLBACK: If Redis doesn't have trick data, get it from database
-          const trickCards = await prisma.trickCard.findMany({
-            where: {
-              trick: {
-                gameId: gameId,
-                isComplete: false
-              }
-            },
-            orderBy: { playOrder: 'asc' },
-            select: {
-              suit: true,
-              rank: true,
-              seatIndex: true
-            }
-          });
+          currentTrickCards = await this.getCurrentTrick(gameId);
           
-          if (trickCards && trickCards.length > 0) {
-            currentTrickCards = trickCards.map(card => ({
+          if (currentTrickCards && currentTrickCards.length > 0) {
+            // Format cards with playerId
+            currentTrickCards = currentTrickCards.map(card => ({
               suit: card.suit,
               rank: card.rank,
               seatIndex: card.seatIndex,
