@@ -614,7 +614,7 @@ class BotService {
 
     const scenario = (game.players[seatIndex]?.isNil || myBid === 0)
       ? 'self_nil'
-      : ((partner?.isNil || partnerBid === 0) ? 'cover_nil' : (tableBidTotal >= 11 ? 'high_pressure' : 'normal'));
+      : ((partner?.isNil || partnerBid === 0) ? 'cover_nil' : (tableBidTotal >= 12 ? 'high_pressure' : 'normal'));
 
     return {
       game,
@@ -780,13 +780,13 @@ class BotService {
     // Following
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length > 0) {
-      // Prefer losing to avoid bags unless needed; if partner winning, dump
+      // If partner is winning, support them by dumping
       if (partnerHasPlayed && partnerCard && partnerCard.suit === leadSuit && this.canWinFollowing(ctx, partnerCard)) {
         return this.sortByRankAsc(leadCards)[0];
       }
-      // If need to block opponents near target: minimal winning, else dump lowest
+      // Try to win, else play high to force opponents to use good cards
       const win = this.minimalWinningFollowing(ctx, hand);
-      return win || this.sortByRankAsc(leadCards)[0];
+      return win || this.sortByRankDesc(leadCards)[0];
     }
     // Void: apply special rules first
     
@@ -812,10 +812,15 @@ class BotService {
       }
     }
     
-    // Default void behavior: dump highest losers (shed risk), avoid cutting unless necessary
+    // Default void behavior: try to cut and win tricks
+    const spades = hand.filter(c => c.suit === 'SPADES');
+    if (spades.length > 0) {
+      const cut = this.minimalSpadeToWin(ctx, hand);
+      return cut || this.sortByRankAsc(spades)[0];
+    }
+    // No spades, dump lowest non-spade
     const nonSp = hand.filter(c => c.suit !== 'SPADES');
-    const dumpPool = nonSp.length ? nonSp : hand;
-    return this.sortByRankDesc(dumpPool)[0];
+    return this.sortByRankAsc(nonSp.length ? nonSp : hand)[0];
   }
 
   playCoverNil(ctx) {
@@ -866,9 +871,23 @@ class BotService {
       const nonSp = hand.filter(c => c.suit !== 'SPADES');
       return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
     }
-    // Following before nil partner: avoid forcing wins; steer safe
+    // Following before nil partner: play aggressively to try to win or force opponents to play high
     const leadCards = hand.filter(c => c.suit === leadSuit);
-    if (leadCards.length) return this.sortByRankAsc(leadCards)[0];
+    if (leadCards.length) {
+      // Try to win with minimal card, else play high to force opponents to burn cards
+      const win = this.minimalWinningFollowing(ctx, hand);
+      if (win) return win;
+      // No win possible, play high to force opponent to burn
+      return this.sortByRankDesc(leadCards)[0];
+    }
+    // Void: must cut with spades if possible to prevent nil partner from winning
+    const spades = hand.filter(c => c.suit === 'SPADES');
+    if (spades.length > 0) {
+      // Play lowest spade that might win, or just lowest to cut
+      const cut = this.minimalSpadeToWin(ctx, hand);
+      return cut || this.sortByRankAsc(spades)[0];
+    }
+    // No spades, dump lowest
     const nonSp = hand.filter(c => c.suit !== 'SPADES');
     return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
   }
