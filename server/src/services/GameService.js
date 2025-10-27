@@ -1125,21 +1125,30 @@ export class GameService {
       let accumulatedTeam1Bags = 0;
       let accumulatedTeam2Bags = 0;
       
+      let team1BagPenalties = 0;
+      let team2BagPenalties = 0;
+      
       for (const roundScore of allRoundScores) {
         accumulatedTeam1Bags += roundScore.team0Bags || 0;
         accumulatedTeam2Bags += roundScore.team1Bags || 0;
         
         // Apply bag penalties when reaching 10+ bags
         if (accumulatedTeam1Bags >= 10) {
-          accumulatedTeam1Bags -= 10; // Reset bags after penalty
+          team1BagPenalties += Math.floor(accumulatedTeam1Bags / 10) * 100; // -100 points per 10 bags
+          accumulatedTeam1Bags = accumulatedTeam1Bags % 10; // Reset bags after penalty
         }
         if (accumulatedTeam2Bags >= 10) {
-          accumulatedTeam2Bags -= 10; // Reset bags after penalty
+          team2BagPenalties += Math.floor(accumulatedTeam2Bags / 10) * 100; // -100 points per 10 bags
+          accumulatedTeam2Bags = accumulatedTeam2Bags % 10; // Reset bags after penalty
         }
       }
       
       team1Bags = accumulatedTeam1Bags;
       team2Bags = accumulatedTeam2Bags;
+      
+      // Apply bag penalties to total scores
+      team1TotalScore -= team1BagPenalties;
+      team2TotalScore -= team2BagPenalties;
 
       // Map database enum values back to client-friendly format
       const gimmickVariantMapping = {

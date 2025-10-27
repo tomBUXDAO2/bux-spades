@@ -242,8 +242,8 @@ export default function GameTablePlayers({
     };
     
     if (isPartnerGame) {
-      // Partner game logic - use array positions for partner calculation
-      const partnerPosition = (position + 2) % 4;
+      // Partner game logic - use actual seat indices for partner calculation
+      const partnerPosition = (actualSeatIndex + 2) % 4;
       const partner = gameState.players[partnerPosition];
       const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
