@@ -827,15 +827,20 @@ class BotService {
     const { hand, isLeading, partnerSeat, trick, leadSuit, partnerHasPlayed, partnerCard, spadesBroken } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
-      // Lead high winners to cover; if known partner void in suit X, lead X
-      // For now, prefer high from non-spade; spade A allowed only if broken/only spades
+      // Lead high winners to cover; prefer spades if broken since we can win them
+      // If spades broken and have good spades, lead spades to take tricks
+      const spades = this.sortByRankDesc(suits['SPADES']||[]);
+      if (spades.length && spadesBroken) {
+        // Lead high spades to take tricks when broken
+        return spades[0];
+      }
+      // Otherwise lead high from non-spades
       const nonSp = ['HEARTS','DIAMONDS','CLUBS'];
       for (const s of nonSp) {
         const cards = this.sortByRankDesc(suits[s]||[]);
         if (cards.length) return cards[0];
       }
-      const spades = this.sortByRankDesc(suits['SPADES']||[]);
-      if (spades.length && spadesBroken) return spades[0];
+      // Fallback: any high card
       return this.sortByRankDesc(hand)[0];
     }
     // Following after nil partner already played
