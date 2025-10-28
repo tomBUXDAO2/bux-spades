@@ -147,6 +147,16 @@ export const BiddingOverlay: React.FC<{
   const forcedBid = (gameState as any).forcedBid;
   const gimmickType = (gameState as any).gimmickVariant || (gameState as any).rules?.gimmickType;
   
+  // Joker Whiz UI selection: first 3 bids must use WHIZ modal; last uses regular
+  try {
+    const bidsArray = (gameState as any).bidding?.bids || [];
+    const bidsPlaced = Array.isArray(bidsArray) ? bidsArray.filter((b: any) => b !== null && b !== undefined).length : 0;
+    const isJokerWhiz = gimmickType === 'JOKER' || gimmickType === 'JOKER_WHIZ';
+    if (isJokerWhiz) {
+      gameType = bidsPlaced < 3 ? 'WHIZ' : 'REG';
+    }
+  } catch {}
+
   // Handle gimmick games
   if (forcedBid === 'SUICIDE') {
     gameType = 'SUICIDE';

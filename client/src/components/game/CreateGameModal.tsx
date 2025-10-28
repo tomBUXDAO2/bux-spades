@@ -47,7 +47,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   // UI state for modal controls
   const [mode, setMode] = useState<GameMode>('PARTNERS');
   const [gameType, setGameType] = useState<'REG' | 'WHIZ' | 'MIRROR' | 'GIMMICK'>('REG');
-  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES'>('SUICIDE');
+  const [gimmickType, setGimmickType] = useState<'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES' | 'JOKER WHIZ'>('SUICIDE');
 
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
@@ -149,7 +149,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
 
   // Get available gimmick options based on game mode
   const getGimmickOptions = () => {
-    const options = ['4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'];
+    const options = ['4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES', 'JOKER WHIZ'];
     if (mode === 'PARTNERS') {
       options.unshift('SUICIDE'); // Add SUICIDE at the beginning for partners mode
     }
@@ -327,7 +327,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                 <label className="text-slate-300 font-medium" style={{ fontSize: `${16 * textScale}px` }}>Gimmick</label>
                 <select
                   value={gimmickType}
-                  onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
+                  onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES' | 'JOKER WHIZ')}
                   disabled={gameType !== 'GIMMICK'}
                   className={`rounded text-slate-800 font-semibold ${
                     gameType === 'GIMMICK' 
@@ -556,7 +556,7 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
             <div className="w-full flex justify-center mb-2">
               <select
                 value={gimmickType}
-                onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES')}
+                onChange={(e) => setGimmickType(e.target.value as 'SUICIDE' | '4 OR NIL' | 'BID 3' | 'BID HEARTS' | 'CRAZY ACES' | 'JOKER WHIZ')}
                 disabled={gameType !== 'GIMMICK'}
                 className={`px-3 py-1 rounded-md text-slate-800 font-semibold ${
                   gameType === 'GIMMICK' 

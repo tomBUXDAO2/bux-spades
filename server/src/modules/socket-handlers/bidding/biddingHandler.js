@@ -76,6 +76,39 @@ class BiddingHandler {
     
     // Handle gimmick games
     if (forcedBid) {
+      // Joker Whiz: first 3 bidders must follow Whiz rules, last bidder regular
+      if (forcedBid === 'JOKER') {
+        // If this player is the last in bidding order, allow any regular bid
+        try {
+          const dealer = gameState.dealer ?? 0;
+          const lastBidderSeat = dealer; // In a 4-player game, dealer bids last
+          if (player?.seatIndex === lastBidderSeat) {
+            return { valid: bid >= 0 && bid <= 13, message: 'Joker Whiz: last bidder can bid any amount' };
+          }
+        } catch {}
+
+        // Use Redis as source of truth to avoid stale bidding arrays
+        let bidsPlaced = 0;
+        try {
+          const latestBids = await redisGameState.getPlayerBids(gameState.id);
+          if (Array.isArray(latestBids)) {
+            bidsPlaced = latestBids.filter(b => b !== null && b !== undefined).length;
+          } else if (Array.isArray(gameState.bidding?.bids)) {
+            bidsPlaced = gameState.bidding.bids.filter(b => b !== null && b !== undefined).length;
+          }
+        } catch {
+          if (Array.isArray(gameState.bidding?.bids)) {
+            bidsPlaced = gameState.bidding.bids.filter(b => b !== null && b !== undefined).length;
+          }
+        }
+
+        if (bidsPlaced < 3) {
+          const validWhizBid = bid === numSpades || bid === 0;
+          return { valid: validWhizBid, message: `Joker Whiz: first 3 must bid ${numSpades} (spades) or nil` };
+        }
+        // Last bidder: any regular bid 0-13 is allowed
+        return { valid: bid >= 0 && bid <= 13, message: 'Joker Whiz: last bidder can bid any amount' };
+      }
       switch (forcedBid) {
         case 'SUICIDE':
           return await this.validateSuicideBid(gameState, player, bid, isNil, isBlindNil);
@@ -631,6 +664,17 @@ class BiddingHandler {
     console.log(`[BIDDING] Full gameState object:`, JSON.stringify(gameState, null, 2));
     
     // Handle different game formats and variants
+    // Joker Whiz: first 3 bidders must follow Whiz (nil or spades-only); last bidder regular
+    if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'JOKER' || gameState.rules?.gimmickType === 'JOKER')) {
+      const bidsArray = gameState.bidding?.bids || [];
+      const bidsPlaced = Array.isArray(bidsArray) ? bidsArray.filter(b => b !== null && b !== undefined).length : 0;
+      if (bidsPlaced < 3) {
+        const hasAce = hand.some(c => c.suit === 'SPADES' && c.rank === 'A');
+        if (numSpades === 0 && !hasAce) return 0; // nil allowed if no spades and no Ace
+        return Math.max(1, numSpades);
+      }
+      // else fall through to standard logic for the last bidder
+    }
     if (gameState.format === 'WHIZ') {
       // WHIZ game bot logic - must bid spades or nil
       const numSpades = hand.filter(card => card.suit === 'SPADES').length;

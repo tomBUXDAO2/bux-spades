@@ -17,7 +17,7 @@ export class GameCreationService {
       };
       
       // Handle gimmick variants - if format is a gimmick variant, map to GIMMICK format
-      const gimmickVariants = ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'];
+      const gimmickVariants = ['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES', 'JOKER WHIZ'];
       const clientFormat = gameData.format || gameData.biddingOption || 'REGULAR';
       
       // Map client gimmick variants to database enum values
@@ -26,7 +26,8 @@ export class GameCreationService {
         '4 OR NIL': 'BID4NIL',
         'BID 3': 'BID3',
         'BID HEARTS': 'BIDHEARTS',
-        'CRAZY ACES': 'CRAZY_ACES'
+        'CRAZY ACES': 'CRAZY_ACES',
+        'JOKER WHIZ': 'JOKER'
       };
       
       let dbFormat;

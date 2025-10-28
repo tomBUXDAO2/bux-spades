@@ -398,6 +398,7 @@ enum GimmickVariant {
   BID3
   BIDHEARTS
   CRAZY_ACES
+  JOKER
 }
 
 enum StatsFormat {
@@ -415,6 +416,7 @@ enum StatsGimmickVariant {
   BID3
   BIDHEARTS
   CRAZY_ACES
+  JOKER
 }
 
 enum StatsMode {

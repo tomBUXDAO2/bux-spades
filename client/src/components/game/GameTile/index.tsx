@@ -30,8 +30,9 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
       else if (gimmickVariant === 'BID3' || gimmickVariant === 'BID 3') label = 'BID 3';
       else if (gimmickVariant === 'BIDHEARTS' || gimmickVariant === 'BID HEARTS') label = 'BID ♡s';
       else if (gimmickVariant === 'CRAZY_ACES' || gimmickVariant === 'CRAZY ACES') label = 'CRAZY As';
+      else if (gimmickVariant === 'JOKER' || gimmickVariant === 'JOKER_WHIZ') label = 'JOKER';
       else label = 'UNKNOWN'; // Fallback instead of "GIMMICK"
-    } else if (['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES'].includes(type)) {
+    } else if (['SUICIDE', '4 OR NIL', 'BID 3', 'BID HEARTS', 'CRAZY ACES', 'JOKER'].includes(type)) {
       // Handle direct gimmick variant types from bidType
       color = 'bg-orange-500';
       if (type === 'SUICIDE') label = 'SUICIDE';
@@ -39,6 +40,7 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
       else if (type === 'BID 3') label = 'BID 3';
       else if (type === 'BID HEARTS') label = 'BID ♡s';
       else if (type === 'CRAZY ACES') label = 'CRAZY As';
+      else if (type === 'JOKER') label = 'JOKER';
       else label = type.toUpperCase();
     }
     
