@@ -583,6 +583,18 @@ export class GameService {
       sanitizedState.playerHands = sanitizedPlayerHands;
     }
     
+    // SECRET ASSASSIN: Do not reveal assassin seat to non-assassin players
+    try {
+      const secretSeat = sanitizedState.play?.secretAssassinSeat ?? sanitizedState.specialRules?.secretAssassinSeat;
+      const rule1 = sanitizedState.specialRules?.specialRule1;
+      const isAssassin = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && secretSeat === userSeatIndex);
+      if (!isAssassin) {
+        if (sanitizedState.play && 'secretAssassinSeat' in sanitizedState.play) {
+          delete sanitizedState.play.secretAssassinSeat;
+        }
+      }
+    } catch {}
+    
     return sanitizedState;
   }
 
@@ -591,21 +603,26 @@ export class GameService {
    */
   static async getCurrentTrick(gameId) {
     try {
+      // Fetch game to get current round and trick number
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { currentRound: true, currentTrick: true, rounds: { select: { id: true, roundNumber: true } } }
+      });
+      if (!game) return [];
+      const round = game.rounds.find(r => r.roundNumber === game.currentRound);
+      if (!round) return [];
+
+      // Find the trick for the current round/trickNumber
+      const trick = await prisma.trick.findFirst({
+        where: { roundId: round.id, trickNumber: game.currentTrick || 1 },
+        select: { id: true }
+      });
+      if (!trick) return [];
+
       const currentTrick = await prisma.trickCard.findMany({
-        where: {
-          trick: {
-            gameId: gameId,
-            isComplete: false
-          }
-        },
-        orderBy: {
-          playOrder: 'asc'
-        },
-        select: {
-          suit: true,
-          rank: true,
-          seatIndex: true
-        }
+        where: { trickId: trick.id },
+        orderBy: { playOrder: 'asc' },
+        select: { suit: true, rank: true, seatIndex: true }
       });
       
       return currentTrick;
@@ -1047,16 +1064,23 @@ export class GameService {
         }
       }
 
-      // Get spadesBroken flag from Redis cache
+      // Get spadesBroken flag and secretAssassinSeat from Redis cache
       let spadesBroken = false;
+      let secretAssassinSeat = null;
       try {
         const cachedGameState = await redisGameState.getGameState(gameId);
-        if (cachedGameState && cachedGameState.play && cachedGameState.play.spadesBroken !== undefined) {
-          spadesBroken = cachedGameState.play.spadesBroken;
-          console.log(`[GAME SERVICE] Retrieved spadesBroken from Redis cache:`, spadesBroken);
+        if (cachedGameState && cachedGameState.play) {
+          if (cachedGameState.play.spadesBroken !== undefined) {
+            spadesBroken = cachedGameState.play.spadesBroken;
+            console.log(`[GAME SERVICE] Retrieved spadesBroken from Redis cache:`, spadesBroken);
+          }
+          if (cachedGameState.play.secretAssassinSeat !== undefined) {
+            secretAssassinSeat = cachedGameState.play.secretAssassinSeat;
+            console.log(`[GAME SERVICE] Retrieved secretAssassinSeat from Redis cache:`, secretAssassinSeat);
+          }
         }
       } catch (error) {
-        console.error('[GAME SERVICE] Error getting spadesBroken from Redis:', error);
+        console.error('[GAME SERVICE] Error getting game state from Redis:', error);
       }
 
       // Get player bids from Redis or database
@@ -1208,7 +1232,10 @@ export class GameService {
         maxPoints: game.maxPoints,
         nilAllowed: game.nilAllowed,
         blindNilAllowed: game.blindNilAllowed,
-        specialRules: game.specialRules,
+        specialRules: {
+          ...game.specialRules,
+          secretAssassinSeat: game.specialRules?.secretAssassinSeat
+        },
         isLeague: game.isLeague,
         isRated: game.isRated,
         currentPlayer: game.currentPlayer,
@@ -1224,7 +1251,8 @@ export class GameService {
         playerBids: playerBids,
         play: {
           currentTrick: currentTrickCards,
-          spadesBroken: spadesBroken
+          spadesBroken: spadesBroken,
+          secretAssassinSeat: secretAssassinSeat || game.specialRules?.secretAssassinSeat
         },
         bidding: {
           bids: playerBids,
@@ -1373,6 +1401,41 @@ export class GameService {
         handsLengths: hands.map((hand, i) => `Seat ${i}: ${hand.length} cards`),
         sampleCards: hands[0].slice(0, 3) // Show first 3 cards of seat 0
       });
+
+      // Assign Secret Assassin on deal (Ace of Spades holder)
+      try {
+        const rule1 = game.specialRules?.specialRule1 || game.specialRule1 || 'NONE';
+        console.log(`[GAME SERVICE] Secret Assassin Check - rule1: ${rule1}, specialRule1: ${game.specialRule1}, specialRules:`, game.specialRules);
+        if (rule1 === 'SECRET_ASSASSIN') {
+          console.log(`[GAME SERVICE] SECRET_ASSASSIN detected, looking for Ace of Spades...`);
+          let secretAssassinSeat = null;
+          for (let s = 0; s < 4; s++) {
+            if (hands[s].some(c => c.suit === 'SPADES' && c.rank === 'A')) {
+              secretAssassinSeat = s;
+              break;
+            }
+          }
+          if (secretAssassinSeat !== null) {
+            const mergedSpecial = { ...(game.specialRules || {}), specialRule1: 'SECRET_ASSASSIN', secretAssassinSeat };
+            await prisma.game.update({ where: { id: gameId }, data: { specialRules: mergedSpecial } });
+            try {
+              const gs = await redisGameState.getGameState(gameId);
+              if (gs) {
+                gs.play = gs.play || {};
+                gs.play.secretAssassinSeat = secretAssassinSeat;
+                gs.specialRules = gs.specialRules || {};
+                gs.specialRules.secretAssassinSeat = secretAssassinSeat;
+                await redisGameState.setGameState(gameId, gs);
+              }
+              console.log(`[GAME SERVICE] Secret Assassin set to seat ${secretAssassinSeat}`);
+            } catch (e) {
+              console.warn('[GAME SERVICE] Could not cache secretAssassinSeat:', e?.message || e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[GAME SERVICE] Secret Assassin assignment error:', e?.message || e);
+      }
 
         // Set current bidder to dealer+1 (wrap 0..3) and clear currentTrick for bidding phase
         const dealerSeatIndex = game.dealer ?? 0;

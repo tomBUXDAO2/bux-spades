@@ -78,7 +78,10 @@ export interface GameState {
   team2Bags?: number;
   gameMode?: GameMode;
   forcedBid?: string;
-  specialRules?: { screamer?: boolean; assassin?: boolean };
+  specialRules?: { 
+    specialRule1?: 'NONE' | 'SCREAMER' | 'ASSASSIN' | 'SECRET_ASSASSIN';
+    specialRule2?: 'NONE' | 'LOWBALL' | 'HIGHBALL';
+  };
   buyIn?: number;
   rated?: boolean;
   isLeague?: boolean;
@@ -121,8 +124,8 @@ export interface GameRules {
   coinAmount: number;
     bidType?: string;  numHands?: number;
   specialRules?: {
-    screamer: boolean;
-    assassin: boolean;
+    specialRule1: 'NONE' | 'SCREAMER' | 'ASSASSIN' | 'SECRET_ASSASSIN';
+    specialRule2: 'NONE' | 'LOWBALL' | 'HIGHBALL';
   };
 }
 
@@ -133,8 +136,8 @@ export interface GameSettings {
   maxPoints: number;
   buyIn: number;
   specialRules: {
-    screamer: boolean;
-    assassin: boolean;
+    specialRule1: 'NONE' | 'SCREAMER' | 'ASSASSIN' | 'SECRET_ASSASSIN';
+    specialRule2: 'NONE' | 'LOWBALL' | 'HIGHBALL';
     allowNil: boolean;
     allowBlindNil: boolean;
   };

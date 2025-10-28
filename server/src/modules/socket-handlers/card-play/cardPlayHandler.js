@@ -117,6 +117,34 @@ class CardPlayHandler {
         throw new Error(`Current trick not found for round ${currentRound.id}, trick ${gameState.currentTrick || 1}`);
       }
 
+      // PRE-VALIDATION: Core rule - cannot lead spades before broken unless only spades
+      try {
+        const cachedState = await GameService.getGameStateForClient(gameId);
+        const trickCards = await prisma.trickCard.count({ where: { trickId: currentTrick.id } });
+        const spadesBroken = cachedState?.play?.spadesBroken || false;
+        if (trickCards === 0 && card?.suit === 'SPADES' && !spadesBroken) {
+          const hands = await redisGameState.getPlayerHands(gameId);
+          const hand = (hands && hands[player.seatIndex]) ? hands[player.seatIndex] : [];
+          const hasNonSpades = hand.some((c) => c.suit !== 'SPADES');
+          if (hasNonSpades) {
+            console.log(`[CARD PLAY] CORE: Rejecting spade lead before broken for user ${userId} (seat ${player.seatIndex})`);
+            // Emit rejection to clients and keep turn
+            const updatedGameState = await GameService.getGameStateForClient(gameId);
+            this.io.to(gameId).emit('card_played', {
+              gameId,
+              gameState: updatedGameState,
+              cardPlayed: { userId, card, seatIndex: player.seatIndex, rejected: true }
+            });
+            if (isBot) {
+              setTimeout(() => this.triggerBotPlayIfNeeded(gameId).catch(()=>{}), 100);
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[CARD PLAY] Pre-validation failed (continuing):', e?.message || e);
+      }
+
       // Log the card play to database (now optimized for performance)
       const logResult = await this.loggingService.logCardPlay(
         gameId,
@@ -158,8 +186,7 @@ class CardPlayHandler {
           // Add a small delay to prevent rapid retries
           setTimeout(async () => {
             try {
-              const { triggerBotPlayIfNeeded } = await import('../card-play/cardPlayHandler.js');
-              await triggerBotPlayIfNeeded(gameId);
+              await this.triggerBotPlayIfNeeded(gameId);
             } catch (error) {
               console.error(`[CARD PLAY] Error triggering bot retry:`, error);
             }

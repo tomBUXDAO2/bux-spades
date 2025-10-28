@@ -66,13 +66,42 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
         </svg>
         <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{(gameState as any).mode || 'PARTNERS'}</span>
-        {/* Special bricks for assassin/screamer */}
-        {(gameState.specialRules?.assassin || (gameState as any).specialRules?.assassin) && (
-          <span className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>
-        )}
-        {(gameState.specialRules?.screamer || (gameState as any).specialRules?.screamer) && (
-          <span className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>
-        )}
+        {/* Special bricks */}
+        {(() => {
+          const specialRule1 = gameState.specialRules?.specialRule1 || (gameState as any).rules?.specialRules?.specialRule1;
+          const specialRule2 = gameState.specialRules?.specialRule2 || (gameState as any).rules?.specialRules?.specialRule2;
+          const bricks = [];
+          
+          // Special Rule 1
+          if (specialRule1 === 'SCREAMER') {
+            bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+          } else if (specialRule1 === 'ASSASSIN') {
+            bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+          } else if (specialRule1 === 'SECRET_ASSASSIN') {
+            bricks.push(<span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>);
+          }
+          
+          // Special Rule 2
+          if (specialRule2 === 'LOWBALL') {
+            bricks.push(<span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>);
+          } else if (specialRule2 === 'HIGHBALL') {
+            bricks.push(<span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>);
+          }
+          
+          // Backward compatibility with old format
+          if (gameState.specialRules?.assassin || (gameState as any).specialRules?.assassin) {
+            if (!bricks.some(brick => brick.key === 'assassin')) {
+              bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+            }
+          }
+          if (gameState.specialRules?.screamer || (gameState as any).specialRules?.screamer) {
+            if (!bricks.some(brick => brick.key === 'screamer')) {
+              bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+            }
+          }
+          
+          return bricks;
+        })()}
       </div>
       {/* Prize info */}
       <div className="mt-2 pt-2 border-t border-gray-700">

@@ -333,7 +333,8 @@ const commands = [
           { name: 'Bid 4 or Nil', value: 'BID4NIL' },
           { name: 'Bid 3', value: 'BID3' },
           { name: 'Bid Hearts', value: 'BIDHEARTS' },
-          { name: 'Crazy Aces', value: 'CRAZY_ACES' }
+          { name: 'Crazy Aces', value: 'CRAZY_ACES' },
+          { name: 'Joker Whiz', value: 'JOKER' }
         ]
       },
       {

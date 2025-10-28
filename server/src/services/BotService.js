@@ -9,6 +9,21 @@ class BotService {
     this.loggingService = GameLoggingService;
   }
 
+  // Normalize a card from either object or string formats like 'SPADES10','HEARTSA','CLUBS3'
+  static normalizeCard(card) {
+    if (typeof card === 'string') {
+      const m = card.match(/^([A-Z]+)([0-9AQJK]{1,2})$/i);
+      if (m) {
+        const suit = m[1].toUpperCase();
+        const rank = m[2].toUpperCase() === '0' ? '10' : m[2].toUpperCase();
+        return { suit: suit, rank: rank };
+      }
+      // Fallback: last char as rank
+      return { suit: card.slice(0, -1).toUpperCase(), rank: card.slice(-1).toUpperCase() };
+    }
+    return card;
+  }
+
   /**
    * Get numeric value of a card rank for comparison
    */
@@ -322,6 +337,35 @@ class BotService {
 
     // Get special rules from game
     const specialRules = game.specialRules || {};
+    const rule1 = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));
+    const rule2 = specialRules.specialRule2 || 'NONE';
+    
+    // Get secret assassin seat - check multiple sources
+    let secretSeat = (game.play?.secretAssassinSeat ?? specialRules.secretAssassinSeat ?? game.specialRules?.secretAssassinSeat);
+    
+    // If still no secret seat and this is SECRET_ASSASSIN, find who has Ace of Spades
+    if (!secretSeat && rule1 === 'SECRET_ASSASSIN') {
+      try {
+        const playerHands = hands; // use already-loaded hands from game state
+        if (playerHands && playerHands.length >= 4) {
+          for (let s = 0; s < 4; s++) {
+            const seatHand = (playerHands[s] || []).map(BotService.normalizeCard);
+            if (seatHand.some(card => card.suit === 'SPADES' && card.rank === 'A')) {
+              secretSeat = s;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[BOT SERVICE] Could not determine secret assassin seat:', e?.message || e);
+      }
+    }
+    
+    // DEBUG: Log secret assassin detection for bots
+    console.log(`[BOT SERVICE] Secret Assassin Debug - rule1: ${rule1}, secretSeat: ${secretSeat}, seatIndex: ${seatIndex}`);
+    const isAssassinSeat = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && secretSeat === seatIndex);
+    const isScreamerSeat = (rule1 === 'SCREAMER') || (rule1 === 'SECRET_ASSASSIN' && secretSeat !== seatIndex);
+    console.log(`[BOT SERVICE] Bot ${botUsername} - isAssassinSeat: ${isAssassinSeat}, isScreamerSeat: ${isScreamerSeat}`);
     console.log(`[BOT SERVICE] Special rules for bot ${botUsername}:`, specialRules);
     
     // CRITICAL: Get spadesBroken from Redis cache for real-time accuracy
@@ -334,8 +378,96 @@ class BotService {
       const ctx = this.buildDecisionContext(game, seatIndex, hand, currentTrickCards, spadesBroken);
       const v2Card = this.selectCardV2(ctx);
       if (v2Card) {
-        console.log(`[BOT SERVICE][AI_V2] Selected ${v2Card.suit}${v2Card.rank} by policy`, { scenario: ctx.scenario });
-        return v2Card;
+        // Enforce core legality + Lowball/Highball if applicable
+        const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+        const normalizedHandAI = hand.map(card => typeof card === 'string' ? { suit: card.substring(0, card.length - 1), rank: card.substring(card.length - 1) } : card);
+        let legal = [];
+        if (currentTrickCards.length === 0) {
+          legal = normalizedHandAI.slice();
+          // CORE: cannot lead spades before broken unless only spades
+          if (!spadesBroken) {
+            const nonSp = legal.filter(c => c.suit !== 'SPADES');
+            if (nonSp.length > 0) legal = nonSp;
+          }
+          if (isAssassinSeat && spadesBroken) {
+            const sp = legal.filter(c => c.suit === 'SPADES');
+            if (sp.length > 0) legal = sp;
+          } else if (isScreamerSeat) {
+            const nonSp = legal.filter(c => c.suit !== 'SPADES');
+            if (nonSp.length > 0) legal = nonSp;
+          }
+        } else {
+          const leadSuit = currentTrickCards[0].suit;
+          const suitCards = normalizedHandAI.filter(c => c.suit === leadSuit);
+          if (suitCards.length > 0) {
+            legal = suitCards;
+          } else {
+            legal = normalizedHandAI.slice();
+            if (isAssassinSeat) {
+              const sp = legal.filter(c => c.suit === 'SPADES');
+              if (sp.length > 0) legal = sp;
+            } else if (isScreamerSeat) {
+              const nonSp = legal.filter(c => c.suit !== 'SPADES');
+              if (nonSp.length > 0) legal = nonSp;
+            }
+          }
+        }
+        console.log(`[BOT SERVICE][AI_V2] After filtering - legal cards:`, legal.map(c => `${c.suit}${c.rank}`));
+        if (rule2 === 'LOWBALL' && legal.length > 0) {
+          if (currentTrickCards.length === 0) {
+            // When leading: for each suit, find lowest card
+            const suits = [...new Set(legal.map(card => card.suit))];
+            const suitOptions = [];
+            for (const suit of suits) {
+              const suitCards = legal.filter(card => card.suit === suit);
+              const sorted = [...suitCards].sort((a,b) => order[a.rank] - order[b.rank]);
+              suitOptions.push(sorted[0]);
+            }
+            const lowest = suitOptions[0];
+            console.log(`[BOT SERVICE][AI_V2] LOWBALL leading -> ${lowest.suit}${lowest.rank}`);
+            return lowest;
+          } else {
+            // When following: lowest in lead suit
+            const lowest = legal.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+            console.log(`[BOT SERVICE][AI_V2] LOWBALL following -> ${lowest.suit}${lowest.rank}`);
+            return lowest;
+          }
+        }
+        if (rule2 === 'HIGHBALL' && legal.length > 0) {
+          if (currentTrickCards.length === 0) {
+            // When leading: for each suit, find highest card
+            const suits = [...new Set(legal.map(card => card.suit))];
+            const suitOptions = [];
+            for (const suit of suits) {
+              const suitCards = legal.filter(card => card.suit === suit);
+              const sorted = [...suitCards].sort((a,b) => order[a.rank] - order[b.rank]);
+              suitOptions.push(sorted[sorted.length-1]);
+            }
+            const highest = suitOptions[0];
+            console.log(`[BOT SERVICE][AI_V2] HIGHBALL leading -> ${highest.suit}${highest.rank}`);
+            return highest;
+          } else {
+            // When following: highest in lead suit
+            const highest = legal.sort((a,b)=>order[b.rank]-order[a.rank])[0];
+            console.log(`[BOT SERVICE][AI_V2] HIGHBALL following -> ${highest.suit}${highest.rank}`);
+            return highest;
+          }
+        }
+        // If we have a legal set after constraints, pick a safe default (lowest)
+        if (legal.length > 0) {
+          const pick = [...legal].sort((a,b)=> order[a.rank]-order[b.rank])[0];
+          console.log(`[BOT SERVICE][AI_V2] Overriding policy with legal pick -> ${pick.suit}${pick.rank}`);
+          return pick;
+        }
+        // Otherwise fall back to policy only if it is legal
+        const v2InHand = normalizedHandAI.find(c => c.suit === v2Card.suit && c.rank === v2Card.rank);
+        if (v2InHand) {
+          console.log(`[BOT SERVICE][AI_V2] Selected ${v2Card.suit}${v2Card.rank} by policy`, { scenario: ctx.scenario });
+          return v2Card;
+        }
+        console.warn('[BOT SERVICE][AI_V2] Policy card not legal/available, falling back to lowest card in hand');
+        const fallback = [...normalizedHandAI].sort((a,b)=> order[a.rank]-order[b.rank])[0];
+        return fallback;
       }
       console.warn('[BOT SERVICE][AI_V2] Fallback to legacy logic');
     }
@@ -343,7 +475,44 @@ class BotService {
     // LEGACY: MANDATORY suit following logic
     if (currentTrickCards.length === 0) {
       // Leading - apply special rules
-      cardToPlay = this.getLeadCard(hand, game, specialRules, spadesBroken);
+      // Normalize
+      const normalizedHandLead = hand.map(BotService.normalizeCard);
+      let legalLead = normalizedHandLead.slice();
+      // CORE: Cannot lead spades before broken unless only spades
+      if (!spadesBroken) {
+        const nonSp = legalLead.filter(c => c.suit !== 'SPADES');
+        if (nonSp.length > 0) legalLead = nonSp;
+      }
+      if (isAssassinSeat && spadesBroken) {
+        const sp = legalLead.filter(c => c.suit === 'SPADES');
+        if (sp.length > 0) legalLead = sp;
+      }
+      if (isScreamerSeat) {
+        const nonSp = legalLead.filter(c => c.suit !== 'SPADES');
+        if (nonSp.length > 0) legalLead = nonSp;
+      }
+      // LOW/HIGHBALL: For each legal suit, find the lowest/highest card in that suit
+      const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+      if (rule2 === 'LOWBALL' || rule2 === 'HIGHBALL') {
+        const suits = [...new Set(legalLead.map(card => card.suit))];
+        const suitOptions = [];
+        
+        for (const suit of suits) {
+          const suitCards = legalLead.filter(card => card.suit === suit);
+          const sorted = [...suitCards].sort((a,b) => order[a.rank] - order[b.rank]);
+          if (rule2 === 'LOWBALL') {
+            suitOptions.push(sorted[0]); // Lowest card in this suit
+          } else { // HIGHBALL
+            suitOptions.push(sorted[sorted.length-1]); // Highest card in this suit
+          }
+        }
+        
+        // Bot can choose any of these suit options (for now, pick first one)
+        cardToPlay = suitOptions[0] || legalLead[0];
+      } else {
+        // Default lowest
+        cardToPlay = legalLead.sort((a,b)=>order[a.rank]-order[b.rank])[0] || legalLead[0];
+      }
     } else {
       // FOLLOWING - MUST follow suit if possible, NO EXCEPTIONS
       const leadSuit = currentTrickCards[0].suit;
@@ -351,29 +520,29 @@ class BotService {
       console.log(`[BOT SERVICE] Bot ${botUsername} hand:`, hand);
       
       // Convert string format cards to object format if needed
-      const normalizedHand = hand.map(card => {
-        if (typeof card === 'string') {
-          const suit = card.substring(0, card.length - 1);
-          const rank = card.substring(card.length - 1);
-          return { suit, rank };
-        }
-        return card;
-      });
+      const normalizedHand = hand.map(BotService.normalizeCard);
 
       // MANDATORY: Find cards of the lead suit
       const suitCards = normalizedHand.filter(card => card.suit === leadSuit);
       console.log(`[BOT SERVICE] Bot ${botUsername} has ${suitCards.length} cards of lead suit ${leadSuit}:`, suitCards.map(c => `${c.suit}${c.rank}`));
       
       if (suitCards.length > 0) {
-        // MANDATORY: Play lowest card of lead suit
-        cardToPlay = suitCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-        console.log(`[BOT SERVICE] Bot ${botUsername} MUST play ${cardToPlay.suit}${cardToPlay.rank} to follow suit`);
+        // LOW/HIGHBALL within lead suit
+        const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+        if (rule2 === 'LOWBALL') {
+          cardToPlay = suitCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+        } else if (rule2 === 'HIGHBALL') {
+          cardToPlay = suitCards.sort((a,b)=>order[b.rank]-order[a.rank])[0];
+        } else {
+          cardToPlay = suitCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+        }
+        console.log(`[BOT SERVICE] Bot ${botUsername} following suit ${leadSuit}, chose ${cardToPlay.suit}${cardToPlay.rank}`);
       } else {
         // Void in lead suit - apply special rules
         let playableCards = normalizedHand;
         
         // ASSASSIN: Must cut with spades when void
-        if (specialRules.assassin) {
+        if (isAssassinSeat) {
           const spades = normalizedHand.filter(card => card.suit === 'SPADES');
           if (spades.length > 0) {
             playableCards = spades; // CRITICAL: ONLY spades are playable
@@ -386,7 +555,7 @@ class BotService {
         }
         
         // SCREAMER: Cannot play spades unless only have spades
-        if (specialRules.screamer) {
+        if (isScreamerSeat) {
           const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
           if (nonSpades.length > 0) {
             playableCards = playableCards.filter(card => card.suit !== 'SPADES');
@@ -394,10 +563,17 @@ class BotService {
           }
         }
         
-        // Play lowest available card
+        // LOW/HIGHBALL among legal options when void
         if (playableCards.length > 0) {
-          cardToPlay = playableCards.sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank))[0];
-          console.log(`[BOT SERVICE] Bot ${botUsername} is void in ${leadSuit}, playing ${cardToPlay.suit}${cardToPlay.rank}`);
+          const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+          if (rule2 === 'LOWBALL') {
+            cardToPlay = playableCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+          } else if (rule2 === 'HIGHBALL') {
+            cardToPlay = playableCards.sort((a,b)=>order[b.rank]-order[a.rank])[0];
+          } else {
+            cardToPlay = playableCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+          }
+          console.log(`[BOT SERVICE] Bot ${botUsername} is void in ${leadSuit}, choosing ${cardToPlay.suit}${cardToPlay.rank}`);
         } else {
           // CRITICAL: If special rules left no valid cards, ignore special rules and play any card
           console.error(`[BOT SERVICE] ERROR: Special rules left bot ${botUsername} with no valid cards! Ignoring special rules.`);
@@ -412,9 +588,9 @@ class BotService {
     }
 
     // CRITICAL: Final validation - ensure card is legal for Assassin mode
-    if (specialRules.assassin && currentTrickCards.length > 0) {
+    if (isAssassinSeat && currentTrickCards.length > 0) {
       const leadSuit = currentTrickCards[0].suit;
-      const hasLeadSuit = normalizedHand.some(card => card.suit === leadSuit);
+      const hasLeadSuit = (hand.map(BotService.normalizeCard)).some(card => card.suit === leadSuit);
       
       if (!hasLeadSuit && cardToPlay.suit !== 'SPADES') {
         console.error(`[BOT SERVICE] ASSASSIN VALIDATION FAILED: Bot ${botUsername} is void in ${leadSuit} but chose ${cardToPlay.suit}${cardToPlay.rank} instead of spades!`);
@@ -527,7 +703,7 @@ class BotService {
       // Card selection logic (same as playBotCard)
       if (currentTrickCards.length === 0) {
         // Leading
-        cardToPlay = this.getLeadCard(hand, game, specialRules, spadesBroken);
+        cardToPlay = this.getLeadCard(hand, game, specialRules, spadesBroken, isAssassinSeat);
       } else {
         // Following - MUST follow suit if possible
         const leadSuit = currentTrickCards[0].suit;
@@ -936,7 +1112,7 @@ class BotService {
   /**
    * Get best card to lead with
    */
-  getLeadCard(hand, game = null, specialRules = {}, spadesBrokenParam = false) {
+  getLeadCard(hand, game = null, specialRules = {}, spadesBrokenParam = false, isAssassinSeat = false) {
     // Convert string format cards to object format if needed
     const normalizedHand = hand.map(card => {
       if (typeof card === 'string') {
@@ -958,7 +1134,7 @@ class BotService {
     const spadesBroken = spadesBrokenParam || (game ? this.areSpadesBroken(game) : false);
 
     // ASSASSIN: Must lead spades if broken and have spades
-    if (specialRules.assassin && spadesBroken && suits['SPADES'] && suits['SPADES'].length > 0) {
+    if (isAssassinSeat && spadesBroken && suits['SPADES'] && suits['SPADES'].length > 0) {
       const cards = suits['SPADES'].sort((a, b) => this.getCardValue(a.rank) - this.getCardValue(b.rank));
       console.log(`[BOT SERVICE] ASSASSIN: Bot MUST lead spades (broken), playing lowest`);
       return cards[0];

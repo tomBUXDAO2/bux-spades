@@ -169,12 +169,48 @@ export class GameLoggingService {
       const cachedGameState = await redisGameState.getGameState(gameId);
       const spadesBroken = cachedGameState?.play?.spadesBroken || false;
       
+      // Determine per-seat rule for Secret Assassin
+      let isAssassinSeat = false;
+      try {
+        let secretSeat = cachedGameState?.play?.secretAssassinSeat ?? specialRules?.secretAssassinSeat;
+        // Fallback: derive secret seat from Redis hands if not present in state
+        if (specialRules?.specialRule1 === 'SECRET_ASSASSIN' && (secretSeat === undefined || secretSeat === null)) {
+          try {
+            // playerHand is already loaded above from Redis
+            if (Array.isArray(playerHand)) {
+              for (let s = 0; s < playerHand.length; s++) {
+                const hasAceOfSpades = (playerHand[s] || []).some(c => c && c.suit === 'SPADES' && c.rank === 'A');
+                if (hasAceOfSpades) { secretSeat = s; break; }
+              }
+            }
+          } catch {}
+        }
+        if (specialRules?.specialRule1 === 'SECRET_ASSASSIN' && (secretSeat === 0 || secretSeat === 1 || secretSeat === 2 || secretSeat === 3)) {
+          isAssassinSeat = (seatIndex === secretSeat);
+        }
+      } catch {}
+
+      const rule1 = specialRules?.specialRule1;
+      const rule2 = specialRules?.specialRule2;
+
+      const ruleAssassin = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && isAssassinSeat);
+      const ruleScreamer = (rule1 === 'SCREAMER') || (rule1 === 'SECRET_ASSASSIN' && !isAssassinSeat && rule1 === 'SECRET_ASSASSIN');
+
       // Validate leading card
       if (existingCardsCount === 0) {
         // Player is leading the trick
         
+        // CORE RULE: Cannot lead spades until broken unless only have spades
+        if (!spadesBroken && suit === 'SPADES') {
+          const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+          if (hasNonSpades) {
+            console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
+            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+          }
+        }
+
         // ASSASSIN: Must lead spades if broken and has spades
-        if (specialRules.assassin && spadesBroken && suit !== 'SPADES') {
+        if (ruleAssassin && spadesBroken && suit !== 'SPADES') {
           const hasSpades = currentHand.some(card => card.suit === 'SPADES');
           if (hasSpades) {
             console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
@@ -183,7 +219,7 @@ export class GameLoggingService {
         }
         
         // SCREAMER: Cannot lead spades unless only have spades
-        if (specialRules.screamer && suit === 'SPADES') {
+        if (ruleScreamer && suit === 'SPADES') {
           const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
           if (hasNonSpades) {
             console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot lead spades, has non-spades. Rejecting.`);
@@ -227,7 +263,7 @@ export class GameLoggingService {
             console.log(`[GAME LOGGING] Seat ${seatIndex} is void in lead suit ${leadCard.suit}, playing ${suit} is valid`);
             
             // ASSASSIN: Must cut with spades when void
-            if (specialRules.assassin && suit !== 'SPADES') {
+            if (ruleAssassin && suit !== 'SPADES') {
               const hasSpades = currentHand.some(card => card.suit === 'SPADES');
               if (hasSpades) {
                 console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must cut with spades but played ${suit}. Rejecting.`);
@@ -235,8 +271,8 @@ export class GameLoggingService {
               }
             }
             
-            // SCREAMER: Cannot play spades unless only have spades
-            if (specialRules.screamer && suit === 'SPADES') {
+            // SCREAMER: Cannot play spades unless only have spades (never applies to Assassin seat)
+            if (!ruleAssassin && ruleScreamer && suit === 'SPADES') {
               const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
               if (hasNonSpades) {
                 console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot play spades, has non-spades. Rejecting.`);
@@ -245,6 +281,91 @@ export class GameLoggingService {
             }
           }
         }
+      }
+
+      // LOWBALL / HIGHBALL enforcement among legal options
+      try {
+        if (rule2 === 'LOWBALL' || rule2 === 'HIGHBALL') {
+          // Build legal set based on rules already checked above
+          let legal = [];
+          if (existingCardsCount === 0) {
+            // Leading
+            legal = currentHand.slice();
+            if (ruleAssassin && spadesBroken) {
+              const sp = currentHand.filter(c => c.suit === 'SPADES');
+              if (sp.length > 0) legal = sp;
+            }
+            if (!ruleAssassin && ruleScreamer) {
+              const nonSp = currentHand.filter(c => c.suit !== 'SPADES');
+              if (nonSp.length > 0) legal = nonSp;
+            }
+          } else {
+            // Following
+            const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
+            const hasLead = currentHand.some(c => c.suit === leadSuit);
+            if (hasLead) {
+              legal = currentHand.filter(c => c.suit === leadSuit);
+            } else {
+              legal = currentHand.slice();
+              if (ruleAssassin) {
+                const sp = currentHand.filter(c => c.suit === 'SPADES');
+                if (sp.length > 0) legal = sp;
+              }
+              if (!ruleAssassin && ruleScreamer) {
+                const nonSp = currentHand.filter(c => c.suit !== 'SPADES');
+                if (nonSp.length > 0) legal = nonSp;
+              }
+            }
+          }
+
+          // Rank ordering helper
+          const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+          const chosen = { suit, rank };
+          
+          if (rule2 === 'LOWBALL') {
+            if (existingCardsCount === 0) {
+              // When leading: must be lowest card in the chosen suit
+              const suitCards = legal.filter(c => c.suit === suit);
+              const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
+              const lowestInSuit = sortedSuit[0];
+              if (!lowestInSuit || lowestInSuit.suit !== chosen.suit || lowestInSuit.rank !== chosen.rank) {
+                console.log(`[GAME LOGGING] LOWBALL: seat ${seatIndex} must play lowest ${lowestInSuit?.suit}${lowestInSuit?.rank} in ${suit} but tried ${suit}${rank}. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
+            } else {
+              // When following: must be lowest card in lead suit
+              const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
+              const lowest = sorted[0];
+              if (lowest.suit !== chosen.suit || lowest.rank !== chosen.rank) {
+                console.log(`[GAME LOGGING] LOWBALL: seat ${seatIndex} must play lowest ${lowest.suit}${lowest.rank} but tried ${suit}${rank}. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
+            }
+          }
+          
+          if (rule2 === 'HIGHBALL') {
+            if (existingCardsCount === 0) {
+              // When leading: must be highest card in the chosen suit
+              const suitCards = legal.filter(c => c.suit === suit);
+              const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
+              const highestInSuit = sortedSuit[sortedSuit.length-1];
+              if (!highestInSuit || highestInSuit.suit !== chosen.suit || highestInSuit.rank !== chosen.rank) {
+                console.log(`[GAME LOGGING] HIGHBALL: seat ${seatIndex} must play highest ${highestInSuit?.suit}${highestInSuit?.rank} in ${suit} but tried ${suit}${rank}. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
+            } else {
+              // When following: must be highest card in lead suit
+              const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
+              const highest = sorted[sorted.length-1];
+              if (highest.suit !== chosen.suit || highest.rank !== chosen.rank) {
+                console.log(`[GAME LOGGING] HIGHBALL: seat ${seatIndex} must play highest ${highest.suit}${highest.rank} but tried ${suit}${rank}. Rejecting.`);
+                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[GAME LOGGING] Low/Highball enforcement skipped due to error:', e?.message || e);
       }
       const calculatedPlayOrder = existingCardsCount + 1;
       console.log(`[GAME LOGGING] Calculated playOrder from DB: ${calculatedPlayOrder} (${existingCardsCount} existing cards in trick ${trickRecord.id})`);

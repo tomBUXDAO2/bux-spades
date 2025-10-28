@@ -52,7 +52,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
   const [minPoints, setMinPoints] = useState(-100);
   const [maxPoints, setMaxPoints] = useState(500);
   const [buyIn, setBuyIn] = useState(100000);
-  const [specialRule, setSpecialRule] = useState<'screamer' | 'assassin' | ''>('');
+  const [specialRule1, setSpecialRule1] = useState<'NONE' | 'SCREAMER' | 'ASSASSIN' | 'SECRET_ASSASSIN'>('NONE');
+  const [specialRule2, setSpecialRule2] = useState<'NONE' | 'LOWBALL' | 'HIGHBALL'>('NONE');
   const [allowNil, setAllowNil] = useState(true);
   const [allowBlindNil, setAllowBlindNil] = useState(false);
 
@@ -138,10 +139,10 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
       maxPoints,
       buyIn,
       specialRules: {
-        screamer: specialRule === 'screamer',
-        assassin: specialRule === 'assassin',
-      allowNil,
-      allowBlindNil
+        specialRule1,
+        specialRule2,
+        allowNil,
+        allowBlindNil
       }
     });
     onClose();
@@ -275,27 +276,37 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               {/* Special Rules */}
               <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
                 <label className="font-bold text-pink-400" style={{ fontSize: `${16 * textScale}px` }}>Special Rules</label>
-                <div className="flex" style={{ gap: `${16 * paddingScale}px` }}>
-                  <label className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
-                    <input
-                      type="checkbox"
-                      checked={specialRule === 'screamer'}
-                      onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
-                      className="form-checkbox bg-slate-700 text-indigo-600 rounded"
-                      style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}
-                    />
-                    <span className="text-slate-300" style={{ fontSize: `${16 * textScale}px` }}> Screamer</span>
-                  </label>
-                  <label className="flex items-center" style={{ gap: `${8 * paddingScale}px` }}>
-                    <input
-                      type="checkbox"
-                      checked={specialRule === 'assassin'}
-                      onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
-                      className="form-checkbox bg-slate-700 text-indigo-600 rounded"
-                      style={{ width: `${18 * iconScale}px`, height: `${18 * iconScale}px` }}
-                    />
-                    <span className="text-slate-300" style={{ fontSize: `${16 * textScale}px` }}>⚔️ Assassin</span>
-                  </label>
+                <div className="flex flex-col" style={{ gap: `${12 * paddingScale}px` }}>
+                  {/* Special Rule 1 */}
+                  <div className="flex flex-col items-center" style={{ gap: `${4 * paddingScale}px` }}>
+                    <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Rule 1:</label>
+                    <select
+                      value={specialRule1}
+                      onChange={(e) => setSpecialRule1(e.target.value as 'NONE' | 'SCREAMER' | 'ASSASSIN' | 'SECRET_ASSASSIN')}
+                      className="bg-slate-700 text-slate-300 rounded px-3 py-1 border border-slate-600"
+                      style={{ fontSize: `${14 * textScale}px` }}
+                    >
+                      <option value="NONE">None</option>
+                      <option value="SCREAMER">Screamer</option>
+                      <option value="ASSASSIN">⚔️ Assassin</option>
+                      <option value="SECRET_ASSASSIN">🕵️ Secret Assassin</option>
+                    </select>
+                  </div>
+                  
+                  {/* Special Rule 2 */}
+                  <div className="flex flex-col items-center" style={{ gap: `${4 * paddingScale}px` }}>
+                    <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Rule 2:</label>
+                    <select
+                      value={specialRule2}
+                      onChange={(e) => setSpecialRule2(e.target.value as 'NONE' | 'LOWBALL' | 'HIGHBALL')}
+                      className="bg-slate-700 text-slate-300 rounded px-3 py-1 border border-slate-600"
+                      style={{ fontSize: `${14 * textScale}px` }}
+                    >
+                      <option value="NONE">None</option>
+                      <option value="LOWBALL">📉 Lowball</option>
+                      <option value="HIGHBALL">📈 Highball</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

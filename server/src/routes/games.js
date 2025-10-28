@@ -121,9 +121,11 @@ router.post('/', async (req, res) => {
       buyIn: req.body.buyIn || 0,
       nilAllowed: req.body.specialRules?.allowNil !== false,
       blindNilAllowed: req.body.specialRules?.allowBlindNil || false,
+      specialRule1: req.body.specialRules?.specialRule1 || 'NONE',
+      specialRule2: req.body.specialRules?.specialRule2 || 'NONE',
       specialRules: req.body.specialRules || {
-        screamer: false,
-        assassin: false
+        specialRule1: 'NONE',
+        specialRule2: 'NONE'
       },
       rules: req.body.rules || {
         gameType: 'PARTNERS',
@@ -134,8 +136,8 @@ router.post('/', async (req, res) => {
         minPoints: -100,
         bidType: clientFormat, // Use original client format for display
         specialRules: {
-          screamer: false,
-          assassin: false
+          specialRule1: 'NONE',
+          specialRule2: 'NONE'
         }
       }
     };

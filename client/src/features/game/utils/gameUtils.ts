@@ -180,6 +180,42 @@ export const getPlayableCards = (
   if (!hand || hand.length === 0) return [];
   
   const specialRules = (gameState as any).specialRules || {};
+  const rule1: 'NONE'|'SCREAMER'|'ASSASSIN'|'SECRET_ASSASSIN' = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));
+  const rule2: 'NONE'|'LOWBALL'|'HIGHBALL' = specialRules.specialRule2 || 'NONE';
+  const secretSeat = (gameState as any).play?.secretAssassinSeat ?? specialRules.secretAssassinSeat;
+
+  // Try to detect my seat by matching hand against gameState.hands
+  let mySeatIndex: number | null = null;
+  try {
+    const hands = (gameState as any).hands as Card[][] | undefined;
+    if (hands && Array.isArray(hands)) {
+      for (let i = 0; i < hands.length; i++) {
+        const h = hands[i] || [];
+        if (h.length === hand.length) {
+          const key = (c: Card) => `${c.suit}-${c.rank}`;
+          const a = new Set(hand.map(key));
+          const b = new Set(h.map(key));
+          if (a.size === b.size && [...a].every(k => b.has(k))) {
+            mySeatIndex = i; break;
+          }
+        }
+      }
+    }
+  } catch {}
+
+  const isAssassinSeat = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && (mySeatIndex === secretSeat));
+  const isScreamerSeat = (rule1 === 'SCREAMER') || (rule1 === 'SECRET_ASSASSIN' && (mySeatIndex !== null) && (mySeatIndex !== secretSeat));
+  
+  // DEBUG: Log Secret Assassin detection
+  console.log('[SECRET ASSASSIN DEBUG]', {
+    rule1,
+    mySeatIndex,
+    secretSeat,
+    isAssassinSeat,
+    isScreamerSeat,
+    specialRules: specialRules,
+    playSecretSeat: (gameState as any).play?.secretAssassinSeat
+  });
   const spadesBroken = hasSpadeBeenPlayed(gameState);
   
   // CRITICAL FIX: Use currentTrick override if provided, otherwise fall back to gameState
@@ -194,6 +230,12 @@ export const getPlayableCards = (
       
       // If player has cards in lead suit, must play one of them
       if (leadSuitCards.length > 0) {
+        // LOW/HIGHBALL applies within the lead suit
+        if (rule2 !== 'NONE') {
+          const order: Record<string, number> = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+          const sorted = [...leadSuitCards].sort((a,b)=> order[a.rank]-order[b.rank]);
+          return rule2 === 'LOWBALL' ? [sorted[0]] : [sorted[sorted.length-1]];
+        }
         return leadSuitCards;
       }
       // If player is void in lead suit
@@ -201,7 +243,7 @@ export const getPlayableCards = (
         let playableCards = hand;
         
         // ASSASSIN: Must cut with spades when void in lead suit
-        if (specialRules.assassin) {
+        if (isAssassinSeat) {
           const spades = hand.filter(card => card.suit === 'SPADES');
           if (spades.length > 0) {
             playableCards = spades; // MUST play spades
@@ -209,13 +251,31 @@ export const getPlayableCards = (
         }
         
         // SCREAMER: Cannot play spades unless only have spades
-        if (specialRules.screamer) {
+        if (isScreamerSeat) {
           const nonSpades = hand.filter(card => card.suit !== 'SPADES');
           if (nonSpades.length > 0) {
             playableCards = playableCards.filter(card => card.suit !== 'SPADES');
           }
         }
-        
+
+        // LOW/HIGHBALL: For each legal suit when void, find the lowest/highest card in that suit
+        if (rule2 !== 'NONE' && playableCards.length > 0) {
+          const order: Record<string, number> = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+          const suits = [...new Set(playableCards.map(card => card.suit))];
+          const result = [];
+          
+          for (const suit of suits) {
+            const suitCards = playableCards.filter(card => card.suit === suit);
+            const sorted = [...suitCards].sort((a,b) => order[a.rank] - order[b.rank]);
+            if (rule2 === 'LOWBALL') {
+              result.push(sorted[0]); // Lowest card in this suit
+            } else { // HIGHBALL
+              result.push(sorted[sorted.length-1]); // Highest card in this suit
+            }
+          }
+          return result;
+        }
+
         return playableCards;
       }
     }
@@ -225,8 +285,16 @@ export const getPlayableCards = (
   if (isLeading) {
     let playableCards = hand;
     
+    // CORE: Cannot lead spades before broken unless only spades in hand
+    if (!spadesBroken) {
+      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+      }
+    }
+
     // ASSASSIN: Must lead spades if spades are broken and player has spades
-    if (specialRules.assassin && spadesBroken) {
+    if (isAssassinSeat && spadesBroken) {
       const spades = hand.filter(card => card.suit === 'SPADES');
       if (spades.length > 0) {
         playableCards = spades; // MUST lead spades
@@ -234,13 +302,31 @@ export const getPlayableCards = (
     }
     
     // SCREAMER: Cannot lead spades unless only have spades (spadesBroken doesn't override this)
-    if (specialRules.screamer) {
+    if (isScreamerSeat) {
       const nonSpades = hand.filter(card => card.suit !== 'SPADES');
       if (nonSpades.length > 0) {
         playableCards = playableCards.filter(card => card.suit !== 'SPADES');
       }
     }
-    
+
+    // LOW/HIGHBALL: For each legal suit, find the lowest/highest card in that suit
+    if (rule2 !== 'NONE' && playableCards.length > 0) {
+      const order: Record<string, number> = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
+      const suits = [...new Set(playableCards.map(card => card.suit))];
+      const result = [];
+      
+      for (const suit of suits) {
+        const suitCards = playableCards.filter(card => card.suit === suit);
+        const sorted = [...suitCards].sort((a,b) => order[a.rank] - order[b.rank]);
+        if (rule2 === 'LOWBALL') {
+          result.push(sorted[0]); // Lowest card in this suit
+        } else { // HIGHBALL
+          result.push(sorted[sorted.length-1]); // Highest card in this suit
+        }
+      }
+      return result;
+    }
+
     return playableCards;
   }
   

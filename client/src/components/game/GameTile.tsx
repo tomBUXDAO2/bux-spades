@@ -49,12 +49,39 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
 
   const getSpecialBricks = (game: GameState) => {
     const bricks = [];
-    if (game.specialRules?.assassin || (game as any).rules?.specialRules?.assassin) {
+    
+    // Handle new special rule format
+    const specialRule1 = game.specialRules?.specialRule1 || (game as any).rules?.specialRules?.specialRule1;
+    const specialRule2 = game.specialRules?.specialRule2 || (game as any).rules?.specialRules?.specialRule2;
+    
+    // Special Rule 1
+    if (specialRule1 === 'SCREAMER') {
+      bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+    } else if (specialRule1 === 'ASSASSIN') {
       bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+    } else if (specialRule1 === 'SECRET_ASSASSIN') {
+      bricks.push(<span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>);
+    }
+    
+    // Special Rule 2
+    if (specialRule2 === 'LOWBALL') {
+      bricks.push(<span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>);
+    } else if (specialRule2 === 'HIGHBALL') {
+      bricks.push(<span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>);
+    }
+    
+    // Backward compatibility with old format
+    if (game.specialRules?.assassin || (game as any).rules?.specialRules?.assassin) {
+      if (!bricks.some(brick => brick.key === 'assassin')) {
+        bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
+      }
     }
     if (game.specialRules?.screamer || (game as any).rules?.specialRules?.screamer) {
-      bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+      if (!bricks.some(brick => brick.key === 'screamer')) {
+        bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
+      }
     }
+    
     return bricks;
   };
 

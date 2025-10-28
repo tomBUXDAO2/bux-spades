@@ -82,13 +82,24 @@ export const commands = [
           )
       )
       .addStringOption(option =>
-        option.setName('special')
-          .setDescription('Special rules (default: None)')
+        option.setName('special1')
+          .setDescription('Special rule 1 (default: None)')
           .setRequired(false)
           .addChoices(
             { name: 'None', value: 'NONE' },
             { name: 'Screamer', value: 'SCREAMER' },
-            { name: 'Assassin', value: 'ASSASSIN' }
+            { name: 'Assassin', value: 'ASSASSIN' },
+            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special2')
+          .setDescription('Special rule 2 (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Lowball', value: 'LOWBALL' },
+            { name: 'Highball', value: 'HIGHBALL' }
           )
       )
       .addStringOption(option =>
@@ -181,13 +192,24 @@ export const commands = [
           )
       )
       .addStringOption(option =>
-        option.setName('special')
-          .setDescription('Special rules (default: None)')
+        option.setName('special1')
+          .setDescription('Special rule 1 (default: None)')
           .setRequired(false)
           .addChoices(
             { name: 'None', value: 'NONE' },
             { name: 'Screamer', value: 'SCREAMER' },
-            { name: 'Assassin', value: 'ASSASSIN' }
+            { name: 'Assassin', value: 'ASSASSIN' },
+            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special2')
+          .setDescription('Special rule 2 (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Lowball', value: 'LOWBALL' },
+            { name: 'Highball', value: 'HIGHBALL' }
           )
       ),
     execute: (interaction) => createGameLine(interaction, 'WHIZ')
@@ -262,13 +284,24 @@ export const commands = [
           )
       )
       .addStringOption(option =>
-        option.setName('special')
-          .setDescription('Special rules (default: None)')
+        option.setName('special1')
+          .setDescription('Special rule 1 (default: None)')
           .setRequired(false)
           .addChoices(
             { name: 'None', value: 'NONE' },
             { name: 'Screamer', value: 'SCREAMER' },
-            { name: 'Assassin', value: 'ASSASSIN' }
+            { name: 'Assassin', value: 'ASSASSIN' },
+            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special2')
+          .setDescription('Special rule 2 (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Lowball', value: 'LOWBALL' },
+            { name: 'Highball', value: 'HIGHBALL' }
           )
       ),
     execute: (interaction) => createGameLine(interaction, 'MIRROR')
@@ -321,7 +354,8 @@ export const commands = [
             { name: 'Bid 4 or Nil', value: 'BID4NIL' },
             { name: 'Bid 3', value: 'BID3' },
             { name: 'Bid Hearts', value: 'BIDHEARTS' },
-            { name: 'Crazy Aces', value: 'CRAZY_ACES' }
+            { name: 'Crazy Aces', value: 'CRAZY_ACES' },
+            { name: 'Joker Whiz', value: 'JOKER' }
           )
       )
       .addIntegerOption(option =>
@@ -355,13 +389,24 @@ export const commands = [
           )
       )
       .addStringOption(option =>
-        option.setName('special')
-          .setDescription('Special rules (default: None)')
+        option.setName('special1')
+          .setDescription('Special rule 1 (default: None)')
           .setRequired(false)
           .addChoices(
             { name: 'None', value: 'NONE' },
             { name: 'Screamer', value: 'SCREAMER' },
-            { name: 'Assassin', value: 'ASSASSIN' }
+            { name: 'Assassin', value: 'ASSASSIN' },
+            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special2')
+          .setDescription('Special rule 2 (default: None)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Lowball', value: 'LOWBALL' },
+            { name: 'Highball', value: 'HIGHBALL' }
           )
       ),
     execute: (interaction) => createGameLine(interaction, 'GIMMICK')
@@ -656,7 +701,8 @@ async function createGameLine(interaction, format) {
     const mode = modeValue === 1 ? 'PARTNERS' : 'SOLO';
     const minPoints = interaction.options.getInteger('minpoints') || -100;
     const maxPoints = interaction.options.getInteger('maxpoints') || 500;
-    const specialRule = interaction.options.getString('special') || 'NONE';
+    const specialRule1 = interaction.options.getString('special1') || 'NONE';
+    const specialRule2 = interaction.options.getString('special2') || 'NONE';
     
     // Gimmick variant (only for /gimmick command)
     const gimmickVariant = format === 'GIMMICK' ? interaction.options.getString('gimmicktype') : null;
@@ -685,7 +731,8 @@ async function createGameLine(interaction, format) {
       minPoints,
       maxPoints,
       gimmickVariant,
-      specialRule,
+      specialRule1,
+      specialRule2,
       nilAllowed,
       blindNilAllowed
     });
@@ -730,9 +777,10 @@ async function createGameLine(interaction, format) {
         mode,
         format,
         minPoints,
-      maxPoints,
+        maxPoints,
         gimmickVariant,
-        specialRule,
+        specialRule1,
+        specialRule2,
         nilAllowed,
         blindNilAllowed
       },
@@ -1080,7 +1128,7 @@ function validateCoins(channelId, coins) {
 
 function createGameLineEmbed(gameLineData) {
   const { settings, players, createdAt } = gameLineData;
-  const { coins, mode, format, minPoints, maxPoints, gimmickVariant, specialRule, nilAllowed, blindNilAllowed } = settings;
+  const { coins, mode, format, minPoints, maxPoints, gimmickVariant, specialRule1, specialRule2, nilAllowed, blindNilAllowed } = settings;
   
   // Format coins (e.g., 100000 -> 100k, 1000000 -> 1mil)
   const coinsDisplay = coins >= 1000000 ? `${coins / 1000000}mil` : `${coins / 1000}k`;
@@ -1098,9 +1146,16 @@ function createGameLineEmbed(gameLineData) {
     gameLineText += `\nnil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
   }
   
-  // Add special rule if present
-  if (specialRule) {
-    gameLineText += `\n🎲 **${specialRule.toUpperCase()}**`;
+  // Add special rules if present
+  const specialRules = [];
+  if (specialRule1 && specialRule1 !== 'NONE') {
+    specialRules.push(specialRule1.toUpperCase());
+  }
+  if (specialRule2 && specialRule2 !== 'NONE') {
+    specialRules.push(specialRule2.toUpperCase());
+  }
+  if (specialRules.length > 0) {
+    gameLineText += `\n🎲 **${specialRules.join(' + ')}**`;
   }
   
   gameLineText += '**'; // Close bold
@@ -1316,9 +1371,16 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
       }
     }
     
-    // Add special rule if present
-    if (settings.specialRule) {
-      gameLineText += `\n🎲 ${settings.specialRule.toUpperCase()}`;
+    // Add special rules if present
+    const specialRules = [];
+    if (settings.specialRule1 && settings.specialRule1 !== 'NONE') {
+      specialRules.push(settings.specialRule1.toUpperCase());
+    }
+    if (settings.specialRule2 && settings.specialRule2 !== 'NONE') {
+      specialRules.push(settings.specialRule2.toUpperCase());
+    }
+    if (specialRules.length > 0) {
+      gameLineText += `\n🎲 ${specialRules.join(' + ')}`;
     }
     
     // Update original embed to show FULL
@@ -1383,9 +1445,16 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
       tableUpDesc += ` ${settings.format}`;
     }
     
-    // Add special rule if present
-    if (gameLine.settings.specialRule) {
-      tableUpDesc += `\n🎲 **${gameLine.settings.specialRule.toUpperCase()}**`;
+    // Add special rules if present
+    const specialRulesUp = [];
+    if (gameLine.settings.specialRule1 && gameLine.settings.specialRule1 !== 'NONE') {
+      specialRulesUp.push(gameLine.settings.specialRule1.toUpperCase());
+    }
+    if (gameLine.settings.specialRule2 && gameLine.settings.specialRule2 !== 'NONE') {
+      specialRulesUp.push(gameLine.settings.specialRule2.toUpperCase());
+    }
+    if (specialRulesUp.length > 0) {
+      tableUpDesc += `\n🎲 **${specialRulesUp.join(' + ')}**`;
     }
     
     tableUpDesc += `\n\n🔴 Red Team: ${redTeam.map(p => `<@${p.discordId}>`).join(', ')}\n` +
@@ -1440,7 +1509,10 @@ async function createGameFromLine(gameLine) {
       maxPoints: settings.maxPoints,
       nilAllowed: settings.nilAllowed,
       blindNilAllowed: settings.blindNilAllowed,
-      specialRules: settings.specialRule && settings.specialRule !== 'NONE' ? { [settings.specialRule.toLowerCase()]: true } : {},
+      specialRules: {
+        specialRule1: settings.specialRule1 || 'NONE',
+        specialRule2: settings.specialRule2 || 'NONE'
+      },
       buyIn: settings.coins,
         currentRound: 1,
         currentTrick: 0,

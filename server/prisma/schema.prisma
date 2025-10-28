@@ -162,6 +162,9 @@ model Game {
   nilAllowed      Boolean?        @default(true)
   blindNilAllowed Boolean?        @default(false)
   specialRules    Json?
+  // New structured special rules
+  specialRule1    SpecialRule1? @default(NONE)
+  specialRule2    SpecialRule2? @default(NONE)
   startedAt       DateTime?
   finishedAt      DateTime?
   createdAt       DateTime        @default(now())
@@ -399,6 +402,21 @@ enum GimmickVariant {
   BIDHEARTS
   CRAZY_ACES
   JOKER
+}
+
+// Primary special rule selector
+enum SpecialRule1 {
+  NONE
+  SCREAMER
+  ASSASSIN
+  SECRET_ASSASSIN
+}
+
+// Secondary special rule selector
+enum SpecialRule2 {
+  NONE
+  LOWBALL
+  HIGHBALL
 }
 
 enum StatsFormat {

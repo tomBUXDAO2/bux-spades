@@ -60,7 +60,12 @@ export class GameCreationService {
         maxPoints: gameData.maxPoints || 200,
         nilAllowed: gameData.nilAllowed !== false,
         blindNilAllowed: gameData.blindNilAllowed || false,
-        specialRules: gameData.specialRules || {},
+        specialRule1: gameData.specialRules?.specialRule1 || 'NONE',
+        specialRule2: gameData.specialRules?.specialRule2 || 'NONE',
+        specialRules: gameData.specialRules || {
+          specialRule1: 'NONE',
+          specialRule2: 'NONE'
+        },
         buyIn: gameData.buyIn || 0,
         players: gameData.players || [],
         rules: gameData.rules || {
@@ -71,7 +76,10 @@ export class GameCreationService {
           maxPoints: gameData.maxPoints || 200,
           minPoints: gameData.minPoints || -100,
           bidType: clientFormat, // Use original client format for display
-          specialRules: gameData.specialRules || {}
+          specialRules: gameData.specialRules || {
+            specialRule1: 'NONE',
+            specialRule2: 'NONE'
+          }
         }
       });
 
