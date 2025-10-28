@@ -3,6 +3,10 @@
 
 import type { Card, Suit, GameState, Player } from "../../../types/game";
 
+// Local cache to eliminate race conditions when the server hasn't
+// yet persisted/propagated that spades are broken
+const spadesBrokenCache: Record<string, boolean> = {};
+
 /**
  * Get card rank value for sorting
  */
@@ -50,10 +54,16 @@ export const getLeadSuit = (trick: Card[] | undefined): Suit | null => {
  */
 export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   // RACE CONDITION FIX: Check both the server's spadesBroken flag AND actual card data
+  const gameId = (game as any)?.id || (game as any)?.gameId || 'unknown-game';
   const spadesBroken = (game as any).play?.spadesBroken || false;
   
   // If spadesBroken flag is true, return true
   if (spadesBroken) {
+    spadesBrokenCache[gameId] = true;
+    return true;
+  }
+  // If we've previously observed spades played for this game/round, honor it immediately
+  if (spadesBrokenCache[gameId]) {
     return true;
   }
   
@@ -61,6 +71,7 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   if (game.play?.completedTricks) {
     for (const trick of game.play.completedTricks) {
       if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
+        spadesBrokenCache[gameId] = true;
         return true;
       }
     }
@@ -69,10 +80,24 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   // RACE CONDITION FIX: Also check current trick for spades
   if (game.play?.currentTrick) {
     if (game.play.currentTrick.some((card: any) => card.suit === 'SPADES')) {
+      spadesBrokenCache[gameId] = true;
       return true;
     }
   }
   
+  // Detect new round to safely clear cache (13 cards in a hand and no completed tricks yet)
+  try {
+    const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
+    const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
+    const completedCount = (game as any).play?.completedTricks?.length || 0;
+    if (firstHandCount === 13 && completedCount === 0) {
+      // Fresh round; rely on server flag for this round until a spade is seen
+      if (!spadesBroken) {
+        delete spadesBrokenCache[gameId];
+      }
+    }
+  } catch {}
+
   return false;
 };
 
