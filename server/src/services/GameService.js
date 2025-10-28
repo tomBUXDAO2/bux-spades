@@ -1305,11 +1305,17 @@ export class GameService {
       
       const playerBags = [0, 0, 0, 0];
       
-      // Sum up all bags from all rounds
+      // Sum up all bags from all rounds, applying solo bag resets (every 5 bags -> reset to 0)
+      // Note: ScoringService applies -50 at 5 bags; the UI should show remaining bags after resets
       game.rounds.forEach(round => {
         round.playerStats.forEach(stats => {
           if (stats.seatIndex >= 0 && stats.seatIndex < 4) {
-            playerBags[stats.seatIndex] += stats.bagsThisRound || 0;
+            const bagsThisRound = stats.bagsThisRound || 0;
+            playerBags[stats.seatIndex] += bagsThisRound;
+            if (playerBags[stats.seatIndex] >= 5) {
+              // Handle multiple penalties (e.g., 10 bags across many rounds)
+              playerBags[stats.seatIndex] = playerBags[stats.seatIndex] % 5;
+            }
           }
         });
       });
