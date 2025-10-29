@@ -641,8 +641,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={specialRule === 'screamer'}
-                  onChange={() => setSpecialRule(specialRule === 'screamer' ? '' : 'screamer')}
+                  checked={specialRule1 === 'SCREAMER'}
+                  onChange={() => setSpecialRule1(specialRule1 === 'SCREAMER' ? 'NONE' : 'SCREAMER')}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded"
                 />
                   <span className={`text-slate-300 ${
@@ -652,8 +652,8 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               <label className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  checked={specialRule === 'assassin'}
-                  onChange={() => setSpecialRule(specialRule === 'assassin' ? '' : 'assassin')}
+                  checked={specialRule1 === 'ASSASSIN'}
+                  onChange={() => setSpecialRule1(specialRule1 === 'ASSASSIN' ? 'NONE' : 'ASSASSIN')}
                   className="form-checkbox bg-slate-700 text-indigo-600 rounded"
                 />
                   <span className={`text-slate-300 ${

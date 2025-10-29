@@ -71,12 +71,12 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
     }
     
     // Backward compatibility with old format
-    if (game.specialRules?.assassin || (game as any).rules?.specialRules?.assassin) {
+    if (game.specialRules?.specialRule1 === 'ASSASSIN' || (game as any).rules?.specialRules?.assassin) {
       if (!bricks.some(brick => brick.key === 'assassin')) {
         bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
       }
     }
-    if (game.specialRules?.screamer || (game as any).rules?.specialRules?.screamer) {
+    if (game.specialRules?.specialRule1 === 'SCREAMER' || (game as any).rules?.specialRules?.screamer) {
       if (!bricks.some(brick => brick.key === 'screamer')) {
         bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
       }

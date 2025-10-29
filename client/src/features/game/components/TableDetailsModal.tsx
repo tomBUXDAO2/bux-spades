@@ -89,12 +89,12 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
           }
           
           // Backward compatibility with old format
-          if (gameState.specialRules?.assassin || (gameState as any).specialRules?.assassin) {
+          if (gameState.specialRules?.specialRule1 === 'ASSASSIN' || (gameState as any).specialRules?.assassin) {
             if (!bricks.some(brick => brick.key === 'assassin')) {
               bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
             }
           }
-          if (gameState.specialRules?.screamer || (gameState as any).specialRules?.screamer) {
+          if (gameState.specialRules?.specialRule1 === 'SCREAMER' || (gameState as any).specialRules?.screamer) {
             if (!bricks.some(brick => brick.key === 'screamer')) {
               bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
             }
