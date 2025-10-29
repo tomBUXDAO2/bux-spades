@@ -53,7 +53,7 @@ interface GameEventHandlersProps {
   onHandCompleted: (data: any) => void;
   onGameOver: (data: any) => void;
   onTrickComplete: (data: any) => void;
-  onClearTableCards: () => void;
+  onClearTableCards: (data?: any) => void;
   onSocketError: (error: { message: string }) => void;
   onEmojiReaction: (data: { playerId: string; emoji: string }) => void;
   onSendEmoji: (data: { fromPlayerId: string; toPlayerId: string; emoji: string }) => void;

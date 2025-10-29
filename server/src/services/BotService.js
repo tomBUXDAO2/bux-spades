@@ -373,8 +373,8 @@ class BotService {
     const spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
     console.log(`[BOT SERVICE] spadesBroken status: ${spadesBroken} (from ${cachedGameState?.play?.spadesBroken !== undefined ? 'Redis' : 'game state'})`);
 
-    // AI V2 path (feature toggle)
-    if (process.env.BOT_AI_V2 === 'true') {
+    // AI V2 path (default ON unless explicitly disabled)
+    if (process.env.BOT_AI_V2 !== 'false') {
       const ctx = this.buildDecisionContext(game, seatIndex, hand, currentTrickCards, spadesBroken);
       const v2Card = this.selectCardV2(ctx);
       if (v2Card) {
@@ -413,6 +413,13 @@ class BotService {
           }
         }
         console.log(`[BOT SERVICE][AI_V2] After filtering - legal cards:`, legal.map(c => `${c.suit}${c.rank}`));
+
+        // Prefer policy-selected v2Card if it is legal
+        const v2IsLegal = legal.some(c => c.suit === v2Card.suit && c.rank === v2Card.rank);
+        if (v2IsLegal) {
+          console.log(`[BOT SERVICE][AI_V2] Using policy pick (legal) -> ${v2Card.suit}${v2Card.rank}`);
+          return v2Card;
+        }
         if (rule2 === 'LOWBALL' && legal.length > 0) {
           if (currentTrickCards.length === 0) {
             // When leading: for each suit, find lowest card
@@ -453,18 +460,14 @@ class BotService {
             return highest;
           }
         }
-        // If we have a legal set after constraints, pick a safe default (lowest)
+        // If we have a legal set after constraints, pick a default when policy isn't legal
         if (legal.length > 0) {
-          const pick = [...legal].sort((a,b)=> order[a.rank]-order[b.rank])[0];
-          console.log(`[BOT SERVICE][AI_V2] Overriding policy with legal pick -> ${pick.suit}${pick.rank}`);
+          // Heuristic: try highest safe when not LOW/HIGHBALL constrained
+          const pick = [...legal].sort((a,b)=> order[b.rank]-order[a.rank])[0];
+          console.log(`[BOT SERVICE][AI_V2] Policy not legal, picking heuristic -> ${pick.suit}${pick.rank}`);
           return pick;
         }
-        // Otherwise fall back to policy only if it is legal
-        const v2InHand = normalizedHandAI.find(c => c.suit === v2Card.suit && c.rank === v2Card.rank);
-        if (v2InHand) {
-          console.log(`[BOT SERVICE][AI_V2] Selected ${v2Card.suit}${v2Card.rank} by policy`, { scenario: ctx.scenario });
-          return v2Card;
-        }
+        // Otherwise, if policy card is still in hand (but filtered by constraints), fail safe to lowest in hand
         console.warn('[BOT SERVICE][AI_V2] Policy card not legal/available, falling back to lowest card in hand');
         const fallback = [...normalizedHandAI].sort((a,b)=> order[a.rank]-order[b.rank])[0];
         return fallback;

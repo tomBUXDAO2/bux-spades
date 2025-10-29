@@ -281,7 +281,8 @@ class CardPlayHandler {
               // Clear table cards first (after 2 seconds)
               setTimeout(async () => {
                 console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
-                this.io.to(gameId).emit('clear_table_cards', { gameId });
+                // Include isRoundComplete so clients can hard-lock table rendering on final trick of a hand
+                this.io.to(gameId).emit('clear_table_cards', { gameId, isRoundComplete: !!trickResult.isRoundComplete });
                 
                 // THEN start new trick after table is cleared
                 if (!trickResult.isRoundComplete) {

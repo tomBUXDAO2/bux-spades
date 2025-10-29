@@ -321,8 +321,8 @@ export class TrickCompletionService {
           team2Score: scores.team1Score, // team1 becomes team2 in client
           team1Bags: scores.team0Bags,
           team2Bags: scores.team1Bags,
-          team1TotalScore: updatedGameState.team1TotalScore || scores.team0Score, // Use running total from game state
-          team2TotalScore: updatedGameState.team2TotalScore || scores.team1Score, // Use running total from game state
+          team1TotalScore: latestRoundScore?.team0RunningTotal || 0, // Use actual running total from database
+          team2TotalScore: latestRoundScore?.team1RunningTotal || 0, // Use actual running total from database
           
           // Team breakdown data
           team1Bid: team0Bid, // team0 becomes team1 in client
@@ -540,6 +540,11 @@ export class TrickCompletionService {
         });
         
         console.log(`[TRICK COMPLETION] Emitted game_update for new round ${nextRoundNumber}`);
+        
+        // CRITICAL FIX: Emit clear_table_cards to ensure client clears all trick-related state
+        // This prevents old trick cards from persisting when the new round starts
+        io.to(gameId).emit('clear_table_cards', { gameId });
+        console.log(`[TRICK COMPLETION] Emitted clear_table_cards for new round ${nextRoundNumber}`);
         
         // Also emit new_hand_started event for better client handling
         io.to(gameId).emit('new_hand_started', {
