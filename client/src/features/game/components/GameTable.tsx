@@ -958,6 +958,10 @@ export default function GameTableModular({
   
   // Trick card rendering
   const renderTrickCards = () => {
+    // Do not show trick cards once the hand is completed or while the hand summary is open
+    if (gameState.status !== 'PLAYING' || showHandSummary) {
+      return null;
+    }
     // CRITICAL FIX: Prioritize currentTrickCards from gameState, then play.currentTrick, then animatedTrickCards
     let displayTrick = [];
     

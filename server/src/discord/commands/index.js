@@ -3,6 +3,9 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 import { DetailedStatsService } from '../../services/DetailedStatsService.js';
 import { prisma } from '../../config/databaseFirst.js';
 
+// Static assets
+const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
+
 // Room IDs
 const LOW_ROOM_ID = '1404937454938619927';
 const HIGH_ROOM_ID = '1403844895445221445';
@@ -617,6 +620,83 @@ export const commands = [
           .setMinValue(1)
       ),
     execute: payUser
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('rules')
+      .setDescription('Display full BUX Spades game rules'),
+    execute: async (interaction) => {
+      try {
+        console.log('[DISCORD] /rules invoked by', interaction.user?.id);
+      const desc = [
+        '**Regular**\n\nPlayers can bid whatever they like from 0-13',
+        '**No Nils**\n\nNil bids are forbidden and the minimum bid is 1',
+        '**Blind Nil**\n\nBefore seeing their cards players can choose to bid nil without seeing their hand for a chance to win x2 nil bonus',
+        '**Whiz**\n\nPlayers can only bid the number of spades in their hand or nil',
+        '**Mirror**\n\nPlayers are forced to bid the number of spades in their hand',
+        '**Suicide (Partners Only)**\n\n1 partner from each team MUST bid nil',
+        '**Crazy Aces**\n\nPlayers must bid 3 for each ace they hold',
+        '**Joker Whiz**\n\nFirst 3 bidders must bid whiz rules, final bidder bids regular',
+        '**Screamer**\n\nPlayers are not allowed to play a spade if they have other suits available',
+        '**Assassin**\n\nPlayers MUST play a spade if they can',
+        '**Secret Assassin**\n\n3 players play screamer rules, whoever is dealt ace of spades plays assassin rules',
+        '**Lowball**\n\nPlayers must all play their lowest card in chosen suit',
+        '**Highball**\n\nPlayers must play their highest card in chosen suit'
+      ].join('\n\n');
+
+      const embed = new EmbedBuilder()
+        .setTitle('📖 BUX Spades Rules')
+        .setDescription(desc)
+        .setColor(0x0099ff)
+        .setThumbnail(THUMBNAIL_URL)
+        .setTimestamp();
+      await interaction.reply({ embeds: [embed] });
+      } catch (err) {
+        console.error('[DISCORD] /rules error:', err);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ Failed to display rules.', ephemeral: true });
+        }
+      }
+    }
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('help')
+      .setDescription('List available user commands'),
+    execute: async (interaction) => {
+      try {
+        console.log('[DISCORD] /help invoked by', interaction.user?.id);
+        // Build help list only from actually-registered, user-facing commands
+        const registeredNames = new Set(commands.map((c) => c.data?.name));
+        const entries = [
+        { name: 'game', text: '`/game` - Create a Regular game line' },
+        { name: 'whiz', text: '`/whiz` - Create a Whiz game line' },
+        { name: 'mirror', text: '`/mirror` - Create a Mirror game line' },
+        { name: 'gimmick', text: '`/gimmick` - Create a Gimmick variant game line' },
+        { name: 'stats', text: '`/stats` - Show player statistics' },
+        { name: 'leaderboard', text: '`/leaderboard` - Show top players' },
+        { name: 'facebookhelp', text: '`/facebookhelp` - How to get the LEAGUE role' },
+        { name: 'rules', text: '`/rules` - Display full game rules' }
+        ];
+        const commandsList = entries
+        .filter(e => registeredNames.has(e.name))
+        .map(e => e.text)
+        .join('\n');
+
+      const embed = new EmbedBuilder()
+        .setTitle('🤖 BUX Spades Commands')
+        .setDescription(commandsList)
+        .setColor(0x00cc88)
+        .setThumbnail(THUMBNAIL_URL)
+        .setTimestamp();
+        await interaction.reply({ embeds: [embed] });
+      } catch (err) {
+        console.error('[DISCORD] /help error:', err);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ Failed to display help.', ephemeral: true });
+        }
+      }
+    }
   }
 ];
 
@@ -1146,13 +1226,13 @@ function createGameLineEmbed(gameLineData) {
     gameLineText += `\nnil ${nilAllowed ? '☑️' : '❌'} bn ${blindNilAllowed ? '☑️' : '❌'}`;
   }
   
-  // Add special rules if present
+  // Add special rules if present (map SECRET_ASSASSIN -> SECRET)
   const specialRules = [];
   if (specialRule1 && specialRule1 !== 'NONE') {
-    specialRules.push(specialRule1.toUpperCase());
+    specialRules.push(specialRule1 === 'SECRET_ASSASSIN' ? 'SECRET' : specialRule1.toUpperCase());
   }
   if (specialRule2 && specialRule2 !== 'NONE') {
-    specialRules.push(specialRule2.toUpperCase());
+    specialRules.push(String(specialRule2).toUpperCase());
   }
   if (specialRules.length > 0) {
     gameLineText += `\n🎲 **${specialRules.join(' + ')}**`;
@@ -1371,14 +1451,14 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
       }
     }
     
-    // Add special rules if present
-    const specialRules = [];
-    if (settings.specialRule1 && settings.specialRule1 !== 'NONE') {
-      specialRules.push(settings.specialRule1.toUpperCase());
-    }
-    if (settings.specialRule2 && settings.specialRule2 !== 'NONE') {
-      specialRules.push(settings.specialRule2.toUpperCase());
-    }
+  // Add special rules if present (map SECRET_ASSASSIN -> SECRET)
+  const specialRules = [];
+  if (settings.specialRule1 && settings.specialRule1 !== 'NONE') {
+    specialRules.push(settings.specialRule1 === 'SECRET_ASSASSIN' ? 'SECRET' : settings.specialRule1.toUpperCase());
+  }
+  if (settings.specialRule2 && settings.specialRule2 !== 'NONE') {
+    specialRules.push(String(settings.specialRule2).toUpperCase());
+  }
     if (specialRules.length > 0) {
       gameLineText += `\n🎲 ${specialRules.join(' + ')}`;
     }
@@ -1446,13 +1526,13 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     }
     
     // Add special rules if present
-    const specialRulesUp = [];
-    if (gameLine.settings.specialRule1 && gameLine.settings.specialRule1 !== 'NONE') {
-      specialRulesUp.push(gameLine.settings.specialRule1.toUpperCase());
-    }
-    if (gameLine.settings.specialRule2 && gameLine.settings.specialRule2 !== 'NONE') {
-      specialRulesUp.push(gameLine.settings.specialRule2.toUpperCase());
-    }
+  const specialRulesUp = [];
+  if (gameLine.settings.specialRule1 && gameLine.settings.specialRule1 !== 'NONE') {
+    specialRulesUp.push(gameLine.settings.specialRule1 === 'SECRET_ASSASSIN' ? 'SECRET' : gameLine.settings.specialRule1.toUpperCase());
+  }
+  if (gameLine.settings.specialRule2 && gameLine.settings.specialRule2 !== 'NONE') {
+    specialRulesUp.push(String(gameLine.settings.specialRule2).toUpperCase());
+  }
     if (specialRulesUp.length > 0) {
       tableUpDesc += `\n🎲 **${specialRulesUp.join(' + ')}**`;
     }

@@ -1,9 +1,30 @@
 import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+// Robust env loading: try CWD .env, then repo root and server/.env
+(() => {
+  dotenv.config();
+  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_GUILD_ID) return;
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootEnv = path.resolve(__dirname, '..', '.env');
+  dotenv.config({ path: rootEnv });
+  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_GUILD_ID) return;
+  const serverEnv = path.resolve(__dirname, '.env');
+  dotenv.config({ path: serverEnv });
+})();
 
 const commands = [
+  {
+    name: 'rules',
+    description: 'Display full BUX Spades game rules'
+  },
+  {
+    name: 'help',
+    description: 'List available user commands'
+  },
   {
     name: 'game',
     description: 'Create a REGULAR league game line',
@@ -78,14 +99,26 @@ const commands = [
         ]
       },
       {
-        name: 'special',
-        description: 'Special rules (default: None)',
+        name: 'special1',
+        description: 'Special rule 1 (default: None)',
         type: 3, // STRING
         required: false,
         choices: [
           { name: 'None', value: 'NONE' },
           { name: 'Screamer', value: 'SCREAMER' },
-          { name: 'Assassin', value: 'ASSASSIN' }
+          { name: 'Assassin', value: 'ASSASSIN' },
+          { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+        ]
+      },
+      {
+        name: 'special2',
+        description: 'Special rule 2 (default: None)',
+        type: 3, // STRING
+        required: false,
+        choices: [
+          { name: 'None', value: 'NONE' },
+          { name: 'Lowball', value: 'LOWBALL' },
+          { name: 'Highball', value: 'HIGHBALL' }
         ]
       },
       {
@@ -184,14 +217,26 @@ const commands = [
         ]
       },
       {
-        name: 'special',
-        description: 'Special rules (default: None)',
+        name: 'special1',
+        description: 'Special rule 1 (default: None)',
         type: 3, // STRING
         required: false,
         choices: [
           { name: 'None', value: 'NONE' },
           { name: 'Screamer', value: 'SCREAMER' },
-          { name: 'Assassin', value: 'ASSASSIN' }
+          { name: 'Assassin', value: 'ASSASSIN' },
+          { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+        ]
+      },
+      {
+        name: 'special2',
+        description: 'Special rule 2 (default: None)',
+        type: 3, // STRING
+        required: false,
+        choices: [
+          { name: 'None', value: 'NONE' },
+          { name: 'Lowball', value: 'LOWBALL' },
+          { name: 'Highball', value: 'HIGHBALL' }
         ]
       }
     ]
@@ -270,14 +315,26 @@ const commands = [
         ]
       },
       {
-        name: 'special',
-        description: 'Special rules (default: None)',
+        name: 'special1',
+        description: 'Special rule 1 (default: None)',
         type: 3, // STRING
         required: false,
         choices: [
           { name: 'None', value: 'NONE' },
           { name: 'Screamer', value: 'SCREAMER' },
-          { name: 'Assassin', value: 'ASSASSIN' }
+          { name: 'Assassin', value: 'ASSASSIN' },
+          { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+        ]
+      },
+      {
+        name: 'special2',
+        description: 'Special rule 2 (default: None)',
+        type: 3, // STRING
+        required: false,
+        choices: [
+          { name: 'None', value: 'NONE' },
+          { name: 'Lowball', value: 'LOWBALL' },
+          { name: 'Highball', value: 'HIGHBALL' }
         ]
       }
     ]
@@ -370,14 +427,26 @@ const commands = [
         ]
       },
       {
-        name: 'special',
-        description: 'Special rules (default: None)',
+        name: 'special1',
+        description: 'Special rule 1 (default: None)',
         type: 3, // STRING
         required: false,
         choices: [
           { name: 'None', value: 'NONE' },
           { name: 'Screamer', value: 'SCREAMER' },
-          { name: 'Assassin', value: 'ASSASSIN' }
+          { name: 'Assassin', value: 'ASSASSIN' },
+          { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+        ]
+      },
+      {
+        name: 'special2',
+        description: 'Special rule 2 (default: None)',
+        type: 3, // STRING
+        required: false,
+        choices: [
+          { name: 'None', value: 'NONE' },
+          { name: 'Lowball', value: 'LOWBALL' },
+          { name: 'Highball', value: 'HIGHBALL' }
         ]
       }
     ]

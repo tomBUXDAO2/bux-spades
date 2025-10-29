@@ -215,8 +215,8 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     });
     
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
-    // The previous logic was incorrectly overriding SCREAMER and other special rules
-    effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted);
+    // Always pass currentTrick to avoid race conditions where gameState.play.currentTrick is undefined
+    effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, currentTrick);
   } else if (Array.isArray(playableCards)) {
     effectivePlayableCards = playableCards;
   }

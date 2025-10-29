@@ -276,9 +276,10 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
               {/* Special Rules */}
               <div className="flex flex-col items-center" style={{ gap: `${8 * paddingScale}px` }}>
                 <label className="font-bold text-pink-400" style={{ fontSize: `${16 * textScale}px` }}>Special Rules</label>
-                <div className="flex flex-col" style={{ gap: `${12 * paddingScale}px` }}>
+                {/* Inline dropdowns */}
+                <div className="flex items-end" style={{ gap: `${16 * paddingScale}px` }}>
                   {/* Special Rule 1 */}
-                  <div className="flex flex-col items-center" style={{ gap: `${4 * paddingScale}px` }}>
+                  <div className="flex flex-col items-start" style={{ gap: `${4 * paddingScale}px` }}>
                     <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Rule 1:</label>
                     <select
                       value={specialRule1}
@@ -287,14 +288,14 @@ const CreateGameModal: React.FC<CreateGameModalProps> = ({ isOpen, onClose, onCr
                       style={{ fontSize: `${14 * textScale}px` }}
                     >
                       <option value="NONE">None</option>
-                      <option value="SCREAMER">Screamer</option>
+                      <option value="SCREAMER">🎭 Screamer</option>
                       <option value="ASSASSIN">⚔️ Assassin</option>
                       <option value="SECRET_ASSASSIN">🕵️ Secret Assassin</option>
                     </select>
                   </div>
-                  
+
                   {/* Special Rule 2 */}
-                  <div className="flex flex-col items-center" style={{ gap: `${4 * paddingScale}px` }}>
+                  <div className="flex flex-col items-start" style={{ gap: `${4 * paddingScale}px` }}>
                     <label className="text-slate-300" style={{ fontSize: `${14 * textScale}px` }}>Rule 2:</label>
                     <select
                       value={specialRule2}

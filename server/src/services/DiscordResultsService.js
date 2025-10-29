@@ -111,13 +111,25 @@ export class DiscordResultsService {
       }
     }
     
-    // Add special rules if present
+    // Add special rules if present (supports legacy and new schema)
     if (game.specialRules) {
-      const specialRulesObj = typeof game.specialRules === 'string' ? JSON.parse(game.specialRules) : game.specialRules;
-      if (specialRulesObj.screamer) {
-        gameLineText += `\n🎲 SCREAMER`;
-      } else if (specialRulesObj.assassin) {
-        gameLineText += `\n🎲 ASSASSIN`;
+      const sr = typeof game.specialRules === 'string' ? JSON.parse(game.specialRules) : game.specialRules;
+      const bricks = [];
+      // Legacy flags
+      if (sr.screamer) bricks.push('SCREAMER');
+      if (sr.assassin) bricks.push('ASSASSIN');
+      // New schema
+      const mapRule1 = (val) => {
+        if (!val || val === 'NONE') return null;
+        if (val === 'SECRET_ASSASSIN') return 'SECRET';
+        return val.toUpperCase();
+      };
+      const r1 = mapRule1(sr.specialRule1);
+      const r2 = sr.specialRule2 && sr.specialRule2 !== 'NONE' ? sr.specialRule2.toUpperCase() : null;
+      if (r1) bricks.push(r1);
+      if (r2) bricks.push(r2);
+      if (bricks.length > 0) {
+        gameLineText += `\n🎲 ${bricks.join(' + ')}`;
       }
     }
 
@@ -129,6 +141,7 @@ export class DiscordResultsService {
     const winnerCoinsFormatted = Math.floor(winnerCoins / 1000);
     const loserCoinsFormatted = Math.floor(loserCoins / 1000);
 
+    const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
     const embed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(
@@ -140,7 +153,7 @@ export class DiscordResultsService {
         `${loserTeam.map(p => `<@${p.user.discordId}>`).join(', ')} - ${loserScore}`
       )
       .setColor(0xffd700)
-      .setThumbnail('https://cdn.discordapp.com/emojis/@bux-spades.png')
+      .setThumbnail(THUMBNAIL_URL)
       .setTimestamp();
 
     return embed;
@@ -209,6 +222,7 @@ export class DiscordResultsService {
     const runnerUp = playerScores[1];
     const losers = playerScores.slice(2);
 
+    const THUMBNAIL_URL2 = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
     const embed = new EmbedBuilder()
       .setTitle('🏆 League Game Results')
       .setDescription(
@@ -224,7 +238,7 @@ export class DiscordResultsService {
         `💰 Coins Won\n3rd/4th: 0k each`
       )
       .setColor(0xffd700)
-      .setThumbnail('https://cdn.discordapp.com/emojis/@bux-spades.png')
+      .setThumbnail(THUMBNAIL_URL2)
       .setTimestamp();
 
     return embed;

@@ -218,6 +218,11 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       console.log('🎮 Round complete event received:', data);
       console.log('🎮 Round complete - setting game state with currentPlayer:', data.gameState?.currentPlayer);
       
+      // Stop any active turn countdown on round completion
+      setCountdownPlayer(null);
+      // Clear any pending played card to avoid ghost overlays
+      setPendingPlayedCard(null);
+
       // Update game state with new scores for scoreboard
       if (data.gameState) {
         setGameState((prevState: GameState) => ({

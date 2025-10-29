@@ -1,8 +1,26 @@
 import { REST, Routes, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (robust: try local, repo root fallback)
+(() => {
+  // First, load default .env based on current working directory
+  dotenv.config();
+  const hasCoreEnv = process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_GUILD_ID;
+  if (hasCoreEnv) return;
+
+  // Fallback 1: load from repo root (../.env relative to this file)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const rootEnvPath = path.resolve(__dirname, '..', '.env');
+  dotenv.config({ path: rootEnvPath });
+  if (process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_GUILD_ID) return;
+
+  // Fallback 2: load from server/.env explicitly
+  const serverEnvPath = path.resolve(__dirname, '.env');
+  dotenv.config({ path: serverEnvPath });
+})();
 
 // Manually define commands here to avoid importing dependencies
 const commands = [
@@ -15,6 +33,16 @@ const commands = [
     data: new SlashCommandBuilder()
       .setName('whiz')
       .setDescription('Create a WHIZ league game line')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('rules')
+      .setDescription('Display full BUX Spades game rules')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('help')
+      .setDescription('List available user commands')
   },
   {
     data: new SlashCommandBuilder()

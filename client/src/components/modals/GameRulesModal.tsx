@@ -202,6 +202,16 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                   <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Suicide (Partners Only)</h3>
                   <p style={{ fontSize: `${14 * textScale}px` }}>1 partner from each team MUST bid nil</p>
                 </div>
+
+                <div>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Crazy Aces</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players must bid 3 for each ace they hold</p>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Joker Whiz</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>First 3 bidders must bid whiz rules, final bidder bids regular</p>
+                </div>
                 
                 <div>
                   <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Screamer</h3>
@@ -211,6 +221,21 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 <div>
                   <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Assassin</h3>
                   <p style={{ fontSize: `${14 * textScale}px` }}>Players MUST play a spade if they can</p>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Secret Assassin</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>3 players play screamer rules, whoever is dealt ace of spades plays assassin rules</p>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Lowball</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players must all play their lowest card in chosen suit</p>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Highball</h3>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>Players must play their highest card in chosen suit</p>
                 </div>
               </div>
             </div>
@@ -250,6 +275,14 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                   <p style={{ fontSize: `${14 * textScale}px` }}>+1 point for every extra trick won over the bid amount (these are known as 'bags')</p>
                   <p className="text-red-400" style={{ fontSize: `${14 * textScale}px` }}>-100 points for reaching 10 bags</p>
                 </div>
+
+              {/* Solo scoring differences */}
+              <div className="bg-slate-700/40 border border-slate-600 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
+                <h3 className="font-semibold text-purple-300" style={{ fontSize: `${16 * textScale}px` }}>Solo Mode Scoring</h3>
+                <p style={{ fontSize: `${14 * textScale}px` }}>Nil bids: +50 for successful, <span className="text-red-400">-50</span> for unsuccessful</p>
+                <p style={{ fontSize: `${14 * textScale}px` }}>Blind Nil: +100 for successful, <span className="text-red-400">-100</span> for unsuccessful</p>
+                <p style={{ fontSize: `${14 * textScale}px` }}>Bag penalty: <span className="text-red-400">-50</span> when reaching 5 bags</p>
+              </div>
               </div>
             </div>
           )}

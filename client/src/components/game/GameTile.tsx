@@ -48,41 +48,36 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
   };
 
   const getSpecialBricks = (game: GameState) => {
-    const bricks = [];
-    
     // Handle new special rule format
     const specialRule1 = game.specialRules?.specialRule1 || (game as any).rules?.specialRules?.specialRule1;
     const specialRule2 = game.specialRules?.specialRule2 || (game as any).rules?.specialRules?.specialRule2;
-    
-    // Special Rule 1
-    if (specialRule1 === 'SCREAMER') {
-      bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
-    } else if (specialRule1 === 'ASSASSIN') {
-      bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
-    } else if (specialRule1 === 'SECRET_ASSASSIN') {
-      bricks.push(<span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>);
+
+    const rule1Brick = (() => {
+      if (specialRule1 === 'SCREAMER') return <span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>;
+      if (specialRule1 === 'ASSASSIN') return <span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>;
+      if (specialRule1 === 'SECRET_ASSASSIN') return <span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>;
+      if ((game as any).rules?.specialRules?.assassin) return <span key="assassin-bc" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>;
+      if ((game as any).rules?.specialRules?.screamer) return <span key="screamer-bc" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>;
+      return null;
+    })();
+
+    const rule2Brick = (() => {
+      if (specialRule2 === 'LOWBALL') return <span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>;
+      if (specialRule2 === 'HIGHBALL') return <span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>;
+      return null;
+    })();
+
+    if (rule1Brick && rule2Brick) {
+      // Stack vertically to occupy an extra row, centered
+      return (
+        <div className="flex flex-col ml-2 items-center">
+          <div className="flex items-center">{rule1Brick}</div>
+          <div className="flex items-center mt-1">{rule2Brick}</div>
+        </div>
+      );
     }
-    
-    // Special Rule 2
-    if (specialRule2 === 'LOWBALL') {
-      bricks.push(<span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>);
-    } else if (specialRule2 === 'HIGHBALL') {
-      bricks.push(<span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>);
-    }
-    
-    // Backward compatibility with old format
-    if (game.specialRules?.specialRule1 === 'ASSASSIN' || (game as any).rules?.specialRules?.assassin) {
-      if (!bricks.some(brick => brick.key === 'assassin')) {
-        bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
-      }
-    }
-    if (game.specialRules?.specialRule1 === 'SCREAMER' || (game as any).rules?.specialRules?.screamer) {
-      if (!bricks.some(brick => brick.key === 'screamer')) {
-        bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
-      }
-    }
-    
-    return bricks;
+
+    return rule1Brick || rule2Brick;
   };
 
   const seatMap = [
@@ -107,7 +102,7 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
         )}
         <span className="text-slate-300 ml-2">bn <span className="align-middle">{(game as any).blindNilAllowed ? '☑️' : '❌'}</span></span>
       </div>
-      {/* Line 2: Buy-in, game mode, and special bricks */}
+      {/* Line 2: Buy-in, game mode, and special bricks (stack specials if both present) */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-yellow-500 text-lg font-bold">{((game.buyIn ?? game.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
         <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">

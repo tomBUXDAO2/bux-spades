@@ -66,41 +66,36 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
         </svg>
         <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{(gameState as any).mode || 'PARTNERS'}</span>
-        {/* Special bricks */}
+        {/* Special bricks - stack rule 2 below rule 1 when both present */}
         {(() => {
           const specialRule1 = gameState.specialRules?.specialRule1 || (gameState as any).rules?.specialRules?.specialRule1;
           const specialRule2 = gameState.specialRules?.specialRule2 || (gameState as any).rules?.specialRules?.specialRule2;
-          const bricks = [];
-          
-          // Special Rule 1
-          if (specialRule1 === 'SCREAMER') {
-            bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
-          } else if (specialRule1 === 'ASSASSIN') {
-            bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
-          } else if (specialRule1 === 'SECRET_ASSASSIN') {
-            bricks.push(<span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>);
+
+          const rule1Brick = (() => {
+            if (specialRule1 === 'SCREAMER') return <span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>;
+            if (specialRule1 === 'ASSASSIN') return <span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>;
+            if (specialRule1 === 'SECRET_ASSASSIN') return <span key="secret-assassin" className="inline whitespace-nowrap bg-purple-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SECRET</span>;
+            if ((gameState as any).specialRules?.assassin) return <span key="assassin-bc" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>;
+            if ((gameState as any).specialRules?.screamer) return <span key="screamer-bc" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>;
+            return null;
+          })();
+
+          const rule2Brick = (() => {
+            if (specialRule2 === 'LOWBALL') return <span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>;
+            if (specialRule2 === 'HIGHBALL') return <span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>;
+            return null;
+          })();
+
+          if (rule1Brick && rule2Brick) {
+            return (
+              <div className="flex flex-col ml-2 items-center">
+                <div className="flex items-center">{rule1Brick}</div>
+                <div className="flex items-center mt-1">{rule2Brick}</div>
+              </div>
+            );
           }
-          
-          // Special Rule 2
-          if (specialRule2 === 'LOWBALL') {
-            bricks.push(<span key="lowball" className="inline whitespace-nowrap bg-green-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">LOWBALL</span>);
-          } else if (specialRule2 === 'HIGHBALL') {
-            bricks.push(<span key="highball" className="inline whitespace-nowrap bg-yellow-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">HIGHBALL</span>);
-          }
-          
-          // Backward compatibility with old format
-          if (gameState.specialRules?.specialRule1 === 'ASSASSIN' || (gameState as any).specialRules?.assassin) {
-            if (!bricks.some(brick => brick.key === 'assassin')) {
-              bricks.push(<span key="assassin" className="inline whitespace-nowrap bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">ASSASSIN</span>);
-            }
-          }
-          if (gameState.specialRules?.specialRule1 === 'SCREAMER' || (gameState as any).specialRules?.screamer) {
-            if (!bricks.some(brick => brick.key === 'screamer')) {
-              bricks.push(<span key="screamer" className="inline whitespace-nowrap bg-blue-600 text-white font-bold text-xs px-2 py-0.5 rounded ml-2">SCREAMER</span>);
-            }
-          }
-          
-          return bricks;
+
+          return rule1Brick || rule2Brick;
         })()}
       </div>
       {/* Prize info */}
