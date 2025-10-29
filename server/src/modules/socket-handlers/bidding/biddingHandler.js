@@ -233,8 +233,39 @@ class BiddingHandler {
       // Validate the bid based on game rules
       const validation = await this.validateBid(gameState, player, bid, isNil, isBlindNil);
       if (!validation.valid) {
-        this.socket.emit('error', { message: validation.message });
-        return;
+        // AUTO-CORRECT for forced variants to prevent stalls (server authoritative)
+        const forcedBid = gameState.gimmickVariant;
+        if (forcedBid === 'BIDHEARTS') {
+          // Get hand from Redis and compute hearts
+          const hands = await redisGameState.getPlayerHands(gameId);
+          const playerHand = hands?.[player.seatIndex] || [];
+          const numHearts = playerHand.filter(card => card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥').length;
+          console.log(`[BIDDING] BIDHEARTS auto-correct: received ${bid}, forcing ${numHearts}`);
+          bid = numHearts;
+        } else if (forcedBid === 'BID3' || forcedBid === 'BID 3') {
+          console.log(`[BIDDING] BID3 auto-correct: forcing bid 3`);
+          bid = 3;
+        } else if (forcedBid === 'BID4NIL' || forcedBid === '4 OR NIL') {
+          // If invalid, default to 4
+          console.log(`[BIDDING] 4 OR NIL auto-correct: forcing bid 4`);
+          bid = 4;
+        } else if (forcedBid === 'CRAZY ACES' || forcedBid === 'CRAZY_ACES') {
+          const hands = await redisGameState.getPlayerHands(gameId);
+          const playerHand = hands?.[player.seatIndex] || [];
+          const numAces = playerHand.filter(card => card.rank === 'A').length;
+          const forced = numAces * 3;
+          console.log(`[BIDDING] CRAZY ACES auto-correct: forcing bid ${forced}`);
+          bid = forced;
+        } else if (forcedBid === 'SUICIDE' && isNil !== true) {
+          // In suicide, one must bid nil – if invalid, default this player to nil
+          console.log(`[BIDDING] SUICIDE auto-correct: forcing nil bid`);
+          bid = 0;
+          isNil = true;
+        } else {
+          // Non-forced modes: keep error
+          this.socket?.emit?.('error', { message: validation.message });
+          return;
+        }
       }
 
       // Update bid in database first (synchronous)

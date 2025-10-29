@@ -136,8 +136,23 @@ class PlayerTimerService {
       }
 
       const hand = hands[seatIndex];
-      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-      const botBid = numSpades > 0 ? numSpades : 2;
+      // Handle forced variants first
+      const forcedBid = game.gimmickVariant || game.formatForced;
+      let botBid;
+      if (forcedBid === 'BIDHEARTS' || forcedBid === 'BID HEARTS') {
+        const numHearts = hand.filter(card => card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥').length;
+        botBid = numHearts;
+      } else if (forcedBid === 'BID3' || forcedBid === 'BID 3') {
+        botBid = 3;
+      } else if (forcedBid === 'BID4NIL' || forcedBid === '4 OR NIL') {
+        botBid = 4; // default to 4 (server accepts 0 or 4)
+      } else if (forcedBid === 'CRAZY ACES' || forcedBid === 'CRAZY_ACES') {
+        const numAces = hand.filter(card => card.rank === 'A').length;
+        botBid = numAces * 3;
+      } else {
+        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
+        botBid = numSpades > 0 ? numSpades : 2;
+      }
       
       console.log(`[PLAYER TIMER] 🎯 Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username}`);
 

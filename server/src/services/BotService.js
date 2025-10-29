@@ -414,11 +414,44 @@ class BotService {
         }
         console.log(`[BOT SERVICE][AI_V2] After filtering - legal cards:`, legal.map(c => `${c.suit}${c.rank}`));
 
-        // Prefer policy-selected v2Card if it is legal
-        const v2IsLegal = legal.some(c => c.suit === v2Card.suit && c.rank === v2Card.rank);
-        if (v2IsLegal) {
-          console.log(`[BOT SERVICE][AI_V2] Using policy pick (legal) -> ${v2Card.suit}${v2Card.rank}`);
+        // Prefer policy-selected v2Card only if it passes LOW/HIGHBALL constraints as well
+        const v2InLegal = legal.some(c => c.suit === v2Card.suit && c.rank === v2Card.rank);
+        const lowHighOk = (() => {
+          if (!v2InLegal) return false;
+          if (rule2 !== 'LOWBALL' && rule2 !== 'HIGHBALL') return true;
+          // Leading
+          if (currentTrickCards.length === 0) {
+            const suitCards = legal.filter(c => c.suit === v2Card.suit).sort((a,b)=>order[a.rank]-order[b.rank]);
+            if (suitCards.length === 0) return false;
+            const lowest = suitCards[0];
+            const highest = suitCards[suitCards.length-1];
+            return rule2 === 'LOWBALL'
+              ? (v2Card.suit === lowest.suit && v2Card.rank === lowest.rank)
+              : (v2Card.suit === highest.suit && v2Card.rank === highest.rank);
+          }
+          // Following
+          // If has lead suit, legal is already lead-suit only; must be lowest/highest of that suit
+          const suits = [...new Set(legal.map(c=>c.suit))];
+          const suitCards = legal.filter(c => c.suit === v2Card.suit).sort((a,b)=>order[a.rank]-order[b.rank]);
+          if (suitCards.length === 0) return false;
+          const lowest = suitCards[0];
+          const highest = suitCards[suitCards.length-1];
+          if (suits.length === 1) {
+            return rule2 === 'LOWBALL'
+              ? (v2Card.suit === lowest.suit && v2Card.rank === lowest.rank)
+              : (v2Card.suit === highest.suit && v2Card.rank === highest.rank);
+          }
+          // Void in lead: must be lowest/highest in the chosen suit
+          return rule2 === 'LOWBALL'
+            ? (v2Card.suit === lowest.suit && v2Card.rank === lowest.rank)
+            : (v2Card.suit === highest.suit && v2Card.rank === highest.rank);
+        })();
+
+        if (v2InLegal && lowHighOk) {
+          console.log(`[BOT SERVICE][AI_V2] Using policy pick (legal + LOW/HIGH compliant) -> ${v2Card.suit}${v2Card.rank}`);
           return v2Card;
+        } else if (v2InLegal && !lowHighOk) {
+          console.log(`[BOT SERVICE][AI_V2] Policy pick fails LOW/HIGH constraint, replacing`);
         }
         if (rule2 === 'LOWBALL' && legal.length > 0) {
           if (currentTrickCards.length === 0) {
@@ -434,9 +467,14 @@ class BotService {
             console.log(`[BOT SERVICE][AI_V2] LOWBALL leading -> ${lowest.suit}${lowest.rank}`);
             return lowest;
           } else {
-            // When following: lowest in lead suit
-            const lowest = legal.sort((a,b)=>order[a.rank]-order[b.rank])[0];
-            console.log(`[BOT SERVICE][AI_V2] LOWBALL following -> ${lowest.suit}${lowest.rank}`);
+            // When following: if has lead suit, lowest in lead suit (legal already filtered)
+            // If void: choose lowest in the CHOSEN suit among legal suits
+            const suits = [...new Set(legal.map(card => card.suit))];
+            const targetSuit = suits[0]; // deterministic: first legal suit
+            const suitCards = legal.filter(c => c.suit === targetSuit);
+            const sorted = suitCards.sort((a,b)=>order[a.rank]-order[b.rank]);
+            const lowest = sorted[0];
+            console.log(`[BOT SERVICE][AI_V2] LOWBALL following ${suits.length>1?'(void)': '(lead)'} -> ${lowest.suit}${lowest.rank}`);
             return lowest;
           }
         }
@@ -454,9 +492,14 @@ class BotService {
             console.log(`[BOT SERVICE][AI_V2] HIGHBALL leading -> ${highest.suit}${highest.rank}`);
             return highest;
           } else {
-            // When following: highest in lead suit
-            const highest = legal.sort((a,b)=>order[b.rank]-order[a.rank])[0];
-            console.log(`[BOT SERVICE][AI_V2] HIGHBALL following -> ${highest.suit}${highest.rank}`);
+            // When following: if has lead suit, highest in lead suit (legal already filtered)
+            // If void: choose highest in the CHOSEN suit among legal suits
+            const suits = [...new Set(legal.map(card => card.suit))];
+            const targetSuit = suits[0];
+            const suitCards = legal.filter(c => c.suit === targetSuit);
+            const sorted = suitCards.sort((a,b)=>order[a.rank]-order[b.rank]);
+            const highest = sorted[sorted.length-1];
+            console.log(`[BOT SERVICE][AI_V2] HIGHBALL following ${suits.length>1?'(void)':'(lead)'} -> ${highest.suit}${highest.rank}`);
             return highest;
           }
         }
@@ -570,9 +613,17 @@ class BotService {
         if (playableCards.length > 0) {
           const order = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
           if (rule2 === 'LOWBALL') {
-            cardToPlay = playableCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
+            // Choose lowest within a chosen suit (first legal suit)
+            const suits = [...new Set(playableCards.map(c=>c.suit))];
+            const targetSuit = suits[0];
+            const inSuit = playableCards.filter(c=>c.suit===targetSuit);
+            cardToPlay = inSuit.sort((a,b)=>order[a.rank]-order[b.rank])[0];
           } else if (rule2 === 'HIGHBALL') {
-            cardToPlay = playableCards.sort((a,b)=>order[b.rank]-order[a.rank])[0];
+            // Choose highest within a chosen suit (first legal suit)
+            const suits = [...new Set(playableCards.map(c=>c.suit))];
+            const targetSuit = suits[0];
+            const inSuit = playableCards.filter(c=>c.suit===targetSuit);
+            cardToPlay = inSuit.sort((a,b)=>order[a.rank]-order[b.rank])[inSuit.length-1];
           } else {
             cardToPlay = playableCards.sort((a,b)=>order[a.rank]-order[b.rank])[0];
           }

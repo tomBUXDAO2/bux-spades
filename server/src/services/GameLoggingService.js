@@ -324,7 +324,7 @@ export class GameLoggingService {
           
           if (rule2 === 'LOWBALL') {
             if (existingCardsCount === 0) {
-              // When leading: must be lowest card in the chosen suit
+              // When leading: must be lowest card in the chosen suit (from legal set)
               const suitCards = legal.filter(c => c.suit === suit);
               const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
               const lowestInSuit = sortedSuit[0];
@@ -333,19 +333,33 @@ export class GameLoggingService {
                 return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
               }
             } else {
-              // When following: must be lowest card in lead suit
-              const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
-              const lowest = sorted[0];
-              if (lowest.suit !== chosen.suit || lowest.rank !== chosen.rank) {
-                console.log(`[GAME LOGGING] LOWBALL: seat ${seatIndex} must play lowest ${lowest.suit}${lowest.rank} but tried ${suit}${rank}. Rejecting.`);
-                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              // When following:
+              // - If player has lead suit: must be lowest card in lead suit (current legal will only be lead suit)
+              // - If void in lead suit: must be lowest card in the CHOSEN suit among legal suits
+              const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
+              const hasLead = currentHand.some(c => c.suit === leadSuit);
+              if (hasLead) {
+                const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
+                const lowest = sorted[0];
+                if (lowest.suit !== chosen.suit || lowest.rank !== chosen.rank) {
+                  console.log(`[GAME LOGGING] LOWBALL: seat ${seatIndex} must play lowest ${lowest.suit}${lowest.rank} (lead suit) but tried ${suit}${rank}. Rejecting.`);
+                  return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+                }
+              } else {
+                const suitCards = legal.filter(c => c.suit === suit);
+                const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
+                const lowestInChosenSuit = sortedSuit[0];
+                if (!lowestInChosenSuit || lowestInChosenSuit.suit !== chosen.suit || lowestInChosenSuit.rank !== chosen.rank) {
+                  console.log(`[GAME LOGGING] LOWBALL: seat ${seatIndex} (void) must play lowest ${lowestInChosenSuit?.suit}${lowestInChosenSuit?.rank} in ${suit} but tried ${suit}${rank}. Rejecting.`);
+                  return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+                }
               }
             }
           }
           
           if (rule2 === 'HIGHBALL') {
             if (existingCardsCount === 0) {
-              // When leading: must be highest card in the chosen suit
+              // When leading: must be highest card in the chosen suit (from legal set)
               const suitCards = legal.filter(c => c.suit === suit);
               const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
               const highestInSuit = sortedSuit[sortedSuit.length-1];
@@ -354,12 +368,26 @@ export class GameLoggingService {
                 return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
               }
             } else {
-              // When following: must be highest card in lead suit
-              const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
-              const highest = sorted[sorted.length-1];
-              if (highest.suit !== chosen.suit || highest.rank !== chosen.rank) {
-                console.log(`[GAME LOGGING] HIGHBALL: seat ${seatIndex} must play highest ${highest.suit}${highest.rank} but tried ${suit}${rank}. Rejecting.`);
-                return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+              // When following:
+              // - If player has lead suit: must be highest card in lead suit (current legal will only be lead suit)
+              // - If void in lead suit: must be highest card in the CHOSEN suit among legal suits
+              const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
+              const hasLead = currentHand.some(c => c.suit === leadSuit);
+              if (hasLead) {
+                const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
+                const highest = sorted[sorted.length-1];
+                if (highest.suit !== chosen.suit || highest.rank !== chosen.rank) {
+                  console.log(`[GAME LOGGING] HIGHBALL: seat ${seatIndex} must play highest ${highest.suit}${highest.rank} (lead suit) but tried ${suit}${rank}. Rejecting.`);
+                  return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+                }
+              } else {
+                const suitCards = legal.filter(c => c.suit === suit);
+                const sortedSuit = suitCards.sort((a,b) => order[a.rank] - order[b.rank]);
+                const highestInChosenSuit = sortedSuit[sortedSuit.length-1];
+                if (!highestInChosenSuit || highestInChosenSuit.suit !== chosen.suit || highestInChosenSuit.rank !== chosen.rank) {
+                  console.log(`[GAME LOGGING] HIGHBALL: seat ${seatIndex} (void) must play highest ${highestInChosenSuit?.suit}${highestInChosenSuit?.rank} in ${suit} but tried ${suit}${rank}. Rejecting.`);
+                  return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
+                }
               }
             }
           }

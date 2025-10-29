@@ -327,6 +327,13 @@ export const getPlayableCards = (
       return result;
     }
 
+    // FINAL GUARD: Even for Assassin, cannot lead spades before broken unless only spades
+    if (!spadesBroken) {
+      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+      }
+    }
     return playableCards;
   }
   
