@@ -743,6 +743,26 @@ class BotService {
       const cachedGameState = await redisGameState.default.getGameState(game.id);
       const spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
 
+      // Determine Secret Assassin seat and role flags
+      const rule1 = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));
+      let secretSeat = (game.play?.secretAssassinSeat ?? specialRules.secretAssassinSeat ?? game.specialRules?.secretAssassinSeat);
+      if (!secretSeat && rule1 === 'SECRET_ASSASSIN') {
+        try {
+          const playerHands = hands;
+          if (playerHands && playerHands.length >= 4) {
+            for (let s = 0; s < 4; s++) {
+              const seatHand = (playerHands[s] || []).map(BotService.normalizeCard);
+              if (seatHand.some(card => card.suit === 'SPADES' && card.rank === 'A')) {
+                secretSeat = s;
+                break;
+              }
+            }
+          }
+        } catch {}
+      }
+      const isAssassinSeat = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && secretSeat === seatIndex);
+      const isScreamerSeat = (rule1 === 'SCREAMER') || (rule1 === 'SECRET_ASSASSIN' && secretSeat !== seatIndex);
+
       // Feature toggle for new AI policy
       if (process.env.BOT_AI_V2 === 'true') {
         const ctx = this.buildDecisionContext(game, seatIndex, hand, currentTrickCards, spadesBroken);
@@ -782,14 +802,14 @@ class BotService {
           // Void in lead suit - apply special rules
           let playableCards = normalizedHand;
           
-          if (specialRules.assassin) {
+          if (isAssassinSeat) {
             const spades = normalizedHand.filter(card => card.suit === 'SPADES');
             if (spades.length > 0) {
               playableCards = spades;
             }
           }
           
-          if (specialRules.screamer) {
+          if (isScreamerSeat) {
             const nonSpades = normalizedHand.filter(card => card.suit !== 'SPADES');
             if (nonSpades.length > 0) {
               playableCards = playableCards.filter(card => card.suit !== 'SPADES');
