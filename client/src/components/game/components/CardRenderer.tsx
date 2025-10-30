@@ -4,7 +4,7 @@
 import React from 'react';
 import type { Card, GameState, Player, Bot } from "../../../types/game";
 import { getCardDimensions, getCardOverlapOffset, getCardVisibility, getSpectatorHandDimensions } from '../../../features/game/utils/cardUtils';
-import { sortCards, getPlayableCards } from '../../../features/game/utils/gameUtils';
+import { sortCards, getPlayableCards, hasSpadeBeenPlayed } from '../../../features/game/utils/gameUtils';
 
 interface CardRendererProps {
   gameState: GameState;
@@ -218,8 +218,43 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // Always pass currentTrick to avoid race conditions where gameState.play.currentTrick is undefined
     effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, currentTrick);
 
-    // SAFETY NET: If rule engine returns empty on lead, ensure at least legal non-spades (or any suit if only spades)
-    if (Array.isArray(effectivePlayableCards) && effectivePlayableCards.length === 0 && gameState.status === 'PLAYING' && isLeading) {
+    // Enforce assassin leading rule explicitly to avoid any edge-case empty sets
+    try {
+      const specialRules: any = (gameState as any).specialRules || {};
+      const rule1 = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));
+      const secretSeat = (gameState as any).play?.secretAssassinSeat ?? specialRules.secretAssassinSeat;
+      let mySeatIndex: number | null = null;
+      try {
+        const hands = (gameState as any).hands as Card[][] | undefined;
+        if (hands && Array.isArray(hands)) {
+          for (let i = 0; i < hands.length; i++) {
+            const h = hands[i] || [];
+            if (h.length === myHand.length) {
+              const key = (c: Card) => `${c.suit}-${c.rank}`;
+              const a = new Set(myHand.map(key));
+              const b = new Set(h.map(key));
+              if (a.size === b.size && [...a].every(k => b.has(k))) { mySeatIndex = i; break; }
+            }
+          }
+        }
+      } catch {}
+      const isAssassinSeat = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && (mySeatIndex === secretSeat));
+      const spadesNowBroken = hasSpadeBeenPlayed(gameState);
+      if (isLeading && isAssassinSeat) {
+        if (spadesNowBroken) {
+          // Only spades are legal when leading as assassin after broken
+          const spades = myHand.filter((c: any) => c.suit === 'SPADES');
+          effectivePlayableCards = spades.length > 0 ? spades : myHand;
+        } else {
+          // Spades cannot be led before broken; allow any non-spade
+          const nonSpades = myHand.filter((c: any) => c.suit !== 'SPADES');
+          effectivePlayableCards = nonSpades.length > 0 ? nonSpades : myHand;
+        }
+      }
+    } catch {}
+
+    // SAFETY NET: If rule engine returns empty on my turn, ensure at least legal non-spades (or any suit if only spades)
+    if (Array.isArray(effectivePlayableCards) && effectivePlayableCards.length === 0 && gameState.status === 'PLAYING') {
       const hasNonSpades = myHand.some((c: any) => c.suit !== 'SPADES');
       if (!spadesActuallyPlayed) {
         effectivePlayableCards = hasNonSpades ? myHand.filter((c: any) => c.suit !== 'SPADES') : myHand;
