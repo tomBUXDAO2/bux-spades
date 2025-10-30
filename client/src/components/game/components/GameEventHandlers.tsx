@@ -266,6 +266,37 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     };
   }, [socket, onGameOver]);
 
+  // Effect to handle trick_started so currentPlayer is up to date when a new trick begins
+  useEffect(() => {
+    if (!socket) return;
+
+    const trickStartedHandler = (data: any) => {
+      try {
+        // Prefer full gameState if provided
+        if (data && data.gameState) {
+          setGameState(normalizeGameState(data.gameState));
+        } else if (data && (data.currentPlayer || data.leadSuit !== undefined)) {
+          // Minimal update: set currentPlayer and reset currentTrick if we have partial payload
+          setGameState((prev: GameState) => ({
+            ...prev,
+            currentPlayer: data.currentPlayer || (prev as any).currentPlayer,
+            play: {
+              ...(prev as any).play,
+              currentTrick: []
+            }
+          } as any));
+        }
+        // Clear any pending played card at trick start
+        setPendingPlayedCard(null);
+      } catch {}
+    };
+
+    socket.on('trick_started', trickStartedHandler);
+    return () => {
+      socket.off('trick_started', trickStartedHandler);
+    };
+  }, [socket, setGameState, setPendingPlayedCard]);
+
   // Effect to handle game_complete event (new event from server)
   useEffect(() => {
     if (!socket) return;

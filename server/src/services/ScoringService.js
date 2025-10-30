@@ -151,31 +151,69 @@ export class ScoringService {
       orderBy: { Round: { roundNumber: 'asc' } }
     });
 
-    const previousTeam0Total = previousScores.reduce((sum, score) => sum + (score.team0Score || 0), 0);
-    const previousTeam1Total = previousScores.reduce((sum, score) => sum + (score.team1Score || 0), 0);
+    // Compute historical bag remainder per team (carry across rounds) to apply -100 per 10 bags
+    const getTeamBagRemainder = (scores, teamKey) => {
+      let remainder = 0;
+      for (const s of scores) {
+        const bagsThis = (teamKey === 0 ? s.team0Bags : s.team1Bags) || 0;
+        remainder += bagsThis;
+        if (remainder >= 10) {
+          // apply as many -100 penalties as fit and carry the remainder forward
+          const penalties = Math.floor(remainder / 10);
+          remainder = remainder - penalties * 10;
+        }
+      }
+      return remainder;
+    };
 
-    const team0RunningTotal = previousTeam0Total + team0Score;
-    const team1RunningTotal = previousTeam1Total + team1Score;
+    const team0PrevBagsRemainder = getTeamBagRemainder(previousScores, 0);
+    const team1PrevBagsRemainder = getTeamBagRemainder(previousScores, 1);
+
+    // Current round bags
+    const team0BagsThisRound = Math.max(0, team0Tricks - team0Bid);
+    const team1BagsThisRound = Math.max(0, team1Tricks - team1Bid);
+
+    // Total including carry remainder
+    const team0BagsTotal = team0PrevBagsRemainder + team0BagsThisRound;
+    const team1BagsTotal = team1PrevBagsRemainder + team1BagsThisRound;
+
+    // Penalties now (this round) based on newly crossed thresholds
+    const team0NewPenalties = Math.floor(team0BagsTotal / 10);
+    const team1NewPenalties = Math.floor(team1BagsTotal / 10);
+
+    const team0PenaltyPoints = team0NewPenalties > 0 ? (-100 * team0NewPenalties) : 0;
+    const team1PenaltyPoints = team1NewPenalties > 0 ? (-100 * team1NewPenalties) : 0;
+
+    // Final points this round include bag penalties applied at end of round
+    const team0PointsThisRound = team0Score + team0PenaltyPoints;
+    const team1PointsThisRound = team1Score + team1PenaltyPoints;
+
+    // Previous running totals (sum of already stored per-round points)
+    const previousTeam0Total = previousScores.reduce((sum, score) => sum + ((score.team0Score || 0)), 0);
+    const previousTeam1Total = previousScores.reduce((sum, score) => sum + ((score.team1Score || 0)), 0);
+
+    const team0RunningTotal = previousTeam0Total + team0PointsThisRound;
+    const team1RunningTotal = previousTeam1Total + team1PointsThisRound;
 
     // Create RoundScore entry
     await prisma.roundScore.create({
       data: {
         id: roundId, // Use roundId as the ID for easy lookup
         roundId,
-        team0Score,
-        team1Score,
-        team0Bags: Math.max(0, team0Tricks - team0Bid),
-        team1Bags: Math.max(0, team1Tricks - team1Bid),
+        team0Score: team0PointsThisRound,
+        team1Score: team1PointsThisRound,
+        team0Bags: team0BagsThisRound,
+        team1Bags: team1BagsThisRound,
         team0RunningTotal,
         team1RunningTotal
       }
     });
 
     return {
-      team0Score,
-      team1Score,
-      team0Bags: Math.max(0, team0Tricks - team0Bid),
-      team1Bags: Math.max(0, team1Tricks - team1Bid),
+      team0Score: team0PointsThisRound,
+      team1Score: team1PointsThisRound,
+      team0Bags: team0BagsThisRound,
+      team1Bags: team1BagsThisRound,
       gameMode: 'PARTNERS'
     };
   }

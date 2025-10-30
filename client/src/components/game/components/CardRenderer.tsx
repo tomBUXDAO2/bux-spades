@@ -217,6 +217,16 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
     // Always pass currentTrick to avoid race conditions where gameState.play.currentTrick is undefined
     effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, currentTrick);
+
+    // SAFETY NET: If rule engine returns empty on lead, ensure at least legal non-spades (or any suit if only spades)
+    if (Array.isArray(effectivePlayableCards) && effectivePlayableCards.length === 0 && gameState.status === 'PLAYING' && isLeading) {
+      const hasNonSpades = myHand.some((c: any) => c.suit !== 'SPADES');
+      if (!spadesActuallyPlayed) {
+        effectivePlayableCards = hasNonSpades ? myHand.filter((c: any) => c.suit !== 'SPADES') : myHand;
+      } else {
+        effectivePlayableCards = myHand;
+      }
+    }
   } else if (Array.isArray(playableCards)) {
     effectivePlayableCards = playableCards;
   }
