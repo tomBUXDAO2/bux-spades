@@ -738,10 +738,20 @@ class BotService {
         }));
       }
 
-      // Get special rules and spadesBroken status
+      // Get special rules and robust spadesBroken status
       const specialRules = game.specialRules || {};
       const cachedGameState = await redisGameState.default.getGameState(game.id);
-      const spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
+      let spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
+      try {
+        const completed = cachedGameState?.play?.completedTricks || [];
+        if (!spadesBroken && Array.isArray(completed)) {
+          for (const t of completed) {
+            if (Array.isArray(t?.cards) && t.cards.some((c)=>c && c.suit === 'SPADES')) { spadesBroken = true; break; }
+          }
+        }
+        const cur = cachedGameState?.play?.currentTrick || [];
+        if (!spadesBroken && Array.isArray(cur) && cur.some((c)=>c && c.suit === 'SPADES')) spadesBroken = true;
+      } catch {}
 
       // Determine Secret Assassin seat and role flags
       const rule1 = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));

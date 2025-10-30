@@ -165,9 +165,23 @@ export class GameLoggingService {
       const playerHand = await redisGameState.getPlayerHands(gameId);
       const currentHand = playerHand && playerHand[seatIndex] ? playerHand[seatIndex] : [];
       
-      // Get spades broken status
+      // Get spades broken status (robust): check flag AND trick history/current trick
       const cachedGameState = await redisGameState.getGameState(gameId);
-      const spadesBroken = cachedGameState?.play?.spadesBroken || false;
+      let spadesBroken = cachedGameState?.play?.spadesBroken || false;
+      try {
+        // Check completed tricks for any spade
+        const completed = cachedGameState?.play?.completedTricks || [];
+        if (!spadesBroken && Array.isArray(completed) && completed.length > 0) {
+          for (const t of completed) {
+            if (Array.isArray(t?.cards) && t.cards.some((c)=>c && c.suit === 'SPADES')) { spadesBroken = true; break; }
+          }
+        }
+        // Check current trick (in-progress) for any spade
+        const cur = cachedGameState?.play?.currentTrick || [];
+        if (!spadesBroken && Array.isArray(cur) && cur.some((c)=>c && c.suit === 'SPADES')) {
+          spadesBroken = true;
+        }
+      } catch {}
       
       // Determine per-seat rule for Secret Assassin
       let isAssassinSeat = false;
