@@ -244,8 +244,8 @@ class CardPlayHandler {
             // This prevents the 4th card from flickering - it will be shown through trick_complete event instead
             console.log(`[CARD PLAY] Skipping card_played event for 4th card to prevent flickering`);
 
-            // Start timer for winning player if they are human (card play - always apply)
-            if (winningPlayer && winningPlayer.isHuman) {
+            // Start timer for winning player if they are human (skip if round just completed)
+            if (winningPlayer && winningPlayer.isHuman && !trickResult.isRoundComplete) {
               console.log(`[CARD PLAY] Starting timer for winning player ${winningPlayer.userId} (seat ${winningPlayer.seatIndex})`);
               playerTimerService.startPlayerTimer(gameId, winningPlayer.userId, winningPlayer.seatIndex, 'playing');
             }

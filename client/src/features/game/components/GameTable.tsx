@@ -218,8 +218,9 @@ export default function GameTableModular({
   const isHost = isLeague && gameState.players?.[0]?.id === propUser?.id;
   
   // Scores come from backend - no calculation needed
-  const team1Score = gameState.team1TotalScore || 0;
-  const team2Score = gameState.team2TotalScore || 0;
+  // Prefer finalScores when game just ended so scoreboard matches Winners modal
+  const team1Score = (finalScores?.team1Score !== undefined ? finalScores.team1Score : (gameState.team1TotalScore || 0));
+  const team2Score = (finalScores?.team2Score !== undefined ? finalScores.team2Score : (gameState.team2TotalScore || 0));
   const team1Bags = gameState.team1Bags || 0;
   const team2Bags = gameState.team2Bags || 0;
   
@@ -330,6 +331,13 @@ export default function GameTableModular({
   };
   
   const handleGameOverWrapper = async (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }) => {
+    // Sync final totals to scoreboard immediately
+    setGameState((prev: any) => ({
+      ...prev,
+      team1TotalScore: typeof data.team1Score === 'number' ? data.team1Score : prev.team1TotalScore,
+      team2TotalScore: typeof data.team2Score === 'number' ? data.team2Score : prev.team2TotalScore,
+      playerScores: Array.isArray(data.playerScores) ? data.playerScores : prev.playerScores
+    }));
     // Trigger coin animations for rated games (actual transactions happen here)
     if (gameState.rated && gameState.buyIn && propUser?.id) {
       // Show credit animation only if user won (actual payment happens in backend)

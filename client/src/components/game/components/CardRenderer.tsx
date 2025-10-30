@@ -241,10 +241,18 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       <div className="flex items-center justify-center h-full w-full">
         <div className="flex items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
-          const isPlayable = !isPlayingCard && ((gameState.status === "PLAYING" &&
+          // HARD GUARD: On lead before spades are broken, if hand has any non-spades, spades are never playable
+          const onLead = Array.isArray(currentTrick) && currentTrick.length === 0;
+          const spadesBrokenFlag = (gameState as any)?.play?.spadesBroken || false;
+          const handHasNonSpades = Array.isArray(myHand) && myHand.some((c: any) => (c.suit as any) !== 'SPADES');
+          const leadingSpadeBlocked = (gameState.status === 'PLAYING') && onLead && !spadesBrokenFlag && handHasNonSpades && card.suit === 'SPADES';
+
+          const basePlayable = !isPlayingCard && ((gameState.status === "PLAYING" &&
             gameState.currentPlayer === currentPlayerId &&
             Array.isArray(effectivePlayableCards) && effectivePlayableCards.some((c: Card) => c.suit === card.suit && c.rank === card.rank)) ||
             (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId));
+
+          const isPlayable = basePlayable && !leadingSpadeBlocked;
           const isVisible = index < visibleCount;
           
           return (

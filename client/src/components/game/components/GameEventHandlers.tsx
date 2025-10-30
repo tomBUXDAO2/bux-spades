@@ -281,15 +281,24 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       // Update game state
       if (data.gameState) {
         setGameState((prevState: GameState) => {
-          const newState = {
+          const newState: any = {
             ...prevState,
             ...data.gameState
           };
           
+          // Sync final totals to scoreboard immediately
+          if (data.scores) {
+            if (typeof data.scores.team1Score === 'number') newState.team1TotalScore = data.scores.team1Score;
+            if (typeof data.scores.team2Score === 'number') newState.team2TotalScore = data.scores.team2Score;
+            if (Array.isArray(data.scores.playerScores)) newState.playerScores = data.scores.playerScores;
+            if (typeof data.scores.team1Bags === 'number') newState.team1Bags = data.scores.team1Bags;
+            if (typeof data.scores.team2Bags === 'number') newState.team2Bags = data.scores.team2Bags;
+          }
+          
           // For solo games, set winningPlayer from the winner
           if (data.winner && data.winner.startsWith('PLAYER_')) {
             const playerIndex = parseInt(data.winner.split('_')[1]);
-            newState.winningPlayer = playerIndex;
+            newState.winningPlayer = playerIndex; // Keep 0-based for solo games
           }
           
           return newState;

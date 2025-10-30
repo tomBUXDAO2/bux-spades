@@ -210,8 +210,51 @@ export class TrickCompletionService {
       const scores = await ScoringService.calculateRoundScores(gameId, roundId);
       console.log(`[TRICK COMPLETION] Scores calculated:`, scores);
 
-      // Check if game is complete
-      const gameComplete = await ScoringService.checkGameComplete(gameId);
+      // Check if game is complete (race-free): evaluate using the just-written latest RoundScore
+      let gameComplete = { isComplete: false };
+      try {
+        const gameConfig = await prisma.game.findUnique({ where: { id: gameId }, select: { mode: true, minPoints: true, maxPoints: true } });
+        const latestRoundScore = await prisma.roundScore.findFirst({
+          where: { Round: { gameId } },
+          orderBy: { Round: { roundNumber: 'desc' } }
+        });
+        if (gameConfig && latestRoundScore) {
+          if (gameConfig.mode === 'SOLO') {
+            const pts = [
+              latestRoundScore.player0Running || 0,
+              latestRoundScore.player1Running || 0,
+              latestRoundScore.player2Running || 0,
+              latestRoundScore.player3Running || 0
+            ];
+            const minP = gameConfig.minPoints ?? -100;
+            const maxP = gameConfig.maxPoints ?? 100;
+            for (let i = 0; i < pts.length; i++) {
+              const v = pts[i];
+              if (v >= maxP || v <= minP) {
+                gameComplete = { isComplete: true, winner: `PLAYER_${i}`, reason: v >= maxP ? `Player ${i} reached ${maxP} points` : `Player ${i} reached ${minP} points` };
+                break;
+              }
+            }
+          } else {
+            const t0 = latestRoundScore.team0RunningTotal || 0;
+            const t1 = latestRoundScore.team1RunningTotal || 0;
+            const minP = gameConfig.minPoints ?? -500;
+            const maxP = gameConfig.maxPoints ?? 500;
+            const t0Ex = t0 >= maxP || t0 <= minP;
+            const t1Ex = t1 >= maxP || t1 <= minP;
+            if (t0Ex && t1Ex) {
+              if (t0 !== t1) {
+                const winner = t0 > t1 ? 'TEAM_0' : 'TEAM_1';
+                gameComplete = { isComplete: true, winner, reason: `Both teams exceeded limits, ${winner} has most points` };
+              }
+            } else if (t0Ex) {
+              gameComplete = { isComplete: true, winner: 'TEAM_0', reason: `Team 0 reached ${t0 >= maxP ? maxP : minP} points` };
+            } else if (t1Ex) {
+              gameComplete = { isComplete: true, winner: 'TEAM_1', reason: `Team 1 reached ${t1 >= maxP ? maxP : minP} points` };
+            }
+          }
+        }
+      } catch {}
       
       if (gameComplete.isComplete) {
         // Complete the game
@@ -259,6 +302,12 @@ export class TrickCompletionService {
       if (io) {
         console.log(`[TRICK COMPLETION] Delaying round_complete event to allow trick animation to complete`);
         
+        // CRITICAL: Stop any player timers until next round actually starts
+        try {
+          const { playerTimerService } = await import('./PlayerTimerService.js');
+          playerTimerService.clearTimer(gameId);
+        } catch {}
+
         // CRITICAL FIX: Delay round_complete event to prevent 4th card flickering on final trick
         // This allows the trick animation to complete before the game state is updated
         setTimeout(async () => {
