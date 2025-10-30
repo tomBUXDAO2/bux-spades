@@ -169,6 +169,7 @@ export class GameLoggingService {
       // Single source of truth for spadesBroken
       const cachedGameState = await redisGameState.getGameState(gameId);
       const spadesBroken = await SpadesRuleService.areSpadesBroken(gameId);
+      console.log(`[GAME LOGGING][DEBUG] spadesBroken=${spadesBroken}, suit=${suit}, rank=${rank}, seat=${seatIndex}, trickCards=${existingCardsCount}`);
       
       // Determine per-seat rule for Secret Assassin
       let isAssassinSeat = false;
@@ -196,6 +197,7 @@ export class GameLoggingService {
 
       const ruleAssassin = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && isAssassinSeat);
       const ruleScreamer = (rule1 === 'SCREAMER') || (rule1 === 'SECRET_ASSASSIN' && !isAssassinSeat && rule1 === 'SECRET_ASSASSIN');
+      console.log(`[GAME LOGGING][DEBUG] rule1=${rule1}, isAssassinSeat=${isAssassinSeat}, ruleAssassin=${ruleAssassin}, ruleScreamer=${ruleScreamer}`);
 
       // Validate leading card
       if (existingCardsCount === 0) {
@@ -213,6 +215,7 @@ export class GameLoggingService {
         // ASSASSIN: Must lead spades if broken and has spades
         if (ruleAssassin && spadesBroken && suit !== 'SPADES') {
           const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+          console.log(`[GAME LOGGING][DEBUG] Assassin lead check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
           if (hasSpades) {
             console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
             return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
@@ -266,6 +269,7 @@ export class GameLoggingService {
             // ASSASSIN: Must cut with spades when void
             if (ruleAssassin && suit !== 'SPADES') {
               const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+              console.log(`[GAME LOGGING][DEBUG] Assassin void-cut check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
               if (hasSpades) {
                 console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must cut with spades but played ${suit}. Rejecting.`);
                 return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };

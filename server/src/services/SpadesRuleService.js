@@ -18,9 +18,16 @@ export class SpadesRuleService {
 
     const completed = Array.isArray(gs.play.completedTricks) ? gs.play.completedTricks : [];
     const current = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
+    const trickNum = Number(gs.play.currentTrickNumber ?? gs.play.currentTrickIndex ?? 1);
 
     // Fresh round guard: nothing played anywhere
     if (completed.length === 0 && current.length === 0) {
+      return false;
+    }
+
+    // First trick guard: if we're at trick 1 of the round and no spade in the current trick yet,
+    // treat spades as NOT broken even if stale completedTricks from a previous round exist in Redis.
+    if (trickNum === 1 && Array.isArray(current) && !current.some(c => c && c.suit === 'SPADES')) {
       return false;
     }
 
