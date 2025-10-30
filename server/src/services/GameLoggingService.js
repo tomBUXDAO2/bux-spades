@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import redisGameState from './RedisGameStateService.js';
+import SpadesRuleService from './SpadesRuleService.js';
 
 // PERFORMANCE: In-memory cache for lead suits to avoid database queries
 const leadSuitCache = new Map(); // trickId -> leadSuit
@@ -165,23 +166,9 @@ export class GameLoggingService {
       const playerHand = await redisGameState.getPlayerHands(gameId);
       const currentHand = playerHand && playerHand[seatIndex] ? playerHand[seatIndex] : [];
       
-      // Get spades broken status (robust): check flag AND trick history/current trick
+      // Single source of truth for spadesBroken
       const cachedGameState = await redisGameState.getGameState(gameId);
-      let spadesBroken = cachedGameState?.play?.spadesBroken || false;
-      try {
-        // Check completed tricks for any spade
-        const completed = cachedGameState?.play?.completedTricks || [];
-        if (!spadesBroken && Array.isArray(completed) && completed.length > 0) {
-          for (const t of completed) {
-            if (Array.isArray(t?.cards) && t.cards.some((c)=>c && c.suit === 'SPADES')) { spadesBroken = true; break; }
-          }
-        }
-        // Check current trick (in-progress) for any spade
-        const cur = cachedGameState?.play?.currentTrick || [];
-        if (!spadesBroken && Array.isArray(cur) && cur.some((c)=>c && c.suit === 'SPADES')) {
-          spadesBroken = true;
-        }
-      } catch {}
+      const spadesBroken = await SpadesRuleService.areSpadesBroken(gameId);
       
       // Determine per-seat rule for Secret Assassin
       let isAssassinSeat = false;
@@ -425,6 +412,9 @@ export class GameLoggingService {
           playedAt: new Date()
         }
       });
+
+      // Persist spadesBroken flag if a spade was played
+      try { if (suit === 'SPADES') { await SpadesRuleService.markSpadesBroken(gameId); } } catch {}
 
       // NUCLEAR: Skip ALL logging for maximum speed
       // this.logGameAction(gameId, 'play_card', {

@@ -2,6 +2,7 @@ import { GameService } from './GameService.js';
 import { GameLoggingService } from './GameLoggingService.js';
 import { BotUserService } from './BotUserService.js';
 import { prisma } from '../config/database.js';
+import SpadesRuleService from './SpadesRuleService.js';
 
 class BotService {
   constructor() {
@@ -740,18 +741,8 @@ class BotService {
 
       // Get special rules and robust spadesBroken status
       const specialRules = game.specialRules || {};
-      const cachedGameState = await redisGameState.default.getGameState(game.id);
-      let spadesBroken = cachedGameState?.play?.spadesBroken || game.play?.spadesBroken || false;
-      try {
-        const completed = cachedGameState?.play?.completedTricks || [];
-        if (!spadesBroken && Array.isArray(completed)) {
-          for (const t of completed) {
-            if (Array.isArray(t?.cards) && t.cards.some((c)=>c && c.suit === 'SPADES')) { spadesBroken = true; break; }
-          }
-        }
-        const cur = cachedGameState?.play?.currentTrick || [];
-        if (!spadesBroken && Array.isArray(cur) && cur.some((c)=>c && c.suit === 'SPADES')) spadesBroken = true;
-      } catch {}
+      // Single source of truth
+      const spadesBroken = await SpadesRuleService.areSpadesBroken(game.id);
 
       // Determine Secret Assassin seat and role flags
       const rule1 = specialRules.specialRule1 || (specialRules.assassin ? 'ASSASSIN' : (specialRules.screamer ? 'SCREAMER' : 'NONE'));
