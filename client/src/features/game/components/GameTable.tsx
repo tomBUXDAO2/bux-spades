@@ -1231,6 +1231,8 @@ export default function GameTableModular({
                 team1Bags={team1Bags}
                 team2Score={team2Score}
                 team2Bags={team2Bags}
+                overrideTeam1Score={(showWinner || showLoser) && finalScores ? finalScores.team1Score : undefined}
+                overrideTeam2Score={(showWinner || showLoser) && finalScores ? finalScores.team2Score : undefined}
               />
         
               {/* Players around the table */}

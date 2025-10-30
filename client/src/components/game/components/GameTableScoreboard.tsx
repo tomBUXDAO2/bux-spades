@@ -9,6 +9,9 @@ interface GameTableScoreboardProps {
   team1Bags: number;
   team2Score: number;
   team2Bags: number;
+  // Optional overrides so we can force-final totals while Winners modal is open
+  overrideTeam1Score?: number;
+  overrideTeam2Score?: number;
 }
 
 const GameTableScoreboard: React.FC<GameTableScoreboardProps> = ({
@@ -17,8 +20,12 @@ const GameTableScoreboard: React.FC<GameTableScoreboardProps> = ({
   team1Score,
   team1Bags,
   team2Score,
-  team2Bags
+  team2Bags,
+  overrideTeam1Score,
+  overrideTeam2Score
 }) => {
+  const displayTeam1 = (overrideTeam1Score !== undefined ? overrideTeam1Score : team1Score);
+  const displayTeam2 = (overrideTeam2Score !== undefined ? overrideTeam2Score : team2Score);
   return (
     <div className={`absolute z-10 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg ${isVerySmallScreen ? 'top-[-6px] right-[-4px]' : 'top-4 right-4'}`}>
       {gameState.gameMode === 'SOLO' ? (
@@ -49,7 +56,7 @@ const GameTableScoreboard: React.FC<GameTableScoreboardProps> = ({
           {/* Red Team Score and Bags */}
           <div className="flex items-center">
             <div className="bg-red-500 rounded-full w-2 h-2 mr-1"></div>
-            <span className="text-white font-bold mr-1 text-sm w-8 text-right">{team1Score}</span>
+            <span className="text-white font-bold mr-1 text-sm w-8 text-right">{displayTeam1}</span>
             {/* Red Team Bags */}
             <div className="flex items-center text-yellow-300 ml-2" title={`Red Team Bags: ${team1Bags}`}> 
               <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
@@ -60,7 +67,7 @@ const GameTableScoreboard: React.FC<GameTableScoreboardProps> = ({
           {/* Blue Team Score and Bags */}
           <div className="flex items-center">
             <div className="bg-blue-500 rounded-full w-2 h-2 mr-1"></div>
-            <span className="text-white font-bold mr-1 text-sm w-8 text-right">{team2Score}</span>
+            <span className="text-white font-bold mr-1 text-sm w-8 text-right">{displayTeam2}</span>
             {/* Blue Team Bags */}
             <div className="flex items-center text-yellow-300 ml-2" title={`Blue Team Bags: ${team2Bags}`}> 
               <img src="/bag.svg" width={16} height={16} alt="Bags" className="mr-1" />
