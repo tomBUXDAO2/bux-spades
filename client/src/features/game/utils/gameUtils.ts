@@ -56,6 +56,8 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   // RACE CONDITION FIX: Check both the server's spadesBroken flag AND actual card data
   const gameId = (game as any)?.id || (game as any)?.gameId || 'unknown-game';
   const spadesBroken = (game as any).play?.spadesBroken || false;
+  const completedTricks = (game as any).play?.completedTricks || [];
+  const currentTrick = (game as any).play?.currentTrick || [];
   
   // If spadesBroken flag is true, return true
   if (spadesBroken) {
@@ -63,13 +65,17 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
     return true;
   }
   // If we've previously observed spades played for this game/round, honor it immediately
-  if (spadesBrokenCache[gameId]) {
+  // BUT reset the cache if there is clearly a fresh trick state with no cards played anywhere
+  if (completedTricks.length === 0 && (!Array.isArray(currentTrick) || currentTrick.length === 0)) {
+    // Fresh round/trick context visible -> do not trust prior cache
+    delete spadesBrokenCache[gameId];
+  } else if (spadesBrokenCache[gameId]) {
     return true;
   }
   
   // RACE CONDITION FIX: Also check completed tricks for spades
-  if (game.play?.completedTricks) {
-    for (const trick of game.play.completedTricks) {
+  if (completedTricks) {
+    for (const trick of completedTricks) {
       if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
         spadesBrokenCache[gameId] = true;
         return true;
@@ -78,8 +84,8 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   }
   
   // RACE CONDITION FIX: Also check current trick for spades
-  if (game.play?.currentTrick) {
-    if (game.play.currentTrick.some((card: any) => card.suit === 'SPADES')) {
+  if (Array.isArray(currentTrick) && currentTrick.length > 0) {
+    if (currentTrick.some((card: any) => card.suit === 'SPADES')) {
       spadesBrokenCache[gameId] = true;
       return true;
     }
