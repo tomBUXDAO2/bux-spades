@@ -405,13 +405,22 @@ class CardPlayHandler {
         // Update Redis cache with the complete updated state (single operation)
         await redisGameState.setGameState(gameId, updatedGameState);
         
+        // CRITICAL: Always ensure currentTrick is set and is an array
+        if (!updatedGameState.play) updatedGameState.play = {};
+        if (!Array.isArray(updatedGameState.play.currentTrick)) {
+          updatedGameState.play.currentTrick = updatedGameState.play.currentTrick || [];
+        }
+        // Also set at top level for client compatibility
+        updatedGameState.currentTrick = updatedGameState.play.currentTrick;
+        updatedGameState.currentTrickCards = updatedGameState.play.currentTrick;
+        
         // Emitting card_played event
         // Game state updated
-        console.log(`[CARD PLAY] Emitting card_played event with currentPlayer: ${updatedGameState.currentPlayer}`);
+        console.log(`[CARD PLAY] Emitting card_played event with currentPlayer: ${updatedGameState.currentPlayer}, currentTrick length: ${updatedGameState.play.currentTrick.length}`);
         this.io.to(gameId).emit('card_played', {
           gameId,
           gameState: updatedGameState,
-          currentTrick: updatedGameState.play?.currentTrick || [],
+          currentTrick: updatedGameState.play.currentTrick, // Always include, always an array
           cardPlayed: {
             userId,
             card,
@@ -671,12 +680,18 @@ class CardPlayHandler {
       
       // CRITICAL: Emit trick_started event to notify clients that new trick has started
       const updatedGameState = await GameService.getGameStateForClient(gameId);
+      // Ensure currentTrick is explicitly set to empty array for new trick
+      if (!updatedGameState.play) updatedGameState.play = {};
+      updatedGameState.play.currentTrick = [];
+      updatedGameState.currentTrick = [];
+      updatedGameState.currentTrickCards = [];
       this.io.to(gameId).emit('trick_started', {
         gameId,
         gameState: updatedGameState,
+        currentTrick: [], // Explicitly set to empty array
         currentPlayer: updatedGameState.currentPlayer
       });
-      console.log(`[CARD PLAY] Emitted trick_started for new trick ${trickNumber}`);
+      console.log(`[CARD PLAY] Emitted trick_started for new trick ${trickNumber} with empty currentTrick`);
       
       // Trigger bot play if next player is a bot
       this.triggerBotPlayIfNeeded(gameId);

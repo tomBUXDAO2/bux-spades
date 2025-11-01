@@ -220,22 +220,42 @@ export class GameLoggingService {
       if (existingCardsCount === 0) {
         // Player is leading the trick
         
-        // CORE RULE: Cannot lead spades until broken unless only have spades
-        if (!spadesBroken && suit === 'SPADES') {
-          const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
-          if (hasNonSpades) {
-            console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
-            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+        // CRITICAL: Hard guard for trick 1 - spades cannot be broken yet, skip assassin rule
+        const isTrick1 = trickNumber === 1;
+        const redisCurrentTrick = await redisGameState.getCurrentTrick(gameId);
+        const isEmptyTrick = !Array.isArray(redisCurrentTrick) || redisCurrentTrick.length === 0;
+        
+        if (isTrick1 && isEmptyTrick) {
+          // At trick 1 with empty current trick - spades CANNOT be broken, skip assassin rule
+          console.log(`[GAME LOGGING] Trick 1 guard: skipping assassin rule (spades not broken yet)`);
+          // Only enforce core rule: cannot lead spades unless only have spades
+          if (suit === 'SPADES') {
+            const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+            if (hasNonSpades) {
+              console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
+              return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+            }
           }
-        }
+          // Allow any non-spade on trick 1 (assassin rule doesn't apply until spades are broken)
+        } else {
+          // Not trick 1 or trick has cards - apply normal rules
+          // CORE RULE: Cannot lead spades until broken unless only have spades
+          if (!spadesBroken && suit === 'SPADES') {
+            const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+            if (hasNonSpades) {
+              console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
+              return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+            }
+          }
 
-        // ASSASSIN: Must lead spades if broken and has spades
-        if (ruleAssassin && spadesBroken && suit !== 'SPADES') {
-          const hasSpades = currentHand.some(card => card.suit === 'SPADES');
-          console.log(`[GAME LOGGING][DEBUG] Assassin lead check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
-          if (hasSpades) {
-            console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
-            return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+          // ASSASSIN: Must lead spades if broken and has spades
+          if (ruleAssassin && spadesBroken && suit !== 'SPADES') {
+            const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+            console.log(`[GAME LOGGING][DEBUG] Assassin lead check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
+            if (hasSpades) {
+              console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
+              return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
+            }
           }
         }
         
