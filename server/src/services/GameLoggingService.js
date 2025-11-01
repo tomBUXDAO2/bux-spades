@@ -145,6 +145,23 @@ export class GameLoggingService {
         console.log(`[GAME LOGGING] Guard: trick ${trickRecord.id} already has ${existingCardsCount} cards. Skipping insert.`);
         return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
       }
+      
+      // CRITICAL FIX: If leading (existingCardsCount === 0), ensure Redis currentTrick is cleared
+      // This prevents race conditions where client plays before Redis cache is synced after trick completion
+      if (existingCardsCount === 0) {
+        const redisCurrentTrick = await redisGameState.getCurrentTrick(gameId);
+        if (Array.isArray(redisCurrentTrick) && redisCurrentTrick.length > 0) {
+          console.log(`[GAME LOGGING] Syncing: Clearing stale Redis currentTrick (${redisCurrentTrick.length} cards) before allowing lead`);
+          await redisGameState.setCurrentTrick(gameId, []);
+          // Also clear from game state cache
+          const gs = await redisGameState.getGameState(gameId);
+          if (gs && gs.play) {
+            gs.play.currentTrick = [];
+            await redisGameState.setGameState(gameId, gs);
+          }
+        }
+      }
+      
       // 2) Do not allow the same seat to play twice in a trick
       const seatAlreadyPlayed = await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id, seatIndex } });
       if (seatAlreadyPlayed) {

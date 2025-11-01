@@ -13,8 +13,6 @@ export class SpadesRuleService {
   static async areSpadesBroken(gameId) {
     const gs = await redisGameState.getGameState(gameId);
     if (!gs || !gs.play) return false;
-    // If flag is set, treat as broken
-    if (gs.play.spadesBroken) return true;
 
     const completed = Array.isArray(gs.play.completedTricks) ? gs.play.completedTricks : [];
     const current = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
@@ -22,16 +20,31 @@ export class SpadesRuleService {
 
     // Fresh round guard: nothing played anywhere
     if (completed.length === 0 && current.length === 0) {
+      // Reset stale flag if present
+      if (gs.play.spadesBroken) {
+        gs.play.spadesBroken = false;
+        await redisGameState.setGameState(gameId, gs);
+      }
       return false;
     }
 
-    // First trick guard: if we're at trick 1 of the round and no spade in the current trick yet,
-    // treat spades as NOT broken even if stale completedTricks from a previous round exist in Redis.
-    if (trickNum === 1 && Array.isArray(current) && !current.some(c => c && c.suit === 'SPADES')) {
+    // CRITICAL: First trick guard - if we're at trick 1 and current trick is empty,
+    // spades CANNOT be broken yet (no spade has been played in this trick).
+    // Reset stale flag and return false even if completedTricks has stale data from previous rounds.
+    if (trickNum === 1 && Array.isArray(current) && current.length === 0) {
+      // Reset stale flag if present
+      if (gs.play.spadesBroken) {
+        gs.play.spadesBroken = false;
+        await redisGameState.setGameState(gameId, gs);
+        console.log(`[SPADES RULE] Reset stale spadesBroken flag at trick 1`);
+      }
       return false;
     }
 
-    // Check completed tricks
+    // If flag is set, treat as broken (but only if we're past trick 1 or current trick has cards)
+    if (gs.play.spadesBroken) return true;
+
+    // Check completed tricks (may contain stale data from previous rounds, but we've already handled trick 1 case above)
     for (const t of completed) {
       if (Array.isArray(t?.cards) && t.cards.some(c => c && c.suit === 'SPADES')) {
         return true;
