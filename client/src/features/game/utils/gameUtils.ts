@@ -63,44 +63,42 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   const roundNumber = (game as any).currentRound || (game as any).round || 0;
   
   // CRITICAL: Check if this is a new round - if so, clear cache
-  if (roundNumberCache[gameId] !== undefined && roundNumberCache[gameId] !== roundNumber) {
+  const previousRound = roundNumberCache[gameId];
+  if (previousRound !== undefined && previousRound !== roundNumber) {
     // Round changed - clear cache for new round
     delete spadesBrokenCache[gameId];
   }
   roundNumberCache[gameId] = roundNumber;
   
-  const isEmptyTrick = !Array.isArray(currentTrick) || currentTrick.length === 0;
-  const hasCompletedTricks = Array.isArray(completedTricks) && completedTricks.length > 0;
-  
   // CRITICAL: Check cache FIRST - if spades were broken before, they stay broken for the round
+  // Once set, cache persists for entire round regardless of server state
   if (spadesBrokenCache[gameId]) {
     return true;
   }
   
-  // Check server flag
+  // Check server flag - if true, set cache immediately
   if (spadesBroken) {
     spadesBrokenCache[gameId] = true;
     return true;
   }
   
-  if (isEmptyTrick) {
-    // Check completed tricks for spades
-    if (hasCompletedTricks) {
-      for (const trick of completedTricks) {
-        if (trick && trick.cards && Array.isArray(trick.cards) && trick.cards.some((card: any) => card && card.suit === 'SPADES')) {
-          spadesBrokenCache[gameId] = true;
-          return true;
-        }
-      }
+  // Check current trick for spades - set cache immediately if found
+  if (Array.isArray(currentTrick) && currentTrick.length > 0) {
+    const hasSpadeInCurrentTrick = currentTrick.some((card: any) => card && card.suit === 'SPADES');
+    if (hasSpadeInCurrentTrick) {
+      spadesBrokenCache[gameId] = true;
+      return true;
     }
-    return false;
   }
   
-  // Current trick has cards - check if a spade is in it
-  const hasSpadeInCurrentTrick = currentTrick.some((card: any) => card && card.suit === 'SPADES');
-  if (hasSpadeInCurrentTrick) {
-    spadesBrokenCache[gameId] = true;
-    return true;
+  // Check completed tricks for spades - set cache immediately if found
+  if (Array.isArray(completedTricks) && completedTricks.length > 0) {
+    for (const trick of completedTricks) {
+      if (trick && trick.cards && Array.isArray(trick.cards) && trick.cards.some((card: any) => card && card.suit === 'SPADES')) {
+        spadesBrokenCache[gameId] = true;
+        return true;
+      }
+    }
   }
 
   return false;
