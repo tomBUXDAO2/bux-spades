@@ -16,43 +16,44 @@ export class SpadesRuleService {
 
     const completed = Array.isArray(gs.play.completedTricks) ? gs.play.completedTricks : [];
     const current = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
-    const trickNum = Number(gs.play.currentTrickNumber ?? gs.play.currentTrickIndex ?? 1);
 
-    // Fresh round guard: nothing played anywhere
-    if (completed.length === 0 && current.length === 0) {
-      // Reset stale flag if present
-      if (gs.play.spadesBroken) {
-        gs.play.spadesBroken = false;
-        await redisGameState.setGameState(gameId, gs);
-      }
-      return false;
-    }
-
-    // CRITICAL: First trick guard - if we're at trick 1 and current trick is empty,
-    // spades CANNOT be broken yet (no spade has been played in this trick).
-    // Reset stale flag and return false even if completedTricks has stale data from previous rounds.
-    if (trickNum === 1 && Array.isArray(current) && current.length === 0) {
-      // Reset stale flag if present
-      if (gs.play.spadesBroken) {
-        gs.play.spadesBroken = false;
-        await redisGameState.setGameState(gameId, gs);
-        console.log(`[SPADES RULE] Reset stale spadesBroken flag at trick 1`);
-      }
-      return false;
-    }
-
-    // If flag is set, treat as broken (but only if we're past trick 1 or current trick has cards)
-    if (gs.play.spadesBroken) return true;
-
-    // Check completed tricks (may contain stale data from previous rounds, but we've already handled trick 1 case above)
+    // Check completed tricks FIRST - if any contain spades, spades are broken
+    // This is the most reliable source of truth - spades that were already played
     for (const t of completed) {
       if (Array.isArray(t?.cards) && t.cards.some(c => c && c.suit === 'SPADES')) {
+        // Ensure flag is set if we found spades in completed tricks
+        if (!gs.play.spadesBroken) {
+          gs.play.spadesBroken = true;
+          await redisGameState.setGameState(gameId, gs);
+        }
         return true;
       }
     }
 
-    // Check current trick
-    if (current.some(c => c && c.suit === 'SPADES')) return true;
+    // Check current trick - if it has spades, spades are broken
+    if (current.some(c => c && c.suit === 'SPADES')) {
+      // Ensure flag is set if we found spades in current trick
+      if (!gs.play.spadesBroken) {
+        gs.play.spadesBroken = true;
+        await redisGameState.setGameState(gameId, gs);
+      }
+      return true;
+    }
+
+    // If flag is set, trust it - spades were broken before
+    // Once broken in a round, they stay broken for the entire round
+    if (gs.play.spadesBroken) return true;
+
+    // Only reset flag if we're at a truly fresh round (no completed tricks AND no current trick)
+    // This means we're at the very start of a new round where nothing has been played
+    if (completed.length === 0 && current.length === 0) {
+      // Reset stale flag if present (fresh round)
+      if (gs.play.spadesBroken) {
+        gs.play.spadesBroken = false;
+        await redisGameState.setGameState(gameId, gs);
+      }
+      return false;
+    }
 
     return false;
   }
