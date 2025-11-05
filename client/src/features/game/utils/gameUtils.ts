@@ -73,9 +73,23 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
       return true;
     }
     
+    // CRITICAL FIX: Check cache BEFORE clearing it - if we've seen spades broken before, keep it
+    if (spadesBrokenCache[gameId]) {
+      return true;
+    }
+    
     // If no completed tricks, we're at trick 1 (spades not broken)
     if (!hasCompletedTricks) {
-      delete spadesBrokenCache[gameId];
+      // Only clear cache if we're at a fresh round (13 cards in hand)
+      // Don't clear if we're mid-round and just don't have completedTricks data yet
+      try {
+        const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
+        const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
+        if (firstHandCount === 13) {
+          // Fresh round - safe to clear cache
+          delete spadesBrokenCache[gameId];
+        }
+      } catch {}
       return false;
     }
     
@@ -87,7 +101,14 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
       }
     }
     // Completed tricks exist but none have spades - spades not broken in this round yet
-    delete spadesBrokenCache[gameId];
+    // Only clear cache if we're at a fresh round
+    try {
+      const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
+      const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
+      if (firstHandCount === 13) {
+        delete spadesBrokenCache[gameId];
+      }
+    } catch {}
     return false;
   }
   
