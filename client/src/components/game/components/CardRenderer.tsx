@@ -183,7 +183,9 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   // Defensive: only use myHand and playableCards if defined
   let effectivePlayableCards: typeof myHand = [];
   if (isMyTurn && Array.isArray(myHand)) {
-    const isLeading = (currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0) || (trickCompleted && currentTrick && Array.isArray(currentTrick) && currentTrick.length === 4);
+    // CRITICAL FIX: Use gameState.play.currentTrick as source of truth, not the prop which might be stale
+    const actualCurrentTrick = (gameState as any).play?.currentTrick || currentTrick || [];
+    const isLeading = Array.isArray(actualCurrentTrick) && actualCurrentTrick.length === 0;
     const spadesBroken = (gameState as any).play?.spadesBroken;
     
     // RACE CONDITION FIX: Check if spades have been played in the current round
@@ -211,12 +213,14 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       gameStatePlay: (gameState as any).play, 
       isLeading,
       completedTricks: gameState.play?.completedTricks?.length,
-      currentTrickLength: gameState.play?.currentTrick?.length
+      currentTrickLength: actualCurrentTrick.length,
+      currentTrickPropLength: currentTrick?.length,
+      gameStateCurrentTrickLength: (gameState as any).play?.currentTrick?.length
     });
     
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
-    // Always pass currentTrick to avoid race conditions where gameState.play.currentTrick is undefined
-    effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, currentTrick);
+    // Use actualCurrentTrick (from gameState) as source of truth, not stale prop
+    effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, actualCurrentTrick);
     
     // DEBUG: Log what getPlayableCards returned when leading
     if (isLeading) {
@@ -253,9 +257,9 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       
       // CRITICAL FIX: Use same spadesBroken detection as getPlayableCards to avoid mismatch
       // Check if we're at trick 1 with empty current trick - spades cannot be broken yet
-      const currentTrickForCheck = currentTrick || (gameState as any).play?.currentTrick || [];
+      // Use actualCurrentTrick (already calculated above) as source of truth
       const completedTricksForCheck = (gameState as any).play?.completedTricks || [];
-      const isEmptyTrick = !Array.isArray(currentTrickForCheck) || currentTrickForCheck.length === 0;
+      const isEmptyTrick = Array.isArray(actualCurrentTrick) && actualCurrentTrick.length === 0;
       const hasCompletedTricks = Array.isArray(completedTricksForCheck) && completedTricksForCheck.length > 0;
       
       // If trick 1 with no completed tricks, spades definitely not broken
