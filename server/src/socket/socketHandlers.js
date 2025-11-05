@@ -114,7 +114,21 @@ export function setupSocketHandlers(io) {
         lobbyChatHandler.handleUserOnline();
       } catch (error) {
         console.error('[SOCKET] Authentication error:', error);
-        socket.emit('auth_error', { message: 'Invalid token' });
+        console.error('[SOCKET] Error details:', {
+          name: error.name,
+          message: error.message,
+          expiredAt: error.expiredAt,
+          jwtSecretSet: !!process.env.JWT_SECRET
+        });
+        
+        let errorMessage = 'Invalid token';
+        if (error.name === 'TokenExpiredError') {
+          errorMessage = 'Token expired';
+        } else if (error.name === 'JsonWebTokenError') {
+          errorMessage = `Invalid token: ${error.message}`;
+        }
+        
+        socket.emit('auth_error', { message: errorMessage });
       }
     });
 

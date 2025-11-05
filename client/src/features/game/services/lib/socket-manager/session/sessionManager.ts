@@ -72,14 +72,18 @@ export class SessionManager {
         };
       } else {
         console.error('Invalid session response:', session);
-        // Clear invalid token
+        // Clear invalid token from all possible storage keys
+        localStorage.removeItem('sessionToken');
         localStorage.removeItem('token');
+        localStorage.removeItem('userData');
         return null;
       }
     } catch (error) {
       console.error('Error fetching session:', error);
-      // Clear token on error
+      // Clear token on error from all possible storage keys
+      localStorage.removeItem('sessionToken');
       localStorage.removeItem('token');
+      localStorage.removeItem('userData');
       return null;
     }
   }

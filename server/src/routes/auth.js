@@ -19,7 +19,21 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', (err, decoded) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      console.error('[AUTH] Token verification error:', {
+        name: err.name,
+        message: err.message,
+        expiredAt: err.expiredAt,
+        jwtSecretSet: !!process.env.JWT_SECRET
+      });
+      
+      let errorMessage = 'Invalid or expired token';
+      if (err.name === 'TokenExpiredError') {
+        errorMessage = 'Token expired';
+      } else if (err.name === 'JsonWebTokenError') {
+        errorMessage = `Invalid token: ${err.message}`;
+      }
+      
+      return res.status(403).json({ error: errorMessage });
     }
     req.userId = decoded.userId;
     next();

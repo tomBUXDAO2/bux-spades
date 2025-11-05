@@ -94,6 +94,24 @@ export const setupSocketListeners = (
 
   socket.on('auth_error', (error) => {
     console.error('Socket authentication error:', error);
+    
+    // Clear invalid tokens from storage
+    const errorMessage = error.message || '';
+    if (errorMessage.includes('expired') || errorMessage.includes('Invalid token')) {
+      console.log('Clearing invalid/expired token from localStorage');
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      
+      // Dispatch event to trigger re-authentication
+      window.dispatchEvent(new CustomEvent('authError', { 
+        detail: { 
+          message: errorMessage,
+          requiresLogin: true 
+        } 
+      }));
+    }
+    
     callbacks.onStateChange({
       isConnected: true,
       isAuthenticated: false,
