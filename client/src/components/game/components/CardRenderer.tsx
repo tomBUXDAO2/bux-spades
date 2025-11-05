@@ -217,6 +217,17 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
     // Always pass currentTrick to avoid race conditions where gameState.play.currentTrick is undefined
     effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, currentTrick);
+    
+    // DEBUG: Log what getPlayableCards returned when leading
+    if (isLeading) {
+      const spadesInPlayable = effectivePlayableCards.filter((c: any) => c.suit === 'SPADES');
+      console.log('[CARD RENDERER] getPlayableCards result when leading:', {
+        totalPlayable: effectivePlayableCards.length,
+        spadesInPlayable: spadesInPlayable.length,
+        spadesCards: spadesInPlayable.map((c: any) => `${c.suit}${c.rank}`),
+        allPlayableSuits: [...new Set(effectivePlayableCards.map((c: any) => c.suit))]
+      });
+    }
 
     // Enforce assassin leading rule explicitly to avoid any edge-case empty sets
     try {
