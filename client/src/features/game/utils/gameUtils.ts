@@ -59,36 +59,42 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   const completedTricks = (game as any).play?.completedTricks || [];
   const currentTrick = (game as any).play?.currentTrick || [];
   
-  // If spadesBroken flag is true, return true
-  if (spadesBroken) {
-    spadesBrokenCache[gameId] = true;
-    return true;
-  }
-  // If we've previously observed spades played for this game/round, honor it immediately
-  // BUT reset the cache if there is clearly a fresh trick state with no cards played anywhere
-  if (completedTricks.length === 0 && (!Array.isArray(currentTrick) || currentTrick.length === 0)) {
-    // Fresh round/trick context visible -> do not trust prior cache
-    delete spadesBrokenCache[gameId];
-  } else if (spadesBrokenCache[gameId]) {
-    return true;
-  }
+  // CRITICAL: If currentTrick is empty, we're leading or between tricks
+  // Check completedTricks to see if spades were broken in a previous trick
+  // If no completed tricks exist (or undefined), we're at trick 1 and spades cannot be broken yet
+  const isEmptyTrick = !Array.isArray(currentTrick) || currentTrick.length === 0;
+  const hasCompletedTricks = Array.isArray(completedTricks) && completedTricks.length > 0;
   
-  // RACE CONDITION FIX: Also check completed tricks for spades
-  if (completedTricks) {
+  if (isEmptyTrick) {
+    // Empty current trick - if no completed tricks, we're at trick 1 (spades not broken)
+    // If completed tricks exist, check if any contain spades
+    if (!hasCompletedTricks) {
+      // No completed tricks = trick 1, spades cannot be broken yet
+      delete spadesBrokenCache[gameId];
+      return false;
+    }
+    // Have completed tricks - check if any contain spades
     for (const trick of completedTricks) {
-      if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
+      if (trick && trick.cards && Array.isArray(trick.cards) && trick.cards.some((card: any) => card && card.suit === 'SPADES')) {
         spadesBrokenCache[gameId] = true;
         return true;
       }
     }
+    // Completed tricks exist but none have spades - spades not broken in this round yet
+    delete spadesBrokenCache[gameId];
+    return false;
   }
   
-  // RACE CONDITION FIX: Also check current trick for spades
-  if (Array.isArray(currentTrick) && currentTrick.length > 0) {
-    if (currentTrick.some((card: any) => card.suit === 'SPADES')) {
-      spadesBrokenCache[gameId] = true;
-      return true;
-    }
+  // Current trick has cards - check if a spade is in it
+  const hasSpadeInCurrentTrick = currentTrick.some((card: any) => card && card.suit === 'SPADES');
+  if (hasSpadeInCurrentTrick) {
+    spadesBrokenCache[gameId] = true;
+    return true;
+  }
+  
+  // No spade in current trick - check cache as fallback
+  if (spadesBrokenCache[gameId]) {
+    return true;
   }
   
   // Detect new round to safely clear cache (13 cards in a hand and no completed tricks yet)
