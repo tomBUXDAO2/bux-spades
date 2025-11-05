@@ -119,9 +119,10 @@ class CardPlayHandler {
 
       // PRE-VALIDATION: Core rule - cannot lead spades before broken unless only spades
       try {
-        const cachedState = await GameService.getGameStateForClient(gameId);
         const trickCards = await prisma.trickCard.count({ where: { trickId: currentTrick.id } });
-        const spadesBroken = cachedState?.play?.spadesBroken || false;
+        // CRITICAL: Use SpadesRuleService to check if spades are broken (checks Redis state, not just flag)
+        const { SpadesRuleService } = await import('../../../services/SpadesRuleService.js');
+        const spadesBroken = await SpadesRuleService.areSpadesBroken(gameId);
         if (trickCards === 0 && card?.suit === 'SPADES' && !spadesBroken) {
           const hands = await redisGameState.getPlayerHands(gameId);
           const hand = (hands && hands[player.seatIndex]) ? hands[player.seatIndex] : [];
