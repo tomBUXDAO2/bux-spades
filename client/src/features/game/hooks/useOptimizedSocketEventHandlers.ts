@@ -230,7 +230,7 @@ export const useOptimizedSocketEventHandlers = ({
             currentTrick: trickData.currentTrick || []
           },
           currentTrickCards: trickData.currentTrick || []
-        };
+        } as any;
         setGameState(normalizeGameState(clearedGameState));
       } else {
         // Fallback to partial update if gameState not provided
@@ -247,7 +247,7 @@ export const useOptimizedSocketEventHandlers = ({
             leadSuit: trickData.leadSuit
           },
           currentTrickCards: []
-        });
+        } as any);
       }
     }
   }, [gameId, setGameState, currentGameState]);
