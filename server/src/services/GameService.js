@@ -1131,13 +1131,16 @@ export class GameService {
       });
       
       if (latestRoundScore) {
+        // CRITICAL FIX: team0RunningTotal and team1RunningTotal already include bag penalties
+        // from ScoringService.calculatePartnersScores, so we should NOT recalculate or subtract again
         team1TotalScore = latestRoundScore.team0RunningTotal || 0; // team0 becomes team1 in client
         team2TotalScore = latestRoundScore.team1RunningTotal || 0; // team1 becomes team2 in client
         team1Bags = latestRoundScore.team0Bags || 0;
         team2Bags = latestRoundScore.team1Bags || 0;
       }
       
-      // Calculate total accumulated bags across all rounds
+      // Calculate total accumulated bags across all rounds (for display purposes only)
+      // Bag penalties are already included in team0RunningTotal/team1RunningTotal from ScoringService
       const allRoundScores = await prisma.roundScore.findMany({
         where: { 
           Round: { gameId }
@@ -1149,30 +1152,25 @@ export class GameService {
       let accumulatedTeam1Bags = 0;
       let accumulatedTeam2Bags = 0;
       
-      let team1BagPenalties = 0;
-      let team2BagPenalties = 0;
-      
+      // Calculate accumulated bags for display (penalties already applied in running totals)
       for (const roundScore of allRoundScores) {
         accumulatedTeam1Bags += roundScore.team0Bags || 0;
         accumulatedTeam2Bags += roundScore.team1Bags || 0;
         
-        // Apply bag penalties when reaching 10+ bags
+        // Apply bag penalties when reaching 10+ bags (for bag count reset only)
         if (accumulatedTeam1Bags >= 10) {
-          team1BagPenalties += Math.floor(accumulatedTeam1Bags / 10) * 100; // -100 points per 10 bags
           accumulatedTeam1Bags = accumulatedTeam1Bags % 10; // Reset bags after penalty
         }
         if (accumulatedTeam2Bags >= 10) {
-          team2BagPenalties += Math.floor(accumulatedTeam2Bags / 10) * 100; // -100 points per 10 bags
           accumulatedTeam2Bags = accumulatedTeam2Bags % 10; // Reset bags after penalty
         }
       }
       
+      // Use accumulated bags for display (current remainder after all penalties)
       team1Bags = accumulatedTeam1Bags;
       team2Bags = accumulatedTeam2Bags;
       
-      // Apply bag penalties to total scores
-      team1TotalScore -= team1BagPenalties;
-      team2TotalScore -= team2BagPenalties;
+      // DO NOT subtract penalties again - they're already in team0RunningTotal/team1RunningTotal
 
       // Map database enum values back to client-friendly format
       const gimmickVariantMapping = {

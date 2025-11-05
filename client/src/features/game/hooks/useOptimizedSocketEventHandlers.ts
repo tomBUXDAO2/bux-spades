@@ -221,30 +221,36 @@ export const useOptimizedSocketEventHandlers = ({
       // Use the full gameState from the server if provided
       if (trickData.gameState) {
         console.log('🎮 Trick started - setting game state with currentPlayer:', trickData.gameState.currentPlayer);
-        setGameState(normalizeGameState(trickData.gameState));
+        // CRITICAL FIX: Ensure currentTrick is explicitly cleared when new trick starts
+        // This prevents cards from being "pushed back" when leading
+        const clearedGameState = {
+          ...trickData.gameState,
+          play: {
+            ...trickData.gameState.play,
+            currentTrick: trickData.currentTrick || []
+          },
+          currentTrickCards: trickData.currentTrick || []
+        };
+        setGameState(normalizeGameState(clearedGameState));
       } else {
         // Fallback to partial update if gameState not provided
         const prevState = currentGameState;
         if (!prevState) return;
         
-        // CRITICAL: Only update if we're actually starting a new trick
-        // Don't interfere with current trick cards
-        const isNewTrick = !prevState.play?.currentTrick || prevState.play.currentTrick.length === 0;
-        
-        if (isNewTrick) {
-          setGameState({
-            ...prevState,
-            play: {
-              ...prevState.play,
-              currentTrick: [],
-              leadSuit: trickData.leadSuit
-            }
-          });
-        }
-        // Don't update if we're in the middle of a trick
+        // CRITICAL: Always clear currentTrick when trick_started event is received
+        // This ensures leading player can immediately play cards
+        setGameState({
+          ...prevState,
+          play: {
+            ...prevState.play,
+            currentTrick: [],
+            leadSuit: trickData.leadSuit
+          },
+          currentTrickCards: []
+        });
       }
     }
-  }, [gameId, setGameState]);
+  }, [gameId, setGameState, currentGameState]);
 
   const handleRoundStarted = useCallback((roundData: any) => {
     console.log('🎮 Round started event received:', roundData);

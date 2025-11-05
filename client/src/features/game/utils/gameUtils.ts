@@ -339,13 +339,16 @@ export const getPlayableCards = (
       return result;
     }
 
-    // FINAL GUARD: Even for Assassin, cannot lead spades before broken unless only spades
+    // CRITICAL FIX: After spades are broken, ALL players can lead spades (unless screamer rule applies)
+    // Only restrict spades if they haven't been broken yet AND player has non-spades
+    // Screamer rule already handled above, so we only need to check core rule here
     if (!spadesBroken) {
       const nonSpades = hand.filter(card => card.suit !== 'SPADES');
       if (nonSpades.length > 0) {
         playableCards = playableCards.filter(card => card.suit !== 'SPADES');
       }
     }
+    // If spadesBroken is true, spades are playable (already in playableCards unless screamer rule filtered them)
     return playableCards;
   }
   

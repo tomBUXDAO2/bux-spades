@@ -239,14 +239,29 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
         }
       } catch {}
       const isAssassinSeat = (rule1 === 'ASSASSIN') || (rule1 === 'SECRET_ASSASSIN' && (mySeatIndex === secretSeat));
-      const spadesNowBroken = hasSpadeBeenPlayed(gameState);
+      
+      // CRITICAL FIX: Use same spadesBroken detection as getPlayableCards to avoid mismatch
+      // Check if we're at trick 1 with empty current trick - spades cannot be broken yet
+      const currentTrickForCheck = currentTrick || (gameState as any).play?.currentTrick || [];
+      const completedTricksForCheck = (gameState as any).play?.completedTricks || [];
+      const isEmptyTrick = !Array.isArray(currentTrickForCheck) || currentTrickForCheck.length === 0;
+      const hasCompletedTricks = Array.isArray(completedTricksForCheck) && completedTricksForCheck.length > 0;
+      
+      // If trick 1 with no completed tricks, spades definitely not broken
+      const isTrick1NoSpades = isEmptyTrick && !hasCompletedTricks;
+      
+      // Use server flag as primary source, but validate with trick data
+      const spadesBrokenFlag = (gameState as any).play?.spadesBroken || false;
+      const spadesNowBroken = !isTrick1NoSpades && (spadesActuallyPlayed || spadesBrokenFlag);
+      
       if (isLeading && isAssassinSeat) {
         if (spadesNowBroken) {
           // Only spades are legal when leading as assassin after broken
           const spades = myHand.filter((c: any) => c.suit === 'SPADES');
           effectivePlayableCards = spades.length > 0 ? spades : myHand;
         } else {
-          // Spades cannot be led before broken; allow any non-spade
+          // CRITICAL: Spades cannot be led before broken; allow any non-spade
+          // This prevents UI from allowing spades that server will reject
           const nonSpades = myHand.filter((c: any) => c.suit !== 'SPADES');
           effectivePlayableCards = nonSpades.length > 0 ? nonSpades : myHand;
         }

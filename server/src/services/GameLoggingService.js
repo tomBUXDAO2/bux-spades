@@ -149,17 +149,16 @@ export class GameLoggingService {
       // CRITICAL FIX: If leading (existingCardsCount === 0), ensure Redis currentTrick is cleared
       // This prevents race conditions where client plays before Redis cache is synced after trick completion
       if (existingCardsCount === 0) {
-        const redisCurrentTrick = await redisGameState.getCurrentTrick(gameId);
-        if (Array.isArray(redisCurrentTrick) && redisCurrentTrick.length > 0) {
-          console.log(`[GAME LOGGING] Syncing: Clearing stale Redis currentTrick (${redisCurrentTrick.length} cards) before allowing lead`);
-          await redisGameState.setCurrentTrick(gameId, []);
-          // Also clear from game state cache
-          const gs = await redisGameState.getGameState(gameId);
-          if (gs && gs.play) {
-            gs.play.currentTrick = [];
-            await redisGameState.setGameState(gameId, gs);
-          }
+        // Always clear currentTrick when leading, even if it appears empty
+        // This ensures consistency and prevents any stale state issues
+        await redisGameState.setCurrentTrick(gameId, []);
+        // Also clear from game state cache and update immediately
+        const gs = await redisGameState.getGameState(gameId);
+        if (gs && gs.play) {
+          gs.play.currentTrick = [];
+          await redisGameState.setGameState(gameId, gs);
         }
+        console.log(`[GAME LOGGING] Cleared currentTrick cache for new trick lead (seat ${seatIndex})`);
       }
       
       // 2) Do not allow the same seat to play twice in a trick
