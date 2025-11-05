@@ -191,7 +191,6 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // Don't recalculate separately - trust the cached result
     const spadesActuallyPlayed = hasSpadeBeenPlayed(gameState);
     
-    
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
     // Use actualCurrentTrick (from gameState) as source of truth, not stale prop
     effectivePlayableCards = getPlayableCards(gameState, myHand, isLeading, trickCompleted, actualCurrentTrick);
