@@ -66,13 +66,19 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   const hasCompletedTricks = Array.isArray(completedTricks) && completedTricks.length > 0;
   
   if (isEmptyTrick) {
-    // Empty current trick - if no completed tricks, we're at trick 1 (spades not broken)
-    // If completed tricks exist, check if any contain spades
+    // Empty current trick - check server flag first, then check completed tricks
+    // If server says spades are broken, trust it (even if we don't see completed tricks yet)
+    if (spadesBroken) {
+      spadesBrokenCache[gameId] = true;
+      return true;
+    }
+    
+    // If no completed tricks, we're at trick 1 (spades not broken)
     if (!hasCompletedTricks) {
-      // No completed tricks = trick 1, spades cannot be broken yet
       delete spadesBrokenCache[gameId];
       return false;
     }
+    
     // Have completed tricks - check if any contain spades
     for (const trick of completedTricks) {
       if (trick && trick.cards && Array.isArray(trick.cards) && trick.cards.some((card: any) => card && card.suit === 'SPADES')) {
@@ -230,6 +236,18 @@ export const getPlayableCards = (
   });
   const spadesBroken = hasSpadeBeenPlayed(gameState);
   
+  // DEBUG: Log spades broken status for leading
+  if (isLeading) {
+    console.log('[PLAYABLE CARDS] Leading check:', {
+      spadesBroken,
+      serverFlag: (gameState as any).play?.spadesBroken,
+      isAssassinSeat,
+      isScreamerSeat,
+      rule1,
+      handSuits: [...new Set(hand.map(c => c.suit))]
+    });
+  }
+  
   // CRITICAL FIX: Use currentTrick override if provided, otherwise fall back to gameState
   const currentTrick = currentTrickOverride || gameState.play?.currentTrick;
   
@@ -297,19 +315,12 @@ export const getPlayableCards = (
   if (isLeading) {
     let playableCards = hand;
     
-    // CORE: Cannot lead spades before broken unless only spades in hand
-    if (!spadesBroken) {
-      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
-      if (nonSpades.length > 0) {
-        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
-      }
-    }
-
     // ASSASSIN: Must lead spades if spades are broken and player has spades
     if (isAssassinSeat && spadesBroken) {
       const spades = hand.filter(card => card.suit === 'SPADES');
       if (spades.length > 0) {
         playableCards = spades; // MUST lead spades
+        return playableCards; // Early return - assassin must lead spades
       }
     }
     
@@ -320,6 +331,16 @@ export const getPlayableCards = (
         playableCards = playableCards.filter(card => card.suit !== 'SPADES');
       }
     }
+
+    // CORE: Cannot lead spades before broken unless only spades in hand
+    // NOTE: This only applies if spades are NOT broken. If spades ARE broken, all cards including spades are playable
+    if (!spadesBroken) {
+      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
+      if (nonSpades.length > 0) {
+        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
+      }
+    }
+    // If spadesBroken is true and player is not screamer, spades are playable (already in playableCards)
 
     // LOW/HIGHBALL: For each legal suit, find the lowest/highest card in that suit
     if (rule2 !== 'NONE' && playableCards.length > 0) {
@@ -339,16 +360,6 @@ export const getPlayableCards = (
       return result;
     }
 
-    // CRITICAL FIX: After spades are broken, ALL players can lead spades (unless screamer rule applies)
-    // Only restrict spades if they haven't been broken yet AND player has non-spades
-    // Screamer rule already handled above, so we only need to check core rule here
-    if (!spadesBroken) {
-      const nonSpades = hand.filter(card => card.suit !== 'SPADES');
-      if (nonSpades.length > 0) {
-        playableCards = playableCards.filter(card => card.suit !== 'SPADES');
-      }
-    }
-    // If spadesBroken is true, spades are playable (already in playableCards unless screamer rule filtered them)
     return playableCards;
   }
   
