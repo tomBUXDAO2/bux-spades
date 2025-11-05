@@ -73,22 +73,33 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
       return true;
     }
     
-    // CRITICAL FIX: Check cache BEFORE clearing it - if we've seen spades broken before, keep it
+    // CRITICAL FIX: Check cache BEFORE anything else - if we've seen spades broken before, keep it
+    // Once spades are broken in a round, they stay broken for the entire round
     if (spadesBrokenCache[gameId]) {
       return true;
     }
     
-    // If no completed tricks, we're at trick 1 (spades not broken)
+    // If no completed tricks, we might be at trick 1 OR we're mid-round without completedTricks data
     if (!hasCompletedTricks) {
-      // Only clear cache if we're at a fresh round (13 cards in hand)
-      // Don't clear if we're mid-round and just don't have completedTricks data yet
+      // NEVER clear cache if we're mid-round - only clear at the start of a fresh round
+      // Check if we're at a fresh round by looking at hand count AND round number
       try {
         const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
         const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
+        const roundNumber = (game as any).currentRound || (game as any).round || 0;
+        const previousRoundCache = (game as any).__previousRound;
+        
+        // Only clear cache if:
+        // 1. We're at a fresh round (13 cards in hand) AND
+        // 2. This is a new round (round number changed from what we cached)
         if (firstHandCount === 13) {
-          // Fresh round - safe to clear cache
-          delete spadesBrokenCache[gameId];
+          // Check if round changed - if so, clear cache for new round
+          if (previousRoundCache !== roundNumber) {
+            (game as any).__previousRound = roundNumber;
+            delete spadesBrokenCache[gameId];
+          }
         }
+        // If not fresh round, don't clear cache (we're mid-round, just missing data)
       } catch {}
       return false;
     }
@@ -101,14 +112,7 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
       }
     }
     // Completed tricks exist but none have spades - spades not broken in this round yet
-    // Only clear cache if we're at a fresh round
-    try {
-      const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
-      const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
-      if (firstHandCount === 13) {
-        delete spadesBrokenCache[gameId];
-      }
-    } catch {}
+    // Don't clear cache here - we might be missing data
     return false;
   }
   
@@ -124,15 +128,27 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
     return true;
   }
   
+  // CRITICAL: If we reach here, current trick has cards but no spade
+  // Check cache - if spades were broken before, keep them broken
+  if (spadesBrokenCache[gameId]) {
+    return true;
+  }
+
   // Detect new round to safely clear cache (13 cards in a hand and no completed tricks yet)
   try {
     const hands: any[] | undefined = (game as any).hands || (game as any).playerHands;
     const firstHandCount = Array.isArray(hands) && Array.isArray(hands[0]) ? hands[0].length : undefined;
     const completedCount = (game as any).play?.completedTricks?.length || 0;
+    const roundNumber = (game as any).currentRound || (game as any).round || 0;
+    const previousRoundCache = (game as any).__previousRound;
+    
     if (firstHandCount === 13 && completedCount === 0) {
-      // Fresh round; rely on server flag for this round until a spade is seen
-      if (!spadesBroken) {
-        delete spadesBrokenCache[gameId];
+      // Fresh round; only clear cache if round number changed
+      if (previousRoundCache !== roundNumber) {
+        (game as any).__previousRound = roundNumber;
+        if (!spadesBroken) {
+          delete spadesBrokenCache[gameId];
+        }
       }
     }
   } catch {}
