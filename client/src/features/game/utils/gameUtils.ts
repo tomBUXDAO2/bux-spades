@@ -124,12 +124,7 @@ export const hasSpadeBeenPlayed = (game: GameState): boolean => {
   }
   
   // No spade in current trick - check cache as fallback
-  if (spadesBrokenCache[gameId]) {
-    return true;
-  }
-  
-  // CRITICAL: If we reach here, current trick has cards but no spade
-  // Check cache - if spades were broken before, keep them broken
+  // CRITICAL: If spades were broken before, keep them broken (even if not in current trick)
   if (spadesBrokenCache[gameId]) {
     return true;
   }
