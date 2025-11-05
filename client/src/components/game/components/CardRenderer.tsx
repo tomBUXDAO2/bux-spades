@@ -186,37 +186,11 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // CRITICAL FIX: Use gameState.play.currentTrick as source of truth, not the prop which might be stale
     const actualCurrentTrick = (gameState as any).play?.currentTrick || currentTrick || [];
     const isLeading = Array.isArray(actualCurrentTrick) && actualCurrentTrick.length === 0;
-    const spadesBroken = (gameState as any).play?.spadesBroken;
     
-    // RACE CONDITION FIX: Check if spades have been played in the current round
-    // by looking at completed tricks and current trick, not just the spadesBroken flag
-    let spadesActuallyPlayed = spadesBroken;
-    if (!spadesActuallyPlayed && gameState.play?.completedTricks) {
-      // Check completed tricks for spades
-      for (const trick of gameState.play.completedTricks) {
-        if (trick.cards && trick.cards.some((card: any) => card.suit === 'SPADES')) {
-          spadesActuallyPlayed = true;
-          break;
-        }
-      }
-    }
-    if (!spadesActuallyPlayed && gameState.play?.currentTrick) {
-      // Check current trick for spades
-      if (gameState.play.currentTrick.some((card: any) => card.suit === 'SPADES')) {
-        spadesActuallyPlayed = true;
-      }
-    }
+    // CRITICAL: Use hasSpadeBeenPlayed function which has the cache logic
+    // Don't recalculate separately - trust the cached result
+    const spadesActuallyPlayed = hasSpadeBeenPlayed(gameState);
     
-    console.log(`[CARD RENDERER] spadesBroken check:`, { 
-      spadesBroken, 
-      spadesActuallyPlayed,
-      gameStatePlay: (gameState as any).play, 
-      isLeading,
-      completedTricks: gameState.play?.completedTricks?.length,
-      currentTrickLength: actualCurrentTrick.length,
-      currentTrickPropLength: currentTrick?.length,
-      gameStateCurrentTrickLength: (gameState as any).play?.currentTrick?.length
-    });
     
     // CRITICAL FIX: Always use getPlayableCards for proper rule validation
     // Use actualCurrentTrick (from gameState) as source of truth, not stale prop
@@ -286,6 +260,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     // SAFETY NET: If rule engine returns empty on my turn, ensure at least legal non-spades (or any suit if only spades)
     if (Array.isArray(effectivePlayableCards) && effectivePlayableCards.length === 0 && gameState.status === 'PLAYING') {
       const hasNonSpades = myHand.some((c: any) => c.suit !== 'SPADES');
+      // Use spadesActuallyPlayed from hasSpadeBeenPlayed which has cache
       if (!spadesActuallyPlayed) {
         effectivePlayableCards = hasNonSpades ? myHand.filter((c: any) => c.suit !== 'SPADES') : myHand;
       } else {
