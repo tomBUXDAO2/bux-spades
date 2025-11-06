@@ -1250,7 +1250,25 @@ export class GameService {
         play: {
           currentTrick: currentTrickCards,
           spadesBroken: spadesBroken,
-          secretAssassinSeat: secretAssassinSeat || game.specialRules?.secretAssassinSeat
+          secretAssassinSeat: secretAssassinSeat || game.specialRules?.secretAssassinSeat,
+          // CRITICAL: Build completedTricks array from current round's completed tricks
+          completedTricks: (() => {
+            const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+            if (!currentRound || !currentRound.tricks) return [];
+            // Get all completed tricks (tricks with 4 cards) from current round
+            return currentRound.tricks
+              .filter(trick => trick.cards && trick.cards.length === 4)
+              .map(trick => ({
+                cards: trick.cards.map(card => ({
+                  suit: card.suit,
+                  rank: card.rank,
+                  seatIndex: card.seatIndex,
+                  playerId: game.players.find(p => p.seatIndex === card.seatIndex)?.userId
+                })),
+                winningSeatIndex: trick.winningSeatIndex,
+                trickNumber: trick.trickNumber
+              }));
+          })()
         },
         bidding: {
           bids: playerBids,
