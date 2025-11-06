@@ -69,32 +69,15 @@ export class TrickCompletionService {
       });
       
       try {
-        // Update player tricks in Redis cache
-        const currentGameState = await redisGameState.getGameState(gameId);
-        if (currentGameState && currentGameState.players) {
-          // Update tricks for each player
-          currentGameState.players.forEach(player => {
-            const stat = currentRoundStats.find(s => s.seatIndex === player.seatIndex);
-            if (stat) {
-              player.tricks = stat.tricksWon;
-            }
-          });
-          
-          await redisGameState.setGameState(gameId, currentGameState);
-          console.log(`[TRICK COMPLETION] Updated player tricks in Redis cache`);
+        // CRITICAL: Rebuild full game state from database to ensure completedTricks is updated
+        // This ensures SpadesRuleService can find spades in completed tricks
+        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        if (freshGameState) {
+          await redisGameState.setGameState(gameId, freshGameState);
+          console.log(`[TRICK COMPLETION] Updated Redis cache with full game state including completedTricks`);
         }
       } catch (error) {
         console.error(`[TRICK COMPLETION] Error updating Redis cache after trick completion:`, error);
-        // Fallback to full rebuild if incremental update fails
-        try {
-          const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
-          if (freshGameState) {
-            await redisGameState.setGameState(gameId, freshGameState);
-            console.log(`[TRICK COMPLETION] Fallback: Updated Redis cache with full game state`);
-          }
-        } catch (fallbackError) {
-          console.error(`[TRICK COMPLETION] Fallback update also failed:`, fallbackError);
-        }
       }
 
       // Check if round is complete using the same stats
