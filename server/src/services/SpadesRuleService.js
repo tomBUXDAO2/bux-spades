@@ -12,16 +12,54 @@ export class SpadesRuleService {
    */
   static async areSpadesBroken(gameId) {
     const gs = await redisGameState.getGameState(gameId);
-    if (!gs || !gs.play) return false;
+    if (!gs) return false;
 
-    // SIMPLE: Just check the flag. Once a spade is played, flag is set to true.
-    // It stays true for the entire round. Only reset on new round.
-    if (gs.play.spadesBroken) return true;
+    gs.play = gs.play || {};
+
+    const currentRound = gs.currentRound ?? gs.play.currentRound ?? null;
+    const storedRound = gs.play.spadesBrokenRound ?? null;
+
+    const currentTrickCards = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
+    const completedTricks = Array.isArray(gs.play.completedTricks) ? gs.play.completedTricks : [];
+    const hasSpadeInCurrentTrick = currentTrickCards.some(card => card && card.suit === 'SPADES');
+    const hasSpadeInCompletedTricks = completedTricks.some(trick =>
+      trick && Array.isArray(trick.cards) && trick.cards.some(card => card && card.suit === 'SPADES')
+    );
+    const hasSpadeHistory = hasSpadeInCurrentTrick || hasSpadeInCompletedTricks;
+
+    if (gs.play.spadesBroken) {
+      // Guard against drift across rounds
+      if (currentRound !== null) {
+        if (storedRound === null) {
+          if (!hasSpadeHistory) {
+            gs.play.spadesBroken = false;
+            delete gs.play.spadesBrokenRound;
+            await redisGameState.setGameState(gameId, gs);
+            return false;
+          }
+        } else if (storedRound !== currentRound) {
+          gs.play.spadesBroken = false;
+          gs.play.spadesBrokenRound = currentRound;
+          await redisGameState.setGameState(gameId, gs);
+          return false;
+        }
+      }
+
+      if (!hasSpadeHistory) {
+        gs.play.spadesBroken = false;
+        delete gs.play.spadesBrokenRound;
+        await redisGameState.setGameState(gameId, gs);
+        return false;
+      }
+      return true;
+    }
 
     // Check current trick - if it has a spade RIGHT NOW, set flag and return true
-    const current = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
-    if (current.some(c => c && c.suit === 'SPADES')) {
+    if (hasSpadeInCurrentTrick || hasSpadeInCompletedTricks) {
       gs.play.spadesBroken = true;
+      if (currentRound !== null) {
+        gs.play.spadesBrokenRound = currentRound;
+      }
       await redisGameState.setGameState(gameId, gs);
       return true;
     }
@@ -36,10 +74,23 @@ export class SpadesRuleService {
     const gs = await redisGameState.getGameState(gameId);
     if (gs) {
       gs.play = gs.play || {};
+      const currentRound = gs.currentRound ?? gs.play.currentRound ?? null;
+      const currentTrickCards = Array.isArray(gs.play.currentTrick) ? gs.play.currentTrick : [];
+      const completedTricks = Array.isArray(gs.play.completedTricks) ? gs.play.completedTricks : [];
+
       if (!gs.play.spadesBroken) {
         gs.play.spadesBroken = true;
-        await redisGameState.setGameState(gameId, gs);
       }
+      if (!Array.isArray(gs.play.completedTricks)) {
+        gs.play.completedTricks = completedTricks;
+      }
+      if (!Array.isArray(gs.play.currentTrick)) {
+        gs.play.currentTrick = currentTrickCards;
+      }
+      if (currentRound !== null) {
+        gs.play.spadesBrokenRound = currentRound;
+      }
+      await redisGameState.setGameState(gameId, gs);
     }
   }
 }

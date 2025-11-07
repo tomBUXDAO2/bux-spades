@@ -180,7 +180,78 @@ export class GameLoggingService {
       
       // Get player hand for all validations
       const playerHand = await redisGameState.getPlayerHands(gameId);
-      const currentHand = playerHand && playerHand[seatIndex] ? playerHand[seatIndex] : [];
+      const parseCardEntry = (card) => {
+        if (!card) return null;
+        if (typeof card === 'string') {
+          const match = card.match(/^(SPADES|HEARTS|DIAMONDS|CLUBS)([0-9]+|10|J|Q|K|A)$/);
+          if (match) {
+            return { suit: match[1], rank: match[2] };
+          }
+          return null;
+        }
+        if (typeof card === 'object' && card.suit && card.rank) {
+          return { suit: card.suit, rank: card.rank };
+        }
+        return null;
+      };
+
+      const normalizeHand = (hand) => {
+        if (!Array.isArray(hand)) return [];
+        return hand.map(parseCardEntry).filter(card => card && card.suit && card.rank);
+      };
+
+      const cardKey = (card) => (card && card.suit && card.rank) ? `${card.suit}-${card.rank}` : null;
+
+      let currentHand = normalizeHand(playerHand && playerHand[seatIndex] ? playerHand[seatIndex] : []);
+
+      let snapshotHandCache = null;
+      let snapshotMerged = false;
+
+      const loadSnapshotHand = async () => {
+        if (snapshotHandCache !== null) return snapshotHandCache;
+        try {
+          const snapshot = await prisma.roundHandSnapshot.findFirst({
+            where: { roundId, seatIndex },
+            select: { cards: true }
+          });
+          if (!snapshot || !snapshot.cards) {
+            snapshotHandCache = [];
+          } else {
+            const rawCards = typeof snapshot.cards === 'string' ? JSON.parse(snapshot.cards) : snapshot.cards;
+            snapshotHandCache = normalizeHand(rawCards);
+          }
+        } catch (error) {
+          console.warn('[GAME LOGGING] Failed to load hand snapshot for fallback:', error?.message || error);
+          snapshotHandCache = [];
+        }
+        return snapshotHandCache;
+      };
+
+      const ensureHandMerged = async () => {
+        if (snapshotMerged) return;
+        const snapshotHand = await loadSnapshotHand();
+        if (snapshotHand.length) {
+          const existingKeys = new Set(currentHand.map(cardKey).filter(Boolean));
+          snapshotHand.forEach(card => {
+            const key = cardKey(card);
+            if (key && !existingKeys.has(key)) {
+              currentHand.push(card);
+              existingKeys.add(key);
+            }
+          });
+        }
+        snapshotMerged = true;
+      };
+
+      const handHas = async (predicate) => {
+        if (currentHand.some(predicate)) return true;
+        await ensureHandMerged();
+        return currentHand.some(predicate);
+      };
+
+      const handHasSuit = (suitToCheck) => handHas(card => card.suit === suitToCheck);
+      const handHasSpades = () => handHas(card => card.suit === 'SPADES');
+      const handHasNonSpades = () => handHas(card => card.suit !== 'SPADES');
       
       // Single source of truth for spadesBroken
       const cachedGameState = await redisGameState.getGameState(gameId);
@@ -229,7 +300,7 @@ export class GameLoggingService {
           console.log(`[GAME LOGGING] Trick 1 guard: skipping assassin rule (spades not broken yet)`);
           // Only enforce core rule: cannot lead spades unless only have spades
           if (suit === 'SPADES') {
-            const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+            const hasNonSpades = await handHasNonSpades();
             if (hasNonSpades) {
               console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
               return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
@@ -240,7 +311,7 @@ export class GameLoggingService {
           // Not trick 1 or trick has cards - apply normal rules
           // CORE RULE: Cannot lead spades until broken unless only have spades
           if (!spadesBroken && suit === 'SPADES') {
-            const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+            const hasNonSpades = await handHasNonSpades();
             if (hasNonSpades) {
               console.log(`[GAME LOGGING] CORE: seat ${seatIndex} cannot lead spades before broken. Rejecting.`);
               return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
@@ -249,7 +320,7 @@ export class GameLoggingService {
 
           // ASSASSIN: Must lead spades if broken and has spades
           if (ruleAssassin && spadesBroken && suit !== 'SPADES') {
-            const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+            const hasSpades = await handHasSpades();
             console.log(`[GAME LOGGING][DEBUG] Assassin lead check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
             if (hasSpades) {
               console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must lead spades (broken) but played ${suit}. Rejecting.`);
@@ -260,7 +331,7 @@ export class GameLoggingService {
         
         // SCREAMER: Cannot lead spades unless only have spades
         if (ruleScreamer && suit === 'SPADES') {
-          const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+          const hasNonSpades = await handHasNonSpades();
           if (hasNonSpades) {
             console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot lead spades, has non-spades. Rejecting.`);
             return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: 0, rejected: true };
@@ -291,9 +362,7 @@ export class GameLoggingService {
         
         if (leadCard && leadCard.suit !== suit) {
           // Player is not following suit - check if they have cards of the lead suit
-          const hasLeadSuit = currentHand.some(card => 
-            card.suit === leadCard.suit
-          );
+          const hasLeadSuit = await handHasSuit(leadCard.suit);
           
           if (hasLeadSuit) {
             console.log(`[GAME LOGGING] Guard: seat ${seatIndex} must follow suit ${leadCard.suit} but played ${suit}. Rejecting card play.`);
@@ -304,7 +373,7 @@ export class GameLoggingService {
             
             // ASSASSIN: Must cut with spades when void
             if (ruleAssassin && suit !== 'SPADES') {
-              const hasSpades = currentHand.some(card => card.suit === 'SPADES');
+              const hasSpades = await handHasSpades();
               console.log(`[GAME LOGGING][DEBUG] Assassin void-cut check: hasSpades=${hasSpades}, attemptedSuit=${suit}`);
               if (hasSpades) {
                 console.log(`[GAME LOGGING] ASSASSIN: seat ${seatIndex} must cut with spades but played ${suit}. Rejecting.`);
@@ -314,7 +383,7 @@ export class GameLoggingService {
             
             // SCREAMER: Cannot play spades unless only have spades (never applies to Assassin seat)
             if (!ruleAssassin && ruleScreamer && suit === 'SPADES') {
-              const hasNonSpades = currentHand.some(card => card.suit !== 'SPADES');
+              const hasNonSpades = await handHasNonSpades();
               if (hasNonSpades) {
                 console.log(`[GAME LOGGING] SCREAMER: seat ${seatIndex} cannot play spades, has non-spades. Rejecting.`);
                 return { cardRecord: null, actualTrickId: trickRecord.id, playOrder: existingCardsCount, rejected: true };
@@ -327,6 +396,7 @@ export class GameLoggingService {
       // LOWBALL / HIGHBALL enforcement among legal options
       try {
         if (rule2 === 'LOWBALL' || rule2 === 'HIGHBALL') {
+          await ensureHandMerged();
           // Build legal set based on rules already checked above
           let legal = [];
           if (existingCardsCount === 0) {
@@ -343,7 +413,7 @@ export class GameLoggingService {
           } else {
             // Following
             const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
-            const hasLead = currentHand.some(c => c.suit === leadSuit);
+            const hasLead = await handHasSuit(leadSuit);
             if (hasLead) {
               legal = currentHand.filter(c => c.suit === leadSuit);
             } else {
@@ -378,7 +448,7 @@ export class GameLoggingService {
               // - If player has lead suit: must be lowest card in lead suit (current legal will only be lead suit)
               // - If void in lead suit: must be lowest card in the CHOSEN suit among legal suits
               const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
-              const hasLead = currentHand.some(c => c.suit === leadSuit);
+              const hasLead = await handHasSuit(leadSuit);
               if (hasLead) {
                 const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
                 const lowest = sorted[0];
@@ -413,7 +483,7 @@ export class GameLoggingService {
               // - If player has lead suit: must be highest card in lead suit (current legal will only be lead suit)
               // - If void in lead suit: must be highest card in the CHOSEN suit among legal suits
               const leadSuit = leadSuitCache.get(trickRecord.id) || leadCard?.suit || (await prisma.trickCard.findFirst({ where: { trickId: trickRecord.id }, orderBy: { playOrder: 'asc' } }))?.suit;
-              const hasLead = currentHand.some(c => c.suit === leadSuit);
+              const hasLead = await handHasSuit(leadSuit);
               if (hasLead) {
                 const sorted = legal.sort((a,b)=> order[a.rank]-order[b.rank]);
                 const highest = sorted[sorted.length-1];

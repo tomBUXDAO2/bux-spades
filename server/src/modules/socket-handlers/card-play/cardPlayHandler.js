@@ -386,7 +386,11 @@ class CardPlayHandler {
         // Update spadesBroken flag if needed
         if (!updatedGameState.play) updatedGameState.play = {};
         if (card.suit === 'SPADES') {
+          const currentRoundNumber = updatedGameState.currentRound ?? gameState.currentRound;
           updatedGameState.play.spadesBroken = true;
+          if (currentRoundNumber !== undefined && currentRoundNumber !== null) {
+            updatedGameState.play.spadesBrokenRound = currentRoundNumber;
+          }
         }
         
         // CRITICAL: Ensure the game state has the correct current player
@@ -403,7 +407,11 @@ class CardPlayHandler {
         // CRITICAL: Preserve spadesBroken flag after database update
         if (card.suit === 'SPADES') {
           updatedGameState.play = updatedGameState.play || {};
+          const currentRoundNumber = updatedGameState.currentRound ?? gameState.currentRound;
           updatedGameState.play.spadesBroken = true;
+          if (currentRoundNumber !== undefined && currentRoundNumber !== null) {
+            updatedGameState.play.spadesBrokenRound = currentRoundNumber;
+          }
           console.log(`[CARD PLAY] Preserved spadesBroken = true after database update`);
         }
         
