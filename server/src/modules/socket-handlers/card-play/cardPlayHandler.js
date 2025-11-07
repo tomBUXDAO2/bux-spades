@@ -146,6 +146,8 @@ class CardPlayHandler {
         console.warn('[CARD PLAY] Pre-validation failed (continuing):', e?.message || e);
       }
 
+      const trickNumberForLogging = currentTrick.trickNumber ?? gameState.currentTrick ?? 1;
+
       // Log the card play to database (now optimized for performance)
       const logResult = await this.loggingService.logCardPlay(
         gameId,
@@ -154,7 +156,9 @@ class CardPlayHandler {
         userId,
         player.seatIndex,
         card.suit,
-        card.rank
+        card.rank,
+        undefined,
+        trickNumberForLogging
       );
       
       // Game state has changed - no caching to ensure fresh data
