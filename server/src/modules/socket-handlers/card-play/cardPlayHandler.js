@@ -260,15 +260,39 @@ class CardPlayHandler {
 
             // Emit trick complete event
             const updatedGameState = await GameService.getGameStateForClient(gameId);
+
+            let cardsForEmit = completedTrickCards.map(card => ({
+              suit: card.suit,
+              rank: card.rank,
+              seatIndex: card.seatIndex,
+              playerId: gameState.players.find(p => p && p.seatIndex === card.seatIndex)?.userId
+            }));
+
+            if (
+              card &&
+              player &&
+              !cardsForEmit.some(
+                c =>
+                  c.seatIndex === player.seatIndex &&
+                  c.rank === card.rank &&
+                  c.suit === card.suit
+              )
+            ) {
+              cardsForEmit = [
+                ...cardsForEmit,
+                {
+                  suit: card.suit,
+                  rank: card.rank,
+                  seatIndex: player.seatIndex,
+                  playerId: player.userId
+                }
+              ];
+            }
+
             emitPersonalizedGameEvent(this.io, gameId, 'trick_complete', updatedGameState, {
               trickWinner: trickResult.winningSeatIndex,
               completedTrick: {
-                cards: completedTrickCards.map(card => ({
-                  suit: card.suit,
-                  rank: card.rank,
-                  seatIndex: card.seatIndex,
-                  playerId: gameState.players.find(p => p && p.seatIndex === card.seatIndex)?.userId
-                }))
+                cards: cardsForEmit
               }
             });
 

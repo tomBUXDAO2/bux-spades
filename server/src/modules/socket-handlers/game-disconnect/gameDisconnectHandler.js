@@ -1,5 +1,5 @@
 import { GameService } from '../../../services/GameService.js';
-import { PlayerTimerService } from '../../../services/PlayerTimerService.js';
+import { playerTimerService } from '../../../services/PlayerTimerService.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import redisGameState from '../../../services/RedisGameStateService.js';
 
@@ -7,8 +7,6 @@ class GameDisconnectHandler {
   constructor(io, socket) {
     this.io = io;
     this.socket = socket;
-    this.playerTimerService = new PlayerTimerService();
-    this.playerTimerService.setIO(this.io);
   }
 
   /**
@@ -47,11 +45,11 @@ class GameDisconnectHandler {
       if (game.status === 'PLAYING' && game.currentPlayer === userId) {
         console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-play timer`);
         // Start timer for auto-play if it's their turn
-        this.playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'playing');
+        playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'playing');
       } else if (game.status === 'BIDDING' && game.currentPlayer === userId) {
         console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-bid timer`);
         // Start timer for auto-bid if it's their turn to bid
-        this.playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'bidding');
+        playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'bidding');
       }
 
       // Emit player disconnected event to other players
