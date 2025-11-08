@@ -1,4 +1,8 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
+import { fileURLToPath } from 'url';
 import { prisma } from '../config/databaseFirst.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { GameService } from '../services/GameService.js';
@@ -7,11 +11,44 @@ import redisGameState from '../services/RedisGameStateService.js';
 import { io } from '../config/server.js';
 import redisSessionService from '../services/RedisSessionService.js';
 import { ForceGameDeletionService } from '../services/ForceGameDeletionService.js';
+import EventService from '../services/EventService.js';
 
 const router = express.Router();
 
-// Check if user is admin
-const isAdmin = async (req, res, next) => {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.resolve(__dirname, '../../uploads');
+const eventBannerDir = path.join(uploadsRoot, 'events');
+
+if (!fs.existsSync(eventBannerDir)) {
+  fs.mkdirSync(eventBannerDir, { recursive: true });
+}
+
+const bannerStorage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    cb(null, eventBannerDir);
+  },
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    const safeName = `event-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, safeName);
+  }
+});
+
+const bannerUpload = multer({
+  storage: bannerStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG and JPEG images are allowed'));
+    }
+  }
+});
+
+async function isAdmin(req, res, next) {
   try {
     const adminIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
     let userDiscordId = req.user?.discordId;
@@ -33,7 +70,104 @@ const isAdmin = async (req, res, next) => {
     console.error('[ADMIN] Error in admin check:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
-};
+}
+
+router.post('/events/banner', authenticateToken, isAdmin, bannerUpload.single('banner'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Banner image is required' });
+    }
+
+    const relativePath = `/uploads/events/${req.file.filename}`;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const absoluteUrl = host ? `${protocol}://${host}${relativePath}` : relativePath;
+
+    res.status(201).json({
+      bannerUrl: absoluteUrl,
+      relativePath
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error uploading event banner:', error);
+    res.status(500).json({ error: 'Failed to upload banner' });
+  }
+});
+
+router.get('/events', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { status, limit } = req.query;
+    let statuses = undefined;
+    if (status) {
+      statuses = status.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+
+    const parsedLimit = limit ? Number(limit) : 50;
+    const take = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 50;
+
+    const events = await EventService.listEvents({
+      status: statuses,
+      limit: take,
+      includeCriteria: true,
+    });
+
+    res.json({ events });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching events:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch events' });
+  }
+});
+
+router.get('/events/active', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const event = await EventService.getActiveEvent({
+      includeCriteria: true,
+      includeStats: true,
+    });
+    res.json({ event });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching active event:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch active event' });
+  }
+});
+
+router.post('/events', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const createdById = req.userId || null;
+    const event = await EventService.createEvent(req.body, createdById);
+    res.status(201).json({ event });
+  } catch (error) {
+    console.error('[ADMIN] Error creating event:', error);
+    res.status(400).json({ error: error.message || 'Failed to create event' });
+  }
+});
+
+router.put('/events/:eventId', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const event = await EventService.updateEvent(eventId, req.body);
+    res.json({ event });
+  } catch (error) {
+    console.error('[ADMIN] Error updating event:', error);
+    res.status(400).json({ error: error.message || 'Failed to update event' });
+  }
+});
+
+router.post('/events/:eventId/status', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { status } = req.body || {};
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    const event = await EventService.updateEventStatus(eventId, status);
+    res.json({ event });
+  } catch (error) {
+    console.error('[ADMIN] Error updating event status:', error);
+    res.status(400).json({ error: error.message || 'Failed to update event status' });
+  }
+});
 
 // Get all active games with player details
 router.get('/games', authenticateToken, isAdmin, async (req, res) => {
@@ -172,8 +306,6 @@ router.delete('/games/:gameId/players/:userId', authenticateToken, isAdmin, asyn
     res.status(500).json({ error: 'Failed to remove player from game' });
   }
 });
-
-export default router;
 
 // Force logout all users: clears Redis sessions and broadcasts socket event
 router.post('/force-logout', authenticateToken, isAdmin, async (req, res) => {
@@ -348,3 +480,5 @@ router.get('/game-details/:gameId', authenticateToken, isAdmin, async (req, res)
     res.status(500).json({ error: 'Failed to get game details' });
   }
 });
+
+export default router;

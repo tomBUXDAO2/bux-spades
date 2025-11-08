@@ -8,21 +8,22 @@ datasource db {
 }
 
 model User {
-  id           String             @id @default(cuid())
-  discordId    String             @unique
-  username     String
-  avatarUrl    String?
-  createdAt    DateTime           @default(now())
-  coins        Int                @default(0)
-  soundEnabled Boolean            @default(true)
-  blockedBy    BlockedUser[]             @relation("BlockedUser")
-  blocked      BlockedUser[]             @relation("BlockedBy")
-  friendOf     Friend[]                  @relation("FriendOf")
-  friends      Friend[]                  @relation("UserFriends")
-  games        GamePlayer[]
-  roundStats   PlayerRoundStats[]
+  id                      String                   @id @default(cuid())
+  discordId               String                   @unique
+  username                String
+  avatarUrl               String?
+  createdAt               DateTime                 @default(now())
+  coins                   Int                      @default(0)
+  soundEnabled            Boolean                  @default(true)
+  blockedBy               BlockedUser[]            @relation("BlockedUser")
+  blocked                 BlockedUser[]            @relation("BlockedBy")
+  friendOf                Friend[]                 @relation("FriendOf")
+  friends                 Friend[]                 @relation("UserFriends")
+  games                   GamePlayer[]
+  roundStats              PlayerRoundStats[]
   tournamentRegistrations TournamentRegistration[]
   tournamentPartners      TournamentRegistration[] @relation("TournamentPartner")
+  eventStats              EventParticipantStat[]
 }
 
 model UserStats {
@@ -163,8 +164,8 @@ model Game {
   blindNilAllowed Boolean?        @default(false)
   specialRules    Json?
   // New structured special rules
-  specialRule1    SpecialRule1? @default(NONE)
-  specialRule2    SpecialRule2? @default(NONE)
+  specialRule1    SpecialRule1?   @default(NONE)
+  specialRule2    SpecialRule2?   @default(NONE)
   startedAt       DateTime?
   finishedAt      DateTime?
   createdAt       DateTime        @default(now())
@@ -176,6 +177,8 @@ model Game {
   dealer          Int?
   gameState       Json?
   lastActionAt    DateTime?
+  eventId         String?
+  event           Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
   EventGame       EventGame[]
   players         GamePlayer[]
   result          GameResult?
@@ -186,6 +189,7 @@ model Game {
   @@index([status, createdAt])
   @@index([currentPlayer])
   @@index([isRated, status])
+  @@index([eventId])
 }
 
 model GamePlayer {
@@ -324,24 +328,69 @@ model BlockedUser {
 }
 
 model Event {
-  id        String      @id
-  name      String
-  startsAt  DateTime
-  endsAt    DateTime
-  rules     Json
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  EventGame EventGame[]
+  id           String                 @id @default(cuid())
+  name         String
+  description  String?
+  timezone     String
+  startsAt     DateTime
+  endsAt       DateTime
+  status       EventStatus            @default(SCHEDULED)
+  bannerUrl    String?
+  filters      Json?
+  createdById  String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  criteria     EventCriterion[]
+  EventGame    EventGame[]
+  participants EventParticipantStat[]
+  Game         Game[]
+
+  @@index([status])
+  @@index([startsAt])
+  @@index([endsAt])
 }
 
 model EventGame {
-  eventId String
-  gameId  String
-  Event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  Game    Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  eventId   String
+  gameId    String
+  qualifies Boolean  @default(true)
+  createdAt DateTime @default(now())
+  Event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  Game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
   @@id([eventId, gameId])
   @@index([gameId])
+}
+
+model EventCriterion {
+  id             String             @id @default(cuid())
+  eventId        String
+  type           EventCriterionType
+  rewardCoins    Int
+  milestoneValue Int?
+  config         Json?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  event          Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, type])
+}
+
+model EventParticipantStat {
+  id                String   @id @default(cuid())
+  eventId           String
+  userId            String
+  gamesPlayed       Int      @default(0)
+  gamesWon          Int      @default(0)
+  winPercent        Float    @default(0)
+  milestoneProgress Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  Event             Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  User              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
 }
 
 model RoundScore {
@@ -377,15 +426,30 @@ enum GameMode {
   SOLO
 }
 
+enum EventStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EventCriterionType {
+  MOST_WINS
+  MOST_GAMES_PLAYED
+  HIGHEST_WIN_PERCENT
+  GAMES_PLAYED_MILESTONE
+  GAMES_WON_MILESTONE
+}
+
 model DiscordGame {
-  id                String    @id @default(cuid())
-  gameId            String    @unique
-  channelId         String
-  commandMessageId  String
-  createdBy         String
-  status            String    @default("WAITING")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String   @id @default(cuid())
+  gameId           String   @unique
+  channelId        String
+  commandMessageId String
+  createdBy        String
+  status           String   @default("WAITING")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 enum GameStatus {
@@ -479,7 +543,7 @@ model TournamentRegistration {
 }
 
 model TournamentMatch {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   tournamentId String
   round        Int
   matchNumber  Int
@@ -488,9 +552,9 @@ model TournamentMatch {
   winnerId     String?
   gameId       String?
   status       MatchStatus @default(PENDING)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, round, matchNumber])
   @@index([tournamentId])

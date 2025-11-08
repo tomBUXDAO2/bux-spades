@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { commands, handleButtonInteraction, handleModalSubmit } from './commands/index.js';
+import { startEventScheduler, stopEventScheduler } from '../services/EventScheduler.js';
 import { registerRoleMetadata } from './linkedRoles.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -120,6 +121,9 @@ client.on('ready', async () => {
   console.log(`[DISCORD BOT] Logged in as ${client.user.tag}`);
   // Command registration removed - register manually using register-discord-commands.js
   await registerRoleMetadata();
+  await startEventScheduler(client).catch((error) => {
+    console.error('[DISCORD BOT] Failed to start event scheduler:', error);
+  });
 });
 
 // Start the bot
@@ -133,4 +137,12 @@ export async function startDiscordBot() {
 }
 
 export { client };
+
+process.on('SIGINT', async () => {
+  try {
+    await stopEventScheduler();
+  } catch (error) {
+    console.error('[DISCORD BOT] Error stopping event scheduler:', error);
+  }
+});
 

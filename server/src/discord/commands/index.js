@@ -2,6 +2,9 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { DetailedStatsService } from '../../services/DetailedStatsService.js';
 import { prisma } from '../../config/databaseFirst.js';
+import EventService from '../../services/EventService.js';
+import EventFilterService from '../../services/EventFilterService.js';
+import EventAnalyticsService from '../../services/EventAnalyticsService.js';
 
 // Static assets
 const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
@@ -9,9 +12,321 @@ const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pr
 // Room IDs
 const LOW_ROOM_ID = '1404937454938619927';
 const HIGH_ROOM_ID = '1403844895445221445';
+const EVENT_ROOM_ID = process.env.DISCORD_EVENT_GAMES_CHANNEL_ID || null;
+const EVENT_ROLE_ID = process.env.DISCORD_EVENT_ROLE_ID || null;
 
 // In-memory storage for game lines (before table creation)
 const gameLines = new Map();
+
+async function createEventGameLine(interaction) {
+  try {
+    await interaction.deferReply();
+
+    if (EVENT_ROOM_ID && interaction.channel?.id !== EVENT_ROOM_ID) {
+      await interaction.editReply({
+        content: `❌ Event games can only be created in <#${EVENT_ROOM_ID}>.`,
+      });
+      return;
+    }
+
+    const event = await EventService.getActiveEvent({ includeCriteria: true });
+    if (!event || (event.status !== 'ACTIVE' && event.status !== 'SCHEDULED')) {
+      await interaction.editReply({
+        content: '❌ There is no active event running right now.',
+      });
+      return;
+    }
+
+    const now = Date.now();
+    const startsAt = new Date(event.startsAt || now).getTime();
+    if (event.status === 'SCHEDULED' && now < startsAt) {
+      await interaction.editReply({
+        content: `❌ **${event.name}** has not started yet. Start time: <t:${Math.floor(startsAt / 1000)}:F>.`,
+      });
+      return;
+    }
+
+    const filters = event.filters || {};
+
+    let format = interaction.options.getString('format');
+    if (format) {
+      format = format.toUpperCase();
+    } else if (Array.isArray(filters.allowedFormats) && filters.allowedFormats.length === 1) {
+      format = String(filters.allowedFormats[0]).toUpperCase();
+    } else if (typeof filters.defaultFormat === 'string') {
+      format = filters.defaultFormat.toUpperCase();
+    } else {
+      format = 'REGULAR';
+    }
+
+    const modeOption = interaction.options.getInteger('mode');
+    let mode = modeOption !== null && modeOption !== undefined ? (modeOption === 1 ? 'PARTNERS' : 'SOLO') : null;
+    if (!mode) {
+      if (Array.isArray(filters.allowedModes) && filters.allowedModes.length === 1) {
+        mode = String(filters.allowedModes[0]).toUpperCase();
+      } else if (typeof filters.defaultMode === 'string') {
+        mode = filters.defaultMode.toUpperCase();
+      } else {
+        mode = 'PARTNERS';
+      }
+    }
+
+    let coins = interaction.options.getInteger('coins');
+    if (coins === null || coins === undefined) {
+      if (Array.isArray(filters.allowedCoins) && filters.allowedCoins.length === 1) {
+        coins = Number(filters.allowedCoins[0]);
+      } else if (filters.coinRange && typeof filters.coinRange.default === 'number') {
+        coins = Number(filters.coinRange.default);
+      } else if (typeof filters.defaultCoins === 'number') {
+        coins = Number(filters.defaultCoins);
+      }
+    }
+
+    if (coins === null || coins === undefined || Number.isNaN(coins) || coins <= 0) {
+      await interaction.editReply({
+        content: '❌ Please specify a valid coin amount for this event.',
+      });
+      return;
+    }
+
+    let minPoints = interaction.options.getInteger('minpoints');
+    if (minPoints === null || minPoints === undefined) {
+      if (typeof filters.minPoints === 'number') {
+        minPoints = filters.minPoints;
+      } else if (filters.pointsRange && typeof filters.pointsRange.min === 'number') {
+        minPoints = filters.pointsRange.min;
+      } else if (typeof filters.defaultMinPoints === 'number') {
+        minPoints = filters.defaultMinPoints;
+      } else {
+        minPoints = -100;
+      }
+    }
+
+    let maxPoints = interaction.options.getInteger('maxpoints');
+    if (maxPoints === null || maxPoints === undefined) {
+      if (typeof filters.maxPoints === 'number') {
+        maxPoints = filters.maxPoints;
+      } else if (filters.pointsRange && typeof filters.pointsRange.max === 'number') {
+        maxPoints = filters.pointsRange.max;
+      } else if (typeof filters.defaultMaxPoints === 'number') {
+        maxPoints = filters.defaultMaxPoints;
+      } else {
+        maxPoints = 500;
+      }
+    }
+
+    let specialRule1 = interaction.options.getString('special1');
+    specialRule1 = specialRule1 ? specialRule1.toUpperCase() : null;
+    if (!specialRule1) {
+      if (typeof filters.defaultSpecialRule1 === 'string') {
+        specialRule1 = filters.defaultSpecialRule1.toUpperCase();
+      } else if (typeof filters.specialRule1 === 'string') {
+        specialRule1 = filters.specialRule1.toUpperCase();
+      } else {
+        specialRule1 = 'NONE';
+      }
+    }
+
+    let specialRule2 = interaction.options.getString('special2');
+    specialRule2 = specialRule2 ? specialRule2.toUpperCase() : null;
+    if (!specialRule2) {
+      if (typeof filters.defaultSpecialRule2 === 'string') {
+        specialRule2 = filters.defaultSpecialRule2.toUpperCase();
+      } else if (typeof filters.specialRule2 === 'string') {
+        specialRule2 = filters.specialRule2.toUpperCase();
+      } else {
+        specialRule2 = 'NONE';
+      }
+    }
+
+    let nilOption = interaction.options.getString('nil');
+    let nilAllowed = nilOption !== null && nilOption !== undefined ? nilOption !== 'false' : null;
+    if (nilAllowed === null) {
+      if (typeof filters.nilAllowed === 'boolean') {
+        nilAllowed = filters.nilAllowed;
+      } else if (typeof filters.defaultNilAllowed === 'boolean') {
+        nilAllowed = filters.defaultNilAllowed;
+      } else {
+        nilAllowed = true;
+      }
+    }
+
+    let blindNilOption = interaction.options.getString('blindnil');
+    let blindNilAllowed = blindNilOption !== null && blindNilOption !== undefined ? blindNilOption === 'true' : null;
+    if (blindNilAllowed === null) {
+      if (typeof filters.blindNilAllowed === 'boolean') {
+        blindNilAllowed = filters.blindNilAllowed;
+      } else if (typeof filters.defaultBlindNilAllowed === 'boolean') {
+        blindNilAllowed = filters.defaultBlindNilAllowed;
+      } else {
+        blindNilAllowed = false;
+      }
+    }
+
+    let gimmickVariant = null;
+    if (format === 'GIMMICK') {
+      gimmickVariant = interaction.options.getString('gimmicktype');
+      if (!gimmickVariant && Array.isArray(filters.allowedGimmickVariants) && filters.allowedGimmickVariants.length === 1) {
+        gimmickVariant = String(filters.allowedGimmickVariants[0]);
+      }
+      if (!gimmickVariant && typeof filters.defaultGimmickVariant === 'string') {
+        gimmickVariant = filters.defaultGimmickVariant;
+      }
+      if (gimmickVariant) {
+        gimmickVariant = gimmickVariant.toUpperCase();
+      }
+    }
+
+    const userValidation = await validateUserForGame(interaction.user.id, coins);
+    if (!userValidation.valid) {
+      await interaction.editReply({
+        content: userValidation.message,
+      });
+      return;
+    }
+
+    const validation = EventFilterService.evaluate(filters, {
+      channelId: interaction.channel?.id || null,
+      coins,
+      format,
+      mode,
+      minPoints,
+      maxPoints,
+      specialRule1,
+      specialRule2,
+      nilAllowed,
+      blindNilAllowed,
+      gimmickVariant,
+    });
+
+    if (!validation.allowed) {
+      await interaction.editReply({
+        content: `❌ ${validation.reason}`,
+      });
+      return;
+    }
+
+    if (format === 'GIMMICK' && !gimmickVariant) {
+      await interaction.editReply({
+        content: '❌ You must select a gimmick variant for this event game.',
+      });
+      return;
+    }
+
+    if (gimmickVariant === 'SUICIDE' && mode !== 'PARTNERS') {
+      await interaction.editReply({
+        content: '❌ Suicide variant is only available in Partners mode.',
+      });
+      return;
+    }
+
+    const gameLineId = `line_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const gameLine = {
+      id: gameLineId,
+      channelId: interaction.channel?.id || null,
+      messageId: null,
+      createdBy: interaction.user.id,
+      createdAt: new Date(),
+      eventId: event.id,
+      eventName: event.name,
+      settings: {
+        coins,
+        mode,
+        format,
+        minPoints,
+        maxPoints,
+        gimmickVariant,
+        specialRule1,
+        specialRule2,
+        nilAllowed,
+        blindNilAllowed,
+      },
+      players: [
+        { discordId: interaction.user.id, username: interaction.user.username, seat: 0 },
+      ],
+    };
+
+    gameLines.set(gameLineId, gameLine);
+
+    const embed = createGameLineEmbed(gameLine);
+    const buttons = createGameLineButtons(gameLineId, false);
+
+    const mentionMessage = EVENT_ROLE_ID
+      ? `<@&${EVENT_ROLE_ID}>`
+      : `🏆 **${event.name}** event game line created!`;
+
+    const response = await interaction.editReply({
+      content: mentionMessage,
+      embeds: [embed],
+      components: [buttons],
+      allowedMentions: EVENT_ROLE_ID ? { roles: [EVENT_ROLE_ID] } : { parse: [] },
+    });
+
+    gameLine.messageId = response.id;
+    gameLines.set(gameLineId, gameLine);
+
+    console.log(`[DISCORD] Event game line created: ${gameLineId} (event ${event.id})`);
+  } catch (error) {
+    console.error('[DISCORD] Error creating event game line:', error);
+    if (interaction.deferred) {
+      await interaction.editReply({
+        content: '❌ Failed to create event game line. Please try again.',
+      });
+    } else {
+      await interaction.reply({
+        content: '❌ Failed to create event game line. Please try again.',
+        ephemeral: true,
+      });
+    }
+  }
+}
+
+async function showEventStats(interaction) {
+  try {
+    await interaction.deferReply({ ephemeral: false });
+
+    let event = await EventService.getActiveEvent({
+      includeCriteria: true,
+      includeStats: true,
+    });
+
+    if (!event) {
+      const upcoming = await EventService.listEvents({
+        status: ['SCHEDULED'],
+        includeCriteria: true,
+        includeStats: false,
+        limit: 1,
+        orderBy: { startsAt: 'asc' },
+      });
+
+      if (!upcoming.length) {
+        await interaction.editReply({
+          content: 'ℹ️ There is no active or scheduled event at the moment.',
+        });
+        return;
+      }
+
+      const upcomingEmbed = await EventAnalyticsService.buildEventStartEmbed(upcoming[0]);
+      await interaction.editReply({ embeds: [upcomingEmbed] });
+      return;
+    }
+
+    const progressEmbed = await EventAnalyticsService.buildEventProgressEmbed(event);
+    await interaction.editReply({ embeds: [progressEmbed] });
+  } catch (error) {
+    console.error('[DISCORD] Error fetching event stats:', error);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({
+        content: '❌ Failed to retrieve event stats. Please try again later.',
+      });
+    } else {
+      await interaction.reply({
+        content: '❌ Failed to retrieve event stats. Please try again later.',
+        ephemeral: true,
+      });
+    }
+  }
+}
 
 // Command registry
 export const commands = [
@@ -413,6 +728,127 @@ export const commands = [
           )
       ),
     execute: (interaction) => createGameLine(interaction, 'GIMMICK')
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('event')
+      .setDescription('Create a game line for the active event')
+      .addStringOption(option =>
+        option.setName('format')
+          .setDescription('Game format (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Regular', value: 'REGULAR' },
+            { name: 'Whiz', value: 'WHIZ' },
+            { name: 'Mirror', value: 'MIRROR' },
+            { name: 'Gimmick', value: 'GIMMICK' }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('mode')
+          .setDescription('Game mode (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Partners', value: 1 },
+            { name: 'Solo', value: 2 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('coins')
+          .setDescription('Buy-in amount (defaults to event settings)')
+          .setRequired(false)
+          .setMinValue(10000)
+          .setMaxValue(50000000)
+      )
+      .addIntegerOption(option =>
+        option.setName('minpoints')
+          .setDescription('Minimum points (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: '-250', value: -250 },
+            { name: '-200', value: -200 },
+            { name: '-150', value: -150 },
+            { name: '-100', value: -100 }
+          )
+      )
+      .addIntegerOption(option =>
+        option.setName('maxpoints')
+          .setDescription('Maximum points (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: '100', value: 100 },
+            { name: '150', value: 150 },
+            { name: '200', value: 200 },
+            { name: '250', value: 250 },
+            { name: '300', value: 300 },
+            { name: '350', value: 350 },
+            { name: '400', value: 400 },
+            { name: '450', value: 450 },
+            { name: '500', value: 500 },
+            { name: '550', value: 550 },
+            { name: '600', value: 600 },
+            { name: '650', value: 650 }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special1')
+          .setDescription('Special rule 1 (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Screamer', value: 'SCREAMER' },
+            { name: 'Assassin', value: 'ASSASSIN' },
+            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('special2')
+          .setDescription('Special rule 2 (defaults to event settings)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'None', value: 'NONE' },
+            { name: 'Lowball', value: 'LOWBALL' },
+            { name: 'Highball', value: 'HIGHBALL' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('gimmicktype')
+          .setDescription('Gimmick variant (required if format is GIMMICK)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Suicide (Partners only)', value: 'SUICIDE' },
+            { name: 'Bid 4 or Nil', value: 'BID4NIL' },
+            { name: 'Bid 3', value: 'BID3' },
+            { name: 'Bid Hearts', value: 'BIDHEARTS' },
+            { name: 'Crazy Aces', value: 'CRAZY_ACES' },
+            { name: 'Joker Whiz', value: 'JOKER' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('nil')
+          .setDescription('Allow Nil bids (default depends on event)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'On', value: 'true' },
+            { name: 'Off', value: 'false' }
+          )
+      )
+      .addStringOption(option =>
+        option.setName('blindnil')
+          .setDescription('Allow Blind Nil bids (default depends on event)')
+          .setRequired(false)
+          .addChoices(
+            { name: 'On', value: 'true' },
+            { name: 'Off', value: 'false' }
+          )
+      ),
+    execute: (interaction) => createEventGameLine(interaction)
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('eventstats')
+      .setDescription('Show the current event standings and progress'),
+    execute: (interaction) => showEventStats(interaction)
   },
   {
     data: new SlashCommandBuilder()
@@ -1272,16 +1708,27 @@ function createGameLineEmbed(gameLineData) {
   }
   
   const embed = new EmbedBuilder()
-    .setTitle('🎮 GAME LINE')
+    .setTitle(gameLineData.eventId ? '🎮 EVENT GAME LINE' : '🎮 GAME LINE')
     .setDescription(gameLineText)
-    .addFields(
-      { name: '👤 Host', value: `<@${gameLineData.createdBy}>`, inline: true },
-      { name: '👥 Players', value: `${players.length}/4`, inline: true },
-      { name: '⏰ Created', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true },
-      { name: '🎯 Current Players', value: `${playersText}${playersNeededText}`, inline: false }
-    )
     .setColor(0x00ff00)
     .setTimestamp();
+
+  const fields = [
+    { name: '👤 Host', value: `<@${gameLineData.createdBy}>`, inline: true },
+    { name: '👥 Players', value: `${players.length}/4`, inline: true },
+    { name: '⏰ Created', value: `<t:${Math.floor(createdAt.getTime() / 1000)}:R>`, inline: true },
+    { name: '🎯 Current Players', value: `${playersText}${playersNeededText}`, inline: false }
+  ];
+
+  if (gameLineData.eventId) {
+    fields.unshift({
+      name: '🏆 Event',
+      value: gameLineData.eventName || 'Active Event',
+      inline: false
+    });
+  }
+
+  embed.addFields(fields);
 
   return embed;
 }
@@ -1462,10 +1909,14 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     if (specialRules.length > 0) {
       gameLineText += `\n🎲 ${specialRules.join(' + ')}`;
     }
+
+    if (gameLine.eventId) {
+      gameLineText = `${gameLine.eventName ? `🏆 ${gameLine.eventName}\n` : '🏆 Event Game\n'}${gameLineText}`;
+    }
     
     // Update original embed to show FULL
     const fullEmbed = new EmbedBuilder()
-      .setTitle('🎮 GAME LINE - FULL')
+      .setTitle(gameLine.eventId ? '🎮 EVENT GAME LINE - FULL' : '🎮 GAME LINE - FULL')
       .setDescription(gameLineText)
       .addFields(
         { name: '👤 Host', value: `<@${gameLine.createdBy}>`, inline: true },
@@ -1536,6 +1987,10 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
     if (specialRulesUp.length > 0) {
       tableUpDesc += `\n🎲 **${specialRulesUp.join(' + ')}**`;
     }
+
+    if (gameLine.eventId) {
+      tableUpDesc = `${gameLine.eventName ? `🏆 **${gameLine.eventName}**\n` : '🏆 **Event Game**\n'}${tableUpDesc}`;
+    }
     
     tableUpDesc += `\n\n🔴 Red Team: ${redTeam.map(p => `<@${p.discordId}>`).join(', ')}\n` +
                    `🔵 Blue Team: ${blueTeam.map(p => `<@${p.discordId}>`).join(', ')}\n\n` +
@@ -1543,7 +1998,7 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
                    `GOOD LUCK! 🍀`;
     
     const tableUpEmbed = new EmbedBuilder()
-      .setTitle('🎮 Table Up!')
+      .setTitle(gameLine.eventId ? `🎮 Table Up! — ${gameLine.eventName || 'Event Game'}` : '🎮 Table Up!')
       .setDescription(tableUpDesc)
       .setColor(0x0099ff)
       .setTimestamp();
@@ -1568,7 +2023,7 @@ async function handleLineFull(interaction, gameLine, gameLineId) {
 }
 
 async function createGameFromLine(gameLine) {
-  const { settings, players } = gameLine;
+  const { settings, players, eventId, eventName } = gameLine;
   const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   // Sort players by seat to ensure correct order
@@ -1594,6 +2049,7 @@ async function createGameFromLine(gameLine) {
         specialRule2: settings.specialRule2 || 'NONE'
       },
       buyIn: settings.coins,
+      eventId: eventId || null,
         currentRound: 1,
         currentTrick: 0,
         currentPlayer: null,
@@ -1647,6 +2103,15 @@ async function createGameFromLine(gameLine) {
         createdAt: new Date()
       }
     });
+
+  if (eventId) {
+    try {
+      await EventService.tagGame(eventId, game.id, true);
+      console.log(`[DISCORD] Tagged game ${game.id} with event ${eventId}${eventName ? ` (${eventName})` : ''}`);
+    } catch (eventError) {
+      console.error('[DISCORD] Failed to tag event game:', eventError);
+    }
+  }
 
   console.log(`[DISCORD] Created game ${gameId} from line with players:`, sortedPlayers.map(p => `${p.username} (seat ${p.seat})`));
   

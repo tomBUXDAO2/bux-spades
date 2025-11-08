@@ -4,9 +4,20 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import session from 'express-session';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import passport from './passport.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
+
+if (!fs.existsSync(uploadsRoot)) {
+  fs.mkdirSync(uploadsRoot, { recursive: true });
+}
 
 const app = express();
 const server = createServer(app);
@@ -26,6 +37,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/uploads', express.static(uploadsRoot));
 
 // Session configuration
 app.use(session({
