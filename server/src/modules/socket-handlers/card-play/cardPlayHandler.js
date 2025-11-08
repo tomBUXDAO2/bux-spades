@@ -6,6 +6,7 @@ import { TrickCompletionService } from '../../../services/TrickCompletionService
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
 
 /**
@@ -131,9 +132,7 @@ class CardPlayHandler {
             console.log(`[CARD PLAY] CORE: Rejecting spade lead before broken for user ${userId} (seat ${player.seatIndex})`);
             // Emit rejection to clients and keep turn
             const updatedGameState = await GameService.getGameStateForClient(gameId);
-            this.io.to(gameId).emit('card_played', {
-              gameId,
-              gameState: updatedGameState,
+            emitPersonalizedGameEvent(this.io, gameId, 'card_played', updatedGameState, {
               cardPlayed: { userId, card, seatIndex: player.seatIndex, rejected: true }
             });
             if (isBot) {
@@ -172,9 +171,7 @@ class CardPlayHandler {
         
         // Emit rejection to all players
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        this.io.to(gameId).emit('card_played', {
-          gameId,
-          gameState: updatedGameState,
+        emitPersonalizedGameEvent(this.io, gameId, 'card_played', updatedGameState, {
           cardPlayed: {
             userId,
             card,
@@ -263,9 +260,7 @@ class CardPlayHandler {
 
             // Emit trick complete event
             const updatedGameState = await GameService.getGameStateForClient(gameId);
-            this.io.to(gameId).emit('trick_complete', {
-              gameId,
-              gameState: updatedGameState,
+            emitPersonalizedGameEvent(this.io, gameId, 'trick_complete', updatedGameState, {
               trickWinner: trickResult.winningSeatIndex,
               completedTrick: {
                 cards: completedTrickCards.map(card => ({
@@ -316,9 +311,7 @@ class CardPlayHandler {
             if (!trickResult.isRoundComplete && !trickResult.isComplete) {
               const newGameState = await GameService.getGameStateForClient(gameId);
               console.log(`[CARD PLAY] Trick started - newGameState.currentPlayer: ${newGameState.currentPlayer}, expected: ${gameState.players.find(p => p && p.seatIndex === trickResult.winningSeatIndex)?.userId}`);
-              this.io.to(gameId).emit('trick_started', {
-                gameId,
-                gameState: newGameState,
+              emitPersonalizedGameEvent(this.io, gameId, 'trick_started', newGameState, {
                 currentPlayer: newGameState.currentPlayer
               });
 
@@ -430,10 +423,8 @@ class CardPlayHandler {
         // Emitting card_played event
         // Game state updated
         console.log(`[CARD PLAY] Emitting card_played event with currentPlayer: ${updatedGameState.currentPlayer}, currentTrick length: ${updatedGameState.play.currentTrick.length}`);
-        this.io.to(gameId).emit('card_played', {
-          gameId,
-          gameState: updatedGameState,
-          currentTrick: updatedGameState.play.currentTrick, // Always include, always an array
+        emitPersonalizedGameEvent(this.io, gameId, 'card_played', updatedGameState, {
+          currentTrick: updatedGameState.play.currentTrick,
           cardPlayed: {
             userId,
             card,
@@ -616,7 +607,13 @@ class CardPlayHandler {
         console.log(`[CARD PLAY] Bot hand from Redis:`, hand.map(c => `${c.suit}${c.rank}`));
       } else {
         // Fallback to database
-        const round = gameState.rounds.find(r => r.roundNumber === gameState.currentRound);
+        const round = await prisma.round.findFirst({
+          where: {
+            gameId,
+            roundNumber: game.currentRound
+          },
+          select: { id: true }
+        });
         if (!round) return;
 
         const handSnapshot = await prisma.roundHandSnapshot.findFirst({
@@ -657,9 +654,7 @@ class CardPlayHandler {
           cachedGameState.currentTrickCards = optimisticTrick;
           
           // Emit immediately for instant feedback
-          this.io.to(gameId).emit('card_played', {
-            gameId,
-            gameState: cachedGameState,
+          emitPersonalizedGameEvent(this.io, gameId, 'card_played', cachedGameState, {
             currentTrick: optimisticTrick,
             cardPlayed: {
               userId: currentPlayer.userId,
@@ -698,10 +693,8 @@ class CardPlayHandler {
       updatedGameState.play.currentTrick = [];
       updatedGameState.currentTrick = [];
       updatedGameState.currentTrickCards = [];
-      this.io.to(gameId).emit('trick_started', {
-        gameId,
-        gameState: updatedGameState,
-        currentTrick: [], // Explicitly set to empty array
+      emitPersonalizedGameEvent(this.io, gameId, 'trick_started', updatedGameState, {
+        currentTrick: [],
         currentPlayer: updatedGameState.currentPlayer
       });
       console.log(`[CARD PLAY] Emitted trick_started for new trick ${trickNumber} with empty currentTrick`);

@@ -6,6 +6,7 @@ import { BotService } from '../../../services/BotService.js';
 import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -320,9 +321,7 @@ class BiddingHandler {
         
         // All players have bid, emit final bidding update then start the round
         const updatedGameState = await GameService.getGameStateForClient(gameId);
-        this.io.to(gameId).emit('bidding_update', {
-          gameId,
-          gameState: updatedGameState,
+        emitPersonalizedGameEvent(this.io, gameId, 'bidding_update', updatedGameState, {
           bid: {
             userId,
             bid,
@@ -387,9 +386,7 @@ class BiddingHandler {
           console.log(`[BIDDING] Forcing currentPlayer in emitted gameState to: ${nextPlayer?.userId}`);
         }
         
-        this.io.to(gameId).emit('bidding_update', {
-          gameId,
-          gameState: updatedGameState,
+        emitPersonalizedGameEvent(this.io, gameId, 'bidding_update', updatedGameState, {
           bid: {
             userId,
             bid,
@@ -551,10 +548,7 @@ class BiddingHandler {
         // NO OVERRIDE - getGameStateForClient already gets correct bidding data from database
         console.log(`[BIDDING] Using getGameStateForClient bidding data:`, updatedGameState.bidding);
         
-        this.io.to(gameId).emit('round_started', {
-          gameId,
-          gameState: updatedGameState
-        });
+        emitPersonalizedGameEvent(this.io, gameId, 'round_started', updatedGameState);
 
         // Start timer for first player if they are human (card play - always apply)
         if (firstPlayer && firstPlayer.isHuman) {
@@ -564,10 +558,7 @@ class BiddingHandler {
       } catch (error) {
         console.error(`[BIDDING] Error getting game state for client:`, error);
         // Fallback: emit minimal round started event
-        this.io.to(gameId).emit('round_started', {
-          gameId,
-          gameState: { status: 'PLAYING', currentPlayer: firstPlayer?.userId }
-        });
+        emitPersonalizedGameEvent(this.io, gameId, 'round_started', { status: 'PLAYING', currentPlayer: firstPlayer?.userId });
 
         // Still start timer even in fallback
         if (firstPlayer && firstPlayer.isHuman) {

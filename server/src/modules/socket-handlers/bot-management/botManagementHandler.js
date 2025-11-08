@@ -4,6 +4,7 @@ import { BotService } from '../../../services/BotService.js';
 import { BotUserService } from '../../../services/BotUserService.js';
 import { prisma } from '../../../config/database.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
+import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
 
 class BotManagementHandler {
   constructor(io, socket) {
@@ -66,10 +67,10 @@ class BotManagementHandler {
       this.systemMessageHandler.handleBotAdded(gameId, bot.username, seatIndex);
 
       // Broadcast game update
-      this.io.to(gameId).emit('game_update', {
-        gameId,
-        gameState: game.toClientFormat()
-      });
+      const broadcastState = await GameService.getGameStateForClient(gameId);
+      if (broadcastState) {
+        emitPersonalizedGameEvent(this.io, gameId, 'game_update', broadcastState);
+      }
 
       console.log(`[BOT MANAGEMENT] Added bot to seat ${seatIndex} in game ${gameId}`);
       
@@ -149,10 +150,10 @@ class BotManagementHandler {
       this.systemMessageHandler.handleBotRemoved(gameId, bot.username);
 
       // Broadcast game update
-      this.io.to(gameId).emit('game_update', {
-        gameId,
-        gameState: game.toClientFormat()
-      });
+      const broadcastState = await GameService.getGameStateForClient(gameId);
+      if (broadcastState) {
+        emitPersonalizedGameEvent(this.io, gameId, 'game_update', broadcastState);
+      }
 
       console.log(`[BOT MANAGEMENT] Removed bot from seat ${seatIndex} in game ${gameId}`);
       
@@ -212,10 +213,10 @@ class BotManagementHandler {
       }
 
       // Broadcast game update
-      this.io.to(gameId).emit('game_update', {
-        gameId,
-        gameState: game.toClientFormat()
-      });
+      const broadcastState = await GameService.getGameStateForClient(gameId);
+      if (broadcastState) {
+        emitPersonalizedGameEvent(this.io, gameId, 'game_update', broadcastState);
+      }
 
       console.log(`[BOT MANAGEMENT] Filled ${addedBots} empty seats with bots in game ${gameId}`);
       

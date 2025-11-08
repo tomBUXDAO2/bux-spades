@@ -3,6 +3,10 @@ import { BotService } from '../../../services/BotService.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import redisSessionService from '../../../services/RedisSessionService.js';
 import { prisma } from '../../../config/database.js';
+import {
+  emitPersonalizedGameEvent,
+  emitPersonalizedGameEventToSocket
+} from '../../../services/SocketGameBroadcastService.js';
 
 /**
  * DATABASE-FIRST GAME JOIN HANDLER
@@ -69,19 +73,7 @@ class GameJoinHandler {
         system.handleBotRemoved(gameId, target.username);
       } catch {}
       // CRITICAL FIX: Send personalized game state to each player
-      const room = this.io.sockets.adapter.rooms.get(gameId);
-      if (room) {
-        for (const socketId of room) {
-          const socket = this.io.sockets.sockets.get(socketId);
-          if (socket && socket.userId) {
-            const personalizedState = GameService.sanitizeGameStateForUser(updatedGameState, socket.userId);
-            socket.emit('game_update', {
-              gameId,
-              gameState: personalizedState
-            });
-          }
-        }
-      }
+      emitPersonalizedGameEvent(this.io, gameId, 'game_update', updatedGameState);
 
       // Clean any orphaned bot users
       try {
@@ -108,26 +100,26 @@ class GameJoinHandler {
         return;
       }
 
-      // Use regular game state service (was working correctly)
-      let gameState;
+      // Fetch the full game state once (unsanitised) and sanitise per socket later
+      let baseGameState;
       try {
         console.log(`[GAME JOIN] Calling getGameStateForClient for ${gameId}`);
-        gameState = await GameService.getGameStateForClient(gameId, userId);
-        console.log(`[GAME JOIN] getGameStateForClient returned for ${gameId}, status: ${gameState?.status}`);
+        baseGameState = await GameService.getGameStateForClient(gameId);
+        console.log(`[GAME JOIN] getGameStateForClient returned for ${gameId}, status: ${baseGameState?.status}`);
       } catch (error) {
         console.error(`[GAME JOIN] Error getting game state for ${gameId}:`, error);
         this.socket.emit('error', { message: 'Failed to load game' });
         return;
       }
 
-      if (!gameState) {
+      if (!baseGameState) {
         console.log(`[GAME JOIN] No game state returned for ${gameId} - game may not exist or be corrupted`);
         this.socket.emit('error', { message: 'Game not found or corrupted. Please try creating a new game.' });
         return;
       }
 
       // Check if player is in the game (handle null players)
-      const player = gameState.players.find(p => p && p.userId === userId && !p.isSpectator);
+      const player = baseGameState.players.find(p => p && p.userId === userId && !p.isSpectator);
       if (!player) {
         // If not a seated player, allow spectating when requested
         if (spectate) {
@@ -162,7 +154,7 @@ class GameJoinHandler {
               const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
               if (freshGameState) {
                 await redisGameState.setGameState(gameId, freshGameState);
-                Object.assign(gameState, freshGameState);
+                baseGameState = freshGameState;
                 console.log(`[GAME JOIN] Refreshed game state with new spectator`);
               }
             } catch (error) {
@@ -179,8 +171,8 @@ class GameJoinHandler {
           const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
           if (freshGameState) {
             await redisGameState.setGameState(gameId, freshGameState);
-            // Update gameState to use fresh data
-            Object.assign(gameState, freshGameState);
+            // Update to use fresh data
+            baseGameState = freshGameState;
           }
           } else {
             console.log(`[GAME JOIN] User ${userId} not in game ${gameId}, clearing active game from session`);
@@ -204,7 +196,7 @@ class GameJoinHandler {
 
       // Load ready states from Redis for league games
       let readyStates = {};
-      if (gameState.isLeague) {
+      if (baseGameState.isLeague) {
         try {
           readyStates = await redisGameState.getPlayerReady(gameId) || {};
           console.log(`[GAME JOIN] Loaded ready states for league game ${gameId}:`, readyStates);
@@ -213,23 +205,20 @@ class GameJoinHandler {
         }
       }
 
-      // Emit game_joined event with current database state
+      // Emit game_joined event with personalised state
       console.log(`[GAME JOIN] Emitting game_joined event for user ${userId} in game ${gameId}`);
-      this.socket.emit('game_joined', {
-        gameId,
-        gameState,
+      emitPersonalizedGameEventToSocket(this.socket, 'game_joined', gameId, baseGameState, {
         spectate: !!spectate
       });
       console.log(`[GAME JOIN] game_joined event emitted successfully for ${gameId}`);
       
-      // Also emit to the room for other players
-      this.io.to(gameId).emit('game_joined', {
-        gameId,
-        gameState
+      // Also emit personalised state to the rest of the room
+      emitPersonalizedGameEvent(this.io, gameId, 'game_joined', baseGameState, {
+        excludeSocketId: this.socket.id
       });
 
       // Emit ready states for league games
-      if (gameState.isLeague && Object.keys(readyStates).length > 0) {
+      if (baseGameState.isLeague && Object.keys(readyStates).length > 0) {
         this.socket.emit('player_ready_update', {
           gameId,
           readyStates
@@ -320,10 +309,7 @@ class GameJoinHandler {
       } catch {}
       
       if (updatedGameState) {
-        this.io.to(gameId).emit('game_update', {
-          gameId,
-          gameState: updatedGameState
-        });
+        emitPersonalizedGameEvent(this.io, gameId, 'game_update', updatedGameState);
       }
       
       console.log(`[INVITE BOT] Bot successfully added to seat ${seatIndex} in game ${gameId}`);
@@ -448,7 +434,7 @@ class GameJoinHandler {
       const updatedState = await GameService.getGameStateForClient(gameId);
       this.io.to(gameId).emit('player_left', { gameId, userId });
       if (updatedState) {
-        this.io.to(gameId).emit('game_update', { gameId, gameState: updatedState });
+        emitPersonalizedGameEvent(this.io, gameId, 'game_update', updatedState);
         console.log(`[GAME LEAVE] Emitted game_update to room ${gameId}`);
       }
       

@@ -3,6 +3,7 @@ import { GameService } from './GameService.js';
 import { ScoringService } from './ScoringService.js';
 import { GameLoggingService } from './GameLoggingService.js';
 import redisGameState from './RedisGameStateService.js';
+import { emitPersonalizedGameEvent } from './SocketGameBroadcastService.js';
 
 /**
  * DATABASE-FIRST TRICK COMPLETION SERVICE
@@ -257,9 +258,7 @@ export class TrickCompletionService {
           
           console.log(`[TRICK COMPLETION] Final scores - team0RunningTotal: ${latestRoundScore?.team0RunningTotal}, team1RunningTotal: ${latestRoundScore?.team1RunningTotal}`);
           
-          io.to(gameId).emit('game_complete', {
-            gameId,
-            gameState: finalGameState,
+          emitPersonalizedGameEvent(io, gameId, 'game_complete', finalGameState, {
             winner: gameComplete.winner,
             reason: gameComplete.reason,
             scores: {
@@ -402,9 +401,7 @@ export class TrickCompletionService {
         // The card play handler will emit clear_table_cards with proper timing
         console.log(`[TRICK COMPLETION] Skipping clear_table_cards emission - managed by card play handler`);
         
-          io.to(gameId).emit('round_complete', {
-            gameId,
-            gameState: updatedGameState,
+          emitPersonalizedGameEvent(io, gameId, 'round_complete', updatedGameState, {
             scores: handSummaryData
           });
         }, 3000); // Wait 3 seconds for trick animation to complete
@@ -566,10 +563,7 @@ export class TrickCompletionService {
           playerScores: updatedGameState.playerScores
         });
         
-        io.to(gameId).emit('game_update', {
-          gameId,
-          gameState: updatedGameState
-        });
+        emitPersonalizedGameEvent(io, gameId, 'game_update', updatedGameState);
         
         console.log(`[TRICK COMPLETION] Emitted game_update for new round ${nextRoundNumber}`);
         
@@ -579,9 +573,7 @@ export class TrickCompletionService {
         console.log(`[TRICK COMPLETION] Emitted clear_table_cards for new round ${nextRoundNumber}`);
         
         // Also emit new_hand_started event for better client handling
-        io.to(gameId).emit('new_hand_started', {
-          gameId,
-          gameState: updatedGameState,
+        emitPersonalizedGameEvent(io, gameId, 'new_hand_started', updatedGameState, {
           roundNumber: nextRoundNumber
         });
         console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);

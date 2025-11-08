@@ -4,6 +4,7 @@ import { GameService } from '../services/GameService.js';
 // CONSOLIDATED: Game model removed - using GameService directly
 import redisGameState from '../services/RedisGameStateService.js';
 import { prisma } from '../config/database.js';
+import { emitPersonalizedGameEvent } from '../services/SocketGameBroadcastService.js';
 
 const router = express.Router();
 
@@ -215,10 +216,7 @@ router.post('/:id/join', async (req, res) => {
         
         // Emit game_update to all players in the room
         const { io } = await import('../../config/server.js');
-        io.to(gameId).emit('game_update', {
-          gameId,
-          gameState
-        });
+        emitPersonalizedGameEvent(io, gameId, 'game_update', gameState);
         console.log(`[API] Emitted game_update to room ${gameId}`);
         
         // Send system message
@@ -287,10 +285,7 @@ router.post('/:id/leave', async (req, res) => {
         
         // Emit game_update to all players in the room
         const { io } = await import('../../config/server.js');
-        io.to(gameId).emit('game_update', {
-          gameId,
-          gameState
-        });
+        emitPersonalizedGameEvent(io, gameId, 'game_update', gameState);
         console.log(`[API] Emitted game_update to room ${gameId} after player left`);
         
         // Send system message

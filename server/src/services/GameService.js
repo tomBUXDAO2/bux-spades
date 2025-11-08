@@ -42,6 +42,8 @@ export class GameService {
         }
       }
       
+      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague);
+
       const dbGame = await prisma.game.create({
         data: {
           id: gameData.id,
@@ -49,7 +51,7 @@ export class GameService {
           mode: gameData.mode,
           format: gameData.format,
           gimmickVariant: gameData.gimmickVariant,
-          isLeague: gameData.isLeague || false,
+          isLeague,
           isRated: gameData.isRated || false,
           maxPoints: gameData.maxPoints,
           minPoints: gameData.minPoints,
@@ -57,6 +59,7 @@ export class GameService {
           nilAllowed: gameData.nilAllowed !== false,
           blindNilAllowed: gameData.blindNilAllowed || false,
           specialRules: gameData.specialRules,
+          eventId: gameData.eventId || null,
           status: 'WAITING',
           dealer: Math.floor(Math.random() * 4), // Random dealer 0-3
           currentRound: 1,
@@ -554,35 +557,45 @@ export class GameService {
    * Sanitize game state for a specific user - only show their own cards
    */
   static sanitizeGameStateForUser(gameState, userId) {
-    if (!gameState || !userId) return gameState;
-    
-    // Find the user's seat index
-    const userPlayer = gameState.players?.find(p => p && p.userId === userId);
-    if (!userPlayer) return gameState;
-    
-    const userSeatIndex = userPlayer.seatIndex;
-    
-    // Create a copy of the game state
+    if (!gameState) return gameState;
+
     const sanitizedState = JSON.parse(JSON.stringify(gameState));
-    
-    // Only show hands for the requesting user
-    if (sanitizedState.hands && Array.isArray(sanitizedState.hands)) {
-      const sanitizedHands = [[], [], [], []];
-      if (userSeatIndex >= 0 && userSeatIndex < 4) {
-        sanitizedHands[userSeatIndex] = sanitizedState.hands[userSeatIndex] || [];
+
+    const scrubAllHands = () => {
+      if (Array.isArray(sanitizedState.hands)) {
+        sanitizedState.hands = sanitizedState.hands.map(() => []);
       }
-      sanitizedState.hands = sanitizedHands;
-    }
-    
-    // CRITICAL: Also sanitize playerHands array to ensure consistency
-    if (sanitizedState.playerHands && Array.isArray(sanitizedState.playerHands)) {
-      const sanitizedPlayerHands = [[], [], [], []];
-      if (userSeatIndex >= 0 && userSeatIndex < 4) {
-        sanitizedPlayerHands[userSeatIndex] = sanitizedState.playerHands[userSeatIndex] || [];
+      if (Array.isArray(sanitizedState.playerHands)) {
+        sanitizedState.playerHands = sanitizedState.playerHands.map(() => []);
       }
-      sanitizedState.playerHands = sanitizedPlayerHands;
+    };
+
+    if (!userId) {
+      scrubAllHands();
+      return sanitizedState;
     }
-    
+
+    const userPlayer = sanitizedState.players?.find(p => p && p.userId === userId);
+
+    if (!userPlayer || userPlayer.seatIndex === undefined || userPlayer.seatIndex === null || userPlayer.seatIndex < 0) {
+      scrubAllHands();
+      return sanitizedState;
+    }
+
+    const userSeatIndex = userPlayer.seatIndex;
+
+    if (Array.isArray(sanitizedState.hands)) {
+      sanitizedState.hands = sanitizedState.hands.map((hand, index) =>
+        index === userSeatIndex ? hand || [] : []
+      );
+    }
+
+    if (Array.isArray(sanitizedState.playerHands)) {
+      sanitizedState.playerHands = sanitizedState.playerHands.map((hand, index) =>
+        index === userSeatIndex ? hand || [] : []
+      );
+    }
+
     // SECRET ASSASSIN: Do not reveal assassin seat to non-assassin players
     try {
       const secretSeat = sanitizedState.play?.secretAssassinSeat ?? sanitizedState.specialRules?.secretAssassinSeat;
@@ -594,7 +607,7 @@ export class GameService {
         }
       }
     } catch {}
-    
+
     return sanitizedState;
   }
 
