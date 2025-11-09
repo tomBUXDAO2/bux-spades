@@ -27,11 +27,18 @@ export const useOptimizedSocketEventHandlers = ({
 }: UseOptimizedSocketEventHandlersProps) => {
   // OPTIMIZED: Use useRef for lastGameUpdate to avoid re-renders
   const lastGameUpdateRef = React.useRef<{ timestamp: number; gameState: any } | null>(null);
+  const previousBidsRef = React.useRef<Array<number | null | undefined> | null>(null);
   
   // OPTIMIZED: Memoize event handlers to prevent recreation on every render
   const handleGameJoined = useCallback((gameData: any) => {
     if (gameData && gameData.gameId === gameId) {
-      setGameState(normalizeGameState(gameData.gameState));
+      const normalizedState = normalizeGameState(gameData.gameState);
+      setGameState(normalizedState);
+      if (Array.isArray(normalizedState?.bidding?.bids)) {
+        previousBidsRef.current = [...normalizedState.bidding.bids];
+      } else {
+        previousBidsRef.current = null;
+      }
       setIsLoading(false);
       setError(null);
       setHasAttemptedJoin(true);
@@ -64,6 +71,9 @@ export const useOptimizedSocketEventHandlers = ({
       requestAnimationFrame(() => {
         const newState = normalizeGameState(gameData.gameState);
         setGameState(newState);
+        if (Array.isArray(newState?.bidding?.bids)) {
+          previousBidsRef.current = [...newState.bidding.bids];
+        }
       });
     }
   }, [gameId, setGameState]);
@@ -76,12 +86,51 @@ export const useOptimizedSocketEventHandlers = ({
     }
   }, [gameId, setError, setIsLoading]);
 
+  const deriveBidChange = (data: any) => {
+    if (data?.bid !== null && data?.bid !== undefined) {
+      return {
+        seatIndex: data.seatIndex ?? data.playerIndex ?? data.seat ?? null,
+        value: data.bid,
+        inferred: false
+      };
+    }
+
+    const bidsFromPayload =
+      (Array.isArray(data?.bids) && data.bids) ||
+      (Array.isArray(data?.bidding?.bids) && data.bidding.bids) ||
+      (Array.isArray(data?.gameState?.bidding?.bids) && data.gameState.bidding.bids);
+
+    if (Array.isArray(bidsFromPayload)) {
+      const previous = previousBidsRef.current || [];
+      for (let i = 0; i < bidsFromPayload.length; i += 1) {
+        const prevBid = previous[i];
+        const nextBid = bidsFromPayload[i];
+        if (
+          nextBid !== null &&
+          nextBid !== undefined &&
+          (prevBid === null || prevBid === undefined || prevBid !== nextBid)
+        ) {
+          return {
+            seatIndex: i,
+            value: nextBid,
+            inferred: true
+          };
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleBiddingUpdate = useCallback((biddingData: any) => {
     console.log('🎮 Bidding update event received:', biddingData);
     if (biddingData && biddingData.gameId === gameId) {
+      const derivedBid = deriveBidChange(biddingData);
+
       // Play bid sound for all bids (human and bot)
-      if (biddingData.bid) {
+      if (derivedBid) {
         import('../../../services/utils/soundUtils').then(({ playBidSound }) => {
+          console.log('[AUDIO DEBUG] bidding_update (optimized) -> playBidSound()', derivedBid);
           playBidSound();
         });
       }
@@ -110,16 +159,25 @@ export const useOptimizedSocketEventHandlers = ({
         }
         
         setGameState(newState);
+        if (Array.isArray(newState?.bidding?.bids)) {
+          previousBidsRef.current = [...newState.bidding.bids];
+        }
       } else {
         // Fallback to partial update if gameState not provided
         const currentState = currentGameState;
         if (currentState) {
-          setGameState({
+          const updatedState = {
             ...currentState,
             bidding: biddingData.bidding
-          });
+          };
+          if (Array.isArray(biddingData?.bidding?.bids)) {
+            previousBidsRef.current = [...biddingData.bidding.bids];
+          }
+          setGameState(updatedState);
         }
       }
+    } else if (Array.isArray(biddingData?.bidding?.bids)) {
+      previousBidsRef.current = [...biddingData.bidding.bids];
     }
   }, [gameId, currentGameState, setGameState]);
 
@@ -176,17 +234,24 @@ export const useOptimizedSocketEventHandlers = ({
           normalizedState.currentTrick = [];
         }
         setGameState(normalizedState);
+        if (Array.isArray(normalizedState?.bidding?.bids)) {
+          previousBidsRef.current = [...normalizedState.bidding.bids];
+        }
       } else {
         // Fallback to partial update if gameState not provided
         const currentTrick = cardData.currentTrick || prevState.play?.currentTrick || [];
-        setGameState({
+        const updatedState = {
           ...prevState,
           play: {
             ...prevState.play,
             currentTrick: Array.isArray(currentTrick) ? currentTrick : []
           },
           currentPlayer: cardData.currentPlayer || prevState.currentPlayer
-        });
+        };
+        if (Array.isArray(updatedState?.bidding?.bids)) {
+          previousBidsRef.current = [...updatedState.bidding.bids];
+        }
+        setGameState(updatedState);
       }
     }
   }, [gameId, setGameState]);
@@ -306,6 +371,12 @@ export const useOptimizedSocketEventHandlers = ({
       localStorage.removeItem('activeGameId');
     }
   }, [gameId, setError, setIsLoading]);
+
+  useEffect(() => {
+    if (Array.isArray(currentGameState?.bidding?.bids)) {
+      previousBidsRef.current = [...currentGameState.bidding.bids];
+    }
+  }, [currentGameState?.bidding?.bids]);
 
   // OPTIMIZED: Memoize event handlers object to prevent recreation
   const eventHandlers = useMemo(() => ({

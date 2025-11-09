@@ -1,7 +1,7 @@
 // Modularized GameTable component
 // This is a simplified version that uses the extracted components
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
 import Chat from '../../../features/chat/Chat';
@@ -176,6 +176,8 @@ export default function GameTableModular({
   const [postHandLock, setPostHandLock] = useState(false);
   // Additional hard mask after summary closes to prevent ANY trick rendering
   const [hardMaskAfterSummary, setHardMaskAfterSummary] = useState(false);
+  const trickClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const showHandSummaryRef = useRef<boolean>(false);
   
   // Utility functions
   const isPlayer = (p: Player | Bot | null): p is Player => {
@@ -288,6 +290,10 @@ export default function GameTableModular({
     }
   };
   
+  useEffect(() => {
+    showHandSummaryRef.current = showHandSummary;
+  }, [showHandSummary]);
+
   const handleHandCompleted = (data: any) => {
     if (data && data.scores) {
       setHandSummaryData(data.scores);
@@ -362,21 +368,106 @@ export default function GameTableModular({
     });
   };
   
+  const normalizeSeatIndex = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const trimmed = value.trim();
+
+      if (/^\d+$/.test(trimmed)) {
+        const parsed = parseInt(trimmed, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+
+      const playerMatch = trimmed.match(/PLAYER_(\d+)/i);
+      if (playerMatch) {
+        const parsed = parseInt(playerMatch[1], 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+
+      const seatMatch = trimmed.match(/SEAT_(\d+)/i);
+      if (seatMatch) {
+        const parsed = parseInt(seatMatch[1], 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+    }
+    return null;
+  };
+
   const handleTrickComplete = (data: any) => {
-    const winnerIndex = data.trick?.winnerIndex ?? data.trickWinner;
+    const winnerIndexRaw =
+      data.trick?.winnerIndex ??
+      data.trick?.winnerSeatIndex ??
+      data.trick?.winningSeatIndex ??
+      data.completedTrick?.winnerIndex ??
+      data.completedTrick?.winnerSeatIndex ??
+      data.completedTrick?.winningSeatIndex ??
+      data.trickWinner ??
+      data.winnerIndex ??
+      data.winnerSeatIndex ??
+      data.winnerSeat ??
+      data.winner?.seatIndex ??
+      data.winnerSeatLabel ??
+      data.winningSeat ??
+      data.gameState?.play?.trickWinnerSeat ??
+      null;
+
+    let winnerIndex = normalizeSeatIndex(winnerIndexRaw);
+
+    if (winnerIndex === null) {
+      const completedTricks = data.completedTricks ?? data.tricks ?? data.gameState?.play?.completedTricks;
+      if (Array.isArray(completedTricks) && completedTricks.length > 0) {
+        const lastCompleted = completedTricks[completedTricks.length - 1];
+        winnerIndex = normalizeSeatIndex(
+          lastCompleted?.winnerSeatIndex ??
+          lastCompleted?.winnerIndex ??
+          lastCompleted?.winningSeatIndex ??
+          lastCompleted?.winningSeat ??
+          lastCompleted?.winnerSeat ??
+          lastCompleted?.seatIndex
+        );
+      }
+    }
+
     // Get trick cards from the gameState's currentTrick (before it gets cleared)
-    const trickCards = data.trick?.cards ?? data.completedTrick?.cards ?? data.gameState?.play?.currentTrick ?? [];
+    const trickCardsSource =
+      data.trick?.cards ??
+      data.completedTrick?.cards ??
+      data.cards ??
+      data.gameState?.play?.currentTrick ??
+      data.currentTrick ??
+      [];
+
+    const trickCards = Array.isArray(trickCardsSource) ? trickCardsSource : [];
+    const resolvedTrickCards = trickCards.length > 0 ? trickCards : lastNonEmptyTrick;
+
+    if (winnerIndex === null) {
+      const winnerCard = Array.isArray(resolvedTrickCards) && resolvedTrickCards.find((card: any) =>
+        card?.winner ||
+        card?.isWinner ||
+        card?.winningSeatIndex !== undefined ||
+        card?.winningSeat !== undefined
+      );
+      if (winnerCard) {
+        winnerIndex = normalizeSeatIndex(
+          winnerCard.winningSeatIndex ?? winnerCard.winningSeat ?? winnerCard.seatIndex ?? winnerCard.playerIndex
+        );
+      }
+    }
     
     console.log('[TRICK COMPLETE] Data received:', data);
-    console.log('[TRICK COMPLETE] Winner index:', winnerIndex);
-    console.log('[TRICK COMPLETE] Trick cards:', trickCards);
+    console.log('[TRICK COMPLETE] Winner index raw:', winnerIndexRaw, '-> normalized:', winnerIndex);
+    console.log('[TRICK COMPLETE] Trick cards (resolved):', resolvedTrickCards);
     
     if (typeof winnerIndex === 'number') {
-      setAnimatedTrickCards(trickCards);
+      setAnimatedTrickCards(resolvedTrickCards);
       setTrickWinner(winnerIndex);
       setAnimatingTrick(true);
       setTrickCompleted(true);
-      setLastNonEmptyTrick(trickCards);
+      if (resolvedTrickCards.length > 0) {
+        setLastNonEmptyTrick(resolvedTrickCards);
+      }
       
       // Play win sound effect when trick completes
       playWinSound();
@@ -384,11 +475,24 @@ export default function GameTableModular({
       // CRITICAL FIX: Don't clear trick animation here - let the server clear_table_cards event handle it
       // This prevents the 4th card from flickering due to race conditions between client and server timers
       console.log('[TRICK ANIMATION] Trick animation started - waiting for server clear_table_cards event');
+      if (trickClearTimeoutRef.current) {
+        clearTimeout(trickClearTimeoutRef.current);
+      }
+      trickClearTimeoutRef.current = setTimeout(() => {
+        console.log('[TRICK ANIMATION] Fallback clearing table cards after timeout');
+        handleClearTableCards({ fallback: true });
+      }, 1800);
+    } else {
+      console.warn('[TRICK COMPLETE] Unable to determine winner seat index from payload', { data });
     }
   };
   
   const handleClearTableCards = (data?: any) => {
     console.log('[TRICK CLEAR] Clearing table cards from server event', data);
+    if (trickClearTimeoutRef.current) {
+      clearTimeout(trickClearTimeoutRef.current);
+      trickClearTimeoutRef.current = null;
+    }
     
     // CRITICAL FIX: Clear all trick-related state when server says to clear table
     setAnimatedTrickCards([]);
@@ -833,7 +937,7 @@ export default function GameTableModular({
     }
   };
   
-  const handleHandSummaryContinue = () => {
+  const handleHandSummaryContinue = useCallback(() => {
     setShowHandSummary(false);
     setHandSummaryData(null);
     // Unlock trick rendering now that user closed the summary
@@ -851,7 +955,7 @@ export default function GameTableModular({
       console.log('[HAND SUMMARY] Continuing to next round for game:', gameState.id);
       socket.emit('hand_summary_continue', { gameId: gameState.id });
     }
-  };
+  }, [socket, gameState.id]);
   
   const handleViewPlayerStats = (player: any) => {
     setSelectedPlayer(player);
@@ -918,6 +1022,24 @@ export default function GameTableModular({
       });
     }
   };
+
+  useEffect(() => {
+    if (!showHandSummary || !gameState?.id) {
+      return;
+    }
+
+    const autoContinueTimeout = window.setTimeout(() => {
+      if (!showHandSummaryRef.current) {
+        return;
+      }
+      console.log('[HAND SUMMARY] Auto-continuing after timeout');
+      handleHandSummaryContinue();
+    }, 15000);
+
+    return () => {
+      window.clearTimeout(autoContinueTimeout);
+    };
+  }, [showHandSummary, gameState?.id, handleHandSummaryContinue]);
   
   const handleFillSeatWithBot = () => {
     if (socket) {

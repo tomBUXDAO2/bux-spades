@@ -194,16 +194,12 @@ export class StatsService {
         update: {
           totalGamesPlayed: stats.totalGames,
           totalGamesWon: stats.gamesWon,
-          totalCoinsWon: stats.totalCoins > 0 ? stats.totalCoins : 0,
-          totalCoinsLost: stats.totalCoins < 0 ? Math.abs(stats.totalCoins) : 0,
           lastGameAt: new Date()
         },
         create: {
           userId,
           totalGamesPlayed: stats.totalGames,
           totalGamesWon: stats.gamesWon,
-          totalCoinsWon: stats.totalCoins > 0 ? stats.totalCoins : 0,
-          totalCoinsLost: stats.totalCoins < 0 ? Math.abs(stats.totalCoins) : 0,
           lastGameAt: new Date()
         }
       });

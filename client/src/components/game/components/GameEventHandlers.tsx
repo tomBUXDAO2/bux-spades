@@ -1,3 +1,26 @@
+  const deriveCardPlayed = (data: any) => {
+    if (data?.cardPlayed) return { ...data.cardPlayed, inferred: false };
+
+    const currentTrickArray =
+      (Array.isArray(data?.currentTrick) && data.currentTrick.length > 0 && data.currentTrick) ||
+      (Array.isArray(data?.gameState?.play?.currentTrick) && data.gameState.play.currentTrick.length > 0 && data.gameState.play.currentTrick);
+
+    if (currentTrickArray) {
+      const lastCard = currentTrickArray[currentTrickArray.length - 1];
+      if (lastCard) {
+        return {
+          userId: lastCard.playerId,
+          seatIndex: lastCard.seatIndex,
+          suit: lastCard.suit,
+          rank: lastCard.rank,
+          inferred: true
+        };
+      }
+    }
+
+    return null;
+  };
+
 // Game event handlers and socket management for GameTable
 // Handles all socket events and game state updates
 
@@ -5,6 +28,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { GameState, Card, Player, Bot } from "../../../types/game";
 import type { ChatMessage } from "../../../features/chat/Chat";
 import { normalizeGameState } from "../../../features/game/hooks/useGameStateNormalization";
+import { playCardSound } from "./AudioManager";
 
 interface GameEventHandlersProps {
   socket: any;
@@ -245,7 +269,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       setTimeout(() => {
         console.log('🎮 Showing hand summary after delay');
         onHandCompleted(data);
-      }, 3000); // Wait 3 seconds for trick animation to complete
+      }, 1200); // Shorter delay to keep game pace snappy
     };
     
     socket.on('round_complete', roundCompletedHandler);
@@ -317,39 +341,68 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
             ...data.gameState
           };
           
-          // Sync final totals to scoreboard immediately
-          if (data.scores) {
-            if (typeof data.scores.team1Score === 'number') newState.team1TotalScore = data.scores.team1Score;
-            if (typeof data.scores.team2Score === 'number') newState.team2TotalScore = data.scores.team2Score;
-            if (Array.isArray(data.scores.playerScores)) newState.playerScores = data.scores.playerScores;
-            if (typeof data.scores.team1Bags === 'number') newState.team1Bags = data.scores.team1Bags;
-            if (typeof data.scores.team2Bags === 'number') newState.team2Bags = data.scores.team2Bags;
+          const appliedScores = data.scores ?? {
+            team1Score: data.gameState.team1TotalScore,
+            team2Score: data.gameState.team2TotalScore,
+            playerScores: data.gameState.playerScores,
+            team1Bags: data.gameState.team1Bags,
+            team2Bags: data.gameState.team2Bags
+          };
+
+          if (appliedScores) {
+            if (typeof appliedScores.team1Score === 'number') newState.team1TotalScore = appliedScores.team1Score;
+            if (typeof appliedScores.team2Score === 'number') newState.team2TotalScore = appliedScores.team2Score;
+            if (Array.isArray(appliedScores.playerScores)) newState.playerScores = appliedScores.playerScores;
+            if (typeof appliedScores.team1Bags === 'number') newState.team1Bags = appliedScores.team1Bags;
+            if (typeof appliedScores.team2Bags === 'number') newState.team2Bags = appliedScores.team2Bags;
           }
           
           // For solo games, set winningPlayer from the winner
-          if (data.winner && data.winner.startsWith('PLAYER_')) {
-            const playerIndex = parseInt(data.winner.split('_')[1]);
-            newState.winningPlayer = playerIndex; // Keep 0-based for solo games
+          const winnerToken = data.winner ?? data.gameState?.winner;
+          if (typeof winnerToken === 'string' && winnerToken.startsWith('PLAYER_')) {
+            const playerIndex = parseInt(winnerToken.split('_')[1], 10);
+            if (!Number.isNaN(playerIndex)) {
+              newState.winningPlayer = playerIndex; // Keep 0-based for solo games
+            }
           }
           
           return newState;
         });
       }
       
-      // Show winners modal
-      if (data.winner && data.scores) {
-        const winnerData = {
-          team1Score: data.scores.team1Score || 0,
-          team2Score: data.scores.team2Score || 0,
-          winningTeam: data.winner === 'TEAM_0' ? 1 : 2,
-          playerScores: data.scores.playerScores || []
-        };
-        
-        // For solo games, update winningTeam to be the player index
-        if (data.winner && data.winner.startsWith('PLAYER_')) {
-          const playerIndex = parseInt(data.winner.split('_')[1]);
-          winnerData.winningTeam = playerIndex; // Keep 0-based for solo games
+      // Show winners modal / final summary even if scores missing
+      const appliedScores = data.scores ?? (data.gameState ? {
+        team1Score: data.gameState.team1TotalScore ?? 0,
+        team2Score: data.gameState.team2TotalScore ?? 0,
+        playerScores: data.gameState.playerScores ?? [],
+        team1Bags: data.gameState.team1Bags ?? 0,
+        team2Bags: data.gameState.team2Bags ?? 0
+      } : null);
+
+      const winnerToken = data.winner ?? data.gameState?.winner ?? null;
+      let winningTeam = 1;
+
+      if (typeof winnerToken === 'string') {
+        if (winnerToken.startsWith('TEAM_')) {
+          const parsed = parseInt(winnerToken.split('_')[1], 10);
+          if (!Number.isNaN(parsed)) winningTeam = parsed + 1;
+        } else if (winnerToken.startsWith('PLAYER_')) {
+          const parsed = parseInt(winnerToken.split('_')[1], 10);
+          if (!Number.isNaN(parsed)) winningTeam = parsed;
         }
+      } else if (typeof winnerToken === 'number') {
+        winningTeam = winnerToken;
+      } else if (appliedScores && typeof appliedScores.team1Score === 'number' && typeof appliedScores.team2Score === 'number') {
+        winningTeam = appliedScores.team1Score >= appliedScores.team2Score ? 1 : 2;
+      }
+
+      if (appliedScores) {
+        const winnerData = {
+          team1Score: appliedScores.team1Score ?? 0,
+          team2Score: appliedScores.team2Score ?? 0,
+          winningTeam,
+          playerScores: appliedScores.playerScores ?? []
+        };
         console.log('🎮 Game complete - calling onGameOver with:', winnerData);
         onGameOver(winnerData);
       }
@@ -368,6 +421,18 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       const cardPlayedHandler = (cardData: any) => {
         console.log('🎮 Card played event received in GameEventHandlers:', cardData);
         
+        // Play card sound for every successful card play (human or bot)
+        console.log('[AUDIO DEBUG] GameEventHandlers card_played payload:', {
+          hasCardPlayed: !!cardData?.cardPlayed,
+          cardPlayed: cardData?.cardPlayed,
+          keys: Object.keys(cardData || {})
+        });
+        const derivedCard = deriveCardPlayed(cardData);
+        if (derivedCard && !derivedCard.rejected) {
+          console.log('[AUDIO DEBUG] GameEventHandlers card_played -> playCardSound()', { inferred: derivedCard.inferred, seatIndex: derivedCard.seatIndex });
+          playCardSound();
+        }
+
         // CRITICAL: Clear pending played card immediately when server confirms the play
         // This prevents cards from staying in hand if played quickly before trick completion
         if (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) {

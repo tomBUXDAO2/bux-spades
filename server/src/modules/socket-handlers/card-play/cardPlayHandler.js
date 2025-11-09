@@ -289,24 +289,40 @@ class CardPlayHandler {
               ];
             }
 
+            // Ensure Redis reflects the full trick until the client clears it
+            await redisGameState.setCurrentTrick(gameId, cardsForEmit);
+
+            // Ensure the emitted game state also contains the full trick for animations
+            updatedGameState.play = updatedGameState.play || {};
+            updatedGameState.play.currentTrick = cardsForEmit;
+            updatedGameState.currentTrickCards = cardsForEmit;
+
+            const trickPayload = {
+              winnerIndex: trickResult.winningSeatIndex,
+              winnerSeatIndex: trickResult.winningSeatIndex,
+              cards: cardsForEmit
+            };
+
             emitPersonalizedGameEvent(this.io, gameId, 'trick_complete', updatedGameState, {
               trickWinner: trickResult.winningSeatIndex,
-              completedTrick: {
-                cards: cardsForEmit
-              }
+              completedTrick: trickPayload,
+              trick: trickPayload
             });
 
-            // Clear trick cards from table after animation (2 seconds delay) - only when trick is complete
+            // Clear trick cards from table after animation (extra delay to allow winner animation) - only when trick is complete
             console.log(`[CARD PLAY] Trick result - isComplete: ${trickResult.isComplete}, winningSeatIndex: ${trickResult.winningSeatIndex}`);
             if (trickResult.isComplete) {
               // CRITICAL FIX: Clear table cards FIRST, then start new trick to prevent flickering
               console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
               
-              // Clear table cards first (after 2 seconds)
+              // Clear table cards first (after 3.5 seconds)
               setTimeout(async () => {
                 console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
                 // Include isRoundComplete so clients can hard-lock table rendering on final trick of a hand
                 this.io.to(gameId).emit('clear_table_cards', { gameId, isRoundComplete: !!trickResult.isRoundComplete });
+
+                // Clear Redis trick cache now that the table is being cleared
+                await redisGameState.setCurrentTrick(gameId, []);
                 
                 // THEN start new trick after table is cleared
                 if (!trickResult.isRoundComplete) {
@@ -326,7 +342,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 2000);
+              }, 3500);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
