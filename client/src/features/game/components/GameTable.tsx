@@ -295,11 +295,51 @@ export default function GameTableModular({
   }, [showHandSummary]);
 
   const handleHandCompleted = (data: any) => {
-    if (data && data.scores) {
-      setHandSummaryData(data.scores);
-    }
+    console.log('[HAND SUMMARY] Hand completed payload received:', {
+      hasData: !!data,
+      hasScores: !!data?.scores,
+      scoresKeys: data?.scores ? Object.keys(data.scores) : null
+    });
+
+    const fallbackSummary = {
+      team1Score: data?.scores?.team1Score ?? (gameState.team1TotalScore ?? 0),
+      team2Score: data?.scores?.team2Score ?? (gameState.team2TotalScore ?? 0),
+      team1Bags: data?.scores?.team1Bags ?? (gameState.team1Bags ?? 0),
+      team2Bags: data?.scores?.team2Bags ?? (gameState.team2Bags ?? 0),
+      team1TotalScore: data?.scores?.team1TotalScore ?? (gameState.team1TotalScore ?? 0),
+      team2TotalScore: data?.scores?.team2TotalScore ?? (gameState.team2TotalScore ?? 0),
+      team1Bid: data?.scores?.team1Bid ?? null,
+      team1Tricks: data?.scores?.team1Tricks ?? null,
+      team1NilPoints: data?.scores?.team1NilPoints ?? 0,
+      team2Bid: data?.scores?.team2Bid ?? null,
+      team2Tricks: data?.scores?.team2Tricks ?? null,
+      team2NilPoints: data?.scores?.team2NilPoints ?? 0,
+      tricksPerPlayer: Array.isArray(data?.scores?.tricksPerPlayer)
+        ? data.scores.tricksPerPlayer
+        : Array.from({ length: 4 }, () => 0),
+      playerBids: Array.isArray(data?.scores?.playerBids)
+        ? data.scores.playerBids
+        : Array.isArray(gameState?.bidding?.bids)
+          ? [...gameState.bidding.bids]
+          : Array.from({ length: 4 }, () => 0),
+      playerNils: Array.isArray(data?.scores?.playerNils)
+        ? data.scores.playerNils
+        : Array.from({ length: 4 }, () => 0),
+      playerBags: Array.isArray(data?.scores?.playerBags)
+        ? data.scores.playerBags
+        : Array.from({ length: 4 }, () => 0),
+      playerScores: Array.isArray(data?.scores?.playerScores)
+        ? data.scores.playerScores
+        : Array.isArray(gameState?.playerScores)
+          ? [...gameState.playerScores]
+          : Array.from({ length: 4 }, () => 0),
+      playerRoundScores: Array.isArray(data?.scores?.playerRoundScores)
+        ? data.scores.playerRoundScores
+        : Array.from({ length: 4 }, () => 0)
+    };
+
+    setHandSummaryData(fallbackSummary);
     setShowHandSummary(true);
-    // Suppress any trick re-render while summary/winner is shown
     tableClearedRef.current = true;
     setPostHandLock(true);
   };
@@ -1023,24 +1063,6 @@ export default function GameTableModular({
     }
   };
 
-  useEffect(() => {
-    if (!showHandSummary || !gameState?.id) {
-      return;
-    }
-
-    const autoContinueTimeout = window.setTimeout(() => {
-      if (!showHandSummaryRef.current) {
-        return;
-      }
-      console.log('[HAND SUMMARY] Auto-continuing after timeout');
-      handleHandSummaryContinue();
-    }, 15000);
-
-    return () => {
-      window.clearTimeout(autoContinueTimeout);
-    };
-  }, [showHandSummary, gameState?.id, handleHandSummaryContinue]);
-  
   const handleFillSeatWithBot = () => {
     if (socket) {
       socket.emit('add_bot', {

@@ -293,118 +293,149 @@ export class TrickCompletionService {
         // CRITICAL FIX: Delay round_complete event to prevent 4th card flickering on final trick
         // This allows the trick animation to complete before the game state is updated
         setTimeout(async () => {
-          console.log(`[TRICK COMPLETION] Emitting round_complete event for game ${gameId}`);
-          
-          // CRITICAL FIX: Clear currentTrick data before getting game state to prevent re-rendering
-          // This ensures the game state doesn't include the completed trick data
-          await redisGameState.setCurrentTrick(gameId, []);
-          console.log(`[TRICK COMPLETION] Cleared currentTrick data to prevent re-rendering`);
-          
-          const updatedGameState = await GameService.getGameStateForClient(gameId);
-        
-        // Get detailed round data for hand summary
-        const currentRound = updatedGameState.rounds.find(r => r.roundNumber === updatedGameState.currentRound);
-        if (!currentRound) {
-          console.error('[TRICK COMPLETION] Current round not found for hand summary');
-        }
-
-        // Get player stats for this round
-        const playerStats = await prisma.playerRoundStats.findMany({
-          where: { roundId: currentRound?.id },
-          orderBy: { seatIndex: 'asc' }
-        });
-
-        // Calculate team data
-        const team0Players = playerStats.filter(p => p.seatIndex % 2 === 0);
-        const team1Players = playerStats.filter(p => p.seatIndex % 2 === 1);
-        
-        const team0Bid = team0Players.reduce((sum, p) => sum + (p.bid || 0), 0);
-        const team0Tricks = team0Players.reduce((sum, p) => sum + p.tricksWon, 0);
-        const team1Bid = team1Players.reduce((sum, p) => sum + (p.bid || 0), 0);
-        const team1Tricks = team1Players.reduce((sum, p) => sum + p.tricksWon, 0);
-
-        // Calculate nil points (100 for made nil, -100 for failed nil)
-        const team0NilPoints = team0Players.reduce((sum, p) => {
-          if (p.bid === 0 || p.isBlindNil) {
-            return sum + (p.tricksWon === 0 ? 100 : -100);
-          }
-          return sum;
-        }, 0);
-        
-        const team1NilPoints = team1Players.reduce((sum, p) => {
-          if (p.bid === 0 || p.isBlindNil) {
-            return sum + (p.tricksWon === 0 ? 100 : -100);
-          }
-          return sum;
-        }, 0);
-
-        // Get the latest RoundScore for running totals
-        const latestRoundScore = await prisma.roundScore.findFirst({
-          where: { 
-            Round: { gameId }
-          },
-          orderBy: { Round: { roundNumber: 'desc' } }
-        });
-
-        // Transform scores to match client expectations
-        const handSummaryData = {
-          team1Score: scores.team0Score, // team0 becomes team1 in client
-          team2Score: scores.team1Score, // team1 becomes team2 in client
-          team1Bags: scores.team0Bags,
-          team2Bags: scores.team1Bags,
-          team1TotalScore: latestRoundScore?.team0RunningTotal || 0, // Use actual running total from database
-          team2TotalScore: latestRoundScore?.team1RunningTotal || 0, // Use actual running total from database
-          
-          // Team breakdown data
-          team1Bid: team0Bid, // team0 becomes team1 in client
-          team1Tricks: team0Tricks,
-          team1NilPoints: team0NilPoints,
-          team2Bid: team1Bid, // team1 becomes team2 in client
-          team2Tricks: team1Tricks,
-          team2NilPoints: team1NilPoints,
-          
-          // Individual player data
-          tricksPerPlayer: playerStats.map(p => p.tricksWon),
-          playerBids: playerStats.map(p => p.bid || 0),
-          playerNils: playerStats.map(p => {
-            // Check if player bid nil (bid = 0) or blind nil
-            const isNilBid = p.bid === 0 && !p.isBlindNil;
-            const isBlindNilBid = p.isBlindNil;
-            
-            if (isNilBid || isBlindNilBid) {
-              // Made nil = 100 points, failed nil = -100 points
-              return p.tricksWon === 0 ? 100 : -100;
+          let updatedGameState = null;
+          const safeEmit = (payload) => {
+            try {
+              emitPersonalizedGameEvent(io, gameId, 'round_complete', updatedGameState || { id: gameId, play: { currentTrick: [] } }, payload);
+            } catch (emitError) {
+              console.error('[TRICK COMPLETION] Failed to emit round_complete payload:', emitError);
             }
-            return 0;
-          }),
-          playerBags: playerStats.map(p => p.bagsThisRound || 0),
+          };
           
-          // Solo game player scores (running totals)
-          playerScores: latestRoundScore ? [
-            latestRoundScore.player0Running || 0,
-            latestRoundScore.player1Running || 0,
-            latestRoundScore.player2Running || 0,
-            latestRoundScore.player3Running || 0
-          ] : [0, 0, 0, 0],
-          
-          // Solo game round scores (points this round only)
-          playerRoundScores: scores.players ? scores.players.map(p => p.pointsThisRound) : [0, 0, 0, 0]
-        };
-        
-        console.log(`[TRICK COMPLETION] Emitting round_complete with data:`, {
-          gameId,
-          gameState: updatedGameState,
-          scores: handSummaryData
-        });
-        
-        // CRITICAL: Don't emit clear_table_cards here - let the card play handler manage timing
-        // The card play handler will emit clear_table_cards with proper timing
-        console.log(`[TRICK COMPLETION] Skipping clear_table_cards emission - managed by card play handler`);
-        
-          emitPersonalizedGameEvent(io, gameId, 'round_complete', updatedGameState, {
-            scores: handSummaryData
-          });
-        }, 3000); // Wait 3 seconds for trick animation to complete
+          try {
+            console.log(`[TRICK COMPLETION] Emitting round_complete event for game ${gameId}`);
+            
+            await redisGameState.setCurrentTrick(gameId, []);
+            console.log(`[TRICK COMPLETION] Cleared currentTrick data to prevent re-rendering`);
+            
+            updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+            if (!updatedGameState) {
+              console.error('[TRICK COMPLETION] Failed to retrieve full game state, using minimal fallback state');
+              updatedGameState = {
+                id: gameId,
+                status: 'PLAYING',
+                currentRound: 0,
+                currentPlayer: null,
+                players: [],
+                play: { currentTrick: [] },
+                currentTrickCards: []
+              };
+            }
+
+            updatedGameState.play = {
+              ...(updatedGameState.play || {}),
+              currentTrick: []
+            };
+            updatedGameState.currentTrickCards = [];
+
+            const baseSummary = {
+              team1Score: scores?.team0Score ?? 0,
+              team2Score: scores?.team1Score ?? 0,
+              team1Bags: scores?.team0Bags ?? 0,
+              team2Bags: scores?.team1Bags ?? 0,
+              team1TotalScore: 0,
+              team2TotalScore: 0,
+              team1Bid: null,
+              team1Tricks: null,
+              team1NilPoints: 0,
+              team2Bid: null,
+              team2Tricks: null,
+              team2NilPoints: 0,
+              tricksPerPlayer: [],
+              playerBids: [],
+              playerNils: [],
+              playerBags: [],
+              playerScores: scores?.players ? scores.players.map(p => p.runningTotal ?? 0) : [],
+              playerRoundScores: scores?.players ? scores.players.map(p => p.pointsThisRound ?? 0) : []
+            };
+
+            try {
+              let currentRound = Array.isArray(updatedGameState.rounds)
+                ? updatedGameState.rounds.find((r) => r && r.roundNumber === updatedGameState.currentRound)
+                : null;
+              if (!currentRound) {
+                console.warn('[TRICK COMPLETION] Current round missing from full game state, querying round table');
+                currentRound = await prisma.round.findFirst({
+                  where: { gameId, roundNumber: updatedGameState.currentRound },
+                  select: { id: true }
+                });
+              }
+
+              if (currentRound) {
+                const playerStats = await prisma.playerRoundStats.findMany({
+                  where: { roundId: currentRound.id },
+                  orderBy: { seatIndex: 'asc' }
+                });
+
+                const team0Players = playerStats.filter(p => p.seatIndex % 2 === 0);
+                const team1Players = playerStats.filter(p => p.seatIndex % 2 === 1);
+
+                baseSummary.team1Bid = team0Players.reduce((sum, p) => sum + (p.bid || 0), 0);
+                baseSummary.team1Tricks = team0Players.reduce((sum, p) => sum + p.tricksWon, 0);
+                baseSummary.team2Bid = team1Players.reduce((sum, p) => sum + (p.bid || 0), 0);
+                baseSummary.team2Tricks = team1Players.reduce((sum, p) => sum + p.tricksWon, 0);
+
+                baseSummary.team1NilPoints = team0Players.reduce((sum, p) => sum + ((p.bid === 0 || p.isBlindNil) ? (p.tricksWon === 0 ? 100 : -100) : 0), 0);
+                baseSummary.team2NilPoints = team1Players.reduce((sum, p) => sum + ((p.bid === 0 || p.isBlindNil) ? (p.tricksWon === 0 ? 100 : -100) : 0), 0);
+
+                baseSummary.tricksPerPlayer = playerStats.map(p => p.tricksWon);
+                baseSummary.playerBids = playerStats.map(p => p.bid || 0);
+                baseSummary.playerNils = playerStats.map(p => {
+                  if (p.bid === 0 || p.isBlindNil) {
+                    return p.tricksWon === 0 ? 100 : -100;
+                  }
+                  return 0;
+                });
+                baseSummary.playerBags = playerStats.map(p => p.bagsThisRound || 0);
+              } else {
+                console.warn('[TRICK COMPLETION] Still unable to resolve current round; continuing with minimal summary data');
+              }
+            } catch (statsError) {
+              console.error('[TRICK COMPLETION] Error enriching round summary with player stats:', statsError);
+            }
+
+            try {
+              const latestRoundScore = await prisma.roundScore.findFirst({
+                where: { Round: { gameId } },
+                orderBy: { Round: { roundNumber: 'desc' } }
+              });
+              if (latestRoundScore) {
+                baseSummary.team1TotalScore = latestRoundScore.team0RunningTotal ?? 0;
+                baseSummary.team2TotalScore = latestRoundScore.team1RunningTotal ?? 0;
+                if (baseSummary.playerScores.length === 0) {
+                  baseSummary.playerScores = [
+                    latestRoundScore.player0Running ?? 0,
+                    latestRoundScore.player1Running ?? 0,
+                    latestRoundScore.player2Running ?? 0,
+                    latestRoundScore.player3Running ?? 0
+                  ];
+                }
+                if (baseSummary.playerRoundScores.length === 0) {
+                  baseSummary.playerRoundScores = [
+                    latestRoundScore.player0Score ?? 0,
+                    latestRoundScore.player1Score ?? 0,
+                    latestRoundScore.player2Score ?? 0,
+                    latestRoundScore.player3Score ?? 0
+                  ];
+                }
+              }
+            } catch (roundScoreError) {
+              console.error('[TRICK COMPLETION] Error fetching latest round score:', roundScoreError);
+            }
+
+            console.log(`[TRICK COMPLETION] Emitting round_complete with data:`, {
+              gameId,
+              gameState: updatedGameState,
+              scores: baseSummary
+            });
+            
+            console.log(`[TRICK COMPLETION] Skipping clear_table_cards emission - managed by card play handler`);
+            safeEmit({ scores: baseSummary });
+          } catch (roundCompleteError) {
+            console.error('[TRICK COMPLETION] Error preparing round_complete event:', roundCompleteError);
+            safeEmit({ scores: scores ?? {} });
+          }
+        }, 900); // Short delay to allow final trick animation before summary
       } else {
         console.log(`[TRICK COMPLETION] No io instance provided, cannot emit round_complete`);
       }
@@ -578,20 +609,52 @@ export class TrickCompletionService {
         });
         console.log(`[TRICK COMPLETION] Emitted new_hand_started for round ${nextRoundNumber}`);
         
-        // CRITICAL: Trigger bot bidding for new round if current player is a bot
+        // CRITICAL: Kick off bidding for the first player (bot or human)
         if (updatedGameState.currentPlayer) {
-          const currentPlayer = updatedGameState.players.find(p => p && (p.id === updatedGameState.currentPlayer || p.userId === updatedGameState.currentPlayer));
-          if (currentPlayer && (currentPlayer.type === 'bot' || currentPlayer.isHuman === false)) {
-            console.log(`[TRICK COMPLETION] ✅ Current player is bot ${currentPlayer.username}, triggering bot bid for new round`);
+          const currentPlayerFromState = updatedGameState.players.find(
+            (p) => p && (p.id === updatedGameState.currentPlayer || p.userId === updatedGameState.currentPlayer)
+          );
+
+          let currentPlayerLive = null;
+          try {
+            const liveGameState = await GameService.getGame(gameId);
+            currentPlayerLive = liveGameState?.players?.find((p) => p && p.userId === updatedGameState.currentPlayer) || null;
+          } catch (timerLookupError) {
+            console.error('[TRICK COMPLETION] Error retrieving live game state for bidding timer:', timerLookupError);
+          }
+
+          const seatIndex =
+            currentPlayerLive?.seatIndex ??
+            currentPlayerFromState?.seatIndex ??
+            0;
+
+          const isHuman =
+            currentPlayerLive?.isHuman ??
+            (typeof currentPlayerFromState?.isHuman === 'boolean'
+              ? currentPlayerFromState.isHuman
+              : currentPlayerFromState?.type !== 'bot');
+
+          if (isHuman) {
+            try {
+              const { playerTimerService } = await import('./PlayerTimerService.js');
+              console.log(
+                `[TRICK COMPLETION] Starting bidding timer for human player ${updatedGameState.currentPlayer} (seat ${seatIndex})`
+              );
+              playerTimerService.startPlayerTimer(gameId, updatedGameState.currentPlayer, seatIndex, 'bidding');
+            } catch (timerError) {
+              console.error('[TRICK COMPLETION] Failed to start bidding timer for new round:', timerError);
+            }
+            console.log(`[TRICK COMPLETION] Current player is human, bot bidding trigger not required`);
+          } else {
+            const botName = currentPlayerFromState?.username || currentPlayerLive?.username || updatedGameState.currentPlayer;
+            console.log(`[TRICK COMPLETION] ✅ Current player is bot ${botName}, triggering bot bid for new round`);
             const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
             const biddingHandler = new BiddingHandler(io, null);
             await biddingHandler.triggerBotBidIfNeeded(gameId);
             console.log(`[TRICK COMPLETION] Bot bid trigger completed for new round`);
-          } else {
-            console.log(`[TRICK COMPLETION] Current player is human or not found, not triggering bot bid for new round`);
           }
         } else {
-          console.log(`[TRICK COMPLETION] No current player set - cannot trigger bot bidding for new round`);
+          console.log(`[TRICK COMPLETION] No current player set - cannot trigger bidding start for new round`);
         }
       }
     } catch (error) {
