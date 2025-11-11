@@ -397,6 +397,17 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       }
 
       if (appliedScores) {
+        // Persist final scores immediately so winner modal reflects the true final totals
+        if (typeof appliedScores.team1Score === 'number' || typeof appliedScores.team2Score === 'number') {
+          setFinalScores({
+            team1Score: typeof appliedScores.team1Score === 'number' ? appliedScores.team1Score : (gameState.team1TotalScore ?? 0),
+            team2Score: typeof appliedScores.team2Score === 'number' ? appliedScores.team2Score : (gameState.team2TotalScore ?? 0)
+          });
+        }
+        if (Array.isArray(appliedScores.playerScores)) {
+          setFinalPlayerScores(appliedScores.playerScores);
+        }
+
         const winnerData = {
           team1Score: appliedScores.team1Score ?? 0,
           team2Score: appliedScores.team2Score ?? 0,
