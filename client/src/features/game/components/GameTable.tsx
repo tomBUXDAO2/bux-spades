@@ -345,34 +345,39 @@ export default function GameTableModular({
   };
   
   useEffect(() => {
-    if ((showWinner || showLoser) &&
-        typeof gameState.team1TotalScore === 'number' &&
-        typeof gameState.team2TotalScore === 'number') {
+    if (showWinner || showLoser) {
       setFinalScores(prev => {
-        if (
-          prev &&
-          prev.team1Score === gameState.team1TotalScore &&
-          prev.team2Score === gameState.team2TotalScore
-        ) {
+        const currentTeam1 = typeof gameState.team1TotalScore === 'number'
+          ? gameState.team1TotalScore
+          : (prev?.team1Score ?? 0);
+        const currentTeam2 = typeof gameState.team2TotalScore === 'number'
+          ? gameState.team2TotalScore
+          : (prev?.team2Score ?? 0);
+
+        if (prev && prev.team1Score === currentTeam1 && prev.team2Score === currentTeam2) {
           return prev;
         }
+
         return {
-          team1Score: gameState.team1TotalScore,
-          team2Score: gameState.team2TotalScore
+          team1Score: currentTeam1,
+          team2Score: currentTeam2
         };
       });
     }
   }, [showWinner, showLoser, gameState.team1TotalScore, gameState.team2TotalScore]);
 
   useEffect(() => {
-    if ((showWinner || showLoser) && Array.isArray(gameState.playerScores) && gameState.playerScores.length === 4) {
-      setFinalPlayerScores(prev => {
-        const same =
-          prev &&
-          prev.length === gameState.playerScores.length &&
-          prev.every((value, index) => value === gameState.playerScores[index]);
-        return same ? prev : [...gameState.playerScores];
-      });
+    if (showWinner || showLoser) {
+      const latestScores = Array.isArray(gameState.playerScores) ? gameState.playerScores : [];
+      if (latestScores.length === 4) {
+        setFinalPlayerScores(prev => {
+          const same =
+            prev &&
+            prev.length === latestScores.length &&
+            prev.every((value, index) => value === latestScores[index]);
+          return same ? prev : [...latestScores];
+        });
+      }
     }
   }, [showWinner, showLoser, gameState.playerScores]);
 
