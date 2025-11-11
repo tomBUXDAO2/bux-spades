@@ -483,8 +483,13 @@ class CardPlayHandler {
         });
         
         if (currentPlayerForTimer && currentPlayerForTimer.isHuman) {
-          console.log(`[CARD PLAY] 🕐 STARTING TIMER for human player ${currentPlayerForTimer.userId} (seat ${currentPlayerForTimer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, currentPlayerForTimer.userId, currentPlayerForTimer.seatIndex, 'playing');
+          if (currentPlayerForTimer.leftAt) {
+            console.log(`[CARD PLAY] ⚠️ Player ${currentPlayerForTimer.userId} disconnected - forcing immediate auto-play`);
+            playerTimerService.forceTimeout(gameId, currentPlayerForTimer.userId, currentPlayerForTimer.seatIndex, 'playing');
+          } else {
+            console.log(`[CARD PLAY] 🕐 STARTING TIMER for human player ${currentPlayerForTimer.userId} (seat ${currentPlayerForTimer.seatIndex})`);
+            playerTimerService.startPlayerTimer(gameId, currentPlayerForTimer.userId, currentPlayerForTimer.seatIndex, 'playing');
+          }
         } else {
           console.log(`[CARD PLAY] ❌ NO TIMER - Player not found or not human:`, {
             player: currentPlayerForTimer,

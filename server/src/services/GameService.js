@@ -1202,6 +1202,7 @@ export class GameService {
         const playerStat = playerStats.find(stat => stat.seatIndex === player.seatIndex);
         const tricksWon = playerStat?.tricksWon || 0;
         console.log(`[GAME SERVICE] Player ${player.seatIndex} (${player.user?.username}): tricks=${tricksWon}, stat=${playerStat ? 'found' : 'not found'}`);
+        const isConnected = !player.leftAt;
         const playerData = {
           id: player.userId,
           userId: player.userId, // CRITICAL: Add userId field for player lookups
@@ -1212,6 +1213,8 @@ export class GameService {
           isHuman: player.isHuman,
           isSpectator: player.isSpectator || false,
           type: player.isHuman ? 'human' : 'bot',
+          leftAt: player.leftAt,
+          isConnected,
           bid: playerBids[player.seatIndex] || null,
           tricks: tricksWon,
           isBlindNil: playerStat?.isBlindNil || false, // Include blind nil information

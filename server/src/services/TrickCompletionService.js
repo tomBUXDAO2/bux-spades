@@ -248,31 +248,43 @@ export class TrickCompletionService {
         if (io) {
           const finalGameState = await GameService.getGameStateForClient(gameId);
           
-          // Get the final running totals from the latest RoundScore
           const latestRoundScore = await prisma.roundScore.findFirst({
             where: { 
               Round: { gameId }
             },
             orderBy: { Round: { roundNumber: 'desc' } }
           });
+
+          const finalTeam1Score = latestRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
+          const finalTeam2Score = latestRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
+          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && latestRoundScore) ? [
+            latestRoundScore.player0Running ?? 0,
+            latestRoundScore.player1Running ?? 0,
+            latestRoundScore.player2Running ?? 0,
+            latestRoundScore.player3Running ?? 0
+          ] : undefined;
+
+          if (finalGameState) {
+            finalGameState.team1TotalScore = finalTeam1Score;
+            finalGameState.team2TotalScore = finalTeam2Score;
+            if (Array.isArray(finalPlayerScores)) {
+              finalGameState.playerScores = finalPlayerScores;
+            }
+            finalGameState.team1Bags = scores.team0Bags ?? finalGameState.team1Bags ?? 0;
+            finalGameState.team2Bags = scores.team1Bags ?? finalGameState.team2Bags ?? 0;
+          }
           
-          console.log(`[TRICK COMPLETION] Final scores - team0RunningTotal: ${latestRoundScore?.team0RunningTotal}, team1RunningTotal: ${latestRoundScore?.team1RunningTotal}`);
+          console.log(`[TRICK COMPLETION] Final scores - team0RunningTotal: ${finalTeam1Score}, team1RunningTotal: ${finalTeam2Score}`);
           
           emitPersonalizedGameEvent(io, gameId, 'game_complete', finalGameState, {
             winner: gameComplete.winner,
             reason: gameComplete.reason,
             scores: {
-              team1Score: latestRoundScore?.team0RunningTotal || 0, // team0 becomes team1 in client
-              team2Score: latestRoundScore?.team1RunningTotal || 0, // team1 becomes team2 in client
+              team1Score: finalTeam1Score,
+              team2Score: finalTeam2Score,
               team1Bags: scores.team0Bags,
               team2Bags: scores.team1Bags,
-              // Solo game player scores (running totals)
-              playerScores: finalGameState.gameMode === 'SOLO' && latestRoundScore ? [
-                latestRoundScore.player0Running || 0,
-                latestRoundScore.player1Running || 0,
-                latestRoundScore.player2Running || 0,
-                latestRoundScore.player3Running || 0
-              ] : undefined
+              playerScores: finalPlayerScores
             }
           });
         }

@@ -344,6 +344,38 @@ export default function GameTableModular({
     setPostHandLock(true);
   };
   
+  useEffect(() => {
+    if ((showWinner || showLoser) &&
+        typeof gameState.team1TotalScore === 'number' &&
+        typeof gameState.team2TotalScore === 'number') {
+      setFinalScores(prev => {
+        if (
+          prev &&
+          prev.team1Score === gameState.team1TotalScore &&
+          prev.team2Score === gameState.team2TotalScore
+        ) {
+          return prev;
+        }
+        return {
+          team1Score: gameState.team1TotalScore,
+          team2Score: gameState.team2TotalScore
+        };
+      });
+    }
+  }, [showWinner, showLoser, gameState.team1TotalScore, gameState.team2TotalScore]);
+
+  useEffect(() => {
+    if ((showWinner || showLoser) && Array.isArray(gameState.playerScores) && gameState.playerScores.length === 4) {
+      setFinalPlayerScores(prev => {
+        const same =
+          prev &&
+          prev.length === gameState.playerScores.length &&
+          prev.every((value, index) => value === gameState.playerScores[index]);
+        return same ? prev : [...gameState.playerScores];
+      });
+    }
+  }, [showWinner, showLoser, gameState.playerScores]);
+
   // Calculate user's coin winnings based on game results
   const calculateUserWinnings = (data: { team1Score: number; team2Score: number; winningTeam: 1 | 2; playerScores?: number[] }, gameState: any, userId: string) => {
     if (!gameState.rated || !gameState.buyIn) return 0;

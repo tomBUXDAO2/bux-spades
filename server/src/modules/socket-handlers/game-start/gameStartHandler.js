@@ -163,6 +163,8 @@ class GameStartHandler {
             seatIndex: currentPlayer.seatIndex
           } : 'null');
           
+          const isDisconnected = currentPlayer?.leftAt;
+          
           if (currentPlayer && !currentPlayer.isHuman) {
             console.log(`[GAME START] Triggering bot bid for ${currentPlayer.user?.username}`);
             // Import and use BiddingHandler
@@ -176,7 +178,10 @@ class GameStartHandler {
             const { BiddingHandler } = await import('../bidding/biddingHandler.js');
             const biddingHandler = new BiddingHandler(this.io, this.socket);
             const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
-            if (shouldApplyTimer) {
+            if (isDisconnected) {
+              console.log(`[GAME START] Player ${currentPlayer.userId} disconnected - forcing immediate auto-bid`);
+              playerTimerService.forceTimeout(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
+            } else if (shouldApplyTimer) {
               console.log(`[GAME START] Starting timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
               playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
             } else {
@@ -194,8 +199,13 @@ class GameStartHandler {
       if (gameState.status === 'PLAYING' && gameState.currentPlayer) {
         const currentPlayer = gameState.players.find(p => p && p.userId === gameState.currentPlayer);
         if (currentPlayer && currentPlayer.isHuman) {
-          console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
+          if (currentPlayer.leftAt) {
+            console.log(`[GAME START] Player ${currentPlayer.userId} disconnected - forcing immediate auto-play`);
+            playerTimerService.forceTimeout(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
+          } else {
+            console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+            playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
+          }
         }
       }
     } catch (error) {

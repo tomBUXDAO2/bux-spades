@@ -70,6 +70,31 @@ class PlayerTimerService {
   }
 
   /**
+   * Force immediate timeout (used when player disconnects while on turn)
+   */
+  forceTimeout(gameId, playerId, playerIndex, phase) {
+    if (!this.io) {
+      console.error('[PLAYER TIMER] ❌ Socket.IO not initialized, cannot force timeout');
+      return;
+    }
+
+    console.log(`[PLAYER TIMER] ⚡ Forcing immediate timeout for player ${playerId} (seat ${playerIndex}) in ${phase} phase`);
+    this.clearTimer(gameId);
+    this.activeTimers.set(gameId, {
+      graceTimeout: null,
+      actionTimeout: null,
+      playerId,
+      phase
+    });
+
+    this.handleTimeout(gameId, playerId, phase)
+      .catch(error => {
+        console.error('[PLAYER TIMER] ❌ Error during forced timeout:', error);
+        this.clearTimer(gameId);
+      });
+  }
+
+  /**
    * Handle timer expiration - trigger auto-action
    */
   async handleTimeout(gameId, playerId, phase) {
