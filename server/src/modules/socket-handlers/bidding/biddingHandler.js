@@ -398,12 +398,8 @@ class BiddingHandler {
 
         // Start timer for next player if they are human and timer should apply
         if (nextPlayer && nextPlayer.isHuman) {
-          const isDisconnected = !!nextPlayer.leftAt;
           const shouldApplyTimer = this.shouldApplyBiddingTimer(gameState);
-          if (isDisconnected) {
-            console.log(`[BIDDING] Player ${nextPlayer.userId} is disconnected - forcing immediate auto-bid`);
-            playerTimerService.forceTimeout(gameId, nextPlayer.userId, nextPlayer.seatIndex, 'bidding');
-          } else if (shouldApplyTimer) {
+          if (shouldApplyTimer) {
             console.log(`[BIDDING] Starting timer for human player ${nextPlayer.userId} (seat ${nextPlayer.seatIndex})`);
             playerTimerService.startPlayerTimer(gameId, nextPlayer.userId, nextPlayer.seatIndex, 'bidding');
           } else {

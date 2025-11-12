@@ -254,6 +254,19 @@ class PlayerTimerService {
   }
 
   /**
+   * Clear timer only if it's set for the specified player
+   */
+  clearTimerForPlayer(gameId, playerId) {
+    const timers = this.activeTimers.get(gameId);
+    if (timers && timers.playerId === playerId) {
+      console.log(`[PLAYER TIMER] 🗑️ CLEARING TIMER for game ${gameId} (player ${playerId}) due to reconnection`);
+      clearTimeout(timers.graceTimeout);
+      clearTimeout(timers.actionTimeout);
+      this.activeTimers.delete(gameId);
+    }
+  }
+
+  /**
    * Clear all timers (for cleanup)
    */
   clearAllTimers() {

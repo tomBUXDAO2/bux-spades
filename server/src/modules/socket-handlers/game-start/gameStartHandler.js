@@ -178,10 +178,7 @@ class GameStartHandler {
             const { BiddingHandler } = await import('../bidding/biddingHandler.js');
             const biddingHandler = new BiddingHandler(this.io, this.socket);
             const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
-            if (isDisconnected) {
-              console.log(`[GAME START] Player ${currentPlayer.userId} disconnected - forcing immediate auto-bid`);
-              playerTimerService.forceTimeout(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
-            } else if (shouldApplyTimer) {
+            if (shouldApplyTimer) {
               console.log(`[GAME START] Starting timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
               playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
             } else {
@@ -199,13 +196,8 @@ class GameStartHandler {
       if (gameState.status === 'PLAYING' && gameState.currentPlayer) {
         const currentPlayer = gameState.players.find(p => p && p.userId === gameState.currentPlayer);
         if (currentPlayer && currentPlayer.isHuman) {
-          if (currentPlayer.leftAt) {
-            console.log(`[GAME START] Player ${currentPlayer.userId} disconnected - forcing immediate auto-play`);
-            playerTimerService.forceTimeout(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
-          } else {
-            console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-            playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
-          }
+          console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+          playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
         }
       }
     } catch (error) {

@@ -9,6 +9,7 @@ import ReadyHandler from '../modules/socket-handlers/ready/readyHandler.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 import { FriendBlockHandler } from '../modules/socket-handlers/friends/friendBlockHandler.js';
 import redisSessionService from '../services/RedisSessionService.js';
+import { playerTimerService } from '../services/PlayerTimerService.js';
 import jwt from 'jsonwebtoken';
 
 export function setupSocketHandlers(io) {
@@ -81,6 +82,7 @@ export function setupSocketHandlers(io) {
               if (playerInGame.leftAt) {
                 console.log(`[SESSION] User ${userId} reconnecting to game ${validActiveGameId} - marking as reconnected`);
                 await GameService.markPlayerReconnected(validActiveGameId, userId);
+                playerTimerService.clearTimerForPlayer(validActiveGameId, userId);
               }
             } else {
               console.log(`[SESSION] User ${userId} is not a player in game ${previousSession.activeGameId}, clearing it`);
