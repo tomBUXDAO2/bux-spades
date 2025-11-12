@@ -84,6 +84,43 @@ const GIMMICK_OPTIONS = ['SUICIDE', 'BID4NIL', 'BID3', 'BIDHEARTS', 'CRAZY_ACES'
 const SPECIAL_RULE1_OPTIONS = ['SCREAMER', 'ASSASSIN', 'SECRET_ASSASSIN'] as const;
 const SPECIAL_RULE2_OPTIONS = ['LOWBALL', 'HIGHBALL'] as const;
 
+const TIMEZONE_OPTIONS = [
+  { label: 'UK', value: 'Europe/London' },
+  { label: 'USA - Pacific', value: 'America/Los_Angeles' },
+  { label: 'USA - Mountain', value: 'America/Denver' },
+  { label: 'USA - Central', value: 'America/Chicago' },
+  { label: 'USA - Eastern', value: 'America/New_York' },
+] as const;
+
+const generateCoinOptions = () => {
+  const values: number[] = [];
+  for (let value = 50_000; value <= 1_000_000; value += 50_000) {
+    values.push(value);
+  }
+  for (let value = 1_500_000; value <= 10_000_000; value += 500_000) {
+    values.push(value);
+  }
+  return values;
+};
+
+const COIN_OPTION_VALUES = generateCoinOptions();
+
+const formatCoins = (value?: number | null) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000;
+    const formatted = Number.isInteger(millions) ? millions.toString() : millions.toFixed(1).replace(/\.0$/, '');
+    return `${formatted}mil`;
+  }
+
+  const thousands = value / 1_000;
+  const formatted = Number.isInteger(thousands) ? thousands.toString() : thousands.toFixed(1).replace(/\.0$/, '');
+  return `${formatted}k`;
+};
+
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -100,7 +137,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   const [eventError, setEventError] = useState<string | null>(null);
   const [eventSuccessMessage, setEventSuccessMessage] = useState<string | null>(null);
   const [eventStatusUpdating, setEventStatusUpdating] = useState<string | null>(null);
-  const timezoneDefault = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const resolvedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timezoneDefault = TIMEZONE_OPTIONS.some((option) => option.value === resolvedTimezone)
+    ? resolvedTimezone
+    : TIMEZONE_OPTIONS[0].value;
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [newEvent, setNewEvent] = useState<EventFormState>({
     name: '',
@@ -287,18 +327,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     setBannerUploadError(null);
   };
 
-  const timezones = [
-    'UTC',
-    'America/New_York',
-    'America/Los_Angeles',
-    'America/Chicago',
-    'Europe/London',
-    'Europe/Paris',
-    'Asia/Singapore',
-    'Asia/Tokyo',
-    'Australia/Sydney',
-  ];
-
   const criterionTypeLabels: Record<EventCriterionForm['type'], string> = {
     MOST_WINS: 'Most Wins',
     MOST_GAMES_PLAYED: 'Most Games Played',
@@ -355,8 +383,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
 
     if (newEvent.minCoins !== undefined || newEvent.maxCoins !== undefined) {
-      const min = newEvent.minCoins ?? 0;
-      const max = newEvent.maxCoins ?? min;
+      const min = newEvent.minCoins ?? newEvent.maxCoins ?? 0;
+      const max = newEvent.maxCoins ?? newEvent.minCoins ?? 0;
       filters.coinRange = { min, max };
     }
 
@@ -500,7 +528,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
 
     const criteriaList = event.criteria.map(criterion => {
       const label = criterionTypeLabels[criterion.type];
-      const reward = `${criterion.rewardCoins.toLocaleString()} coins`;
+      const reward = `${formatCoins(criterion.rewardCoins)} coins`;
       if ((criterion.type === 'GAMES_PLAYED_MILESTONE' || criterion.type === 'GAMES_WON_MILESTONE') && criterion.milestoneValue) {
         return `${label} — ${reward} (every ${criterion.milestoneValue})`;
       }
@@ -978,8 +1006,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                         onChange={e => handleEventInputChange('timezone', e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
                       >
-                        {timezones.map(tz => (
-                          <option key={tz} value={tz}>{tz}</option>
+                        {TIMEZONE_OPTIONS.map(tz => (
+                          <option key={tz.value} value={tz.value}>{tz.label}</option>
                         ))}
                       </select>
                     </div>
@@ -1114,22 +1142,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                     <div className="space-y-2">
                       <label className="block text-sm font-semibold text-white">Buy-In Range (Coins)</label>
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          value={newEvent.minCoins ?? ''}
+                        <select
+                          value={newEvent.minCoins !== undefined ? String(newEvent.minCoins) : ''}
                           onChange={e => handleEventInputChange('minCoins', e.target.value ? Number(e.target.value) : undefined)}
                           className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                          placeholder="Min"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          value={newEvent.maxCoins ?? ''}
+                        >
+                          <option value="">Min</option>
+                          {COIN_OPTION_VALUES.map(value => (
+                            <option key={`min-${value}`} value={value}>{formatCoins(value)}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={newEvent.maxCoins !== undefined ? String(newEvent.maxCoins) : ''}
                           onChange={e => handleEventInputChange('maxCoins', e.target.value ? Number(e.target.value) : undefined)}
                           className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                          placeholder="Max"
-                        />
+                        >
+                          <option value="">Max</option>
+                          {COIN_OPTION_VALUES.map(value => (
+                            <option key={`max-${value}`} value={value}>{formatCoins(value)}</option>
+                          ))}
+                        </select>
                       </div>
                       <p className="text-xs text-slate-400">Leave blank to allow any buy-in.</p>
                     </div>
@@ -1138,6 +1170,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="number"
+                          min={-250}
+                          max={-100}
+                          step={50}
                           value={newEvent.minPoints ?? ''}
                           onChange={e => handleEventInputChange('minPoints', e.target.value ? Number(e.target.value) : undefined)}
                           className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
@@ -1145,6 +1180,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                         />
                         <input
                           type="number"
+                          min={100}
+                          max={650}
+                          step={50}
                           value={newEvent.maxPoints ?? ''}
                           onChange={e => handleEventInputChange('maxPoints', e.target.value ? Number(e.target.value) : undefined)}
                           className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
@@ -1301,13 +1339,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                           </div>
                           <div className="md:col-span-3 space-y-1">
                             <label className="text-xs uppercase tracking-wide text-slate-400">Reward Coins</label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={criterion.rewardCoins}
-                              onChange={e => updateCriterion(index, { rewardCoins: Math.max(1, Number(e.target.value)) })}
+                            <select
+                              value={String(criterion.rewardCoins)}
+                              onChange={e => updateCriterion(index, { rewardCoins: Number(e.target.value) })}
                               className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-2 text-white text-sm"
-                            />
+                            >
+                              {COIN_OPTION_VALUES.map(value => (
+                                <option key={`reward-${value}`} value={value}>{formatCoins(value)}</option>
+                              ))}
+                            </select>
                           </div>
                           {(criterion.type === 'GAMES_PLAYED_MILESTONE' || criterion.type === 'GAMES_WON_MILESTONE') && (
                             <div className="md:col-span-3 space-y-1">

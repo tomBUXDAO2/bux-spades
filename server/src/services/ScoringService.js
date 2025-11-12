@@ -1,4 +1,5 @@
 import { prisma } from '../config/database.js';
+import EventService from './EventService.js';
 
 /**
  * DATABASE-FIRST SCORING SERVICE
@@ -521,7 +522,7 @@ export class ScoringService {
       // Get game info
       const game = await prisma.game.findUnique({
         where: { id: gameId },
-        select: { currentRound: true, mode: true }
+        select: { currentRound: true, mode: true, eventId: true }
       });
 
       if (!game) {
@@ -542,6 +543,11 @@ export class ScoringService {
           Round: { gameId }
         },
         orderBy: { Round: { roundNumber: 'desc' } }
+      });
+
+      const gamePlayersForEvent = await prisma.gamePlayer.findMany({
+        where: { gameId },
+        select: { userId: true, seatIndex: true }
       });
 
       // Create game result - only team scores for partners games
@@ -586,15 +592,26 @@ export class ScoringService {
 
       console.log(`[SCORING] Game ${gameId} completed successfully`);
       
+      if (game.eventId) {
+        try {
+          await EventService.recordGameCompletion({
+            eventId: game.eventId,
+            gameId,
+            winner,
+            players: gamePlayersForEvent.map((player) => ({
+              userId: player.userId,
+              seatIndex: player.seatIndex,
+            })),
+          });
+        } catch (eventError) {
+          console.error('[SCORING] Error recording event completion stats:', eventError);
+        }
+      }
+
       // CRITICAL FIX: Clear activeGameId from all players' sessions so they don't get redirected back
       try {
-        const gamePlayers = await prisma.gamePlayer.findMany({
-          where: { gameId },
-          select: { userId: true }
-        });
-        
         const redisSessionService = (await import('./RedisSessionService.js')).default;
-        for (const player of gamePlayers) {
+        for (const player of gamePlayersForEvent) {
           await redisSessionService.clearActiveGame(player.userId);
           console.log(`[SCORING] Cleared activeGameId for player ${player.userId}`);
         }
@@ -624,15 +641,10 @@ export class ScoringService {
       // Update user stats for all players
       try {
         const { StatsService } = await import('./StatsService.js');
-        const gamePlayers = await prisma.gamePlayer.findMany({
-          where: { gameId },
-          select: { userId: true }
-        });
-        
-        for (const player of gamePlayers) {
+        for (const player of gamePlayersForEvent) {
           await StatsService.updateUserStats(player.userId);
         }
-        console.log(`[SCORING] Updated stats for ${gamePlayers.length} players`);
+        console.log(`[SCORING] Updated stats for ${gamePlayersForEvent.length} players`);
       } catch (statsError) {
         console.error('[SCORING] Error updating user stats:', statsError);
         // Don't throw - stats update failure shouldn't break game completion

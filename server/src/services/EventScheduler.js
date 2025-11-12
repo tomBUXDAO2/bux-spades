@@ -52,6 +52,19 @@ export async function stopEventScheduler() {
 async function tickInternal() {
   const event = await EventService.getActiveEvent({ includeCriteria: true, includeStats: true });
   if (!event) {
+    if (schedulerState.lastEventId) {
+      try {
+        const completedEvent = await EventService.getEventById(schedulerState.lastEventId, {
+          includeCriteria: true,
+          includeStats: true,
+        });
+        if (completedEvent && completedEvent.status === 'COMPLETED') {
+          await announceEventEnd(completedEvent);
+        }
+      } catch (error) {
+        console.error('[EVENT SCHEDULER] Failed to fetch completed event for wrap-up:', error);
+      }
+    }
     schedulerState.lastEventId = null;
     return;
   }
