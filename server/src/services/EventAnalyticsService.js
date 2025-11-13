@@ -48,11 +48,10 @@ export class EventAnalyticsService {
       .setThumbnail(THUMBNAIL_URL);
 
     const bannerUrl = resolveBannerUrl(event.bannerUrl);
+    console.log('[EVENT ANALYTICS] Banner URL:', { original: event.bannerUrl, resolved: bannerUrl });
     if (bannerUrl) {
       embed.setImage(bannerUrl);
     }
-
-    embed.setThumbnail(THUMBNAIL_URL);
 
     const filterDescription = this.describeFilters(event.filters || {});
     embed.setDescription(
@@ -91,6 +90,8 @@ export class EventAnalyticsService {
       });
     }
 
+    embed.setFooter({ text: 'To create event games, use /event in 🎪-events game room' });
+
     return embed;
   }
 
@@ -122,8 +123,6 @@ export class EventAnalyticsService {
         `**Participants:** ${uniquePlayers}`,
       ].join('\n'),
     );
-
-    embed.setThumbnail(THUMBNAIL_URL);
 
     const winLeaders = [...participants]
       .filter((p) => p.gamesWon > 0)
@@ -160,6 +159,8 @@ export class EventAnalyticsService {
         value: await this.renderLeaderboard(winRateLeaders, 'winPercent'),
       });
     }
+
+    embed.setFooter({ text: 'To create event games, use /event in 🎪-events game room' });
 
     return embed;
   }
