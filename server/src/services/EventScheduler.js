@@ -120,6 +120,10 @@ async function announceEventStart(event) {
     const embed = await EventAnalyticsService.buildEventStartEmbed(event);
     const content = EVENT_ROLE_ID ? `<@&${EVENT_ROLE_ID}>` : null;
 
+    // Log embed data to debug image issue
+    const embedData = embed.toJSON();
+    console.log('[EVENT SCHEDULER] Embed data:', JSON.stringify(embedData, null, 2));
+
     await channel.send({
       content,
       embeds: [embed],

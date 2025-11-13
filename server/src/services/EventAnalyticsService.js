@@ -51,6 +51,9 @@ export class EventAnalyticsService {
     console.log('[EVENT ANALYTICS] Banner URL:', { original: event.bannerUrl, resolved: bannerUrl });
     if (bannerUrl) {
       embed.setImage(bannerUrl);
+      console.log('[EVENT ANALYTICS] Set image on embed:', bannerUrl);
+    } else {
+      console.log('[EVENT ANALYTICS] No banner URL provided');
     }
 
     const filterDescription = this.describeFilters(event.filters || {});
