@@ -2,18 +2,59 @@ import EventFilterService from './EventFilterService.js';
 import EventService from './EventService.js';
 import { EmbedBuilder } from 'discord.js';
 
+const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
+
 const MAX_LEADER_ROWS = 5;
+const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
+
+function formatCoinsShort(value) {
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+
+  if (Math.abs(value) >= 1_000_000) {
+    const millions = value / 1_000_000;
+    const formatted = Number.isInteger(millions) ? millions.toString() : millions.toFixed(1).replace(/\.0$/, '');
+    return `${formatted}mil`;
+  }
+
+  if (Math.abs(value) >= 1_000) {
+    const thousands = value / 1_000;
+    const formatted = Number.isInteger(thousands) ? thousands.toString() : thousands.toFixed(1).replace(/\.0$/, '');
+    return `${formatted}k`;
+  }
+
+  return `${value}`;
+}
+
+function resolveBannerUrl(bannerUrl) {
+  if (!bannerUrl) {
+    return null;
+  }
+  if (bannerUrl.startsWith('http://') || bannerUrl.startsWith('https://')) {
+    return bannerUrl;
+  }
+  const base = process.env.PUBLIC_ASSET_BASE_URL || process.env.PUBLIC_URL || '';
+  if (!base) {
+    return bannerUrl;
+  }
+  return `${base.replace(/\/$/, '')}/${bannerUrl.replace(/^\//, '')}`;
+}
 
 export class EventAnalyticsService {
   static async buildEventStartEmbed(event) {
     const embed = new EmbedBuilder()
       .setTitle(`🏆 ${event.name} Has Started!`)
       .setColor(0xffd700)
-      .setTimestamp(new Date(event.startsAt));
+      .setTimestamp(new Date(event.startsAt))
+      .setThumbnail(THUMBNAIL_URL);
 
-    if (event.bannerUrl) {
-      embed.setImage(event.bannerUrl);
+    const bannerUrl = resolveBannerUrl(event.bannerUrl);
+    if (bannerUrl) {
+      embed.setImage(bannerUrl);
     }
+
+    embed.setThumbnail(THUMBNAIL_URL);
 
     const filterDescription = this.describeFilters(event.filters);
     embed.setDescription(
@@ -32,7 +73,7 @@ export class EventAnalyticsService {
         name: '🎯 Prizes',
         value: event.criteria
           .map((criterion) => {
-            const amount = `${criterion.rewardCoins.toLocaleString()} coins`;
+            const amount = `${formatCoinsShort(criterion.rewardCoins)} coins`;
             switch (criterion.type) {
               case 'MOST_WINS':
                 return `• Most wins: **${amount}**`;
@@ -59,11 +100,21 @@ export class EventAnalyticsService {
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${event.name} — Live Standings`)
       .setColor(0x2b6cb0)
-      .setTimestamp(new Date());
+      .setTimestamp(new Date())
+      .setThumbnail(THUMBNAIL_URL);
+
+    const bannerUrl = resolveBannerUrl(event.bannerUrl);
+    if (bannerUrl) {
+      embed.setImage(bannerUrl);
+    }
 
     const participants = event.participants || [];
-
-    const totalGames = participants.reduce((sum, p) => sum + (p.gamesPlayed || 0), 0);
+    const eventGames = Array.isArray(event.EventGame) ? event.EventGame.filter((game) => game?.qualifies !== false) : [];
+    const recordedGames = eventGames.length;
+    const inferredGamesFromStats = participants.length
+      ? Math.max(...participants.map((p) => p?.gamesPlayed || 0), 0)
+      : 0;
+    const totalGames = recordedGames || inferredGamesFromStats || 0;
     const uniquePlayers = participants.length;
 
     embed.setDescription(
@@ -73,6 +124,8 @@ export class EventAnalyticsService {
         `**Participants:** ${uniquePlayers}`,
       ].join('\n'),
     );
+
+    embed.setThumbnail(THUMBNAIL_URL);
 
     const winLeaders = [...participants]
       .filter((p) => p.gamesWon > 0)
@@ -117,14 +170,23 @@ export class EventAnalyticsService {
     const embed = new EmbedBuilder()
       .setTitle(`🏁 ${event.name} — Results`)
       .setColor(0x38a169)
-      .setTimestamp(new Date(event.endsAt));
+      .setTimestamp(new Date(event.endsAt))
+      .setThumbnail(THUMBNAIL_URL);
 
-    if (event.bannerUrl) {
-      embed.setImage(event.bannerUrl);
+    const bannerUrl = resolveBannerUrl(event.bannerUrl);
+    if (bannerUrl) {
+      embed.setImage(bannerUrl);
     }
 
+    embed.setThumbnail(THUMBNAIL_URL);
+
     const participants = event.participants || [];
-    const totalGames = participants.reduce((sum, p) => sum + (p.gamesPlayed || 0), 0);
+    const eventGames = Array.isArray(event.EventGame) ? event.EventGame.filter((game) => game?.qualifies !== false) : [];
+    const recordedGames = eventGames.length;
+    const inferredGamesFromStats = participants.length
+      ? Math.max(...participants.map((p) => p?.gamesPlayed || 0), 0)
+      : 0;
+    const totalGames = recordedGames || inferredGamesFromStats || 0;
     const uniquePlayers = participants.length;
 
     embed.setDescription(
@@ -144,7 +206,10 @@ export class EventAnalyticsService {
         if (!top.length) continue;
 
         const title = this.describeCriterion(criterion);
-        const value = await this.renderLeaderboard(top, criterion.type === 'HIGHEST_WIN_PERCENT' ? 'winPercent' : 'gamesWon');
+        const value = await this.renderLeaderboard(
+          top,
+          criterion.type === 'HIGHEST_WIN_PERCENT' ? 'winPercent' : 'gamesWon',
+        );
         fields.push({ name: title, value });
       }
     }
@@ -211,7 +276,7 @@ export class EventAnalyticsService {
   }
 
   static describeCriterion(criterion) {
-    const amount = `${criterion.rewardCoins.toLocaleString()} coins`;
+    const amount = `${formatCoinsShort(criterion.rewardCoins)} coins`;
     switch (criterion.type) {
       case 'MOST_WINS':
         return `🥇 Most Wins — ${amount}`;

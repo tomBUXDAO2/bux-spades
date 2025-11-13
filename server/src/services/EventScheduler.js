@@ -4,13 +4,15 @@ import EventAnalyticsService from './EventAnalyticsService.js';
 const schedulerState = {
   intervalId: null,
   lastEventId: null,
+  lastProgressAt: null,
   client: null,
 };
 
 const ANNOUNCEMENT_CHANNEL_ID = process.env.DISCORD_EVENTS_ANNOUNCEMENT_CHANNEL_ID || null;
 const EVENT_ROLE_ID = process.env.DISCORD_EVENT_ROLE_ID || null;
 
-const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+const PROGRESS_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+const TICK_INTERVAL_MS = 60 * 1000;
 
 export async function startEventScheduler(discordClient) {
   if (!discordClient) {
@@ -32,9 +34,14 @@ export async function startEventScheduler(discordClient) {
     } catch (error) {
       console.error('[EVENT SCHEDULER] Tick error:', error);
     }
-  }, REFRESH_INTERVAL_MS);
+  }, TICK_INTERVAL_MS);
 
-  console.log('[EVENT SCHEDULER] Started with interval', REFRESH_INTERVAL_MS);
+  console.log(
+    '[EVENT SCHEDULER] Started with tick interval',
+    TICK_INTERVAL_MS,
+    'and progress refresh interval',
+    PROGRESS_REFRESH_INTERVAL_MS,
+  );
 }
 
 export async function stopEventScheduler() {
@@ -45,18 +52,20 @@ export async function stopEventScheduler() {
 
   schedulerState.client = null;
   schedulerState.lastEventId = null;
+  schedulerState.lastProgressAt = null;
 
   console.log('[EVENT SCHEDULER] Stopped');
 }
 
 async function tickInternal() {
-  const event = await EventService.getActiveEvent({ includeCriteria: true, includeStats: true });
+  const event = await EventService.getActiveEvent({ includeCriteria: true, includeStats: true, includeGames: true });
   if (!event) {
     if (schedulerState.lastEventId) {
       try {
         const completedEvent = await EventService.getEventById(schedulerState.lastEventId, {
           includeCriteria: true,
           includeStats: true,
+          includeGames: true,
         });
         if (completedEvent && completedEvent.status === 'COMPLETED') {
           await announceEventEnd(completedEvent);
@@ -66,21 +75,28 @@ async function tickInternal() {
       }
     }
     schedulerState.lastEventId = null;
+    schedulerState.lastProgressAt = null;
     return;
   }
 
   if (event.status === 'ACTIVE' && schedulerState.lastEventId !== event.id) {
     await announceEventStart(event);
     schedulerState.lastEventId = event.id;
+    schedulerState.lastProgressAt = Date.now();
   }
 
   if (event.status === 'ACTIVE') {
-    await postMidEventUpdate(event);
+    const now = Date.now();
+    if (!schedulerState.lastProgressAt || now - schedulerState.lastProgressAt >= PROGRESS_REFRESH_INTERVAL_MS) {
+      await postMidEventUpdate(event);
+      schedulerState.lastProgressAt = now;
+    }
   }
 
   if (event.status === 'COMPLETED' && schedulerState.lastEventId === event.id) {
     await announceEventEnd(event);
     schedulerState.lastEventId = null;
+    schedulerState.lastProgressAt = null;
   }
 }
 

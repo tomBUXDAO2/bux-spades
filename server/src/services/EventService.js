@@ -307,19 +307,20 @@ export class EventService {
       throw new Error('Event ID is required');
     }
 
-    const { includeCriteria = true, includeStats = false } = options;
+    const { includeCriteria = true, includeStats = false, includeGames = false } = options;
 
     return prisma.event.findUnique({
       where: { id: eventId },
       include: {
         criteria: includeCriteria,
         participants: includeStats,
+        EventGame: includeGames,
       },
     });
   }
 
   static async getActiveEvent(options = {}) {
-    const { includeCriteria = true, includeStats = false } = options;
+    const { includeCriteria = true, includeStats = false, includeGames = false } = options;
     const now = new Date();
 
     let event = await prisma.event.findFirst({
@@ -339,6 +340,7 @@ export class EventService {
       include: {
         criteria: includeCriteria,
         participants: includeStats,
+        EventGame: includeGames,
       },
     });
 
@@ -353,6 +355,7 @@ export class EventService {
         include: {
           criteria: includeCriteria,
           participants: includeStats,
+          EventGame: includeGames,
         },
       });
     }

@@ -15,6 +15,557 @@ const HIGH_ROOM_ID = '1403844895445221445';
 const EVENT_ROOM_ID = process.env.DISCORD_EVENT_GAMES_CHANNEL_ID || null;
 const EVENT_ROLE_ID = process.env.DISCORD_EVENT_ROLE_ID || null;
 
+const FORMAT_LABELS = {
+  REGULAR: 'Regular',
+  WHIZ: 'Whiz',
+  MIRROR: 'Mirror',
+  GIMMICK: 'Gimmick',
+};
+
+const MODE_CHOICES = [
+  { name: 'Partners', value: 1, key: 'PARTNERS' },
+  { name: 'Solo', value: 2, key: 'SOLO' },
+];
+
+const SPECIAL1_LABELS = {
+  NONE: 'None',
+  SCREAMER: 'Screamer',
+  ASSASSIN: 'Assassin',
+  SECRET_ASSASSIN: 'Secret Assassin',
+};
+
+const SPECIAL2_LABELS = {
+  NONE: 'None',
+  LOWBALL: 'Lowball',
+  HIGHBALL: 'Highball',
+};
+
+const GIMMICK_LABELS = {
+  SUICIDE: 'Suicide (Partners only)',
+  BID4NIL: 'Bid 4 or Nil',
+  BID3: 'Bid 3',
+  BIDHEARTS: 'Bid Hearts',
+  CRAZY_ACES: 'Crazy Aces',
+  JOKER: 'Joker Whiz',
+};
+
+const DEFAULT_EVENT_COMMAND_CONFIG = {
+  formatChoices: ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'].map((value) => ({
+    name: FORMAT_LABELS[value] || value,
+    value,
+  })),
+  modeChoices: MODE_CHOICES.map(({ name, value }) => ({ name, value })),
+  coinChoices: [],
+  coinMin: 10000,
+  coinMax: 50000000,
+  minPointChoices: [-250, -200, -150, -100].map((value) => ({ name: `${value}`, value })),
+  maxPointChoices: [100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650].map((value) => ({
+    name: `${value}`,
+    value,
+  })),
+  special1Choices: Object.entries(SPECIAL1_LABELS).map(([value, name]) => ({ name, value })),
+  special2Choices: Object.entries(SPECIAL2_LABELS).map(([value, name]) => ({ name, value })),
+  nilChoices: [
+    { name: 'On', value: 'true' },
+    { name: 'Off', value: 'false' },
+  ],
+  blindNilChoices: [
+    { name: 'On', value: 'true' },
+    { name: 'Off', value: 'false' },
+  ],
+  gimmickChoices: Object.entries(GIMMICK_LABELS).map(([value, name]) => ({ name, value })),
+};
+
+function cloneChoices(list = []) {
+  return list.map((choice) => ({ ...choice }));
+}
+
+function cloneEventCommandConfig(baseConfig = DEFAULT_EVENT_COMMAND_CONFIG) {
+  return {
+    formatChoices: cloneChoices(baseConfig.formatChoices),
+    modeChoices: cloneChoices(baseConfig.modeChoices),
+    coinChoices: cloneChoices(baseConfig.coinChoices),
+    coinMin: baseConfig.coinMin,
+    coinMax: baseConfig.coinMax,
+    minPointChoices: cloneChoices(baseConfig.minPointChoices),
+    maxPointChoices: cloneChoices(baseConfig.maxPointChoices),
+    special1Choices: cloneChoices(baseConfig.special1Choices),
+    special2Choices: cloneChoices(baseConfig.special2Choices),
+    nilChoices: cloneChoices(baseConfig.nilChoices),
+    blindNilChoices: cloneChoices(baseConfig.blindNilChoices),
+    gimmickChoices: cloneChoices(baseConfig.gimmickChoices),
+  };
+}
+
+function normalizeUpper(value) {
+  if (typeof value === 'string') {
+    return value.toUpperCase();
+  }
+  return value;
+}
+
+function uniqueNormalizedStrings(values = []) {
+  const seen = new Set();
+  const result = [];
+  values.forEach((value) => {
+    const normalized = normalizeUpper(value);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  });
+  return result;
+}
+
+function extractNumberArray(value) {
+  if (Array.isArray(value)) {
+    const seen = new Set();
+    const result = [];
+    value.forEach((entry) => {
+      const numberValue = Number(entry);
+      if (Number.isFinite(numberValue) && !seen.has(numberValue)) {
+        seen.add(numberValue);
+        result.push(numberValue);
+      }
+    });
+    return result;
+  }
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return [numeric];
+  }
+
+  return [];
+}
+
+function formatCoinLabel(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return String(value);
+  }
+  if (numeric >= 1000000) {
+    const millions = numeric / 1000000;
+    return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`;
+  }
+  if (numeric >= 1000) {
+    const thousands = numeric / 1000;
+    return thousands % 1 === 0 ? `${thousands}k` : `${thousands.toFixed(1)}k`;
+  }
+  return `${numeric}`;
+}
+
+function buildModeChoices(modeValues = []) {
+  const normalized = uniqueNormalizedStrings(modeValues);
+  if (!normalized.length) {
+    return cloneChoices(DEFAULT_EVENT_COMMAND_CONFIG.modeChoices);
+  }
+
+  const modeMap = new Map(MODE_CHOICES.map(({ key, name, value }) => [key, { name, value }]));
+  const choices = normalized
+    .map((mode) => modeMap.get(mode))
+    .filter(Boolean);
+
+  return choices.length ? choices : cloneChoices(DEFAULT_EVENT_COMMAND_CONFIG.modeChoices);
+}
+
+function firstNonEmptyArray(...arrays) {
+  for (const array of arrays) {
+    if (Array.isArray(array) && array.length) {
+      return array;
+    }
+  }
+  return [];
+}
+
+function buildLabeledChoices(values = [], labelLookup = {}) {
+  const normalized = uniqueNormalizedStrings(values);
+  if (!normalized.length) {
+    return [];
+  }
+  return normalized.map((value) => ({
+    name: labelLookup[value] || value,
+    value,
+  }));
+}
+
+function buildCoinChoicesFromRange(min, max, step) {
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  let numericStep = Number(step);
+
+  if (!Number.isFinite(numericMin) || !Number.isFinite(numericMax) || numericMin <= 0 || numericMax < numericMin) {
+    return [];
+  }
+
+  if (numericMin === numericMax) {
+    return [
+      {
+        name: formatCoinLabel(numericMin),
+        value: numericMin,
+      },
+    ];
+  }
+
+  if (!Number.isFinite(numericStep) || numericStep <= 0) {
+    if (numericMax <= 1_000_000) {
+      numericStep = 50_000;
+    } else {
+      numericStep = 500_000;
+    }
+  }
+
+  const values = [];
+  for (let value = numericMin; value <= numericMax; value += numericStep) {
+    if (values.length >= 25) {
+      break;
+    }
+    values.push(Math.round(value));
+  }
+
+  return values.map((value) => ({
+    name: formatCoinLabel(value),
+    value,
+  }));
+}
+
+async function loadEventCommandConfig() {
+  const config = cloneEventCommandConfig();
+
+  try {
+    const event = await EventService.getActiveEvent({ includeCriteria: false });
+    if (!event) {
+      return config;
+    }
+
+    const filters = event.filters || {};
+
+    const formatList = uniqueNormalizedStrings(filters.allowedFormats || filters.formats);
+    if (formatList.length) {
+      config.formatChoices = formatList
+        .slice(0, 25)
+        .map((format) => ({ name: FORMAT_LABELS[format] || format, value: format }));
+    } else if (typeof filters.defaultFormat === 'string') {
+      const format = normalizeUpper(filters.defaultFormat);
+      config.formatChoices = [{ name: FORMAT_LABELS[format] || format, value: format }];
+    }
+
+    const modeChoices = buildModeChoices(filters.allowedModes || filters.modes);
+    if (modeChoices.length) {
+      config.modeChoices = modeChoices.slice(0, 25);
+    } else if (typeof filters.defaultMode === 'string') {
+      const defaultMode = buildModeChoices([filters.defaultMode]);
+      if (defaultMode.length) {
+        config.modeChoices = defaultMode.slice(0, 25);
+      }
+    }
+
+    const coinList = extractNumberArray(filters.coins);
+    if (coinList.length) {
+      const sorted = Array.from(new Set(coinList)).sort((a, b) => a - b).slice(0, 25);
+      config.coinChoices = sorted.map((value) => ({
+        name: formatCoinLabel(value),
+        value,
+      }));
+      config.coinMin = sorted[0];
+      config.coinMax = sorted[sorted.length - 1];
+    } else if (filters.coinRange) {
+      const { min, max, step } = filters.coinRange;
+      const choices = buildCoinChoicesFromRange(min, max, step);
+      if (choices.length) {
+        config.coinChoices = choices;
+      }
+      if (Number.isFinite(Number(min))) {
+        config.coinMin = Number(min);
+      }
+      if (Number.isFinite(Number(max))) {
+        config.coinMax = Number(max);
+      }
+    } else if (typeof filters.defaultCoins === 'number' && Number.isFinite(filters.defaultCoins)) {
+      const value = Number(filters.defaultCoins);
+      config.coinChoices = [{ name: formatCoinLabel(value), value }];
+      config.coinMin = value;
+      config.coinMax = value;
+    }
+
+    const minPointsList = firstNonEmptyArray(
+      extractNumberArray(filters.allowedMinPoints),
+      extractNumberArray(filters.minPoints),
+      extractNumberArray(filters.pointsRange?.min),
+    );
+
+    if (minPointsList.length) {
+      const sortedMin = Array.from(new Set(minPointsList)).sort((a, b) => a - b).slice(0, 25);
+      config.minPointChoices = sortedMin.map((value) => ({ name: `${value}`, value }));
+    }
+
+    const maxPointsList = firstNonEmptyArray(
+      extractNumberArray(filters.allowedMaxPoints),
+      extractNumberArray(filters.maxPoints),
+      extractNumberArray(filters.pointsRange?.max),
+    );
+
+    if (maxPointsList.length) {
+      const sortedMax = Array.from(new Set(maxPointsList)).sort((a, b) => a - b).slice(0, 25);
+      config.maxPointChoices = sortedMax.map((value) => ({ name: `${value}`, value }));
+    }
+
+    const special1Choices = buildLabeledChoices(
+      filters.allowedSpecialRule1 || filters.specialRule1,
+      SPECIAL1_LABELS,
+    );
+    if (special1Choices.length) {
+      config.special1Choices = special1Choices.slice(0, 25);
+    }
+
+    const special2Choices = buildLabeledChoices(
+      filters.allowedSpecialRule2 || filters.specialRule2,
+      SPECIAL2_LABELS,
+    );
+    if (special2Choices.length) {
+      config.special2Choices = special2Choices.slice(0, 25);
+    }
+
+    if (typeof filters.nilAllowed === 'boolean') {
+      config.nilChoices = [
+        {
+          name: filters.nilAllowed ? 'On' : 'Off',
+          value: filters.nilAllowed ? 'true' : 'false',
+        },
+      ];
+    }
+
+    if (typeof filters.defaultNilAllowed === 'boolean' && !filters.nilAllowed) {
+      config.nilChoices = [
+        {
+          name: filters.defaultNilAllowed ? 'On' : 'Off',
+          value: filters.defaultNilAllowed ? 'true' : 'false',
+        },
+      ];
+    }
+
+    if (typeof filters.blindNilAllowed === 'boolean') {
+      config.blindNilChoices = [
+        {
+          name: filters.blindNilAllowed ? 'On' : 'Off',
+          value: filters.blindNilAllowed ? 'true' : 'false',
+        },
+      ];
+    }
+
+    if (typeof filters.defaultBlindNilAllowed === 'boolean' && !filters.blindNilAllowed) {
+      config.blindNilChoices = [
+        {
+          name: filters.defaultBlindNilAllowed ? 'On' : 'Off',
+          value: filters.defaultBlindNilAllowed ? 'true' : 'false',
+        },
+      ];
+    }
+
+    const gimmickChoices = buildLabeledChoices(
+      filters.allowedGimmickVariants || filters.gimmickVariants,
+      GIMMICK_LABELS,
+    );
+    if (gimmickChoices.length) {
+      config.gimmickChoices = gimmickChoices.slice(0, 25);
+    } else if (typeof filters.defaultGimmickVariant === 'string') {
+      const variant = normalizeUpper(filters.defaultGimmickVariant);
+      config.gimmickChoices = [
+        {
+          name: GIMMICK_LABELS[variant] || variant,
+          value: variant,
+        },
+      ];
+    }
+  } catch (error) {
+    console.error('[DISCORD] Failed to load event command configuration:', error);
+    return config;
+  }
+
+  return config;
+}
+
+function buildEventCommandBuilder(config) {
+  const builder = new SlashCommandBuilder()
+    .setName('event')
+    .setDescription('Create a game line for the active event');
+
+  if (config.formatChoices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('format')
+        .setDescription('Game format (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.formatChoices.slice(0, 25)),
+    );
+  }
+
+  if (config.modeChoices.length > 1) {
+    builder.addIntegerOption((option) =>
+      option
+        .setName('mode')
+        .setDescription('Game mode (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.modeChoices.slice(0, 25)),
+    );
+  }
+
+  builder.addIntegerOption((option) => {
+    option
+      .setName('coins')
+      .setDescription('Buy-in amount (defaults to event settings)')
+      .setRequired(false)
+      .setMinValue(config.coinMin)
+      .setMaxValue(config.coinMax);
+
+    if (config.coinChoices.length) {
+      option.addChoices(...config.coinChoices.slice(0, 25));
+      if (config.coinChoices.length === 1) {
+        option.setMinValue(config.coinChoices[0].value);
+        option.setMaxValue(config.coinChoices[0].value);
+      }
+    }
+
+    return option;
+  });
+
+  if (config.minPointChoices.length > 1) {
+    builder.addIntegerOption((option) =>
+      option
+        .setName('minpoints')
+        .setDescription('Minimum points (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.minPointChoices.slice(0, 25)),
+    );
+  } else if (config.minPointChoices.length === 1) {
+    builder.addIntegerOption((option) =>
+      option
+        .setName('minpoints')
+        .setDescription('Minimum points (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(config.minPointChoices[0]),
+    );
+  }
+
+  if (config.maxPointChoices.length > 1) {
+    builder.addIntegerOption((option) =>
+      option
+        .setName('maxpoints')
+        .setDescription('Maximum points (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.maxPointChoices.slice(0, 25)),
+    );
+  } else if (config.maxPointChoices.length === 1) {
+    builder.addIntegerOption((option) =>
+      option
+        .setName('maxpoints')
+        .setDescription('Maximum points (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(config.maxPointChoices[0]),
+    );
+  }
+
+  if (config.special1Choices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('special1')
+        .setDescription('Special rule 1 (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.special1Choices.slice(0, 25)),
+    );
+  } else if (config.special1Choices.length === 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('special1')
+        .setDescription('Special rule 1 (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(config.special1Choices[0]),
+    );
+  }
+
+  if (config.special2Choices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('special2')
+        .setDescription('Special rule 2 (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(...config.special2Choices.slice(0, 25)),
+    );
+  } else if (config.special2Choices.length === 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('special2')
+        .setDescription('Special rule 2 (defaults to event settings)')
+        .setRequired(false)
+        .addChoices(config.special2Choices[0]),
+    );
+  }
+
+  if (config.gimmickChoices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('gimmicktype')
+        .setDescription('Gimmick variant (required if format is GIMMICK)')
+        .setRequired(false)
+        .addChoices(...config.gimmickChoices.slice(0, 25)),
+    );
+  } else if (config.gimmickChoices.length === 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('gimmicktype')
+        .setDescription('Gimmick variant (required if format is GIMMICK)')
+        .setRequired(false)
+        .addChoices(config.gimmickChoices[0]),
+    );
+  }
+
+  if (config.nilChoices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('nil')
+        .setDescription('Allow Nil bids (default depends on event)')
+        .setRequired(false)
+        .addChoices(...config.nilChoices.slice(0, 25)),
+    );
+  } else if (config.nilChoices.length === 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('nil')
+        .setDescription('Allow Nil bids (default depends on event)')
+        .setRequired(false)
+        .addChoices(config.nilChoices[0]),
+    );
+  }
+
+  if (config.blindNilChoices.length > 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('blindnil')
+        .setDescription('Allow Blind Nil bids (default depends on event)')
+        .setRequired(false)
+        .addChoices(...config.blindNilChoices.slice(0, 25)),
+    );
+  } else if (config.blindNilChoices.length === 1) {
+    builder.addStringOption((option) =>
+      option
+        .setName('blindnil')
+        .setDescription('Allow Blind Nil bids (default depends on event)')
+        .setRequired(false)
+        .addChoices(config.blindNilChoices[0]),
+    );
+  }
+
+  return builder;
+}
+
+let eventCommandConfig = cloneEventCommandConfig();
+try {
+  eventCommandConfig = await loadEventCommandConfig();
+} catch (error) {
+  console.error('[DISCORD] Event command configuration fallback triggered:', error);
+  eventCommandConfig = cloneEventCommandConfig();
+}
+
 // In-memory storage for game lines (before table creation)
 const gameLines = new Map();
 
@@ -32,7 +583,7 @@ async function createEventGameLine(interaction) {
     const event = await EventService.getActiveEvent({ includeCriteria: true });
     if (!event || (event.status !== 'ACTIVE' && event.status !== 'SCHEDULED')) {
       await interaction.editReply({
-        content: '❌ There is no active event running right now.',
+      content: '❌ No events currently running, please try again later.',
       });
       return;
     }
@@ -288,6 +839,7 @@ async function showEventStats(interaction) {
     let event = await EventService.getActiveEvent({
       includeCriteria: true,
       includeStats: true,
+      includeGames: true,
     });
 
     if (!event) {
@@ -730,118 +1282,7 @@ export const commands = [
     execute: (interaction) => createGameLine(interaction, 'GIMMICK')
   },
   {
-    data: new SlashCommandBuilder()
-      .setName('event')
-      .setDescription('Create a game line for the active event')
-      .addStringOption(option =>
-        option.setName('format')
-          .setDescription('Game format (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'Regular', value: 'REGULAR' },
-            { name: 'Whiz', value: 'WHIZ' },
-            { name: 'Mirror', value: 'MIRROR' },
-            { name: 'Gimmick', value: 'GIMMICK' }
-          )
-      )
-      .addIntegerOption(option =>
-        option.setName('mode')
-          .setDescription('Game mode (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'Partners', value: 1 },
-            { name: 'Solo', value: 2 }
-          )
-      )
-      .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount (defaults to event settings)')
-          .setRequired(false)
-          .setMinValue(10000)
-          .setMaxValue(50000000)
-      )
-      .addIntegerOption(option =>
-        option.setName('minpoints')
-          .setDescription('Minimum points (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: '-250', value: -250 },
-            { name: '-200', value: -200 },
-            { name: '-150', value: -150 },
-            { name: '-100', value: -100 }
-          )
-      )
-      .addIntegerOption(option =>
-        option.setName('maxpoints')
-          .setDescription('Maximum points (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: '100', value: 100 },
-            { name: '150', value: 150 },
-            { name: '200', value: 200 },
-            { name: '250', value: 250 },
-            { name: '300', value: 300 },
-            { name: '350', value: 350 },
-            { name: '400', value: 400 },
-            { name: '450', value: 450 },
-            { name: '500', value: 500 },
-            { name: '550', value: 550 },
-            { name: '600', value: 600 },
-            { name: '650', value: 650 }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('special1')
-          .setDescription('Special rule 1 (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'None', value: 'NONE' },
-            { name: 'Screamer', value: 'SCREAMER' },
-            { name: 'Assassin', value: 'ASSASSIN' },
-            { name: 'Secret Assassin', value: 'SECRET_ASSASSIN' }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('special2')
-          .setDescription('Special rule 2 (defaults to event settings)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'None', value: 'NONE' },
-            { name: 'Lowball', value: 'LOWBALL' },
-            { name: 'Highball', value: 'HIGHBALL' }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('gimmicktype')
-          .setDescription('Gimmick variant (required if format is GIMMICK)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'Suicide (Partners only)', value: 'SUICIDE' },
-            { name: 'Bid 4 or Nil', value: 'BID4NIL' },
-            { name: 'Bid 3', value: 'BID3' },
-            { name: 'Bid Hearts', value: 'BIDHEARTS' },
-            { name: 'Crazy Aces', value: 'CRAZY_ACES' },
-            { name: 'Joker Whiz', value: 'JOKER' }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('nil')
-          .setDescription('Allow Nil bids (default depends on event)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'On', value: 'true' },
-            { name: 'Off', value: 'false' }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('blindnil')
-          .setDescription('Allow Blind Nil bids (default depends on event)')
-          .setRequired(false)
-          .addChoices(
-            { name: 'On', value: 'true' },
-            { name: 'Off', value: 'false' }
-          )
-      ),
+    data: buildEventCommandBuilder(eventCommandConfig),
     execute: (interaction) => createEventGameLine(interaction)
   },
   {

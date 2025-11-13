@@ -1,7 +1,8 @@
-import { REST, Routes, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { commands } from './src/discord/commands/index.js';
 
 // Load environment variables (robust: try local, repo root fallback)
 (() => {
@@ -21,70 +22,6 @@ import { fileURLToPath } from 'url';
   const serverEnvPath = path.resolve(__dirname, '.env');
   dotenv.config({ path: serverEnvPath });
 })();
-
-// Manually define commands here to avoid importing dependencies
-const commands = [
-  {
-    data: new SlashCommandBuilder()
-      .setName('game')
-      .setDescription('Create a REGULAR league game line')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('whiz')
-      .setDescription('Create a WHIZ league game line')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('rules')
-      .setDescription('Display full BUX Spades game rules')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('help')
-      .setDescription('List available user commands')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('mirror')
-      .setDescription('Create a MIRROR league game line')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('gimmick')
-      .setDescription('Create a GIMMICK league game line')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('facebookhelp')
-      .setDescription('Show how to get the LEAGUE role')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('postfacebookhelp')
-      .setDescription('Post Facebook instructions to help channel (Admin only)')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('userstats')
-      .setDescription('Show player statistics')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('leaderboard')
-      .setDescription('Show top players')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('activegames')
-      .setDescription('Show currently active games')
-  },
-  {
-    data: new SlashCommandBuilder()
-      .setName('pay')
-      .setDescription('Admin: Pay coins to a user')
-  }
-];
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
