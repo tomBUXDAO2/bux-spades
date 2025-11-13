@@ -3,9 +3,7 @@ import EventService from './EventService.js';
 import { EmbedBuilder } from 'discord.js';
 
 const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
-
 const MAX_LEADER_ROWS = 5;
-const THUMBNAIL_URL = process.env.PUBLIC_THUMBNAIL_URL || 'https://bux-spades.pro/optimized/bux-spades.png';
 
 function formatCoinsShort(value) {
   if (!Number.isFinite(value)) {
