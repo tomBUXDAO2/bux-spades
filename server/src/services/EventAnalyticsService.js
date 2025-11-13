@@ -54,7 +54,7 @@ export class EventAnalyticsService {
 
     embed.setThumbnail(THUMBNAIL_URL);
 
-    const filterDescription = this.describeFilters(event.filters);
+    const filterDescription = this.describeFilters(event.filters || {});
     embed.setDescription(
       [
         event.description || 'Join the games and climb the leaderboard!',
