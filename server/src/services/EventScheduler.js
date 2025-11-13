@@ -4,6 +4,7 @@ import EventAnalyticsService from './EventAnalyticsService.js';
 const schedulerState = {
   intervalId: null,
   lastEventId: null,
+  lastEventStatus: null,
   lastProgressAt: null,
   client: null,
 };
@@ -52,6 +53,7 @@ export async function stopEventScheduler() {
 
   schedulerState.client = null;
   schedulerState.lastEventId = null;
+  schedulerState.lastEventStatus = null;
   schedulerState.lastProgressAt = null;
 
   console.log('[EVENT SCHEDULER] Stopped');
@@ -75,15 +77,24 @@ async function tickInternal() {
       }
     }
     schedulerState.lastEventId = null;
+    schedulerState.lastEventStatus = null;
     schedulerState.lastProgressAt = null;
     return;
   }
 
-  if (event.status === 'ACTIVE' && schedulerState.lastEventId !== event.id) {
+  // Check if event just transitioned to ACTIVE (from SCHEDULED or new event)
+  const isNewEvent = schedulerState.lastEventId !== event.id;
+  const justBecameActive = event.status === 'ACTIVE' && schedulerState.lastEventStatus !== 'ACTIVE';
+  
+  if (event.status === 'ACTIVE' && (isNewEvent || justBecameActive)) {
     await announceEventStart(event);
     schedulerState.lastEventId = event.id;
     schedulerState.lastProgressAt = Date.now();
   }
+
+  // Update tracking
+  schedulerState.lastEventId = event.id;
+  schedulerState.lastEventStatus = event.status;
 
   if (event.status === 'ACTIVE') {
     const now = Date.now();
@@ -96,6 +107,7 @@ async function tickInternal() {
   if (event.status === 'COMPLETED' && schedulerState.lastEventId === event.id) {
     await announceEventEnd(event);
     schedulerState.lastEventId = null;
+    schedulerState.lastEventStatus = null;
     schedulerState.lastProgressAt = null;
   }
 }
