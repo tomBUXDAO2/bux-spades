@@ -13,6 +13,7 @@ import TablePage from './pages/TablePage';
 import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import { SocketProvider } from '@/features/auth/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import ForceLogoutModal from './components/modals/ForceLogoutModal';
@@ -73,6 +74,10 @@ const router = createBrowserRouter(
         {
           path: "privacy",
           element: <PrivacyPolicy />
+        },
+        {
+          path: "terms",
+          element: <TermsOfService />
         },
         {
           path: "",
