@@ -55,6 +55,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       user: {
         id: user.id,
         discordId: user.discordId,
+        facebookId: user.facebookId,
         username: user.username,
         avatarUrl: user.avatarUrl,
         coins: user.coins || 1000,
@@ -186,6 +187,81 @@ router.get('/blocked', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('[AUTH] Error fetching blocked users:', error);
     res.status(500).json({ error: 'Failed to fetch blocked users' });
+  }
+});
+
+// Facebook OAuth callback
+router.get('/facebook/callback', async (req, res) => {
+  try {
+    const { code, error } = req.query;
+
+    if (error) {
+      console.error('[FACEBOOK OAUTH] Authorization error:', error);
+      return res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`);
+    }
+
+    if (!code) {
+      return res.status(400).send('Missing authorization code');
+    }
+
+    // Exchange code for access token
+    const tokenResponse = await fetch('https://graph.facebook.com/v18.0/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        redirect_uri: `${process.env.SERVER_URL || 'https://bux-spades-server.fly.dev'}/api/auth/facebook/callback`,
+        code: code
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to exchange code for token');
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Get user info from Facebook
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email,picture.type(large)&access_token=${accessToken}`);
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const facebookUser = await userResponse.json();
+
+    // Create or update user in database
+    const user = await prisma.user.upsert({
+      where: { facebookId: facebookUser.id },
+      update: {
+        username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
+        avatarUrl: facebookUser.picture?.data?.url || null,
+      },
+      create: {
+        facebookId: facebookUser.id,
+        username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
+        avatarUrl: facebookUser.picture?.data?.url || null,
+        coins: 5000000, // Starting coins
+      }
+    });
+
+    // Create JWT token
+    const jwtToken = jwt.sign(
+      { userId: user.id, facebookId: user.facebookId },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    );
+
+    // Redirect to client with token
+    res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback?token=${jwtToken}`);
+
+  } catch (error) {
+    console.error('[FACEBOOK OAUTH] Error in callback:', error);
+    res.redirect(`${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=oauth_error`);
   }
 });
 
