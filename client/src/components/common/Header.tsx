@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import GameRulesModal from '@/components/modals/GameRulesModal';
 import AdminPanel from '@/components/admin/AdminPanel';
@@ -223,6 +224,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                     </>
                   )}
                   
+                  <Link
+                    to="/privacy"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                  >
+                    Privacy Policy
+                  </Link>
+                  <div className="border-t border-slate-700"></div>
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
