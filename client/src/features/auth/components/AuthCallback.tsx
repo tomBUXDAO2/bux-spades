@@ -11,7 +11,7 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const fetchUserProfile = async (token: string) => {
       try {
-        console.log('Fetching profile with Discord token:', token);
+        console.log('Fetching profile with token:', token);
         const response = await axios.get('/api/auth/profile', {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -20,7 +20,7 @@ const AuthCallback: React.FC = () => {
         });
         
         if (response.data?.user) {
-          console.log('Discord login successful:', response.data);
+          console.log('Login successful:', response.data);
           const userData = {
             ...response.data.user,
             sessionToken: token
@@ -67,7 +67,7 @@ const AuthCallback: React.FC = () => {
           navigate('/login', { replace: true });
         }
       } catch (error: any) {
-        console.error('Error fetching profile after Discord login:', error);
+        console.error('Error fetching profile after login:', error);
         localStorage.removeItem('sessionToken');
         navigate('/login', { replace: true });
       }
@@ -75,7 +75,7 @@ const AuthCallback: React.FC = () => {
 
     const token = searchParams.get('token');
     if (token) {
-      console.log('Discord callback received token:', token);
+      console.log('Callback received token:', token);
       
       // Store the JWT token in localStorage
       try {
@@ -94,7 +94,7 @@ const AuthCallback: React.FC = () => {
       
       fetchUserProfile(token);
     } else {
-      console.error('No token received from Discord callback');
+      console.error('No token received from callback');
       navigate('/login', { replace: true });
     }
   }, [searchParams, navigate, setUser]);
@@ -102,7 +102,7 @@ const AuthCallback: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900">
       <div className="text-center">
-        <h2 className="text-2xl font-semibold text-slate-200">Completing Discord login...</h2>
+        <h2 className="text-2xl font-semibold text-slate-200">Completing login...</h2>
         <p className="mt-2 text-slate-400">Please wait while we redirect you.</p>
       </div>
     </div>
