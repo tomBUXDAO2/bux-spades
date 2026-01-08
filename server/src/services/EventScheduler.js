@@ -99,7 +99,7 @@ async function tickInternal() {
   if (event.status === 'ACTIVE') {
     const now = Date.now();
     if (!schedulerState.lastProgressAt || now - schedulerState.lastProgressAt >= PROGRESS_REFRESH_INTERVAL_MS) {
-      await postMidEventUpdate(event);
+    await postMidEventUpdate(event);
       schedulerState.lastProgressAt = now;
     }
   }

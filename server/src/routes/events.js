@@ -36,3 +36,4 @@ router.get('/:eventId', async (req, res) => {
 export const eventRoutes = router;
 
 
+

@@ -607,7 +607,7 @@ export class ScoringService {
           console.error('[SCORING] Error recording event completion stats:', eventError);
         }
       }
-
+      
       // CRITICAL FIX: Clear activeGameId from all players' sessions so they don't get redirected back
       try {
         const redisSessionService = (await import('./RedisSessionService.js')).default;
