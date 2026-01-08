@@ -14,9 +14,11 @@ export const normalizeGameState = (state: any): GameState => {
   });
   
   // Deep clone play object to ensure React detects changes
+  // CRITICAL: Preserve currentTrick from multiple possible sources
+  const currentTrickSource = state.play?.currentTrick || state.currentTrickCards || state.currentTrick || [];
   const play = state.play ? {
     ...state.play,
-    currentTrick: state.play.currentTrick ? [...state.play.currentTrick.map((card: any) => ({...card}))] : []
+    currentTrick: Array.isArray(currentTrickSource) ? [...currentTrickSource.map((card: any) => ({...card}))] : []
   } : state.play;
   
   // Preserve bidding state from server
@@ -32,6 +34,9 @@ export const normalizeGameState = (state: any): GameState => {
     bidsString: JSON.stringify(state.bidding?.bids)
   });
   
+  // CRITICAL: Ensure currentTrickCards is properly set from multiple possible sources
+  const currentTrickCards = play?.currentTrick || state.currentTrickCards || state.currentTrick || [];
+  
   return { 
     ...state, 
     players: normalizedPlayers, 
@@ -39,11 +44,11 @@ export const normalizeGameState = (state: any): GameState => {
     bidding,
     hands: state.hands, // CRITICAL: Preserve hands data
     currentPlayer: state.currentPlayer, // CRITICAL: Preserve currentPlayer from server
-    currentTrickCards: state.currentTrickCards, // CRITICAL: Preserve currentTrickCards for renderTrickCards
+    currentTrickCards: Array.isArray(currentTrickCards) ? currentTrickCards : [], // CRITICAL: Preserve currentTrickCards for renderTrickCards
     playerScores: state.playerScores, // CRITICAL: Preserve playerScores from server for solo games
     playerBags: state.playerBags, // CRITICAL: Preserve playerBags from server for solo games
     status: state.status, // CRITICAL: Preserve game status
     currentRound: state.currentRound, // CRITICAL: Preserve current round
-    currentTrick: state.currentTrick // CRITICAL: Preserve current trick
+    currentTrick: Array.isArray(currentTrickCards) ? currentTrickCards : [] // CRITICAL: Preserve current trick
   } as GameState;
 };

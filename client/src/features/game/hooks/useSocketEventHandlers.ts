@@ -46,6 +46,22 @@ export const useSocketEventHandlers = ({
     const handleGameJoined = (gameData: any) => {
       if (gameData && gameData.gameId === gameId) {
         const normalizedState = normalizeGameState(gameData.gameState);
+        
+        // CRITICAL FIX: Ensure currentTrick is properly preserved from server state
+        // This is especially important for reconnections where players might have missed card_played events
+        if (normalizedState.status === 'PLAYING') {
+          const serverCurrentTrick = gameData.gameState?.play?.currentTrick || gameData.gameState?.currentTrickCards || [];
+          if (Array.isArray(serverCurrentTrick) && serverCurrentTrick.length > 0) {
+            normalizedState.play = {
+              ...normalizedState.play,
+              currentTrick: serverCurrentTrick
+            };
+            normalizedState.currentTrickCards = serverCurrentTrick;
+            normalizedState.currentTrick = serverCurrentTrick;
+            console.log('[GAME JOINED] Preserved currentTrick from server:', serverCurrentTrick.length, 'cards');
+          }
+        }
+        
         setGameState(normalizedState);
         if (Array.isArray(normalizedState?.bidding?.bids)) {
           previousBidsRef.current = [...normalizedState.bidding.bids];
@@ -95,6 +111,34 @@ export const useSocketEventHandlers = ({
         // OPTIMIZED: Use requestAnimationFrame for smoother updates
         requestAnimationFrame(() => {
           const newState = normalizeGameState(gameData.gameState);
+          
+          // CRITICAL FIX: Preserve currentTrick during gameplay if it exists
+          // This prevents cards from disappearing during state updates
+          if (newState.status === 'PLAYING') {
+            const prevState = currentGameState;
+            const serverCurrentTrick = gameData.gameState?.play?.currentTrick || gameData.gameState?.currentTrickCards || [];
+            
+            // If server has currentTrick data, use it
+            if (Array.isArray(serverCurrentTrick) && serverCurrentTrick.length > 0) {
+              newState.play = {
+                ...newState.play,
+                currentTrick: serverCurrentTrick
+              };
+              newState.currentTrickCards = serverCurrentTrick;
+              newState.currentTrick = serverCurrentTrick;
+            } 
+            // Otherwise, preserve existing currentTrick from client state if available
+            else if (prevState && Array.isArray(prevState.play?.currentTrick) && prevState.play.currentTrick.length > 0) {
+              newState.play = {
+                ...newState.play,
+                currentTrick: prevState.play.currentTrick
+              };
+              newState.currentTrickCards = prevState.play.currentTrick;
+              newState.currentTrick = prevState.play.currentTrick;
+              console.log('[GAME UPDATE] Preserved existing currentTrick:', prevState.play.currentTrick.length, 'cards');
+            }
+          }
+          
           setGameState(newState);
           if (Array.isArray(newState?.bidding?.bids)) {
             previousBidsRef.current = [...newState.bidding.bids];
@@ -288,21 +332,37 @@ export const useSocketEventHandlers = ({
             const normalizedState = normalizeGameState(gameStateWithBidding);
             
             // Ensure currentTrick is never undefined - use data from currentTrick or gameState
-            const currentTrick = cardData.currentTrick || serverGameState?.play?.currentTrick || [];
-            if (Array.isArray(currentTrick)) {
+            const currentTrick = cardData.currentTrick || serverGameState?.play?.currentTrick || serverGameState?.currentTrickCards || [];
+            if (Array.isArray(currentTrick) && currentTrick.length > 0) {
               normalizedState.play = {
                 ...normalizedState.play,
                 currentTrick: currentTrick
               };
               // CRITICAL: Also set currentTrick at top level for renderTrickCards
               normalizedState.currentTrick = currentTrick;
+              normalizedState.currentTrickCards = currentTrick;
+              console.log('[CARD PLAYED] Setting currentTrick with', currentTrick.length, 'cards');
             } else {
-              // Fallback to empty array if currentTrick is not an array
-              normalizedState.play = {
-                ...normalizedState.play,
-                currentTrick: []
-              };
-              normalizedState.currentTrick = [];
+              // CRITICAL FIX: If server doesn't provide currentTrick, preserve existing one
+              // This prevents cards from disappearing if the event doesn't include full trick data
+              const existingTrick = prevState?.play?.currentTrick || [];
+              if (Array.isArray(existingTrick) && existingTrick.length > 0) {
+                normalizedState.play = {
+                  ...normalizedState.play,
+                  currentTrick: existingTrick
+                };
+                normalizedState.currentTrick = existingTrick;
+                normalizedState.currentTrickCards = existingTrick;
+                console.log('[CARD PLAYED] Preserved existing currentTrick:', existingTrick.length, 'cards');
+              } else {
+                // Fallback to empty array if no trick data available
+                normalizedState.play = {
+                  ...normalizedState.play,
+                  currentTrick: []
+                };
+                normalizedState.currentTrick = [];
+                normalizedState.currentTrickCards = [];
+              }
             }
             if (Array.isArray(normalizedState?.bidding?.bids)) {
               previousBidsRef.current = [...normalizedState.bidding.bids];
