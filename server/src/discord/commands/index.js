@@ -2950,14 +2950,16 @@ async function handleTournamentButton(interaction) {
       
       // Show select menu for partner selection (for partners tournaments)
       if (tournament.mode === 'PARTNERS') {
+        // Defer reply immediately to prevent timeout
+        await interaction.deferReply({ ephemeral: true });
+        
         const { StringSelectMenuBuilder } = await import('discord.js');
         
         // Get all guild members
         const guild = interaction.guild;
         if (!guild) {
-          return interaction.reply({
-            content: '❌ Could not access server members. Please try again.',
-            ephemeral: true
+          return interaction.editReply({
+            content: '❌ Could not access server members. Please try again.'
           });
         }
         
@@ -3012,8 +3014,11 @@ async function handleTournamentButton(interaction) {
           const isRegisteredAlone = registeredAlone.has(memberId);
           const displayName = member.displayName || member.user.username;
           
+          // Truncate display name if too long (Discord limit is 100 chars for label)
+          const truncatedName = displayName.length > 80 ? displayName.substring(0, 77) + '...' : displayName;
+          
           options.push({
-            label: displayName,
+            label: truncatedName,
             value: memberId,
             description: isRegisteredAlone 
               ? 'Already registered (will be your partner)' 
@@ -3025,6 +3030,12 @@ async function handleTournamentButton(interaction) {
         // Limit to 25 options (Discord limit)
         const selectOptions = options.slice(0, 25);
         
+        if (selectOptions.length === 0) {
+          return interaction.editReply({
+            content: '❌ No available partners found. All server members are already registered or not in the database.'
+          });
+        }
+        
         const selectMenu = new StringSelectMenuBuilder()
           .setCustomId(`tournament_partner_select_${tournamentId}`)
           .setPlaceholder('Select a partner or choose auto-assign...')
@@ -3032,14 +3043,13 @@ async function handleTournamentButton(interaction) {
         
         const row = new ActionRowBuilder().addComponents(selectMenu);
         
-        await interaction.reply({
+        await interaction.editReply({
           content: '**Select your partner:**\n\n' +
             '• Choose a player from the list\n' +
             '• Players with ✅ are already registered alone\n' +
             '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
             '• Or select "No Partner" to be auto-assigned',
-          components: [row],
-          ephemeral: true
+          components: [row]
         });
       } else {
         // Solo tournament - register directly
