@@ -3679,10 +3679,29 @@ async function handleTournamentButton(interaction) {
       const prefix = 'tournament_confirm_partner_';
       const remaining = customId.substring(prefix.length);
       const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      
+      if (lastUnderscoreIndex === -1) {
+        console.error('[TOURNAMENT] Invalid confirm button format:', customId);
+        return interaction.editReply({
+          content: '❌ Invalid button format. Please click "Join" again.',
+          components: []
+        });
+      }
+      
       const tournamentId = remaining.substring(0, lastUnderscoreIndex);
       const partnerDiscordId = remaining.substring(lastUnderscoreIndex + 1);
       
-      console.log('[TOURNAMENT] Confirm partner - tournamentId:', tournamentId, 'partnerDiscordId:', partnerDiscordId);
+      console.log('[TOURNAMENT] Confirm partner - customId:', customId);
+      console.log('[TOURNAMENT] Confirm partner - extracted tournamentId:', tournamentId, 'Length:', tournamentId.length);
+      console.log('[TOURNAMENT] Confirm partner - extracted partnerDiscordId:', partnerDiscordId);
+      
+      if (!tournamentId || tournamentId.trim() === '') {
+        console.error('[TOURNAMENT] Empty tournamentId from confirm button:', customId);
+        return interaction.editReply({
+          content: '❌ Invalid tournament ID. Please click "Join" again.',
+          components: []
+        });
+      }
       
       // Get user
       let user = await prisma.user.findUnique({
@@ -3709,11 +3728,21 @@ async function handleTournamentButton(interaction) {
       }
       
       // Get tournament
+      console.log('[TOURNAMENT] Confirm partner - looking up tournament:', tournamentId);
       const tournament = await prisma.tournament.findUnique({
-        where: { id: tournamentId }
+        where: { id: tournamentId },
+        include: { registrations: true }
       });
       
-      if (!tournament || tournament.status !== 'REGISTRATION_OPEN') {
+      if (!tournament) {
+        console.error('[TOURNAMENT] Confirm partner - tournament not found:', tournamentId);
+        return interaction.editReply({
+          content: `❌ Tournament not found. Please click "Join" again from the tournament embed.`,
+          components: []
+        });
+      }
+      
+      if (tournament.status !== 'REGISTRATION_OPEN') {
         return interaction.editReply({
           content: '❌ Registration is closed for this tournament.',
           components: []
