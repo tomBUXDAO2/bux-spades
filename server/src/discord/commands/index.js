@@ -2630,16 +2630,32 @@ async function handleTournamentPartnerSelect(interaction) {
     }
     
     // Get tournament
-    console.log('[TOURNAMENT] Looking up tournament with ID:', tournamentId);
+    console.log('[TOURNAMENT] Looking up tournament with ID:', tournamentId, 'Length:', tournamentId.length);
+    
+    // Check if tournamentId is valid (not empty)
+    if (!tournamentId || tournamentId.trim() === '') {
+      console.error('[TOURNAMENT] Empty tournamentId extracted from customId:', customId);
+      return interaction.editReply({
+        content: '❌ Invalid tournament ID. Please try clicking "Join" again from the tournament embed.',
+        components: []
+      });
+    }
+    
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
       include: { registrations: true }
     });
     
     if (!tournament) {
+      // Try to find any tournaments to see if it's a database issue
+      const allTournaments = await prisma.tournament.findMany({
+        select: { id: true, name: true, status: true },
+        take: 5
+      });
       console.error('[TOURNAMENT] Tournament not found. ID:', tournamentId);
+      console.error('[TOURNAMENT] Available tournaments:', allTournaments.map(t => ({ id: t.id, name: t.name, status: t.status })));
       return interaction.editReply({
-        content: `❌ Tournament not found. (ID: ${tournamentId})\n\nPlease try clicking "Join" again from the tournament embed.`,
+        content: `❌ Tournament not found. Please try clicking "Join" again from the tournament embed.\n\nIf this persists, the tournament may have been deleted.`,
         components: []
       });
     }
