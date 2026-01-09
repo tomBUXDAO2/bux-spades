@@ -3432,11 +3432,21 @@ async function handleTournamentButton(interaction) {
       }
     } else if (customId.startsWith('tournament_partner_next_')) {
       // Show next 25
+      // Format: tournament_partner_next_<tournamentId>_<offset>
       await interaction.deferUpdate();
       
-      const parts = customId.replace('tournament_partner_next_', '').split('_');
-      const tournamentId = parts[0];
-      const currentOffset = parseInt(parts[1]) || 0;
+      const remaining = customId.replace('tournament_partner_next_', '');
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      if (lastUnderscoreIndex === -1) {
+        return interaction.editReply({
+          content: '❌ Invalid pagination button. Please try clicking "Join" again.',
+          components: []
+        });
+      }
+      const tournamentId = remaining.substring(0, lastUnderscoreIndex);
+      const currentOffset = parseInt(remaining.substring(lastUnderscoreIndex + 1)) || 0;
+      
+      console.log('[TOURNAMENT] Next page - tournamentId:', tournamentId, 'offset:', currentOffset);
       
       const guild = interaction.guild;
       if (!guild) {
@@ -3500,12 +3510,22 @@ async function handleTournamentButton(interaction) {
       });
     } else if (customId.startsWith('tournament_partner_prev_')) {
       // Show previous 25
+      // Format: tournament_partner_prev_<tournamentId>_<offset>
       await interaction.deferUpdate();
       
-      const parts = customId.replace('tournament_partner_prev_', '').split('_');
-      const tournamentId = parts[0];
-      const currentOffset = parseInt(parts[1]) || 0;
+      const remaining = customId.replace('tournament_partner_prev_', '');
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      if (lastUnderscoreIndex === -1) {
+        return interaction.editReply({
+          content: '❌ Invalid pagination button. Please try clicking "Join" again.',
+          components: []
+        });
+      }
+      const tournamentId = remaining.substring(0, lastUnderscoreIndex);
+      const currentOffset = parseInt(remaining.substring(lastUnderscoreIndex + 1)) || 0;
       const newOffset = Math.max(0, currentOffset); // Use the provided offset (already calculated)
+      
+      console.log('[TOURNAMENT] Prev page - tournamentId:', tournamentId, 'offset:', newOffset);
       
       const guild = interaction.guild;
       if (!guild) {
