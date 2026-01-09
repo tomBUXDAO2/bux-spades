@@ -27,6 +27,11 @@ export class TournamentBracketService {
         throw new Error('Tournament registration must be open or closed to generate bracket');
       }
 
+      // Delete existing matches if any (allows regenerating bracket)
+      await prisma.tournamentMatch.deleteMany({
+        where: { tournamentId },
+      });
+
       const registrations = tournament.registrations;
       
       // Step 1: Form teams
