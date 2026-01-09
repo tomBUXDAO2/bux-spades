@@ -329,14 +329,14 @@ export class TrickCompletionService {
           console.error(`[TRICK COMPLETION] CRITICAL: io instance is null/undefined, cannot emit game_complete!`);
         }
         
-        return { isComplete: true, isGameComplete: true };
+        // Note: we do NOT return here; we still want to emit round_complete below
       }
 
-      // CRITICAL: Always emit round_complete if game is not complete, OR if io is provided and we haven't emitted game_complete
-      // This ensures the hand summary modal always appears
-      console.log(`[TRICK COMPLETION] Game is NOT complete, checking if we should emit round_complete. io: ${io ? 'available' : 'null'}, gameComplete.isComplete: ${gameComplete.isComplete}`);
-      if (io && !gameComplete.isComplete) {
-        console.log(`[TRICK COMPLETION] Game not complete, will emit round_complete event`);
+      // CRITICAL: Always emit round_complete so the hand summary modal appears,
+      // regardless of whether the game is now complete. The client can then
+      // handle both round_complete and game_complete in sequence.
+      if (io) {
+        console.log(`[TRICK COMPLETION] Emitting round_complete event (gameComplete.isComplete=${gameComplete.isComplete})`);
         console.log(`[TRICK COMPLETION] Delaying round_complete event to allow trick animation to complete`);
         
         // CRITICAL: Stop any player timers until next round actually starts
