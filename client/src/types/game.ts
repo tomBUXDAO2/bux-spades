@@ -53,6 +53,10 @@ export interface GameState {
   players: (Player | Bot | null)[];
   currentPlayer: string;
   currentTrick: Card[];
+  // Optional top-level mirror of the current trick cards used by
+  // various rendering and socket handlers to prevent flicker and
+  // preserve trick state across updates.
+  currentTrickCards?: Card[];
   completedTricks: Card[][];
   team1TotalScore?: number;
   team2TotalScore?: number;
