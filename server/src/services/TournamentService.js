@@ -231,5 +231,30 @@ export class TournamentService {
       unpartneredPlayers,
     };
   }
+
+  static async cancelTournament(tournamentId) {
+    // Update tournament status to CANCELLED
+    return await prisma.tournament.update({
+      where: { id: tournamentId },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
+  static async deleteTournament(tournamentId) {
+    // Delete all registrations first (cascade)
+    await prisma.tournamentRegistration.deleteMany({
+      where: { tournamentId },
+    });
+
+    // Delete tournament matches if any
+    await prisma.tournamentMatch.deleteMany({
+      where: { tournamentId },
+    });
+
+    // Delete the tournament
+    return await prisma.tournament.delete({
+      where: { id: tournamentId },
+    });
+  }
 }
 

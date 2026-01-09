@@ -346,6 +346,62 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleCancelTournament = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to cancel this tournament? This will mark it as cancelled but keep it in the database.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiUrl}/api/admin/tournaments/${tournamentId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel tournament');
+      }
+
+      setTournamentSuccessMessage('Tournament cancelled successfully');
+      await fetchTournaments();
+    } catch (err) {
+      console.error('Error cancelling tournament:', err);
+      setTournamentError('Failed to cancel tournament');
+    }
+  };
+
+  const handleDeleteTournament = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this tournament? This action cannot be undone and will delete all registrations.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiUrl}/api/admin/tournaments/${tournamentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete tournament');
+      }
+
+      setTournamentSuccessMessage('Tournament deleted successfully');
+      await fetchTournaments();
+    } catch (err) {
+      console.error('Error deleting tournament:', err);
+      setTournamentError('Failed to delete tournament');
+    }
+  };
+
   const handleEventInputChange = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setNewEvent(prev => ({
       ...prev,
@@ -1548,7 +1604,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       {tournaments.map(tournament => (
                         <div key={tournament.id} className="bg-slate-800 rounded-lg border border-slate-700 p-4">
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="flex-1">
                               <h4 className="font-semibold text-white" style={{ fontSize: `${16 * textScale}px` }}>{tournament.name}</h4>
                               <p className="text-slate-400" style={{ fontSize: `${12 * textScale}px` }}>
                                 {tournament.mode} • {tournament.format} • {tournament.eliminationType} Elimination
@@ -1560,15 +1616,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                                 Status: {tournament.status} • Registrations: {tournament._count?.registrations || 0}
                               </p>
                             </div>
-                            <a
-                              href={`/tournament/${tournament.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-400 hover:text-blue-300"
-                              style={{ fontSize: `${12 * textScale}px` }}
-                            >
-                              View Lobby →
-                            </a>
+                            <div className="flex flex-col gap-2 ml-4">
+                              <a
+                                href={`/tournament/${tournament.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300 text-center"
+                                style={{ fontSize: `${12 * textScale}px` }}
+                              >
+                                View Lobby →
+                              </a>
+                              {tournament.status !== 'CANCELLED' && (
+                                <button
+                                  onClick={() => handleCancelTournament(tournament.id)}
+                                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-center"
+                                  style={{ fontSize: `${11 * textScale}px` }}
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteTournament(tournament.id)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-center"
+                                style={{ fontSize: `${11 * textScale}px` }}
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}

@@ -246,6 +246,28 @@ router.get('/tournaments', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// Cancel tournament
+router.post('/tournaments/:id/cancel', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const tournament = await TournamentService.cancelTournament(req.params.id);
+    res.json({ tournament });
+  } catch (error) {
+    console.error('[ADMIN] Error cancelling tournament:', error);
+    res.status(400).json({ error: error.message || 'Failed to cancel tournament' });
+  }
+});
+
+// Delete tournament
+router.delete('/tournaments/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await TournamentService.deleteTournament(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[ADMIN] Error deleting tournament:', error);
+    res.status(400).json({ error: error.message || 'Failed to delete tournament' });
+  }
+});
+
 // Generate bracket for tournament (closes registration and starts tournament)
 router.post('/tournaments/:tournamentId/generate-bracket', authenticateToken, isAdmin, async (req, res) => {
   try {

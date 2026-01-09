@@ -2772,6 +2772,9 @@ async function handleTournamentButton(interaction) {
       }
       
     } else if (customId.startsWith('cancel_registration_') || customId.startsWith('unregister_tournament_')) {
+      // Defer reply since we need to do async operations
+      await interaction.deferReply({ ephemeral: true });
+      
       // Cancel registration
       const registration = await prisma.tournamentRegistration.findUnique({
         where: {
@@ -2784,9 +2787,8 @@ async function handleTournamentButton(interaction) {
       });
       
       if (!registration) {
-        return interaction.reply({
-          content: '❌ You are not registered for this tournament.',
-          ephemeral: true
+        return interaction.editReply({
+          content: '❌ You are not registered for this tournament.'
         });
       }
       
@@ -2807,12 +2809,14 @@ async function handleTournamentButton(interaction) {
         });
       }
       
-      await interaction.reply({
-        content: '✅ Registration cancelled.',
-        ephemeral: true
+      await interaction.editReply({
+        content: '✅ Registration cancelled.'
       });
       
-      await updateTournamentEmbed(null, tournamentId);
+      // Update embed in background (don't await to avoid blocking)
+      updateTournamentEmbed(null, tournamentId).catch(err => {
+        console.error('[TOURNAMENT] Error updating embed after unregister:', err);
+      });
     } else if (customId.startsWith('view_tournament_lobby_')) {
       // View lobby - send URL to tournament lobby page
       const clientUrl = process.env.CLIENT_URL || 'https://www.bux-spades.pro';
