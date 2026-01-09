@@ -305,8 +305,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const fetchTournaments = async () => {
+    setTournamentsLoading(true);
+    setTournamentError(null);
+    setTournamentSuccessMessage(null);
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiUrl}/api/admin/tournaments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch tournaments');
+      }
+
+      const data = await response.json();
+      setTournaments(Array.isArray(data.tournaments) ? data.tournaments : []);
+    } catch (err) {
+      console.error('Error fetching tournaments:', err);
+      setTournamentError('Failed to load tournaments');
+    } finally {
+      setTournamentsLoading(false);
+    }
+  };
+
   const handleEventInputChange = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setNewEvent(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleTournamentInputChange = <K extends keyof TournamentFormState>(key: K, value: TournamentFormState[K]) => {
+    setNewTournament(prev => ({
       ...prev,
       [key]: value,
     }));
@@ -379,6 +414,59 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
     setBannerPreviewUrl(null);
     setBannerUploadError(null);
+  };
+
+  const handleTournamentBannerFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target;
+    const file = input.files?.[0] || null;
+    input.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      setTournamentBannerUploadError('Only PNG or JPEG images are supported.');
+      return;
+    }
+
+    setTournamentBannerUploading(true);
+    setTournamentBannerUploadError(null);
+
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const formData = new FormData();
+      formData.append('banner', file);
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/admin/tournaments/banner`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const message = await response.json().catch(() => ({}));
+        throw new Error(message?.error || 'Failed to upload banner image');
+      }
+
+      const data = await response.json();
+      handleTournamentInputChange('bannerUrl', data.bannerUrl);
+
+      if (tournamentBannerPreviewUrl) {
+        URL.revokeObjectURL(tournamentBannerPreviewUrl);
+      }
+      setTournamentBannerPreviewUrl(URL.createObjectURL(file));
+    } catch (err: any) {
+      console.error('Error uploading tournament banner:', err);
+      setTournamentBannerUploadError(err?.message || 'Failed to upload banner image');
+    } finally {
+      setTournamentBannerUploading(false);
+    }
   };
 
   const criterionTypeLabels: Record<EventCriterionForm['type'], string> = {
@@ -695,6 +783,100 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
     setBannerPreviewUrl(null);
     setBannerUploadError(null);
+  };
+
+  const resetTournamentForm = () => {
+    setNewTournament({
+      name: '',
+      mode: 'PARTNERS',
+      format: 'REGULAR',
+      startTime: '',
+      buyIn: undefined,
+      eliminationType: 'SINGLE',
+      prizes: {
+        winners: '',
+        runnersUp: '',
+      },
+      bannerUrl: '',
+      minPoints: -100,
+      maxPoints: 500,
+      nilAllowed: true,
+      blindNilAllowed: false,
+      numHands: undefined,
+      gimmickVariant: null,
+      isRated: true,
+    });
+    if (tournamentBannerPreviewUrl) {
+      URL.revokeObjectURL(tournamentBannerPreviewUrl);
+    }
+    setTournamentBannerPreviewUrl(null);
+    setTournamentBannerUploadError(null);
+  };
+
+  const buildTournamentPayload = () => {
+    const startTimeIso = newTournament.startTime ? new Date(newTournament.startTime).toISOString() : null;
+
+    if (!startTimeIso) {
+      throw new Error('Please provide a tournament start time');
+    }
+
+    if (!newTournament.name.trim()) {
+      throw new Error('Tournament name is required');
+    }
+
+    return {
+      name: newTournament.name.trim(),
+      mode: newTournament.mode,
+      format: newTournament.format,
+      startTime: startTimeIso,
+      buyIn: newTournament.buyIn ?? null,
+      eliminationType: newTournament.eliminationType,
+      prizes: newTournament.prizes,
+      bannerUrl: newTournament.bannerUrl || null,
+      minPoints: newTournament.minPoints,
+      maxPoints: newTournament.maxPoints,
+      nilAllowed: newTournament.nilAllowed,
+      blindNilAllowed: newTournament.blindNilAllowed,
+      numHands: newTournament.numHands,
+      gimmickVariant: newTournament.gimmickVariant,
+      isRated: newTournament.isRated,
+    };
+  };
+
+  const handleCreateTournament = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setTournamentError(null);
+
+    try {
+      const payload = buildTournamentPayload();
+
+      setCreatingTournament(true);
+
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiBaseUrl}/api/admin/tournaments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.json().catch(() => ({}));
+        throw new Error(message?.error || 'Failed to create tournament');
+      }
+
+      setTournamentSuccessMessage('Tournament created successfully!');
+      resetTournamentForm();
+      await fetchTournaments();
+    } catch (err: any) {
+      console.error('Error creating tournament:', err);
+      setTournamentError(err?.message || 'Failed to create tournament');
+    } finally {
+      setCreatingTournament(false);
+    }
   };
 
   const fetchEvents = async () => {
