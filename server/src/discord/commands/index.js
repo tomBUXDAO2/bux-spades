@@ -2804,8 +2804,26 @@ async function handleTournamentPartnerSelect(interaction) {
 
 // Helper function to build partner select menu options
 async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = null, limit = 25, offset = 0) {
-  // Fetch all members
-  await guild.members.fetch();
+  // Fetch all members with timeout and error handling
+  try {
+    // Use Promise.race to add a timeout
+    const fetchPromise = guild.members.fetch();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('GuildMembersTimeout')), 8000)
+    );
+    
+    await Promise.race([fetchPromise, timeoutPromise]);
+  } catch (error) {
+    console.error('[TOURNAMENT] Error fetching guild members:', error.message);
+    // Continue with cached members if fetch fails or times out
+    if (error.message === 'GuildMembersTimeout' || error.code === 'GuildMembersTimeout') {
+      console.log('[TOURNAMENT] Member fetch timed out, using cached members');
+    } else {
+      // For other errors, still try to use cached members
+      console.log('[TOURNAMENT] Using cached members due to fetch error');
+    }
+  }
+  
   let members = Array.from(guild.members.cache.values())
     .filter(m => !m.user.bot && m.user.id !== userId);
   
@@ -3350,44 +3368,52 @@ async function handleTournamentButton(interaction) {
       }
       
       const userId = interaction.user.id;
-      const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious, nextOffset } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, 0);
       
-      if (options.length === 0) {
-        return interaction.editReply({
-          content: '❌ No available partners found.'
+      try {
+        const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious, nextOffset } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, 0);
+      
+        if (options.length === 0) {
+          return interaction.editReply({
+            content: '❌ No available partners found.'
+          });
+        }
+        
+        const { StringSelectMenuBuilder } = await import('discord.js');
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId(`tournament_partner_select_${tournamentId}`)
+          .setPlaceholder('Select a partner or choose auto-assign...')
+          .addOptions(options);
+        
+        const components = [new ActionRowBuilder().addComponents(selectMenu)];
+        
+        // Add pagination buttons if needed
+        if (totalPages > 1 && hasNext && nextOffset !== null) {
+          const paginationRow = new ActionRowBuilder();
+          paginationRow.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`tournament_partner_next_${tournamentId}_${nextOffset}`)
+              .setLabel('Next 25 ▶')
+              .setStyle(ButtonStyle.Secondary)
+          );
+          components.push(paginationRow);
+        }
+        
+        await interaction.editReply({
+          content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
+            `Showing ${options.length} of ${totalMembers} total members.\n\n` +
+            '• Players with ✅ are already registered alone\n' +
+            '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+            '• Players with ❌ are not in database (need to play first)\n' +
+            '• Or select "No Partner" to be auto-assigned\n\n' +
+            '*Use the navigation buttons to see more members.*',
+          components: components
+        });
+      } catch (error) {
+        console.error('[TOURNAMENT] Error in show_full_list:', error);
+        await interaction.editReply({
+          content: '❌ Error loading members. The server may be too large. Please use the 🔍 Search button instead.'
         });
       }
-      
-      const { StringSelectMenuBuilder } = await import('discord.js');
-      const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`tournament_partner_select_${tournamentId}`)
-        .setPlaceholder('Select a partner or choose auto-assign...')
-        .addOptions(options);
-      
-      const components = [new ActionRowBuilder().addComponents(selectMenu)];
-      
-      // Add pagination buttons if needed
-      if (totalPages > 1 && hasNext && nextOffset !== null) {
-        const paginationRow = new ActionRowBuilder();
-        paginationRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`tournament_partner_next_${tournamentId}_${nextOffset}`)
-            .setLabel('Next 25 ▶')
-            .setStyle(ButtonStyle.Secondary)
-        );
-        components.push(paginationRow);
-      }
-      
-      await interaction.editReply({
-        content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
-          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
-          '• Players with ✅ are already registered alone\n' +
-          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-          '• Players with ❌ are not in database (need to play first)\n' +
-          '• Or select "No Partner" to be auto-assigned\n\n' +
-          '*Use the navigation buttons to see more members.*',
-        components: components
-      });
     } else if (customId.startsWith('tournament_partner_next_')) {
       // Show next 25
       await interaction.deferUpdate();
