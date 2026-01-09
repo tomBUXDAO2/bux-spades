@@ -421,10 +421,12 @@ class GameJoinHandler {
       // Notify play again handler if player is leaving during play again wait
       try {
         const { PlayAgainHandler } = await import('../play-again/playAgainHandler.js');
-        const playAgainHandler = new PlayAgainHandler(this.io, this.socket);
+        // Use static method or create instance with io
+        const playAgainHandler = new PlayAgainHandler(this.io, null);
         await playAgainHandler.handlePlayerLeft(gameId, userId);
       } catch (err) {
         // Play again handler might not be initialized, ignore
+        console.error('[GAME LEAVE] Error notifying play again handler:', err);
       }
 
       // Leave the socket room
