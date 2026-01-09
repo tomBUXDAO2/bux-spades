@@ -1533,7 +1533,7 @@ async function handleTournamentPartnerSearch(interaction) {
     await interaction.deferReply({ ephemeral: true });
     
     const customId = interaction.customId;
-    const tournamentId = customId.split('_').pop();
+    const tournamentId = customId.replace('tournament_partner_search_', '');
     const searchQuery = interaction.fields.getTextInputValue('partner_search')?.trim() || null;
     
     const guild = interaction.guild;
@@ -1627,7 +1627,9 @@ export async function handleButtonInteraction(interaction) {
         customId.startsWith('tournament_confirm_partner_') ||
         customId.startsWith('tournament_cancel_partner_') ||
         customId.startsWith('tournament_open_search_') ||
-        customId.startsWith('tournament_show_full_list_')) {
+        customId.startsWith('tournament_show_full_list_') ||
+        customId.startsWith('tournament_partner_next_') ||
+        customId.startsWith('tournament_partner_prev_')) {
       await handleTournamentButton(interaction);
       return;
     }
@@ -2608,9 +2610,12 @@ async function handleTournamentPartnerSelect(interaction) {
     await interaction.deferUpdate();
     
     const customId = interaction.customId;
-    const tournamentId = customId.split('_').pop();
+    // Extract tournamentId: format is "tournament_partner_select_<tournamentId>"
+    const tournamentId = customId.replace('tournament_partner_select_', '');
     const userId = interaction.user.id;
     const selectedValue = interaction.values[0];
+    
+    console.log('[TOURNAMENT] Partner select - customId:', customId, 'tournamentId:', tournamentId);
     
     // Get user
     let user = await prisma.user.findUnique({
@@ -2625,17 +2630,21 @@ async function handleTournamentPartnerSelect(interaction) {
     }
     
     // Get tournament
+    console.log('[TOURNAMENT] Looking up tournament with ID:', tournamentId);
     const tournament = await prisma.tournament.findUnique({
       where: { id: tournamentId },
       include: { registrations: true }
     });
     
     if (!tournament) {
+      console.error('[TOURNAMENT] Tournament not found. ID:', tournamentId);
       return interaction.editReply({
-        content: '❌ Tournament not found.',
+        content: `❌ Tournament not found. (ID: ${tournamentId})\n\nPlease try clicking "Join" again from the tournament embed.`,
         components: []
       });
     }
+    
+    console.log('[TOURNAMENT] Tournament found:', tournament.name, 'Status:', tournament.status);
     
     if (tournament.status !== 'REGISTRATION_OPEN') {
       return interaction.editReply({
@@ -2794,7 +2803,7 @@ async function handleTournamentPartnerSelect(interaction) {
 }
 
 // Helper function to build partner select menu options
-async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = null, limit = 25) {
+async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = null, limit = 25, offset = 0) {
   // Fetch all members
   await guild.members.fetch();
   let members = Array.from(guild.members.cache.values())
@@ -2838,21 +2847,32 @@ async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = nu
     }
   });
   
+  // Filter out already partnered members
+  const availableMembers = members.filter(m => !registeredWithPartner.has(m.user.id));
+  
   // Build select menu options
   const options = [];
   
-  // Add "No Partner (Auto-assign)" option
-  options.push({
-    label: 'No Partner (Auto-assign)',
-    value: 'auto_assign',
-    description: 'You will be randomly paired when registration closes',
-    emoji: '🎲'
-  });
+  // Add "No Partner (Auto-assign)" option only on first page
+  if (offset === 0) {
+    options.push({
+      label: 'No Partner (Auto-assign)',
+      value: 'auto_assign',
+      description: 'You will be randomly paired when registration closes',
+      emoji: '🎲'
+    });
+  }
   
-  // Add members (up to limit)
-  for (const member of members.slice(0, limit - 1)) {
+  // Calculate pagination
+  // Page 1: offset 0, shows auto-assign + 24 members (25 total)
+  // Page 2+: offset 24, 49, etc., shows 25 members each (no auto-assign)
+  const memberSlots = offset === 0 ? limit - 1 : limit; // First page has 1 slot for auto-assign
+  const startIndex = offset === 0 ? 0 : offset - 1; // Adjust for auto-assign on first page
+  
+  // Add members (with pagination)
+  const endIndex = Math.min(startIndex + memberSlots, availableMembers.length);
+  for (const member of availableMembers.slice(startIndex, endIndex)) {
     const memberId = member.user.id;
-    if (registeredWithPartner.has(memberId)) continue; // Skip already partnered
     
     // Check if user exists in database
     const dbUser = await prisma.user.findUnique({
@@ -2878,7 +2898,34 @@ async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = nu
     });
   }
   
-  return { options, totalMembers: members.length };
+  // Calculate page info
+  // First page shows 24 members + auto-assign, subsequent pages show 25 members
+  const membersPerPage = limit - 1; // 24 members per page (first page) or 25 (other pages)
+  const firstPageMembers = 24;
+  const otherPagesMembers = 25;
+  
+  let totalPages;
+  if (availableMembers.length <= firstPageMembers) {
+    totalPages = 1;
+  } else {
+    const remainingMembers = availableMembers.length - firstPageMembers;
+    totalPages = 1 + Math.ceil(remainingMembers / otherPagesMembers);
+  }
+  
+  const currentPage = offset === 0 ? 1 : Math.floor((offset - 1) / otherPagesMembers) + 2;
+  const hasNext = endIndex < availableMembers.length;
+  const hasPrevious = offset > 0;
+  
+  return { 
+    options, 
+    totalMembers: availableMembers.length,
+    totalPages,
+    currentPage,
+    hasNext,
+    hasPrevious,
+    nextOffset: hasNext ? endIndex + 1 : null,
+    prevOffset: hasPrevious ? (offset === 0 ? 0 : Math.max(0, startIndex - otherPagesMembers + 1)) : null
+  };
 }
 
 // Tournament modal handler
@@ -3123,10 +3170,11 @@ async function handleTournamentButton(interaction) {
         }
         
         // Use helper function to build options
-        const { options, totalMembers } = await buildPartnerOptions(guild, userId, tournamentId, null, 25);
+        const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, 0);
         
-        // If we have more than 25 options, show search options
-        if (totalMembers > 24) {
+        // Discord's StringSelectMenu has a hard limit of 25 options
+        // If we have more than 25 members, we must use search or pagination
+        if (totalMembers > 25) {
           const searchModal = new ModalBuilder()
             .setCustomId(`tournament_partner_search_${tournamentId}`)
             .setTitle('Search for Partner');
@@ -3143,7 +3191,9 @@ async function handleTournamentButton(interaction) {
           
           await interaction.editReply({
             content: `**Partner Selection**\n\n` +
-              `There are ${totalMembers} members in the server. Use the buttons below to search or view the first 25 alphabetically.`,
+              `There are **${totalMembers} members** in the server.\n\n` +
+              `⚠️ **Discord limits dropdowns to 25 options**, so you must use search to find your partner.\n\n` +
+              `**Click the search button below to find any member by name.**`,
             components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -3152,7 +3202,7 @@ async function handleTournamentButton(interaction) {
                   .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
                   .setCustomId(`tournament_show_full_list_${tournamentId}`)
-                  .setLabel('📋 Show First 25')
+                  .setLabel('📋 Show First 25 (A-Z)')
                   .setStyle(ButtonStyle.Secondary)
               )
             ]
@@ -3167,16 +3217,40 @@ async function handleTournamentButton(interaction) {
           .setPlaceholder('Select a partner or choose auto-assign...')
           .addOptions(options);
         
-        const row = new ActionRowBuilder().addComponents(selectMenu);
+        const components = [new ActionRowBuilder().addComponents(selectMenu)];
+        
+        // Add pagination buttons if needed
+        if (totalPages > 1) {
+          const paginationRow = new ActionRowBuilder();
+          if (hasPrevious) {
+            paginationRow.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`tournament_partner_prev_${tournamentId}_0`)
+                .setLabel('◀ Previous 25')
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+          if (hasNext) {
+            paginationRow.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`tournament_partner_next_${tournamentId}_24`)
+                .setLabel('Next 25 ▶')
+                .setStyle(ButtonStyle.Secondary)
+            );
+          }
+          if (paginationRow.components.length > 0) {
+            components.push(paginationRow);
+          }
+        }
         
         await interaction.editReply({
-          content: '**Select your partner:**\n\n' +
+          content: `**Select your partner:** (Page ${currentPage} of ${totalPages})\n\n` +
             '• Choose a player from the list (alphabetically sorted)\n' +
             '• Players with ✅ are already registered alone\n' +
             '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
             '• Players with ❌ are not in database (need to play first)\n' +
             '• Or select "No Partner" to be auto-assigned',
-          components: [row]
+          components: components
         });
       } else {
         // Solo tournament - register directly
@@ -3244,7 +3318,7 @@ async function handleTournamentButton(interaction) {
       });
     } else if (customId.startsWith('tournament_open_search_')) {
       // Open search modal
-      const tournamentId = customId.split('_').pop();
+      const tournamentId = customId.replace('tournament_open_search_', '');
       const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
       
       const searchModal = new ModalBuilder()
@@ -3266,7 +3340,7 @@ async function handleTournamentButton(interaction) {
       // Show first 25 alphabetically
       await interaction.deferReply({ ephemeral: true });
       
-      const tournamentId = customId.split('_').pop();
+      const tournamentId = customId.replace('tournament_show_full_list_', '');
       const guild = interaction.guild;
       
       if (!guild) {
@@ -3276,7 +3350,7 @@ async function handleTournamentButton(interaction) {
       }
       
       const userId = interaction.user.id;
-      const { options, totalMembers } = await buildPartnerOptions(guild, userId, tournamentId, null, 25);
+      const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious, nextOffset } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, 0);
       
       if (options.length === 0) {
         return interaction.editReply({
@@ -3290,17 +3364,163 @@ async function handleTournamentButton(interaction) {
         .setPlaceholder('Select a partner or choose auto-assign...')
         .addOptions(options);
       
-      const row = new ActionRowBuilder().addComponents(selectMenu);
+      const components = [new ActionRowBuilder().addComponents(selectMenu)];
+      
+      // Add pagination buttons if needed
+      if (totalPages > 1 && hasNext && nextOffset !== null) {
+        const paginationRow = new ActionRowBuilder();
+        paginationRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tournament_partner_next_${tournamentId}_${nextOffset}`)
+            .setLabel('Next 25 ▶')
+            .setStyle(ButtonStyle.Secondary)
+        );
+        components.push(paginationRow);
+      }
       
       await interaction.editReply({
-        content: `**First 25 Partners (Alphabetically Sorted):**\n\n` +
-          `Showing first 25 of ${totalMembers} total members.\n\n` +
+        content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
+          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
           '• Players with ✅ are already registered alone\n' +
           '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
           '• Players with ❌ are not in database (need to play first)\n' +
           '• Or select "No Partner" to be auto-assigned\n\n' +
-          '*Use the search button to find specific partners.*',
-        components: [row]
+          '*Use the navigation buttons to see more members.*',
+        components: components
+      });
+    } else if (customId.startsWith('tournament_partner_next_')) {
+      // Show next 25
+      await interaction.deferUpdate();
+      
+      const parts = customId.replace('tournament_partner_next_', '').split('_');
+      const tournamentId = parts[0];
+      const currentOffset = parseInt(parts[1]) || 0;
+      
+      const guild = interaction.guild;
+      if (!guild) {
+        return interaction.editReply({
+          content: '❌ Could not access server members. Please try again.',
+          components: []
+        });
+      }
+      
+      const userId = interaction.user.id;
+      // Get current page info to calculate next offset
+      const currentPageInfo = await buildPartnerOptions(guild, userId, tournamentId, null, 25, currentOffset);
+      const newOffset = currentPageInfo.nextOffset || currentOffset;
+      
+      const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious, prevOffset } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, newOffset);
+      
+      if (options.length === 0) {
+        return interaction.editReply({
+          content: '❌ No more partners available.',
+          components: []
+        });
+      }
+      
+      const { StringSelectMenuBuilder } = await import('discord.js');
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`tournament_partner_select_${tournamentId}`)
+        .setPlaceholder('Select a partner...')
+        .addOptions(options);
+      
+      const components = [new ActionRowBuilder().addComponents(selectMenu)];
+      
+      // Add pagination buttons
+      const paginationRow = new ActionRowBuilder();
+      if (hasPrevious) {
+        paginationRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tournament_partner_prev_${tournamentId}_${newOffset - 1}`)
+            .setLabel('◀ Previous 25')
+            .setStyle(ButtonStyle.Secondary)
+        );
+      }
+      if (hasNext) {
+        paginationRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tournament_partner_next_${tournamentId}_${newOffset}`)
+            .setLabel('Next 25 ▶')
+            .setStyle(ButtonStyle.Secondary)
+        );
+      }
+      if (paginationRow.components.length > 0) {
+        components.push(paginationRow);
+      }
+      
+      await interaction.editReply({
+        content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
+          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Players with ❌ are not in database (need to play first)',
+        components: components
+      });
+    } else if (customId.startsWith('tournament_partner_prev_')) {
+      // Show previous 25
+      await interaction.deferUpdate();
+      
+      const parts = customId.replace('tournament_partner_prev_', '').split('_');
+      const tournamentId = parts[0];
+      const currentOffset = parseInt(parts[1]) || 0;
+      const newOffset = Math.max(0, currentOffset); // Use the provided offset (already calculated)
+      
+      const guild = interaction.guild;
+      if (!guild) {
+        return interaction.editReply({
+          content: '❌ Could not access server members. Please try again.',
+          components: []
+        });
+      }
+      
+      const userId = interaction.user.id;
+      const { options, totalMembers, totalPages, currentPage, hasNext, hasPrevious, nextOffset, prevOffset } = await buildPartnerOptions(guild, userId, tournamentId, null, 25, newOffset);
+      
+      if (options.length === 0) {
+        return interaction.editReply({
+          content: '❌ No partners available.',
+          components: []
+        });
+      }
+      
+      const { StringSelectMenuBuilder } = await import('discord.js');
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`tournament_partner_select_${tournamentId}`)
+        .setPlaceholder(newOffset === 0 ? 'Select a partner or choose auto-assign...' : 'Select a partner...')
+        .addOptions(options);
+      
+      const components = [new ActionRowBuilder().addComponents(selectMenu)];
+      
+      // Add pagination buttons
+      const paginationRow = new ActionRowBuilder();
+      if (hasPrevious && prevOffset !== null) {
+        paginationRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tournament_partner_prev_${tournamentId}_${prevOffset}`)
+            .setLabel('◀ Previous 25')
+            .setStyle(ButtonStyle.Secondary)
+        );
+      }
+      if (hasNext && nextOffset !== null) {
+        paginationRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tournament_partner_next_${tournamentId}_${nextOffset}`)
+            .setLabel('Next 25 ▶')
+            .setStyle(ButtonStyle.Secondary)
+        );
+      }
+      if (paginationRow.components.length > 0) {
+        components.push(paginationRow);
+      }
+      
+      await interaction.editReply({
+        content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
+          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
+          (newOffset === 0 ? '• Or select "No Partner" to be auto-assigned\n' : '') +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Players with ❌ are not in database (need to play first)',
+        components: components
       });
     } else if (customId.startsWith('view_tournament_lobby_')) {
       // View lobby - send URL to tournament lobby page
@@ -3313,11 +3533,16 @@ async function handleTournamentButton(interaction) {
       });
     } else if (customId.startsWith('tournament_confirm_partner_')) {
       // Confirm partner registration
+      // Format: tournament_confirm_partner_<tournamentId>_<partnerDiscordId>
       await interaction.deferUpdate();
       
-      const parts = customId.split('_');
-      const tournamentId = parts[3];
-      const partnerDiscordId = parts[4];
+      const prefix = 'tournament_confirm_partner_';
+      const remaining = customId.substring(prefix.length);
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      const tournamentId = remaining.substring(0, lastUnderscoreIndex);
+      const partnerDiscordId = remaining.substring(lastUnderscoreIndex + 1);
+      
+      console.log('[TOURNAMENT] Confirm partner - tournamentId:', tournamentId, 'partnerDiscordId:', partnerDiscordId);
       
       // Get user
       let user = await prisma.user.findUnique({
@@ -3429,6 +3654,7 @@ async function handleTournamentButton(interaction) {
       // Cancel partner selection
       await interaction.deferUpdate();
       
+      // Just cancel - no need to extract tournamentId
       await interaction.editReply({
         content: '❌ Partner selection cancelled.',
         components: []
