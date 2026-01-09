@@ -43,17 +43,6 @@ const bannerStorage = multer.diskStorage({
   }
 });
 
-const bannerStorage = multer.diskStorage({
-  destination: (_, __, cb) => {
-    cb(null, eventBannerDir);
-  },
-  filename: (_, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.png';
-    const safeName = `event-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, safeName);
-  }
-});
-
 const tournamentBannerStorage = multer.diskStorage({
   destination: (_, __, cb) => {
     cb(null, tournamentBannerDir);
