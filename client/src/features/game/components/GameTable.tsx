@@ -266,17 +266,20 @@ export default function GameTableModular({
       setDealingComplete(false);
       setDealtCardCount(0);
       setBiddingReady(false);
+      // CRITICAL: Reset the ref so cards don't stay revealed from previous rounds
+      cardsRevealedDuringBiddingRef.current = false;
       
       // Play dealer animation with sound effects
       const { playCardDealingSound } = require('@/components/game/components/AudioManager');
       playCardDealingSound();
       
-      // Stagger card dealing animation - reveal cards one by one
+      // Stagger card dealing animation - reveal cards one by one (but keep them face down)
       for (let i = 0; i < 13; i++) {
         setTimeout(() => {
           setDealtCardCount(i + 1);
           if (i === 12) {
             // After all cards are dealt, mark dealing as complete
+            // BUT DO NOT reveal cards - they stay face down until player's turn
             setDealingComplete(true);
             setBiddingReady(true);
           }
@@ -807,29 +810,42 @@ export default function GameTableModular({
         gameStateBlindNilAllowed: (gameState as any)?.blindNilAllowed
       });
       
+      // CRITICAL: Cards must stay face down until it's YOUR turn to bid
+      // This applies to ALL players, not just the current bidder
+      if (!isMyTurn) {
+        // If it's NOT my turn, ensure cards stay face down
+        setCardsRevealed(false);
+        console.log('[CARD REVEAL] Keeping cards face down - not my turn, currentPlayer:', gameState?.currentPlayer, 'myUserId:', currentPlayerId);
+        return; // Don't process further if it's not my turn
+      }
+      
+      // Only process card revealing logic if it's MY turn
       // BLIND NIL LOGIC: Show blind nil modal before revealing cards
       if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && allowBlindNil && !blindNilDismissed) {
-        console.log('[BLIND NIL] Showing blind nil modal');
+        console.log('[BLIND NIL] Showing blind nil modal - cards stay face down');
         setDealingComplete(true);
         setShowBlindNilModal(true);
-        // Don't reveal cards yet - wait for blind nil decision
+        // CRITICAL: Don't reveal cards yet - wait for blind nil decision
+        setCardsRevealed(false);
         return;
       }
       
-      // FIXED: Only reveal cards when it's your turn and you haven't bid yet (and not showing blind nil modal)
+      // CRITICAL: Only reveal cards when it's YOUR turn to bid AND blind nil modal is not showing
       if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && !showBlindNilModal) {
         setDealingComplete(true);
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
+        console.log('[CARD REVEAL] Revealing cards - it is my turn to bid');
       }
       
-      // CRITICAL: Set dealingComplete to true when hands exist, regardless of turn
+      // Set dealingComplete to true when hands exist (for animation purposes)
+      // But cards remain face down until player's turn
       if (Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
         setDealingComplete(true);
       }
       
-      // Keep cards revealed if they were revealed before
-      if (cardsRevealedDuringBiddingRef.current) {
+      // Keep cards revealed ONLY if they were revealed during THIS bidding phase AND it's still your turn
+      if (cardsRevealedDuringBiddingRef.current && isMyTurn && !showBlindNilModal) {
         setCardsRevealed(true);
       }
     }
