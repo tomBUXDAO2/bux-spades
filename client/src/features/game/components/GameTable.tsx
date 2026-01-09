@@ -286,7 +286,9 @@ export default function GameTableModular({
     console.log('[HAND SUMMARY] Hand completed payload received:', {
       hasData: !!data,
       hasScores: !!data?.scores,
-      scoresKeys: data?.scores ? Object.keys(data.scores) : null
+      scoresKeys: data?.scores ? Object.keys(data.scores) : null,
+      dataKeys: data ? Object.keys(data) : null,
+      fullData: data
     });
 
     const fallbackSummary = {

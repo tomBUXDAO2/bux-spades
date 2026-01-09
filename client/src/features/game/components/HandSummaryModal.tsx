@@ -141,7 +141,9 @@ export default function HandSummaryModal({
                   <div className="grid grid-cols-2 gap-3">
                     {gameState.players.map((player, index) => {
                       if (!player) return null;
-                      const bid = gameState.bidding?.bids?.[index] || 0;
+                      // CRITICAL FIX: Use playerBids from handSummaryData instead of gameState.bidding
+                      // gameState.bidding might be stale or from a different round
+                      const bid = (handSummaryData as any)?.playerBids?.[index] ?? gameState.bidding?.bids?.[index] ?? 0;
                       const tricks = tricksPerPlayer[index] || 0;
                       const totalScore = handSummaryData.playerScores?.[index] || gameState.playerScores?.[index] || 0;
                       

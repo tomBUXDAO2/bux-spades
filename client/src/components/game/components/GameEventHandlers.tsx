@@ -241,6 +241,8 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     const roundCompletedHandler = (data: any) => {
       console.log('🎮 Round complete event received:', data);
       console.log('🎮 Round complete - setting game state with currentPlayer:', data.gameState?.currentPlayer);
+      console.log('🎮 Round complete - scores data:', data.scores);
+      console.log('🎮 Round complete - data keys:', Object.keys(data || {}));
       
       // Stop any active turn countdown on round completion
       setCountdownPlayer(null);

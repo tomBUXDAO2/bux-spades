@@ -438,14 +438,24 @@ export class TrickCompletionService {
             console.log(`[TRICK COMPLETION] Emitting round_complete with data:`, {
               gameId,
               gameState: updatedGameState,
-              scores: baseSummary
+              scores: baseSummary,
+              tricksPerPlayer: baseSummary.tricksPerPlayer,
+              playerBids: baseSummary.playerBids,
+              team1Bid: baseSummary.team1Bid,
+              team1Tricks: baseSummary.team1Tricks,
+              team2Bid: baseSummary.team2Bid,
+              team2Tricks: baseSummary.team2Tricks
             });
             
             console.log(`[TRICK COMPLETION] Skipping clear_table_cards emission - managed by card play handler`);
-            safeEmit({ scores: baseSummary });
+            // CRITICAL FIX: Pass scores in extraPayload so emitPersonalizedGameEvent can properly spread it
+            const emitPayload = { extraPayload: { scores: baseSummary } };
+            console.log(`[TRICK COMPLETION] Emit payload structure:`, JSON.stringify(emitPayload, null, 2));
+            safeEmit(emitPayload);
           } catch (roundCompleteError) {
             console.error('[TRICK COMPLETION] Error preparing round_complete event:', roundCompleteError);
-            safeEmit({ scores: scores ?? {} });
+            // CRITICAL FIX: Pass scores in extraPayload so emitPersonalizedGameEvent can properly spread it
+            safeEmit({ extraPayload: { scores: scores ?? {} } });
           }
         }, 900); // Short delay to allow final trick animation before summary
       } else {
