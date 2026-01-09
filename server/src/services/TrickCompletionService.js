@@ -249,17 +249,25 @@ export class TrickCompletionService {
           // CRITICAL FIX: Use the running totals directly from calculateRoundScores
           // The scores object now includes team0RunningTotal and team1RunningTotal
           // This ensures we have the correct final scores including the last round
-          const finalGameState = await GameService.getGameStateForClient(gameId);
+          // DO NOT use getGameStateForClient here as it may have stale scores from cache
           
-          // Get the RoundScore we just created to verify, but use scores object as primary source
+          // Get the RoundScore we just created - this has the correct final scores
           const currentRoundScore = await prisma.roundScore.findUnique({
             where: { id: roundId } // RoundScore.id = roundId
           });
 
-          // Use running totals from scores object (calculated and stored in RoundScore)
-          // Fall back to RoundScore query if scores object doesn't have them (backward compatibility)
-          const finalTeam1Score = scores.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
-          const finalTeam2Score = scores.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
+          // CRITICAL: Use running totals from scores object FIRST (most reliable)
+          // Then fall back to RoundScore query (should match)
+          // DO NOT use finalGameState scores as they may be stale
+          const finalTeam1Score = scores.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? 0;
+          const finalTeam2Score = scores.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? 0;
+          
+          console.log(`[TRICK COMPLETION] Final scores - scores object: team0RunningTotal=${scores.team0RunningTotal}, team1RunningTotal=${scores.team1RunningTotal}`);
+          console.log(`[TRICK COMPLETION] Final scores - RoundScore query: team0RunningTotal=${currentRoundScore?.team0RunningTotal}, team1RunningTotal=${currentRoundScore?.team1RunningTotal}`);
+          console.log(`[TRICK COMPLETION] Final scores - USING: team0RunningTotal=${finalTeam1Score}, team1RunningTotal=${finalTeam2Score}`);
+
+          // Get game state for client (but we'll override the scores)
+          const finalGameState = await GameService.getGameStateForClient(gameId);
           
           // For solo games, get player running totals from RoundScore
           const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && currentRoundScore) ? [
@@ -268,11 +276,8 @@ export class TrickCompletionService {
             currentRoundScore.player2Running ?? 0,
             currentRoundScore.player3Running ?? 0
           ] : undefined;
-          
-          console.log(`[TRICK COMPLETION] Final scores - scores object: team0RunningTotal=${scores.team0RunningTotal}, team1RunningTotal=${scores.team1RunningTotal}`);
-          console.log(`[TRICK COMPLETION] Final scores - RoundScore query: team0RunningTotal=${currentRoundScore?.team0RunningTotal}, team1RunningTotal=${currentRoundScore?.team1RunningTotal}`);
-          console.log(`[TRICK COMPLETION] Final scores - USING: team0RunningTotal=${finalTeam1Score}, team1RunningTotal=${finalTeam2Score}`);
 
+          // CRITICAL: Override the scores in finalGameState with the correct final scores
           if (finalGameState) {
             finalGameState.team1TotalScore = finalTeam1Score;
             finalGameState.team2TotalScore = finalTeam2Score;
@@ -283,7 +288,14 @@ export class TrickCompletionService {
             finalGameState.team2Bags = scores.team1Bags ?? finalGameState.team2Bags ?? 0;
           }
           
-          console.log(`[TRICK COMPLETION] Final scores - team0RunningTotal: ${finalTeam1Score}, team1RunningTotal: ${finalTeam2Score}`);
+          // Update Redis cache with correct final scores immediately
+          const redisGameState = (await import('../../../services/RedisGameStateService.js')).default;
+          if (finalGameState) {
+            await redisGameState.setGameState(gameId, finalGameState);
+            console.log(`[TRICK COMPLETION] Updated Redis cache with correct final scores`);
+          }
+          
+          console.log(`[TRICK COMPLETION] Emitting game_complete with final scores: team1Score=${finalTeam1Score}, team2Score=${finalTeam2Score}`);
           
           emitPersonalizedGameEvent(io, gameId, 'game_complete', finalGameState, {
             winner: gameComplete.winner,
