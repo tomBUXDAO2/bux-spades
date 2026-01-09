@@ -3,6 +3,9 @@ import {
   RouterProvider,
   createBrowserRouter,
   Navigate,
+  useLocation,
+  useParams,
+  useNavigate,
 } from 'react-router-dom';
 import { AuthProvider as AuthContextProvider, useAuth } from '@/features/auth/AuthContext';
 import Login from '@/features/auth/components/Login';
@@ -15,6 +18,7 @@ import FacebookVerification from './pages/FacebookVerification';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import TournamentLobby from '@/features/tournament/TournamentLobby';
+import TournamentLobbyModal from './components/modals/TournamentLobbyModal';
 import { SocketProvider } from '@/features/auth/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import ForceLogoutModal from './components/modals/ForceLogoutModal';
@@ -102,7 +106,7 @@ const router = createBrowserRouter(
         },
         {
           path: "tournament/:tournamentId",
-          element: <TournamentLobby />
+          element: <TournamentLobbyRoute />
         },
         {
           path: "*",
@@ -117,6 +121,56 @@ const router = createBrowserRouter(
     }
   }
 );
+
+// Component to handle tournament route - shows as overlay
+const TournamentLobbyRoute: React.FC = () => {
+  const { tournamentId } = useParams<{ tournamentId: string }>();
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const [showModal, setShowModal] = useState(true);
+
+  useEffect(() => {
+    // When modal closes, navigate back to the appropriate page
+    if (!showModal) {
+      if (user) {
+        navigate('/');
+      } else {
+        navigate('/login');
+      }
+    }
+  }, [showModal, navigate, user]);
+
+  if (!tournamentId) {
+    return <Navigate to="/" />;
+  }
+
+  // Show underlying page based on auth status
+  const underlyingPage = loading ? (
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="text-center">
+        <h2 className="text-2xl font-semibold text-white">Loading...</h2>
+      </div>
+    </div>
+  ) : user ? (
+    <HomePage />
+  ) : (
+    <Login />
+  );
+
+  return (
+    <>
+      {underlyingPage}
+      {/* Show tournament modal as overlay */}
+      <TournamentLobbyModal
+        isOpen={showModal}
+        tournamentId={tournamentId}
+        onClose={() => {
+          setShowModal(false);
+        }}
+      />
+    </>
+  );
+};
 
 const AppWithSocket: React.FC = () => {
   const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();

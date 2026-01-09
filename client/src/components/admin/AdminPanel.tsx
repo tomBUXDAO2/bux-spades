@@ -1619,8 +1619,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                             <div className="flex flex-col gap-2 ml-4">
                               <a
                                 href={`/tournament/${tournament.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
                                 className="text-blue-400 hover:text-blue-300 text-center"
                                 style={{ fontSize: `${12 * textScale}px` }}
                               >
