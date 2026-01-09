@@ -3210,19 +3210,23 @@ async function handleTournamentButton(interaction) {
       tournamentId = customId.replace('tournament_open_search_', '');
     } else if (customId.startsWith('tournament_show_full_list_')) {
       tournamentId = customId.replace('tournament_show_full_list_', '');
+    } else if (customId.startsWith('tournament_confirm_partner_')) {
+      // Format: tournament_confirm_partner_<tournamentId>_<partnerDiscordId>
+      const remaining = customId.replace('tournament_confirm_partner_', '');
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
+    } else if (customId.startsWith('tournament_cancel_partner_')) {
+      tournamentId = customId.replace('tournament_cancel_partner_', '');
+    } else if (customId.startsWith('tournament_partner_next_')) {
+      const remaining = customId.replace('tournament_partner_next_', '');
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
+    } else if (customId.startsWith('tournament_partner_prev_')) {
+      const remaining = customId.replace('tournament_partner_prev_', '');
+      const lastUnderscoreIndex = remaining.lastIndexOf('_');
+      tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
     } else {
-      // For next/prev buttons, extract differently
-      if (customId.startsWith('tournament_partner_next_')) {
-        const remaining = customId.replace('tournament_partner_next_', '');
-        const lastUnderscoreIndex = remaining.lastIndexOf('_');
-        tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
-      } else if (customId.startsWith('tournament_partner_prev_')) {
-        const remaining = customId.replace('tournament_partner_prev_', '');
-        const lastUnderscoreIndex = remaining.lastIndexOf('_');
-        tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
-      } else {
-        tournamentId = customId.split('_').pop(); // Fallback
-      }
+      tournamentId = customId.split('_').pop(); // Fallback
     }
     
     console.log('[TOURNAMENT] Button click - customId:', customId, 'tournamentId:', tournamentId);
