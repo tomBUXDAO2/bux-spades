@@ -96,7 +96,8 @@ interface TournamentFormState {
   nilAllowed: boolean | null;
   blindNilAllowed: boolean | null;
   gimmickVariant?: string | null;
-  isRated: boolean;
+  specialRule1: string[];
+  specialRule2: string[];
 }
 
 const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
@@ -215,7 +216,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     nilAllowed: true,
     blindNilAllowed: false,
     gimmickVariant: null,
-    isRated: true,
+    specialRule1: [],
+    specialRule2: [],
   });
   const [tournamentBannerPreviewUrl, setTournamentBannerPreviewUrl] = useState<string | null>(null);
   const [tournamentBannerUploadError, setTournamentBannerUploadError] = useState<string | null>(null);
@@ -810,7 +812,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       nilAllowed: true,
       blindNilAllowed: false,
       gimmickVariant: null,
-      isRated: true,
+      specialRule1: [],
+      specialRule2: [],
     });
     if (tournamentBannerPreviewUrl) {
       URL.revokeObjectURL(tournamentBannerPreviewUrl);
@@ -844,7 +847,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       nilAllowed: newTournament.nilAllowed,
       blindNilAllowed: newTournament.blindNilAllowed,
       gimmickVariant: newTournament.gimmickVariant,
-      isRated: newTournament.isRated,
+      specialRule1: newTournament.specialRule1.length > 0 ? newTournament.specialRule1 : null,
+      specialRule2: newTournament.specialRule2.length > 0 ? newTournament.specialRule2 : null,
     };
   };
 
@@ -1424,15 +1428,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-white">Rated Game</label>
-                        <select
-                          value={newTournament.isRated ? 'true' : 'false'}
-                          onChange={e => handleTournamentInputChange('isRated', e.target.value === 'true')}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                        >
-                          <option value="true">Yes</option>
-                          <option value="false">No</option>
-                        </select>
+                        <label className="block text-sm font-semibold text-white">Special Rule #1</label>
+                        <div className="flex flex-wrap gap-2">
+                          {SPECIAL_RULE1_OPTIONS.map(rule => (
+                            <button
+                              type="button"
+                              key={rule}
+                              onClick={() => handleTournamentInputChange('specialRule1', toggleSelection(newTournament.specialRule1, rule))}
+                              className={`px-3 py-1 rounded border ${
+                                newTournament.specialRule1.includes(rule) ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-300'
+                              }`}
+                            >
+                              {rule}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Special Rule #2</label>
+                        <div className="flex flex-wrap gap-2">
+                          {SPECIAL_RULE2_OPTIONS.map(rule => (
+                            <button
+                              type="button"
+                              key={rule}
+                              onClick={() => handleTournamentInputChange('specialRule2', toggleSelection(newTournament.specialRule2, rule))}
+                              className={`px-3 py-1 rounded border ${
+                                newTournament.specialRule2.includes(rule) ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-300'
+                              }`}
+                            >
+                              {rule}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>

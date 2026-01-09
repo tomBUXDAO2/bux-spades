@@ -524,6 +524,7 @@ model Tournament {
   eliminationType   TournamentEliminationType @default(SINGLE)
   prizes            Json?                    // { winners: string, runnersUp: string } or coin amounts
   bannerUrl         String?
+  specialRules      Json?                    // { specialRule1: string[], specialRule2: string[] }
   discordMessageId  String?
   discordChannelId  String?
   status            TournamentStatus         @default(REGISTRATION_OPEN)

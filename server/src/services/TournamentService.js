@@ -29,7 +29,8 @@ export class TournamentService {
       nilAllowed = true,
       blindNilAllowed = false,
       gimmickVariant = null,
-      isRated = true,
+      specialRule1 = null,
+      specialRule2 = null,
     } = data || {};
 
     if (!name || typeof name !== 'string') {
@@ -73,13 +74,22 @@ export class TournamentService {
       }
     }
 
+    // Build specialRules JSON from specialRule1 and specialRule2
+    const specialRules = {};
+    if (specialRule1 && Array.isArray(specialRule1) && specialRule1.length > 0) {
+      specialRules.specialRule1 = specialRule1.length === 1 ? specialRule1[0] : specialRule1;
+    }
+    if (specialRule2 && Array.isArray(specialRule2) && specialRule2.length > 0) {
+      specialRules.specialRule2 = specialRule2.length === 1 ? specialRule2[0] : specialRule2;
+    }
+
     return prisma.tournament.create({
       data: {
         name: name.trim(),
         mode,
         format,
         gimmickVariant,
-        isRated,
+        isRated: true, // Tournaments always have 4 human players, so always rated
         minPoints,
         maxPoints,
         nilAllowed,
@@ -89,6 +99,7 @@ export class TournamentService {
         eliminationType,
         prizes: prizesData,
         bannerUrl,
+        specialRules: Object.keys(specialRules).length > 0 ? specialRules : null,
         status: 'REGISTRATION_OPEN',
       },
       include: {
