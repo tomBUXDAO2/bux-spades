@@ -145,6 +145,22 @@ export class TournamentBracketService {
   static async generateSingleEliminationBracket(tournamentId, teams) {
     const numTeams = teams.length;
     
+    // Special case: if only 2 teams, just create the Final
+    if (numTeams === 2) {
+      const seededTeams = [...teams].sort(() => Math.random() - 0.5);
+      await prisma.tournamentMatch.create({
+        data: {
+          tournamentId,
+          round: 1, // Final (will be labeled correctly in UI)
+          matchNumber: 1,
+          team1Id: seededTeams[0].id,
+          team2Id: seededTeams[1].id,
+          status: 'PENDING',
+        },
+      });
+      return;
+    }
+    
     // Calculate next round size
     // Find largest power of 2 <= numTeams, then that's our target for next round
     // Example: 9 teams -> next round should have 8 teams (largest power of 2 <= 9)
@@ -168,12 +184,13 @@ export class TournamentBracketService {
     let matchNumber = 1;
     const matches = [];
     let round = 1;
+    const hasByes = numByes > 0;
     
     // Assign byes first (teams that automatically advance)
     let teamIndex = 0;
+    const teamsWithByes = [];
     for (let i = 0; i < numByes && teamIndex < seededTeams.length; i++) {
-      // Teams with byes don't need a match, they advance automatically
-      // We'll track them for bracket display but don't create a match
+      teamsWithByes.push(seededTeams[teamIndex]);
       teamIndex++;
     }
     

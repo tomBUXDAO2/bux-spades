@@ -335,6 +335,29 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                   };
 
                   const rounds = Array.from(matchesByRound.keys()).sort((a, b) => a - b);
+                  
+                  // Calculate round names based on number of teams and rounds
+                  const getRoundName = (roundNum: number, totalRounds: number, hasByes: boolean) => {
+                    // Check if first round has byes
+                    const firstRoundMatches = matchesByRound.get(1) || [];
+                    const hasByesInFirstRound = firstRoundMatches.some(m => m.status === 'COMPLETED' && !m.team2Id);
+                    
+                    if (roundNum === totalRounds) {
+                      return 'Final';
+                    } else if (roundNum === totalRounds - 1) {
+                      return 'Semi-Finals';
+                    } else if (roundNum === totalRounds - 2) {
+                      return 'Quarter-Finals';
+                    } else if (roundNum === totalRounds - 3) {
+                      return 'Round of 16';
+                    } else if (roundNum === totalRounds - 4) {
+                      return 'Round of 32';
+                    } else if (roundNum === 1 && hasByesInFirstRound) {
+                      return 'Qualifying Round';
+                    } else {
+                      return `Round ${roundNum}`;
+                    }
+                  };
 
                   return (
                     <div className="space-y-6">
@@ -343,11 +366,12 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                         const isFirstRound = round === 1;
                         const isBye = (match: typeof tournament.matches[0]) => 
                           match.status === 'COMPLETED' && !match.team2Id;
+                        const roundName = getRoundName(round, rounds.length, isFirstRound);
 
                         return (
                           <div key={round} className="border-t border-slate-700 pt-4 first:border-t-0 first:pt-0">
                             <h3 className="text-lg font-semibold text-white mb-3">
-                              Round {round}
+                              {roundName}
                             </h3>
                             <div className="space-y-2">
                               {roundMatches.map(match => {
