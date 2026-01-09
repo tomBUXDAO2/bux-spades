@@ -305,7 +305,8 @@ export class TrickCompletionService {
           }
           
           // Update Redis cache with correct final scores immediately
-          const redisGameState = (await import('../../../services/RedisGameStateService.js')).default;
+          // Use the already-imported redisGameState service; dynamic import here
+          // was resolving to an incorrect path in production and throwing.
           if (finalGameState) {
             await redisGameState.setGameState(gameId, finalGameState);
             console.log(`[TRICK COMPLETION] Updated Redis cache with correct final scores`);
