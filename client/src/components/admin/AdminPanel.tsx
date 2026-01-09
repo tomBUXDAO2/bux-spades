@@ -852,14 +852,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       mode: newTournament.mode,
       format: newTournament.format,
       startTime: startTimeIso,
-      buyIn: newTournament.buyIn ?? null,
+      buyIn: newTournament.tableBuyIn ?? null, // Table buy-in (game cost)
+      tournamentBuyIn: newTournament.tournamentBuyIn ?? null, // Tournament entry fee
       eliminationType: newTournament.eliminationType,
-      prizes: newTournament.prizes,
+      prizes: (() => {
+        // Format prizes for PARTNERS mode (show as "X mil each")
+        if (newTournament.mode === 'PARTNERS' && (newTournament.prizes.winners || newTournament.prizes.runnersUp)) {
+          return {
+            winners: newTournament.prizes.winners ? `${formatCoins(newTournament.prizes.winners)} each` : undefined,
+            runnersUp: newTournament.prizes.runnersUp ? `${formatCoins(newTournament.prizes.runnersUp)} each` : undefined,
+          };
+        }
+        return newTournament.prizes;
+      })(),
       bannerUrl: newTournament.bannerUrl || null,
       minPoints: newTournament.minPoints,
       maxPoints: newTournament.maxPoints,
-      nilAllowed: newTournament.nilAllowed,
-      blindNilAllowed: newTournament.blindNilAllowed,
+      nilAllowed: newTournament.format === 'REGULAR' ? newTournament.nilAllowed : false,
+      blindNilAllowed: newTournament.format === 'REGULAR' ? newTournament.blindNilAllowed : false,
       gimmickVariant: newTournament.gimmickVariant,
       specialRule1: newTournament.specialRule1.length > 0 ? newTournament.specialRule1 : null,
       specialRule2: newTournament.specialRule2.length > 0 ? newTournament.specialRule2 : null,
