@@ -294,6 +294,18 @@ export default function GameTableModular({
     showHandSummaryRef.current = showHandSummary;
   }, [showHandSummary]);
 
+  // CRITICAL FIX: Clear hard mask when active trick is detected (player joined mid-game)
+  useEffect(() => {
+    if (hardMaskAfterSummary && gameState.status === 'PLAYING') {
+      const currentTrick = (gameState as any)?.play?.currentTrick || (gameState as any)?.currentTrickCards || [];
+      if (Array.isArray(currentTrick) && currentTrick.length > 0) {
+        // Active trick detected - clear the hard mask to allow rendering
+        console.log('[HARD MASK] Active trick detected, clearing hard mask');
+        setHardMaskAfterSummary(false);
+      }
+    }
+  }, [hardMaskAfterSummary, gameState.status, (gameState as any)?.play?.currentTrick, (gameState as any)?.currentTrickCards]);
+
   const handleHandCompleted = (data: any) => {
     console.log('[HAND SUMMARY] Hand completed payload received:', {
       hasData: !!data,
