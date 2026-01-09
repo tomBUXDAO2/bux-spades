@@ -260,11 +260,28 @@ export default function GameTableModular({
     if (data.hands || (data.status === "BIDDING" && gameState.hands)) {
       const handsArray = data.hands.map((h: any) => h.hand);
       setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING", currentPlayer: data.currentPlayer }));
-      setDealingComplete(true);
-      setBiddingReady(true);
-      // CRITICAL FIX: Do NOT reveal cards for everyone immediately
-      // Let the useEffect (lines 569-583) handle revealing cards only for the current bidder
-      // Don't set cardsRevealed to false here - let the useEffect handle it
+      
+      // CRITICAL: Start with cards face down and dealing incomplete
+      setCardsRevealed(false);
+      setDealingComplete(false);
+      setDealtCardCount(0);
+      setBiddingReady(false);
+      
+      // Play dealer animation with sound effects
+      const { playCardDealingSound } = require('@/components/game/components/AudioManager');
+      playCardDealingSound();
+      
+      // Stagger card dealing animation - reveal cards one by one
+      for (let i = 0; i < 13; i++) {
+        setTimeout(() => {
+          setDealtCardCount(i + 1);
+          if (i === 12) {
+            // After all cards are dealt, mark dealing as complete
+            setDealingComplete(true);
+            setBiddingReady(true);
+          }
+        }, i * 100); // 100ms delay between each card (matches sound timing)
+      }
       
       // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
       if (data.gameState?.rated && data.gameState?.buyIn) {

@@ -337,12 +337,13 @@ export const playCardDealingSound = () => {
     ensureAudioInitialized();
     if (!isSoundEnabled()) return;
 
-    for (let i = 0; i < 7; i++) {
+    // Play card.wav 13 times (one for each card) with staggered timing
+    for (let i = 0; i < 13; i++) {
       setTimeout(() => {
         const tempAudio = createAudioElement('/sounds/card.wav', 0.3);
         if (!tempAudio) return;
         tempAudio.play().catch(err => console.log('Card dealing audio play failed:', err));
-      }, i * 150);
+      }, i * 100); // 100ms delay between each card sound
     }
   } catch (error) {
     console.log('Card dealing audio not supported or failed to load:', error);

@@ -6,6 +6,7 @@ import { prisma } from '../../../config/database.js';
 const playAgainResponses = new Map(); // gameId -> Map<userId, {seatIndex, timestamp}>
 const playAgainTimers = new Map(); // gameId -> NodeJS.Timeout
 const playAgainLeftPlayers = new Map(); // gameId -> Set<userId> (players who left during wait)
+const playAgainInitialPlayers = new Map(); // gameId -> Set<userId> (human players when play again started)
 
 class PlayAgainHandler {
   constructor(io, socket) {
@@ -51,6 +52,18 @@ class PlayAgainHandler {
       if (!playAgainResponses.has(gameId)) {
         playAgainResponses.set(gameId, new Map());
         console.log(`[PLAY AGAIN] Initialized tracking for game ${gameId}`);
+        
+        // Track initial human players when first response comes in
+        const initialHumanPlayers = await prisma.gamePlayer.findMany({
+          where: { 
+            gameId, 
+            isHuman: true,
+            leftAt: null
+          },
+          select: { userId: true }
+        });
+        playAgainInitialPlayers.set(gameId, new Set(initialHumanPlayers.map(p => p.userId)));
+        console.log(`[PLAY AGAIN] Tracked ${initialHumanPlayers.length} initial human players for game ${gameId}`);
       }
 
       const responses = playAgainResponses.get(gameId);
@@ -108,28 +121,19 @@ class PlayAgainHandler {
     try {
       const responses = playAgainResponses.get(gameId);
       const leftPlayers = playAgainLeftPlayers.get(gameId) || new Set();
+      const initialPlayers = playAgainInitialPlayers.get(gameId) || new Set();
 
-      // Get all human players from original game
-      const allHumanPlayers = await prisma.gamePlayer.findMany({
-        where: { 
-          gameId, 
-          isHuman: true,
-          leftAt: null // Only players who haven't left before play again started
-        },
-        select: { userId: true }
-      });
-
-      const allPlayerIds = new Set(allHumanPlayers.map(p => p.userId));
+      // Use initial players tracked when play again started, not current DB state
       const respondedIds = new Set(responses ? Array.from(responses.keys()) : []);
       
-      // Check if all players have either responded or left
-      const allAccountedFor = allPlayerIds.size > 0 && 
-        Array.from(allPlayerIds).every(userId => 
+      // Check if all initial players have either responded or left
+      const allAccountedFor = initialPlayers.size > 0 && 
+        Array.from(initialPlayers).every(userId => 
           respondedIds.has(userId) || leftPlayers.has(userId)
         );
 
       if (allAccountedFor && responses && responses.size > 0) {
-        console.log(`[PLAY AGAIN] All players accounted for, processing immediately for game ${gameId}`);
+        console.log(`[PLAY AGAIN] All ${initialPlayers.size} initial players accounted for (${responses.size} responded, ${leftPlayers.size} left), processing immediately for game ${gameId}`);
         // Clear timer and process immediately
         if (playAgainTimers.has(gameId)) {
           clearTimeout(playAgainTimers.get(gameId));
@@ -336,6 +340,7 @@ class PlayAgainHandler {
     }
     playAgainResponses.delete(gameId);
     playAgainLeftPlayers.delete(gameId);
+    playAgainInitialPlayers.delete(gameId);
     console.log(`[PLAY AGAIN] Cleaned up tracking for game ${gameId}`);
   }
 

@@ -332,7 +332,9 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   faceDown={
                     // CRITICAL: During bidding, show cards face up when cardsRevealed is true
                     // Once cards are revealed, they stay revealed (handled by ref in GameTable)
-                    gameState.status === "BIDDING" && !cardsRevealed
+                    // Also keep face down if dealing is not complete or card hasn't been dealt yet
+                    (gameState.status === "BIDDING" && !cardsRevealed) || 
+                    (!dealingComplete && index >= dealtCardCount)
                   }
                 />
                 {!isPlayable && gameState.currentPlayer === currentPlayerId && (
