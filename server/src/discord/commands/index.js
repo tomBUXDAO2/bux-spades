@@ -2819,6 +2819,28 @@ async function handleTournamentPartnerSelect(interaction) {
     }
     
     // Partner is not registered - show confirmation warning
+    console.log('[TOURNAMENT] Creating confirm button - tournamentId:', tournamentId, 'partnerDiscordId:', partnerDiscordId);
+    
+    // Verify tournament exists before creating button
+    const tournamentCheck = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      select: { id: true, name: true, status: true }
+    });
+    
+    if (!tournamentCheck) {
+      console.error('[TOURNAMENT] CRITICAL: Tournament not found when creating confirm button. ID:', tournamentId);
+      const allTournaments = await prisma.tournament.findMany({
+        select: { id: true, name: true },
+        take: 5,
+        orderBy: { createdAt: 'desc' }
+      });
+      console.error('[TOURNAMENT] Available tournaments:', allTournaments);
+      return interaction.editReply({
+        content: `❌ Tournament not found. Please click "Join" again from the tournament embed.`,
+        components: []
+      });
+    }
+    
     const { ButtonBuilder } = await import('discord.js');
     const confirmButton = new ButtonBuilder()
       .setCustomId(`tournament_confirm_partner_${tournamentId}_${partnerDiscordId}`)
@@ -2831,6 +2853,8 @@ async function handleTournamentPartnerSelect(interaction) {
       .setStyle(ButtonStyle.Danger);
     
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+    
+    console.log('[TOURNAMENT] Confirm button customId:', confirmButton.data.custom_id);
     
     await interaction.editReply({
       content: `⚠️ **Partner Confirmation Required**\n\n` +
@@ -3729,18 +3753,50 @@ async function handleTournamentButton(interaction) {
       
       // Get tournament
       console.log('[TOURNAMENT] Confirm partner - looking up tournament:', tournamentId);
-      const tournament = await prisma.tournament.findUnique({
-        where: { id: tournamentId },
-        include: { registrations: true }
-      });
+      console.log('[TOURNAMENT] Confirm partner - tournamentId type:', typeof tournamentId, 'length:', tournamentId?.length);
       
-      if (!tournament) {
-        console.error('[TOURNAMENT] Confirm partner - tournament not found:', tournamentId);
+      let tournament;
+      try {
+        tournament = await prisma.tournament.findUnique({
+          where: { id: tournamentId },
+          include: { registrations: true }
+        });
+      } catch (dbError) {
+        console.error('[TOURNAMENT] Database error looking up tournament:', dbError);
         return interaction.editReply({
-          content: `❌ Tournament not found. Please click "Join" again from the tournament embed.`,
+          content: '❌ Database error. Please try again.',
           components: []
         });
       }
+      
+      if (!tournament) {
+        console.error('[TOURNAMENT] Confirm partner - tournament not found. ID:', tournamentId);
+        // List all tournaments for debugging
+        try {
+          const allTournaments = await prisma.tournament.findMany({
+            select: { id: true, name: true, status: true },
+            take: 10,
+            orderBy: { createdAt: 'desc' }
+          });
+          console.error('[TOURNAMENT] All tournaments in database:', allTournaments.map(t => ({ id: t.id, name: t.name })));
+          console.error('[TOURNAMENT] Looking for exact match...');
+          const exactMatch = allTournaments.find(t => t.id === tournamentId);
+          if (exactMatch) {
+            console.error('[TOURNAMENT] Found exact match but findUnique returned null - possible database issue');
+          } else {
+            console.error('[TOURNAMENT] No exact match found - tournamentId may be incorrect');
+          }
+        } catch (error) {
+          console.error('[TOURNAMENT] Error listing tournaments:', error);
+        }
+        
+        return interaction.editReply({
+          content: `❌ Tournament not found.\n\n**Tournament ID:** \`${tournamentId}\`\n\nPlease click "Join" again from the tournament embed.`,
+          components: []
+        });
+      }
+      
+      console.log('[TOURNAMENT] Confirm partner - tournament found:', tournament.name, 'ID:', tournament.id);
       
       if (tournament.status !== 'REGISTRATION_OPEN') {
         return interaction.editReply({
