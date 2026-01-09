@@ -145,9 +145,12 @@ export class TournamentBracketService {
   static async generateSingleEliminationBracket(tournamentId, teams) {
     const numTeams = teams.length;
     
-    // Calculate next round size (next power of 2)
-    // Find smallest power of 2 >= numTeams
-    let nextRoundSize = Math.pow(2, Math.ceil(Math.log2(numTeams)));
+    // Calculate next round size
+    // Find largest power of 2 <= numTeams, then that's our target for next round
+    // Example: 9 teams -> next round should have 8 teams (largest power of 2 <= 9)
+    // Example: 21 teams -> next round should have 16 teams (largest power of 2 <= 21)
+    const largestPowerOf2 = Math.pow(2, Math.floor(Math.log2(numTeams)));
+    const nextRoundSize = largestPowerOf2;
     
     // Calculate byes: we need nextRoundSize teams in next round
     // If numPlaying teams play, we get numPlaying/2 winners
