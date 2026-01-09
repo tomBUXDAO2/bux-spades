@@ -2661,7 +2661,7 @@ async function handleTournamentModal(interaction) {
       });
     }
     
-    await updateTournamentEmbed(interaction, tournamentId);
+    await updateTournamentEmbed(null, tournamentId);
     
   } catch (error) {
     console.error('[TOURNAMENT] Error handling modal:', error);
@@ -2768,7 +2768,7 @@ async function handleTournamentButton(interaction) {
           ephemeral: true
         });
         
-        await updateTournamentEmbed(interaction, tournamentId);
+        await updateTournamentEmbed(null, tournamentId);
       }
       
     } else if (customId.startsWith('cancel_registration_') || customId.startsWith('unregister_tournament_')) {
@@ -2812,7 +2812,7 @@ async function handleTournamentButton(interaction) {
         ephemeral: true
       });
       
-      await updateTournamentEmbed(interaction, tournamentId);
+      await updateTournamentEmbed(null, tournamentId);
     } else if (customId.startsWith('view_tournament_lobby_')) {
       // View lobby - send URL to tournament lobby page
       const clientUrl = process.env.CLIENT_URL || 'https://www.bux-spades.pro';
@@ -2840,12 +2840,17 @@ async function updateTournamentEmbed(interaction, tournamentId) {
     const { TournamentService } = await import('../../services/TournamentService.js');
     
     const tournament = await TournamentService.getTournament(tournamentId);
-    if (!tournament) return;
+    if (!tournament || !tournament.discordMessageId) {
+      console.warn('[TOURNAMENT] Cannot update embed - tournament or Discord message ID missing');
+      return;
+    }
     
     // Use DiscordTournamentService to update the embed
     const { client } = await import('../bot.js');
     if (client && client.isReady()) {
       await DiscordTournamentService.updateTournamentEmbed(client, tournament);
+    } else {
+      console.warn('[TOURNAMENT] Discord client not ready, cannot update embed');
     }
     
   } catch (error) {
