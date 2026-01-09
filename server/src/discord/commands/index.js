@@ -1567,13 +1567,11 @@ async function handleTournamentPartnerSearch(interaction) {
         ? `**Search Results for "${searchQuery}":**\n\n` +
           `Found ${options.length - 1} matching member${options.length - 1 !== 1 ? 's' : ''} (out of ${totalMembers} total).\n\n` +
           '• Players with ✅ are already registered alone\n' +
-          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-          '• Players with ❌ are not in database (need to play first)'
+          '• Players with ⚠️ are not yet registered (they will need to confirm)'
         : '**Select your partner:**\n\n' +
           '• Choose a player from the list (alphabetically sorted)\n' +
           '• Players with ✅ are already registered alone\n' +
           '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-          '• Players with ❌ are not in database (need to play first)\n' +
           '• Or select "No Partner" to be auto-assigned',
       components: [row]
     });
@@ -2944,7 +2942,19 @@ async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = nu
   });
   
   // Filter out already partnered members
-  const availableMembers = members.filter(m => !registeredWithPartner.has(m.user.id));
+  let availableMembers = members.filter(m => !registeredWithPartner.has(m.user.id));
+  
+  // Filter out members who are not in the database (they can't be selected anyway)
+  const membersInDb = [];
+  for (const member of availableMembers) {
+    const dbUser = await prisma.user.findUnique({
+      where: { discordId: member.user.id }
+    });
+    if (dbUser) {
+      membersInDb.push(member);
+    }
+  }
+  availableMembers = membersInDb;
   
   // Build select menu options
   const options = [];
@@ -2970,27 +2980,21 @@ async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = nu
   for (const member of availableMembers.slice(startIndex, endIndex)) {
     const memberId = member.user.id;
     
-    // Check if user exists in database
-    const dbUser = await prisma.user.findUnique({
-      where: { discordId: memberId }
-    });
-    
+    // User is guaranteed to be in database (we filtered above)
     const isRegisteredAlone = registeredAlone.has(memberId);
     const displayName = member.displayName || member.user.username;
     
     // Truncate display name if too long
     const truncatedName = displayName.length > 80 ? displayName.substring(0, 77) + '...' : displayName;
-    const description = dbUser 
-      ? (isRegisteredAlone 
-          ? 'Already registered (will be your partner)' 
-          : 'Not yet registered (needs confirmation)')
-      : 'Not in database (needs to play first)';
+    const description = isRegisteredAlone 
+      ? 'Already registered (will be your partner)' 
+      : 'Not yet registered (needs confirmation)';
     
     options.push({
       label: truncatedName,
       value: memberId,
       description: description.length > 100 ? description.substring(0, 97) + '...' : description,
-      emoji: isRegisteredAlone ? '✅' : (dbUser ? '⚠️' : '❌')
+      emoji: isRegisteredAlone ? '✅' : '⚠️'
     });
   }
   
@@ -3329,11 +3333,11 @@ async function handleTournamentButton(interaction) {
           const actionRow = new ActionRowBuilder().addComponents(searchInput);
           searchModal.addComponents(actionRow);
           
-          await interaction.editReply({
-            content: `**Partner Selection**\n\n` +
-              `There are **${totalMembers} members** in the server.\n\n` +
-              `⚠️ **Discord limits dropdowns to 25 options**, so you must use search to find your partner.\n\n` +
-              `**Click the search button below to find any member by name.**`,
+        await interaction.editReply({
+          content: `**Partner Selection**\n\n` +
+            `There are **${totalMembers} eligible members** (players who have played at least one game).\n\n` +
+            `⚠️ **Discord limits dropdowns to 25 options**, so you must use search to find your partner.\n\n` +
+            `**Click the search button below to find any member by name.**`,
             components: [
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -3388,7 +3392,6 @@ async function handleTournamentButton(interaction) {
             '• Choose a player from the list (alphabetically sorted)\n' +
             '• Players with ✅ are already registered alone\n' +
             '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-            '• Players with ❌ are not in database (need to play first)\n' +
             '• Or select "No Partner" to be auto-assigned',
           components: components
         });
@@ -3520,14 +3523,13 @@ async function handleTournamentButton(interaction) {
           components.push(paginationRow);
         }
         
-        await interaction.editReply({
-          content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
-            `Showing ${options.length} of ${totalMembers} total members.\n\n` +
-            '• Players with ✅ are already registered alone\n' +
-            '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-            '• Players with ❌ are not in database (need to play first)\n' +
-            '• Or select "No Partner" to be auto-assigned\n\n' +
-            '*Use the navigation buttons to see more members.*',
+      await interaction.editReply({
+        content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
+          `Showing ${options.length} of ${totalMembers} eligible members.\n\n` +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Or select "No Partner" to be auto-assigned\n\n' +
+          '*Use the navigation buttons to see more members.*',
           components: components
         });
       } catch (error) {
@@ -3608,10 +3610,9 @@ async function handleTournamentButton(interaction) {
       
       await interaction.editReply({
         content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
-          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
+          `Showing ${options.length} of ${totalMembers} eligible members.\n\n` +
           '• Players with ✅ are already registered alone\n' +
-          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-          '• Players with ❌ are not in database (need to play first)',
+          '• Players with ⚠️ are not yet registered (they will need to confirm)',
         components: components
       });
     } else if (customId.startsWith('tournament_partner_prev_')) {
@@ -3683,11 +3684,10 @@ async function handleTournamentButton(interaction) {
       
       await interaction.editReply({
         content: `**Partners (Page ${currentPage} of ${totalPages}):**\n\n` +
-          `Showing ${options.length} of ${totalMembers} total members.\n\n` +
+          `Showing ${options.length} of ${totalMembers} eligible members.\n\n` +
           (newOffset === 0 ? '• Or select "No Partner" to be auto-assigned\n' : '') +
           '• Players with ✅ are already registered alone\n' +
-          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
-          '• Players with ❌ are not in database (need to play first)',
+          '• Players with ⚠️ are not yet registered (they will need to confirm)',
         components: components
       });
     } else if (customId.startsWith('view_tournament_lobby_')) {
