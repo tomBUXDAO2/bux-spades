@@ -246,23 +246,39 @@ export class TrickCompletionService {
         
         // Emit game complete event if io is provided
         if (io) {
+          // CRITICAL FIX: Get the RoundScore for the CURRENT round that just completed
+          // The scores object returned from calculateRoundScores contains the final scores
+          // Use those directly instead of querying the database which might have stale data
+          const currentRound = await prisma.round.findUnique({
+            where: { id: roundId },
+            select: { roundNumber: true }
+          });
+          
+          // Get the RoundScore we just created for this round
+          const currentRoundScore = await prisma.roundScore.findUnique({
+            where: { id: roundId } // RoundScore.id = roundId
+          });
+
           const finalGameState = await GameService.getGameStateForClient(gameId);
           
-          const latestRoundScore = await prisma.roundScore.findFirst({
+          // Use the current round score (which includes the last round's scores) or fall back to latest
+          const finalRoundScore = currentRoundScore || await prisma.roundScore.findFirst({
             where: { 
               Round: { gameId }
             },
             orderBy: { Round: { roundNumber: 'desc' } }
           });
 
-          const finalTeam1Score = latestRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
-          const finalTeam2Score = latestRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
-          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && latestRoundScore) ? [
-            latestRoundScore.player0Running ?? 0,
-            latestRoundScore.player1Running ?? 0,
-            latestRoundScore.player2Running ?? 0,
-            latestRoundScore.player3Running ?? 0
+          const finalTeam1Score = finalRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
+          const finalTeam2Score = finalRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
+          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && finalRoundScore) ? [
+            finalRoundScore.player0Running ?? 0,
+            finalRoundScore.player1Running ?? 0,
+            finalRoundScore.player2Running ?? 0,
+            finalRoundScore.player3Running ?? 0
           ] : undefined;
+          
+          console.log(`[TRICK COMPLETION] Final scores from RoundScore (round ${currentRound?.roundNumber || 'unknown'}): team0RunningTotal: ${finalTeam1Score}, team1RunningTotal: ${finalTeam2Score}`);
 
           if (finalGameState) {
             finalGameState.team1TotalScore = finalTeam1Score;
