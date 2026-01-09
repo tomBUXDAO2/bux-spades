@@ -215,6 +215,8 @@ export class ScoringService {
       team1Score: team1PointsThisRound,
       team0Bags: team0BagsThisRound,
       team1Bags: team1BagsThisRound,
+      team0RunningTotal, // CRITICAL: Include running totals in return value
+      team1RunningTotal, // CRITICAL: Include running totals in return value
       gameMode: 'PARTNERS'
     };
   }

@@ -246,39 +246,32 @@ export class TrickCompletionService {
         
         // Emit game complete event if io is provided
         if (io) {
-          // CRITICAL FIX: Get the RoundScore for the CURRENT round that just completed
-          // The scores object returned from calculateRoundScores contains the final scores
-          // Use those directly instead of querying the database which might have stale data
-          const currentRound = await prisma.round.findUnique({
-            where: { id: roundId },
-            select: { roundNumber: true }
-          });
+          // CRITICAL FIX: Use the running totals directly from calculateRoundScores
+          // The scores object now includes team0RunningTotal and team1RunningTotal
+          // This ensures we have the correct final scores including the last round
+          const finalGameState = await GameService.getGameStateForClient(gameId);
           
-          // Get the RoundScore we just created for this round
+          // Get the RoundScore we just created to verify, but use scores object as primary source
           const currentRoundScore = await prisma.roundScore.findUnique({
             where: { id: roundId } // RoundScore.id = roundId
           });
 
-          const finalGameState = await GameService.getGameStateForClient(gameId);
+          // Use running totals from scores object (calculated and stored in RoundScore)
+          // Fall back to RoundScore query if scores object doesn't have them (backward compatibility)
+          const finalTeam1Score = scores.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
+          const finalTeam2Score = scores.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
           
-          // Use the current round score (which includes the last round's scores) or fall back to latest
-          const finalRoundScore = currentRoundScore || await prisma.roundScore.findFirst({
-            where: { 
-              Round: { gameId }
-            },
-            orderBy: { Round: { roundNumber: 'desc' } }
-          });
-
-          const finalTeam1Score = finalRoundScore?.team0RunningTotal ?? finalGameState?.team1TotalScore ?? 0;
-          const finalTeam2Score = finalRoundScore?.team1RunningTotal ?? finalGameState?.team2TotalScore ?? 0;
-          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && finalRoundScore) ? [
-            finalRoundScore.player0Running ?? 0,
-            finalRoundScore.player1Running ?? 0,
-            finalRoundScore.player2Running ?? 0,
-            finalRoundScore.player3Running ?? 0
+          // For solo games, get player running totals from RoundScore
+          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && currentRoundScore) ? [
+            currentRoundScore.player0Running ?? 0,
+            currentRoundScore.player1Running ?? 0,
+            currentRoundScore.player2Running ?? 0,
+            currentRoundScore.player3Running ?? 0
           ] : undefined;
           
-          console.log(`[TRICK COMPLETION] Final scores from RoundScore (round ${currentRound?.roundNumber || 'unknown'}): team0RunningTotal: ${finalTeam1Score}, team1RunningTotal: ${finalTeam2Score}`);
+          console.log(`[TRICK COMPLETION] Final scores - scores object: team0RunningTotal=${scores.team0RunningTotal}, team1RunningTotal=${scores.team1RunningTotal}`);
+          console.log(`[TRICK COMPLETION] Final scores - RoundScore query: team0RunningTotal=${currentRoundScore?.team0RunningTotal}, team1RunningTotal=${currentRoundScore?.team1RunningTotal}`);
+          console.log(`[TRICK COMPLETION] Final scores - USING: team0RunningTotal=${finalTeam1Score}, team1RunningTotal=${finalTeam2Score}`);
 
           if (finalGameState) {
             finalGameState.team1TotalScore = finalTeam1Score;
