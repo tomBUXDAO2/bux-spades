@@ -579,6 +579,27 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     };
   }, [socket, onSeatReplacementStarted]);
 
+  // Play again handlers
+  useEffect(() => {
+    if (!socket) return;
+
+    const newGameCreatedHandler = (data: any) => {
+      console.log('[PLAY AGAIN] New game created:', data);
+      if (data.newGameId) {
+        // Update localStorage with new game ID
+        localStorage.setItem('activeGameId', data.newGameId);
+        // Redirect to new game table
+        window.location.href = `/table/${data.newGameId}`;
+      }
+    };
+
+    socket.on('new_game_created', newGameCreatedHandler);
+    
+    return () => {
+      socket.off('new_game_created', newGameCreatedHandler);
+    };
+  }, [socket]);
+
   return {
     trickTimeoutRef
   };

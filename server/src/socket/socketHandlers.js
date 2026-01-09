@@ -8,6 +8,7 @@ import { BotManagementHandler } from '../modules/socket-handlers/bot-management/
 import ReadyHandler from '../modules/socket-handlers/ready/readyHandler.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 import { FriendBlockHandler } from '../modules/socket-handlers/friends/friendBlockHandler.js';
+import { PlayAgainHandler } from '../modules/socket-handlers/play-again/playAgainHandler.js';
 import redisSessionService from '../services/RedisSessionService.js';
 import { playerTimerService } from '../services/PlayerTimerService.js';
 import jwt from 'jsonwebtoken';
@@ -144,6 +145,7 @@ export function setupSocketHandlers(io) {
     const botManagementHandler = new BotManagementHandler(io, socket);
     const readyHandler = new ReadyHandler(io, socket);
     const friendBlockHandler = new FriendBlockHandler(io, socket);
+    const playAgainHandler = new PlayAgainHandler(io, socket);
     console.log(`[SOCKET] Handlers initialized for socket ${socket.id}`);
 
     // Simple per-socket debounce map for join_game to avoid rapid repeat loops
@@ -187,6 +189,9 @@ export function setupSocketHandlers(io) {
     socket.on('add_bot', (data) => botManagementHandler.handleAddBot(data));
     socket.on('remove_bot', (data) => botManagementHandler.handleRemoveBot(data));
     socket.on('fill_with_bots', (data) => botManagementHandler.handleFillWithBots(data));
+    
+    // Play again event
+    socket.on('play_again', (data) => playAgainHandler.handlePlayAgain(data));
     
     // Hand summary continue event - start new round
     socket.on('hand_summary_continue', async (data) => {

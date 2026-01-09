@@ -418,6 +418,15 @@ class GameJoinHandler {
         console.log(`[GAME LEAVE] Game ${gameId} was NOT cleaned up - either rated or has human players remaining`);
       }
 
+      // Notify play again handler if player is leaving during play again wait
+      try {
+        const { PlayAgainHandler } = await import('../play-again/playAgainHandler.js');
+        const playAgainHandler = new PlayAgainHandler(this.io, this.socket);
+        await playAgainHandler.handlePlayerLeft(gameId, userId);
+      } catch (err) {
+        // Play again handler might not be initialized, ignore
+      }
+
       // Leave the socket room
       this.socket.leave(gameId);
       console.log(`[GAME LEAVE] User ${userId} left room for game ${gameId}`);

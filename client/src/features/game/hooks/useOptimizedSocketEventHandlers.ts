@@ -285,11 +285,11 @@ export const useOptimizedSocketEventHandlers = ({
             console.log('[CARD PLAYED] Preserved existing currentTrick:', existingTrick.length, 'cards');
           } else {
             // Fallback to empty array if no trick data available
-            normalizedState.play = {
-              ...normalizedState.play,
-              currentTrick: []
-            };
-            normalizedState.currentTrick = [];
+          normalizedState.play = {
+            ...normalizedState.play,
+            currentTrick: []
+          };
+          normalizedState.currentTrick = [];
             normalizedState.currentTrickCards = [];
           }
         }
