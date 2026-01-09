@@ -3168,8 +3168,48 @@ async function handleTournamentModal(interaction) {
 async function handleTournamentButton(interaction) {
   try {
     const customId = interaction.customId;
-    const tournamentId = customId.split('_').pop();
     const userId = interaction.user.id;
+    
+    // Extract tournamentId based on button type
+    let tournamentId;
+    if (customId.startsWith('join_tournament_')) {
+      tournamentId = customId.replace('join_tournament_', '');
+    } else if (customId.startsWith('register_tournament_')) {
+      tournamentId = customId.replace('register_tournament_', '');
+    } else if (customId.startsWith('unregister_tournament_')) {
+      tournamentId = customId.replace('unregister_tournament_', '');
+    } else if (customId.startsWith('cancel_registration_')) {
+      tournamentId = customId.replace('cancel_registration_', '');
+    } else if (customId.startsWith('view_tournament_lobby_')) {
+      tournamentId = customId.replace('view_tournament_lobby_', '');
+    } else if (customId.startsWith('tournament_open_search_')) {
+      tournamentId = customId.replace('tournament_open_search_', '');
+    } else if (customId.startsWith('tournament_show_full_list_')) {
+      tournamentId = customId.replace('tournament_show_full_list_', '');
+    } else {
+      // For next/prev buttons, extract differently
+      if (customId.startsWith('tournament_partner_next_')) {
+        const remaining = customId.replace('tournament_partner_next_', '');
+        const lastUnderscoreIndex = remaining.lastIndexOf('_');
+        tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
+      } else if (customId.startsWith('tournament_partner_prev_')) {
+        const remaining = customId.replace('tournament_partner_prev_', '');
+        const lastUnderscoreIndex = remaining.lastIndexOf('_');
+        tournamentId = lastUnderscoreIndex !== -1 ? remaining.substring(0, lastUnderscoreIndex) : remaining;
+      } else {
+        tournamentId = customId.split('_').pop(); // Fallback
+      }
+    }
+    
+    console.log('[TOURNAMENT] Button click - customId:', customId, 'tournamentId:', tournamentId);
+    
+    if (!tournamentId || tournamentId.trim() === '') {
+      console.error('[TOURNAMENT] CRITICAL: Empty tournamentId from button:', customId);
+      return interaction.reply({
+        content: '❌ Invalid tournament ID. Please try again.',
+        ephemeral: true
+      });
+    }
     
     // Get or create user
     let user = await prisma.user.findUnique({
