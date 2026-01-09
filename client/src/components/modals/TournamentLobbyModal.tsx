@@ -297,11 +297,118 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
             {tournament.matches.length > 0 && (
               <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
                 <h2 className="text-2xl font-bold mb-4 text-white">Tournament Bracket</h2>
-                <div className="text-slate-400">
-                  <p>Bracket will be generated when registration closes.</p>
-                  <p className="text-sm mt-2">Matches: {tournament.matches.length}</p>
-                </div>
-                {/* TODO: Render bracket visualization */}
+                {(() => {
+                  // Group matches by round
+                  const matchesByRound = new Map<number, typeof tournament.matches>();
+                  tournament.matches.forEach(match => {
+                    if (!matchesByRound.has(match.round)) {
+                      matchesByRound.set(match.round, []);
+                    }
+                    matchesByRound.get(match.round)!.push(match);
+                  });
+
+                  // Build team ID to players map
+                  const teamIdToPlayers = new Map<string, Array<{ username: string; avatarUrl?: string | null }>>();
+                  tournament.registrations.forEach(reg => {
+                    if (reg.partnerId && reg.isComplete) {
+                      const teamId = `team_${reg.userId}_${reg.partnerId}`;
+                      if (!teamIdToPlayers.has(teamId)) {
+                        teamIdToPlayers.set(teamId, [
+                          { username: reg.user.username, avatarUrl: reg.user.avatarUrl },
+                          { username: reg.partner?.username || 'Unknown', avatarUrl: reg.partner?.avatarUrl },
+                        ]);
+                      }
+                    } else if (!reg.partnerId && !reg.isSub) {
+                      const teamId = `team_${reg.userId}`;
+                      teamIdToPlayers.set(teamId, [
+                        { username: reg.user.username, avatarUrl: reg.user.avatarUrl },
+                      ]);
+                    }
+                  });
+
+                  const getTeamDisplay = (teamId: string | null) => {
+                    if (!teamId) return null;
+                    const players = teamIdToPlayers.get(teamId);
+                    if (!players) return teamId;
+                    return players.map(p => p.username).join(' & ');
+                  };
+
+                  const rounds = Array.from(matchesByRound.keys()).sort((a, b) => a - b);
+
+                  return (
+                    <div className="space-y-6">
+                      {rounds.map(round => {
+                        const roundMatches = matchesByRound.get(round)!;
+                        const isFirstRound = round === 1;
+                        const isBye = (match: typeof tournament.matches[0]) => 
+                          match.status === 'COMPLETED' && !match.team2Id;
+
+                        return (
+                          <div key={round} className="border-t border-slate-700 pt-4 first:border-t-0 first:pt-0">
+                            <h3 className="text-lg font-semibold text-white mb-3">
+                              Round {round}
+                            </h3>
+                            <div className="space-y-2">
+                              {roundMatches.map(match => {
+                                const team1Display = getTeamDisplay(match.team1Id);
+                                const team2Display = match.team2Id ? getTeamDisplay(match.team2Id) : null;
+                                const isByeMatch = isBye(match);
+                                const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+
+                                return (
+                                  <div
+                                    key={match.id}
+                                    className={`bg-slate-700 rounded p-3 ${
+                                      match.status === 'COMPLETED' ? 'border-2 border-yellow-500' : 
+                                      match.status === 'IN_PROGRESS' ? 'border-2 border-blue-500' : 
+                                      'border border-slate-600'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex-1">
+                                        <div className="text-sm text-slate-400 mb-1">
+                                          Match {match.matchNumber}
+                                        </div>
+                                        <div className="text-white">
+                                          {team1Display || 'TBD'}
+                                          {team2Display ? (
+                                            <>
+                                              {' vs '}
+                                              {team2Display}
+                                            </>
+                                          ) : isByeMatch ? (
+                                            <span className="text-yellow-400 ml-2">(BYE - Automatic Advance)</span>
+                                          ) : (
+                                            <span className="text-slate-500 ml-2">vs TBD</span>
+                                          )}
+                                        </div>
+                                        {winner && (
+                                          <div className="text-yellow-400 font-semibold mt-1">
+                                            Winner: {winner}
+                                          </div>
+                                        )}
+                                        {match.gameId && (
+                                          <div className="text-blue-400 text-sm mt-1">
+                                            Game: {match.gameId}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-slate-400">
+                                        {match.status === 'COMPLETED' ? '✅ Completed' :
+                                         match.status === 'IN_PROGRESS' ? '🔄 In Progress' :
+                                         '⏳ Pending'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
