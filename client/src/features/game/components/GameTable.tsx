@@ -170,12 +170,6 @@ export default function GameTableModular({
   
   // Refs
   const infoRef = useRef<HTMLDivElement>(null);
-  // Track whether server signaled table clear for the last trick
-  const tableClearedRef = useRef<boolean>(false);
-  // Hard lock to prevent any trick rendering until user closes summary
-  const [postHandLock, setPostHandLock] = useState(false);
-  // Additional hard mask after summary closes to prevent ANY trick rendering
-  const [hardMaskAfterSummary, setHardMaskAfterSummary] = useState(false);
   const trickClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const showHandSummaryRef = useRef<boolean>(false);
   
@@ -238,12 +232,6 @@ export default function GameTableModular({
     setBiddingReady(false);
     setDealtCardCount(0);
     setCardsRevealed(false);
-    // Only lift suppression when summary is not being shown
-    if (!showHandSummary) {
-      tableClearedRef.current = false;
-    }
-    // Clear hard mask when new hand actually starts
-    setHardMaskAfterSummary(false);
   };
   
   const handleGameJoined = (data: any) => {
@@ -294,18 +282,6 @@ export default function GameTableModular({
     showHandSummaryRef.current = showHandSummary;
   }, [showHandSummary]);
 
-  // CRITICAL FIX: Clear hard mask when active trick is detected (player joined mid-game)
-  useEffect(() => {
-    if (hardMaskAfterSummary && gameState.status === 'PLAYING') {
-      const currentTrick = (gameState as any)?.play?.currentTrick || (gameState as any)?.currentTrickCards || [];
-      if (Array.isArray(currentTrick) && currentTrick.length > 0) {
-        // Active trick detected - clear the hard mask to allow rendering
-        console.log('[HARD MASK] Active trick detected, clearing hard mask');
-        setHardMaskAfterSummary(false);
-      }
-    }
-  }, [hardMaskAfterSummary, gameState.status, (gameState as any)?.play?.currentTrick, (gameState as any)?.currentTrickCards]);
-
   const handleHandCompleted = (data: any) => {
     console.log('[HAND SUMMARY] Hand completed payload received:', {
       hasData: !!data,
@@ -352,8 +328,6 @@ export default function GameTableModular({
 
     setHandSummaryData(fallbackSummary);
     setShowHandSummary(true);
-    tableClearedRef.current = true;
-    setPostHandLock(true);
   };
   
   useEffect(() => {
@@ -591,12 +565,6 @@ export default function GameTableModular({
     setTrickCompleted(false);
     // Clear any pending overlay
     setPendingPlayedCard(null);
-    // Mark table as cleared to prevent last-trick fallback from reappearing
-    tableClearedRef.current = true;
-    // If server indicates this was the final trick of the hand, hard-lock rendering immediately
-    if (data && data.isRoundComplete) {
-      setPostHandLock(true);
-    }
     
     // CRITICAL FIX: Always clear currentTrick when server emits clear_table_cards
     // This is the authoritative signal that the table should be cleared
@@ -1029,17 +997,12 @@ export default function GameTableModular({
   const handleHandSummaryContinue = useCallback(() => {
     setShowHandSummary(false);
     setHandSummaryData(null);
-    // Unlock trick rendering now that user closed the summary
-    setPostHandLock(false);
     // CRITICAL FIX: Clear lastNonEmptyTrick to prevent old trick cards from reappearing
     setLastNonEmptyTrick([]);
     setAnimatedTrickCards([]);
     setTrickWinner(null);
     setAnimatingTrick(false);
     setTrickCompleted(false);
-    // DO NOT reset tableClearedRef here; keep it true until 'new_hand_started' or a non-empty currentTrick arrives
-    // HARD MASK: Block ALL trick rendering after summary closes
-    setHardMaskAfterSummary(true);
     if (socket && gameState.id) {
       console.log('[HAND SUMMARY] Continuing to next round for game:', gameState.id);
       socket.emit('hand_summary_continue', { gameId: gameState.id });
@@ -1194,33 +1157,13 @@ export default function GameTableModular({
   
   // Trick card rendering
   const renderTrickCards = () => {
-    // Do not show trick cards once the hand is completed or while the hand summary is open
-    if (postHandLock || gameState.status !== 'PLAYING' || showHandSummary) {
+    // Only check game status - never mask tricks for players or spectators
+    if (gameState.status !== 'PLAYING') {
       return null;
     }
-    // HARD MASK: Block ALL trick rendering after summary closes until new hand starts
-    if (hardMaskAfterSummary) {
-      console.log('[RENDER TRICK CARDS] Hard mask active - blocking all trick rendering');
-      return null;
-    }
-    // If server signaled table cleared, suppress any trick cards until next trick/hand
-    if (tableClearedRef.current) {
-      // Reset when a new trick starts: handled below when currentTrick has cards
-      const ct = (gameState as any)?.play?.currentTrick;
-      if (!showHandSummary && Array.isArray(ct) && ct.length > 0) {
-        tableClearedRef.current = false;
-      } else {
-        return null;
-      }
-    }
+    
     // CRITICAL FIX: Prioritize currentTrickCards from gameState, then play.currentTrick, then animatedTrickCards
     let displayTrick = [];
-    
-    // If a new trick is in progress, allow fallback again
-    const currentTrickLen = (gameState as any)?.play?.currentTrick?.length || 0;
-    if (currentTrickLen > 0) {
-      tableClearedRef.current = false;
-    }
 
     if (animatingTrick && animatedTrickCards.length > 0) {
       displayTrick = animatedTrickCards;
@@ -1241,7 +1184,7 @@ export default function GameTableModular({
     
     // CRITICAL FIX: If displayTrick is empty but we had 4 cards before, keep showing them
     // This prevents the 4th card from disappearing when the trick is marked as complete
-    if (displayTrick.length === 0 && lastNonEmptyTrick.length === 4 && !tableClearedRef.current) {
+    if (displayTrick.length === 0 && lastNonEmptyTrick.length === 4) {
       displayTrick = lastNonEmptyTrick;
       console.log('[RENDER TRICK CARDS] Using lastNonEmptyTrick to prevent flickering');
     }
@@ -1628,3 +1571,4 @@ export default function GameTableModular({
     </>
   );
 }
+
