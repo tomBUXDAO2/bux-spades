@@ -17,6 +17,22 @@ export class DiscordTournamentService {
         throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
       }
 
+      // Check if bot has permission to send messages
+      const botMember = await channel.guild.members.fetch(client.user.id);
+      const permissions = channel.permissionsFor(botMember);
+      
+      if (!permissions.has('ViewChannel')) {
+        throw new Error(`Bot does not have 'View Channel' permission in tournament channel ${TOURNAMENT_CHANNEL_ID}`);
+      }
+      
+      if (!permissions.has('SendMessages')) {
+        throw new Error(`Bot does not have 'Send Messages' permission in tournament channel ${TOURNAMENT_CHANNEL_ID}`);
+      }
+      
+      if (!permissions.has('EmbedLinks')) {
+        throw new Error(`Bot does not have 'Embed Links' permission in tournament channel ${TOURNAMENT_CHANNEL_ID}`);
+      }
+
       const embed = this.buildTournamentEmbed(tournament);
       const components = this.buildTournamentButtons(tournament.id);
 
@@ -37,6 +53,19 @@ export class DiscordTournamentService {
       };
     } catch (error) {
       console.error('[DISCORD TOURNAMENT] Error posting embed:', error);
+      
+      // Provide helpful error message for permission issues
+      if (error.code === 50001 || error.message?.includes('Missing Access') || error.message?.includes('permission')) {
+        const helpfulError = new Error(
+          `Bot lacks permission to post in tournament channel ${TOURNAMENT_CHANNEL_ID}. ` +
+          `Please ensure the bot has the following permissions in that channel: ` +
+          `View Channel, Send Messages, Embed Links, and Attach Files. ` +
+          `Original error: ${error.message}`
+        );
+        helpfulError.code = error.code;
+        throw helpfulError;
+      }
+      
       throw error;
     }
   }
