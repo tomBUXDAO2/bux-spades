@@ -203,6 +203,11 @@ export class TrickCompletionService {
         const currentRoundScore = await prisma.roundScore.findUnique({
           where: { id: roundId } // RoundScore.id = roundId
         });
+        
+        console.log(`[TRICK COMPLETION] Game completion check - gameConfig:`, gameConfig ? 'found' : 'null', `currentRoundScore:`, currentRoundScore ? 'found' : 'null');
+        console.log(`[TRICK COMPLETION] Scores object keys:`, Object.keys(scores || {}));
+        console.log(`[TRICK COMPLETION] Scores object:`, scores);
+        
         if (gameConfig && currentRoundScore) {
           if (gameConfig.mode === 'SOLO') {
             const pts = [
@@ -222,8 +227,8 @@ export class TrickCompletionService {
             }
           } else {
             // CRITICAL: Use running totals from scores object (most reliable) or currentRoundScore
-            const t0 = scores.team0RunningTotal ?? currentRoundScore.team0RunningTotal ?? 0;
-            const t1 = scores.team1RunningTotal ?? currentRoundScore.team1RunningTotal ?? 0;
+            const t0 = scores?.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? 0;
+            const t1 = scores?.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? 0;
             const minP = gameConfig.minPoints ?? -500;
             const maxP = gameConfig.maxPoints ?? 500;
             console.log(`[TRICK COMPLETION] Checking game completion - t0: ${t0}, t1: ${t1}, minP: ${minP}, maxP: ${maxP}`);
@@ -241,15 +246,22 @@ export class TrickCompletionService {
             }
             console.log(`[TRICK COMPLETION] Game completion check result: isComplete=${gameComplete.isComplete}, winner=${gameComplete.winner}`);
           }
+        } else {
+          console.log(`[TRICK COMPLETION] Cannot check game completion - missing gameConfig or currentRoundScore`);
         }
-      } catch {}
+      } catch (error) {
+        console.error(`[TRICK COMPLETION] Error checking game completion:`, error);
+        // Don't throw - continue to emit round_complete even if check fails
+      }
       
       if (gameComplete.isComplete) {
+        console.log(`[TRICK COMPLETION] Game is complete! Winner: ${gameComplete.winner}, Reason: ${gameComplete.reason}`);
         // Complete the game
         await ScoringService.completeGame(gameId, gameComplete.winner, gameComplete.reason);
         
         // Emit game complete event if io is provided
         if (io) {
+          console.log(`[TRICK COMPLETION] io instance available, emitting game_complete event`);
           // CRITICAL FIX: Use the running totals directly from calculateRoundScores
           // The scores object now includes team0RunningTotal and team1RunningTotal
           // This ensures we have the correct final scores including the last round
@@ -312,13 +324,19 @@ export class TrickCompletionService {
               playerScores: finalPlayerScores
             }
           });
+          console.log(`[TRICK COMPLETION] game_complete event emitted successfully`);
+        } else {
+          console.error(`[TRICK COMPLETION] CRITICAL: io instance is null/undefined, cannot emit game_complete!`);
         }
         
         return { isComplete: true, isGameComplete: true };
       }
 
-      // Emit round complete event if io is provided
-      if (io) {
+      // CRITICAL: Always emit round_complete if game is not complete, OR if io is provided and we haven't emitted game_complete
+      // This ensures the hand summary modal always appears
+      console.log(`[TRICK COMPLETION] Game is NOT complete, checking if we should emit round_complete. io: ${io ? 'available' : 'null'}, gameComplete.isComplete: ${gameComplete.isComplete}`);
+      if (io && !gameComplete.isComplete) {
+        console.log(`[TRICK COMPLETION] Game not complete, will emit round_complete event`);
         console.log(`[TRICK COMPLETION] Delaying round_complete event to allow trick animation to complete`);
         
         // CRITICAL: Stop any player timers until next round actually starts
@@ -326,7 +344,7 @@ export class TrickCompletionService {
           const { playerTimerService } = await import('./PlayerTimerService.js');
           playerTimerService.clearTimer(gameId);
         } catch {}
-
+        
         // CRITICAL FIX: Delay round_complete event to prevent 4th card flickering on final trick
         // This allows the trick animation to complete before the game state is updated
         setTimeout(async () => {
