@@ -1513,13 +1513,82 @@ export async function handleModalSubmit(interaction) {
     
     if (customId.startsWith('tournament_modal_')) {
       await handleTournamentModal(interaction);
+    } else if (customId.startsWith('tournament_partner_search_')) {
+      await handleTournamentPartnerSearch(interaction);
     }
   } catch (error) {
     console.error('[DISCORD] Error handling modal submit:', error);
-    await interaction.reply({
-      content: '❌ An error occurred. Please try again.',
-      ephemeral: true
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true
+      });
+    }
+  }
+}
+
+// Handle tournament partner search modal
+async function handleTournamentPartnerSearch(interaction) {
+  try {
+    await interaction.deferReply({ ephemeral: true });
+    
+    const customId = interaction.customId;
+    const tournamentId = customId.split('_').pop();
+    const searchQuery = interaction.fields.getTextInputValue('partner_search')?.trim() || null;
+    
+    const guild = interaction.guild;
+    if (!guild) {
+      return interaction.editReply({
+        content: '❌ Could not access server members. Please try again.'
+      });
+    }
+    
+    const userId = interaction.user.id;
+    const { options, totalMembers } = await buildPartnerOptions(guild, userId, tournamentId, searchQuery, 25);
+    
+    if (options.length === 0) {
+      return interaction.editReply({
+        content: searchQuery 
+          ? `❌ No members found matching "${searchQuery}". Try a different search term.`
+          : '❌ No available partners found.'
+      });
+    }
+    
+    const { StringSelectMenuBuilder } = await import('discord.js');
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`tournament_partner_select_${tournamentId}`)
+      .setPlaceholder(searchQuery ? `Results for "${searchQuery}"...` : 'Select a partner...')
+      .addOptions(options);
+    
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+    
+    await interaction.editReply({
+      content: searchQuery
+        ? `**Search Results for "${searchQuery}":**\n\n` +
+          `Found ${options.length - 1} matching member${options.length - 1 !== 1 ? 's' : ''} (out of ${totalMembers} total).\n\n` +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Players with ❌ are not in database (need to play first)'
+        : '**Select your partner:**\n\n' +
+          '• Choose a player from the list (alphabetically sorted)\n' +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Players with ❌ are not in database (need to play first)\n' +
+          '• Or select "No Partner" to be auto-assigned',
+      components: [row]
     });
+  } catch (error) {
+    console.error('[TOURNAMENT] Error handling partner search:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true
+      });
+    } else {
+      await interaction.editReply({
+        content: '❌ An error occurred. Please try again.'
+      });
+    }
   }
 }
 
@@ -1556,7 +1625,9 @@ export async function handleButtonInteraction(interaction) {
         customId.startsWith('unregister_tournament_') ||
         customId.startsWith('view_tournament_lobby_') ||
         customId.startsWith('tournament_confirm_partner_') ||
-        customId.startsWith('tournament_cancel_partner_')) {
+        customId.startsWith('tournament_cancel_partner_') ||
+        customId.startsWith('tournament_open_search_') ||
+        customId.startsWith('tournament_show_full_list_')) {
       await handleTournamentButton(interaction);
       return;
     }
@@ -2722,6 +2793,94 @@ async function handleTournamentPartnerSelect(interaction) {
   }
 }
 
+// Helper function to build partner select menu options
+async function buildPartnerOptions(guild, userId, tournamentId, searchQuery = null, limit = 25) {
+  // Fetch all members
+  await guild.members.fetch();
+  let members = Array.from(guild.members.cache.values())
+    .filter(m => !m.user.bot && m.user.id !== userId);
+  
+  // Filter by search query if provided
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    members = members.filter(m => {
+      const displayName = (m.displayName || m.user.username).toLowerCase();
+      const username = m.user.username.toLowerCase();
+      return displayName.includes(query) || username.includes(query);
+    });
+  }
+  
+  // Sort alphabetically
+  members.sort((a, b) => {
+    const nameA = (a.displayName || a.user.username).toLowerCase();
+    const nameB = (b.displayName || b.user.username).toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+  
+  // Get existing registrations
+  const existingRegistrations = await prisma.tournamentRegistration.findMany({
+    where: { tournamentId },
+    include: { user: true, partner: true }
+  });
+  
+  // Build sets of registered users
+  const registeredWithPartner = new Set();
+  const registeredAlone = new Set();
+  
+  existingRegistrations.forEach(reg => {
+    if (reg.partnerId && reg.isComplete) {
+      registeredWithPartner.add(reg.user.discordId);
+      if (reg.partner?.discordId) {
+        registeredWithPartner.add(reg.partner.discordId);
+      }
+    } else if (!reg.partnerId) {
+      registeredAlone.add(reg.user.discordId);
+    }
+  });
+  
+  // Build select menu options
+  const options = [];
+  
+  // Add "No Partner (Auto-assign)" option
+  options.push({
+    label: 'No Partner (Auto-assign)',
+    value: 'auto_assign',
+    description: 'You will be randomly paired when registration closes',
+    emoji: '🎲'
+  });
+  
+  // Add members (up to limit)
+  for (const member of members.slice(0, limit - 1)) {
+    const memberId = member.user.id;
+    if (registeredWithPartner.has(memberId)) continue; // Skip already partnered
+    
+    // Check if user exists in database
+    const dbUser = await prisma.user.findUnique({
+      where: { discordId: memberId }
+    });
+    
+    const isRegisteredAlone = registeredAlone.has(memberId);
+    const displayName = member.displayName || member.user.username;
+    
+    // Truncate display name if too long
+    const truncatedName = displayName.length > 80 ? displayName.substring(0, 77) + '...' : displayName;
+    const description = dbUser 
+      ? (isRegisteredAlone 
+          ? 'Already registered (will be your partner)' 
+          : 'Not yet registered (needs confirmation)')
+      : 'Not in database (needs to play first)';
+    
+    options.push({
+      label: truncatedName,
+      value: memberId,
+      description: description.length > 100 ? description.substring(0, 97) + '...' : description,
+      emoji: isRegisteredAlone ? '✅' : (dbUser ? '⚠️' : '❌')
+    });
+  }
+  
+  return { options, totalMembers: members.length };
+}
+
 // Tournament modal handler
 async function handleTournamentModal(interaction) {
   try {
@@ -2953,7 +3112,7 @@ async function handleTournamentButton(interaction) {
         // Defer reply immediately to prevent timeout
         await interaction.deferReply({ ephemeral: true });
         
-        const { StringSelectMenuBuilder } = await import('discord.js');
+        const { StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
         
         // Get all guild members
         const guild = interaction.guild;
@@ -2963,91 +3122,59 @@ async function handleTournamentButton(interaction) {
           });
         }
         
-        // Fetch all members (this might take a moment for large servers)
-        await guild.members.fetch();
-        const members = guild.members.cache.filter(m => !m.user.bot);
+        // Use helper function to build options
+        const { options, totalMembers } = await buildPartnerOptions(guild, userId, tournamentId, null, 25);
         
-        // Get existing registrations
-        const existingRegistrations = await prisma.tournamentRegistration.findMany({
-          where: { tournamentId },
-          include: { user: true, partner: true }
-        });
-        
-        // Build sets of registered users
-        const registeredWithPartner = new Set();
-        const registeredAlone = new Set();
-        
-        existingRegistrations.forEach(reg => {
-          if (reg.partnerId && reg.isComplete) {
-            registeredWithPartner.add(reg.user.discordId);
-            if (reg.partner?.discordId) {
-              registeredWithPartner.add(reg.partner.discordId);
-            }
-          } else if (!reg.partnerId) {
-            registeredAlone.add(reg.user.discordId);
-          }
-        });
-        
-        // Build select menu options
-        const options = [];
-        
-        // Add "No Partner (Auto-assign)" option
-        options.push({
-          label: 'No Partner (Auto-assign)',
-          value: 'auto_assign',
-          description: 'You will be randomly paired when registration closes',
-          emoji: '🎲'
-        });
-        
-        // Add available members (not registered with partner, not self)
-        for (const [memberId, member] of members) {
-          if (memberId === userId) continue; // Skip self
-          if (registeredWithPartner.has(memberId)) continue; // Skip already partnered
+        // If we have more than 25 options, show search options
+        if (totalMembers > 24) {
+          const searchModal = new ModalBuilder()
+            .setCustomId(`tournament_partner_search_${tournamentId}`)
+            .setTitle('Search for Partner');
           
-          // Check if user exists in database
-          const dbUser = await prisma.user.findUnique({
-            where: { discordId: memberId }
+          const searchInput = new TextInputBuilder()
+            .setCustomId('partner_search')
+            .setLabel('Type to search for a partner')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setPlaceholder('Start typing a name...');
+          
+          const actionRow = new ActionRowBuilder().addComponents(searchInput);
+          searchModal.addComponents(actionRow);
+          
+          await interaction.editReply({
+            content: `**Partner Selection**\n\n` +
+              `There are ${totalMembers} members in the server. Use the buttons below to search or view the first 25 alphabetically.`,
+            components: [
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`tournament_open_search_${tournamentId}`)
+                  .setLabel('🔍 Search for Partner')
+                  .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                  .setCustomId(`tournament_show_full_list_${tournamentId}`)
+                  .setLabel('📋 Show First 25')
+                  .setStyle(ButtonStyle.Secondary)
+              )
+            ]
           });
           
-          if (!dbUser) continue; // Skip if not in database
-          
-          const isRegisteredAlone = registeredAlone.has(memberId);
-          const displayName = member.displayName || member.user.username;
-          
-          // Truncate display name if too long (Discord limit is 100 chars for label)
-          const truncatedName = displayName.length > 80 ? displayName.substring(0, 77) + '...' : displayName;
-          
-          options.push({
-            label: truncatedName,
-            value: memberId,
-            description: isRegisteredAlone 
-              ? 'Already registered (will be your partner)' 
-              : 'Not yet registered (needs confirmation)',
-            emoji: isRegisteredAlone ? '✅' : '⚠️'
-          });
+          return;
         }
         
-        // Limit to 25 options (Discord limit)
-        const selectOptions = options.slice(0, 25);
-        
-        if (selectOptions.length === 0) {
-          return interaction.editReply({
-            content: '❌ No available partners found. All server members are already registered or not in the database.'
-          });
-        }
-        
+        // If 25 or fewer options, show select menu directly
         const selectMenu = new StringSelectMenuBuilder()
           .setCustomId(`tournament_partner_select_${tournamentId}`)
           .setPlaceholder('Select a partner or choose auto-assign...')
-          .addOptions(selectOptions);
+          .addOptions(options);
         
         const row = new ActionRowBuilder().addComponents(selectMenu);
         
         await interaction.editReply({
           content: '**Select your partner:**\n\n' +
-            '• Choose a player from the list\n' +
+            '• Choose a player from the list (alphabetically sorted)\n' +
             '• Players with ✅ are already registered alone\n' +
             '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+            '• Players with ❌ are not in database (need to play first)\n' +
             '• Or select "No Partner" to be auto-assigned',
           components: [row]
         });
@@ -3114,6 +3241,66 @@ async function handleTournamentButton(interaction) {
       // Update embed in background (don't await to avoid blocking)
       updateTournamentEmbed(null, tournamentId).catch(err => {
         console.error('[TOURNAMENT] Error updating embed after unregister:', err);
+      });
+    } else if (customId.startsWith('tournament_open_search_')) {
+      // Open search modal
+      const tournamentId = customId.split('_').pop();
+      const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+      
+      const searchModal = new ModalBuilder()
+        .setCustomId(`tournament_partner_search_${tournamentId}`)
+        .setTitle('Search for Partner');
+      
+      const searchInput = new TextInputBuilder()
+        .setCustomId('partner_search')
+        .setLabel('Type to search for a partner')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setPlaceholder('Start typing a name...');
+      
+      const actionRow = new ActionRowBuilder().addComponents(searchInput);
+      searchModal.addComponents(actionRow);
+      
+      await interaction.showModal(searchModal);
+    } else if (customId.startsWith('tournament_show_full_list_')) {
+      // Show first 25 alphabetically
+      await interaction.deferReply({ ephemeral: true });
+      
+      const tournamentId = customId.split('_').pop();
+      const guild = interaction.guild;
+      
+      if (!guild) {
+        return interaction.editReply({
+          content: '❌ Could not access server members. Please try again.'
+        });
+      }
+      
+      const userId = interaction.user.id;
+      const { options, totalMembers } = await buildPartnerOptions(guild, userId, tournamentId, null, 25);
+      
+      if (options.length === 0) {
+        return interaction.editReply({
+          content: '❌ No available partners found.'
+        });
+      }
+      
+      const { StringSelectMenuBuilder } = await import('discord.js');
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`tournament_partner_select_${tournamentId}`)
+        .setPlaceholder('Select a partner or choose auto-assign...')
+        .addOptions(options);
+      
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+      
+      await interaction.editReply({
+        content: `**First 25 Partners (Alphabetically Sorted):**\n\n` +
+          `Showing first 25 of ${totalMembers} total members.\n\n` +
+          '• Players with ✅ are already registered alone\n' +
+          '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+          '• Players with ❌ are not in database (need to play first)\n' +
+          '• Or select "No Partner" to be auto-assigned\n\n' +
+          '*Use the search button to find specific partners.*',
+        components: [row]
       });
     } else if (customId.startsWith('view_tournament_lobby_')) {
       // View lobby - send URL to tournament lobby page
