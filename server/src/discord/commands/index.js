@@ -1523,6 +1523,27 @@ export async function handleModalSubmit(interaction) {
   }
 }
 
+// Export select menu handler for interaction handling
+export async function handleSelectMenuInteraction(interaction) {
+  try {
+    const customId = interaction.customId;
+    
+    // Handle tournament partner selection
+    if (customId.startsWith('tournament_partner_select_')) {
+      await handleTournamentPartnerSelect(interaction);
+      return;
+    }
+  } catch (error) {
+    console.error('[DISCORD] Error handling select menu interaction:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true
+      });
+    }
+  }
+}
+
 // Export button handler for interaction handling
 export async function handleButtonInteraction(interaction) {
   try {
@@ -1533,7 +1554,9 @@ export async function handleButtonInteraction(interaction) {
         customId.startsWith('cancel_registration_') ||
         customId.startsWith('join_tournament_') ||
         customId.startsWith('unregister_tournament_') ||
-        customId.startsWith('view_tournament_lobby_')) {
+        customId.startsWith('view_tournament_lobby_') ||
+        customId.startsWith('tournament_confirm_partner_') ||
+        customId.startsWith('tournament_cancel_partner_')) {
       await handleTournamentButton(interaction);
       return;
     }
@@ -2508,6 +2531,197 @@ async function createGameFromLine(gameLine) {
 }
 
 
+// Tournament partner select menu handler
+async function handleTournamentPartnerSelect(interaction) {
+  try {
+    await interaction.deferUpdate();
+    
+    const customId = interaction.customId;
+    const tournamentId = customId.split('_').pop();
+    const userId = interaction.user.id;
+    const selectedValue = interaction.values[0];
+    
+    // Get user
+    let user = await prisma.user.findUnique({
+      where: { discordId: userId }
+    });
+    
+    if (!user) {
+      return interaction.editReply({
+        content: '❌ User not found. Please try again.',
+        components: []
+      });
+    }
+    
+    // Get tournament
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true }
+    });
+    
+    if (!tournament) {
+      return interaction.editReply({
+        content: '❌ Tournament not found.',
+        components: []
+      });
+    }
+    
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      return interaction.editReply({
+        content: '❌ Registration is closed for this tournament.',
+        components: []
+      });
+    }
+    
+    // Check if already registered
+    const existingRegistration = await prisma.tournamentRegistration.findUnique({
+      where: {
+        tournamentId_userId: {
+          tournamentId,
+          userId: user.id
+        }
+      }
+    });
+    
+    if (existingRegistration) {
+      return interaction.editReply({
+        content: '❌ You are already registered for this tournament.',
+        components: []
+      });
+    }
+    
+    // Handle auto-assign
+    if (selectedValue === 'auto_assign') {
+      await prisma.tournamentRegistration.create({
+        data: {
+          tournamentId,
+          userId: user.id,
+          isComplete: false
+        }
+      });
+      
+      await interaction.editReply({
+        content: '✅ Successfully registered! You will be auto-assigned a partner when registration closes.',
+        components: []
+      });
+      
+      await updateTournamentEmbed(null, tournamentId);
+      return;
+    }
+    
+    // Handle partner selection
+    const partnerDiscordId = selectedValue;
+    const partner = await prisma.user.findUnique({
+      where: { discordId: partnerDiscordId }
+    });
+    
+    if (!partner) {
+      return interaction.editReply({
+        content: '❌ Partner not found in database.',
+        components: []
+      });
+    }
+    
+    if (partner.id === user.id) {
+      return interaction.editReply({
+        content: '❌ You cannot partner with yourself.',
+        components: []
+      });
+    }
+    
+    // Check if partner is already registered
+    const partnerRegistration = await prisma.tournamentRegistration.findUnique({
+      where: {
+        tournamentId_userId: {
+          tournamentId,
+          userId: partner.id
+        }
+      }
+    });
+    
+    if (partnerRegistration) {
+      if (partnerRegistration.partnerId && partnerRegistration.isComplete) {
+        return interaction.editReply({
+          content: `❌ ${partner.username} is already registered with a partner for this tournament.`,
+          components: []
+        });
+      } else if (!partnerRegistration.partnerId) {
+        // Partner is registered alone - auto-assign them
+        await prisma.tournamentRegistration.createMany({
+          data: [
+            {
+              tournamentId,
+              userId: user.id,
+              partnerId: partner.id,
+              isComplete: true
+            },
+            {
+              tournamentId,
+              userId: partner.id,
+              partnerId: user.id,
+              isComplete: true
+            }
+          ],
+          skipDuplicates: true
+        });
+        
+        // Update existing registration
+        await prisma.tournamentRegistration.update({
+          where: { id: partnerRegistration.id },
+          data: {
+            partnerId: user.id,
+            isComplete: true
+          }
+        });
+        
+        await interaction.editReply({
+          content: `✅ Successfully registered with ${partner.username} for the tournament!`,
+          components: []
+        });
+        
+        await updateTournamentEmbed(null, tournamentId);
+        return;
+      }
+    }
+    
+    // Partner is not registered - show confirmation warning
+    const { ButtonBuilder } = await import('discord.js');
+    const confirmButton = new ButtonBuilder()
+      .setCustomId(`tournament_confirm_partner_${tournamentId}_${partnerDiscordId}`)
+      .setLabel('Confirm Registration')
+      .setStyle(ButtonStyle.Success);
+    
+    const cancelButton = new ButtonBuilder()
+      .setCustomId(`tournament_cancel_partner_${tournamentId}`)
+      .setLabel('Cancel')
+      .setStyle(ButtonStyle.Danger);
+    
+    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+    
+    await interaction.editReply({
+      content: `⚠️ **Partner Confirmation Required**\n\n` +
+        `You selected **${partner.username}** as your partner, but they are not yet registered for this tournament.\n\n` +
+        `**Please confirm with ${partner.username} that they are willing and able to play before proceeding.**\n\n` +
+        `Once you confirm, ${partner.username} will be automatically registered as your partner.`,
+      components: [row]
+    });
+    
+  } catch (error) {
+    console.error('[TOURNAMENT] Error handling partner select:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true
+      });
+    } else {
+      await interaction.editReply({
+        content: '❌ An error occurred. Please try again.',
+        components: []
+      });
+    }
+  }
+}
+
 // Tournament modal handler
 async function handleTournamentModal(interaction) {
   try {
@@ -2734,25 +2948,99 @@ async function handleTournamentButton(interaction) {
         });
       }
       
-      // Show modal for partner selection (for partners tournaments)
+      // Show select menu for partner selection (for partners tournaments)
       if (tournament.mode === 'PARTNERS') {
-        const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+        const { StringSelectMenuBuilder } = await import('discord.js');
         
-        const modal = new ModalBuilder()
-          .setCustomId(`tournament_modal_${tournamentId}`)
-          .setTitle('Tournament Registration');
+        // Get all guild members
+        const guild = interaction.guild;
+        if (!guild) {
+          return interaction.reply({
+            content: '❌ Could not access server members. Please try again.',
+            ephemeral: true
+          });
+        }
         
-        const partnerInput = new TextInputBuilder()
-          .setCustomId('partner_name')
-          .setLabel('Partner Name (blank = auto-assign)')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-          .setPlaceholder('Type @username or paste user mention');
+        // Fetch all members (this might take a moment for large servers)
+        await guild.members.fetch();
+        const members = guild.members.cache.filter(m => !m.user.bot);
         
-        const actionRow = new ActionRowBuilder().addComponents(partnerInput);
-        modal.addComponents(actionRow);
+        // Get existing registrations
+        const existingRegistrations = await prisma.tournamentRegistration.findMany({
+          where: { tournamentId },
+          include: { user: true, partner: true }
+        });
         
-        await interaction.showModal(modal);
+        // Build sets of registered users
+        const registeredWithPartner = new Set();
+        const registeredAlone = new Set();
+        
+        existingRegistrations.forEach(reg => {
+          if (reg.partnerId && reg.isComplete) {
+            registeredWithPartner.add(reg.user.discordId);
+            if (reg.partner?.discordId) {
+              registeredWithPartner.add(reg.partner.discordId);
+            }
+          } else if (!reg.partnerId) {
+            registeredAlone.add(reg.user.discordId);
+          }
+        });
+        
+        // Build select menu options
+        const options = [];
+        
+        // Add "No Partner (Auto-assign)" option
+        options.push({
+          label: 'No Partner (Auto-assign)',
+          value: 'auto_assign',
+          description: 'You will be randomly paired when registration closes',
+          emoji: '🎲'
+        });
+        
+        // Add available members (not registered with partner, not self)
+        for (const [memberId, member] of members) {
+          if (memberId === userId) continue; // Skip self
+          if (registeredWithPartner.has(memberId)) continue; // Skip already partnered
+          
+          // Check if user exists in database
+          const dbUser = await prisma.user.findUnique({
+            where: { discordId: memberId }
+          });
+          
+          if (!dbUser) continue; // Skip if not in database
+          
+          const isRegisteredAlone = registeredAlone.has(memberId);
+          const displayName = member.displayName || member.user.username;
+          
+          options.push({
+            label: displayName,
+            value: memberId,
+            description: isRegisteredAlone 
+              ? 'Already registered (will be your partner)' 
+              : 'Not yet registered (needs confirmation)',
+            emoji: isRegisteredAlone ? '✅' : '⚠️'
+          });
+        }
+        
+        // Limit to 25 options (Discord limit)
+        const selectOptions = options.slice(0, 25);
+        
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId(`tournament_partner_select_${tournamentId}`)
+          .setPlaceholder('Select a partner or choose auto-assign...')
+          .addOptions(selectOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        await interaction.reply({
+          content: '**Select your partner:**\n\n' +
+            '• Choose a player from the list\n' +
+            '• Players with ✅ are already registered alone\n' +
+            '• Players with ⚠️ are not yet registered (they will need to confirm)\n' +
+            '• Or select "No Partner" to be auto-assigned',
+          components: [row],
+          ephemeral: true
+        });
       } else {
         // Solo tournament - register directly
         await prisma.tournamentRegistration.create({
@@ -2825,6 +3113,128 @@ async function handleTournamentButton(interaction) {
       await interaction.reply({
         content: `🔗 **Tournament Lobby:**\n${lobbyUrl}\n\n*Note: Registration must be done via the Join button above.*`,
         ephemeral: true
+      });
+    } else if (customId.startsWith('tournament_confirm_partner_')) {
+      // Confirm partner registration
+      await interaction.deferUpdate();
+      
+      const parts = customId.split('_');
+      const tournamentId = parts[3];
+      const partnerDiscordId = parts[4];
+      
+      // Get user
+      let user = await prisma.user.findUnique({
+        where: { discordId: userId }
+      });
+      
+      if (!user) {
+        return interaction.editReply({
+          content: '❌ User not found. Please try again.',
+          components: []
+        });
+      }
+      
+      // Get partner
+      const partner = await prisma.user.findUnique({
+        where: { discordId: partnerDiscordId }
+      });
+      
+      if (!partner) {
+        return interaction.editReply({
+          content: '❌ Partner not found.',
+          components: []
+        });
+      }
+      
+      // Get tournament
+      const tournament = await prisma.tournament.findUnique({
+        where: { id: tournamentId }
+      });
+      
+      if (!tournament || tournament.status !== 'REGISTRATION_OPEN') {
+        return interaction.editReply({
+          content: '❌ Registration is closed for this tournament.',
+          components: []
+        });
+      }
+      
+      // Check if already registered
+      const existingRegistration = await prisma.tournamentRegistration.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId,
+            userId: user.id
+          }
+        }
+      });
+      
+      if (existingRegistration) {
+        return interaction.editReply({
+          content: '❌ You are already registered for this tournament.',
+          components: []
+        });
+      }
+      
+      // Check if partner is now registered
+      const partnerRegistration = await prisma.tournamentRegistration.findUnique({
+        where: {
+          tournamentId_userId: {
+            tournamentId,
+            userId: partner.id
+          }
+        }
+      });
+      
+      if (partnerRegistration && partnerRegistration.partnerId && partnerRegistration.isComplete) {
+        return interaction.editReply({
+          content: `❌ ${partner.username} is already registered with a partner.`,
+          components: []
+        });
+      }
+      
+      // Register both players
+      await prisma.tournamentRegistration.createMany({
+        data: [
+          {
+            tournamentId,
+            userId: user.id,
+            partnerId: partner.id,
+            isComplete: true
+          },
+          {
+            tournamentId,
+            userId: partner.id,
+            partnerId: user.id,
+            isComplete: true
+          }
+        ],
+        skipDuplicates: true
+      });
+      
+      // If partner was registered alone, update their registration
+      if (partnerRegistration && !partnerRegistration.partnerId) {
+        await prisma.tournamentRegistration.update({
+          where: { id: partnerRegistration.id },
+          data: {
+            partnerId: user.id,
+            isComplete: true
+          }
+        });
+      }
+      
+      await interaction.editReply({
+        content: `✅ Successfully registered with ${partner.username} for the tournament!\n\n<@${partnerDiscordId}> has been automatically registered as your partner.`,
+        components: []
+      });
+      
+      await updateTournamentEmbed(null, tournamentId);
+    } else if (customId.startsWith('tournament_cancel_partner_')) {
+      // Cancel partner selection
+      await interaction.deferUpdate();
+      
+      await interaction.editReply({
+        content: '❌ Partner selection cancelled.',
+        components: []
       });
     }
     

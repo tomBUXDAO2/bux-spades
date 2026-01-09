@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
-import { commands, handleButtonInteraction, handleModalSubmit } from './commands/index.js';
+import { commands, handleButtonInteraction, handleSelectMenuInteraction, handleModalSubmit } from './commands/index.js';
 import { startEventScheduler, stopEventScheduler } from '../services/EventScheduler.js';
 import { registerRoleMetadata } from './linkedRoles.js';
 
@@ -100,6 +100,9 @@ client.on('interactionCreate', async (interaction) => {
     } else if (interaction.isButton()) {
       // Handle button interactions
       await handleButtonInteraction(interaction);
+    } else if (interaction.isStringSelectMenu()) {
+      // Handle select menu interactions
+      await handleSelectMenuInteraction(interaction);
     } else if (interaction.isModalSubmit()) {
       // Handle modal submissions
       await handleModalSubmit(interaction);
