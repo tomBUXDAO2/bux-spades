@@ -14,6 +14,7 @@ import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import TournamentLobby from '@/features/tournament/TournamentLobby';
 import { SocketProvider } from '@/features/auth/SocketContext';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import ForceLogoutModal from './components/modals/ForceLogoutModal';
@@ -98,6 +99,10 @@ const router = createBrowserRouter(
         {
           path: "test-table",
           element: <ProtectedRoute><TestTablePage /></ProtectedRoute>
+        },
+        {
+          path: "tournament/:tournamentId",
+          element: <TournamentLobby />
         },
         {
           path: "*",

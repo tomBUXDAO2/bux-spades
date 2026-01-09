@@ -509,23 +509,29 @@ enum StatsMode {
 }
 
 model Tournament {
-  id              String                   @id @default(cuid())
-  name            String
-  mode            GameMode
-  format          GameFormat
-  gimmickVariant  GimmickVariant?
-  isRated         Boolean                  @default(true)
-  minPoints       Int?
-  maxPoints       Int?
-  nilAllowed      Boolean?                 @default(true)
-  blindNilAllowed Boolean?                 @default(false)
-  buyIn           Int?
-  startTime       DateTime
-  status          TournamentStatus         @default(REGISTRATION_OPEN)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  registrations   TournamentRegistration[]
-  matches         TournamentMatch[]
+  id                String                   @id @default(cuid())
+  name              String
+  mode              GameMode
+  format            GameFormat
+  gimmickVariant    GimmickVariant?
+  isRated           Boolean                  @default(true)
+  minPoints         Int?
+  maxPoints         Int?
+  nilAllowed        Boolean?                 @default(true)
+  blindNilAllowed   Boolean?                 @default(false)
+  buyIn             Int?
+  numHands          Int?
+  startTime         DateTime
+  eliminationType   TournamentEliminationType @default(SINGLE)
+  prizes            Json?                    // { winners: string, runnersUp: string } or coin amounts
+  bannerUrl         String?
+  discordMessageId  String?
+  discordChannelId  String?
+  status            TournamentStatus         @default(REGISTRATION_OPEN)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  registrations     TournamentRegistration[]
+  matches           TournamentMatch[]
 }
 
 model TournamentRegistration {
@@ -567,6 +573,11 @@ enum TournamentStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum TournamentEliminationType {
+  SINGLE
+  DOUBLE
 }
 
 enum MatchStatus {

@@ -78,6 +78,28 @@ interface EventSummary {
   }>;
 }
 
+interface TournamentFormState {
+  name: string;
+  mode: 'PARTNERS' | 'SOLO';
+  format: 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
+  startTime: string;
+  buyIn?: number;
+  eliminationType: 'SINGLE' | 'DOUBLE';
+  prizes: {
+    winners: string;
+    runnersUp: string;
+  };
+  bannerUrl: string;
+  // Game settings
+  minPoints?: number;
+  maxPoints?: number;
+  nilAllowed: boolean | null;
+  blindNilAllowed: boolean | null;
+  numHands?: number;
+  gimmickVariant?: string | null;
+  isRated: boolean;
+}
+
 const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
 const MODE_OPTIONS = ['PARTNERS', 'SOLO'] as const;
 const GIMMICK_OPTIONS = ['SUICIDE', 'BID4NIL', 'BID3', 'BIDHEARTS', 'CRAZY_ACES', 'JOKER'] as const;
@@ -171,6 +193,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   const [bannerUploadError, setBannerUploadError] = useState<string | null>(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   
+  // Tournament state
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [tournamentsLoading, setTournamentsLoading] = useState(false);
+  const [tournamentError, setTournamentError] = useState<string | null>(null);
+  const [tournamentSuccessMessage, setTournamentSuccessMessage] = useState<string | null>(null);
+  const [creatingTournament, setCreatingTournament] = useState(false);
+  const [newTournament, setNewTournament] = useState<TournamentFormState>({
+    name: '',
+    mode: 'PARTNERS',
+    format: 'REGULAR',
+    startTime: '',
+    buyIn: undefined,
+    eliminationType: 'SINGLE',
+    prizes: {
+      winners: '',
+      runnersUp: '',
+    },
+    bannerUrl: '',
+    minPoints: -100,
+    maxPoints: 500,
+    nilAllowed: true,
+    blindNilAllowed: false,
+    numHands: undefined,
+    gimmickVariant: null,
+    isRated: true,
+  });
+  const [tournamentBannerPreviewUrl, setTournamentBannerPreviewUrl] = useState<string | null>(null);
+  const [tournamentBannerUploadError, setTournamentBannerUploadError] = useState<string | null>(null);
+  const [tournamentBannerUploading, setTournamentBannerUploading] = useState(false);
+  
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
   const [screenHeight, setScreenHeight] = useState(window.innerHeight);
@@ -206,6 +258,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       fetchGames();
     } else if (activeTab === 'events') {
       fetchEvents();
+    } else if (activeTab === 'tournaments') {
+      fetchTournaments();
     }
   }, [isOpen, activeTab]);
 
@@ -966,15 +1020,300 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             )}
 
             {activeTab === 'tournaments' && (
-              <div>
-                <h3 className="font-semibold text-white mb-4" style={{ fontSize: `${18 * textScale}px` }}>Create Tournament</h3>
-                <p className="text-slate-400 mb-4" style={{ fontSize: `${14 * textScale}px` }}>
-                  Set up a new tournament with custom rules and prizes.
-                </p>
-                {/* Tournament creation form will go here */}
-                <div className="bg-slate-800 rounded-lg text-center text-slate-400" style={{ padding: `${16 * paddingScale}px`, fontSize: `${14 * textScale}px` }}>
-                  Tournament creation coming soon...
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-white mb-2" style={{ fontSize: `${18 * textScale}px` }}>Create Tournament</h3>
+                  <p className="text-slate-400" style={{ fontSize: `${14 * textScale}px` }}>
+                    Set up a tournament with custom rules, prizes, and elimination format. Tournament will be posted to Discord automatically.
+                  </p>
                 </div>
+
+                {tournamentSuccessMessage && (
+                  <div className="bg-green-900/50 border border-green-700 rounded p-3 text-green-200" style={{ fontSize: `${14 * textScale}px` }}>
+                    {tournamentSuccessMessage}
+                  </div>
+                )}
+
+                {tournamentError && (
+                  <div className="bg-red-900/50 border border-red-700 rounded p-3 text-red-200" style={{ fontSize: `${14 * textScale}px` }}>
+                    {tournamentError}
+                  </div>
+                )}
+
+                <form className="bg-slate-800 rounded-lg border border-slate-700 p-4 space-y-4" onSubmit={handleCreateTournament} style={{ fontSize: `${14 * textScale}px` }}>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Tournament Name *</label>
+                      <input
+                        required
+                        value={newTournament.name}
+                        onChange={e => handleTournamentInputChange('name', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        placeholder="e.g. Winter Championship 2025"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Start Date & Time *</label>
+                      <input
+                        required
+                        type="datetime-local"
+                        value={newTournament.startTime}
+                        onChange={e => handleTournamentInputChange('startTime', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Mode *</label>
+                      <select
+                        required
+                        value={newTournament.mode}
+                        onChange={e => handleTournamentInputChange('mode', e.target.value as 'PARTNERS' | 'SOLO')}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      >
+                        {MODE_OPTIONS.map(mode => (
+                          <option key={mode} value={mode}>{mode}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Format *</label>
+                      <select
+                        required
+                        value={newTournament.format}
+                        onChange={e => handleTournamentInputChange('format', e.target.value as 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK')}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      >
+                        {FORMAT_OPTIONS.map(format => (
+                          <option key={format} value={format}>{format}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Elimination Type *</label>
+                      <select
+                        required
+                        value={newTournament.eliminationType}
+                        onChange={e => handleTournamentInputChange('eliminationType', e.target.value as 'SINGLE' | 'DOUBLE')}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      >
+                        <option value="SINGLE">Single Elimination</option>
+                        <option value="DOUBLE">Double Elimination (lose twice to be eliminated)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Buy-in (Coins)</label>
+                      <select
+                        value={newTournament.buyIn || ''}
+                        onChange={e => handleTournamentInputChange('buyIn', e.target.value ? Number(e.target.value) : undefined)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      >
+                        <option value="">Free Tournament</option>
+                        {COIN_OPTION_VALUES.map(value => (
+                          <option key={value} value={value}>{formatCoins(value)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Winners Prize</label>
+                      <input
+                        value={newTournament.prizes.winners}
+                        onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, winners: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        placeholder="e.g. 10M coins or Trophy + 5M coins"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Runners-up Prize</label>
+                      <input
+                        value={newTournament.prizes.runnersUp}
+                        onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, runnersUp: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        placeholder="e.g. 5M coins"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-white">Banner Image</label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleTournamentBannerFileChange}
+                      className="w-full text-sm text-slate-200 file:mr-4 file:cursor-pointer file:rounded file:border-0 file:bg-red-600 file:px-3 file:py-2 file:text-white"
+                    />
+                    <p className="text-xs text-slate-400">
+                      Upload a PNG or JPEG banner for the tournament.
+                    </p>
+                    {tournamentBannerUploading && (
+                      <div className="text-xs text-slate-300">Uploading banner...</div>
+                    )}
+                    {tournamentBannerUploadError && (
+                      <div className="text-xs text-red-300">{tournamentBannerUploadError}</div>
+                    )}
+                    {tournamentBannerPreviewUrl && (
+                      <div className="flex flex-col gap-2 rounded border border-slate-700 bg-slate-900 p-3">
+                        <div className="flex items-start gap-3">
+                          <img
+                            src={tournamentBannerPreviewUrl}
+                            alt="Tournament banner preview"
+                            className="h-24 w-40 rounded object-cover"
+                          />
+                          <div className="flex flex-col gap-2 text-xs text-slate-300">
+                            <span>Current banner preview</span>
+                            <button
+                              type="button"
+                              onClick={handleClearTournamentBanner}
+                              className="text-red-300 hover:text-red-200 text-sm"
+                            >
+                              Remove banner
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-700 pt-4">
+                    <h4 className="font-semibold text-white mb-3" style={{ fontSize: `${16 * textScale}px` }}>Game Settings</h4>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Min Points</label>
+                        <input
+                          type="number"
+                          value={newTournament.minPoints || ''}
+                          onChange={e => handleTournamentInputChange('minPoints', e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          placeholder="-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Max Points</label>
+                        <input
+                          type="number"
+                          value={newTournament.maxPoints || ''}
+                          onChange={e => handleTournamentInputChange('maxPoints', e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          placeholder="500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Number of Hands</label>
+                        <input
+                          type="number"
+                          value={newTournament.numHands || ''}
+                          onChange={e => handleTournamentInputChange('numHands', e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          placeholder="Leave empty for default"
+                        />
+                      </div>
+                      {newTournament.format === 'GIMMICK' && (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-white">Gimmick Variant</label>
+                          <select
+                            value={newTournament.gimmickVariant || ''}
+                            onChange={e => handleTournamentInputChange('gimmickVariant', e.target.value || null)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          >
+                            <option value="">None</option>
+                            {GIMMICK_OPTIONS.map(variant => (
+                              <option key={variant} value={variant}>{variant}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Nil Allowed</label>
+                        <select
+                          value={newTournament.nilAllowed === null ? '' : newTournament.nilAllowed ? 'true' : 'false'}
+                          onChange={e => handleTournamentInputChange('nilAllowed', e.target.value === '' ? null : e.target.value === 'true')}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        >
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Blind Nil Allowed</label>
+                        <select
+                          value={newTournament.blindNilAllowed === null ? '' : newTournament.blindNilAllowed ? 'true' : 'false'}
+                          onChange={e => handleTournamentInputChange('blindNilAllowed', e.target.value === '' ? null : e.target.value === 'true')}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        >
+                          <option value="false">No</option>
+                          <option value="true">Yes</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Rated Game</label>
+                        <select
+                          value={newTournament.isRated ? 'true' : 'false'}
+                          onChange={e => handleTournamentInputChange('isRated', e.target.value === 'true')}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        >
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="submit"
+                      disabled={creatingTournament}
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded px-4 py-2"
+                      style={{ fontSize: `${14 * textScale}px` }}
+                    >
+                      {creatingTournament ? 'Creating...' : 'Create Tournament'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetTournamentForm}
+                      className="bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded px-4 py-2"
+                      style={{ fontSize: `${14 * textScale}px` }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </form>
+
+                {tournaments.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="font-semibold text-white mb-4" style={{ fontSize: `${18 * textScale}px` }}>Existing Tournaments</h3>
+                    <div className="space-y-3">
+                      {tournaments.map(tournament => (
+                        <div key={tournament.id} className="bg-slate-800 rounded-lg border border-slate-700 p-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-semibold text-white" style={{ fontSize: `${16 * textScale}px` }}>{tournament.name}</h4>
+                              <p className="text-slate-400" style={{ fontSize: `${12 * textScale}px` }}>
+                                {tournament.mode} • {tournament.format} • {tournament.eliminationType} Elimination
+                              </p>
+                              <p className="text-slate-400" style={{ fontSize: `${12 * textScale}px` }}>
+                                Starts: {new Date(tournament.startTime).toLocaleString()}
+                              </p>
+                              <p className="text-slate-400" style={{ fontSize: `${12 * textScale}px` }}>
+                                Status: {tournament.status} • Registrations: {tournament._count?.registrations || 0}
+                              </p>
+                            </div>
+                            <a
+                              href={`/tournament/${tournament.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300"
+                              style={{ fontSize: `${12 * textScale}px` }}
+                            >
+                              View Lobby →
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

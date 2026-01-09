@@ -1293,77 +1293,6 @@ export const commands = [
   },
   {
     data: new SlashCommandBuilder()
-      .setName('regulartournament')
-      .setDescription('Create a REGULAR tournament')
-      .addStringOption(option =>
-        option.setName('name')
-          .setDescription('Tournament name')
-          .setRequired(true)
-      )
-      .addIntegerOption(option =>
-        option.setName('mode')
-          .setDescription('Game mode')
-          .setRequired(true)
-          .addChoices(
-            { name: 'Partners', value: 1 },
-            { name: 'Solo', value: 2 }
-          )
-      )
-      .addIntegerOption(option =>
-        option.setName('coins')
-          .setDescription('Buy-in amount')
-          .setRequired(true)
-          .addChoices(
-            { name: '100k', value: 100000 },
-            { name: '200k', value: 200000 },
-            { name: '300k', value: 300000 },
-            { name: '400k', value: 400000 },
-            { name: '500k', value: 500000 },
-            { name: '600k', value: 600000 },
-            { name: '700k', value: 700000 },
-            { name: '800k', value: 800000 },
-            { name: '900k', value: 900000 },
-            { name: '1M', value: 1000000 },
-            { name: '2M', value: 2000000 },
-            { name: '3M', value: 3000000 },
-            { name: '4M', value: 4000000 },
-            { name: '5M', value: 5000000 },
-            { name: '6M', value: 6000000 },
-            { name: '7M', value: 7000000 },
-            { name: '8M', value: 8000000 },
-            { name: '9M', value: 9000000 },
-            { name: '10M', value: 10000000 }
-          )
-      )
-      .addStringOption(option =>
-        option.setName('starttime')
-          .setDescription('Start time (e.g., "2025-10-15 19:00" or "tomorrow 7pm")')
-          .setRequired(true)
-      )
-      .addIntegerOption(option =>
-        option.setName('minpoints')
-          .setDescription('Minimum points to win (default: -100)')
-          .setRequired(false)
-      )
-      .addIntegerOption(option =>
-        option.setName('maxpoints')
-          .setDescription('Maximum points to lose (default: 500)')
-          .setRequired(false)
-      )
-      .addBooleanOption(option =>
-        option.setName('nilallowed')
-          .setDescription('Allow nil bids (default: true)')
-          .setRequired(false)
-      )
-      .addBooleanOption(option =>
-        option.setName('blindnilallowed')
-          .setDescription('Allow blind nil bids (default: false)')
-          .setRequired(false)
-      ),
-    execute: (interaction) => createTournament(interaction, 'REGULAR')
-  },
-  {
-    data: new SlashCommandBuilder()
       .setName('facebookhelp')
       .setDescription('Post Facebook connection instructions'),
     execute: async (interaction) => {
@@ -1600,7 +1529,11 @@ export async function handleButtonInteraction(interaction) {
     const customId = interaction.customId;
     
     // Handle tournament buttons
-    if (customId.startsWith('register_tournament_') || customId.startsWith('cancel_registration_')) {
+    if (customId.startsWith('register_tournament_') || 
+        customId.startsWith('cancel_registration_') ||
+        customId.startsWith('join_tournament_') ||
+        customId.startsWith('unregister_tournament_') ||
+        customId.startsWith('view_tournament_lobby_')) {
       await handleTournamentButton(interaction);
       return;
     }
@@ -2782,7 +2715,8 @@ async function handleTournamentButton(interaction) {
       });
     }
     
-    if (customId.startsWith('register_tournament_')) {
+    // Handle both old and new button IDs
+    if (customId.startsWith('register_tournament_') || customId.startsWith('join_tournament_')) {
       // Check if already registered
       const existingRegistration = await prisma.tournamentRegistration.findUnique({
         where: {
@@ -2837,7 +2771,7 @@ async function handleTournamentButton(interaction) {
         await updateTournamentEmbed(interaction, tournamentId);
       }
       
-    } else if (customId.startsWith('cancel_registration_')) {
+    } else if (customId.startsWith('cancel_registration_') || customId.startsWith('unregister_tournament_')) {
       // Cancel registration
       const registration = await prisma.tournamentRegistration.findUnique({
         where: {
@@ -2879,6 +2813,15 @@ async function handleTournamentButton(interaction) {
       });
       
       await updateTournamentEmbed(interaction, tournamentId);
+    } else if (customId.startsWith('view_tournament_lobby_')) {
+      // View lobby - send URL to tournament lobby page
+      const clientUrl = process.env.CLIENT_URL || 'https://www.bux-spades.pro';
+      const lobbyUrl = `${clientUrl}/tournament/${tournamentId}`;
+      
+      await interaction.reply({
+        content: `🔗 **Tournament Lobby:**\n${lobbyUrl}\n\n*Note: Registration must be done via the Join button above.*`,
+        ephemeral: true
+      });
     }
     
   } catch (error) {
@@ -2893,176 +2836,21 @@ async function handleTournamentButton(interaction) {
 // Update tournament embed with current registration stats
 async function updateTournamentEmbed(interaction, tournamentId) {
   try {
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: tournamentId },
-      include: { registrations: { include: { user: true } } }
-    });
+    const { DiscordTournamentService } = await import('../../services/DiscordTournamentService.js');
+    const { TournamentService } = await import('../../services/TournamentService.js');
     
+    const tournament = await TournamentService.getTournament(tournamentId);
     if (!tournament) return;
     
-    const completeTeams = tournament.registrations.filter(r => r.isComplete && r.partnerId).length;
-    const needPartner = tournament.registrations.filter(r => !r.isComplete || !r.partnerId).length;
-    
-    const embed = new EmbedBuilder()
-      .setTitle(`🏆 ${tournament.name}`)
-      .setDescription(
-        `**📅 Starts:** <t:${Math.floor(tournament.startTime.getTime() / 1000)}:F>\n` +
-        `**🎮 Mode:** ${tournament.mode}\n` +
-        `**💰 Buy-in:** ${tournament.buyIn >= 1000000 ? `${tournament.buyIn / 1000000}M` : `${tournament.buyIn / 1000}k`} coins\n` +
-        `**📊 Points:** ${tournament.minPoints} to ${tournament.maxPoints}\n` +
-        `**🎯 Format:** ${tournament.format}\n` +
-        `**🎲 Nils:** ${tournament.nilAllowed ? 'Allowed' : 'Not Allowed'}\n` +
-        `**👁️ Blind Nils:** ${tournament.blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n\n` +
-        `**Teams:** ${completeTeams}\n` +
-        `**Need a P:** ${needPartner}`
-      )
-      .setColor(0x0099ff)
-      .setTimestamp();
-    
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`register_tournament_${tournamentId}`)
-          .setLabel('Register')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`cancel_registration_${tournamentId}`)
-          .setLabel('Cancel Registration')
-          .setStyle(ButtonStyle.Danger)
-      );
-    
-    await interaction.editReply({
-      embeds: [embed],
-      components: [row]
-    });
+    // Use DiscordTournamentService to update the embed
+    const { client } = await import('../bot.js');
+    if (client && client.isReady()) {
+      await DiscordTournamentService.updateTournamentEmbed(client, tournament);
+    }
     
   } catch (error) {
     console.error('[TOURNAMENT] Error updating embed:', error);
   }
 }
 
-// Tournament creation function
-async function createTournament(interaction, format) {
-  try {
-    // Check if user is admin
-    const adminIds = process.env.DISCORD_ADMIN_IDS?.split(',') || [];
-    if (!adminIds.includes(interaction.user.id)) {
-      await interaction.reply({
-        content: '❌ This command is only available to administrators.',
-        ephemeral: true
-      });
-      return;
-    }
-
-    // Defer reply to prevent timeout
-    await interaction.deferReply();
-
-    const name = interaction.options.getString('name');
-    const coins = interaction.options.getInteger('coins');
-    const modeValue = interaction.options.getInteger('mode');
-    const mode = modeValue === 1 ? 'PARTNERS' : 'SOLO';
-    const minPoints = interaction.options.getInteger('minpoints') || -100;
-    const maxPoints = interaction.options.getInteger('maxpoints') || 500;
-    const nilAllowed = interaction.options.getBoolean('nilallowed') ?? true;
-    const blindNilAllowed = interaction.options.getBoolean('blindnilallowed') ?? false;
-    const startTimeStr = interaction.options.getString('starttime');
-
-    // Parse start time
-    let startTime;
-    try {
-      // Try parsing various formats
-      if (startTimeStr.includes('tomorrow')) {
-        const timeMatch = startTimeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-        if (timeMatch) {
-          let hours = parseInt(timeMatch[1]);
-          const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-          const ampm = timeMatch[3]?.toLowerCase();
-          
-          if (ampm === 'pm' && hours !== 12) hours += 12;
-          if (ampm === 'am' && hours === 12) hours = 0;
-          
-          startTime = new Date();
-          startTime.setDate(startTime.getDate() + 1);
-          startTime.setHours(hours, minutes, 0, 0);
-        } else {
-          throw new Error('Invalid time format');
-        }
-      } else {
-        startTime = new Date(startTimeStr);
-        if (isNaN(startTime.getTime())) {
-          throw new Error('Invalid date format');
-        }
-      }
-    } catch (error) {
-      return interaction.editReply({
-        content: '❌ Invalid start time format. Use formats like "2025-10-15 19:00" or "tomorrow 7pm"'
-      });
-    }
-
-    // Validate start time is in the future
-    if (startTime <= new Date()) {
-      return interaction.editReply({
-        content: '❌ Tournament start time must be in the future.'
-      });
-    }
-
-    // Create tournament in database
-    const tournament = await prisma.tournament.create({
-      data: {
-        name,
-        mode,
-        format,
-        isRated: true,
-        minPoints,
-        maxPoints,
-        nilAllowed,
-        blindNilAllowed,
-        buyIn: coins,
-        startTime
-      }
-    });
-
-    // Create tournament registration embed
-    const embed = new EmbedBuilder()
-      .setTitle(`🏆 ${name}`)
-      .setDescription(
-        `**📅 Starts:** <t:${Math.floor(startTime.getTime() / 1000)}:F>\n` +
-        `**🎮 Mode:** ${mode}\n` +
-        `**💰 Buy-in:** ${coins >= 1000000 ? `${coins / 1000000}M` : `${coins / 1000}k`} coins\n` +
-        `**📊 Points:** ${minPoints} to ${maxPoints}\n` +
-        `**🎯 Format:** ${format}\n` +
-        `**🎲 Nils:** ${nilAllowed ? 'Allowed' : 'Not Allowed'}\n` +
-        `**👁️ Blind Nils:** ${blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n\n` +
-        `**Teams:** 0\n` +
-        `**Need a P:** 0`
-      )
-      .setColor(0x0099ff)
-      .setTimestamp();
-
-    // Create registration buttons
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`register_tournament_${tournament.id}`)
-          .setLabel('Register')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`cancel_registration_${tournament.id}`)
-          .setLabel('Cancel Registration')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-    await interaction.editReply({
-      embeds: [embed],
-      components: [row]
-    });
-
-    console.log(`[TOURNAMENT] Created tournament: ${name} (${tournament.id})`);
-
-  } catch (error) {
-    console.error('[TOURNAMENT] Error creating tournament:', error);
-    await interaction.editReply({
-      content: '❌ Error creating tournament. Please try again.'
-    });
-  }
-}
+// Tournament creation removed - tournaments can only be created via admin panel

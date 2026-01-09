@@ -12,6 +12,9 @@ import { io } from '../config/server.js';
 import redisSessionService from '../services/RedisSessionService.js';
 import { ForceGameDeletionService } from '../services/ForceGameDeletionService.js';
 import EventService from '../services/EventService.js';
+import { TournamentService } from '../services/TournamentService.js';
+import { DiscordTournamentService } from '../services/DiscordTournamentService.js';
+import { TournamentBracketService } from '../services/TournamentBracketService.js';
 
 const router = express.Router();
 
@@ -19,9 +22,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsRoot = path.resolve(__dirname, '../uploads');
 const eventBannerDir = path.join(uploadsRoot, 'events');
+const tournamentBannerDir = path.join(uploadsRoot, 'tournaments');
 
 if (!fs.existsSync(eventBannerDir)) {
   fs.mkdirSync(eventBannerDir, { recursive: true });
+}
+
+if (!fs.existsSync(tournamentBannerDir)) {
+  fs.mkdirSync(tournamentBannerDir, { recursive: true });
 }
 
 const bannerStorage = multer.diskStorage({
@@ -35,8 +43,43 @@ const bannerStorage = multer.diskStorage({
   }
 });
 
+const bannerStorage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    cb(null, eventBannerDir);
+  },
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    const safeName = `event-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, safeName);
+  }
+});
+
+const tournamentBannerStorage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    cb(null, tournamentBannerDir);
+  },
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    const safeName = `tournament-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, safeName);
+  }
+});
+
 const bannerUpload = multer({
   storage: bannerStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG and JPEG images are allowed'));
+    }
+  }
+});
+
+const tournamentBannerUpload = multer({
+  storage: tournamentBannerStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (_, file, cb) => {
     const allowed = ['image/png', 'image/jpeg', 'image/jpg'];
@@ -138,6 +181,84 @@ router.post('/events', authenticateToken, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('[ADMIN] Error creating event:', error);
     res.status(400).json({ error: error.message || 'Failed to create event' });
+  }
+});
+
+// Tournament banner upload
+router.post('/tournaments/banner', authenticateToken, isAdmin, tournamentBannerUpload.single('banner'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Banner image is required' });
+    }
+
+    const relativePath = `/uploads/tournaments/${req.file.filename}`;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const absoluteUrl = host ? `${protocol}://${host}${relativePath}` : relativePath;
+
+    res.status(201).json({
+      bannerUrl: absoluteUrl,
+      relativePath
+    });
+  } catch (error) {
+    console.error('[ADMIN] Error uploading tournament banner:', error);
+    res.status(500).json({ error: 'Failed to upload banner' });
+  }
+});
+
+// Create tournament
+router.post('/tournaments', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const createdById = req.userId || null;
+    const tournament = await TournamentService.createTournament(req.body, createdById);
+    
+    // Post embed to Discord
+    try {
+      const { client } = await import('../discord/bot.js');
+      if (client && client.isReady()) {
+        await DiscordTournamentService.postTournamentEmbed(client, tournament);
+      } else {
+        console.warn('[ADMIN] Discord client not ready, tournament created but embed not posted');
+      }
+    } catch (discordError) {
+      console.error('[ADMIN] Error posting tournament to Discord:', discordError);
+      // Don't fail the request if Discord fails - tournament is still created
+    }
+    
+    res.status(201).json({ tournament });
+  } catch (error) {
+    console.error('[ADMIN] Error creating tournament:', error);
+    res.status(400).json({ error: error.message || 'Failed to create tournament' });
+  }
+});
+
+// Get tournaments
+router.get('/tournaments', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const tournaments = await TournamentService.getTournaments({ status, limit: 100 });
+    res.json({ tournaments });
+  } catch (error) {
+    console.error('[ADMIN] Error fetching tournaments:', error);
+    res.status(500).json({ error: 'Failed to fetch tournaments' });
+  }
+});
+
+// Generate bracket for tournament (closes registration and starts tournament)
+router.post('/tournaments/:tournamentId/generate-bracket', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { tournamentId } = req.params;
+    
+    // Close registration
+    await TournamentService.updateTournament(tournamentId, { status: 'REGISTRATION_CLOSED' });
+    
+    // Generate bracket
+    const result = await TournamentBracketService.generateBracket(tournamentId);
+    
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[ADMIN] Error generating bracket:', error);
+    res.status(400).json({ error: error.message || 'Failed to generate bracket' });
   }
 });
 
