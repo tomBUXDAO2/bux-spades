@@ -520,7 +520,6 @@ model Tournament {
   nilAllowed        Boolean?                 @default(true)
   blindNilAllowed   Boolean?                 @default(false)
   buyIn             Int?
-  numHands          Int?
   startTime         DateTime
   eliminationType   TournamentEliminationType @default(SINGLE)
   prizes            Json?                    // { winners: string, runnersUp: string } or coin amounts

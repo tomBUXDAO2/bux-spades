@@ -95,7 +95,6 @@ interface TournamentFormState {
   maxPoints?: number;
   nilAllowed: boolean | null;
   blindNilAllowed: boolean | null;
-  numHands?: number;
   gimmickVariant?: string | null;
   isRated: boolean;
 }
@@ -215,7 +214,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     maxPoints: 500,
     nilAllowed: true,
     blindNilAllowed: false,
-    numHands: undefined,
     gimmickVariant: null,
     isRated: true,
   });
@@ -811,7 +809,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       maxPoints: 500,
       nilAllowed: true,
       blindNilAllowed: false,
-      numHands: undefined,
       gimmickVariant: null,
       isRated: true,
     });
@@ -846,7 +843,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       maxPoints: newTournament.maxPoints,
       nilAllowed: newTournament.nilAllowed,
       blindNilAllowed: newTournament.blindNilAllowed,
-      numHands: newTournament.numHands,
       gimmickVariant: newTournament.gimmickVariant,
       isRated: newTournament.isRated,
     };
@@ -1388,16 +1384,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                           onChange={e => handleTournamentInputChange('maxPoints', e.target.value ? Number(e.target.value) : undefined)}
                           className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
                           placeholder="500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-white">Number of Hands</label>
-                        <input
-                          type="number"
-                          value={newTournament.numHands || ''}
-                          onChange={e => handleTournamentInputChange('numHands', e.target.value ? Number(e.target.value) : undefined)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                          placeholder="Leave empty for default"
                         />
                       </div>
                       {newTournament.format === 'GIMMICK' && (

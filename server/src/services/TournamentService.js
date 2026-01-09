@@ -28,7 +28,6 @@ export class TournamentService {
       maxPoints = 500,
       nilAllowed = true,
       blindNilAllowed = false,
-      numHands = null,
       gimmickVariant = null,
       isRated = true,
     } = data || {};
@@ -85,7 +84,6 @@ export class TournamentService {
         maxPoints,
         nilAllowed,
         blindNilAllowed,
-        numHands,
         buyIn: buyIn !== null && buyIn !== undefined ? Number(buyIn) : null,
         startTime: startDate,
         eliminationType,
