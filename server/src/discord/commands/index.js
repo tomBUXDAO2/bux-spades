@@ -3702,6 +3702,7 @@ async function handleTournamentButton(interaction) {
     } else if (customId.startsWith('tournament_confirm_partner_')) {
       // Confirm partner registration
       // Format: tournament_confirm_partner_<tournamentId>_<partnerDiscordId>
+      // tournamentId was already extracted by handleTournamentButton above, but we need to extract partnerDiscordId
       await interaction.deferUpdate();
       
       const prefix = 'tournament_confirm_partner_';
@@ -3716,15 +3717,15 @@ async function handleTournamentButton(interaction) {
         });
       }
       
-      const tournamentId = remaining.substring(0, lastUnderscoreIndex);
+      // Extract partnerDiscordId (tournamentId was already extracted correctly by handleTournamentButton)
       const partnerDiscordId = remaining.substring(lastUnderscoreIndex + 1);
       
       console.log('[TOURNAMENT] Confirm partner - customId:', customId);
-      console.log('[TOURNAMENT] Confirm partner - extracted tournamentId:', tournamentId, 'Length:', tournamentId.length);
+      console.log('[TOURNAMENT] Confirm partner - tournamentId from handleTournamentButton:', tournamentId, 'Length:', tournamentId?.length);
       console.log('[TOURNAMENT] Confirm partner - extracted partnerDiscordId:', partnerDiscordId);
       
       if (!tournamentId || tournamentId.trim() === '') {
-        console.error('[TOURNAMENT] Empty tournamentId from confirm button:', customId);
+        console.error('[TOURNAMENT] Empty tournamentId from handleTournamentButton:', customId);
         return interaction.editReply({
           content: '❌ Invalid tournament ID. Please click "Join" again.',
           components: []
