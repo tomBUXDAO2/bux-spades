@@ -194,21 +194,22 @@ export class TrickCompletionService {
       const scores = await ScoringService.calculateRoundScores(gameId, roundId);
       console.log(`[TRICK COMPLETION] Scores calculated:`, scores);
 
-      // Check if game is complete (race-free): evaluate using the just-written latest RoundScore
+      // Check if game is complete (race-free): evaluate using the RoundScore we just created
       let gameComplete = { isComplete: false };
       try {
         const gameConfig = await prisma.game.findUnique({ where: { id: gameId }, select: { mode: true, minPoints: true, maxPoints: true } });
-        const latestRoundScore = await prisma.roundScore.findFirst({
-          where: { Round: { gameId } },
-          orderBy: { Round: { roundNumber: 'desc' } }
+        // CRITICAL FIX: Use the RoundScore we just created for this round (by roundId)
+        // Don't query by roundNumber desc as that might get a previous round
+        const currentRoundScore = await prisma.roundScore.findUnique({
+          where: { id: roundId } // RoundScore.id = roundId
         });
-        if (gameConfig && latestRoundScore) {
+        if (gameConfig && currentRoundScore) {
           if (gameConfig.mode === 'SOLO') {
             const pts = [
-              latestRoundScore.player0Running || 0,
-              latestRoundScore.player1Running || 0,
-              latestRoundScore.player2Running || 0,
-              latestRoundScore.player3Running || 0
+              currentRoundScore.player0Running || 0,
+              currentRoundScore.player1Running || 0,
+              currentRoundScore.player2Running || 0,
+              currentRoundScore.player3Running || 0
             ];
             const minP = gameConfig.minPoints ?? -100;
             const maxP = gameConfig.maxPoints ?? 100;
@@ -220,10 +221,12 @@ export class TrickCompletionService {
               }
             }
           } else {
-            const t0 = latestRoundScore.team0RunningTotal || 0;
-            const t1 = latestRoundScore.team1RunningTotal || 0;
+            // CRITICAL: Use running totals from scores object (most reliable) or currentRoundScore
+            const t0 = scores.team0RunningTotal ?? currentRoundScore.team0RunningTotal ?? 0;
+            const t1 = scores.team1RunningTotal ?? currentRoundScore.team1RunningTotal ?? 0;
             const minP = gameConfig.minPoints ?? -500;
             const maxP = gameConfig.maxPoints ?? 500;
+            console.log(`[TRICK COMPLETION] Checking game completion - t0: ${t0}, t1: ${t1}, minP: ${minP}, maxP: ${maxP}`);
             const t0Ex = t0 >= maxP || t0 <= minP;
             const t1Ex = t1 >= maxP || t1 <= minP;
             if (t0Ex && t1Ex) {
@@ -236,6 +239,7 @@ export class TrickCompletionService {
             } else if (t1Ex) {
               gameComplete = { isComplete: true, winner: 'TEAM_1', reason: `Team 1 reached ${t1 >= maxP ? maxP : minP} points` };
             }
+            console.log(`[TRICK COMPLETION] Game completion check result: isComplete=${gameComplete.isComplete}, winner=${gameComplete.winner}`);
           }
         }
       } catch {}
