@@ -34,7 +34,8 @@ export class DiscordTournamentService {
       }
 
       const embed = this.buildTournamentEmbed(tournament);
-      const components = this.buildTournamentButtons(tournament.id);
+      const registrationClosed = tournament.status === 'REGISTRATION_CLOSED' || tournament.status === 'IN_PROGRESS';
+      const components = this.buildTournamentButtons(tournament.id, registrationClosed);
 
       const message = await channel.send({
         embeds: [embed],
@@ -112,6 +113,16 @@ export class DiscordTournamentService {
 
     // Build description
     let description = `**📅 Starts:** <t:${startTimestamp}:F>\n`;
+    
+    // Show registration status
+    if (tournament.status === 'REGISTRATION_CLOSED') {
+      description += `**🔒 Registration:** CLOSED - Bracket Finalized\n`;
+    } else if (tournament.status === 'IN_PROGRESS') {
+      description += `**▶️ Status:** IN PROGRESS\n`;
+    } else {
+      description += `**✅ Registration:** OPEN\n`;
+    }
+    
     description += `**🎮 Mode:** ${tournament.mode}\n`;
     description += `**💰 Entry Fee:** ${entryFeeStr}\n`;
     description += `**🎲 Table Buy-in:** ${tableBuyInStr}\n`;
@@ -169,22 +180,31 @@ export class DiscordTournamentService {
   /**
    * Build tournament action buttons
    */
-  static buildTournamentButtons(tournamentId) {
-    return new ActionRowBuilder()
-      .addComponents(
+  static buildTournamentButtons(tournamentId, registrationClosed = false) {
+    const buttons = [];
+    
+    if (!registrationClosed) {
+      buttons.push(
         new ButtonBuilder()
           .setCustomId(`join_tournament_${tournamentId}`)
           .setLabel('Join')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`unregister_tournament_${tournamentId}`)
-          .setLabel('Unregister')
-          .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-          .setCustomId(`view_tournament_lobby_${tournamentId}`)
-          .setLabel('View Lobby')
-          .setStyle(ButtonStyle.Secondary)
+          .setStyle(ButtonStyle.Primary)
       );
+    }
+    
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId(`unregister_tournament_${tournamentId}`)
+        .setLabel('Unregister')
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(registrationClosed), // Disable unregister when registration is closed
+      new ButtonBuilder()
+        .setCustomId(`view_tournament_lobby_${tournamentId}`)
+        .setLabel('View Lobby')
+        .setStyle(ButtonStyle.Secondary)
+    );
+    
+    return new ActionRowBuilder().addComponents(buttons);
   }
 
   /**
@@ -226,7 +246,8 @@ export class DiscordTournamentService {
       // Fetch fresh tournament data with registrations
       const freshTournament = await TournamentService.getTournament(tournament.id);
       const embed = this.buildTournamentEmbed(freshTournament);
-      const components = this.buildTournamentButtons(tournament.id);
+      const registrationClosed = freshTournament.status === 'REGISTRATION_CLOSED' || freshTournament.status === 'IN_PROGRESS';
+      const components = this.buildTournamentButtons(tournament.id, registrationClosed);
 
       await message.edit({
         embeds: [embed],
@@ -337,6 +358,42 @@ export class DiscordTournamentService {
       console.log(`[DISCORD TOURNAMENT] Posted start embed for tournament ${tournament.id}`);
     } catch (error) {
       console.error('[DISCORD TOURNAMENT] Error posting start embed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Post bracket finalized embed to Discord
+   */
+  static async postBracketFinalizedEmbed(client, tournament, teams) {
+    try {
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🔒 ${tournament.name} - Registration Closed`)
+        .setDescription(
+          `**Registration is now closed and the bracket has been finalized!**\n\n` +
+          `**Teams:** ${teams.length}\n` +
+          `**Status:** Bracket ready - Tournament will start soon\n\n` +
+          `View the bracket and match details in the tournament lobby.`
+        )
+        .setColor(0xff9900)
+        .setTimestamp();
+
+      if (tournament.bannerUrl) {
+        embed.setImage(tournament.bannerUrl);
+      }
+
+      await channel.send({
+        embeds: [embed],
+      });
+
+      console.log(`[DISCORD TOURNAMENT] Posted bracket finalized embed for tournament ${tournament.id}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting bracket finalized embed:', error);
       throw error;
     }
   }

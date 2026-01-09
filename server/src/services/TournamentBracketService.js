@@ -49,10 +49,32 @@ export class TournamentBracketService {
       }
 
       // Step 3: Close registration (bracket is finalized but tournament not started yet)
-      await prisma.tournament.update({
+      const updatedTournament = await prisma.tournament.update({
         where: { id: tournamentId },
         data: { status: 'REGISTRATION_CLOSED' },
+        include: {
+          registrations: {
+            include: {
+              user: true,
+              partner: true,
+            },
+          },
+        },
       });
+
+      // Step 4: Update Discord embed to show registration is closed
+      try {
+        const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
+        const { client } = await import('../discord/bot.js');
+        if (client && client.isReady()) {
+          await DiscordTournamentService.updateTournamentEmbed(client, updatedTournament);
+          // Post a new message announcing bracket is finalized
+          await DiscordTournamentService.postBracketFinalizedEmbed(client, updatedTournament, teams);
+        }
+      } catch (discordError) {
+        console.error('[TOURNAMENT BRACKET] Error updating Discord embed:', discordError);
+        // Don't fail bracket generation if Discord fails
+      }
 
       return { teams, bracketGenerated: true };
     } catch (error) {
