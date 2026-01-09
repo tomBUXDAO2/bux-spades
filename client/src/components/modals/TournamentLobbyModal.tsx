@@ -6,6 +6,7 @@ interface TournamentRegistration {
   userId: string;
   partnerId: string | null;
   isComplete: boolean;
+  isSub: boolean;
   registeredAt: string;
   user: {
     id: string;
