@@ -268,6 +268,30 @@ router.delete('/tournaments/:id', authenticateToken, isAdmin, async (req, res) =
   }
 });
 
+// Finalize bracket (close registration and generate bracket)
+router.post('/tournaments/:id/finalize-bracket', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { TournamentBracketService } = await import('../services/TournamentBracketService.js');
+    const result = await TournamentBracketService.generateBracket(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[ADMIN] Error finalizing bracket:', error);
+    res.status(400).json({ error: error.message || 'Failed to finalize bracket' });
+  }
+});
+
+// Start tournament (create game tables and post Discord embed)
+router.post('/tournaments/:id/start', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { TournamentService } = await import('../services/TournamentService.js');
+    const result = await TournamentService.startTournament(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[ADMIN] Error starting tournament:', error);
+    res.status(400).json({ error: error.message || 'Failed to start tournament' });
+  }
+});
+
 // Generate bracket for tournament (closes registration and starts tournament)
 router.post('/tournaments/:tournamentId/generate-bracket', authenticateToken, isAdmin, async (req, res) => {
   try {

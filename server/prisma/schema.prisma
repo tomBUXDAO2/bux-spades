@@ -541,6 +541,7 @@ model TournamentRegistration {
   userId       String
   partnerId    String?
   isComplete   Boolean    @default(false)
+  isSub        Boolean    @default(false) // True if player is a substitute (odd number without partner)
   registeredAt DateTime   @default(now())
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)

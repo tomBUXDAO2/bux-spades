@@ -43,10 +43,10 @@ export class TournamentBracketService {
         await this.generateSingleEliminationBracket(tournamentId, teams);
       }
 
-      // Step 3: Update tournament status
+      // Step 3: Close registration (bracket is finalized but tournament not started yet)
       await prisma.tournament.update({
         where: { id: tournamentId },
-        data: { status: 'IN_PROGRESS' },
+        data: { status: 'REGISTRATION_CLOSED' },
       });
 
       return { teams, bracketGenerated: true };
@@ -104,6 +104,18 @@ export class TournamentBracketService {
       // Shuffle for random pairing
       const shuffled = [...unpartnered].sort(() => Math.random() - 0.5);
       
+      // If odd number, mark the last one as a sub
+      let subRegistrationId = null;
+      if (shuffled.length % 2 === 1) {
+        const subPlayer = shuffled.pop();
+        subRegistrationId = subPlayer.id;
+        // Mark as sub in database
+        await prisma.tournamentRegistration.update({
+          where: { id: subPlayer.id },
+          data: { isSub: true },
+        });
+      }
+      
       // Pair them up
       for (let i = 0; i < shuffled.length; i += 2) {
         if (i + 1 < shuffled.length) {
@@ -117,15 +129,6 @@ export class TournamentBracketService {
           });
           processedIds.add(player1.id);
           processedIds.add(player2.id);
-        } else {
-          // Odd player out - they get a bye or waitlist
-          // For now, we'll add them as a solo team (they'll need to wait for another player)
-          const player = shuffled[i];
-          teams.push({
-            id: `team_${player.userId}`,
-            playerIds: [player.userId],
-            registrationIds: [player.id],
-          });
         }
       }
     }
@@ -135,50 +138,62 @@ export class TournamentBracketService {
 
   /**
    * Generate single elimination bracket
+   * Ensures each round has double the games of the next round
+   * Example: 9 teams -> 7 byes, 2 play -> 8 teams next round
+   * Example: 21 teams -> 11 byes, 10 play (5 winners) -> 16 teams next round
    */
   static async generateSingleEliminationBracket(tournamentId, teams) {
     const numTeams = teams.length;
     
-    // Find next power of 2
-    const bracketSize = Math.pow(2, Math.ceil(Math.log2(numTeams)));
-    const numByes = bracketSize - numTeams;
-
+    // Calculate next round size (next power of 2)
+    // Find smallest power of 2 >= numTeams
+    let nextRoundSize = Math.pow(2, Math.ceil(Math.log2(numTeams)));
+    
+    // Calculate byes: we need nextRoundSize teams in next round
+    // If numPlaying teams play, we get numPlaying/2 winners
+    // So: numPlaying/2 + numByes = nextRoundSize
+    // And: numPlaying + numByes = numTeams
+    // Solving: numByes = 2 * nextRoundSize - numTeams
+    //          numPlaying = numTeams - numByes
+    const numByes = 2 * nextRoundSize - numTeams;
+    const numPlaying = numTeams - numByes;
+    
     // Seed teams (random for now, could be based on rating later)
     const seededTeams = [...teams].sort(() => Math.random() - 0.5);
     
     // Create first round matches
     let matchNumber = 1;
     const matches = [];
-
-    // Teams with byes get a free pass (we'll handle this in match creation)
-    let teamIndex = 0;
     let round = 1;
     
-    // First round: pair up teams, some get byes
-    for (let i = 0; i < bracketSize; i += 2) {
-      const team1 = seededTeams[teamIndex] || null;
-      const team2 = (i + 1 < bracketSize && teamIndex + 1 < seededTeams.length) 
-        ? seededTeams[teamIndex + 1] 
-        : null;
-
-      if (team1) {
-        matches.push({
-          tournamentId,
-          round,
-          matchNumber,
-          team1Id: team1.id,
-          team2Id: team2?.id || null,
-          status: team2 ? 'PENDING' : 'COMPLETED', // Bye = auto-win
-          winnerId: team2 ? null : team1.id,
-        });
-        matchNumber++;
-      }
+    // Assign byes first (teams that automatically advance)
+    let teamIndex = 0;
+    for (let i = 0; i < numByes && teamIndex < seededTeams.length; i++) {
+      // Teams with byes don't need a match, they advance automatically
+      // We'll track them for bracket display but don't create a match
+      teamIndex++;
+    }
+    
+    // Create matches for teams that need to play
+    const teamsPlaying = seededTeams.slice(teamIndex);
+    for (let i = 0; i < teamsPlaying.length; i += 2) {
+      const team1 = teamsPlaying[i];
+      const team2 = teamsPlaying[i + 1] || null;
       
-      teamIndex += 2;
+      matches.push({
+        tournamentId,
+        round,
+        matchNumber,
+        team1Id: team1.id,
+        team2Id: team2?.id || null,
+        status: team2 ? 'PENDING' : 'COMPLETED', // Odd team gets bye
+        winnerId: team2 ? null : team1.id,
+      });
+      matchNumber++;
     }
 
     // Create subsequent rounds
-    let currentRoundSize = bracketSize / 2;
+    let currentRoundSize = nextRoundSize;
     round = 2;
     
     while (currentRoundSize > 1) {

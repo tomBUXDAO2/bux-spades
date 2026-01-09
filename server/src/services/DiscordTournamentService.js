@@ -239,5 +239,106 @@ export class DiscordTournamentService {
       throw error;
     }
   }
+
+  /**
+   * Post tournament start embed with match details and player tags
+   */
+  static async postTournamentStartEmbed(client, tournament, createdGames) {
+    try {
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      // Get all first round matches (including byes)
+      const { prisma } = await import('../config/database.js');
+      const firstRoundMatches = await prisma.tournamentMatch.findMany({
+        where: {
+          tournamentId: tournament.id,
+          round: 1,
+        },
+        orderBy: { matchNumber: 'asc' },
+      });
+
+      // Get all registrations with user info
+      const registrations = await prisma.tournamentRegistration.findMany({
+        where: { tournamentId: tournament.id },
+        include: {
+          user: true,
+          partner: true,
+        },
+      });
+
+      // Build team ID to players map
+      const teamIdToPlayers = new Map();
+      for (const reg of registrations) {
+        if (reg.partnerId && reg.isComplete) {
+          const teamId = `team_${reg.userId}_${reg.partnerId}`;
+          if (!teamIdToPlayers.has(teamId)) {
+            teamIdToPlayers.set(teamId, [
+              { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+              { id: reg.partnerId, discordId: reg.partner?.discordId, username: reg.partner?.username },
+            ]);
+          }
+        } else if (!reg.partnerId && !reg.isSub) {
+          const teamId = `team_${reg.userId}`;
+          teamIdToPlayers.set(teamId, [
+            { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+          ]);
+        }
+      }
+
+      // Build match descriptions
+      const matchDescriptions = [];
+      const allPlayerMentions = new Set();
+      const teamsWithByes = [];
+
+      for (const match of firstRoundMatches) {
+        const team1Players = teamIdToPlayers.get(match.team1Id) || [];
+        const team2Players = match.team2Id ? (teamIdToPlayers.get(match.team2Id) || []) : null;
+
+        if (match.status === 'COMPLETED' || !match.team2Id) {
+          // Bye - team automatically advances
+          const team1Mentions = team1Players.map(p => `<@${p.discordId}>`).join(' & ');
+          teamsWithByes.push(team1Mentions);
+          matchDescriptions.push(`**Match ${match.matchNumber}:** ${team1Mentions} - **BYE** (automatic advance)`);
+          team1Players.forEach(p => allPlayerMentions.add(p.discordId));
+        } else {
+          // Regular match
+          const team1Mentions = team1Players.map(p => `<@${p.discordId}>`).join(' & ');
+          const team2Mentions = team2Players.map(p => `<@${p.discordId}>`).join(' & ');
+          matchDescriptions.push(`**Match ${match.matchNumber}:** ${team1Mentions} vs ${team2Mentions}`);
+          [...team1Players, ...team2Players].forEach(p => allPlayerMentions.add(p.discordId));
+        }
+      }
+
+      // Build embed
+      const embed = new EmbedBuilder()
+        .setTitle(`🏆 ${tournament.name} - Tournament Started!`)
+        .setDescription(
+          `The tournament has begun! Here are the first round matches:\n\n` +
+          matchDescriptions.join('\n') +
+          (teamsWithByes.length > 0 ? `\n\n**Teams with Byes:**\n${teamsWithByes.join(', ')}` : '')
+        )
+        .setColor(0x00ff00)
+        .setTimestamp();
+
+      if (tournament.bannerUrl) {
+        embed.setImage(tournament.bannerUrl);
+      }
+
+      // Post with all player mentions
+      const mentions = Array.from(allPlayerMentions).map(id => `<@${id}>`).join(' ');
+      await channel.send({
+        content: mentions || undefined,
+        embeds: [embed],
+      });
+
+      console.log(`[DISCORD TOURNAMENT] Posted start embed for tournament ${tournament.id}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting start embed:', error);
+      throw error;
+    }
+  }
 }
 

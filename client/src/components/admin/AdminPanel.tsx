@@ -402,6 +402,62 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleFinalizeBracket = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to finalize the bracket? This will close registration, auto-assign partners, and generate the tournament bracket.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiUrl}/api/admin/tournaments/${tournamentId}/finalize-bracket`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to finalize bracket');
+      }
+
+      setTournamentSuccessMessage('Bracket finalized successfully');
+      await fetchTournaments();
+    } catch (err) {
+      console.error('Error finalizing bracket:', err);
+      setTournamentError('Failed to finalize bracket');
+    }
+  };
+
+  const handleStartTournament = async (tournamentId: string) => {
+    if (!confirm('Are you sure you want to start the tournament? This will create game tables and post match details to Discord.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('sessionToken');
+      const apiUrl = apiBaseUrl;
+      const response = await fetch(`${apiUrl}/api/admin/tournaments/${tournamentId}/start`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start tournament');
+      }
+
+      setTournamentSuccessMessage('Tournament started successfully');
+      await fetchTournaments();
+    } catch (err) {
+      console.error('Error starting tournament:', err);
+      setTournamentError('Failed to start tournament');
+    }
+  };
+
   const handleEventInputChange = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setNewEvent(prev => ({
       ...prev,
@@ -1624,7 +1680,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                               >
                                 View Lobby →
                               </a>
-                              {tournament.status !== 'CANCELLED' && (
+                              {tournament.status === 'REGISTRATION_OPEN' && (
+                                <button
+                                  onClick={() => handleFinalizeBracket(tournament.id)}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-center"
+                                  style={{ fontSize: `${11 * textScale}px` }}
+                                >
+                                  Finalize Bracket
+                                </button>
+                              )}
+                              {tournament.status === 'REGISTRATION_CLOSED' && (
+                                <button
+                                  onClick={() => handleStartTournament(tournament.id)}
+                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-center"
+                                  style={{ fontSize: `${11 * textScale}px` }}
+                                >
+                                  Start Tournament
+                                </button>
+                              )}
+                              {tournament.status !== 'CANCELLED' && tournament.status !== 'REGISTRATION_CLOSED' && (
                                 <button
                                   onClick={() => handleCancelTournament(tournament.id)}
                                   className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-center"
