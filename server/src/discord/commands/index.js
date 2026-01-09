@@ -2613,9 +2613,27 @@ async function handleTournamentPartnerSelect(interaction) {
     // Extract tournamentId: format is "tournament_partner_select_<tournamentId>"
     const tournamentId = customId.replace('tournament_partner_select_', '');
     const userId = interaction.user.id;
-    const selectedValue = interaction.values[0];
+    const selectedValue = interaction.values?.[0];
     
-    console.log('[TOURNAMENT] Partner select - customId:', customId, 'tournamentId:', tournamentId);
+    console.log('[TOURNAMENT] Partner select - customId:', customId);
+    console.log('[TOURNAMENT] Extracted tournamentId:', tournamentId);
+    console.log('[TOURNAMENT] Selected value:', selectedValue);
+    
+    if (!tournamentId || tournamentId.trim() === '') {
+      console.error('[TOURNAMENT] CRITICAL: Empty tournamentId from customId:', customId);
+      return interaction.editReply({
+        content: '❌ Invalid tournament ID. Please click "Join" again from the tournament embed.',
+        components: []
+      });
+    }
+    
+    if (!selectedValue) {
+      console.error('[TOURNAMENT] CRITICAL: No selected value');
+      return interaction.editReply({
+        content: '❌ No partner selected. Please try again.',
+        components: []
+      });
+    }
     
     // Get user
     let user = await prisma.user.findUnique({
@@ -2632,32 +2650,52 @@ async function handleTournamentPartnerSelect(interaction) {
     // Get tournament
     console.log('[TOURNAMENT] Looking up tournament with ID:', tournamentId, 'Length:', tournamentId.length);
     
-    // Check if tournamentId is valid (not empty)
-    if (!tournamentId || tournamentId.trim() === '') {
-      console.error('[TOURNAMENT] Empty tournamentId extracted from customId:', customId);
+    let tournament;
+    try {
+      tournament = await prisma.tournament.findUnique({
+        where: { id: tournamentId },
+        include: { registrations: true }
+      });
+    } catch (dbError) {
+      console.error('[TOURNAMENT] Database error looking up tournament:', dbError);
       return interaction.editReply({
-        content: '❌ Invalid tournament ID. Please try clicking "Join" again from the tournament embed.',
+        content: '❌ Database error. Please try again in a moment.',
         components: []
       });
     }
     
-    const tournament = await prisma.tournament.findUnique({
-      where: { id: tournamentId },
-      include: { registrations: true }
-    });
-    
     if (!tournament) {
       // Try to find any tournaments to see if it's a database issue
-      const allTournaments = await prisma.tournament.findMany({
-        select: { id: true, name: true, status: true },
-        take: 5
-      });
-      console.error('[TOURNAMENT] Tournament not found. ID:', tournamentId);
-      console.error('[TOURNAMENT] Available tournaments:', allTournaments.map(t => ({ id: t.id, name: t.name, status: t.status })));
-      return interaction.editReply({
-        content: `❌ Tournament not found. Please try clicking "Join" again from the tournament embed.\n\nIf this persists, the tournament may have been deleted.`,
-        components: []
-      });
+      try {
+        const allTournaments = await prisma.tournament.findMany({
+          select: { id: true, name: true, status: true },
+          take: 10,
+          orderBy: { createdAt: 'desc' }
+        });
+        console.error('[TOURNAMENT] Tournament not found. ID:', tournamentId);
+        console.error('[TOURNAMENT] Available tournaments:', allTournaments.map(t => ({ id: t.id, name: t.name, status: t.status })));
+        
+        // Check if the tournamentId matches any existing tournament (maybe case sensitivity issue?)
+        const matchingTournament = allTournaments.find(t => t.id === tournamentId);
+        if (matchingTournament) {
+          console.log('[TOURNAMENT] Found matching tournament with different case or format');
+          tournament = await prisma.tournament.findUnique({
+            where: { id: matchingTournament.id },
+            include: { registrations: true }
+          });
+        } else {
+          return interaction.editReply({
+            content: `❌ Tournament not found.\n\n**Tournament ID:** \`${tournamentId}\`\n\nPlease click "Join" again from the tournament embed. If this persists, the tournament may have been deleted.`,
+            components: []
+          });
+        }
+      } catch (error) {
+        console.error('[TOURNAMENT] Error checking available tournaments:', error);
+        return interaction.editReply({
+          content: `❌ Tournament not found. Please click "Join" again from the tournament embed.`,
+          components: []
+        });
+      }
     }
     
     console.log('[TOURNAMENT] Tournament found:', tournament.name, 'Status:', tournament.status);
