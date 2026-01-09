@@ -204,13 +204,26 @@ router.post('/tournaments', authenticateToken, isAdmin, async (req, res) => {
     // Post embed to Discord
     try {
       const { client } = await import('../discord/bot.js');
+      console.log('[ADMIN] Discord client check:', { 
+        hasClient: !!client, 
+        isReady: client?.isReady?.(), 
+        userTag: client?.user?.tag 
+      });
+      
       if (client && client.isReady()) {
+        console.log('[ADMIN] Posting tournament embed to Discord...');
         await DiscordTournamentService.postTournamentEmbed(client, tournament);
+        console.log('[ADMIN] Tournament embed posted successfully');
       } else {
-        console.warn('[ADMIN] Discord client not ready, tournament created but embed not posted');
+        console.warn('[ADMIN] Discord client not ready, tournament created but embed not posted. Client state:', {
+          exists: !!client,
+          isReady: client?.isReady?.(),
+          readyAt: client?.readyAt
+        });
       }
     } catch (discordError) {
       console.error('[ADMIN] Error posting tournament to Discord:', discordError);
+      console.error('[ADMIN] Discord error stack:', discordError.stack);
       // Don't fail the request if Discord fails - tournament is still created
     }
     

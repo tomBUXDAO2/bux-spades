@@ -47,12 +47,24 @@ export class DiscordTournamentService {
   static buildTournamentEmbed(tournament) {
     const startTimestamp = Math.floor(new Date(tournament.startTime).getTime() / 1000);
     
-    // Format buy-in
-    const buyInStr = tournament.buyIn 
-      ? tournament.buyIn >= 1000000 
-        ? `${tournament.buyIn / 1000000}M` 
-        : `${tournament.buyIn / 1000}k`
-      : 'Free';
+    // Format tournament entry fee
+    const formatCoins = (value) => {
+      if (!value) return 'Free';
+      if (value >= 1000000) {
+        const millions = value / 1000000;
+        return Number.isInteger(millions) ? `${millions}M` : `${millions.toFixed(1)}M`;
+      }
+      const thousands = value / 1000;
+      return Number.isInteger(thousands) ? `${thousands}k` : `${thousands.toFixed(1)}k`;
+    };
+
+    const entryFeeStr = tournament.tournamentBuyIn 
+      ? `${formatCoins(tournament.tournamentBuyIn)} coins`
+      : 'Free Entry';
+    
+    const tableBuyInStr = tournament.buyIn 
+      ? `${formatCoins(tournament.buyIn)} coins per game`
+      : 'Free Games';
 
     // Format prizes
     let prizesText = '';
@@ -72,17 +84,33 @@ export class DiscordTournamentService {
     // Build description
     let description = `**📅 Starts:** <t:${startTimestamp}:F>\n`;
     description += `**🎮 Mode:** ${tournament.mode}\n`;
-    description += `**💰 Buy-in:** ${buyInStr} coins\n`;
+    description += `**💰 Entry Fee:** ${entryFeeStr}\n`;
+    description += `**🎲 Table Buy-in:** ${tableBuyInStr}\n`;
     description += `**📊 Points:** ${tournament.minPoints || -100} to ${tournament.maxPoints || 500}\n`;
     description += `**🎯 Format:** ${tournament.format}\n`;
     description += `**⚔️ Elimination:** ${tournament.eliminationType === 'DOUBLE' ? 'Double (lose twice to be eliminated)' : 'Single'}\n`;
     
-    if (tournament.numHands) {
-      description += `**🃏 Hands:** ${tournament.numHands}\n`;
+    // Only show nil settings if format is REGULAR
+    if (tournament.format === 'REGULAR') {
+      description += `**🎲 Nils:** ${tournament.nilAllowed ? 'Allowed' : 'Not Allowed'}\n`;
+      description += `**👁️ Blind Nils:** ${tournament.blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n`;
     }
     
-    description += `**🎲 Nils:** ${tournament.nilAllowed ? 'Allowed' : 'Not Allowed'}\n`;
-    description += `**👁️ Blind Nils:** ${tournament.blindNilAllowed ? 'Allowed' : 'Not Allowed'}\n`;
+    // Show special rules if present
+    if (tournament.specialRules) {
+      const rules = typeof tournament.specialRules === 'string' 
+        ? JSON.parse(tournament.specialRules) 
+        : tournament.specialRules;
+      
+      if (rules.specialRule1 && rules.specialRule1.length > 0) {
+        const rule1 = Array.isArray(rules.specialRule1) ? rules.specialRule1.join(', ') : rules.specialRule1;
+        description += `**⚡ Special Rule #1:** ${rule1}\n`;
+      }
+      if (rules.specialRule2 && rules.specialRule2.length > 0) {
+        const rule2 = Array.isArray(rules.specialRule2) ? rules.specialRule2.join(', ') : rules.specialRule2;
+        description += `**⚡ Special Rule #2:** ${rule2}\n`;
+      }
+    }
     
     if (prizesText) {
       description += prizesText;
