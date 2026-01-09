@@ -19,7 +19,8 @@ export class TournamentService {
       mode,
       format,
       startTime,
-      buyIn,
+      buyIn, // Table buy-in (game cost)
+      tournamentBuyIn, // Tournament entry fee
       eliminationType = 'SINGLE',
       prizes = null,
       bannerUrl = null,
@@ -60,7 +61,15 @@ export class TournamentService {
     if (buyIn !== null && buyIn !== undefined) {
       const parsedBuyIn = Number(buyIn);
       if (!Number.isFinite(parsedBuyIn) || parsedBuyIn < 0) {
-        throw new Error('Buy-in must be a non-negative number');
+        throw new Error('Table buy-in must be a non-negative number');
+      }
+    }
+
+    // Validate tournament buy-in if provided
+    if (tournamentBuyIn !== null && tournamentBuyIn !== undefined) {
+      const parsedTournamentBuyIn = Number(tournamentBuyIn);
+      if (!Number.isFinite(parsedTournamentBuyIn) || parsedTournamentBuyIn < 0) {
+        throw new Error('Tournament entry fee must be a non-negative number');
       }
     }
 
@@ -95,6 +104,7 @@ export class TournamentService {
         nilAllowed,
         blindNilAllowed,
         buyIn: buyIn !== null && buyIn !== undefined ? Number(buyIn) : null,
+        tournamentBuyIn: tournamentBuyIn !== null && tournamentBuyIn !== undefined ? Number(tournamentBuyIn) : null,
         startTime: startDate,
         eliminationType,
         prizes: prizesData,

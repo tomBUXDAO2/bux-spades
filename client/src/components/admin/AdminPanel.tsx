@@ -83,11 +83,12 @@ interface TournamentFormState {
   mode: 'PARTNERS' | 'SOLO';
   format: 'REGULAR' | 'WHIZ' | 'MIRROR' | 'GIMMICK';
   startTime: string;
-  buyIn?: number;
+  tournamentBuyIn?: number; // Entry fee at tournament start
+  tableBuyIn?: number; // Coin cost to play each game
   eliminationType: 'SINGLE' | 'DOUBLE';
   prizes: {
-    winners: string;
-    runnersUp: string;
+    winners?: number; // Coin amount (for PARTNERS: "X mil each")
+    runnersUp?: number; // Coin amount (for PARTNERS: "X mil each")
   };
   bannerUrl: string;
   // Game settings
@@ -126,6 +127,17 @@ const generateCoinOptions = () => {
 };
 
 const COIN_OPTION_VALUES = generateCoinOptions();
+
+// Prize options for tournaments (1 mil to 100 mil, in 1 mil increments)
+const generatePrizeOptions = () => {
+  const values: number[] = [];
+  for (let value = 1_000_000; value <= 100_000_000; value += 1_000_000) {
+    values.push(value);
+  }
+  return values;
+};
+
+const PRIZE_OPTION_VALUES = generatePrizeOptions();
 
 const formatCoins = (value?: number | null) => {
   if (value === null || value === undefined) {
@@ -204,11 +216,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     mode: 'PARTNERS',
     format: 'REGULAR',
     startTime: '',
-    buyIn: undefined,
+    tournamentBuyIn: undefined,
+    tableBuyIn: undefined,
     eliminationType: 'SINGLE',
     prizes: {
-      winners: '',
-      runnersUp: '',
+      winners: undefined,
+      runnersUp: undefined,
     },
     bannerUrl: '',
     minPoints: -100,
@@ -800,11 +813,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       mode: 'PARTNERS',
       format: 'REGULAR',
       startTime: '',
-      buyIn: undefined,
+      tournamentBuyIn: undefined,
+      tableBuyIn: undefined,
       eliminationType: 'SINGLE',
       prizes: {
-        winners: '',
-        runnersUp: '',
+        winners: undefined,
+        runnersUp: undefined,
       },
       bannerUrl: '',
       minPoints: -100,
@@ -1292,40 +1306,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">Buy-in (Coins)</label>
+                      <label className="block text-sm font-semibold text-white">Tournament Entry Fee (Coins)</label>
                       <select
-                        value={newTournament.buyIn || ''}
-                        onChange={e => handleTournamentInputChange('buyIn', e.target.value ? Number(e.target.value) : undefined)}
+                        value={newTournament.tournamentBuyIn || ''}
+                        onChange={e => handleTournamentInputChange('tournamentBuyIn', e.target.value ? Number(e.target.value) : undefined)}
                         className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
                       >
-                        <option value="">Free Tournament</option>
+                        <option value="">Free Entry</option>
                         {COIN_OPTION_VALUES.map(value => (
                           <option key={value} value={value}>{formatCoins(value)}</option>
                         ))}
                       </select>
+                      <p className="text-xs text-slate-400">Entry fee paid at tournament start</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-white">Table Buy-in (Coins)</label>
+                      <select
+                        value={newTournament.tableBuyIn || ''}
+                        onChange={e => handleTournamentInputChange('tableBuyIn', e.target.value ? Number(e.target.value) : undefined)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      >
+                        <option value="">Free Games</option>
+                        {COIN_OPTION_VALUES.map(value => (
+                          <option key={value} value={value}>{formatCoins(value)}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-slate-400">Coin cost to play each game (stays constant)</p>
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">Winners Prize</label>
-                      <input
-                        value={newTournament.prizes.winners}
-                        onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, winners: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                        placeholder="e.g. 10M coins or Trophy + 5M coins"
-                      />
+                  {newTournament.mode === 'PARTNERS' && (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Winners Prize</label>
+                        <select
+                          value={newTournament.prizes.winners || ''}
+                          onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, winners: e.target.value ? Number(e.target.value) : undefined })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        >
+                          <option value="">No prize</option>
+                          {PRIZE_OPTION_VALUES.map(value => (
+                            <option key={value} value={value}>{formatCoins(value)} each</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">Runners-up Prize</label>
+                        <select
+                          value={newTournament.prizes.runnersUp || ''}
+                          onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, runnersUp: e.target.value ? Number(e.target.value) : undefined })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                        >
+                          <option value="">No prize</option>
+                          {PRIZE_OPTION_VALUES.map(value => (
+                            <option key={value} value={value}>{formatCoins(value)} each</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">Runners-up Prize</label>
-                      <input
-                        value={newTournament.prizes.runnersUp}
-                        onChange={e => handleTournamentInputChange('prizes', { ...newTournament.prizes, runnersUp: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                        placeholder="e.g. 5M coins"
-                      />
-                    </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-white">Banner Image</label>
@@ -1408,24 +1447,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       <div className="space-y-2">
                         <label className="block text-sm font-semibold text-white">Nil Allowed</label>
                         <select
+                          disabled={newTournament.format !== 'REGULAR'}
                           value={newTournament.nilAllowed === null ? '' : newTournament.nilAllowed ? 'true' : 'false'}
                           onChange={e => handleTournamentInputChange('nilAllowed', e.target.value === '' ? null : e.target.value === 'true')}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="true">Yes</option>
                           <option value="false">No</option>
                         </select>
+                        {newTournament.format !== 'REGULAR' && (
+                          <p className="text-xs text-slate-400">Only available for REGULAR format</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="block text-sm font-semibold text-white">Blind Nil Allowed</label>
                         <select
+                          disabled={newTournament.format !== 'REGULAR'}
                           value={newTournament.blindNilAllowed === null ? '' : newTournament.blindNilAllowed ? 'true' : 'false'}
                           onChange={e => handleTournamentInputChange('blindNilAllowed', e.target.value === '' ? null : e.target.value === 'true')}
-                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="false">No</option>
                           <option value="true">Yes</option>
                         </select>
+                        {newTournament.format !== 'REGULAR' && (
+                          <p className="text-xs text-slate-400">Only available for REGULAR format</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="block text-sm font-semibold text-white">Special Rule #1</label>

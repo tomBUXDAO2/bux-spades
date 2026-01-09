@@ -519,7 +519,8 @@ model Tournament {
   maxPoints         Int?
   nilAllowed        Boolean?                 @default(true)
   blindNilAllowed   Boolean?                 @default(false)
-  buyIn             Int?
+  buyIn             Int?                    // Table buy-in (coin cost per game)
+  tournamentBuyIn   Int?                    // Tournament entry fee
   startTime         DateTime
   eliminationType   TournamentEliminationType @default(SINGLE)
   prizes            Json?                    // { winners: string, runnersUp: string } or coin amounts

@@ -8,3 +8,4 @@ END $$;
 -- AlterTable
 ALTER TABLE "Tournament" ADD COLUMN IF NOT EXISTS "eliminationType" "TournamentEliminationType" NOT NULL DEFAULT 'SINGLE';
 ALTER TABLE "Tournament" ADD COLUMN IF NOT EXISTS "specialRules" JSONB;
+ALTER TABLE "Tournament" ADD COLUMN IF NOT EXISTS "tournamentBuyIn" INTEGER;
