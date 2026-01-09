@@ -469,6 +469,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleClearTournamentBanner = () => {
+    handleTournamentInputChange('bannerUrl', '');
+    if (tournamentBannerPreviewUrl) {
+      URL.revokeObjectURL(tournamentBannerPreviewUrl);
+    }
+    setTournamentBannerPreviewUrl(null);
+    setTournamentBannerUploadError(null);
+  };
+
   const criterionTypeLabels: Record<EventCriterionForm['type'], string> = {
     MOST_WINS: 'Most Wins',
     MOST_GAMES_PLAYED: 'Most Games Played',
