@@ -299,15 +299,6 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
               <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
                 <h2 className="text-2xl font-bold mb-4 text-white">Tournament Bracket</h2>
                 {(() => {
-                  // Group matches by round
-                  const matchesByRound = new Map<number, typeof tournament.matches>();
-                  tournament.matches.forEach(match => {
-                    if (!matchesByRound.has(match.round)) {
-                      matchesByRound.set(match.round, []);
-                    }
-                    matchesByRound.get(match.round)!.push(match);
-                  });
-
                   // Build team ID to players map
                   const teamIdToPlayers = new Map<string, Array<{ username: string; avatarUrl?: string | null }>>();
                   tournament.registrations.forEach(reg => {
@@ -328,111 +319,292 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                   });
 
                   const getTeamDisplay = (teamId: string | null) => {
-                    if (!teamId) return null;
+                    if (!teamId) return { name: 'TBD', players: [] };
                     const players = teamIdToPlayers.get(teamId);
-                    if (!players) return teamId;
-                    return players.map(p => p.username).join(' & ');
+                    if (!players) return { name: teamId, players: [] };
+                    return { 
+                      name: players.map(p => p.username).join(' & '), 
+                      players 
+                    };
                   };
 
-                  const rounds = Array.from(matchesByRound.keys()).sort((a, b) => a - b);
+                  // Check if double elimination
+                  const isDoubleElimination = tournament.eliminationType === 'DOUBLE';
                   
-                  // Calculate round names based on number of teams and rounds
-                  const getRoundName = (roundNum: number, totalRounds: number, hasByes: boolean) => {
-                    // Check if first round has byes
-                    const firstRoundMatches = matchesByRound.get(1) || [];
-                    const hasByesInFirstRound = firstRoundMatches.some(m => m.status === 'COMPLETED' && !m.team2Id);
-                    
-                    if (roundNum === totalRounds) {
-                      return 'Final';
-                    } else if (roundNum === totalRounds - 1) {
-                      return 'Semi-Finals';
-                    } else if (roundNum === totalRounds - 2) {
-                      return 'Quarter-Finals';
-                    } else if (roundNum === totalRounds - 3) {
-                      return 'Round of 16';
-                    } else if (roundNum === totalRounds - 4) {
-                      return 'Round of 32';
-                    } else if (roundNum === 1 && hasByesInFirstRound) {
-                      return 'Qualifying Round';
-                    } else {
-                      return `Round ${roundNum}`;
-                    }
-                  };
+                  if (isDoubleElimination) {
+                    // Separate winners and losers brackets
+                    const winnersMatches = tournament.matches.filter(m => m.round < 1000 && m.round % 100 === 0);
+                    const losersMatches = tournament.matches.filter(m => m.round < 1000 && m.round % 100 !== 0);
+                    const grandFinals = tournament.matches.filter(m => m.round === 1000);
 
-                  return (
-                    <div className="space-y-6">
-                      {rounds.map(round => {
-                        const roundMatches = matchesByRound.get(round)!;
-                        const isFirstRound = round === 1;
-                        const isBye = (match: typeof tournament.matches[0]) => 
-                          match.status === 'COMPLETED' && !match.team2Id;
-                        const roundName = getRoundName(round, rounds.length, isFirstRound);
+                    // Group by round
+                    const winnersByRound = new Map<number, typeof tournament.matches>();
+                    winnersMatches.forEach(m => {
+                      const round = m.round / 100;
+                      if (!winnersByRound.has(round)) {
+                        winnersByRound.set(round, []);
+                      }
+                      winnersByRound.get(round)!.push(m);
+                    });
 
-                        return (
-                          <div key={round} className="border-t border-slate-700 pt-4 first:border-t-0 first:pt-0">
-                            <h3 className="text-lg font-semibold text-white mb-3">
-                              {roundName}
-                            </h3>
-                            <div className="space-y-2">
-                              {roundMatches.map(match => {
-                                const team1Display = getTeamDisplay(match.team1Id);
-                                const team2Display = match.team2Id ? getTeamDisplay(match.team2Id) : null;
-                                const isByeMatch = isBye(match);
-                                const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+                    const losersByRound = new Map<number, typeof tournament.matches>();
+                    losersMatches.forEach(m => {
+                      const round = m.round;
+                      if (!losersByRound.has(round)) {
+                        losersByRound.set(round, []);
+                      }
+                      losersByRound.get(round)!.push(m);
+                    });
 
+                    const winnersRounds = Array.from(winnersByRound.keys()).sort((a, b) => a - b);
+                    const losersRounds = Array.from(losersByRound.keys()).sort((a, b) => a - b);
+
+                    return (
+                      <div className="space-y-8">
+                        {/* Winners Bracket */}
+                        <div>
+                          <h3 className="text-xl font-bold mb-4 text-green-400">Winners Bracket</h3>
+                          <div className="overflow-x-auto">
+                            <div className="flex gap-4 min-w-max">
+                              {winnersRounds.map((roundNum, idx) => {
+                                const roundMatches = winnersByRound.get(roundNum)!;
+                                const roundName = roundNum === winnersRounds.length ? 'Final' :
+                                                 roundNum === winnersRounds.length - 1 ? 'Semi-Finals' :
+                                                 roundNum === winnersRounds.length - 2 ? 'Quarter-Finals' :
+                                                 `Round ${roundNum}`;
+                                
                                 return (
-                                  <div
-                                    key={match.id}
-                                    className={`bg-slate-700 rounded p-3 ${
-                                      match.status === 'COMPLETED' ? 'border-2 border-yellow-500' : 
-                                      match.status === 'IN_PROGRESS' ? 'border-2 border-blue-500' : 
-                                      'border border-slate-600'
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex-1">
-                                        <div className="text-sm text-slate-400 mb-1">
-                                          Match {match.matchNumber}
-                                        </div>
-                                        <div className="text-white">
-                                          {team1Display || 'TBD'}
-                                          {team2Display ? (
-                                            <>
-                                              {' vs '}
-                                              {team2Display}
-                                            </>
-                                          ) : isByeMatch ? (
-                                            <span className="text-yellow-400 ml-2">(BYE - Automatic Advance)</span>
+                                  <div key={roundNum} className="flex flex-col gap-2 min-w-[200px]">
+                                    <div className="text-center font-semibold text-white mb-2 text-sm">{roundName}</div>
+                                    {roundMatches.map((match, matchIdx) => {
+                                      const team1 = getTeamDisplay(match.team1Id);
+                                      const team2 = getTeamDisplay(match.team2Id);
+                                      const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+                                      const isBye = match.status === 'COMPLETED' && !match.team2Id;
+
+                                      return (
+                                        <div
+                                          key={match.id}
+                                          className={`bg-slate-700 rounded p-2 border ${
+                                            match.status === 'COMPLETED' ? 'border-yellow-500' : 
+                                            match.status === 'IN_PROGRESS' ? 'border-blue-500' : 
+                                            'border-slate-600'
+                                          }`}
+                                        >
+                                          <div className="text-xs text-slate-400 mb-1">M{match.matchNumber}</div>
+                                          <div className={`text-xs py-1 px-2 rounded mb-1 ${winner && winner.name === team1.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                            {team1.name}
+                                          </div>
+                                          {team2.name !== 'TBD' && !isBye ? (
+                                            <div className={`text-xs py-1 px-2 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                              {team2.name}
+                                            </div>
+                                          ) : isBye ? (
+                                            <div className="text-xs text-yellow-400 italic">BYE</div>
                                           ) : (
-                                            <span className="text-slate-500 ml-2">vs TBD</span>
+                                            <div className="text-xs text-slate-500 italic">TBD</div>
+                                          )}
+                                          {match.gameId && (
+                                            <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
                                           )}
                                         </div>
-                                        {winner && (
-                                          <div className="text-yellow-400 font-semibold mt-1">
-                                            Winner: {winner}
-                                          </div>
-                                        )}
-                                        {match.gameId && (
-                                          <div className="text-blue-400 text-sm mt-1">
-                                            Game: {match.gameId}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-slate-400">
-                                        {match.status === 'COMPLETED' ? '✅ Completed' :
-                                         match.status === 'IN_PROGRESS' ? '🔄 In Progress' :
-                                         '⏳ Pending'}
-                                      </div>
-                                    </div>
+                                      );
+                                    })}
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
+                        </div>
+
+                        {/* Losers Bracket */}
+                        {losersRounds.length > 0 && (
+                          <div>
+                            <h3 className="text-xl font-bold mb-4 text-red-400">Losers Bracket</h3>
+                            <div className="overflow-x-auto">
+                              <div className="flex gap-4 min-w-max">
+                                {losersRounds.map((roundNum) => {
+                                  const roundMatches = losersByRound.get(roundNum)!;
+                                  
+                                  return (
+                                    <div key={roundNum} className="flex flex-col gap-2 min-w-[200px]">
+                                      <div className="text-center font-semibold text-white mb-2 text-sm">Round {roundNum}</div>
+                                      {roundMatches.map((match) => {
+                                        const team1 = getTeamDisplay(match.team1Id);
+                                        const team2 = getTeamDisplay(match.team2Id);
+                                        const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+
+                                        return (
+                                          <div
+                                            key={match.id}
+                                            className={`bg-slate-700 rounded p-2 border ${
+                                              match.status === 'COMPLETED' ? 'border-yellow-500' : 
+                                              match.status === 'IN_PROGRESS' ? 'border-blue-500' : 
+                                              'border-slate-600'
+                                            }`}
+                                          >
+                                            <div className="text-xs text-slate-400 mb-1">M{match.matchNumber}</div>
+                                            <div className={`text-xs py-1 px-2 rounded mb-1 ${winner && winner.name === team1.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                              {team1.name}
+                                            </div>
+                                            <div className={`text-xs py-1 px-2 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                              {team2.name !== 'TBD' ? team2.name : 'TBD'}
+                                            </div>
+                                            {match.gameId && (
+                                              <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Grand Finals */}
+                        {grandFinals.length > 0 && (
+                          <div>
+                            <h3 className="text-xl font-bold mb-4 text-yellow-400">Grand Finals</h3>
+                            <div className="flex justify-center">
+                              <div className="flex flex-col gap-2 min-w-[200px]">
+                                {grandFinals.map((match) => {
+                                  const team1 = getTeamDisplay(match.team1Id);
+                                  const team2 = getTeamDisplay(match.team2Id);
+                                  const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+
+                                  return (
+                                    <div
+                                      key={match.id}
+                                      className={`bg-slate-700 rounded p-3 border-2 ${
+                                        match.status === 'COMPLETED' ? 'border-yellow-500' : 
+                                        match.status === 'IN_PROGRESS' ? 'border-blue-500' : 
+                                        'border-slate-600'
+                                      }`}
+                                    >
+                                      <div className="text-sm text-slate-400 mb-2">Grand Finals</div>
+                                      <div className={`text-sm py-2 px-3 rounded mb-2 ${winner && winner.name === team1.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                        {team1.name}
+                                      </div>
+                                      <div className={`text-sm py-2 px-3 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                        {team2.name !== 'TBD' ? team2.name : 'TBD'}
+                                      </div>
+                                      {match.gameId && (
+                                        <div className="text-xs text-blue-400 mt-2">Game: {match.gameId.slice(-8)}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    // Single elimination bracket
+                    const matchesByRound = new Map<number, typeof tournament.matches>();
+                    tournament.matches.forEach(match => {
+                      if (!matchesByRound.has(match.round)) {
+                        matchesByRound.set(match.round, []);
+                      }
+                      matchesByRound.get(match.round)!.push(match);
+                    });
+
+                    const rounds = Array.from(matchesByRound.keys()).sort((a, b) => a - b);
+                    const totalRounds = rounds.length;
+
+                    const getRoundName = (roundNum: number) => {
+                      if (roundNum === totalRounds) {
+                        return 'Final';
+                      } else if (roundNum === totalRounds - 1) {
+                        return 'Semi-Finals';
+                      } else if (roundNum === totalRounds - 2) {
+                        return 'Quarter-Finals';
+                      } else if (roundNum === totalRounds - 3) {
+                        return 'Round of 16';
+                      } else if (roundNum === totalRounds - 4) {
+                        return 'Round of 32';
+                      } else {
+                        const firstRoundMatches = matchesByRound.get(1) || [];
+                        const hasByes = firstRoundMatches.some(m => m.status === 'COMPLETED' && !m.team2Id);
+                        return hasByes ? 'Qualifying Round' : `Round ${roundNum}`;
+                      }
+                    };
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <div className="flex gap-4 min-w-max pb-4">
+                          {rounds.map((roundNum, idx) => {
+                            const roundMatches = matchesByRound.get(roundNum)!;
+                            const roundName = getRoundName(roundNum);
+                            const isFinal = roundNum === totalRounds;
+
+                            return (
+                              <div key={roundNum} className="flex flex-col gap-2 min-w-[200px]">
+                                <div className={`text-center font-semibold mb-2 ${isFinal ? 'text-yellow-400 text-lg' : 'text-white text-sm'}`}>
+                                  {roundName}
+                                </div>
+                                {roundMatches.map((match, matchIdx) => {
+                                  const team1 = getTeamDisplay(match.team1Id);
+                                  const team2 = getTeamDisplay(match.team2Id);
+                                  const winner = match.winnerId ? getTeamDisplay(match.winnerId) : null;
+                                  const isBye = match.status === 'COMPLETED' && !match.team2Id;
+
+                                  return (
+                                    <div
+                                      key={match.id}
+                                      className={`bg-slate-700 rounded p-2 border ${
+                                        match.status === 'COMPLETED' ? 'border-yellow-500' : 
+                                        match.status === 'IN_PROGRESS' ? 'border-blue-500' : 
+                                        'border-slate-600'
+                                      } ${isFinal ? 'border-2' : ''}`}
+                                    >
+                                      <div className="text-xs text-slate-400 mb-1">M{match.matchNumber}</div>
+                                      <div className={`text-xs py-1 px-2 rounded mb-1 ${winner && winner.name === team1.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                        {team1.name}
+                                      </div>
+                                      {team2.name !== 'TBD' && !isBye ? (
+                                        <div className={`text-xs py-1 px-2 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
+                                          {team2.name}
+                                        </div>
+                                      ) : isBye ? (
+                                        <div className="text-xs text-yellow-400 italic">BYE</div>
+                                      ) : (
+                                        <div className="text-xs text-slate-500 italic">TBD</div>
+                                      )}
+                                      {match.gameId && (
+                                        <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                          {/* Winner column */}
+                          {rounds.length > 0 && (
+                            <div className="flex flex-col justify-center min-w-[150px]">
+                              <div className="text-center font-bold text-yellow-400 mb-2 text-lg">Winner</div>
+                              <div className="bg-gradient-to-b from-yellow-600 to-yellow-700 rounded p-4 border-2 border-yellow-500 text-center">
+                                <div className="text-white font-bold text-sm">
+                                  {(() => {
+                                    const finalMatch = matchesByRound.get(rounds[rounds.length - 1])?.[0];
+                                    if (finalMatch?.winnerId) {
+                                      return getTeamDisplay(finalMatch.winnerId).name;
+                                    }
+                                    return 'TBD';
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                 })()}
               </div>
             )}
