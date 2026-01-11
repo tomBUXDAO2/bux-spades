@@ -24,9 +24,24 @@ export class TournamentReadyService {
    */
   static async markPlayerReady(matchId, userId, discordId) {
     try {
-      if (!redisClient || !redisClient.isReady) {
-        console.error('[TOURNAMENT READY] Redis client not available or not connected. isReady:', redisClient?.isReady);
+      if (!redisClient) {
+        console.error('[TOURNAMENT READY] Redis client not available');
         return false;
+      }
+      
+      // Check if Redis is connected
+      try {
+        await redisClient.ping();
+      } catch (pingError) {
+        console.error('[TOURNAMENT READY] Redis ping failed, attempting to connect...', pingError);
+        try {
+          if (!redisClient.isOpen) {
+            await redisClient.connect();
+          }
+        } catch (connectError) {
+          console.error('[TOURNAMENT READY] Failed to connect to Redis:', connectError);
+          return false;
+        }
       }
       
       console.log('[TOURNAMENT READY] Marking ready - matchId:', matchId, 'userId:', userId, 'discordId:', discordId);
