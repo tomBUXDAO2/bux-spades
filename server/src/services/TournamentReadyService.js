@@ -24,10 +24,17 @@ export class TournamentReadyService {
    */
   static async markPlayerReady(matchId, userId, discordId) {
     try {
-      if (!redisClient) return false;
+      if (!redisClient || !redisClient.isReady) {
+        console.error('[TOURNAMENT READY] Redis client not available or not connected. isReady:', redisClient?.isReady);
+        return false;
+      }
+      
+      console.log('[TOURNAMENT READY] Marking ready - matchId:', matchId, 'userId:', userId, 'discordId:', discordId);
       
       const key = this.getReadyStatusKey(matchId);
+      console.log('[TOURNAMENT READY] Getting ready data from key:', key);
       const readyData = await redisClient.get(key);
+      console.log('[TOURNAMENT READY] Ready data from Redis:', readyData);
       const ready = readyData ? JSON.parse(readyData) : { ready: new Set(), players: {} };
       
       // Convert Set to Array for JSON

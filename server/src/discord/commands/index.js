@@ -3202,7 +3202,13 @@ async function handleTournamentButton(interaction) {
     // Handle ready button early (doesn't need tournamentId)
     if (customId.startsWith('tournament_ready_')) {
       const matchId = customId.replace('tournament_ready_', '');
-      await handleTournamentReady(interaction, matchId);
+      console.log('[TOURNAMENT] Ready button clicked - matchId:', matchId, 'userId:', userId);
+      try {
+        await handleTournamentReady(interaction, matchId);
+      } catch (error) {
+        console.error('[TOURNAMENT] Error in handleTournamentReady:', error);
+        throw error; // Re-throw to be caught by outer try-catch
+      }
       return;
     }
     
@@ -3936,19 +3942,26 @@ async function updateTournamentEmbed(interaction, tournamentId) {
 // Handle tournament ready button
 async function handleTournamentReady(interaction, matchId) {
   try {
+    console.log('[TOURNAMENT READY] Starting handleTournamentReady for matchId:', matchId);
     await interaction.deferUpdate();
+    console.log('[TOURNAMENT READY] Deferred interaction');
     
     const userId = interaction.user.id;
+    console.log('[TOURNAMENT READY] User ID:', userId);
+    
     const { TournamentReadyService } = await import('../../services/TournamentReadyService.js');
     const { DiscordTournamentService } = await import('../../services/DiscordTournamentService.js');
     const { client } = await import('../bot.js');
+    console.log('[TOURNAMENT READY] Imports successful');
     
     // Get user from database
     const user = await prisma.user.findUnique({
       where: { discordId: userId }
     });
+    console.log('[TOURNAMENT READY] User lookup result:', user ? 'found' : 'not found');
     
     if (!user) {
+      console.error('[TOURNAMENT READY] User not found in database');
       return interaction.editReply({
         content: '❌ User not found in database. Please try again.',
         components: []
@@ -4026,10 +4039,13 @@ async function handleTournamentReady(interaction, matchId) {
     }
     
     // Mark player as ready
-    await TournamentReadyService.markPlayerReady(matchId, user.id, userId);
+    console.log('[TOURNAMENT READY] Marking player as ready - matchId:', matchId, 'userId:', user.id);
+    const markedReady = await TournamentReadyService.markPlayerReady(matchId, user.id, userId);
+    console.log('[TOURNAMENT READY] Mark ready result:', markedReady);
     
     // Check if all players are ready
     const allReady = await TournamentReadyService.areAllPlayersReady(matchId, allPlayerIds);
+    console.log('[TOURNAMENT READY] All players ready?', allReady, 'allPlayerIds:', allPlayerIds);
     
     // Update embed with current status
     const readyStatus = await TournamentReadyService.getReadyStatus(matchId);
