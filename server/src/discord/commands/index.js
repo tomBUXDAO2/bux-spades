@@ -1627,7 +1627,8 @@ export async function handleButtonInteraction(interaction) {
         customId.startsWith('tournament_open_search_') ||
         customId.startsWith('tournament_show_full_list_') ||
         customId.startsWith('tournament_partner_next_') ||
-        customId.startsWith('tournament_partner_prev_')) {
+        customId.startsWith('tournament_partner_prev_') ||
+        customId.startsWith('tournament_ready_')) {
       await handleTournamentButton(interaction);
       return;
     }
@@ -3198,6 +3199,13 @@ async function handleTournamentButton(interaction) {
     const customId = interaction.customId;
     const userId = interaction.user.id;
     
+    // Handle ready button early (doesn't need tournamentId)
+    if (customId.startsWith('tournament_ready_')) {
+      const matchId = customId.replace('tournament_ready_', '');
+      await handleTournamentReady(interaction, matchId);
+      return;
+    }
+    
     // Extract tournamentId based on button type
     let tournamentId;
     if (customId.startsWith('join_tournament_')) {
@@ -3922,6 +3930,145 @@ async function updateTournamentEmbed(interaction, tournamentId) {
     
   } catch (error) {
     console.error('[TOURNAMENT] Error updating embed:', error);
+  }
+}
+
+// Handle tournament ready button
+async function handleTournamentReady(interaction, matchId) {
+  try {
+    await interaction.deferUpdate();
+    
+    const userId = interaction.user.id;
+    const { TournamentReadyService } = await import('../../services/TournamentReadyService.js');
+    const { DiscordTournamentService } = await import('../../services/DiscordTournamentService.js');
+    const { client } = await import('../bot.js');
+    
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { discordId: userId }
+    });
+    
+    if (!user) {
+      return interaction.editReply({
+        content: '❌ User not found in database. Please try again.',
+        components: []
+      });
+    }
+    
+    // Get match and verify user is in the match
+    const match = await prisma.tournamentMatch.findUnique({
+      where: { id: matchId },
+      include: {
+        tournament: {
+          include: {
+            registrations: {
+              include: {
+                user: true,
+                partner: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!match) {
+      return interaction.editReply({
+        content: '❌ Match not found.',
+        components: []
+      });
+    }
+    
+    // Build team ID to players map
+    const teamIdToPlayers = new Map();
+    for (const reg of match.tournament.registrations) {
+      if (reg.partnerId && reg.isComplete) {
+        const teamId = `team_${reg.userId}_${reg.partnerId}`;
+        if (!teamIdToPlayers.has(teamId)) {
+          teamIdToPlayers.set(teamId, [
+            { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+            { id: reg.partnerId, discordId: reg.partner?.discordId, username: reg.partner?.username },
+          ]);
+        }
+      } else if (!reg.partnerId && !reg.isSub) {
+        const teamId = `team_${reg.userId}`;
+        teamIdToPlayers.set(teamId, [
+          { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+        ]);
+      }
+    }
+    
+    const team1Players = teamIdToPlayers.get(match.team1Id) || [];
+    const team2Players = match.team2Id ? (teamIdToPlayers.get(match.team2Id) || []) : null;
+    const allPlayers = [...team1Players, ...(team2Players || [])];
+    
+    // Verify user is in this match
+    const userInMatch = allPlayers.some(p => p.id === user.id);
+    if (!userInMatch) {
+      return interaction.editReply({
+        content: '❌ You are not part of this match.',
+        components: []
+      });
+    }
+    
+    // Check if timer has expired first
+    const allPlayerIds = allPlayers.map(p => p.id);
+    const expiryCheck = await TournamentReadyService.handleTimerExpiry(matchId, allPlayerIds);
+    
+    if (expiryCheck.expired) {
+      // Timer expired - handle based on missing count
+      const { DiscordTournamentService } = await import('../../services/DiscordTournamentService.js');
+      await DiscordTournamentService.handleTimerExpiry(client, match, match.tournament, expiryCheck);
+      return interaction.editReply({
+        content: '⏰ Timer expired - match is being handled automatically.',
+        components: []
+      });
+    }
+    
+    // Mark player as ready
+    await TournamentReadyService.markPlayerReady(matchId, user.id, userId);
+    
+    // Check if all players are ready
+    const allReady = await TournamentReadyService.areAllPlayersReady(matchId, allPlayerIds);
+    
+    // Update embed with current status
+    const readyStatus = await TournamentReadyService.getReadyStatus(matchId);
+    const timeRemaining = await TournamentReadyService.getTimeRemaining(matchId);
+    const embed = TournamentReadyService.buildReadyEmbed(
+      match,
+      match.tournament,
+      teamIdToPlayers,
+      readyStatus,
+      timeRemaining
+    );
+    
+    const readyButton = TournamentReadyService.buildReadyButton(matchId);
+    const row = new ActionRowBuilder().addComponents(readyButton);
+    
+    await interaction.editReply({
+      embeds: [embed],
+      components: [row],
+    });
+    
+    // If all players ready, create game and post "Table Up" embed
+    if (allReady) {
+      await TournamentReadyService.clearReadyStatus(matchId);
+      await DiscordTournamentService.createGameAndPostTableUp(client, match, match.tournament);
+    }
+    
+  } catch (error) {
+    console.error('[TOURNAMENT] Error handling ready button:', error);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred. Please try again.',
+        ephemeral: true
+      });
+    } else {
+      await interaction.editReply({
+        content: '❌ An error occurred. Please try again.',
+        components: []
+      });
+    }
   }
 }
 

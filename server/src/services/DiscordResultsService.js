@@ -40,31 +40,40 @@ export class DiscordResultsService {
         return;
       }
 
-      console.log(`[DISCORD RESULTS] Posting results for league game ${gameId}`);
-
-      // Create embed based on game mode
-      let embed;
-      if (game.mode === 'PARTNERS') {
-        embed = await this.createPartnersEmbed(game);
-      } else {
-        embed = await this.createSoloEmbed(game);
-      }
-
-      // Post to results channel
-      const resultsChannelId = '1404128066296610878';
-      const channel = await client.channels.fetch(resultsChannelId);
+      // Check if this is a tournament game
+      const isTournamentGame = gameId.startsWith('tournament_');
       
-      if (!channel) {
-        console.error(`[DISCORD RESULTS] Results channel ${resultsChannelId} not found`);
-        return;
+      if (isTournamentGame) {
+        // Tournament game - post to tournament channel and handle bracket
+        await this.postTournamentGameResult(gameId, game);
+      } else {
+        // Regular league game - post to results channel
+        console.log(`[DISCORD RESULTS] Posting results for league game ${gameId}`);
+
+        // Create embed based on game mode
+        let embed;
+        if (game.mode === 'PARTNERS') {
+          embed = await this.createPartnersEmbed(game);
+        } else {
+          embed = await this.createSoloEmbed(game);
+        }
+
+        // Post to results channel
+        const resultsChannelId = '1404128066296610878';
+        const channel = await client.channels.fetch(resultsChannelId);
+        
+        if (!channel) {
+          console.error(`[DISCORD RESULTS] Results channel ${resultsChannelId} not found`);
+          return;
+        }
+
+        await channel.send({
+          content: '<@&1403953667501195284>',
+          embeds: [embed]
+        });
+
+        console.log(`[DISCORD RESULTS] Successfully posted results for game ${gameId}`);
       }
-
-      await channel.send({
-        content: '<@&1403953667501195284>',
-        embeds: [embed]
-      });
-
-      console.log(`[DISCORD RESULTS] Successfully posted results for game ${gameId}`);
     } catch (error) {
       console.error(`[DISCORD RESULTS] Error posting results for game ${gameId}:`, error);
     }
@@ -242,5 +251,93 @@ export class DiscordResultsService {
       .setTimestamp();
 
     return embed;
+  }
+
+  /**
+   * Post tournament game result and advance bracket
+   */
+  static async postTournamentGameResult(gameId, game) {
+    try {
+      const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
+      const { TournamentBracketService } = await import('./TournamentBracketService.js');
+      const { client } = await import('../discord/bot.js');
+      
+      // Extract tournamentId and matchId from gameId
+      // Format: tournament_${tournamentId}_match_${matchId}
+      const parts = gameId.replace('tournament_', '').split('_match_');
+      if (parts.length !== 2) {
+        console.error(`[DISCORD RESULTS] Invalid tournament gameId format: ${gameId}`);
+        return;
+      }
+      
+      const tournamentId = parts[0];
+      const matchId = parts[1];
+
+      // Get match
+      const match = await prisma.tournamentMatch.findUnique({
+        where: { id: matchId },
+        include: {
+          tournament: true,
+        },
+      });
+
+      if (!match || match.tournamentId !== tournamentId) {
+        console.error(`[DISCORD RESULTS] Match not found for gameId: ${gameId}`);
+        return;
+      }
+
+      // Determine winner team ID based on game result
+      const winnerTeam = game.result.winner; // 0 or 1
+      let winnerTeamId = null;
+
+      if (game.mode === 'PARTNERS') {
+        // For partners, winner is team-based
+        // Get players by team
+        const team0Players = game.players.filter(p => p.teamIndex === 0).map(p => p.userId);
+        const team1Players = game.players.filter(p => p.teamIndex === 1).map(p => p.userId);
+        
+        if (winnerTeam === 0 && team0Players.length === 2) {
+          winnerTeamId = `team_${team0Players[0]}_${team0Players[1]}`;
+        } else if (winnerTeam === 1 && team1Players.length === 2) {
+          winnerTeamId = `team_${team1Players[0]}_${team1Players[1]}`;
+        }
+      } else {
+        // For solo, winner is single player
+        const winnerPlayer = game.players.find(p => {
+          const playerIndex = game.players.indexOf(p);
+          return winnerTeam === Math.floor(playerIndex / 2); // teamIndex
+        });
+        
+        if (winnerPlayer) {
+          winnerTeamId = `team_${winnerPlayer.userId}`;
+        }
+      }
+
+      if (!winnerTeamId) {
+        console.error(`[DISCORD RESULTS] Could not determine winner team for game ${gameId}`);
+        return;
+      }
+
+      // Update match
+      await prisma.tournamentMatch.update({
+        where: { id: matchId },
+        data: {
+          status: 'COMPLETED',
+          winnerId: winnerTeamId,
+        },
+      });
+
+      // Record match result and advance bracket
+      await TournamentBracketService.recordMatchResult(tournamentId, matchId, winnerTeamId);
+
+      // Post result to tournament channel
+      if (client && client.isReady()) {
+        await DiscordTournamentService.postTournamentMatchResult(client, match, game, winnerTeamId);
+      }
+
+      console.log(`[DISCORD RESULTS] Successfully posted tournament result for game ${gameId}`);
+    } catch (error) {
+      console.error(`[DISCORD RESULTS] Error posting tournament game result:`, error);
+    }
   }
 }

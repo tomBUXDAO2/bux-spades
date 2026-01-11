@@ -264,6 +264,186 @@ export class DiscordTournamentService {
   /**
    * Post tournament start embed with match details and player tags
    */
+  /**
+   * Post "Good Luck" embed when tournament starts
+   */
+  static async postTournamentGoodLuckEmbed(client, tournament) {
+    try {
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🏆 ${tournament.name} - Tournament Started!`)
+        .setDescription(
+          `**Good luck to all players!** 🎉\n\n` +
+          `The tournament has officially begun. Check your match below and click **Ready** when you're prepared to play.\n\n` +
+          `You have **5 minutes** to ready up. Games will start automatically once all 4 players are ready.`
+        )
+        .setColor(0x00ff00)
+        .setTimestamp();
+
+      if (tournament.bannerUrl) {
+        embed.setImage(tournament.bannerUrl);
+      }
+
+      await channel.send({ embeds: [embed] });
+      console.log(`[DISCORD TOURNAMENT] Posted good luck embed for tournament ${tournament.id}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting good luck embed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Post ready embeds for each game with ready buttons
+   */
+  static async postTournamentReadyEmbeds(client, tournament, matchesToPost = null) {
+    try {
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      const { TournamentReadyService } = await import('./TournamentReadyService.js');
+      const { prisma } = await import('../config/database.js');
+
+      // Get matches to post (either provided or first round)
+      let matches;
+      if (matchesToPost) {
+        matches = matchesToPost;
+      } else {
+        matches = await prisma.tournamentMatch.findMany({
+          where: {
+            tournamentId: tournament.id,
+            round: 1,
+            team2Id: { not: null }, // Exclude byes
+          },
+          orderBy: { matchNumber: 'asc' },
+        });
+      }
+
+      // Get all registrations with user info
+      const registrations = await prisma.tournamentRegistration.findMany({
+        where: { tournamentId: tournament.id },
+        include: {
+          user: true,
+          partner: true,
+        },
+      });
+
+      // Build team ID to players map
+      const teamIdToPlayers = new Map();
+      for (const reg of registrations) {
+        if (reg.partnerId && reg.isComplete) {
+          const teamId = `team_${reg.userId}_${reg.partnerId}`;
+          if (!teamIdToPlayers.has(teamId)) {
+            teamIdToPlayers.set(teamId, [
+              { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+              { id: reg.partnerId, discordId: reg.partner?.discordId, username: reg.partner?.username },
+            ]);
+          }
+        } else if (!reg.partnerId && !reg.isSub) {
+          const teamId = `team_${reg.userId}`;
+          teamIdToPlayers.set(teamId, [
+            { id: reg.userId, discordId: reg.user.discordId, username: reg.user.username },
+          ]);
+        }
+      }
+
+      // Post embed for each match with ready button
+      for (const match of matches) {
+        const team1Players = teamIdToPlayers.get(match.team1Id) || [];
+        const team2Players = match.team2Id ? (teamIdToPlayers.get(match.team2Id) || []) : null;
+
+        if (team1Players.length === 0 || !team2Players || team2Players.length === 0) {
+          console.warn(`[TOURNAMENT] Skipping match ${match.id} - missing team players`);
+          continue;
+        }
+
+        const allPlayerIds = [
+          ...team1Players.map(p => p.id),
+          ...team2Players.map(p => p.id),
+        ];
+
+        // Initialize ready status and set 5-minute timer
+        const expiryTimestamp = Date.now() + (5 * 60 * 1000);
+        await TournamentReadyService.setTimer(match.id, expiryTimestamp);
+
+        // Build embed
+        const readyStatus = await TournamentReadyService.getReadyStatus(match.id);
+        const timeRemaining = await TournamentReadyService.getTimeRemaining(match.id);
+        const embed = TournamentReadyService.buildReadyEmbed(
+          match,
+          tournament,
+          teamIdToPlayers,
+          readyStatus,
+          timeRemaining
+        );
+
+        // Build ready button
+        const readyButton = TournamentReadyService.buildReadyButton(match.id);
+        const row = new ActionRowBuilder().addComponents(readyButton);
+
+        // Tag all players
+        const mentions = [
+          ...team1Players.map(p => `<@${p.discordId}>`),
+          ...team2Players.map(p => `<@${p.discordId}>`),
+        ].join(' ');
+
+        await channel.send({
+          content: mentions,
+          embeds: [embed],
+          components: [row],
+        });
+      }
+
+      // Post bye teams separately (only for first round)
+      if (!matchesToPost) {
+        const byeMatches = await prisma.tournamentMatch.findMany({
+          where: {
+            tournamentId: tournament.id,
+            round: 1,
+            OR: [
+              { team2Id: null },
+              { status: 'COMPLETED' },
+            ],
+          },
+          orderBy: { matchNumber: 'asc' },
+        });
+
+        if (byeMatches.length > 0) {
+        const teamsWithByes = [];
+        for (const match of byeMatches) {
+          const team1Players = teamIdToPlayers.get(match.team1Id) || [];
+          if (team1Players.length > 0) {
+            teamsWithByes.push(team1Players.map(p => `<@${p.discordId}>`).join(' & '));
+          }
+        }
+
+        if (teamsWithByes.length > 0) {
+          const embed = new EmbedBuilder()
+            .setTitle('🎁 Teams with Byes - Automatic Advance')
+            .setDescription(
+              `The following teams have a bye and automatically advance to the next round:\n\n` +
+              teamsWithByes.map((team, idx) => `**${idx + 1}.** ${team}`).join('\n')
+            )
+            .setColor(0xffaa00)
+            .setTimestamp();
+
+          await channel.send({ embeds: [embed] });
+        }
+        }
+      }
+
+      console.log(`[DISCORD TOURNAMENT] Posted ready embeds for ${matches.length} matches`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting ready embeds:', error);
+      throw error;
+    }
+  }
+
   static async postTournamentStartEmbed(client, tournament, createdGames) {
     try {
       const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
@@ -397,5 +577,443 @@ export class DiscordTournamentService {
       throw error;
     }
   }
-}
 
+  /**
+   * Create game and post "Table Up" embed when all players are ready
+   */
+  static async createGameAndPostTableUp(client, match, tournament) {
+    try {
+      const { GameService } = await import('./GameService.js');
+      const { prisma } = await import('../config/database.js');
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      // Build team ID to player IDs map
+      const teamIdToPlayerIds = new Map();
+      const registrations = await prisma.tournamentRegistration.findMany({
+        where: { tournamentId: tournament.id },
+        include: { user: true, partner: true },
+      });
+
+      for (const reg of registrations) {
+        if (reg.partnerId && reg.isComplete) {
+          const teamId = `team_${reg.userId}_${reg.partnerId}`;
+          if (!teamIdToPlayerIds.has(teamId)) {
+            teamIdToPlayerIds.set(teamId, [reg.userId, reg.partnerId]);
+          }
+        } else if (!reg.partnerId && !reg.isSub) {
+          const teamId = `team_${reg.userId}`;
+          teamIdToPlayerIds.set(teamId, [reg.userId]);
+        }
+      }
+
+      const team1Players = teamIdToPlayerIds.get(match.team1Id) || [];
+      const team2Players = match.team2Id ? (teamIdToPlayerIds.get(match.team2Id) || []) : null;
+
+      if (team1Players.length === 0 || !team2Players || team2Players.length === 0) {
+        throw new Error('Missing team players for match');
+      }
+
+      // Create game
+      const gameId = `tournament_${tournament.id}_match_${match.id}`;
+      const gameData = {
+        id: gameId,
+        createdById: team1Players[0],
+        mode: tournament.mode,
+        format: tournament.format,
+        gimmickVariant: tournament.gimmickVariant,
+        isLeague: true,
+        isRated: true,
+        maxPoints: tournament.maxPoints || 500,
+        minPoints: tournament.minPoints || -100,
+        buyIn: tournament.buyIn || 0,
+        nilAllowed: tournament.nilAllowed !== false,
+        blindNilAllowed: tournament.blindNilAllowed || false,
+        specialRules: tournament.specialRules || {},
+        status: 'WAITING',
+      };
+
+      const game = await GameService.createGame(gameData);
+
+      // Add players to game
+      const allPlayers = [...team1Players, ...team2Players];
+      for (let i = 0; i < allPlayers.length && i < 4; i++) {
+        const userId = allPlayers[i];
+        const seatIndex = i;
+        const teamIndex = tournament.mode === 'PARTNERS' ? (i < 2 ? 0 : 1) : i;
+
+        await prisma.gamePlayer.create({
+          data: {
+            gameId: game.id,
+            userId,
+            seatIndex,
+            teamIndex,
+            isHuman: true,
+            joinedAt: new Date(),
+          },
+        });
+      }
+
+      // Update match with game ID
+      await prisma.tournamentMatch.update({
+        where: { id: match.id },
+        data: { gameId: game.id, status: 'IN_PROGRESS' },
+      });
+
+      // Post "Table Up" embed - team1Players and team2Players are already user IDs
+      const team1Mentions = team1Players.map(userId => {
+        const reg = registrations.find(r => r.userId === userId || r.partnerId === userId);
+        if (reg) {
+          if (reg.userId === userId) {
+            return `<@${reg.user.discordId}>`;
+          } else if (reg.partnerId === userId) {
+            const partnerReg = registrations.find(r => r.userId === userId);
+            return `<@${partnerReg?.user?.discordId}>`;
+          }
+        }
+        return '';
+      }).filter(Boolean).join(' & ');
+
+      const team2Mentions = team2Players.map(userId => {
+        const reg = registrations.find(r => r.userId === userId || r.partnerId === userId);
+        if (reg) {
+          if (reg.userId === userId) {
+            return `<@${reg.user.discordId}>`;
+          } else if (reg.partnerId === userId) {
+            const partnerReg = registrations.find(r => r.userId === userId);
+            return `<@${partnerReg?.user?.discordId}>`;
+          }
+        }
+        return '';
+      }).filter(Boolean).join(' & ');
+
+      const allMentions = [
+        ...team1Players.map(userId => {
+          const reg = registrations.find(r => r.userId === userId || r.partnerId === userId);
+          if (reg) {
+            return reg.userId === userId ? `<@${reg.user.discordId}>` : `<@${registrations.find(r => r.userId === userId)?.user?.discordId}>`;
+          }
+          return '';
+        }),
+        ...team2Players.map(userId => {
+          const reg = registrations.find(r => r.userId === userId || r.partnerId === userId);
+          if (reg) {
+            return reg.userId === userId ? `<@${reg.user.discordId}>` : `<@${registrations.find(r => r.userId === userId)?.user?.discordId}>`;
+          }
+          return '';
+        }),
+      ].filter(Boolean).join(' ');
+
+      const clientUrl = process.env.CLIENT_URL || 'https://www.bux-spades.pro';
+      const gameUrl = `${clientUrl}/game/${gameId}`;
+
+      const embed = new EmbedBuilder()
+        .setTitle(`✅ Match ${match.matchNumber} - Table Up!`)
+        .setDescription(
+          `All players are ready! The game table is now available.\n\n` +
+          `**Team 1:** ${team1Mentions}\n` +
+          `**Team 2:** ${team2Mentions}\n\n` +
+          `🔗 **Game Link:** ${gameUrl}\n\n` +
+          `*Click the link above to join your game table.*`
+        )
+        .setColor(0x00ff00)
+        .setTimestamp();
+
+      await channel.send({
+        content: allMentions,
+        embeds: [embed],
+      });
+
+      console.log(`[DISCORD TOURNAMENT] Created game ${gameId} and posted table up embed`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error creating game and posting table up:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle timer expiry for a match
+   * 1 missing: prompt admin to add sub name
+   * 2 missing: void game, 2 present players become a team and progress
+   * 3 missing: assign 1 sub as partner, that team progresses
+   */
+  static async handleTimerExpiry(client, match, tournament, expiryCheck) {
+    try {
+      const { prisma } = await import('../config/database.js');
+      const { TournamentBracketService } = await import('./TournamentBracketService.js');
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      const { TournamentReadyService } = await import('./TournamentReadyService.js');
+
+      // Clear ready status
+      await TournamentReadyService.clearReadyStatus(match.id);
+
+      // Get registrations to find players
+      const registrations = await prisma.tournamentRegistration.findMany({
+        where: { tournamentId: tournament.id },
+        include: { user: true, partner: true },
+      });
+
+      // Build team ID to player IDs map
+      const teamIdToPlayerIds = new Map();
+      for (const reg of registrations) {
+        if (reg.partnerId && reg.isComplete) {
+          const teamId = `team_${reg.userId}_${reg.partnerId}`;
+          if (!teamIdToPlayerIds.has(teamId)) {
+            teamIdToPlayerIds.set(teamId, [reg.userId, reg.partnerId]);
+          }
+        } else if (!reg.partnerId && !reg.isSub) {
+          const teamId = `team_${reg.userId}`;
+          teamIdToPlayerIds.set(teamId, [reg.userId]);
+        }
+      }
+
+      const team1Players = teamIdToPlayerIds.get(match.team1Id) || [];
+      const team2Players = match.team2Id ? (teamIdToPlayerIds.get(match.team2Id) || []) : null;
+      const allPlayers = [...team1Players, ...(team2Players || [])];
+
+      // Get missing and ready players
+      const missingPlayerIds = expiryCheck.missingPlayerIds || [];
+      const readyPlayerIds = expiryCheck.readyPlayerIds || [];
+      const missingCount = expiryCheck.missingCount || 0;
+
+      if (missingCount === 1) {
+        // 1 missing: prompt admin to add sub name
+        const missingUserId = missingPlayerIds[0];
+        const missingReg = registrations.find(r => r.userId === missingUserId);
+        const missingDiscordId = missingReg?.user?.discordId;
+
+        const readyRegs = registrations.filter(r => readyPlayerIds.includes(r.userId));
+        const readyMentions = readyRegs.map(r => `<@${r.user.discordId}>`).join(', ');
+
+        const embed = new EmbedBuilder()
+          .setTitle(`⚠️ Match ${match.matchNumber} - 1 Player Missing`)
+          .setDescription(
+            `**Timer expired!** 1 player did not ready up.\n\n` +
+            `**Ready Players (3/4):** ${readyMentions}\n` +
+            `**Missing Player:** <@${missingDiscordId}>\n\n` +
+            `**Admins:** Please use \`/tournament-sub\` command to assign a substitute player.\n` +
+            `Format: \`/tournament-sub match:<matchId> player:<discordId>\``
+          )
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+
+      } else if (missingCount === 2) {
+        // 2 missing: void game, 2 present players become a team and progress
+        const readyRegs = registrations.filter(r => readyPlayerIds.includes(r.userId));
+        
+        if (readyRegs.length !== 2) {
+          console.error(`[TOURNAMENT] Expected 2 ready players but found ${readyRegs.length}`);
+          return;
+        }
+
+        // Create new team from the 2 present players
+        const player1Id = readyRegs[0].userId;
+        const player2Id = readyRegs[1].userId;
+
+        // Mark match as completed with new team as winner
+        const newTeamId = `team_${player1Id}_${player2Id}`;
+        
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: {
+            status: 'COMPLETED',
+            winnerId: newTeamId,
+          },
+        });
+
+        // Advance bracket with new team
+        await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
+
+        const readyMentions = readyRegs.map(r => `<@${r.user.discordId}>`).join(' & ');
+
+        const embed = new EmbedBuilder()
+          .setTitle(`✅ Match ${match.matchNumber} - Auto-Advanced`)
+          .setDescription(
+            `**Timer expired!** 2 players did not ready up.\n\n` +
+            `**Game voided.** The 2 present players form a new team and automatically advance:\n` +
+            `${readyMentions}\n\n` +
+            `*This team will continue as a pair for the rest of the tournament.*`
+          )
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+
+      } else if (missingCount === 3) {
+        // 3 missing: assign 1 sub as partner, that team progresses
+        const readyUserId = readyPlayerIds[0];
+        const readyReg = registrations.find(r => r.userId === readyUserId);
+        
+        if (!readyReg) {
+          console.error(`[TOURNAMENT] Ready player not found: ${readyUserId}`);
+          return;
+        }
+
+        // Find an available sub
+        const subs = registrations.filter(r => r.isSub && r.tournamentId === tournament.id);
+        if (subs.length === 0) {
+          const embed = new EmbedBuilder()
+            .setTitle(`❌ Match ${match.matchNumber} - No Subs Available`)
+            .setDescription(
+              `**Timer expired!** 3 players did not ready up.\n\n` +
+              `**Ready Player:** <@${readyReg.user.discordId}>\n\n` +
+              `**Error:** No substitutes available. Please manually handle this match.`
+            )
+            .setColor(0xff0000)
+            .setTimestamp();
+
+          await channel.send({ embeds: [embed] });
+          return;
+        }
+
+        // Assign first available sub
+        const subReg = subs[0];
+        const newTeamId = `team_${readyUserId}_${subReg.userId}`;
+
+        // Mark match as completed with new team as winner
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: {
+            status: 'COMPLETED',
+            winnerId: newTeamId,
+          },
+        });
+
+        // Advance bracket with new team
+        await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`✅ Match ${match.matchNumber} - Sub Assigned`)
+          .setDescription(
+            `**Timer expired!** 3 players did not ready up.\n\n` +
+            `**Substitute assigned:** <@${subReg.user.discordId}> partners with <@${readyReg.user.discordId}>\n\n` +
+            `**New team advances automatically.**`
+          )
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+      }
+
+      console.log(`[DISCORD TOURNAMENT] Handled timer expiry for match ${match.id} - ${missingCount} missing`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error handling timer expiry:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Post tournament match result and check for next round matches
+   */
+  static async postTournamentMatchResult(client, match, game, winnerTeamId) {
+    try {
+      const { prisma } = await import('../config/database.js');
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      
+      if (!channel) {
+        throw new Error(`Tournament channel ${TOURNAMENT_CHANNEL_ID} not found`);
+      }
+
+      // Get tournament with registrations
+      const tournament = await prisma.tournament.findUnique({
+        where: { id: match.tournamentId },
+        include: {
+          registrations: {
+            include: { user: true, partner: true },
+          },
+        },
+      });
+
+      if (!tournament) {
+        console.error(`[DISCORD TOURNAMENT] Tournament not found: ${match.tournamentId}`);
+        return;
+      }
+
+      // Build team ID to players map
+      const teamIdToPlayers = new Map();
+      for (const reg of tournament.registrations) {
+        if (reg.partnerId && reg.isComplete) {
+          const teamId = `team_${reg.userId}_${reg.partnerId}`;
+          if (!teamIdToPlayers.has(teamId)) {
+            teamIdToPlayers.set(teamId, [
+              { discordId: reg.user.discordId, username: reg.user.username },
+              { discordId: reg.partner?.discordId, username: reg.partner?.username },
+            ]);
+          }
+        } else if (!reg.partnerId && !reg.isSub) {
+          const teamId = `team_${reg.userId}`;
+          teamIdToPlayers.set(teamId, [
+            { discordId: reg.user.discordId, username: reg.user.username },
+          ]);
+        }
+      }
+
+      // Get winner players
+      const winnerPlayers = teamIdToPlayers.get(winnerTeamId) || [];
+      const winnerMentions = winnerPlayers.map(p => `<@${p.discordId}>`).join(' & ');
+
+      // Post result embed
+      const embed = new EmbedBuilder()
+        .setTitle(`🏆 Match ${match.matchNumber} - Complete!`)
+        .setDescription(
+          `**Winner:** ${winnerMentions}\n\n` +
+          `*Bracket has been updated. Next round matches will be called shortly.*`
+        )
+        .setColor(0x00ff00)
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] });
+
+      // Check for next round matches ready to be called
+      await this.checkAndCallNextRoundMatches(client, tournament, match);
+
+      console.log(`[DISCORD TOURNAMENT] Posted match result for match ${match.id}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting match result:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check for next round matches that are ready to be called
+   */
+  static async checkAndCallNextRoundMatches(client, tournament, completedMatch) {
+    try {
+      const { prisma } = await import('../config/database.js');
+      
+      // Determine next round based on completed match
+      const nextRound = completedMatch.round + (completedMatch.round < 1000 ? 100 : 0);
+      const nextMatchNumber = Math.ceil(completedMatch.matchNumber / 2);
+
+      // Get all matches in the next round
+      const nextRoundMatches = await prisma.tournamentMatch.findMany({
+        where: {
+          tournamentId: tournament.id,
+          round: nextRound,
+        },
+        orderBy: { matchNumber: 'asc' },
+      });
+
+      // Check each match to see if both teams are determined
+      const readyMatches = [];
+      for (const nextMatch of nextRoundMatches) {
+        if (nextMatch.team1Id && nextMatch.team2Id && nextMatch.status === 'PENDING') {
+          // Both teams determined - call the game
+          readyMatches.push(nextMatch);
+        }
+      }
+
+      // Post ready embeds for matches that are ready
+      if (readyMatches.length > 0) {
+        await this.postTournamentReadyEmbeds(client, tournament, readyMatches);
+      }
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error checking next round matches:', error);
+    }
+  }
+}

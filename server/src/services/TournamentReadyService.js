@@ -1,0 +1,256 @@
+import { redisClient } from '../config/redis.js';
+import { prisma } from '../config/database.js';
+import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+
+export class TournamentReadyService {
+  static READY_TTL = 300; // 5 minutes in seconds
+
+  /**
+   * Get ready status key for a match
+   */
+  static getReadyStatusKey(matchId) {
+    return `tournament:ready:${matchId}`;
+  }
+
+  /**
+   * Get timer expiry key for a match
+   */
+  static getTimerKey(matchId) {
+    return `tournament:timer:${matchId}`;
+  }
+
+  /**
+   * Mark a player as ready for a match
+   */
+  static async markPlayerReady(matchId, userId, discordId) {
+    try {
+      if (!redisClient) return false;
+      
+      const key = this.getReadyStatusKey(matchId);
+      const readyData = await redisClient.get(key);
+      const ready = readyData ? JSON.parse(readyData) : { ready: new Set(), players: {} };
+      
+      // Convert Set to Array for JSON
+      if (!ready.ready) ready.ready = [];
+      if (!ready.players) ready.players = {};
+      
+      ready.ready.push(userId);
+      ready.players[userId] = {
+        discordId,
+        readyAt: new Date().toISOString(),
+      };
+      
+      // Save back (Set stored as array)
+      await redisClient.setEx(key, this.READY_TTL, JSON.stringify({
+        ...ready,
+        ready: [...new Set(ready.ready)], // Ensure uniqueness
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error marking player ready:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get ready status for a match
+   */
+  static async getReadyStatus(matchId) {
+    try {
+      if (!redisClient) return { ready: [], players: {}, timerExpiry: null };
+      
+      const key = this.getReadyStatusKey(matchId);
+      const timerKey = this.getTimerKey(matchId);
+      
+      const readyData = await redisClient.get(key);
+      const timerExpiry = await redisClient.get(timerKey);
+      
+      const ready = readyData ? JSON.parse(readyData) : { ready: [], players: {} };
+      
+      return {
+        ready: ready.ready || [],
+        players: ready.players || {},
+        timerExpiry: timerExpiry ? parseInt(timerExpiry) : null,
+      };
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error getting ready status:', error);
+      return { ready: [], players: {}, timerExpiry: null };
+    }
+  }
+
+  /**
+   * Set timer expiry for a match
+   */
+  static async setTimer(matchId, expiryTimestamp) {
+    try {
+      if (!redisClient) return false;
+      
+      const key = this.getTimerKey(matchId);
+      const ttl = Math.max(0, Math.floor((expiryTimestamp - Date.now()) / 1000));
+      
+      if (ttl > 0) {
+        await redisClient.setEx(key, ttl, expiryTimestamp.toString());
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error setting timer:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if all players are ready
+   */
+  static async areAllPlayersReady(matchId, expectedPlayerIds) {
+    const status = await this.getReadyStatus(matchId);
+    const readySet = new Set(status.ready || []);
+    
+    return expectedPlayerIds.every(id => readySet.has(id));
+  }
+
+  /**
+   * Get time remaining in seconds
+   */
+  static async getTimeRemaining(matchId) {
+    try {
+      if (!redisClient) return 0;
+      
+      const timerKey = this.getTimerKey(matchId);
+      const expiry = await redisClient.get(timerKey);
+      
+      if (!expiry) return 0;
+      
+      const expiryTimestamp = parseInt(expiry);
+      const remaining = Math.max(0, Math.floor((expiryTimestamp - Date.now()) / 1000));
+      
+      return remaining;
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error getting time remaining:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clear ready status for a match
+   */
+  static async clearReadyStatus(matchId) {
+    try {
+      if (!redisClient) return false;
+      
+      const key = this.getReadyStatusKey(matchId);
+      const timerKey = this.getTimerKey(matchId);
+      
+      await redisClient.del(key);
+      await redisClient.del(timerKey);
+      
+      return true;
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error clearing ready status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if timer has expired for a match
+   */
+  static async isTimerExpired(matchId) {
+    try {
+      const timeRemaining = await this.getTimeRemaining(matchId);
+      return timeRemaining <= 0;
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error checking timer expiry:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Handle timer expiry for a match
+   * Returns: { expired: boolean, missingCount: number, missingPlayerIds: string[] }
+   */
+  static async handleTimerExpiry(matchId, expectedPlayerIds) {
+    try {
+      const isExpired = await this.isTimerExpired(matchId);
+      if (!isExpired) {
+        return { expired: false, missingCount: 0, missingPlayerIds: [] };
+      }
+
+      const readyStatus = await this.getReadyStatus(matchId);
+      const readySet = new Set(readyStatus.ready || []);
+      const missingPlayerIds = expectedPlayerIds.filter(id => !readySet.has(id));
+      const missingCount = missingPlayerIds.length;
+
+      return {
+        expired: true,
+        missingCount,
+        missingPlayerIds,
+        readyPlayerIds: expectedPlayerIds.filter(id => readySet.has(id)),
+      };
+    } catch (error) {
+      console.error('[TOURNAMENT READY] Error handling timer expiry:', error);
+      return { expired: false, missingCount: 0, missingPlayerIds: [] };
+    }
+  }
+
+  /**
+   * Format time remaining as MM:SS
+   */
+  static formatTimeRemaining(seconds) {
+    if (seconds <= 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Build ready button embed with current status
+   */
+  static buildReadyEmbed(match, tournament, teamIdToPlayers, readyStatus, timeRemaining) {
+    const team1Players = teamIdToPlayers.get(match.team1Id) || [];
+    const team2Players = match.team2Id ? (teamIdToPlayers.get(match.team2Id) || []) : null;
+    
+    const allPlayerIds = [
+      ...team1Players.map(p => p.id),
+      ...(team2Players || []).map(p => p.id),
+    ];
+    
+    const readySet = new Set(readyStatus.ready || []);
+    const allReady = allPlayerIds.length === 4 && allPlayerIds.every(id => readySet.has(id));
+    
+    const readyPlayers = [];
+    const waitingPlayers = [];
+    
+    [...team1Players, ...(team2Players || [])].forEach(player => {
+      if (readySet.has(player.id)) {
+        readyPlayers.push(`✅ <@${player.discordId}>`);
+      } else {
+        waitingPlayers.push(`⏳ <@${player.discordId}>`);
+      }
+    });
+    
+    const embed = new EmbedBuilder()
+      .setTitle(`🎮 Match ${match.matchNumber} - ${allReady ? 'READY!' : 'Waiting for Players'}`)
+      .setDescription(
+        `**Team 1:** ${team1Players.map(p => `<@${p.discordId}>`).join(' & ')}\n` +
+        (team2Players ? `**Team 2:** ${team2Players.map(p => `<@${p.discordId}>`).join(' & ')}\n` : '') +
+        `\n**Ready (${readyPlayers.length}/4):**\n${readyPlayers.join('\n') || 'None'}\n` +
+        `\n**Waiting:**\n${waitingPlayers.join('\n') || 'None'}\n` +
+        `\n**Time Remaining:** ${this.formatTimeRemaining(timeRemaining)}`
+      )
+      .setColor(allReady ? 0x00ff00 : 0xffaa00)
+      .setTimestamp();
+    
+    return embed;
+  }
+
+  /**
+   * Build ready button (one button for all players)
+   */
+  static buildReadyButton(matchId) {
+    return new ButtonBuilder()
+      .setCustomId(`tournament_ready_${matchId}`)
+      .setLabel('Ready ✓')
+      .setStyle(ButtonStyle.Success);
+  }
+}

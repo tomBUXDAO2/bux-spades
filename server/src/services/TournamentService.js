@@ -260,7 +260,6 @@ export class TournamentService {
   static async startTournament(tournamentId) {
     const { TournamentBracketService } = await import('./TournamentBracketService.js');
     const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
-    const { GameService } = await import('./GameService.js');
     
     // Get tournament with matches and registrations
     const tournament = await prisma.tournament.findUnique({
@@ -287,91 +286,14 @@ export class TournamentService {
       throw new Error('Tournament bracket must be finalized before starting');
     }
 
-    // Create game tables for first round matches
-    const createdGames = [];
-    const teamIdToPlayerIds = new Map(); // Map team IDs to player user IDs
-    
-    // Build team ID to player IDs map from registrations
-    for (const reg of tournament.registrations) {
-      if (reg.partnerId && reg.isComplete) {
-        const teamId = `team_${reg.userId}_${reg.partnerId}`;
-        if (!teamIdToPlayerIds.has(teamId)) {
-          teamIdToPlayerIds.set(teamId, [reg.userId, reg.partnerId]);
-        }
-      } else if (!reg.partnerId && !reg.isSub) {
-        // Solo team (shouldn't happen in PARTNERS mode, but handle it)
-        const teamId = `team_${reg.userId}`;
-        teamIdToPlayerIds.set(teamId, [reg.userId]);
-      }
-    }
-
-    for (const match of tournament.matches) {
-      if (match.status === 'COMPLETED' || !match.team1Id) {
-        // Skip byes and completed matches
-        continue;
-      }
-
-      const team1Players = teamIdToPlayerIds.get(match.team1Id) || [];
-      const team2Players = teamIdToPlayerIds.get(match.team2Id) || [];
-
-      if (team1Players.length === 0 || (match.team2Id && team2Players.length === 0)) {
-        console.warn(`[TOURNAMENT] Skipping match ${match.id} - missing team players`);
-        continue;
-      }
-
-      // Create game with tournament settings
-      const gameId = `tournament_${tournamentId}_match_${match.id}`;
-      const gameData = {
-        id: gameId,
-        createdById: team1Players[0], // Use first player as creator
-        mode: tournament.mode,
-        format: tournament.format,
-        gimmickVariant: tournament.gimmickVariant,
-        isLeague: true,
-        isRated: true, // Tournament games are always rated
-        maxPoints: tournament.maxPoints || 500,
-        minPoints: tournament.minPoints || -100,
-        buyIn: tournament.buyIn || 0,
-        nilAllowed: tournament.nilAllowed !== false,
-        blindNilAllowed: tournament.blindNilAllowed || false,
-        specialRules: tournament.specialRules || {},
-        status: 'WAITING',
-      };
-
-      const game = await GameService.createGame(gameData);
-
-      // Add players to game
-      const allPlayers = [...team1Players, ...(match.team2Id ? team2Players : [])];
-      for (let i = 0; i < allPlayers.length && i < 4; i++) {
-        const userId = allPlayers[i];
-        const seatIndex = i;
-        const teamIndex = tournament.mode === 'PARTNERS' ? (i < 2 ? 0 : 1) : i;
-
-        await prisma.gamePlayer.create({
-          data: {
-            gameId: game.id,
-            userId,
-            seatIndex,
-            teamIndex,
-            isHuman: true,
-            joinedAt: new Date(),
-          },
-        });
-      }
-
-      // Update match with game ID
-      await prisma.tournamentMatch.update({
-        where: { id: match.id },
-        data: { gameId: game.id, status: 'IN_PROGRESS' },
-      });
-
-      createdGames.push({ match, game });
-    }
-
-    // Post Discord embed with match details
+    // Post "Good Luck" embed and ready embeds (NO game creation yet)
     const { client } = await import('../discord/bot.js');
     if (client && client.isReady()) {
-      await DiscordTournamentService.postTournamentStartEmbed(client, tournament, createdGames);
+      // Post initial good luck embed
+      await DiscordTournamentService.postTournamentGoodLuckEmbed(client, tournament);
+      
+      // Post ready embeds for each game with ready buttons
+      await DiscordTournamentService.postTournamentReadyEmbeds(client, tournament);
     }
 
     // Update tournament status
@@ -380,7 +302,7 @@ export class TournamentService {
       data: { status: 'IN_PROGRESS' },
     });
 
-    return { gamesCreated: createdGames.length, matches: createdGames };
+    return { success: true, message: 'Tournament started - waiting for players to ready up' };
   }
 }
 
