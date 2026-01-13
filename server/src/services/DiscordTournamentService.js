@@ -875,7 +875,7 @@ export class DiscordTournamentService {
         });
 
         // Advance bracket with new team
-        await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
+        const advanceResult = await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
 
         const readyMentions = actualReadyUserIds.map(userId => {
           const reg = registrations.find(r => r.userId === userId);
@@ -894,6 +894,11 @@ export class DiscordTournamentService {
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+        
+        // Check if tournament is complete (only one team left)
+        if (advanceResult?.completed && advanceResult?.winnerTeamId) {
+          await this.postTournamentWinnerEmbed(client, tournament, advanceResult.winnerTeamId);
+        }
 
       } else if (readyCount === 1) {
         // 1/4 ready: Team with 0 ready forfeits, prompt admin for sub to partner with 1 ready player
@@ -962,7 +967,7 @@ export class DiscordTournamentService {
   /**
    * Post tournament match result and check for next round matches
    */
-  static async postTournamentMatchResult(client, match, game, winnerTeamId) {
+  static async postTournamentMatchResult(client, match, game, winnerTeamId, advanceResult = null) {
     try {
       const { prisma } = await import('../config/database.js');
       const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);

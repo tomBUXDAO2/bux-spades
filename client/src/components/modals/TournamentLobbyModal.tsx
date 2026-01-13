@@ -320,12 +320,47 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
 
                   const getTeamDisplay = (teamId: string | null) => {
                     if (!teamId) return { name: 'TBD', players: [] };
-                    const players = teamIdToPlayers.get(teamId);
-                    if (!players) return { name: teamId, players: [] };
-                    return { 
-                      name: players.map(p => p.username).join(' & '), 
-                      players 
-                    };
+                    
+                    // Check if already mapped
+                    let players = teamIdToPlayers.get(teamId);
+                    if (players) {
+                      return { 
+                        name: players.map(p => p.username).join(' & '), 
+                        players 
+                      };
+                    }
+                    
+                    // Parse team ID format: team_userId1_userId2 or team_userId
+                    if (teamId.startsWith('team_')) {
+                      const parts = teamId.replace('team_', '').split('_');
+                      const playerUsernames: string[] = [];
+                      
+                      for (const userId of parts) {
+                        // Find user in registrations
+                        const reg = tournament.registrations.find(r => r.userId === userId);
+                        if (reg) {
+                          playerUsernames.push(reg.user.username);
+                        } else {
+                          // Try to find as partner
+                          const partnerReg = tournament.registrations.find(r => r.partnerId === userId);
+                          if (partnerReg) {
+                            playerUsernames.push(partnerReg.partner?.username || 'Unknown');
+                          } else {
+                            playerUsernames.push('Unknown');
+                          }
+                        }
+                      }
+                      
+                      if (playerUsernames.length > 0) {
+                        return {
+                          name: playerUsernames.join(' & '),
+                          players: playerUsernames.map(username => ({ username, avatarUrl: null }))
+                        };
+                      }
+                    }
+                    
+                    // Fallback: return team ID as name
+                    return { name: teamId, players: [] };
                   };
 
                   // Check if double elimination

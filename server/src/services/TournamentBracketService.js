@@ -435,7 +435,7 @@ export class TournamentBracketService {
     });
 
     if (remainingMatches === 0) {
-      // Tournament complete
+      // Tournament complete - find winner
       const finalMatch = await prisma.tournamentMatch.findFirst({
         where: {
           tournamentId,
@@ -449,8 +449,37 @@ export class TournamentBracketService {
           where: { id: tournamentId },
           data: { status: 'COMPLETED' },
         });
+        
+        // Return winner info for Discord embed
+        return { completed: true, winnerTeamId: finalMatch.winnerId };
       }
     }
+    
+    // Check if only one team remains (tournament winner)
+    const allMatches = await prisma.tournamentMatch.findMany({
+      where: { tournamentId },
+      include: {
+        tournament: true,
+      },
+    });
+    
+    const activeTeams = new Set();
+    allMatches.forEach(match => {
+      if (match.team1Id && match.status !== 'COMPLETED') activeTeams.add(match.team1Id);
+      if (match.team2Id && match.status !== 'COMPLETED') activeTeams.add(match.team2Id);
+    });
+    
+    // If only one team left and no pending matches, they're the winner
+    if (activeTeams.size === 1 && remainingMatches === 0) {
+      const winnerTeamId = Array.from(activeTeams)[0];
+      await prisma.tournament.update({
+        where: { id: tournamentId },
+        data: { status: 'COMPLETED' },
+      });
+      return { completed: true, winnerTeamId };
+    }
+    
+    return { completed: false };
   }
 }
 
