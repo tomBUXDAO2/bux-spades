@@ -3,7 +3,10 @@ import { prisma } from '../config/database.js';
 import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 
 export class TournamentReadyService {
-  static READY_TTL = 300; // 5 minutes in seconds
+  // Keep ready status longer than the 5-minute match timer so we still
+  // know who clicked ready when the timer expires. Timer TTL is 300s;
+  // we keep ready data for 15 minutes and explicitly clear it when done.
+  static READY_TTL = 900; // 15 minutes in seconds
 
   /**
    * Get ready status key for a match
