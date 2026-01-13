@@ -389,9 +389,9 @@ export class TournamentBracketService {
       });
 
       // Advance bracket - find next round matches and update them
-      await this.advanceBracket(tournamentId, match, winnerTeamId);
+      const advanceResult = await this.advanceBracket(tournamentId, match, winnerTeamId);
 
-      return match;
+      return { match, advanceResult };
     } catch (error) {
       console.error('[TOURNAMENT BRACKET] Error recording match result:', error);
       throw error;

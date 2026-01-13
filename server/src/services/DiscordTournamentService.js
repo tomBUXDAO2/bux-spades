@@ -1073,4 +1073,177 @@ export class DiscordTournamentService {
       console.error('[DISCORD TOURNAMENT] Error checking next round matches:', error);
     }
   }
+  
+  /**
+   * Post tournament winner embed with prizes
+   */
+  static async postTournamentWinnerEmbed(client, tournament, winnerTeamId) {
+    try {
+      const { prisma } = await import('../config/database.js');
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      
+      // Get tournament with registrations
+      const fullTournament = await prisma.tournament.findUnique({
+        where: { id: tournament.id },
+        include: {
+          registrations: {
+            include: { user: true, partner: true },
+          },
+        },
+      });
+      
+      if (!fullTournament) return;
+      
+      // Parse winner team ID to get player IDs
+      const winnerParts = winnerTeamId.replace('team_', '').split('_');
+      const winnerPlayers = winnerParts.map(userId => {
+        const reg = fullTournament.registrations.find(r => r.userId === userId);
+        if (reg) {
+          return { username: reg.user.username, discordId: reg.user.discordId };
+        }
+        // Try partner
+        const partnerReg = fullTournament.registrations.find(r => r.partnerId === userId);
+        if (partnerReg) {
+          return { username: partnerReg.partner?.username || 'Unknown', discordId: partnerReg.partner?.discordId };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      // Find runners-up (second place team from final match)
+      const finalMatch = await prisma.tournamentMatch.findFirst({
+        where: {
+          tournamentId: tournament.id,
+          round: { gte: 1000 },
+        },
+        orderBy: { round: 'desc' },
+      });
+      
+      let runnersUpPlayers = [];
+      if (finalMatch) {
+        const runnersUpTeamId = finalMatch.team1Id === winnerTeamId ? finalMatch.team2Id : finalMatch.team1Id;
+        if (runnersUpTeamId) {
+          const runnersUpParts = runnersUpTeamId.replace('team_', '').split('_');
+          runnersUpPlayers = runnersUpParts.map(userId => {
+            const reg = fullTournament.registrations.find(r => r.userId === userId);
+            if (reg) {
+              return { username: reg.user.username, discordId: reg.user.discordId };
+            }
+            const partnerReg = fullTournament.registrations.find(r => r.partnerId === userId);
+            if (partnerReg) {
+              return { username: partnerReg.partner?.username || 'Unknown', discordId: partnerReg.partner?.discordId };
+            }
+            return null;
+          }).filter(Boolean);
+        }
+      }
+      
+      const winnerMentions = winnerPlayers.map(p => `<@${p.discordId}>`).join(' & ');
+      const runnersUpMentions = runnersUpPlayers.length > 0 
+        ? runnersUpPlayers.map(p => `<@${p.discordId}>`).join(' & ')
+        : 'N/A';
+      
+      const winnerPrize = tournament.winnerPrize || '10mil each';
+      const runnerUpPrize = tournament.runnerUpPrize || '6mil each';
+      
+      const embed = new EmbedBuilder()
+        .setTitle(`🏆 Tournament Complete - Winners!`)
+        .setDescription(
+          `**Congratulations to our tournament winners!**\n\n` +
+          `**🥇 Winners:** ${winnerMentions}\n` +
+          `**Prize:** ${winnerPrize}\n\n` +
+          (runnersUpPlayers.length > 0 ? 
+            `**🥈 Runners-Up:** ${runnersUpMentions}\n` +
+            `**Prize:** ${runnerUpPrize}\n\n` : '') +
+          `Thank you to everyone who participated! We hope you had fun and we'll see you in the next tournament! 🎉`
+        )
+        .setColor(0xffd700)
+        .setTimestamp();
+      
+      await channel.send({ 
+        content: winnerMentions,
+        embeds: [embed] 
+      });
+      
+      console.log(`[DISCORD TOURNAMENT] Posted winner embed for tournament ${tournament.id}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting winner embed:', error);
+    }
+  }
+  
+  /**
+   * Post elimination embed when a team is eliminated
+   */
+  static async postEliminationEmbed(client, tournament, eliminatedTeamId, match) {
+    try {
+      const { prisma } = await import('../config/database.js');
+      const channel = await client.channels.fetch(TOURNAMENT_CHANNEL_ID);
+      
+      // Get tournament with registrations
+      const fullTournament = await prisma.tournament.findUnique({
+        where: { id: tournament.id },
+        include: {
+          registrations: {
+            include: { user: true, partner: true },
+          },
+        },
+      });
+      
+      if (!fullTournament) return;
+      
+      // Count defeats for this team (only in double elimination)
+      if (tournament.eliminationType === 'DOUBLE') {
+        const defeats = await prisma.tournamentMatch.count({
+          where: {
+            tournamentId: tournament.id,
+            OR: [
+              { team1Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId } },
+              { team2Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId } },
+            ],
+            status: 'COMPLETED',
+          },
+        });
+        
+        // Only post elimination embed after 2 defeats
+        if (defeats < 2) {
+          return; // Not eliminated yet
+        }
+      }
+      
+      // Parse eliminated team ID to get player IDs
+      const eliminatedParts = eliminatedTeamId.replace('team_', '').split('_');
+      const eliminatedPlayers = eliminatedParts.map(userId => {
+        const reg = fullTournament.registrations.find(r => r.userId === userId);
+        if (reg) {
+          return { username: reg.user.username, discordId: reg.user.discordId };
+        }
+        const partnerReg = fullTournament.registrations.find(r => r.partnerId === userId);
+        if (partnerReg) {
+          return { username: partnerReg.partner?.username || 'Unknown', discordId: partnerReg.partner?.discordId };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      if (eliminatedPlayers.length === 0) return;
+      
+      const eliminatedMentions = eliminatedPlayers.map(p => `<@${p.discordId}>`).join(' & ');
+      
+      const embed = new EmbedBuilder()
+        .setTitle(`❌ Team Eliminated`)
+        .setDescription(
+          `**${eliminatedMentions}** have been eliminated from the tournament.\n\n` +
+          `Thank you for playing! We hope you had fun and we'll see you in the next tournament! 🎉`
+        )
+        .setColor(0xff0000)
+        .setTimestamp();
+      
+      await channel.send({ 
+        content: eliminatedMentions,
+        embeds: [embed] 
+      });
+      
+      console.log(`[DISCORD TOURNAMENT] Posted elimination embed for team ${eliminatedTeamId}`);
+    } catch (error) {
+      console.error('[DISCORD TOURNAMENT] Error posting elimination embed:', error);
+    }
+  }
 }
