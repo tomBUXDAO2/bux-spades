@@ -328,11 +328,11 @@ export class DiscordResultsService {
       });
 
       // Record match result and advance bracket
-      await TournamentBracketService.recordMatchResult(tournamentId, matchId, winnerTeamId);
+      const result = await TournamentBracketService.recordMatchResult(tournamentId, matchId, winnerTeamId);
 
       // Post result to tournament channel
       if (client && client.isReady()) {
-        await DiscordTournamentService.postTournamentMatchResult(client, match, game, winnerTeamId);
+        await DiscordTournamentService.postTournamentMatchResult(client, result.match, game, winnerTeamId, result.advanceResult);
       }
 
       console.log(`[DISCORD RESULTS] Successfully posted tournament result for game ${gameId}`);
