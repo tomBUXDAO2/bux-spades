@@ -50,13 +50,26 @@ export class TournamentReadyService {
       console.log('[TOURNAMENT READY] Getting ready data from key:', key);
       const readyData = await redisClient.get(key);
       console.log('[TOURNAMENT READY] Ready data from Redis:', readyData);
-      const ready = readyData ? JSON.parse(readyData) : { ready: new Set(), players: {} };
       
-      // Convert Set to Array for JSON
-      if (!ready.ready) ready.ready = [];
+      // Initialize ready object - always use arrays, not Sets
+      let ready;
+      if (readyData) {
+        ready = JSON.parse(readyData);
+        // Ensure ready is an array (might be stored as array or Set-like object)
+        if (!Array.isArray(ready.ready)) {
+          ready.ready = ready.ready ? Array.from(ready.ready) : [];
+        }
+      } else {
+        ready = { ready: [], players: {} };
+      }
+      
+      // Ensure players object exists
       if (!ready.players) ready.players = {};
       
-      ready.ready.push(userId);
+      // Add userId to ready array if not already present
+      if (!ready.ready.includes(userId)) {
+        ready.ready.push(userId);
+      }
       ready.players[userId] = {
         discordId,
         readyAt: new Date().toISOString(),
