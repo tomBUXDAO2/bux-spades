@@ -93,13 +93,18 @@ export class TournamentReadyService {
    */
   static async getReadyStatus(matchId) {
     try {
-      if (!redisClient) return { ready: [], players: {}, timerExpiry: null };
+      if (!redisClient) {
+        console.log(`[TOURNAMENT READY] Redis client not available for match ${matchId}`);
+        return { ready: [], players: {}, timerExpiry: null };
+      }
       
       const key = this.getReadyStatusKey(matchId);
       const timerKey = this.getTimerKey(matchId);
       
       const readyData = await redisClient.get(key);
       const timerExpiry = await redisClient.get(timerKey);
+      
+      console.log(`[TOURNAMENT READY] Getting ready status for match ${matchId}: timerKey=${timerKey}, timerExpiry=${timerExpiry}`);
       
       const ready = readyData ? JSON.parse(readyData) : { ready: [], players: {} };
       
@@ -119,13 +124,21 @@ export class TournamentReadyService {
    */
   static async setTimer(matchId, expiryTimestamp) {
     try {
-      if (!redisClient) return false;
+      if (!redisClient) {
+        console.error('[TOURNAMENT READY] Redis client not available for setting timer');
+        return false;
+      }
       
       const key = this.getTimerKey(matchId);
       const ttl = Math.max(0, Math.floor((expiryTimestamp - Date.now()) / 1000));
       
+      console.log(`[TOURNAMENT READY] Setting timer for match ${matchId}: expiry=${expiryTimestamp}, ttl=${ttl}s, key=${key}`);
+      
       if (ttl > 0) {
         await redisClient.setEx(key, ttl, expiryTimestamp.toString());
+        console.log(`[TOURNAMENT READY] Timer set successfully for match ${matchId}`);
+      } else {
+        console.warn(`[TOURNAMENT READY] Timer TTL is ${ttl}, not setting timer for match ${matchId}`);
       }
       
       return true;
