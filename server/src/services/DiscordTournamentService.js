@@ -736,9 +736,11 @@ export class DiscordTournamentService {
 
   /**
    * Handle timer expiry for a match
-   * 1 missing: prompt admin to add sub name
-   * 2 missing: void game, 2 present players become a team and progress
-   * 3 missing: assign 1 sub as partner, that team progresses
+   * Scenarios are based on how many players actually clicked ready:
+   * - 3/4 ready: Show missing player, prompt admin for sub
+   * - 2/4 ready: Void game, 2 present players become team and progress
+   * - 1/4 ready: Team with 0 ready forfeits, prompt admin for sub to partner with 1 ready player
+   * - 0/4 ready: Game voided, nobody progresses, next round opponent gets bye
    */
   static async handleTimerExpiry(client, match, tournament, expiryCheck) {
     try {
@@ -777,9 +779,17 @@ export class DiscordTournamentService {
       // Get missing and ready players
       const missingPlayerIds = expiryCheck.missingPlayerIds || [];
       const readyPlayerIds = expiryCheck.readyPlayerIds || [];
-      const missingCount = expiryCheck.missingCount || 0;
+      const readyCount = readyPlayerIds.length;
 
-      if (missingCount === 0) {
+      console.log('[DISCORD TOURNAMENT] Timer expiry scenario', {
+        matchId: match.id,
+        readyPlayerIds,
+        missingPlayerIds,
+        readyCount,
+        expectedPlayers: allPlayers,
+      });
+
+      if (readyCount === 0) {
         // 0/4 ready: Game voided, nobody progresses, next round opponent gets bye
         await prisma.tournamentMatch.update({
           where: { id: match.id },
@@ -804,7 +814,7 @@ export class DiscordTournamentService {
 
         await channel.send({ embeds: [embed] });
 
-      } else if (missingCount === 1) {
+      } else if (readyCount === 3) {
         // 3/4 ready: Show missing player, prompt admin for sub
         const missingUserId = missingPlayerIds[0];
         const missingReg = registrations.find(r => r.userId === missingUserId || r.partnerId === missingUserId);
@@ -836,7 +846,7 @@ export class DiscordTournamentService {
 
         await channel.send({ embeds: [embed] });
 
-      } else if (missingCount === 2) {
+      } else if (readyCount === 2) {
         // 2/4 ready: Void game, 2 present players become a team and progress
         // Extract actual user IDs (not partner IDs)
         const actualReadyUserIds = readyPlayerIds.filter(id => {
@@ -885,7 +895,7 @@ export class DiscordTournamentService {
 
         await channel.send({ embeds: [embed] });
 
-      } else if (missingCount === 3) {
+      } else if (readyCount === 1) {
         // 1/4 ready: Team with 0 ready forfeits, prompt admin for sub to partner with 1 ready player
         const readyUserId = readyPlayerIds[0];
         const readyReg = registrations.find(r => r.userId === readyUserId);
@@ -932,6 +942,14 @@ export class DiscordTournamentService {
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+      } else {
+        console.warn('[DISCORD TOURNAMENT] Unhandled timer expiry scenario', {
+          matchId: match.id,
+          readyPlayerIds,
+          missingPlayerIds,
+          readyCount,
+          expectedPlayers: allPlayers,
+        });
       }
 
       console.log(`[DISCORD TOURNAMENT] Handled timer expiry for match ${match.id} - ${missingCount} missing`);
