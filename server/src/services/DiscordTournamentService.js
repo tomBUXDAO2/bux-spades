@@ -779,14 +779,48 @@ export class DiscordTournamentService {
       const readyPlayerIds = expiryCheck.readyPlayerIds || [];
       const missingCount = expiryCheck.missingCount || 0;
 
-      if (missingCount === 1) {
-        // 1 missing: prompt admin to add sub name
-        const missingUserId = missingPlayerIds[0];
-        const missingReg = registrations.find(r => r.userId === missingUserId);
-        const missingDiscordId = missingReg?.user?.discordId;
+      if (missingCount === 0) {
+        // 0/4 ready: Game voided, nobody progresses, next round opponent gets bye
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: {
+            status: 'COMPLETED',
+            winnerId: null, // No winner - game voided
+          },
+        });
 
-        const readyRegs = registrations.filter(r => readyPlayerIds.includes(r.userId));
-        const readyMentions = readyRegs.map(r => `<@${r.user.discordId}>`).join(', ');
+        // Advance bracket with null winner (creates bye)
+        await TournamentBracketService.advanceBracket(tournament.id, match, null);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`❌ Match ${match.matchNumber} - Game Voided`)
+          .setDescription(
+            `**Timer expired!** No players ready up.\n\n` +
+            `**Game voided.** Nobody progresses.\n\n` +
+            `*The next round opponent will receive a bye.*`
+          )
+          .setColor(0xff0000)
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+
+      } else if (missingCount === 1) {
+        // 3/4 ready: Show missing player, prompt admin for sub
+        const missingUserId = missingPlayerIds[0];
+        const missingReg = registrations.find(r => r.userId === missingUserId || r.partnerId === missingUserId);
+        const missingDiscordId = missingReg?.user?.discordId || missingReg?.partner?.discordId;
+
+        const readyRegs = registrations.filter(r => 
+          readyPlayerIds.includes(r.userId) || (r.partnerId && readyPlayerIds.includes(r.partnerId))
+        );
+        const readyMentions = readyRegs.map(r => {
+          if (readyPlayerIds.includes(r.userId)) {
+            return `<@${r.user.discordId}>`;
+          } else if (r.partnerId && readyPlayerIds.includes(r.partnerId)) {
+            return `<@${r.partner?.discordId}>`;
+          }
+          return '';
+        }).filter(Boolean).join(', ');
 
         const embed = new EmbedBuilder()
           .setTitle(`⚠️ Match ${match.matchNumber} - 1 Player Missing`)
@@ -795,7 +829,7 @@ export class DiscordTournamentService {
             `**Ready Players (3/4):** ${readyMentions}\n` +
             `**Missing Player:** <@${missingDiscordId}>\n\n` +
             `**Admins:** Please use \`/tournament-sub\` command to assign a substitute player.\n` +
-            `Format: \`/tournament-sub match:<matchId> player:<discordId>\``
+            `Format: \`/tournament-sub match:${match.id} player:<discordId>\``
           )
           .setColor(0xff9900)
           .setTimestamp();
@@ -803,17 +837,21 @@ export class DiscordTournamentService {
         await channel.send({ embeds: [embed] });
 
       } else if (missingCount === 2) {
-        // 2 missing: void game, 2 present players become a team and progress
-        const readyRegs = registrations.filter(r => readyPlayerIds.includes(r.userId));
+        // 2/4 ready: Void game, 2 present players become a team and progress
+        // Extract actual user IDs (not partner IDs)
+        const actualReadyUserIds = readyPlayerIds.filter(id => {
+          const reg = registrations.find(r => r.userId === id);
+          return reg && !reg.isSub;
+        });
         
-        if (readyRegs.length !== 2) {
-          console.error(`[TOURNAMENT] Expected 2 ready players but found ${readyRegs.length}`);
+        if (actualReadyUserIds.length !== 2) {
+          console.error(`[TOURNAMENT] Expected 2 ready players but found ${actualReadyUserIds.length}`);
           return;
         }
 
         // Create new team from the 2 present players
-        const player1Id = readyRegs[0].userId;
-        const player2Id = readyRegs[1].userId;
+        const player1Id = actualReadyUserIds[0];
+        const player2Id = actualReadyUserIds[1];
 
         // Mark match as completed with new team as winner
         const newTeamId = `team_${player1Id}_${player2Id}`;
@@ -829,7 +867,10 @@ export class DiscordTournamentService {
         // Advance bracket with new team
         await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
 
-        const readyMentions = readyRegs.map(r => `<@${r.user.discordId}>`).join(' & ');
+        const readyMentions = actualReadyUserIds.map(userId => {
+          const reg = registrations.find(r => r.userId === userId);
+          return `<@${reg?.user?.discordId}>`;
+        }).filter(Boolean).join(' & ');
 
         const embed = new EmbedBuilder()
           .setTitle(`✅ Match ${match.matchNumber} - Auto-Advanced`)
@@ -845,7 +886,7 @@ export class DiscordTournamentService {
         await channel.send({ embeds: [embed] });
 
       } else if (missingCount === 3) {
-        // 3 missing: assign 1 sub as partner, that team progresses
+        // 1/4 ready: Team with 0 ready forfeits, prompt admin for sub to partner with 1 ready player
         const readyUserId = readyPlayerIds[0];
         const readyReg = registrations.find(r => r.userId === readyUserId);
         
@@ -854,45 +895,38 @@ export class DiscordTournamentService {
           return;
         }
 
-        // Find an available sub
-        const subs = registrations.filter(r => r.isSub && r.tournamentId === tournament.id);
-        if (subs.length === 0) {
-          const embed = new EmbedBuilder()
-            .setTitle(`❌ Match ${match.matchNumber} - No Subs Available`)
-            .setDescription(
-              `**Timer expired!** 3 players did not ready up.\n\n` +
-              `**Ready Player:** <@${readyReg.user.discordId}>\n\n` +
-              `**Error:** No substitutes available. Please manually handle this match.`
-            )
-            .setColor(0xff0000)
-            .setTimestamp();
-
-          await channel.send({ embeds: [embed] });
-          return;
+        // Determine which team forfeited (the one with 0 ready players)
+        const team1Ready = team1Players.some(id => readyPlayerIds.includes(id));
+        const team2Ready = team2Players && team2Players.some(id => readyPlayerIds.includes(id));
+        
+        let forfeitingTeamName = 'Unknown Team';
+        if (!team1Ready) {
+          forfeitingTeamName = `Team 1 (${match.team1Id})`;
+        } else if (!team2Ready) {
+          forfeitingTeamName = `Team 2 (${match.team2Id})`;
         }
 
-        // Assign first available sub
-        const subReg = subs[0];
-        const newTeamId = `team_${readyUserId}_${subReg.userId}`;
-
-        // Mark match as completed with new team as winner
-        await prisma.tournamentMatch.update({
-          where: { id: match.id },
-          data: {
-            status: 'COMPLETED',
-            winnerId: newTeamId,
-          },
-        });
-
-        // Advance bracket with new team
-        await TournamentBracketService.advanceBracket(tournament.id, match, newTeamId);
+        const missingRegs = registrations.filter(r => 
+          missingPlayerIds.includes(r.userId) || (r.partnerId && missingPlayerIds.includes(r.partnerId))
+        );
+        const missingMentions = missingRegs.map(r => {
+          if (missingPlayerIds.includes(r.userId)) {
+            return `<@${r.user.discordId}>`;
+          } else if (r.partnerId && missingPlayerIds.includes(r.partnerId)) {
+            return `<@${r.partner?.discordId}>`;
+          }
+          return '';
+        }).filter(Boolean).join(', ');
 
         const embed = new EmbedBuilder()
-          .setTitle(`✅ Match ${match.matchNumber} - Sub Assigned`)
+          .setTitle(`⚠️ Match ${match.matchNumber} - Team Forfeited`)
           .setDescription(
             `**Timer expired!** 3 players did not ready up.\n\n` +
-            `**Substitute assigned:** <@${subReg.user.discordId}> partners with <@${readyReg.user.discordId}>\n\n` +
-            `**New team advances automatically.**`
+            `**Ready Player:** <@${readyReg.user.discordId}>\n` +
+            `**Missing Players:** ${missingMentions}\n\n` +
+            `**${forfeitingTeamName} forfeits.**\n\n` +
+            `**Admins:** Please use \`/tournament-sub\` command to assign a substitute partner for the ready player.\n` +
+            `Format: \`/tournament-sub match:${match.id} player:<discordId>\``
           )
           .setColor(0xff9900)
           .setTimestamp();

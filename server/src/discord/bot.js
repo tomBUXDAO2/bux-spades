@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { commands, handleButtonInteraction, handleSelectMenuInteraction, handleModalSubmit } from './commands/index.js';
 import { startEventScheduler, stopEventScheduler } from '../services/EventScheduler.js';
 import { registerRoleMetadata } from './linkedRoles.js';
+import { TournamentTimerService } from '../services/TournamentTimerService.js';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
@@ -128,6 +129,8 @@ client.on('ready', async () => {
   await startEventScheduler(client).catch((error) => {
     console.error('[DISCORD BOT] Failed to start event scheduler:', error);
   });
+  // Start tournament timer checker
+  TournamentTimerService.start(client);
 });
 
 // Start the bot
