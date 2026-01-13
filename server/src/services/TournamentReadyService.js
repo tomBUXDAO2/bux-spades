@@ -160,6 +160,7 @@ export class TournamentReadyService {
 
   /**
    * Get time remaining in seconds
+   * Returns 0 if timer doesn't exist (either never set or expired and deleted by Redis TTL)
    */
   static async getTimeRemaining(matchId) {
     try {
@@ -168,11 +169,15 @@ export class TournamentReadyService {
       const timerKey = this.getTimerKey(matchId);
       const expiry = await redisClient.get(timerKey);
       
-      if (!expiry) return 0;
+      if (!expiry) {
+        console.log(`[TOURNAMENT READY] Timer key ${timerKey} not found (expired or never set)`);
+        return 0; // Timer expired (Redis TTL deleted it) or never set
+      }
       
       const expiryTimestamp = parseInt(expiry);
       const remaining = Math.max(0, Math.floor((expiryTimestamp - Date.now()) / 1000));
       
+      console.log(`[TOURNAMENT READY] Time remaining for match ${matchId}: ${remaining}s (expires at ${expiryTimestamp}, now ${Date.now()})`);
       return remaining;
     } catch (error) {
       console.error('[TOURNAMENT READY] Error getting time remaining:', error);

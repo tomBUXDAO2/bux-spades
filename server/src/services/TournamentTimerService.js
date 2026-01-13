@@ -82,24 +82,32 @@ export class TournamentTimerService {
       
       for (const match of activeMatches) {
         console.log(`[TOURNAMENT TIMER] Checking match ${match.id}...`);
-        // Check if this match has a timer set
+        // Check if this match has a timer set or if it expired (timer key might be deleted by Redis TTL)
         const readyStatus = await TournamentReadyService.getReadyStatus(match.id);
         console.log(`[TOURNAMENT TIMER] Match ${match.id} ready status:`, {
           timerExpiry: readyStatus.timerExpiry,
           ready: readyStatus.ready,
         });
         
-        if (!readyStatus.timerExpiry) {
-          console.log(`[TOURNAMENT TIMER] Match ${match.id} has no timer set, skipping`);
-          continue; // No timer set for this match
-        }
-
-        // Check if timer has expired
+        // Check if timer has expired (this will return true if timer key was deleted by Redis TTL)
         const isExpired = await TournamentReadyService.isTimerExpired(match.id);
         console.log(`[TOURNAMENT TIMER] Match ${match.id} timer expired?`, isExpired);
+        
+        // If timerExpiry is null, it could mean:
+        // 1. Timer was never set (match created before timer service)
+        // 2. Timer expired and Redis deleted the key (TTL expired)
+        // We only process if timer has expired (meaning it was set and then expired)
+        if (!readyStatus.timerExpiry && !isExpired) {
+          console.log(`[TOURNAMENT TIMER] Match ${match.id} has no timer set and hasn't expired, skipping`);
+          continue; // No timer was ever set for this match
+        }
+        
         if (!isExpired) {
+          console.log(`[TOURNAMENT TIMER] Match ${match.id} timer hasn't expired yet, skipping`);
           continue; // Timer hasn't expired yet
         }
+        
+        console.log(`[TOURNAMENT TIMER] Match ${match.id} timer has expired!`);
 
         // Build team ID to player IDs map
         const teamIdToPlayerIds = new Map();
