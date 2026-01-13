@@ -21,7 +21,9 @@ export class TournamentTimerService {
     this.client = client;
 
     // Run immediately, then every minute
-    this.checkExpiredTimers();
+    this.checkExpiredTimers().catch(error => {
+      console.error('[TOURNAMENT TIMER] Error in initial check:', error);
+    });
 
     this.intervalId = setInterval(async () => {
       try {
@@ -51,10 +53,12 @@ export class TournamentTimerService {
    */
   static async checkExpiredTimers() {
     if (!this.client) {
+      console.log('[TOURNAMENT TIMER] No client available, skipping check');
       return;
     }
 
     try {
+      console.log('[TOURNAMENT TIMER] Checking for expired timers...');
       // Find all matches that are waiting for players to ready up
       const activeMatches = await prisma.tournamentMatch.findMany({
         where: {
@@ -74,15 +78,25 @@ export class TournamentTimerService {
         },
       });
 
+      console.log(`[TOURNAMENT TIMER] Found ${activeMatches.length} pending matches`);
+      
       for (const match of activeMatches) {
+        console.log(`[TOURNAMENT TIMER] Checking match ${match.id}...`);
         // Check if this match has a timer set
         const readyStatus = await TournamentReadyService.getReadyStatus(match.id);
+        console.log(`[TOURNAMENT TIMER] Match ${match.id} ready status:`, {
+          timerExpiry: readyStatus.timerExpiry,
+          ready: readyStatus.ready,
+        });
+        
         if (!readyStatus.timerExpiry) {
+          console.log(`[TOURNAMENT TIMER] Match ${match.id} has no timer set, skipping`);
           continue; // No timer set for this match
         }
 
         // Check if timer has expired
         const isExpired = await TournamentReadyService.isTimerExpired(match.id);
+        console.log(`[TOURNAMENT TIMER] Match ${match.id} timer expired?`, isExpired);
         if (!isExpired) {
           continue; // Timer hasn't expired yet
         }
