@@ -1026,8 +1026,19 @@ export class DiscordTournamentService {
 
       await channel.send({ embeds: [embed] });
 
-      // Check for next round matches ready to be called
-      await this.checkAndCallNextRoundMatches(client, tournament, match);
+      // Check if tournament is complete (winner determined)
+      if (advanceResult?.completed && advanceResult?.winnerTeamId) {
+        await this.postTournamentWinnerEmbed(client, tournament, advanceResult.winnerTeamId);
+      } else {
+        // Check for next round matches that are ready to be called
+        await this.checkAndCallNextRoundMatches(client, tournament, match);
+      }
+      
+      // Post elimination embed for losing team (if double elimination, check defeats)
+      const losingTeamId = match.team1Id === winnerTeamId ? match.team2Id : match.team1Id;
+      if (losingTeamId) {
+        await this.postEliminationEmbed(client, tournament, losingTeamId, match);
+      }
 
       console.log(`[DISCORD TOURNAMENT] Posted match result for match ${match.id}`);
     } catch (error) {
