@@ -895,9 +895,44 @@ export class DiscordTournamentService {
 
         await channel.send({ embeds: [embed] });
         
+        // Post elimination embeds for the 2 missing players (they form the losing team)
+        const missingTeam1Id = match.team1Id;
+        const missingTeam2Id = match.team2Id;
+        
+        // Determine which team had the missing players (the one that didn't have ready players)
+        const team1Ready = team1Players.some(id => readyPlayerIds.includes(id));
+        const team2Ready = team2Players && team2Players.some(id => readyPlayerIds.includes(id));
+        
+        if (!team1Ready && missingTeam1Id) {
+          await this.postEliminationEmbed(client, tournament, missingTeam1Id, match);
+        }
+        if (!team2Ready && missingTeam2Id) {
+          await this.postEliminationEmbed(client, tournament, missingTeam2Id, match);
+        }
+        
         // Check if tournament is complete (only one team left)
         if (advanceResult?.completed && advanceResult?.winnerTeamId) {
           await this.postTournamentWinnerEmbed(client, tournament, advanceResult.winnerTeamId);
+        } else {
+          // Check manually if only one team remains
+          const allMatches = await prisma.tournamentMatch.findMany({
+            where: { tournamentId: tournament.id },
+          });
+          
+          const activeTeams = new Set();
+          allMatches.forEach(m => {
+            if (m.team1Id && m.status !== 'COMPLETED') activeTeams.add(m.team1Id);
+            if (m.team2Id && m.status !== 'COMPLETED') activeTeams.add(m.team2Id);
+          });
+          
+          if (activeTeams.size === 1) {
+            const winnerTeamId = Array.from(activeTeams)[0];
+            await prisma.tournament.update({
+              where: { id: tournament.id },
+              data: { status: 'COMPLETED' },
+            });
+            await this.postTournamentWinnerEmbed(client, tournament, winnerTeamId);
+          }
         }
 
       } else if (readyCount === 1) {
@@ -1207,16 +1242,24 @@ export class DiscordTournamentService {
           where: {
             tournamentId: tournament.id,
             OR: [
-              { team1Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId } },
-              { team2Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId } },
+              { team1Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId }, status: 'COMPLETED' },
+              { team2Id: eliminatedTeamId, winnerId: { not: eliminatedTeamId }, status: 'COMPLETED' },
             ],
-            status: 'COMPLETED',
           },
         });
         
         // Only post elimination embed after 2 defeats
         if (defeats < 2) {
+          console.log(`[DISCORD TOURNAMENT] Team ${eliminatedTeamId} has ${defeats} defeats, not eliminated yet (need 2)`);
           return; // Not eliminated yet
+        }
+      } else {
+        // Single elimination - check if this match eliminated them
+        const isEliminated = (match.team1Id === eliminatedTeamId && match.winnerId !== eliminatedTeamId) ||
+                            (match.team2Id === eliminatedTeamId && match.winnerId !== eliminatedTeamId);
+        if (!isEliminated) {
+          console.log(`[DISCORD TOURNAMENT] Team ${eliminatedTeamId} not eliminated in this match`);
+          return;
         }
       }
       
