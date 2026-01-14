@@ -991,8 +991,10 @@ export class DiscordTournamentService {
           expectedPlayers: allPlayers,
         });
       }
-
-      console.log(`[DISCORD TOURNAMENT] Handled timer expiry for match ${match.id} - ${missingCount} missing`);
+      
+      // Final summary log for this expiry handling
+      const finalMissingCount = missingPlayerIds?.length ?? 0;
+      console.log(`[DISCORD TOURNAMENT] Handled timer expiry for match ${match.id} - ${finalMissingCount} missing`);
     } catch (error) {
       console.error('[DISCORD TOURNAMENT] Error handling timer expiry:', error);
       throw error;
