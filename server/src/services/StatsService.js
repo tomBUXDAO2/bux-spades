@@ -1,4 +1,4 @@
-import { prisma } from '../config/databaseFirst.js';
+import { prisma } from '../config/database.js';
 
 export class StatsService {
   // Get user stats calculated from actual game data
@@ -84,20 +84,58 @@ export class StatsService {
       });
 
       // Get games won count
-      const gamesWon = await prisma.gameResult.count({
+      // IMPORTANT: winner in gameResult is stored as TEAM_0 / TEAM_1 (partners) or PLAYER_i (solo),
+      // not as a userId, so we need to infer whether the user was on the winning team.
+      const userGames = await prisma.gameResult.findMany({
         where: {
           game: {
-            players: {
-              some: { userId }
-            },
             status: 'FINISHED',
             ...(format !== 'ALL' && { format }),
             ...(mode !== 'ALL' && { mode }),
-            ...(isLeague && { isLeague: true })
-          },
-          winner: userId
+            ...(isLeague && { isLeague: true }),
+            players: {
+              some: { userId }
+            }
+          }
+        },
+        include: {
+          game: {
+            select: {
+              mode: true,
+              players: {
+                where: { userId },
+                select: { seatIndex: true, userId: true }
+              }
+            }
+          }
         }
       });
+
+      const gamesWon = userGames.filter(result => {
+        const userPlayer = result.game.players.find(p => p.userId === userId);
+        if (!userPlayer) {
+          console.error(`[STATS SERVICE] No player found for user ${userId} in game result ${result.id}`);
+          return false;
+        }
+
+        const userSeat = userPlayer.seatIndex;
+        if (userSeat === undefined || userSeat === null) {
+          console.error(`[STATS SERVICE] Invalid seatIndex for user ${userId} in game result ${result.id}`);
+          return false;
+        }
+
+        if (result.game.mode === 'SOLO') {
+          // For solo games, winner is stored as PLAYER_i
+          const expectedWinner = `PLAYER_${userSeat}`;
+          const isWinner = result.winner === expectedWinner;
+          return isWinner;
+        } else {
+          // TEAM_0 = seats 0 & 2, TEAM_1 = seats 1 & 3
+          const userTeam = (userSeat % 2 === 0) ? 'TEAM_0' : 'TEAM_1';
+          const isWinner = result.winner === userTeam;
+          return isWinner;
+        }
+      }).length;
 
       // Get total games played
       const totalGames = await prisma.gamePlayer.count({
@@ -193,20 +231,47 @@ export class StatsService {
         where: { userId },
         update: {
           totalGamesPlayed: stats.totalGames,
-          totalGamesWon: stats.gamesWon,
-          lastGameAt: new Date()
+          totalGamesWon: stats.gamesWon
         },
         create: {
           userId,
           totalGamesPlayed: stats.totalGames,
-          totalGamesWon: stats.gamesWon,
-          lastGameAt: new Date()
+          totalGamesWon: stats.gamesWon
         }
       });
 
       console.log(`[STATS SERVICE] Updated stats for user ${userId}`);
     } catch (error) {
       console.error('[STATS SERVICE] Error updating user stats:', error);
+      throw error;
+    }
+  }
+
+  // Rebuild stats for all users from historical game data
+  static async rebuildAllUserStats() {
+    try {
+      console.log('[STATS SERVICE] Rebuilding userStats for all users...');
+
+      const users = await prisma.user.findMany({
+        select: { id: true }
+      });
+
+      let processed = 0;
+      for (const user of users) {
+        try {
+          await this.updateUserStats(user.id);
+          processed += 1;
+          if (processed % 50 === 0) {
+            console.log(`[STATS SERVICE] Rebuilt stats for ${processed}/${users.length} users...`);
+          }
+        } catch (err) {
+          console.error(`[STATS SERVICE] Failed to rebuild stats for user ${user.id}:`, err);
+        }
+      }
+
+      console.log(`[STATS SERVICE] Completed rebuild for ${processed}/${users.length} users`);
+    } catch (error) {
+      console.error('[STATS SERVICE] Error rebuilding all user stats:', error);
       throw error;
     }
   }
