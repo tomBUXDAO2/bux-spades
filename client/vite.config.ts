@@ -8,6 +8,8 @@ const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
 const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000';
 
 export default defineConfig({
+  // Relative base path for Capacitor - ensures assets load in native WebView
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {

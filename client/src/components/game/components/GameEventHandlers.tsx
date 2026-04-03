@@ -29,6 +29,7 @@ import type { GameState, Card, Player, Bot } from "../../../types/game";
 import type { ChatMessage } from "../../../features/chat/Chat";
 import { normalizeGameState } from "../../../features/game/hooks/useGameStateNormalization";
 import { playCardSound } from "./AudioManager";
+import { resetCardPlayDebounce } from "../../../features/game/utils/playCardUtils";
 
 interface GameEventHandlersProps {
   socket: any;
@@ -71,9 +72,8 @@ interface GameEventHandlersProps {
   setRecentChatMessages: (messages: Record<string, ChatMessage>) => void;
   
   // Handlers
-  onNewHandStarted: () => void;
+  onNewHandStarted: (data?: { gameState?: GameState; gameId?: string; roundNumber?: number }) => void;
   onGameJoined: (data: any) => void;
-  onGameStarted: (data: any) => void;
   onHandCompleted: (data: any) => void;
   onGameOver: (data: any) => void;
   onTrickComplete: (data: any) => void;
@@ -125,7 +125,6 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     setRecentChatMessages,
     onNewHandStarted,
     onGameJoined,
-    onGameStarted,
     onHandCompleted,
     onGameOver,
     onTrickComplete,
@@ -211,7 +210,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         // Update game state with new hands
         setGameState(normalizeGameState(data.gameState));
       }
-      onNewHandStarted();
+      onNewHandStarted(data);
     };
     
     socket.on('new_hand_started', handleNewHandStartedEvent);
@@ -223,16 +222,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
 
   // game_joined handled in useSocketEventHandlers.ts
 
-  // Handle game started event
-  useEffect(() => {
-    if (!socket) return;
-    
-    socket.on('game_started', onGameStarted);
-    
-    return () => {
-      socket.off('game_started', onGameStarted);
-    };
-  }, [socket, onGameStarted]);
+  // game_started: parent useSocketEventHandlers updates game; GameTable runs deal animation from gameState
 
   // Effect to handle round completion (replaces hand_completed)
   useEffect(() => {
@@ -257,11 +247,12 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
           // Use running totals from server (already calculated correctly)
           team1TotalScore: data.scores?.team1TotalScore || data.gameState.team1TotalScore || 0,
           team2TotalScore: data.scores?.team2TotalScore || data.gameState.team2TotalScore || 0,
-          team1Bags: data.scores?.team1Bags || 0,
-          team2Bags: data.scores?.team2Bags || 0,
-          // Update player scores for solo games
+          // Bags: data.scores.team*Bags are this-hand-only; cumulative display bags come from gameState (GameService)
+          team1Bags: data.gameState.team1Bags ?? prevState.team1Bags ?? 0,
+          team2Bags: data.gameState.team2Bags ?? prevState.team2Bags ?? 0,
+          // Solo: same — keep running bag totals from full game state, not round summary
           playerScores: data.scores?.playerScores || data.gameState.playerScores || prevState.playerScores,
-          playerBags: data.scores?.playerBags || data.gameState.playerBags || prevState.playerBags
+          playerBags: data.gameState.playerBags ?? prevState.playerBags
         }));
       }
       
@@ -271,7 +262,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       setTimeout(() => {
         console.log('🎮 Showing hand summary after delay');
         onHandCompleted(data);
-      }, 1200); // Shorter delay to keep game pace snappy
+      }, 600);
     };
     
     socket.on('round_complete', roundCompletedHandler);
@@ -298,6 +289,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
 
     const trickStartedHandler = (data: any) => {
       try {
+        resetCardPlayDebounce();
         // Prefer full gameState if provided
         if (data && data.gameState) {
           setGameState(normalizeGameState(data.gameState));

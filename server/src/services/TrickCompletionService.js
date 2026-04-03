@@ -501,7 +501,7 @@ export class TrickCompletionService {
             // CRITICAL FIX: Pass scores in extraPayload so emitPersonalizedGameEvent can properly spread it
             safeEmit({ extraPayload: { scores: scores ?? {} } });
           }
-        }, 900); // Short delay to allow final trick animation before summary
+        }, 550); // Brief delay so final trick can finish before round_complete
       } else {
         console.log(`[TRICK COMPLETION] No io instance provided, cannot emit round_complete`);
       }

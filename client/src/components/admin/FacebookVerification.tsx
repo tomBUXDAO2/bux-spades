@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import axios from '@/features/auth/AuthContext/hooks/AxiosConfig';
 
 interface FacebookVerificationProps {
   userDiscordId?: string;

@@ -1,266 +1,102 @@
-# Bux Spades 2.0
+# BUX Spades
 
-A modern multiplayer Spades card game platform with customizable rules, real-time gameplay, and social features.
+Multiplayer Spades with real-time play, lobby, chat, and configurable rules. **Web** (Vite + React) and **mobile** (Capacitor) clients talk to a **Node** API with **Socket.IO**, **PostgreSQL** (Prisma), and **Redis**.
 
-## Features
-
-### Authentication
-- **Discord OAuth2 Integration**: Quick login with Discord account
-- **Email/Password**: Traditional authentication method
-- Secure JWT-based session management
-- Profile linking between authentication methods
-
-### Game Modes
-- **Partners/Solo Play**: Choose between team-based or individual gameplay
-- **Flexible Bidding Options**:
-  - Regular (with optional nil and blind nil)
-  - Whiz (must bid nil or number of spades)
-  - Mirror (forced to bid number of spades)
-  - Gimmick (hearts, bid 3, bid 4 or nil, suicide)
-- **Special Rules**:
-  - Screamer (spade play restrictions)
-  - Assassin (forced spade cutting and leading)
-
-### Game Settings
-- Customizable point ranges (-250 to -100 minimum, 100 to 650 maximum)
-- Flexible coin buy-in (100k minimum, 50k increments)
-- House rake: 10%
-- Prize distribution: 180k per player
-
-### Social Features
-- Real-time chat in lobby and game rooms
-- Friends list system
-- Player blocking functionality
-- Profile customization
-- Detailed statistics tracking
-
-### Anti-Cheating Measures
-- Face-down card dealing
-- Cards revealed only when player becomes active
-- Blind nil risk confirmation before card reveal
-
-## Tech Stack
-
-### Frontend
-- **React 18** with TypeScript
-- **Vite** for fast development and building
-- **Redux Toolkit** for state management
-- **Socket.IO Client** for real-time communication
-- **Tailwind CSS** for styling
-- **React Router** for navigation
-
-### Backend
-- **Node.js** with Express
-- **TypeScript** for type safety
-- **Prisma** for database ORM
-- **PostgreSQL** for data storage
-- **Socket.IO** for real-time communication
-- **Passport.js** for authentication
-- **JWT** for session management
-
-## Project Structure
+## Repository layout
 
 ```
-bux-spades-2.0/
-├── client/                      # Frontend React application
-│   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   │   ├── auth/          # Authentication components
-│   │   │   ├── game/          # Game-related components
-│   │   │   ├── lobby/         # Lobby components
-│   │   │   ├── chat/          # Chat components
-│   │   │   └── common/        # Shared components
-│   │   ├── pages/             # Main page components
-│   │   ├── store/             # Redux store and slices
-│   │   ├── services/          # API and socket services
-│   │   ├── hooks/             # Custom React hooks
-│   │   ├── context/           # React context providers
-│   │   ├── utils/             # Utility functions
-│   │   ├── types/             # TypeScript type definitions
-│   │   └── assets/            # Static assets
-│   ├── public/                # Public static files
-│   └── package.json           # Frontend dependencies
-│
-├── server/                     # Backend Node.js application
-│   ├── src/
-│   │   ├── controllers/       # Route controllers
-│   │   ├── models/            # Database models
-│   │   ├── routes/            # API routes
-│   │   ├── services/          # Business logic
-│   │   ├── socket/            # Socket.IO event handlers
-│   │   ├── middleware/        # Express middleware
-│   │   ├── config/            # Configuration files
-│   │   ├── utils/             # Utility functions
-│   │   └── types/             # TypeScript type definitions
-│   ├── prisma/                # Database schema and migrations
-│   └── package.json           # Backend dependencies
-│
-├── shared/                     # Shared types and utilities
-│   └── types/                 # Shared TypeScript types
-│
-└── README.md                  # Project documentation
+bux-spades/
+├── client/           # React + TypeScript (Vite). Primary UI.
+├── server/           # Express + Socket.IO (JavaScript, Prisma schema in server/prisma).
+├── scripts/          # Dev helpers, DB smoke tests, one-off maintenance (see scripts/README.md).
+├── docs/             # Design notes, deploy guides, archived fix write-ups (docs/archive/).
+├── redis/            # Local Redis config (if used).
+├── migrations/       # Legacy / auxiliary SQL (prefer Prisma migrations under server/prisma).
+└── vercel.json       # Frontend hosting config (typical setup: API elsewhere, client on Vercel).
 ```
 
-## Game Rules
+There is **no** shared `shared/` package in this repo; types live in `client` (and server uses its own modules).
 
-### Basic Spades Rules
-- Spades are always trump
-- Must follow suit if possible
-- Highest card of the led suit wins unless a spade is played
-- Highest spade wins if any spades are played
+## Prerequisites
 
-### Scoring Rules
-#### Basic Scoring
-- Each trick is worth 10 points
-- Bidding and making exactly your bid: 10 points per trick × bid amount
-- Overtricks (bags): 1 point each
-- Every 10 bags = -100 point penalty
-- After earning the -100 point penalty, bags reset to 0
-- Failing to make bid: -10 points per trick bid
-- Nil bid (making it): 100 points
-- Blind nil bid (making it): 200 points
-- Failing nil bid: -100 points
-- Failing blind nil bid: -200 points
+- **Node.js** 18+
+- **PostgreSQL** (or compatible host for Prisma)
+- **Redis** (for game cache / sessions — match `server/.env`)
+- **Optional:** [Fly.io CLI](https://fly.io/docs/hands-on/install-flyctl/) (`flyctl`) for `npm run deploy:server`
+- **Optional:** Discord / Facebook app credentials for OAuth (see server auth routes)
 
-#### Bag Rules
-- Bags are overtricks (tricks won beyond your bid)
-- Each bag is worth 1 point
-- Every 10 bags = -100 point penalty
-- After earning the -100 point penalty, bags reset to 0
-- Bags are tracked separately from regular points
-- Example: If you have 9 bags and get 2 more, you get:
-  - 2 points for the bags
-  - -100 point penalty
-  - Bags reset to 1
+## Quick start (local)
 
-#### Team Scoring
-- Partners' points are combined
-- Bags are combined between partners
-- Team must reach minimum points to win (e.g., 500)
-- Team must not reach maximum negative points to avoid losing (e.g., -200)
+1. **Install**
 
-#### Game Mode Scoring
-All game modes use the same scoring system, with differences only in bidding rules:
-- **Regular**: Standard bidding with optional nil and blind nil
-- **Whiz**: Must bid nil or number of spades in hand
-- **Mirror**: Forced to bid number of spades in hand
-- **Gimmick**: Forced specific bids:
-  - Hearts bid: Must bid hearts
-  - Bid 3: Must bid 3
-  - Bid 4 or nil: Must bid either 4 or nil
-  - Suicide: One partner from each team must bid nil
+   ```bash
+   cd server && npm install
+   cd ../client && npm install
+   ```
 
-### Special Rules
-- **Screamer**: Cannot play spades unless following spade lead or no other suits available
-- **Assassin**: Must cut and lead spades when possible
-- **Blind Nil**: Option to bid nil before seeing cards
-- **Suicide**: One partner from each team must bid nil
+2. **Environment**
 
-## Getting Started
+   - Copy and fill env files for `server/` and `client/` (see any `.env.example` in those folders if present).
+   - Server needs at least `DATABASE_URL`, JWT/session secrets, and Redis URL as required by `server/src/config`.
 
-### Prerequisites
-- Node.js (v18 or higher)
-- PostgreSQL (v14 or higher)
-- Docker and Docker Compose (optional)
-- Discord Developer Account (for OAuth2)
+3. **Database**
 
-### Installation
+   ```bash
+   cd server
+   npx prisma migrate dev
+   ```
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/bux-spades-2.0.git
-cd bux-spades-2.0
-```
+4. **Run API + web**
 
-2. Install dependencies:
-```bash
-# Install backend dependencies
-cd server
-npm install
+   From the **repo root**:
 
-# Install frontend dependencies
-cd ../client
-npm install
-```
+   ```bash
+   npm run dev
+   ```
 
-3. Set up environment variables:
-```bash
-# In server directory
-cp .env.example .env
-# Edit .env with your configuration:
-# - Database credentials
-# - JWT secret
-# - Discord OAuth2 credentials (Client ID and Secret)
-# - Email service credentials (if using email authentication)
+   - API: `http://localhost:3000` (per `server` scripts)
+   - Web: `http://localhost:5173` (Vite default)
 
-# In client directory
-cp .env.example .env
-# Edit .env with your configuration:
-# - API endpoints
-# - Discord OAuth2 Client ID
-```
+   The script clears listeners on ports **3000** and **5173** before starting.
 
-4. Set up the database:
-```bash
-# In server directory
-npx prisma migrate dev
-```
+## Root `package.json` scripts
 
-5. Start the development servers:
-```bash
-# Start backend (from server directory)
-npm run dev
+| Script | What it does |
+|--------|----------------|
+| `npm run dev` / `start` | `./scripts/start-dev.sh` — both servers |
+| `npm run deploy:server` | `flyctl deploy` for `bux-spades-server` (requires CLI + auth) |
+| `npm run script:db:test` | Prisma connectivity smoke test |
+| `npm run script:db:cleanup` | **Destructive** DB wipe helper (`DATABASE_URL` + `YES` confirmation) |
+| `npm run script:server:restart` | Kill node server pattern, Redis flush, `server` dev |
+| `cap:*`, `apk:*`, `ios:*` | Capacitor / mobile build helpers (see `client/` docs) |
 
-# Start frontend (from client directory)
-npm run dev
-```
+More detail: [`scripts/README.md`](scripts/README.md).
 
-### Docker Deployment
-```bash
-docker-compose up --build
-```
+## Documentation
 
-## Development Workflow
+| Doc | Topic |
+|-----|--------|
+| [`docs/DEPLOY_APP_STORES.md`](docs/DEPLOY_APP_STORES.md) | App store / mobile release notes |
+| [`client/CAPACITOR_SETUP.md`](client/CAPACITOR_SETUP.md), [`client/MOBILE_SETUP.md`](client/MOBILE_SETUP.md) | Mobile tooling |
+| [`server/ARCHITECTURE.md`](server/ARCHITECTURE.md) | Server-oriented overview |
+| [`docs/archive/`](docs/archive/) | Old bug-fix write-ups (historical) |
 
-1. **Authentication System**
-   - Discord OAuth2 integration
-   - Email/password authentication
-   - JWT session management
-   - Profile management
+## Tech stack (accurate to this repo)
 
-2. **Game Lobby**
-   - Real-time game list
-   - Game creation with customizable rules
-   - Player joining/leaving
-   - Chat system
+**Client:** React 18, TypeScript, Vite, Tailwind, React Router, Redux Toolkit (where used), Socket.IO client, Capacitor for native shells.
 
-3. **Game Implementation**
-   - Card dealing and shuffling
-   - Bidding system
-   - Trick taking
-   - Scoring system
-   - Real-time updates
+**Server:** Node, Express, Socket.IO, Prisma → PostgreSQL, Redis, Passport (Discord/Facebook/etc. as configured). Main source is **JavaScript** (`server/src/**/*.js`); `npm run build` in server runs `tsc` if you add TS tooling.
 
-4. **Social Features**
-   - Friends list
-   - Player blocking
-   - Profile customization
-   - Statistics tracking
+## Game features (summary)
+
+- Partners and solo modes, multiple bidding variants (regular, whiz, mirror, gimmicks), nil / blind nil where rules allow.
+- Real-time table, bidding, tricks, scoring; anti-cheat-oriented UX (e.g. face-down deal until it is your turn to bid).
+- Lobby, in-game chat, profiles, stats (see DB schema and client routes for current scope).
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Use feature branches and small PRs. Run client typecheck (`cd client && npx tsc --noEmit`) and server smoke tests after server changes when possible.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Thanks to all contributors and testers
-- Inspired by traditional Spades card game
-- Built with modern web technologies 
+No `LICENSE` file is present in this repository; treat usage as **all rights reserved** unless you add a license.

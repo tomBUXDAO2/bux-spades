@@ -1,7 +1,7 @@
 // Modularized GameTable component
 // This is a simplified version that uses the extracted components
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
 import Chat from '../../../features/chat/Chat';
@@ -96,6 +96,9 @@ export default function GameTableModular({
   
   // Ref to track if cards have been revealed during bidding (never flip back)
   const cardsRevealedDuringBiddingRef = useRef(false);
+  const dealGenerationRef = useRef(0);
+  const dealPrimedKeyRef = useRef<string | null>(null);
+  const pendingPlayedCardRef = useRef<Card | null>(null);
   
   // Modal states
   const [showHandSummary, setShowHandSummary] = useState(false);
@@ -133,6 +136,36 @@ export default function GameTableModular({
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
   const [pendingBid, setPendingBid] = useState<{ playerId: string; bid: number } | null>(null);
+
+  useEffect(() => {
+    pendingPlayedCardRef.current = pendingPlayedCard;
+  }, [pendingPlayedCard]);
+
+  const scheduleDealAnimation = useCallback(() => {
+    cardsRevealedDuringBiddingRef.current = false;
+    dealGenerationRef.current += 1;
+    const gen = dealGenerationRef.current;
+    setCardsRevealed(false);
+    setDealingComplete(false);
+    setDealtCardCount(0);
+    setBiddingReady(false);
+    try {
+      const { playCardDealingSound } = require('@/components/game/components/AudioManager');
+      playCardDealingSound();
+    } catch {
+      /* optional */
+    }
+    for (let i = 0; i < 13; i++) {
+      setTimeout(() => {
+        if (dealGenerationRef.current !== gen) return;
+        setDealtCardCount(i + 1);
+        if (i === 12) {
+          setDealingComplete(true);
+          setBiddingReady(true);
+        }
+      }, i * 100);
+    }
+  }, []);
   
   
   // League states
@@ -228,10 +261,7 @@ export default function GameTableModular({
   
   // Event handlers
   const handleNewHandStarted = () => {
-    setDealingComplete(false);
-    setBiddingReady(false);
-    setDealtCardCount(0);
-    setCardsRevealed(false);
+    // Deal stagger is scheduled once from gameState when BIDDING + hands arrive (see effect below)
   };
   
   const handleGameJoined = (data: any) => {
@@ -256,48 +286,36 @@ export default function GameTableModular({
     }
   };
   
-  const handleGameStarted = (data: any) => {
-    if (data.hands || (data.status === "BIDDING" && gameState.hands)) {
-      const handsArray = data.hands.map((h: any) => h.hand);
-      setGameState(prev => ({ ...prev, hands: handsArray, status: data.status || "BIDDING", currentPlayer: data.currentPlayer }));
-      
-      // CRITICAL: Start with cards face down and dealing incomplete
-      setCardsRevealed(false);
-      setDealingComplete(false);
-      setDealtCardCount(0);
-      setBiddingReady(false);
-      // CRITICAL: Reset the ref so cards don't stay revealed from previous rounds
-      cardsRevealedDuringBiddingRef.current = false;
-      
-      // Play dealer animation with sound effects
-      const { playCardDealingSound } = require('@/components/game/components/AudioManager');
-      playCardDealingSound();
-      
-      // Stagger card dealing animation - reveal cards one by one (but keep them face down)
-      for (let i = 0; i < 13; i++) {
-        setTimeout(() => {
-          setDealtCardCount(i + 1);
-          if (i === 12) {
-            // After all cards are dealt, mark dealing as complete
-            // BUT DO NOT reveal cards - they stay face down until player's turn
-            setDealingComplete(true);
-            setBiddingReady(true);
-          }
-        }, i * 100); // 100ms delay between each card (matches sound timing)
-      }
-      
-      // Show coin deduction ANIMATION at game start (visual only, no actual deduction)
-      if (data.gameState?.rated && data.gameState?.buyIn) {
-        setCoinDeductionAmount(data.gameState.buyIn);
-        setShowCoinDeduction(true);
-        // Hide animation after 3 seconds
-        setTimeout(() => setShowCoinDeduction(false), 3000);
-      }
-      
-      // setIsStarting(false); // Using prop from parent
+  const biddingHandsLengthKey = useMemo(() => {
+    const h = (gameState as any)?.hands;
+    if (!Array.isArray(h)) return "";
+    return h.map((seat: unknown) => (Array.isArray(seat) ? seat.length : 0)).join("-");
+  }, [gameState, (gameState as any)?.hands]);
+
+  // Single place for deal stagger: follows merged gameState (from socket + game prop), avoids duplicate game_started listeners
+  useEffect(() => {
+    if (!gameState?.id || gameState.status !== "BIDDING") return;
+    const parts = biddingHandsLengthKey.split("-").filter(Boolean).map(Number);
+    const maxLen = parts.length ? Math.max(0, ...parts) : 0;
+    if (maxLen === 0) return;
+    const key = `${gameState.id}:${gameState.currentRound ?? 0}`;
+    if (dealPrimedKeyRef.current === key) return;
+    dealPrimedKeyRef.current = key;
+    scheduleDealAnimation();
+    const gs = gameState as GameState & { rated?: boolean; buyIn?: number };
+    if ((gameState.currentRound ?? 1) <= 1 && gs.rated && gs.buyIn) {
+      setCoinDeductionAmount(gs.buyIn);
+      setShowCoinDeduction(true);
+      setTimeout(() => setShowCoinDeduction(false), 3000);
     }
-  };
-  
+  }, [
+    gameState?.id,
+    gameState?.status,
+    gameState?.currentRound,
+    biddingHandsLengthKey,
+    scheduleDealAnimation,
+  ]);
+
   useEffect(() => {
     showHandSummaryRef.current = showHandSummary;
   }, [showHandSummary]);
@@ -767,7 +785,6 @@ export default function GameTableModular({
     setRecentChatMessages,
     onNewHandStarted: handleNewHandStarted,
     onGameJoined: handleGameJoined,
-    onGameStarted: handleGameStarted,
     onHandCompleted: handleHandCompleted,
     onGameOver: handleGameOverWrapper,
     onTrickComplete: handleTrickComplete,
@@ -823,29 +840,27 @@ export default function GameTableModular({
       // BLIND NIL LOGIC: Show blind nil modal before revealing cards
       if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && allowBlindNil && !blindNilDismissed) {
         console.log('[BLIND NIL] Showing blind nil modal - cards stay face down');
-        setDealingComplete(true);
         setShowBlindNilModal(true);
         // CRITICAL: Don't reveal cards yet - wait for blind nil decision
         setCardsRevealed(false);
         return;
       }
       
-      // CRITICAL: Only reveal cards when it's YOUR turn to bid AND blind nil modal is not showing
-      if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && !showBlindNilModal) {
-        setDealingComplete(true);
+      // Only after deal animation completes: reveal when it's your turn (avoids face-up flash mid-deal)
+      if (
+        isMyTurn &&
+        !haveBid &&
+        !cardsRevealedDuringBiddingRef.current &&
+        !showBlindNilModal &&
+        dealingComplete
+      ) {
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
         console.log('[CARD REVEAL] Revealing cards - it is my turn to bid');
       }
       
-      // Set dealingComplete to true when hands exist (for animation purposes)
-      // But cards remain face down until player's turn
-      if (Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
-        setDealingComplete(true);
-      }
-      
       // Keep cards revealed ONLY if they were revealed during THIS bidding phase AND it's still your turn
-      if (cardsRevealedDuringBiddingRef.current && isMyTurn && !showBlindNilModal) {
+      if (cardsRevealedDuringBiddingRef.current && isMyTurn && !showBlindNilModal && dealingComplete) {
         setCardsRevealed(true);
       }
     }
@@ -855,11 +870,11 @@ export default function GameTableModular({
       setCardsRevealed(true);
     }
     
-    // CRITICAL: Never flip cards back to face down if they were revealed during bidding
-    if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING') {
+    // Never flip cards back to face down if they were revealed during bidding (after deal finished)
+    if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING' && dealingComplete) {
       setCardsRevealed(true);
     }
-  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex, showBlindNilModal, blindNilDismissed]);
+  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex, showBlindNilModal, blindNilDismissed, dealingComplete]);
   
   // Game action handlers
   const [isPlayingCard, setIsPlayingCard] = useState(false);
@@ -892,10 +907,9 @@ export default function GameTableModular({
       playCardSound
     });
     
-    // Reset the flag after a delay
     setTimeout(() => {
       setIsPlayingCard(false);
-    }, 1000);
+    }, 400);
   };
   
   const handleBidWrapper = (bid: number) => {
@@ -1347,10 +1361,45 @@ export default function GameTableModular({
     return createPortal(content, document.body);
   };
   
-  // Update game state when prop changes
+  // Update game state when prop changes; avoid clobbering optimistic hand while a play is in flight
   useEffect(() => {
-    setGameState(game);
-  }, [game]);
+    setGameState((prev) => {
+      if (!game) return prev;
+      const me = game.players?.find(
+        (p): p is Player | Bot =>
+          !!p && (p.id === propUser?.id || p.userId === propUser?.id)
+      );
+      const mySeat = me?.seatIndex ?? -1;
+      const pending = pendingPlayedCardRef.current;
+      const gHands = (game as any).hands;
+      const pHands = prev.hands as Card[][] | undefined;
+      if (
+        pending &&
+        game.status === 'PLAYING' &&
+        mySeat >= 0 &&
+        Array.isArray(gHands) &&
+        Array.isArray(gHands[mySeat]) &&
+        Array.isArray(pHands) &&
+        Array.isArray(pHands[mySeat])
+      ) {
+        const serverHand = gHands[mySeat];
+        const prevHand = pHands[mySeat];
+        const serverHas = serverHand.some(
+          (c: Card) => c.suit === pending.suit && c.rank === pending.rank
+        );
+        const prevMissing = !prevHand.some(
+          (c: Card) => c.suit === pending.suit && c.rank === pending.rank
+        );
+        if (serverHas && prevMissing) {
+          return {
+            ...game,
+            hands: gHands.map((h: Card[], i: number) => (i === mySeat ? prevHand : h)),
+          };
+        }
+      }
+      return game;
+    });
+  }, [game, propUser?.id]);
   
   // Listen for ready state updates
   useEffect(() => {

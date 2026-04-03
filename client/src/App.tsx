@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { 
+import {
   RouterProvider,
   createBrowserRouter,
   Navigate,
+  Outlet,
   useLocation,
   useParams,
   useNavigate,
 } from 'react-router-dom';
+import { CapacitorAuthHandler } from '@/features/auth/CapacitorAuthHandler';
 import { AuthProvider as AuthContextProvider, useAuth } from '@/features/auth/AuthContext';
 import Login from '@/features/auth/components/Login';
 import Register from '@/features/auth/components/Register';
@@ -109,6 +111,12 @@ const router = createBrowserRouter(
   [
     {
       path: "/",
+      element: (
+        <>
+          <CapacitorAuthHandler />
+          <Outlet />
+        </>
+      ),
       children: [
         {
           path: "login",

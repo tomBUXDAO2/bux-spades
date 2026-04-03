@@ -4,6 +4,11 @@ const getApiUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
+  // Capacitor native app - use production API (hostname is "localhost" in WebView)
+  if (typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.()) {
+    return 'https://bux-spades-server.fly.dev';
+  }
+  
   // Check if we're in production by looking at the current URL
   const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
   

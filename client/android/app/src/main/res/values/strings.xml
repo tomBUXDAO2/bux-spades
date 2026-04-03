@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bux Spades</string>
+    <string name="title_activity_main">Bux Spades</string>
+    <string name="package_name">com.buxspades.app</string>
+    <string name="custom_url_scheme">com.buxspades.app</string>
+</resources>

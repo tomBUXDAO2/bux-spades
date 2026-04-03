@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IoClose, IoChevronBack, IoChevronForward } from 'react-icons/io5';
 import { abbreviateBotName } from '../../utils/botUtils';
+import { apiFetch } from '@/services/lib/api';
 
 interface Card {
   suit: string;
@@ -52,7 +53,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
     try {
       console.log('[TRICK HISTORY] Fetching trick history from server for game:', gameId);
       
-      const response = await fetch(`/api/games/${gameId}/tricks`);
+      const response = await apiFetch(`/api/games/${gameId}/tricks`);
       if (!response.ok) {
         throw new Error(`Failed to fetch trick history: ${response.statusText}`);
       }

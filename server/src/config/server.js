@@ -30,7 +30,11 @@ const corsOptions = {
     'https://bux-spades.vercel.app',
     'https://bux-spades-git-main-tombuxdao.vercel.app',
     'https://www.bux-spades.pro',
-    'https://bux-spades.pro'
+    'https://bux-spades.pro',
+    // Capacitor native app (iOS/Android WebView)
+    'capacitor://localhost',
+    'ionic://localhost',
+    'http://localhost'
   ],
   credentials: true
 };

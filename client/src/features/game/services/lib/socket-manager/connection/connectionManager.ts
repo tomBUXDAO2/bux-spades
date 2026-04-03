@@ -12,6 +12,11 @@ export const getWebSocketUrl = () => {
     return url;
   }
   
+  // Capacitor native app - use production WebSocket (hostname is "localhost" in WebView)
+  if (typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.()) {
+    return 'wss://bux-spades-server.fly.dev';
+  }
+  
   // Check if we're in production by looking at the current URL
   const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
   console.log('Production check:', { hostname: window.location.hostname, isProduction });

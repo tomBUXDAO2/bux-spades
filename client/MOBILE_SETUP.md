@@ -6,9 +6,10 @@ This guide explains how to turn your Bux Spades web app into a mobile app withou
 
 We've set up multiple approaches to create a mobile version:
 
-1. **PWA (Progressive Web App)** - Installable web app that works on mobile browsers
-2. **React Native Web** - Shared codebase between web and mobile
-3. **Expo** - Full native mobile app development
+1. **Capacitor** (Recommended for App Stores) - Native iOS and Android apps from your web codebase. See [CAPACITOR_SETUP.md](./CAPACITOR_SETUP.md).
+2. **PWA (Progressive Web App)** - Installable web app that works on mobile browsers
+3. **React Native Web** - Shared codebase between web and mobile
+4. **Expo** - Full native mobile app development
 
 ## Option 1: PWA (Recommended for Quick Start)
 

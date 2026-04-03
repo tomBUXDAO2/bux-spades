@@ -1,9 +1,16 @@
 import axios from 'axios';
 
-// Configure axios defaults
-axios.defaults.baseURL = import.meta.env.PROD
-  ? import.meta.env.VITE_PROD_API_URL
-  : import.meta.env.VITE_API_URL;
+// Get API base URL - matches api.ts logic for Capacitor and web
+const getBaseURL = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (import.meta.env.VITE_PROD_API_URL && import.meta.env.PROD) return import.meta.env.VITE_PROD_API_URL;
+  if (typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.()) {
+    return 'https://bux-spades-server.fly.dev';
+  }
+  const isProduction = typeof window !== 'undefined' && window.location?.hostname !== 'localhost' && window.location?.hostname !== '127.0.0.1';
+  return isProduction ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
+};
+axios.defaults.baseURL = getBaseURL();
 axios.defaults.withCredentials = true;
 
 // Add request/response interceptors for debugging

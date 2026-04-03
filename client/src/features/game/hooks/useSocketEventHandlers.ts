@@ -450,11 +450,7 @@ export const useSocketEventHandlers = ({
       console.log('🎮 Game started event received:', gameData);
       if (gameData && gameData.gameId === gameId) {
         setGameState(normalizeGameState(gameData.gameState));
-        
-        // Play card dealing sound effect when cards are dealt
-        import('../../../services/utils/soundUtils').then(({ playCardDealingSound }) => {
-          playCardDealingSound();
-        });
+        // Dealing sound + stagger: GameTable schedules from gameState (avoids double audio)
       }
     };
 

@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@expo/metro-config": "^0.17.1",
@@ -41,6 +47,12 @@
     "mobile:build": "expo build",
     "build:mobile": "node scripts/build-mobile.js",
     "dev:mobile": "vite --config vite.mobile.config.ts",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android",
+    "cap:run:ios": "npx cap run ios",
+    "cap:run:android": "npx cap run android",
+    "apk:debug": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
     "optimize-images": "node scripts/optimize-images.js"
   },
   "devDependencies": {

@@ -342,7 +342,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 1200);
+              }, 900);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }

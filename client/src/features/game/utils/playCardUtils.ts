@@ -4,9 +4,13 @@
 import type { Card } from "../../../types/game";
 import type { GameState } from "../../../types/game";
 
-// Debounce mechanism to prevent multiple rapid card plays
+// Light debounce to prevent double-submits; reset when a new trick starts (see resetCardPlayDebounce)
 let lastCardPlayTime = 0;
-const CARD_PLAY_DEBOUNCE_MS = 500; // 500ms debounce
+const CARD_PLAY_DEBOUNCE_MS = 200;
+
+export const resetCardPlayDebounce = () => {
+  lastCardPlayTime = 0;
+};
 
 export interface PlayCardCallbacks {
   setGameState: (updater: (prev: GameState) => GameState) => void;

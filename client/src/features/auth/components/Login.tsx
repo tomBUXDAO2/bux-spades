@@ -1,42 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+const isCapacitor = () =>
+  typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
 
 const Login: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState(false);
 
-  const handleDiscordLogin = () => {
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError === 'oauth_failed') {
+      setError('Login failed. Please try again.');
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const handleDiscordLogin = async () => {
     setDiscordError(false);
-    
-    // Original working Discord OAuth URL with client ID
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
-    const serverUrl = import.meta.env.PROD
-      ? "https://bux-spades-server.fly.dev"
-      : "http://localhost:3000";
-    
+    const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
     const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/discord/callback`);
     const scope = encodeURIComponent('identify email');
-    
+    const state = isCapacitor() ? '&state=capacitor' : '';
     if (!clientId) {
       setError('Discord client ID not configured');
       return;
     }
-    
-    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
-    
-    // Add error handling for the redirect
+    const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${state}`;
     try {
-      // Add a timeout to detect if Discord OAuth is failing
-      const timeout = setTimeout(() => {
-        setDiscordError(true);
-      }, 10000); // 10 second timeout
-      
-      window.location.href = discordAuthUrl;
-      
-      // Clear timeout if page changes (successful redirect)
-      window.addEventListener('beforeunload', () => clearTimeout(timeout));
-    } catch (error) {
-      console.error('Discord login redirect failed:', error);
+      if (isCapacitor()) {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: discordAuthUrl });
+      } else {
+        window.location.href = discordAuthUrl;
+      }
+    } catch (err) {
+      console.error('Discord login failed:', err);
       setError('Failed to redirect to Discord login. Please try again.');
     }
   };

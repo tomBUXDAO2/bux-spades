@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import axios from 'axios';
+import axios from '../AuthContext/hooks/AxiosConfig';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();

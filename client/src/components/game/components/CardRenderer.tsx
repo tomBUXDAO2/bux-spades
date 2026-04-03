@@ -307,10 +307,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 e.preventDefault();
                 e.stopPropagation();
                 if (isPlayable && gameState.status === "PLAYING") {
-                  // Add a small delay to prevent rapid clicks
-                  setTimeout(() => {
-                    onPlayCard(card);
-                  }, 50);
+                  onPlayCard(card);
                 }
               }}
               onMouseDown={(e) => {
