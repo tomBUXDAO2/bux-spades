@@ -1,0 +1,31 @@
+# Dependencies — installed in image via npm ci
+node_modules
+
+# Secrets and local env (Fly uses secrets / env in fly.toml)
+.env
+.env.*
+!.env.example
+
+# Git / IDE
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode
+
+# Docs and noise
+*.md
+README*
+
+# Large SQL dumps (not needed to run the app)
+neon_backup*.sql
+*_backup*.sql
+
+# Logs and caches
+npm-debug.log*
+coverage
+.turbo
+.cache
+
+# Test / one-off scripts not needed at runtime
+check-chosen-stats.js

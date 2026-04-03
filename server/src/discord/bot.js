@@ -8,12 +8,16 @@ const token = process.env.DISCORD_BOT_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
 
+// Do not process.exit here — this module loads on every server start. Missing Discord
+// env (e.g. on Fly before secrets are set) must not kill the HTTP API; index.js only
+// calls startDiscordBot() when DISCORD_BOT_TOKEN is present.
 if (!token || !clientId || !guildId) {
-  console.error('[DISCORD BOT] Missing required environment variables: DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, or DISCORD_GUILD_ID');
-  process.exit(1);
+  console.warn(
+    '[DISCORD BOT] Missing DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, or DISCORD_GUILD_ID — bot disabled; API still starts.'
+  );
 }
 
-// Create Discord client
+// Create Discord client (login only from startDiscordBot when token exists)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
