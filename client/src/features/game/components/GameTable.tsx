@@ -100,39 +100,40 @@ function TrickTableCard({
           ? { x: 0, y: -36 }
           : { x: 36, y: 0 };
 
+  // Position on a non-motion wrapper so Tailwind transforms are not overwritten by Framer Motion's x/y.
   return (
-    <motion.div
-      className={`${positions[displayPosition]} z-20`}
-      style={{ pointerEvents: 'none' }}
-      initial={skipEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
-      animate={{
-        opacity: animatingTrick ? 0.82 : 1,
-        scale: isWinningCard ? 1.05 : 1,
-        x: 0,
-        y: 0,
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 420,
-        damping: 28,
-        mass: 0.85,
-      }}
-    >
-      <div className="relative">
-        <CardImage
-          card={card}
-          width={tableCardWidth}
-          height={tableCardHeight}
-          className="shadow-lg"
-          alt={`${card.rank}${card.suit}`}
-        />
-        {isWinningCard && (
-          <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
-            ✓
-          </div>
-        )}
-      </div>
-    </motion.div>
+    <div className={`${positions[displayPosition]} z-20 pointer-events-none`}>
+      <motion.div
+        initial={skipEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
+        animate={{
+          opacity: animatingTrick ? 0.82 : 1,
+          scale: isWinningCard ? 1.05 : 1,
+          x: 0,
+          y: 0,
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 420,
+          damping: 28,
+          mass: 0.85,
+        }}
+      >
+        <div className="relative">
+          <CardImage
+            card={card}
+            width={tableCardWidth}
+            height={tableCardHeight}
+            className="shadow-lg"
+            alt={`${card.rank}${card.suit}`}
+          />
+          {isWinningCard && (
+            <div className="absolute -top-2 -right-2 flex h-6 w-6 animate-pulse items-center justify-center rounded-full bg-yellow-400 text-xs font-bold text-black">
+              ✓
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
