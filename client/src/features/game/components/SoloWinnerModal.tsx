@@ -136,8 +136,8 @@ export default function SoloWinnerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="w-full max-w-md sm:max-w-lg backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 sm:p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-2 backdrop-blur-sm sm:p-4">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950/95 p-3 shadow-lobby backdrop-blur-xl sm:max-w-lg sm:p-4">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaTrophy className="h-6 w-6 text-yellow-500" />
           <h2 className="text-lg font-bold text-white text-center">{getPlacementText(userPlacement)}</h2>
@@ -161,14 +161,14 @@ export default function SoloWinnerModal({
             const avatarUrl = (p && ('avatar' in p) && p.avatar) ? p.avatar! : '/default-pfp.jpg';
             
             return (
-              <div key={index} className={`bg-gray-800/50 backdrop-blur rounded-lg p-2 border ${isWinner ? 'border-yellow-500' : 'border-white/5'}`}>
+              <div key={index} className={`rounded-lg border bg-slate-900/50 p-2 backdrop-blur-sm ${isWinner ? 'border-amber-400/60' : 'border-white/10'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center min-w-0 flex-1">
                     <div className={`${playerColor.bg} rounded-full w-2 h-2 mr-2 flex-shrink-0`}></div>
                     <img src={avatarUrl} alt={displayName} className="w-5 h-5 rounded-full mr-2 object-cover flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-white truncate">{displayName}</div>
-                      <div className="text-xs text-gray-400">{getPlacementText(placement)}</div>
+                      <div className="text-xs text-slate-400">{getPlacementText(placement)}</div>
                     </div>
                     {isWinner && <FaTrophy className="h-4 w-4 text-yellow-500 ml-2 flex-shrink-0" />}
                   </div>
@@ -177,7 +177,7 @@ export default function SoloWinnerModal({
                       {score}
                     </span>
                     {isRated && buyIn > 0 && (
-                      <span className={`text-xs ${placement === 1 ? 'text-yellow-400' : placement === 2 ? 'text-green-400' : 'text-gray-400'}`}>
+                      <span className={`text-xs ${placement === 1 ? 'text-yellow-400' : placement === 2 ? 'text-green-400' : 'text-slate-400'}`}>
                         {placement === 1 ? `+${formatCoins(coinPrizes.firstPlace)}` : 
                          placement === 2 ? `+${formatCoins(coinPrizes.secondPlace)}` : 
                          '0k'}
@@ -194,13 +194,13 @@ export default function SoloWinnerModal({
           <div className="mt-4 flex flex-col gap-2">
             <button
               onClick={handlePlayAgain}
-              className="w-full px-4 py-2 text-sm bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
+              className="w-full rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Play Again ({timeRemaining}s)
             </button>
             <button
               onClick={handleLeave}
-              className="w-full px-4 py-2 text-sm bg-gray-600 text-white font-medium rounded-md shadow hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 transition-colors"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 shadow-sm transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Leave Table
             </button>
@@ -210,14 +210,14 @@ export default function SoloWinnerModal({
             {humanPlayerCount > 1 ? (
               <>
                 <p className="text-sm font-medium text-white">Waiting for other players...</p>
-                <p className="text-xs text-gray-400 mt-1">You can leave the table if you don't want to wait</p>
+                <p className="mt-1 text-xs text-slate-400">You can leave the table if you don't want to wait</p>
               </>
             ) : (
               <p className="text-sm font-medium text-white">Starting new game...</p>
             )}
             <button
               onClick={handleLeave}
-              className="mt-3 w-full px-4 py-2 text-sm bg-gray-600 text-white font-medium rounded-md shadow hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 transition-colors"
+              className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 shadow-sm transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Leave Table
             </button>

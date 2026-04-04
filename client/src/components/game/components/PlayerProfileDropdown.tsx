@@ -136,7 +136,7 @@ export default function PlayerProfileDropdown({
         console.log('Rendering main dropdown menu');
         return createPortal(
         <div 
-          className="fixed z-[9999] w-32 bg-gray-800 rounded-lg shadow-lg border border-white py-1 dropdown-menu" 
+          className="dropdown-menu fixed z-[9999] w-32 rounded-lg border border-white/10 bg-slate-950/95 py-1 shadow-lobby backdrop-blur-xl" 
           style={{ 
             top: dropdownPosition.top,
             left: dropdownPosition.left
@@ -155,7 +155,7 @@ export default function PlayerProfileDropdown({
                   setShowEmojiPicker(true);
                   onShowEmojiPicker();
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center border-b border-gray-600"
+                className="flex w-full items-center border-b border-white/10 px-3 py-2 text-left text-sm text-white hover:bg-white/10"
               >
                 <span className="mr-2">😀</span>
                 Emoji
@@ -167,7 +167,7 @@ export default function PlayerProfileDropdown({
                   onViewStats();
                   setIsOpen(false);
                 }}
-                className={`w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center ${userIsAdmin && onOpenAdminPanel ? 'border-b border-gray-600' : ''}`}
+                className={`flex w-full items-center px-3 py-2 text-left text-sm text-white hover:bg-white/10 ${userIsAdmin && onOpenAdminPanel ? 'border-b border-white/10' : ''}`}
               >
                 <span className="mr-2">📊</span>
                 My Stats
@@ -182,7 +182,7 @@ export default function PlayerProfileDropdown({
                     onOpenAdminPanel();
                     setIsOpen(false);
                   }}
-                  className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center font-semibold"
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-semibold text-red-300 hover:bg-red-950/40"
                 >
                   <span className="mr-2">⚠️</span>
                   ADMIN
@@ -197,7 +197,7 @@ export default function PlayerProfileDropdown({
                   e.stopPropagation();
                   setShowEmojiPicker(true);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center border-b border-gray-600"
+                className="flex w-full items-center border-b border-white/10 px-3 py-2 text-left text-sm text-white hover:bg-white/10"
               >
                 <span className="mr-2">😀</span>
                 Send Emoji
@@ -209,7 +209,7 @@ export default function PlayerProfileDropdown({
                   onViewStats();
                   setIsOpen(false);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center"
+                className="flex w-full items-center px-3 py-2 text-left text-sm text-white hover:bg-white/10"
               >
                 <span className="mr-2">📊</span>
                 View Stats
@@ -224,7 +224,7 @@ export default function PlayerProfileDropdown({
       {/* Emoji Picker - rendered via portal outside component tree */}
       {showEmojiPicker && createPortal(
         <div 
-          className="fixed z-[9999] w-64 bg-gray-800 rounded-lg shadow-lg border border-white p-2 emoji-picker" 
+          className="emoji-picker fixed z-[9999] w-64 rounded-lg border border-white/10 bg-slate-950/95 p-2 shadow-lobby backdrop-blur-xl" 
           style={{ 
             top: Math.max(10, Math.min(dropdownPosition.top - 100, window.innerHeight - 200)),
             left: (() => {
@@ -246,13 +246,13 @@ export default function PlayerProfileDropdown({
             })()
           }}
         >
-          <div className="text-xs text-gray-300 mb-2 px-2">Quick React</div>
+          <div className="mb-2 px-2 text-xs text-slate-400">Quick React</div>
           <div className="grid grid-cols-6 gap-1">
             {EMOJI_OPTIONS.map((emoji, index) => (
               <button
                 key={index}
                 onClick={() => handleEmojiClick(emoji)}
-                className="w-8 h-8 text-lg hover:bg-gray-700 rounded flex items-center justify-center transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded text-lg transition-colors hover:bg-white/10"
               >
                 {emoji}
               </button>

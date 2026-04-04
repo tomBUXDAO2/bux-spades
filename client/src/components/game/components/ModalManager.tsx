@@ -83,12 +83,12 @@ const StartWarningModal: React.FC<{
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-xl border border-white/10 bg-slate-950/95 p-6 shadow-lobby backdrop-blur-xl">
         <div>
           {/* Header with inline icon and title */}
-          <div className="flex items-center justify-center mb-4">
-            <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-4 flex items-center justify-center">
+            <svg className="mr-2 h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h3 className="text-2xl font-bold text-white">
@@ -96,25 +96,25 @@ const StartWarningModal: React.FC<{
             </h3>
           </div>
           {/* Message - center aligned */}
-          <div className="text-center mb-6">
-            <p className="text-lg text-gray-200 mb-2 font-semibold">
+          <div className="mb-6 text-center">
+            <p className="mb-2 text-lg font-semibold text-slate-200">
               Coin games require 4 human players.<br />You have {emptySeats} empty seat{emptySeats !== 1 ? 's' : ''}.
             </p>
-            <p className="text-gray-300">
+            <p className="text-slate-400">
               If you continue, the game will start with bot players in all empty seats and the game will not be rated.
             </p>
           </div>
           {/* Buttons */}
-          <div className="flex gap-3 justify-center">
+          <div className="flex justify-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-slate-200 transition-colors hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               onClick={onPlayWithBots}
-              className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+              className="rounded-lg bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 font-semibold text-slate-900 shadow-md shadow-amber-950/30 transition hover:from-amber-300 hover:to-amber-500"
             >
               Play with Bots
             </button>
@@ -136,12 +136,12 @@ const BotWarningModal: React.FC<{
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-xl border border-white/10 bg-slate-950/95 p-6 shadow-lobby backdrop-blur-xl">
         <div>
           {/* Header with inline icon and title */}
-          <div className="flex items-center justify-center mb-4">
-            <svg className="h-6 w-6 text-yellow-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-4 flex items-center justify-center">
+            <svg className="mr-2 h-6 w-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h3 className="text-2xl font-bold text-white">
@@ -149,26 +149,26 @@ const BotWarningModal: React.FC<{
             </h3>
           </div>
           {/* Message - center aligned */}
-          <div className="text-center mb-6">
-            <p className="text-lg text-gray-200 mb-2 font-semibold">
+          <div className="mb-6 text-center">
+            <p className="mb-2 text-lg font-semibold text-slate-200">
               Coin games require 4 human players.<br />You have {botCount} bot player{botCount !== 1 ? 's' : ''}.
             </p>
-            <p className="text-gray-300">
+            <p className="text-slate-400">
               If you continue, the game will start but will not be rated.
             </p>
           </div>
           {/* Buttons */}
-          <div className="flex gap-3 justify-center">
+          <div className="flex justify-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-slate-200 transition-colors hover:bg-white/10"
             >
               Cancel
             </button>
             {!isStarting && (
               <button
                 onClick={onStartWithBots}
-                className="px-4 py-2 bg-yellow-500 text-black font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                className="rounded-lg bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 font-semibold text-slate-900 shadow-md shadow-amber-950/30 transition hover:from-amber-300 hover:to-amber-500"
               >
                 Start Game
               </button>
@@ -189,22 +189,22 @@ const LeaveTableModal: React.FC<{
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
-        <h3 className="text-white text-lg font-bold mb-4">Leave Table?</h3>
-        <p className="text-gray-300 mb-6">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 max-w-sm rounded-xl border border-white/10 bg-slate-950/95 p-6 shadow-lobby backdrop-blur-xl">
+        <h3 className="mb-4 text-lg font-bold text-white">Leave Table?</h3>
+        <p className="mb-6 text-slate-400">
           Are you sure you want to leave this table? You will lose your seat and any ongoing game.
         </p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+            className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-slate-200 transition hover:bg-white/10"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+            className="flex-1 rounded-lg border border-red-500/40 bg-red-950/50 px-4 py-2 text-red-100 transition hover:bg-red-900/60"
           >
             Leave Table
           </button>

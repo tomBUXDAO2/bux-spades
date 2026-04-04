@@ -143,7 +143,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -151,7 +151,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
       }}
     >
       <div 
-        className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg border border-slate-700 p-4 md:p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+        className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 p-4 shadow-lobby backdrop-blur-xl md:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
@@ -183,7 +183,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
             )}
 
             {/* Tournament Details */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+            <div className="rounded-xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-sm">
               <div className="grid md:grid-cols-2 gap-4 mb-6">
                 <div>
                   <p className="text-slate-400 text-sm mb-1">Start Time</p>
@@ -230,14 +230,14 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                     <p className="text-yellow-400">🏆 Winners: {tournament.prizes.winners}</p>
                   )}
                   {tournament.prizes.runnersUp && (
-                    <p className="text-gray-400">🥈 Runners-up: {tournament.prizes.runnersUp}</p>
+                    <p className="text-slate-400">🥈 Runners-up: {tournament.prizes.runnersUp}</p>
                   )}
                 </div>
               )}
 
               {/* Registration Notice */}
-              <div className="bg-blue-900/30 border border-blue-700 rounded p-4 mt-4">
-                <p className="text-blue-200 text-sm">
+              <div className="mt-4 rounded-lg border border-cyan-500/25 bg-cyan-950/25 p-4">
+                <p className="text-sm text-cyan-200/90">
                   <strong>Note:</strong> Registration must be done via the Discord Join button in the #tournaments channel. 
                   Only members of the Discord server can register.
                 </p>
@@ -245,7 +245,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
             </div>
 
             {/* Registered Teams */}
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+            <div className="rounded-xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-sm">
               <h2 className="text-2xl font-bold mb-4 text-white">Registered Teams</h2>
               <div className="mb-4 text-slate-400">
                 <p>Complete Teams: {completeTeams.length / 2}</p>
@@ -258,7 +258,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
               ) : (
                 <div className="space-y-3">
                   {teams.map((team, index) => (
-                    <div key={index} className="bg-slate-700 rounded p-4">
+                    <div key={index} className="rounded-lg border border-white/5 bg-white/5 p-4">
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           {team.player1.user.avatarUrl && (
@@ -296,7 +296,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
 
             {/* Bracket */}
             {tournament.matches.length > 0 && (
-              <div className="bg-slate-800 rounded-lg border border-slate-700 p-6">
+              <div className="rounded-xl border border-white/10 bg-slate-900/40 p-6 backdrop-blur-sm">
                 <h2 className="text-2xl font-bold mb-4 text-white">Tournament Bracket</h2>
                 {(() => {
                   // Build team ID to players map

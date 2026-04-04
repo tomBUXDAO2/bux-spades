@@ -94,7 +94,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div 
-      className="border-t border-gray-800"
+      className="border-t border-white/10"
       style={{
         padding: `${8 * scale}px`
       }}
@@ -107,7 +107,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={`Type a ${chatType} message...`}
-            className="w-full bg-gray-700 text-white rounded-lg border-0 pr-10 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-slate-900/60 pr-10 text-slate-100 placeholder:text-slate-500 backdrop-blur-sm focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
             style={getInputStyles()}
             disabled={!isConnected || !isAuthenticated}
           />
@@ -117,7 +117,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             ref={emojiButtonRef}
             type="button"
             onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-            className="absolute top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+            className="absolute top-1/2 -translate-y-1/2 transform text-slate-500 transition-colors hover:text-cyan-300"
             style={{
               right: `${8 * scale}px`
             }}
@@ -156,11 +156,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="submit"
           disabled={!newMessage.trim() || !isConnected || !isAuthenticated}
-          className="flex items-center justify-center rounded-md transition flex-shrink-0"
+          className={`flex flex-shrink-0 items-center justify-center rounded-lg border transition ${
+            newMessage.trim() && isConnected && isAuthenticated
+              ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/25 hover:from-cyan-400 hover:to-teal-500'
+              : 'border-white/10 bg-slate-800/80 text-slate-500'
+          }`}
           style={{
             width: `${40 * scale}px`,
             height: `${40 * scale}px`,
-            backgroundColor: newMessage.trim() && isConnected && isAuthenticated ? '#4f46e5' : '#4b5563'
           }}
           aria-label="Send"
         >
@@ -183,13 +186,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       
       {/* Connection status */}
       {!isConnected && (
-        <div className="text-xs text-red-400 mt-1">
+        <div className="mt-1 text-xs text-red-400/90">
           Disconnected. Retrying... ({retryCount}/3)
         </div>
       )}
       
       {!isAuthenticated && (
-        <div className="text-xs text-yellow-400 mt-1">
+        <div className="mt-1 text-xs text-amber-400/90">
           Not authenticated. Please refresh the page.
         </div>
       )}

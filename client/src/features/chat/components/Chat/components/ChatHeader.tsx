@@ -29,7 +29,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const scale = isSmallScreen ? 0.8 : isMediumScreen ? 0.85 : 1;
   return (
     <div 
-      className="flex items-center justify-between bg-gray-900 border-b border-gray-600"
+      className="flex items-center justify-between border-b border-white/10 bg-slate-950/60"
       style={{
         padding: `${8 * scale}px`,
         fontSize: `${14 * scale}px`
@@ -37,11 +37,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     >
       <div className="flex items-center gap-2">
         <button
-          className="flex items-center justify-center rounded-md font-semibold transition"
+          className={`flex items-center justify-center rounded-lg font-semibold transition ${
+            activeTab === 'chat'
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30'
+              : 'border border-white/10 bg-white/5 hover:bg-white/10'
+          }`}
           style={{
             width: `${(isMobile ? 48 : 80) * scale}px`,
             height: `${(isMobile ? 32 : 40) * scale}px`,
-            backgroundColor: activeTab === 'chat' ? '#4f46e5' : '#374151'
           }}
           onClick={() => onTabChange('chat')}
           aria-label="Chat"
@@ -58,11 +61,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </button>
         {showPlayerListTab && (
           <button
-            className="flex items-center justify-center rounded-md font-semibold transition"
+            className={`flex items-center justify-center rounded-lg font-semibold transition ${
+              activeTab === 'players'
+                ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30'
+                : 'border border-white/10 bg-white/5 hover:bg-white/10'
+            }`}
             style={{
               width: `${(isMobile ? 48 : 80) * scale}px`,
               height: `${(isMobile ? 32 : 40) * scale}px`,
-              backgroundColor: activeTab === 'players' ? '#4f46e5' : '#374151'
             }}
             onClick={() => onTabChange('players')}
             aria-label="Players"
@@ -83,7 +89,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         {onToggleChatType && (
           <div className="flex items-center gap-2 ml-2">
             <span 
-              className="text-gray-300"
+              className="text-slate-300"
               style={{
                 fontSize: `${(isMobile ? 12 : 14) * scale}px`
               }}
@@ -92,16 +98,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             </span>
             <button
               onClick={onToggleChatType}
-              className="relative inline-flex items-center rounded-full transition-colors"
+              className="relative inline-flex items-center rounded-full border border-white/10 bg-slate-900/70 shadow-inner transition-colors"
               style={{
                 height: `${(isMobile ? 20 : 24) * scale}px`,
                 width: `${(isMobile ? 36 : 44) * scale}px`,
-                backgroundColor: chatType === 'game' ? '#4f46e5' : '#4b5563'
               }}
               aria-label={`Switch to ${chatType === 'game' ? 'lobby' : 'game'} chat`}
             >
               <span
-                className="inline-block rounded-full bg-white transition-transform"
+                className="inline-block rounded-full bg-gradient-to-br from-cyan-400 to-teal-600 shadow-sm transition-transform"
                 style={{
                   height: `${(isMobile ? 16 : 20) * scale}px`,
                   width: `${(isMobile ? 16 : 20) * scale}px`,

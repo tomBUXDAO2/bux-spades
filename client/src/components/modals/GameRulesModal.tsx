@@ -39,10 +39,10 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
-      <div className="bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full overflow-hidden" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
+      <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 shadow-lobby backdrop-blur-xl" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-700" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px`, paddingRight: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
+        <div className="flex items-center justify-between border-b border-white/10" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px`, paddingRight: isPortrait ? `${12 * paddingScale}px` : `${24 * paddingScale}px` }}>
           <h2 className="font-bold text-slate-200" style={{ fontSize: isPortrait ? `${18 * textScale}px` : `${24 * textScale}px` }}>Game Rules</h2>
           <button
             onClick={onClose}
@@ -55,13 +55,13 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-white/10">
           <button
             onClick={() => setActiveTab('rules')}
             className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'rules'
-                ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                ? 'border-b-2 border-cyan-400 bg-white/5 text-cyan-300'
+                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
             }`}
             style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
@@ -75,8 +75,8 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
             onClick={() => setActiveTab('gameTypes')}
             className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'gameTypes'
-                ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                ? 'border-b-2 border-cyan-400 bg-white/5 text-cyan-300'
+                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
             }`}
             style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
@@ -90,8 +90,8 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
             onClick={() => setActiveTab('scoring')}
             className={`flex-1 font-medium transition-colors flex items-center justify-center ${
               activeTab === 'scoring'
-                ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                ? 'border-b-2 border-cyan-400 bg-white/5 text-cyan-300'
+                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
             }`}
             style={{ padding: isPortrait ? `${8 * paddingScale}px 12px` : `${16 * paddingScale}px ${24 * paddingScale}px`, gap: `${8 * paddingScale}px`, fontSize: isPortrait ? `${12 * textScale}px` : `${16 * textScale}px` }}
           >
@@ -277,7 +277,7 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
               {/* Solo scoring differences */}
-              <div className="bg-slate-700/40 border border-slate-600 rounded-lg" style={{ padding: `${12 * paddingScale}px` }}>
+              <div className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm" style={{ padding: `${12 * paddingScale}px` }}>
                 <h3 className="font-semibold text-purple-300" style={{ fontSize: `${16 * textScale}px` }}>Solo Mode Scoring</h3>
                 <p style={{ fontSize: `${14 * textScale}px` }}>Nil bids: +50 for successful, <span className="text-red-400">-50</span> for unsuccessful</p>
                 <p style={{ fontSize: `${14 * textScale}px` }}>Blind Nil: +100 for successful, <span className="text-red-400">-100</span> for unsuccessful</p>

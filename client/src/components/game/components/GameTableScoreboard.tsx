@@ -27,7 +27,7 @@ const GameTableScoreboard: React.FC<GameTableScoreboardProps> = ({
   const displayTeam1 = (overrideTeam1Score !== undefined ? overrideTeam1Score : team1Score);
   const displayTeam2 = (overrideTeam2Score !== undefined ? overrideTeam2Score : team2Score);
   return (
-    <div className={`absolute z-10 px-3 py-2 bg-gray-800/90 rounded-lg shadow-lg ${isVerySmallScreen ? 'top-[-6px] right-[-4px]' : 'top-4 right-4'}`}>
+    <div className={`absolute z-10 rounded-lg border border-white/10 bg-slate-950/90 px-3 py-2 shadow-lobby-sm backdrop-blur-xl ${isVerySmallScreen ? 'top-[-6px] right-[-4px]' : 'top-4 right-4'}`}>
       {gameState.gameMode === 'SOLO' ? (
         // Solo mode - 4 individual players in 2 columns
         <div className="grid grid-cols-2 gap-2">

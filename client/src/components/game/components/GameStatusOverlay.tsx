@@ -57,7 +57,7 @@ export const StartGameButton: React.FC<{
     return (
       <button
         onClick={onStartGame}
-        className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all pointer-events-auto relative z-[100010]"
+        className="pointer-events-auto relative z-[100010] transform rounded-lg bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 font-bold text-slate-900 shadow-lg shadow-amber-950/30 transition-all hover:scale-105 hover:from-amber-300 hover:to-amber-500"
         style={{ fontSize: `${Math.floor(16 * scaleFactor)}px` }}
       >
         Start Game
@@ -80,7 +80,7 @@ export const WaitingForPlayersMessage: React.FC<{
   
   if (!isLeague && sanitizedPlayers.length < 4) {
     return (
-      <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
+      <div className="pointer-events-auto rounded-lg border border-white/10 bg-slate-900/85 px-4 py-2 text-center text-slate-200 backdrop-blur-md"
            style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
         <div className="font-bold">Waiting for Players</div>
         <div className="text-sm mt-1">{sanitizedPlayers.length}/4 joined</div>
@@ -90,7 +90,7 @@ export const WaitingForPlayersMessage: React.FC<{
   
   if (!isLeague && sanitizedPlayers[0]?.id !== currentPlayerId) {
     return (
-      <div className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-center pointer-events-auto"
+      <div className="pointer-events-auto rounded-lg border border-white/10 bg-slate-900/85 px-4 py-2 text-center text-slate-200 backdrop-blur-md"
            style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
         <div className="font-bold">Waiting for Host</div>
         <div className="text-sm mt-1">Only {sanitizedPlayers[0]?.username || 'Unknown'} can start</div>
@@ -311,7 +311,7 @@ export const DealingCardsMessage: React.FC<{
   if (hasBids) return null;
   
   return (
-    <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+    <div className="pointer-events-auto animate-pulse rounded-lg border border-white/10 bg-slate-900/85 px-4 py-2 text-center text-white backdrop-blur-md"
          style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
       <div className="font-bold">Dealing Cards...</div>
       <div className="text-sm mt-1">Please wait while cards are being dealt</div>
@@ -340,7 +340,7 @@ export const WaitingForPlayerBiddingMessage: React.FC<{
   if (!waitingName) return null;
   
   return (
-    <div className="px-4 py-2 bg-gray-700 text-white rounded-lg text-center animate-pulse pointer-events-auto"
+    <div className="pointer-events-auto animate-pulse rounded-lg border border-white/10 bg-slate-900/85 px-4 py-2 text-center text-white backdrop-blur-md"
          style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
       <div className="font-bold">Waiting for {waitingName}</div>
     </div>
@@ -407,7 +407,7 @@ export const WaitingForPlayerPlayingMessage: React.FC<{
       : "Unknown";
   
   return (
-    <div className="px-4 py-2 bg-gray-700/70 text-white rounded-lg text-center pointer-events-auto"
+    <div className="pointer-events-auto rounded-lg border border-white/10 bg-slate-900/75 px-4 py-2 text-center text-white backdrop-blur-md"
          style={{ fontSize: `${Math.floor(14 * scaleFactor)}px` }}>
       <div className="text-sm">Waiting for {waitingName} to play</div>
     </div>

@@ -163,10 +163,10 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
-      <div className="bg-slate-800 rounded-lg max-w-6xl w-full overflow-y-auto" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
+      <div className="w-full max-w-6xl overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 shadow-lobby backdrop-blur-xl" style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}>
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-slate-600" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${16 * paddingScale}px`, paddingRight: `${16 * paddingScale}px` }}>
+        <div className="flex items-center justify-between border-b border-white/10" style={{ paddingTop: `${8 * paddingScale}px`, paddingBottom: `${8 * paddingScale}px`, paddingLeft: `${16 * paddingScale}px`, paddingRight: `${16 * paddingScale}px` }}>
           {!isPortrait && <h2 className="font-bold text-white" style={{ fontSize: `${24 * textScale}px` }}>Player Stats</h2>}
           {isPortrait && <div></div>}
           

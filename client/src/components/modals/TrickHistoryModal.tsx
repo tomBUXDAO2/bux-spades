@@ -208,8 +208,8 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
-      <div className="bg-gray-800 rounded-lg p-4 md:p-6 max-w-2xl w-full mx-4 shadow-xl border border-white/20 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 p-4 shadow-lobby backdrop-blur-xl md:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 md:mb-6">
           <h3 className="text-lg md:text-2xl font-bold text-white">
@@ -217,7 +217,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="p-1 md:p-2 text-gray-400 hover:text-white transition-colors"
+            className="p-1 text-slate-400 transition-colors hover:text-white md:p-2"
           >
             <IoClose className="h-5 w-5 md:h-6 md:w-6" />
           </button>
@@ -225,12 +225,12 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
 
         {loading ? (
           <div className="flex items-center justify-center h-32 md:h-64">
-            <div className="text-gray-400 text-sm md:text-lg">Loading trick history...</div>
+            <div className="text-slate-400 text-sm md:text-lg">Loading trick history...</div>
           </div>
         ) : trickHistory.length === 0 ? (
           <div className="flex items-center justify-center h-32 md:h-64">
             <div className="text-center">
-              <div className="text-gray-400 text-sm md:text-lg mb-2">No trick history available</div>
+              <div className="text-slate-400 text-sm md:text-lg mb-2">No trick history available</div>
             </div>
           </div>
         ) : (
@@ -240,7 +240,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
               <div className="text-white text-sm md:text-lg mb-2">
                 Round {currentRound?.roundNumber}, Trick {currentTrick?.trickNumber}
               </div>
-              <div className="text-gray-400 text-xs md:text-sm">
+              <div className="text-slate-400 text-xs md:text-sm">
                 Led by {getPlayerName(currentTrick?.leadPlayerId || '')} • 
                 Won by {getPlayerName(currentTrick?.winningPlayerId || '')}
               </div>
@@ -255,7 +255,7 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
                 return (
                   <div key={index} className="flex flex-col items-center gap-2">
                     <SmallCssCard rank={rank} suit={suit as any} highlight={isWinningCard} />
-                    <div className="text-center text-xs md:text-sm text-gray-300 max-w-[60px] md:max-w-[80px] truncate" title={getPlayerName(card.playerId)}>
+                    <div className="text-center text-xs md:text-sm text-slate-300 max-w-[60px] md:max-w-[80px] truncate" title={getPlayerName(card.playerId)}>
                       {getPlayerName(card.playerId)}
                     </div>
                   </div>
@@ -270,15 +270,15 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
                 disabled={!canGoBack}
                 className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-lg transition-colors text-xs md:text-sm ${
                   canGoBack 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/20 hover:from-cyan-400 hover:to-teal-500' 
+                    : 'cursor-not-allowed border border-white/10 bg-slate-800/80 text-slate-500'
                 }`}
               >
                 <IoChevronBack className="h-5 w-5" />
                 Previous Trick
               </button>
 
-              <div className="text-gray-400 text-xs md:text-sm text-center">
+              <div className="text-slate-400 text-xs md:text-sm text-center">
                 {trickHistory.length > 0 && currentRound && (
                   `Hand ${currentRound.roundNumber} — ${currentTrickIndex + 1} of ${currentRound.tricks.length} tricks`
                 )}
@@ -289,8 +289,8 @@ const TrickHistoryModal: React.FC<TrickHistoryModalProps> = ({
                 disabled={!canGoForward}
                 className={`flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1 md:py-2 rounded-lg transition-colors text-xs md:text-sm ${
                   canGoForward 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/20 hover:from-cyan-400 hover:to-teal-500' 
+                    : 'cursor-not-allowed border border-white/10 bg-slate-800/80 text-slate-500'
                 }`}
               >
                 Next Trick

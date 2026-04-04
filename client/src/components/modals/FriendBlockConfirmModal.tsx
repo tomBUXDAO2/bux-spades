@@ -24,7 +24,7 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           title: 'Add Friend',
           message: `Are you sure you want to add ${username} as a friend?`,
           confirmText: 'Add Friend',
-          confirmColor: 'bg-green-600 hover:bg-green-700',
+          confirmClass: 'rounded-lg border border-emerald-500/40 bg-emerald-950/50 px-4 py-2 font-semibold text-emerald-100 transition hover:bg-emerald-900/60',
           icon: '👥'
         };
       case 'remove_friend':
@@ -32,7 +32,7 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           title: 'Remove Friend',
           message: `Are you sure you want to remove ${username} from your friends?`,
           confirmText: 'Remove Friend',
-          confirmColor: 'bg-red-600 hover:bg-red-700',
+          confirmClass: 'rounded-lg border border-red-500/40 bg-red-950/50 px-4 py-2 font-semibold text-red-100 transition hover:bg-red-900/60',
           icon: '👥'
         };
       case 'block_user':
@@ -40,7 +40,7 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           title: 'Block User',
           message: `Are you sure you want to block ${username}? They will not be able to see you or send you messages.`,
           confirmText: 'Block User',
-          confirmColor: 'bg-red-600 hover:bg-red-700',
+          confirmClass: 'rounded-lg border border-red-500/40 bg-red-950/50 px-4 py-2 font-semibold text-red-100 transition hover:bg-red-900/60',
           icon: '🚫'
         };
       case 'unblock_user':
@@ -48,7 +48,7 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           title: 'Unblock User',
           message: `Are you sure you want to unblock ${username}?`,
           confirmText: 'Unblock User',
-          confirmColor: 'bg-green-600 hover:bg-green-700',
+          confirmClass: 'rounded-lg border border-emerald-500/40 bg-emerald-950/50 px-4 py-2 font-semibold text-emerald-100 transition hover:bg-emerald-900/60',
           icon: '🔓'
         };
       default:
@@ -56,7 +56,7 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           title: 'Confirm Action',
           message: 'Are you sure you want to proceed?',
           confirmText: 'Confirm',
-          confirmColor: 'bg-blue-600 hover:bg-blue-700',
+          confirmClass: 'rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 font-semibold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500',
           icon: '❓'
         };
     }
@@ -65,8 +65,8 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
   const content = getModalContent();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-      <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-xl border border-white/10 bg-slate-950/95 p-6 shadow-lobby backdrop-blur-xl">
         <div className="text-center">
           <div className="text-4xl mb-4">{content.icon}</div>
           <h2 className="text-xl font-bold text-slate-200 mb-4">
@@ -78,13 +78,13 @@ const FriendBlockConfirmModal: React.FC<FriendBlockConfirmModalProps> = ({
           <div className="flex gap-3 justify-center">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 transition-colors"
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-slate-200 transition hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
-              className={`px-4 py-2 text-white rounded transition-colors ${content.confirmColor}`}
+              className={content.confirmClass}
             >
               {content.confirmText}
             </button>

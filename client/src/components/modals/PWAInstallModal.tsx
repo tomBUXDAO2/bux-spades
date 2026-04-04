@@ -71,8 +71,8 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg p-4 sm:p-6 max-w-sm w-full mx-2 animate-fade-in border border-white/20 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="mx-2 max-h-[90vh] w-full max-w-sm animate-fade-in overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 p-4 shadow-lobby backdrop-blur-xl sm:p-6">
         <div className="text-center">
           <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">{instructions.icon}</div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-200 mb-3 sm:mb-4">
@@ -84,7 +84,7 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
               Get the best experience by installing BUX Spades as an app!
             </p>
             
-            <div className="bg-slate-700 p-3 sm:p-4 rounded-lg text-left space-y-2">
+            <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3 text-left backdrop-blur-sm sm:p-4">
               <h3 className="font-semibold text-slate-200 text-sm sm:text-base">How to install:</h3>
               <ol className="list-decimal list-inside space-y-1 text-xs sm:text-sm">
                 {instructions.steps.map((step, index) => (
@@ -93,8 +93,8 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
               </ol>
             </div>
 
-            <div className="bg-blue-900/20 border border-blue-500/30 p-2 sm:p-3 rounded-lg">
-              <p className="text-xs sm:text-sm text-blue-300">
+            <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 p-2 sm:p-3">
+              <p className="text-xs text-cyan-200/90 sm:text-sm">
                 💡 <strong>Tip:</strong> Once installed, the app will open in full-screen mode 
                 and feel just like a native app!
               </p>
@@ -105,7 +105,7 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
             {platform === 'android' && deferredPrompt && (
               <button
                 onClick={handleInstallClick}
-                className="w-full bg-green-600 text-white py-2 sm:py-3 px-4 sm:px-6 rounded-lg font-semibold hover:bg-green-700 transition text-sm sm:text-base"
+                className="w-full rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 py-2 px-4 text-sm font-semibold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500 sm:py-3 sm:px-6 sm:text-base"
               >
                 Install Now
               </button>
@@ -113,7 +113,7 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
             
             <button
               onClick={onClose}
-              className="w-full bg-slate-600 text-white py-2 sm:py-3 px-4 sm:px-6 rounded-lg font-semibold hover:bg-slate-700 transition text-sm sm:text-base"
+              className="w-full rounded-lg border border-white/10 bg-white/5 py-2 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/10 sm:py-3 sm:px-6 sm:text-base"
             >
               Maybe Later
             </button>

@@ -9,13 +9,13 @@ const ClosurePopup: React.FC<ClosurePopupProps> = ({ message, onClose }) => {
   if (!message) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000]">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-white/20 text-center">
-        <h3 className="text-xl font-bold text-white mb-3">Table Closed</h3>
-        <p className="text-gray-200 mb-6">{message}</p>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-xl border border-white/10 bg-slate-950/95 p-6 text-center shadow-lobby backdrop-blur-xl">
+        <h3 className="mb-3 text-xl font-bold text-white">Table Closed</h3>
+        <p className="mb-6 text-slate-300">{message}</p>
         <button
           onClick={onClose}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 font-semibold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500"
         >
           OK
         </button>

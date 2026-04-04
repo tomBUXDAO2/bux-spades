@@ -47,14 +47,14 @@ export default function SeatReplacementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="w-[380px] max-sm:w-[280px] sm:w-[320px] md:w-[360px] rounded-2xl border border-white/10 bg-slate-950/95 p-4 shadow-lobby backdrop-blur-xl max-sm:p-3">
         <div className="flex items-center justify-center gap-2 mb-3">
           <FaClock className="h-6 w-6 text-orange-500" />
           <h2 className="text-lg font-bold text-white text-center">Seat Replacement</h2>
         </div>
 
-        <p className="text-sm text-gray-300 text-center mb-4">
+        <p className="mb-4 text-center text-sm text-slate-400">
           Seat {seatIndex + 1} will be filled by a bot in:
         </p>
 
@@ -65,7 +65,7 @@ export default function SeatReplacementModal({
         <div className="flex flex-col gap-2">
           <button
             onClick={onFillSeat}
-            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-800 text-white font-medium rounded shadow hover:from-blue-700 hover:to-blue-900 transition-all flex items-center justify-center"
+            className="flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500"
           >
             <FaRobot className="mr-2" />
             Fill Seat Now
@@ -73,7 +73,7 @@ export default function SeatReplacementModal({
           
           <button
             onClick={onClose}
-            className="w-full px-4 py-1.5 text-sm bg-gradient-to-r from-gray-600 to-gray-800 text-white font-medium rounded shadow hover:from-gray-700 hover:to-gray-900 transition-all"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-1.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
           >
             Close
           </button>

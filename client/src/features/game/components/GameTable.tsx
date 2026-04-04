@@ -1603,7 +1603,7 @@ export default function GameTableModular({
 
             {/* Cards area - show for actual players or face-down cards for spectators */}
             {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
-              <div className="bg-gray-800/50 rounded-lg relative mb-0 mt-auto" 
+              <div className="relative mb-0 mt-auto rounded-lg border border-white/10 bg-slate-900/40 backdrop-blur-sm" 
                    style={{ 
                         height: `${Math.floor((window.innerWidth < 900 ? 77 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168)) * scaleFactor + 20)}px`
                    }}>
@@ -1653,7 +1653,7 @@ export default function GameTableModular({
                 onPlayerClick={handleViewPlayerStats}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-lg">Connecting chat...</div>
+              <div className="flex h-full items-center justify-center text-lg text-slate-400">Connecting chat...</div>
             )}
           </div>
         </div>

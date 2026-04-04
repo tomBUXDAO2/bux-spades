@@ -9,8 +9,8 @@ const NewUserWelcomeModal: React.FC<NewUserWelcomeModalProps> = ({ isOpen, onClo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4 animate-fade-in border border-white/20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md animate-fade-in rounded-xl border border-white/10 bg-slate-950/95 p-8 shadow-lobby backdrop-blur-xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-200 mb-4">Welcome to BUX Spades! 🎉</h2>
           
@@ -21,7 +21,7 @@ const NewUserWelcomeModal: React.FC<NewUserWelcomeModalProps> = ({ isOpen, onClo
               coins to start your journey!
             </p>
             
-            <div className="bg-slate-700 p-4 rounded-lg text-left space-y-2">
+            <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4 text-left backdrop-blur-sm">
               <h3 className="font-semibold text-slate-200">Quick Tips:</h3>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>Create or join a game in the lobby</li>
@@ -35,7 +35,7 @@ const NewUserWelcomeModal: React.FC<NewUserWelcomeModalProps> = ({ isOpen, onClo
           <div className="mt-8">
             <button
               onClick={onClose}
-              className="w-full bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 transition"
+              className="w-full rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 py-3 px-6 font-semibold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500"
             >
               Let's Play!
             </button>

@@ -68,7 +68,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
     return (
       <div
         key={player.id}
-        className="flex items-center justify-between p-2 hover:bg-gray-700 rounded-lg transition-colors"
+        className="flex items-center justify-between rounded-lg p-2 transition-colors hover:bg-white/5"
       >
         <div className="flex items-center gap-2 flex-1">
           <img
@@ -81,14 +81,14 @@ export const PlayerList: React.FC<PlayerListProps> = ({
           />
           <div className="flex-1 min-w-0">
             <div
-              className="font-medium text-white truncate cursor-pointer hover:text-blue-300"
+              className="cursor-pointer truncate font-medium text-white hover:text-cyan-300"
               style={{ fontSize: fontSizes.playerName }}
               onClick={() => onPlayerClick && onPlayerClick(player)}
             >
               {isBot ? abbreviateBotName(player.username || player.name) : (player.username || player.name)}
-              {isBot && <span className="text-xs text-gray-400 ml-1">(Bot)</span>}
+              {isBot && <span className="ml-1 text-xs text-slate-400">(Bot)</span>}
             </div>
-            <div className="text-xs text-gray-400" style={{ fontSize: fontSizes.status }}>
+            <div className="text-xs text-slate-400" style={{ fontSize: fontSizes.status }}>
               {isSpectator ? 'Spectator' : 'Player'}
               {status !== 'not_friend' && (
                 <span className="ml-1">
@@ -105,7 +105,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             {status === 'friend' ? (
               <button
                 onClick={() => handlePlayerAction('remove_friend', player.id)}
-                className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition-colors"
+                className="rounded px-2 py-1 text-xs text-red-100 transition-colors border border-red-500/40 bg-red-950/50 hover:bg-red-900/60"
                 title="Remove friend"
               >
                 Remove
@@ -113,7 +113,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             ) : (
               <button
                 onClick={() => handlePlayerAction('add_friend', player.id)}
-                className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded transition-colors"
+                className="rounded px-2 py-1 text-xs text-emerald-100 transition-colors border border-emerald-500/40 bg-emerald-950/50 hover:bg-emerald-900/60"
                 title="Add friend"
               >
                 Add
@@ -121,7 +121,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
             )}
             <button
               onClick={() => handlePlayerAction('block_user', player.id)}
-              className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded transition-colors"
+              className="rounded border border-white/15 bg-slate-800/80 px-2 py-1 text-xs text-slate-200 transition-colors hover:bg-slate-700/80"
               title="Block user"
             >
               Block
@@ -132,7 +132,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
         {!isBot && status === 'blocked' && (
           <button
             onClick={() => handlePlayerAction('unblock_user', player.id)}
-            className="text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded transition-colors"
+            className="rounded border border-amber-500/40 bg-amber-950/50 px-2 py-1 text-xs text-amber-100 transition-colors hover:bg-amber-900/60"
             title="Unblock user"
           >
             Unblock
@@ -148,7 +148,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
       {players.length > 0 && (
         <div className="mb-4">
           <h3
-            className="text-white font-semibold mb-2 pb-1 border-b border-gray-600"
+            className="mb-2 border-b border-white/10 pb-1 font-semibold text-white"
             style={{ fontSize: fontSizes.sectionTitle }}
           >
             Players ({players.length})
@@ -163,7 +163,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
       {spectators.length > 0 && (
         <div>
           <h3
-            className="text-white font-semibold mb-2 pb-1 border-b border-gray-600"
+            className="mb-2 border-b border-white/10 pb-1 font-semibold text-white"
             style={{ fontSize: fontSizes.sectionTitle }}
           >
             Spectators ({spectators.length})
@@ -176,7 +176,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
       
       {/* Empty state */}
       {players.length === 0 && spectators.length === 0 && (
-        <div className="text-center text-gray-400 py-8">
+        <div className="py-8 text-center text-slate-400">
           <div className="text-4xl mb-2">👥</div>
           <div style={{ fontSize: fontSizes.playerName }}>No players online</div>
         </div>

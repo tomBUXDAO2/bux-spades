@@ -117,7 +117,7 @@ export default function HandSummaryModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-50" />
+          <div className="fixed inset-0 bg-black/55 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -131,7 +131,7 @@ export default function HandSummaryModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-sm sm:max-w-lg backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-2 sm:p-4 shadow-xl">
+              <Dialog.Panel className="w-full max-w-sm sm:max-w-lg rounded-2xl border border-white/10 bg-slate-950/95 p-2 shadow-lobby backdrop-blur-xl sm:p-4">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <h2 className="text-lg font-bold text-white text-center">Hand Summary</h2>
                 </div>
@@ -188,7 +188,7 @@ export default function HandSummaryModal({
                       }
                       
                       return (
-                        <div key={index} className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                        <div key={index} className="rounded-lg border border-white/10 bg-slate-900/50 p-2 backdrop-blur-sm">
                           <div className="flex items-center mb-2">
                             <img 
                               src={getPlayerAvatar(index)} 
@@ -200,13 +200,13 @@ export default function HandSummaryModal({
                           <div className="space-y-1">
                             {/* Made/Bid */}
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">Made/Bid:</span>
+                              <span className="text-slate-400">Made/Bid:</span>
                               <span className="text-white">({tricks}/{bid}) {madeBidPoints}</span>
                             </div>
                             
                             {/* Nils - always show */}
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">Nils:</span>
+                              <span className="text-slate-400">Nils:</span>
                               <span className={`font-medium ${nilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {nilPoints === 0 ? '0' : nilPoints}
                               </span>
@@ -214,15 +214,15 @@ export default function HandSummaryModal({
                             
                             {/* Bags - always show (includes penalty if applied) */}
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">Bags:</span>
-                              <span className={`font-medium ${bagScore === 0 ? 'text-gray-400' : bagScore > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                              <span className="text-slate-400">Bags:</span>
+                              <span className={`font-medium ${bagScore === 0 ? 'text-slate-400' : bagScore > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
                                 {bagScore === 0 ? '0' : bagScore}
                               </span>
                             </div>
                             
                             {/* Round Score */}
                             <div className="flex justify-between text-xs border-t border-white/10 pt-1">
-                              <span className="text-gray-400">Round:</span>
+                              <span className="text-slate-400">Round:</span>
                               <span className={`font-bold ${roundScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {roundScore}
                               </span>
@@ -230,7 +230,7 @@ export default function HandSummaryModal({
                             
                             {/* Total Score */}
                             <div className="flex justify-between text-xs">
-                              <span className="text-gray-400">Total:</span>
+                              <span className="text-slate-400">Total:</span>
                               <span className="font-medium text-white">{totalScore}</span>
                             </div>
                           </div>
@@ -242,7 +242,7 @@ export default function HandSummaryModal({
                   // Partners mode - side-by-side layout for mobile
                   <div className="grid grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                    <div className="rounded-lg border border-white/10 bg-slate-900/50 p-2 backdrop-blur-sm">
                       <div className="flex items-center mb-2">
                         <div className="bg-red-500 rounded-full w-2 h-2 mr-2"></div>
                         <h3 className="text-sm font-semibold text-white">Red Team</h3>
@@ -250,13 +250,13 @@ export default function HandSummaryModal({
                       <div className="space-y-1">
                         {/* Made/Bid */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Made/Bid:</span>
+                          <span className="text-slate-400">Made/Bid:</span>
                           <span className="text-white">({team1Tricks}/{team1Bid}) {team1Tricks >= team1Bid ? team1Bid * 10 : -(team1Bid * 10)}</span>
                         </div>
                         
                         {/* Nils - always show */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Nils:</span>
+                          <span className="text-slate-400">Nils:</span>
                           <span className={`font-medium ${team1NilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {team1NilPoints === 0 ? '0' : team1NilPoints}
                           </span>
@@ -264,15 +264,15 @@ export default function HandSummaryModal({
                         
                         {/* Bags - show raw bag count */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Bags:</span>
-                          <span className={`font-medium ${team1BagDisplay === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
+                          <span className="text-slate-400">Bags:</span>
+                          <span className={`font-medium ${team1BagDisplay === 0 ? 'text-slate-400' : 'text-yellow-400'}`}>
                             {team1BagDisplay === 0 ? '0' : team1BagDisplay}
                           </span>
                         </div>
                         
                         {/* Round Score */}
                         <div className="flex justify-between text-xs border-t border-white/10 pt-1">
-                          <span className="text-gray-400">Round Score:</span>
+                          <span className="text-slate-400">Round Score:</span>
                           <span className={`font-bold ${team1Score >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {team1Score}
                           </span>
@@ -280,7 +280,7 @@ export default function HandSummaryModal({
                         
                         {/* Total Score */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Total Score</span>
+                          <span className="text-slate-400">Total Score</span>
                           <span className="font-medium text-white">{team1TotalScore}</span>
                         </div>
                         
@@ -301,7 +301,7 @@ export default function HandSummaryModal({
                     </div>
 
                     {/* Blue Team */}
-                    <div className="bg-gray-800/50 backdrop-blur rounded-lg p-2 border border-white/5">
+                    <div className="rounded-lg border border-white/10 bg-slate-900/50 p-2 backdrop-blur-sm">
                       <div className="flex items-center mb-2">
                         <div className="bg-blue-500 rounded-full w-2 h-2 mr-2"></div>
                         <h3 className="text-sm font-semibold text-white">Blue Team</h3>
@@ -309,13 +309,13 @@ export default function HandSummaryModal({
                       <div className="space-y-1">
                         {/* Made/Bid */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Made/Bid:</span>
+                          <span className="text-slate-400">Made/Bid:</span>
                           <span className="text-white">({team2Tricks}/{team2Bid}) {team2Tricks >= team2Bid ? team2Bid * 10 : -(team2Bid * 10)}</span>
                         </div>
                         
                         {/* Nils - always show */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Nils:</span>
+                          <span className="text-slate-400">Nils:</span>
                           <span className={`font-medium ${team2NilPoints >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {team2NilPoints === 0 ? '0' : team2NilPoints}
                           </span>
@@ -323,15 +323,15 @@ export default function HandSummaryModal({
                         
                         {/* Bags - show raw bag count */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Bags:</span>
-                          <span className={`font-medium ${team2BagDisplay === 0 ? 'text-gray-400' : 'text-yellow-400'}`}>
+                          <span className="text-slate-400">Bags:</span>
+                          <span className={`font-medium ${team2BagDisplay === 0 ? 'text-slate-400' : 'text-yellow-400'}`}>
                             {team2BagDisplay === 0 ? '0' : team2BagDisplay}
                           </span>
                         </div>
                         
                         {/* Round Score */}
                         <div className="flex justify-between text-xs border-t border-white/10 pt-1">
-                          <span className="text-gray-400">Round Score:</span>
+                          <span className="text-slate-400">Round Score:</span>
                           <span className={`font-bold ${team2Score >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {team2Score}
                           </span>
@@ -339,7 +339,7 @@ export default function HandSummaryModal({
                         
                         {/* Total Score */}
                         <div className="flex justify-between text-xs">
-                          <span className="text-gray-400">Total Score</span>
+                          <span className="text-slate-400">Total Score</span>
                           <span className="font-medium text-white">{team2TotalScore}</span>
                         </div>
                         

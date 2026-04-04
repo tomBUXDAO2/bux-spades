@@ -21,9 +21,9 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
   if (!isOpen) return null;
 
   return (
-    <div className="fixed left-4 top-20 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl p-4 z-[999999] text-sm text-white">
-      <div className="font-bold mb-2 flex items-center gap-2">
-        <IoInformationCircleOutline className="inline-block h-4 w-4 text-blue-400" />
+    <div className="fixed left-4 top-20 z-[999999] w-64 rounded-xl border border-white/10 bg-slate-950/95 p-4 text-sm text-white shadow-lobby backdrop-blur-xl">
+      <div className="mb-2 flex items-center gap-2 font-bold">
+        <IoInformationCircleOutline className="inline-block h-4 w-4 text-cyan-400" />
         Table Details
       </div>
       {/* GameTile-style info header */}

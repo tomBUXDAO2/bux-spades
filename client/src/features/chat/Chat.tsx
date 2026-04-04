@@ -100,7 +100,7 @@ export default function Chat({
 
   return (
     <>
-      <div className="flex flex-col h-full bg-gray-800 border-l border-gray-600">
+      <div className="flex h-full flex-col border-l border-white/10 bg-slate-950/45 shadow-lobby-sm backdrop-blur-xl">
         {/* Chat Header */}
         <ChatHeader
           activeTab={activeTab}

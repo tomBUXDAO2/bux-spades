@@ -11,7 +11,7 @@ const BlindNilModal: React.FC<BlindNilModalProps> = ({ isOpen, onBlindNil, onReg
 
   return (
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999]">
-      <div className="w-[380px] md:w-[360px] sm:w-[320px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl">
+      <div className="w-[380px] max-sm:w-[280px] sm:w-[320px] md:w-[360px] rounded-2xl border border-white/10 bg-slate-950/95 p-4 shadow-lobby backdrop-blur-xl max-sm:p-3">
         <div className="text-center mb-3 max-sm:mb-2">
           <h2 className="text-lg max-sm:text-base font-bold text-white">Bid blind nil?</h2>
         </div>
@@ -25,7 +25,7 @@ const BlindNilModal: React.FC<BlindNilModalProps> = ({ isOpen, onBlindNil, onReg
               e.preventDefault();
               e.stopPropagation();
             }}
-            className="flex-1 bg-gradient-to-br from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-lg cursor-pointer"
+            className="flex-1 cursor-pointer rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 py-3 px-4 font-bold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500"
             style={{ pointerEvents: 'auto' }}
           >
             Yes
@@ -39,7 +39,7 @@ const BlindNilModal: React.FC<BlindNilModalProps> = ({ isOpen, onBlindNil, onReg
               e.preventDefault();
               e.stopPropagation();
             }}
-            className="flex-1 bg-gradient-to-br from-gray-600 to-gray-800 hover:from-gray-700 hover:to-gray-900 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-lg cursor-pointer"
+            className="flex-1 cursor-pointer rounded-lg border border-white/10 bg-white/5 py-3 px-4 font-bold text-slate-200 transition hover:bg-white/10"
             style={{ pointerEvents: 'auto' }}
           >
             No

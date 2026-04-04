@@ -79,7 +79,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
     return (
       <div
         key={player.id}
-        className="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors"
+        className="flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-white/5"
       >
         <div className="flex items-center gap-3 flex-1">
           {/* Avatar with online indicator */}
@@ -93,22 +93,22 @@ export const PlayerList: React.FC<PlayerListProps> = ({
               }}
             />
             {/* Green dot for online status */}
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-gray-800 rounded-full"></div>
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-500"></div>
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <div
-                className="font-medium text-white truncate cursor-pointer hover:text-blue-300"
+                className="cursor-pointer truncate font-medium text-white hover:text-cyan-300"
                 style={{ fontSize: fontSizes.playerName }}
                 onClick={() => onPlayerClick && onPlayerClick(player)}
               >
                 {isBot ? abbreviateBotName(player.username || player.name) : (player.username || player.name)}
                 {isSpectator && <EyeIcon />}
               </div>
-              {isBot && <span className="text-xs text-gray-400">(Bot)</span>}
+              {isBot && <span className="text-xs text-slate-400">(Bot)</span>}
             </div>
-            <div className="text-xs text-gray-400" style={{ fontSize: fontSizes.status }}>
+            <div className="text-xs text-slate-400" style={{ fontSize: fontSizes.status }}>
               {isSpectator ? 'Spectator' : 'Player'}
               {status !== 'not_friend' && (
                 <span className="ml-1">
@@ -123,17 +123,17 @@ export const PlayerList: React.FC<PlayerListProps> = ({
         {!isBot && !isCurrentUser && status !== 'blocked' && (
           <div className="flex gap-1">
             {status === 'friend' ? (
-              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700" title="Remove Friend"
+              <button className="flex h-8 w-8 items-center justify-center rounded-full border border-red-500/40 bg-red-950/60 hover:bg-red-900/70" title="Remove Friend"
                 onClick={() => handlePlayerAction('remove_friend', player.id)}>
                 <img src="/remove-friend.svg" alt="Remove Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
               </button>
             ) : (
-              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700" title="Add Friend"
+              <button className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-950/50 hover:bg-emerald-900/60" title="Add Friend"
                 onClick={() => handlePlayerAction('add_friend', player.id)}>
                 <img src="/add-friend.svg" alt="Add Friend" className="w-5 h-5" style={{ filter: 'invert(1) brightness(2)' }} />
               </button>
             )}
-            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500" title="Block"
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-slate-800/80 hover:bg-slate-700/80" title="Block"
               onClick={() => handlePlayerAction('block_user', player.id)}>
               <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
                 <circle cx="12" cy="12" r="11" stroke="white" strokeWidth="2" />
@@ -144,7 +144,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
         )}
         
         {!isBot && !isCurrentUser && status === 'blocked' && (
-          <button className="w-8 h-8 flex items-center justify-center rounded-full bg-yellow-600 border border-slate-300 hover:bg-yellow-700" title="Unblock"
+          <button className="flex h-8 w-8 items-center justify-center rounded-full border border-amber-500/40 bg-amber-950/50 hover:bg-amber-900/60" title="Unblock"
             onClick={() => handlePlayerAction('unblock_user', player.id)}>
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
               <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -161,7 +161,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
       {players.length > 0 && (
         <div className="mb-4">
           <h3
-            className="text-white font-semibold mb-2 pb-1 border-b border-gray-600"
+            className="mb-2 border-b border-white/10 pb-1 font-semibold text-white"
             style={{ fontSize: fontSizes.sectionTitle }}
           >
             Players ({players.length})
@@ -176,7 +176,7 @@ export const PlayerList: React.FC<PlayerListProps> = ({
       {spectators.length > 0 && (
         <div>
           <h3
-            className="text-white font-semibold mb-2 pb-1 border-b border-gray-600"
+            className="mb-2 border-b border-white/10 pb-1 font-semibold text-white"
             style={{ fontSize: fontSizes.sectionTitle }}
           >
             Spectators ({spectators.length})

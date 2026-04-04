@@ -69,10 +69,10 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({
   const displayCoins = (stats as any)?.coins ?? player.coins ?? 0;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-white/10 bg-slate-950/95 shadow-lobby backdrop-blur-xl">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-slate-600">
+        <div className="flex items-center justify-between border-b border-white/10 p-6">
           <h2 className="text-3xl font-bold text-white">Player Stats</h2>
           
           {/* Radio buttons and close button */}

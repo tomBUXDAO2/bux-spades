@@ -103,7 +103,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               key={message.id || index}
               className="w-full text-center my-2"
             >
-              <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: fontSizes.messageText }}>
+              <span className="text-amber-400/95 italic flex items-center justify-center gap-1" style={{ fontSize: fontSizes.messageText }}>
                 {message.message.includes('spectating') && <EyeIcon />}
                 {message.message}
               </span>
@@ -130,7 +130,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 />
               </div>
             )}
-            <div className={`max-w-[80%] ${isCurrentUser ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg ${isMobile ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
+            <div className={`max-w-[80%] rounded-xl border ${isCurrentUser ? 'border-cyan-500/25 bg-gradient-to-br from-cyan-600/90 to-teal-700/90 text-white shadow-md shadow-cyan-950/20' : 'border-white/10 bg-slate-800/80 text-slate-100 backdrop-blur-sm'} ${isMobile ? 'px-2 py-1.5' : 'px-3 py-2'}`}>
               <div className="flex justify-between items-center mb-1">
                 {!isCurrentUser && (
                   <span className="font-medium opacity-80" style={{ fontSize: fontSizes.username }}>{message.userName}</span>
