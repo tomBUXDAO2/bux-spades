@@ -20,12 +20,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       }}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8"
+        className="bg-slate-900 border border-slate-700 rounded-xl shadow-xl max-w-md w-full p-6 sm:p-7"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="login-modal-title" className="sr-only">
-          Sign in to BUX Spades
-        </h2>
         <LoginPanel variant="modal" onClose={onClose} />
       </div>
     </div>
