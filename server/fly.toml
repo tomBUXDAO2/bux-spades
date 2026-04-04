@@ -11,6 +11,14 @@ primary_region = "lax"
   min_machines_running = 1
   processes = ["app"]
 
+# After Machine starts, wait before HTTP checks (Node + Prisma + optional Discord)
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "15s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
