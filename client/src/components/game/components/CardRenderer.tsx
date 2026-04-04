@@ -2,6 +2,7 @@
 // Handles player hand, spectator hand, and card images
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import type { Card, GameState, Player, Bot } from "../../../types/game";
 import { getCardDimensions, getCardOverlapOffset, getCardVisibility, getSpectatorHandDimensions } from '../../../features/game/utils/cardUtils';
 import { sortCards, getPlayableCards, hasSpadeBeenPlayed } from '../../../features/game/utils/gameUtils';
@@ -289,20 +290,37 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
 
           const isPlayable = basePlayable && !leadingSpadeBlocked;
           const isVisible = index < visibleCount;
-          
+          const dimUnplayable =
+            (!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId;
+
           return (
-            <div
+            <motion.div
               key={`${card.suit}${card.rank}`}
-              className={`relative transition-all duration-300 ${isPlayable && !isPlayingCard ? 'cursor-pointer hover:z-20 hover:shadow-lg hover:-translate-y-3' : 'cursor-not-allowed'} ${(!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+              className={`relative ${isPlayable && !isPlayingCard ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'grayscale pointer-events-none' : ''}`}
               style={{
                 width: `${cardDimensions.cardUIWidth}px`,
                 height: `${cardDimensions.cardUIHeight}px`,
                 marginLeft: index > 0 ? `${cardOverlapOffset}px` : '0',
                 zIndex: 50 + index,
                 pointerEvents: 'auto',
-                opacity: isVisible ? 1 : 0,
                 filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
               }}
+              initial={false}
+              animate={{
+                opacity: !isVisible ? 0 : dimUnplayable ? 0.5 : 1,
+                y: isVisible ? 0 : 14,
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 320,
+                damping: 28,
+              }}
+              whileHover={
+                isPlayable && !isPlayingCard
+                  ? { y: -10, scale: 1.03, zIndex: 80, transition: { type: 'spring', stiffness: 400, damping: 22 } }
+                  : undefined
+              }
+              whileTap={isPlayable && !isPlayingCard ? { scale: 0.97 } : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -339,7 +357,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
                 )}
               </div>
-            </div>
+            </motion.div>
           );
         })}
         </div>

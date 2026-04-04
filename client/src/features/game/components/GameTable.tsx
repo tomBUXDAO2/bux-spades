@@ -2,6 +2,7 @@
 // This is a simplified version that uses the extracted components
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
 import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
 import Chat from '../../../features/chat/Chat';
@@ -1293,14 +1294,38 @@ export default function GameTableModular({
       }
       
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
-      
+
+      const enterFrom =
+        displayPosition === 0
+          ? { x: 0, y: 36 }
+          : displayPosition === 1
+            ? { x: -36, y: 0 }
+            : displayPosition === 2
+              ? { x: 0, y: -36 }
+              : { x: 36, y: 0 };
+
       return (
         <div
-          key={`${card.suit}-${card.rank}-${i}`}
-          className={`${positions[displayPosition]} z-20 transition-all duration-500 ${animatingTrick ? 'opacity-80' : ''}`}
+          key={`trick-${seatIndex}-${card.suit}-${card.rank}`}
+          className={`${positions[displayPosition]} z-20`}
           style={{ pointerEvents: 'none' }}
         >
-          <div className="transition-all duration-300">
+          <motion.div
+            className="relative"
+            initial={{ opacity: 0, scale: 0.88, ...enterFrom }}
+            animate={{
+              opacity: animatingTrick ? 0.82 : 1,
+              scale: isWinningCard ? 1.05 : 1,
+              x: 0,
+              y: 0,
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 420,
+              damping: 28,
+              mass: 0.85,
+            }}
+          >
             <CardImage
               card={card}
               width={tableCardWidth}
@@ -1308,12 +1333,12 @@ export default function GameTableModular({
               className="shadow-lg"
               alt={`${card.rank}${card.suit}`}
             />
-          </div>
-          {isWinningCard && (
-            <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
-              ✓
-            </div>
-          )}
+            {isWinningCard && (
+              <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
+                ✓
+              </div>
+            )}
+          </motion.div>
         </div>
       );
     }) : [];
