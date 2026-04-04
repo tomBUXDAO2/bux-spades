@@ -1,0 +1,14 @@
+---
+description: Commit git changes after completing code edits in this repo
+alwaysApply: true
+---
+
+# Git: commit after changes
+
+After you finish a task that modifies project files (code, config, assets):
+
+1. Run `git status` and stage only intentional changes (never `.env`, secrets, or accidental scratch files).
+2. Create a **single focused commit** with a clear conventional-style message (e.g. `fix(client): …`, `feat(server): …`).
+3. If the user asked to push or deploy, run `git push` after the commit; otherwise mention that the commit is local.
+
+Do not end a coding session with uncommitted fixes when the user expected them saved. If there is nothing to commit, say so briefly.

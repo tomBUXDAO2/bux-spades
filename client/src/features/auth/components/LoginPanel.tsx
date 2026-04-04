@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 
 const isCapacitor = () =>
   typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
@@ -11,18 +10,20 @@ export interface LoginPanelProps {
 }
 
 const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState(false);
 
+  // Use window.location, not useSearchParams: LoginModal renders outside RouterProvider.
   useEffect(() => {
-    const urlError = searchParams.get('error');
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get('error');
     if (urlError === 'oauth_failed') {
       setError('Login failed. Please try again.');
-      setSearchParams({}, { replace: true });
+      const { pathname, hash } = window.location;
+      window.history.replaceState({}, '', pathname + hash);
     }
-  }, [searchParams, setSearchParams]);
+  }, []);
 
   const handleDiscordLogin = async () => {
     setDiscordError(false);
