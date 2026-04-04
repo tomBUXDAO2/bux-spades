@@ -22,22 +22,20 @@ playerTimerService.setIO(io);
 // CONSOLIDATED: GameManager removed - using GameService directly
 console.log('[SERVER] Loaded existing games');
 
-// Start periodic cleanup service
-PeriodicCleanupService.start();
-
-// Start Discord bot
-if (process.env.DISCORD_BOT_TOKEN) {
-  startDiscordBot().catch(error => {
-    console.error('[SERVER] Error starting Discord bot:', error);
-  });
-} else {
-  console.log('[SERVER] Discord bot disabled (no DISCORD_BOT_TOKEN)');
-}
-
-// Start server
+// Bind HTTP immediately so Fly's post-start socket check sees :3000 (cleanup/Discord can follow).
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[SERVER] Server running on port ${PORT}`);
   console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  PeriodicCleanupService.start();
+
+  if (process.env.DISCORD_BOT_TOKEN) {
+    startDiscordBot().catch(error => {
+      console.error('[SERVER] Error starting Discord bot:', error);
+    });
+  } else {
+    console.log('[SERVER] Discord bot disabled (no DISCORD_BOT_TOKEN)');
+  }
 });
 
 // Graceful shutdown
