@@ -848,6 +848,11 @@ class BotService {
     const bidsArray = game.bidding?.bids || []; // seat-indexed when available
     const myBid = bidsArray?.[seatIndex] ?? game.players[seatIndex]?.bid ?? (game.bids?.find(b => b.userId === game.players[seatIndex]?.id)?.bid ?? null);
     const partnerBid = bidsArray?.[partnerSeat] ?? partner?.bid ?? (game.bids?.find(b => b.userId === partner?.id)?.bid ?? null);
+    const isNilBid = (b) => {
+      if (b === 0 || b === '0') return true;
+      if (b === null || b === undefined || b === '') return false;
+      return Number(b) === 0;
+    };
     const oppSeats = [0,1,2,3].filter(s => s !== seatIndex && s !== partnerSeat);
     const oppBids = oppSeats.map(s => bidsArray?.[s] ?? null);
     const tableBidTotal = [myBid, partnerBid, ...oppBids].reduce((a,b)=>a+(Number.isFinite(b)?b:0),0);
@@ -863,9 +868,9 @@ class BotService {
     const partnerHasPlayed = trick.some(c => c.seatIndex === partnerSeat);
     const partnerCard = partnerHasPlayed ? trick.find(c => c.seatIndex === partnerSeat) : null;
 
-    const scenario = (game.players[seatIndex]?.isNil || myBid === 0)
+    const scenario = (game.players[seatIndex]?.isNil || isNilBid(myBid))
       ? 'self_nil'
-      : ((partner?.isNil || partnerBid === 0) ? 'cover_nil' : (tableBidTotal >= 12 ? 'high_pressure' : 'normal'));
+      : ((partner?.isNil || isNilBid(partnerBid)) ? 'cover_nil' : (tableBidTotal >= 12 ? 'high_pressure' : 'normal'));
 
     return {
       game,
@@ -911,21 +916,55 @@ class BotService {
   sortByRankDesc(cards) { return [...cards].sort((a,b)=> this.getCardValue(b.rank) - this.getCardValue(a.rank)); }
   groupBySuit(cards) { return cards.reduce((m,c)=>(m[c.suit]=(m[c.suit]||[]).concat(c),m),{}); }
 
+  /**
+   * Winning seat for a partially-played trick (Spades rules: spades trump; else high lead suit).
+   * Off-suit sluffs (not spade) never win.
+   */
+  provisionalTrickWinnerSeat(trick) {
+    if (!trick || trick.length === 0) return null;
+    const leadSuit = trick[0].suit;
+    const spades = trick.filter(c => c.suit === 'SPADES');
+    let pool = spades.length > 0 ? spades : trick.filter(c => c.suit === leadSuit);
+    if (pool.length === 0) return trick[0].seatIndex;
+    return pool.reduce((best, c) =>
+      this.getCardValue(c.rank) > this.getCardValue(best.rank) ? c : best
+    ).seatIndex;
+  }
+
+  /** If this seat plays `card`, would they take the trick? */
+  wouldSeatTakeTrickWithCard(trick, card, seatIndex) {
+    const hyp = trick.concat([{ suit: card.suit, rank: card.rank, seatIndex }]);
+    return this.provisionalTrickWinnerSeat(hyp) === seatIndex;
+  }
+
+  /** Highest legal card that does not win the trick for nil; fallback to lowest if forced to win. */
+  nilPickHighestLosing(trick, leadSuit, seatIndex, legalCards) {
+    if (!legalCards || legalCards.length === 0) return null;
+    for (const c of this.sortByRankDesc(legalCards)) {
+      if (!this.wouldSeatTakeTrickWithCard(trick, c, seatIndex)) return c;
+    }
+    return this.sortByRankAsc(legalCards)[0];
+  }
+
   currentHighestOfSuit(ctx, suit) {
     const inSuit = ctx.trick.filter(c => c.suit === suit);
     if (inSuit.length === 0) return null;
     return this.sortByRankDesc(inSuit)[0];
   }
 
+  partnerNilCurrentlyWinningTrick(ctx) {
+    const { trick, partnerSeat, partnerHasPlayed } = ctx;
+    if (!partnerHasPlayed || trick.length === 0) return false;
+    return this.provisionalTrickWinnerSeat(trick) === partnerSeat;
+  }
+
   canWinFollowing(ctx, card) {
-    // If following suit, it wins if rank > current highest of lead suit and no spade trump already played
     const { trick, leadSuit } = ctx;
-    if (!leadSuit) return true; // leading case handled elsewhere
+    if (!leadSuit) return true;
     if (card.suit !== leadSuit) return false;
-    const highestLead = this.currentHighestOfSuit(ctx, leadSuit);
-    // if any spade already in trick, only spades can win
     const spadeInTrick = trick.some(c => c.suit === 'SPADES');
     if (spadeInTrick) return false;
+    const highestLead = this.currentHighestOfSuit(ctx, leadSuit);
     return !highestLead || this.getCardValue(card.rank) > this.getCardValue(highestLead.rank);
   }
 
@@ -984,12 +1023,8 @@ class BotService {
       const winning = this.minimalWinningFollowing(ctx, hand);
       if (winning) {
         // Do not over partner's sure win
-        if (partnerHasPlayed && partnerCard && partnerCard.suit === leadSuit) {
-          const partnerWinning = this.canWinFollowing(ctx, partnerCard);
-          if (partnerWinning) {
-            // partner already winning, dump lowest lead-suit
-            return this.sortByRankAsc(leadCards)[0];
-          }
+        if (partnerHasPlayed && this.provisionalTrickWinnerSeat(trick) === partnerSeat) {
+          return this.sortByRankAsc(leadCards)[0];
         }
         return winning;
       }
@@ -1032,7 +1067,7 @@ class BotService {
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length > 0) {
       // If partner is winning, support them by dumping
-      if (partnerHasPlayed && partnerCard && partnerCard.suit === leadSuit && this.canWinFollowing(ctx, partnerCard)) {
+      if (partnerHasPlayed && this.provisionalTrickWinnerSeat(trick) === partnerSeat) {
         return this.sortByRankAsc(leadCards)[0];
       }
       // Try to win, else play high to force opponents to use good cards
@@ -1075,7 +1110,7 @@ class BotService {
   }
 
   playCoverNil(ctx) {
-    const { hand, isLeading, partnerSeat, trick, leadSuit, partnerHasPlayed, partnerCard, spadesBroken } = ctx;
+    const { hand, isLeading, partnerSeat, seatIndex, trick, leadSuit, partnerHasPlayed, partnerCard, spadesBroken } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
       // Lead high winners to cover; prefer spades if broken since we can win them
@@ -1096,18 +1131,12 @@ class BotService {
     }
     // Following after nil partner already played
     if (partnerHasPlayed) {
-      // If nil partner is safe (won't win), don't waste; otherwise take with Q (if hold QKA), else with minimal winning
-      const partnerSafe = (()=>{
-        if (!partnerCard) return true;
-        if (leadSuit && partnerCard.suit !== leadSuit) return true; // void, likely safe unless cutting
-        return !this.canWinFollowing(ctx, partnerCard);
-      })();
-      if (partnerSafe) {
-        // Dump lowest legal card
+      // Partner no longer winning (someone covered or trumped) — keep high cards, dump low
+      if (!this.partnerNilCurrentlyWinningTrick(ctx)) {
         const leadCards = hand.filter(c => c.suit === leadSuit);
         if (leadCards.length) return this.sortByRankAsc(leadCards)[0];
         const nonSp = hand.filter(c => c.suit !== 'SPADES');
-        return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
+        return this.sortByRankAsc(nonSp.length ? nonSp : hand)[0];
       }
       // Need to win to cover
       const leadCards = hand.filter(c => c.suit === leadSuit);
@@ -1127,61 +1156,61 @@ class BotService {
       const nonSp = hand.filter(c => c.suit !== 'SPADES');
       return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
     }
-    // Following before nil partner: play aggressively to try to win or force opponents to play high
+    // Following before nil partner plays: if nil partner LED, duck low and save cover cards
+    const nilPartnerLed = trick.length > 0 && trick[0].seatIndex === partnerSeat;
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length) {
-      // Try to win with minimal card, else play high to force opponents to burn cards
+      if (nilPartnerLed) {
+        return this.sortByRankAsc(leadCards)[0];
+      }
       const win = this.minimalWinningFollowing(ctx, hand);
       if (win) return win;
-      // No win possible, play high to force opponent to burn
       return this.sortByRankDesc(leadCards)[0];
     }
-    // Void: must cut with spades if possible to prevent nil partner from winning
     const spades = hand.filter(c => c.suit === 'SPADES');
+    const nonSp = hand.filter(c => c.suit !== 'SPADES');
+    if (nilPartnerLed) {
+      if (nonSp.length > 0) return this.sortByRankAsc(nonSp)[0];
+      const pick = this.nilPickHighestLosing(trick, leadSuit, seatIndex, spades);
+      if (pick) return pick;
+      return spades.length ? this.sortByRankAsc(spades)[0] : this.sortByRankAsc(hand)[0];
+    }
     if (spades.length > 0) {
-      // Play lowest spade that might win, or just lowest to cut
       const cut = this.minimalSpadeToWin(ctx, hand);
       return cut || this.sortByRankAsc(spades)[0];
     }
-    // No spades, dump lowest
-    const nonSp = hand.filter(c => c.suit !== 'SPADES');
-    return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
+    return this.sortByRankAsc(nonSp.length ? nonSp : hand)[0];
   }
 
   playSelfNil(ctx) {
-    const { hand, isLeading, leadSuit, trick } = ctx;
+    const { hand, isLeading, leadSuit, trick, seatIndex } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
-      // Lead suits where we have safely low cards; avoid high leads
-      const candidates = ['HEARTS','DIAMONDS','CLUBS','SPADES'];
+      const candidates = ['HEARTS', 'DIAMONDS', 'CLUBS', 'SPADES'];
       for (const s of candidates) {
-        const cards = this.sortByRankAsc(suits[s]||[]);
+        const cards = this.sortByRankAsc(suits[s] || []);
         if (cards.length) return cards[0];
       }
       return this.sortByRankAsc(hand)[0];
     }
-    // Following
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length) {
-      // Play highest that still loses to current highest
-      const currentHighest = this.currentHighestOfSuit(ctx, leadSuit);
-      const losing = this.sortByRankDesc(leadCards).find(c => this.getCardValue(c.rank) < (currentHighest ? this.getCardValue(currentHighest.rank) : 99));
-      if (losing) return losing;
-      // If all would win, choose smallest risk: the lowest
+      const pick = this.nilPickHighestLosing(trick, leadSuit, seatIndex, leadCards);
+      if (pick) return pick;
       return this.sortByRankAsc(leadCards)[0];
     }
-    // Void: never cut unless someone already cut and we can play lower spade than existing spade
-    const trickSpades = trick.filter(c => c.suit === 'SPADES');
-    if (trickSpades.length > 0) {
-      const lowestTrickSpade = this.sortByRankAsc(trickSpades)[0];
-      const mySpades = this.sortByRankAsc(hand.filter(c => c.suit === 'SPADES'));
-      const safeLower = mySpades.find(s => this.getCardValue(s.rank) < this.getCardValue(lowestTrickSpade.rank));
-      if (safeLower) return safeLower;
+    const trickHasSpade = trick.some(c => c.suit === 'SPADES');
+    const mySpades = hand.filter(c => c.suit === 'SPADES');
+    const myNonSp = hand.filter(c => c.suit !== 'SPADES');
+    if (!trickHasSpade && myNonSp.length > 0) {
+      return this.sortByRankDesc(myNonSp)[0];
     }
-    // Prefer discarding highest risky non-trumps first
-    const nonSp = hand.filter(c => c.suit !== 'SPADES');
-    const dumpPool = nonSp.length ? nonSp : hand;
-    return this.sortByRankDesc(dumpPool)[0];
+    if (mySpades.length > 0) {
+      const pick = this.nilPickHighestLosing(trick, leadSuit, seatIndex, mySpades);
+      if (pick) return pick;
+      return this.sortByRankAsc(mySpades)[0];
+    }
+    return this.sortByRankDesc(hand)[0];
   }
 
   /**
