@@ -1042,7 +1042,7 @@ class BotService {
   }
 
   playNormalPressure(ctx) {
-    const { hand, isLeading, leadSuit, partnerHasPlayed, partnerCard, specialRules, spadesBroken } = ctx;
+    const { hand, isLeading, leadSuit, trick, partnerSeat, partnerHasPlayed, partnerCard, specialRules, spadesBroken } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
       // ASSASSIN: Must lead spades if broken and have spades
