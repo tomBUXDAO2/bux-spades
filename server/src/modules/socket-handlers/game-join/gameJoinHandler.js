@@ -1,5 +1,6 @@
 import { GameService } from '../../../services/GameService.js';
 import { BotService } from '../../../services/BotService.js';
+import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import redisSessionService from '../../../services/RedisSessionService.js';
 import { prisma } from '../../../config/database.js';
@@ -240,6 +241,20 @@ class GameJoinHandler {
         }
       } catch (err) {
         console.error('[GAME JOIN] Error sending system message:', err);
+      }
+
+      // Re-read DB: authenticate can race ahead of disconnect's markPlayerDisconnected, so auth may skip
+      // markPlayerReconnected/clearTimer. Join always runs after both; fix stale disconnect + timer here.
+      if (!spectate) {
+        const gpRow = await prisma.gamePlayer.findFirst({
+          where: { gameId, userId, isSpectator: false },
+          select: { leftAt: true }
+        });
+        if (gpRow?.leftAt) {
+          await GameService.markPlayerReconnected(gameId, userId);
+          playerTimerService.clearTimerForPlayer(gameId, userId);
+          console.log(`[GAME JOIN] Cleared disconnect state and auto-play timer for user ${userId}`);
+        }
       }
       
       console.log(`[GAME JOIN] User ${userId} successfully joined game ${gameId}`);
