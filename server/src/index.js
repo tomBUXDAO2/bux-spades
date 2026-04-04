@@ -2,56 +2,63 @@
 import './config/logging.js';
 
 import { app, server, io, PORT, HOST } from './config/server.js';
-// CONSOLIDATED: GameManager removed - using GameService directly
-import { setupSocketHandlers } from './socket/socketHandlers.js';
-import { setupRoutes } from './routes/index.js';
-import { PeriodicCleanupService } from './services/PeriodicCleanupService.js';
-import { startDiscordBot } from './discord/bot.js';
-import { playerTimerService } from './services/PlayerTimerService.js';
 
-// Setup routes
-setupRoutes(app);
-
-// Setup socket handlers
-setupSocketHandlers(io);
-
-// Initialize player timer service with Socket.IO instance
-playerTimerService.setIO(io);
-
-// Load existing games on startup
-// CONSOLIDATED: GameManager removed - using GameService directly
-console.log('[SERVER] Loaded existing games');
-
-// Bind HTTP immediately so Fly's post-start socket check sees the internal port (cleanup/Discord can follow).
-server.listen(PORT, HOST, () => {
+// Bind the port before loading routes, sockets, and Discord so Fly's listener probe sees :3000 quickly.
+// Full API/socket setup runs in the listening callback (dynamic imports).
+server.listen(PORT, HOST, async () => {
   console.log(`[SERVER] Listening on http://${HOST}:${PORT}`);
-  console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  PeriodicCleanupService.start();
+  try {
+    const { setupRoutes } = await import('./routes/index.js');
+    setupRoutes(app);
 
-  if (process.env.DISCORD_BOT_TOKEN) {
-    startDiscordBot().catch(error => {
-      console.error('[SERVER] Error starting Discord bot:', error);
-    });
-  } else {
-    console.log('[SERVER] Discord bot disabled (no DISCORD_BOT_TOKEN)');
+    const { setupSocketHandlers } = await import('./socket/socketHandlers.js');
+    setupSocketHandlers(io);
+
+    const { playerTimerService } = await import('./services/PlayerTimerService.js');
+    playerTimerService.setIO(io);
+
+    console.log('[SERVER] Loaded existing games');
+
+    const { PeriodicCleanupService } = await import('./services/PeriodicCleanupService.js');
+    PeriodicCleanupService.start();
+
+    if (process.env.DISCORD_BOT_TOKEN) {
+      const { startDiscordBot } = await import('./discord/bot.js');
+      startDiscordBot().catch((error) => {
+        console.error('[SERVER] Error starting Discord bot:', error);
+      });
+    } else {
+      console.log('[SERVER] Discord bot disabled (no DISCORD_BOT_TOKEN)');
+    }
+
+    console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
+  } catch (err) {
+    console.error('[SERVER] Post-listen bootstrap failed:', err);
+    process.exit(1);
   }
+});
+
+server.on('error', (err) => {
+  console.error('[SERVER] server.listen error:', err);
+  process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('[SERVER] Shutting down gracefully...');
-  
-  // Stop periodic cleanup service
-  PeriodicCleanupService.stop();
-  
-  // Clear all player timers
-  playerTimerService.clearAllTimers();
-  
-  // Save all games before shutdown
-  // CONSOLIDATED: GameManager removed - using GameService directly
+
+  try {
+    const { PeriodicCleanupService } = await import('./services/PeriodicCleanupService.js');
+    PeriodicCleanupService.stop();
+    const { playerTimerService } = await import('./services/PlayerTimerService.js');
+    playerTimerService.clearAllTimers();
+  } catch (e) {
+    console.error('[SERVER] Shutdown cleanup error:', e);
+  }
+
   console.log('[SERVER] Shutdown complete');
-  
+
   server.close(() => {
     console.log('[SERVER] Server closed');
     process.exit(0);

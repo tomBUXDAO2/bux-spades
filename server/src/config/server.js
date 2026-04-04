@@ -20,6 +20,12 @@ if (!fs.existsSync(uploadsRoot)) {
 }
 
 const app = express();
+
+// Register before heavy middleware so Fly proxy / health checks succeed while the rest of the app loads.
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 const server = createServer(app);
 
 // CORS configuration
