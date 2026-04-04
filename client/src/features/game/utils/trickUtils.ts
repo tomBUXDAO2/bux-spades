@@ -17,13 +17,13 @@ export interface OrderedPlayersResult {
 /**
  * Get table positions for trick cards
  */
-/** Tight cluster around table center (all anchors use center + small offset). */
+/** One slot per display seat — card sits near that seat (south/west/north/east). */
 export const getTrickCardPositions = (): TrickCardPositions => {
   return {
-    0: 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 translate-y-[min(10vh,4.25rem)]',
-    1: 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -translate-x-[min(11vw,5rem)]',
-    2: 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -translate-y-[min(10vh,4.25rem)]',
-    3: 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 translate-x-[min(11vw,5rem)]',
+    0: 'absolute bottom-[20%] left-1/2 -translate-x-1/2',
+    1: 'absolute left-[20%] top-1/2 -translate-y-1/2',
+    2: 'absolute left-1/2 top-[20%] -translate-x-1/2',
+    3: 'absolute right-[20%] top-1/2 -translate-y-1/2',
   };
 };
 
