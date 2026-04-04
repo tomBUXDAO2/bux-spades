@@ -93,12 +93,12 @@ function TrickTableCard({
 
   const enterFrom =
     displayPosition === 0
-      ? { x: 0, y: 36 }
+      ? { x: 0, y: 22 }
       : displayPosition === 1
-        ? { x: -36, y: 0 }
+        ? { x: -22, y: 0 }
         : displayPosition === 2
-          ? { x: 0, y: -36 }
-          : { x: 36, y: 0 };
+          ? { x: 0, y: -22 }
+          : { x: 22, y: 0 };
 
   // Position on a non-motion wrapper so Tailwind transforms are not overwritten by Framer Motion's x/y.
   return (
@@ -113,9 +113,9 @@ function TrickTableCard({
         }}
         transition={{
           type: 'spring',
-          stiffness: 420,
-          damping: 28,
-          mass: 0.85,
+          stiffness: 620,
+          damping: 36,
+          mass: 0.55,
         }}
       >
         <div className="relative">
@@ -667,7 +667,7 @@ export default function GameTableModular({
       trickClearTimeoutRef.current = setTimeout(() => {
         console.log('[TRICK ANIMATION] Fallback clearing table cards after timeout');
         handleClearTableCards({ fallback: true });
-      }, 1800);
+      }, 950);
     } else {
       console.warn('[TRICK COMPLETE] Unable to determine winner seat index from payload', { data });
     }

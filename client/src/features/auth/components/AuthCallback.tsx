@@ -64,12 +64,12 @@ const AuthCallback: React.FC = () => {
         } else {
           console.error('Invalid profile response:', response.data);
           localStorage.removeItem('sessionToken');
-          navigate('/login', { replace: true });
+          navigate('/?signin=1', { replace: true });
         }
       } catch (error: any) {
         console.error('Error fetching profile after login:', error);
         localStorage.removeItem('sessionToken');
-        navigate('/login', { replace: true });
+        navigate('/?signin=1', { replace: true });
       }
     };
 
@@ -95,7 +95,7 @@ const AuthCallback: React.FC = () => {
       fetchUserProfile(token);
     } else {
       console.error('No token received from callback');
-      navigate('/login', { replace: true });
+      navigate('/?signin=1', { replace: true });
     }
   }, [searchParams, navigate, setUser]);
 

@@ -32,10 +32,10 @@ export const CapacitorAuthHandler: React.FC = () => {
             navigate('/', { replace: true });
           }
         } else {
-          navigate('/login', { replace: true });
+          navigate('/?signin=1', { replace: true });
         }
       } catch {
-        navigate('/login', { replace: true });
+        navigate('/?signin=1', { replace: true });
       }
     };
 
@@ -51,7 +51,7 @@ export const CapacitorAuthHandler: React.FC = () => {
       const token = u.searchParams.get('token');
       const err = u.searchParams.get('error');
       if (err) {
-        navigate('/login?error=oauth_failed', { replace: true });
+        navigate('/?signin=1&error=oauth_failed', { replace: true });
         return;
       }
       if (token) {

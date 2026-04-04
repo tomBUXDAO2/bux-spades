@@ -18,10 +18,13 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlError = params.get('error');
-    if (urlError === 'oauth_failed') {
+    const oauthErrors = ['oauth_failed', 'oauth_error', 'authorization_failed'];
+    if (urlError && oauthErrors.includes(urlError)) {
       setError('Login failed. Please try again.');
-      const { pathname, hash } = window.location;
-      window.history.replaceState({}, '', pathname + hash);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      url.searchParams.delete('signin');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
     }
   }, []);
 

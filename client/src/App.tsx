@@ -9,7 +9,6 @@ import {
 } from 'react-router-dom';
 import { CapacitorAuthHandler } from '@/features/auth/CapacitorAuthHandler';
 import { AuthProvider as AuthContextProvider, useAuth } from '@/features/auth/AuthContext';
-import Login from '@/features/auth/components/Login';
 import Register from '@/features/auth/components/Register';
 import AuthCallback from '@/features/auth/components/AuthCallback';
 import HomePage from '@/features/lobby/HomePage';
@@ -51,7 +50,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/?signin=1" replace />;
   }
 
   return <>{children}</>;
@@ -113,7 +112,7 @@ const router = createBrowserRouter(
       children: [
         {
           path: "login",
-          element: <Login />
+          element: <Navigate to="/?signin=1" replace />
         },
         {
           path: "register",
@@ -206,18 +205,18 @@ const AppWithSocket: React.FC = () => {
         isOpen={showSessionInvalidatedModal}
         onClose={() => {
           setShowSessionInvalidatedModal(false);
-          window.location.href = '/login';
+          window.location.href = '/?signin=1';
         }}
         onLogin={() => {
           setShowSessionInvalidatedModal(false);
-          window.location.href = '/login';
+          window.location.href = '/?signin=1';
         }}
       />
       <ForceLogoutModal
         isOpen={showForceLogoutModal}
         onClose={() => {
           setShowForceLogoutModal(false);
-          window.location.href = '/login';
+          window.location.href = '/?signin=1';
         }}
       />
       <PWAInstallModal

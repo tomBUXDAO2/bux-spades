@@ -198,7 +198,7 @@ router.get('/facebook/callback', async (req, res) => {
 
     if (error) {
       console.error('[FACEBOOK OAUTH] Authorization error:', error);
-      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`;
+      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=authorization_failed`;
       return res.redirect(loginUrl);
     }
 
@@ -267,7 +267,7 @@ router.get('/facebook/callback', async (req, res) => {
   } catch (error) {
     console.error('[FACEBOOK OAUTH] Error in callback:', error);
     const isCapacitor = req.query?.state === 'capacitor';
-    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=oauth_error`;
+    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=oauth_error`;
     res.redirect(loginUrl);
   }
 });
@@ -280,7 +280,7 @@ router.get('/discord/callback', async (req, res) => {
 
     if (error) {
       console.error('[DISCORD OAUTH] Authorization error:', error);
-      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=authorization_failed`;
+      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=authorization_failed`;
       return res.redirect(loginUrl);
     }
 
@@ -355,7 +355,7 @@ router.get('/discord/callback', async (req, res) => {
   } catch (error) {
     console.error('[DISCORD OAUTH] Error in callback:', error);
     const isCapacitor = req.query?.state === 'capacitor';
-    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/login?error=oauth_error`;
+    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=oauth_error`;
     res.redirect(loginUrl);
   }
 });

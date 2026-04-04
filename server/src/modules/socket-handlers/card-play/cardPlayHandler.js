@@ -315,7 +315,7 @@ class CardPlayHandler {
               // CRITICAL FIX: Clear table cards FIRST, then start new trick to prevent flickering
               console.log(`[CARD PLAY] Checking if round is complete - isRoundComplete: ${trickResult.isRoundComplete}`);
               
-              // Clear table cards first (after 3.5 seconds)
+              // Brief pause so winner highlight is visible, then clear and start next trick
               setTimeout(async () => {
                 console.log('[CARD PLAY] Emitting clear_table_cards event - trick is complete');
                 // Include isRoundComplete so clients can hard-lock table rendering on final trick of a hand
@@ -342,7 +342,7 @@ class CardPlayHandler {
                 } else {
                   console.log(`[CARD PLAY] Round is complete, not starting new trick`);
                 }
-              }, 900);
+              }, 480);
             } else {
               console.log(`[CARD PLAY] NOT emitting clear_table_cards event - trick is not complete`);
             }
