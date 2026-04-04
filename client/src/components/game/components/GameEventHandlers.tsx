@@ -1,35 +1,38 @@
-  const deriveCardPlayed = (data: any) => {
-    if (data?.cardPlayed) return { ...data.cardPlayed, inferred: false };
-
-    const currentTrickArray =
-      (Array.isArray(data?.currentTrick) && data.currentTrick.length > 0 && data.currentTrick) ||
-      (Array.isArray(data?.gameState?.play?.currentTrick) && data.gameState.play.currentTrick.length > 0 && data.gameState.play.currentTrick);
-
-    if (currentTrickArray) {
-      const lastCard = currentTrickArray[currentTrickArray.length - 1];
-      if (lastCard) {
-        return {
-          userId: lastCard.playerId,
-          seatIndex: lastCard.seatIndex,
-          suit: lastCard.suit,
-          rank: lastCard.rank,
-          inferred: true
-        };
-      }
-    }
-
-    return null;
-  };
-
 // Game event handlers and socket management for GameTable
 // Handles all socket events and game state updates
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { GameState, Card, Player, Bot } from "../../../types/game";
 import type { ChatMessage } from "../../../features/chat/Chat";
 import { normalizeGameState } from "../../../features/game/hooks/useGameStateNormalization";
 import { playCardSound } from "./AudioManager";
-import { resetCardPlayDebounce } from "../../../features/game/utils/playCardUtils";
+import {
+  mergeServerStatePreservingOptimisticHand,
+  resetCardPlayDebounce
+} from "../../../features/game/utils/playCardUtils";
+
+const deriveCardPlayed = (data: any) => {
+  if (data?.cardPlayed) return { ...data.cardPlayed, inferred: false };
+
+  const currentTrickArray =
+    (Array.isArray(data?.currentTrick) && data.currentTrick.length > 0 && data.currentTrick) ||
+    (Array.isArray(data?.gameState?.play?.currentTrick) && data.gameState.play.currentTrick.length > 0 && data.gameState.play.currentTrick);
+
+  if (currentTrickArray) {
+    const lastCard = currentTrickArray[currentTrickArray.length - 1];
+    if (lastCard) {
+      return {
+        userId: lastCard.playerId,
+        seatIndex: lastCard.seatIndex,
+        suit: lastCard.suit,
+        rank: lastCard.rank,
+        inferred: true
+      };
+    }
+  }
+
+  return null;
+};
 
 interface GameEventHandlersProps {
   socket: any;
@@ -61,6 +64,8 @@ interface GameEventHandlersProps {
   setTrickCompleted: (completed: boolean) => void;
   setLastNonEmptyTrick: (trick: Card[]) => void;
   setPendingPlayedCard: (card: Card | null) => void;
+  /** Ref mirroring pending played card — used to merge stale server hands on trick_started */
+  pendingPlayedCardRef?: RefObject<Card | null>;
   setPendingBid: (bid: { playerId: string; bid: number } | null) => void;
   setLeagueReady: (ready: boolean[]) => void;
   setSeatReplacement: (replacement: {
@@ -118,6 +123,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
+    pendingPlayedCardRef,
     setPendingBid,
     setLeagueReady,
     setSeatReplacement,
@@ -292,7 +298,14 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         resetCardPlayDebounce();
         // Prefer full gameState if provided
         if (data && data.gameState) {
-          setGameState(normalizeGameState(data.gameState));
+          setGameState((prev: GameState) =>
+            mergeServerStatePreservingOptimisticHand(
+              prev,
+              data.gameState,
+              user?.id,
+              pendingPlayedCardRef
+            )
+          );
         } else if (data && (data.currentPlayer || data.leadSuit !== undefined)) {
           // Minimal update: set currentPlayer and reset currentTrick if we have partial payload
           setGameState((prev: GameState) => ({
@@ -304,8 +317,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
             }
           } as any));
         }
-        // Clear any pending played card at trick start
-        setPendingPlayedCard(null);
+        // Do not clear pending here — trick_started can race before card_played and would snap the card back
       } catch {}
     };
 
@@ -313,7 +325,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
     return () => {
       socket.off('trick_started', trickStartedHandler);
     };
-  }, [socket, setGameState, setPendingPlayedCard]);
+  }, [socket, setGameState, user?.id, pendingPlayedCardRef]);
 
   // Effect to handle game_complete event (new event from server)
   useEffect(() => {
@@ -438,9 +450,10 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
           playCardSound();
         }
 
-        // CRITICAL: Clear pending played card immediately when server confirms the play
-        // This prevents cards from staying in hand if played quickly before trick completion
-        if (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) {
+        const isMyPlay =
+          (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) ||
+          (derivedCard && !derivedCard.rejected && derivedCard.userId === user?.id);
+        if (isMyPlay) {
           setPendingPlayedCard(null);
           console.log('🎮 Cleared pending played card - server confirmed play for user:', user?.id);
         }

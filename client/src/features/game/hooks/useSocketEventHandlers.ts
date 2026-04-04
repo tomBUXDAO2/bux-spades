@@ -2,6 +2,10 @@ import React, { useEffect } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import { playBidSound, playCardSound } from '../../../components/game/components/AudioManager';
 import type { GameState } from "../../../types/game";
+import {
+  mergeServerStatePreservingOptimisticHand,
+  optimisticSocketMergeRef
+} from '../utils/playCardUtils';
 
 interface UseSocketEventHandlersProps {
   socket: any;
@@ -367,7 +371,12 @@ export const useSocketEventHandlers = ({
             if (Array.isArray(normalizedState?.bidding?.bids)) {
               previousBidsRef.current = [...normalizedState.bidding.bids];
             }
-            return normalizedState;
+            return mergeServerStatePreservingOptimisticHand(
+              prevState,
+              normalizedState,
+              userId,
+              optimisticSocketMergeRef
+            );
           } else {
             // Fallback to partial update if gameState not provided
             const currentTrick = cardData.currentTrick || prevState.play?.currentTrick || [];
@@ -418,7 +427,15 @@ export const useSocketEventHandlers = ({
         // Use the full gameState from the server if provided
         if (trickData.gameState) {
           console.log('🎮 Trick started - setting game state with currentPlayer:', trickData.gameState.currentPlayer);
-          setGameState(normalizeGameState(trickData.gameState));
+          (setGameState as any)((prevState: GameState | null) => {
+            if (!prevState) return normalizeGameState(trickData.gameState);
+            return mergeServerStatePreservingOptimisticHand(
+              prevState,
+              trickData.gameState,
+              userId,
+              optimisticSocketMergeRef
+            );
+          });
         } else {
           // Fallback to partial update if gameState not provided
           (setGameState as any)((prevState: any) => {

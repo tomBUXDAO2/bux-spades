@@ -3,6 +3,54 @@
 
 import type { Card } from "../../../types/game";
 import type { GameState } from "../../../types/game";
+import { normalizeGameState } from "../hooks/useGameStateNormalization";
+
+/**
+ * When the server snapshot still includes a card we already removed optimistically
+ * (race: trick_started / game_update before card_played), keep our hand row.
+ */
+export const mergeServerStatePreservingOptimisticHand = (
+  prev: GameState,
+  incoming: GameState | Record<string, unknown>,
+  userId: string | undefined,
+  pendingRef: { current: Card | null } | undefined
+): GameState => {
+  const next = normalizeGameState(incoming as GameState);
+  const pending = pendingRef?.current;
+  if (!pending || !userId) return next;
+
+  const me = next.players?.find(
+    (p: any) => p && (p.id === userId || p.userId === userId)
+  );
+  const seat = me?.seatIndex ?? -1;
+  const nextHands = (next as any).hands as Card[][] | undefined;
+  const prevHands = (prev as any).hands as Card[][] | undefined;
+  if (
+    seat < 0 ||
+    !Array.isArray(nextHands?.[seat]) ||
+    !Array.isArray(prevHands?.[seat])
+  ) {
+    return next;
+  }
+
+  const serverHas = nextHands[seat].some(
+    (c: Card) => c.suit === pending.suit && c.rank === pending.rank
+  );
+  const alreadyRemovedInPrev = !prevHands[seat].some(
+    (c: Card) => c.suit === pending.suit && c.rank === pending.rank
+  );
+
+  if (serverHas && alreadyRemovedInPrev) {
+    return {
+      ...next,
+      hands: nextHands.map((h: Card[], i: number) =>
+        i === seat ? prevHands[seat] : h
+      ),
+    } as GameState;
+  }
+
+  return next;
+};
 
 // Light debounce to prevent double-submits; reset when a new trick starts (see resetCardPlayDebounce)
 let lastCardPlayTime = 0;
@@ -11,6 +59,9 @@ const CARD_PLAY_DEBOUNCE_MS = 200;
 export const resetCardPlayDebounce = () => {
   lastCardPlayTime = 0;
 };
+
+/** Synced from GameTable whenever `pendingPlayedCard` changes — used by useSocketEventHandlers merge. */
+export const optimisticSocketMergeRef: { current: Card | null } = { current: null };
 
 export interface PlayCardCallbacks {
   setGameState: (updater: (prev: GameState) => GameState) => void;

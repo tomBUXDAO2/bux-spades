@@ -30,7 +30,7 @@ import { getTrickCardPositions, getOrderedPlayersForTrick } from '../utils/trick
 import { rotatePlayersForCurrentView } from '../utils/playerUtils';
 import { getScaleFactor } from '../utils/scaleUtils';
 import { handleGameOver } from '../utils/gameOverUtils';
-import { handlePlayCard } from '../utils/playCardUtils';
+import { handlePlayCard, optimisticSocketMergeRef } from '../utils/playCardUtils';
 import { handleBid } from '../utils/bidUtils';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
@@ -139,6 +139,7 @@ export default function GameTableModular({
 
   useEffect(() => {
     pendingPlayedCardRef.current = pendingPlayedCard;
+    optimisticSocketMergeRef.current = pendingPlayedCard;
   }, [pendingPlayedCard]);
 
   const scheduleDealAnimation = useCallback(() => {
@@ -779,6 +780,7 @@ export default function GameTableModular({
     setTrickCompleted,
     setLastNonEmptyTrick,
     setPendingPlayedCard,
+    pendingPlayedCardRef,
     setLeagueReady,
     setSeatReplacement,
     setLobbyMessages,
