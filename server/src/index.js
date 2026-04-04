@@ -1,7 +1,7 @@
 // EMERGENCY: Disable logging in production FIRST
 import './config/logging.js';
 
-import { app, server, io, PORT } from './config/server.js';
+import { app, server, io, PORT, HOST } from './config/server.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { setupSocketHandlers } from './socket/socketHandlers.js';
 import { setupRoutes } from './routes/index.js';
@@ -22,9 +22,9 @@ playerTimerService.setIO(io);
 // CONSOLIDATED: GameManager removed - using GameService directly
 console.log('[SERVER] Loaded existing games');
 
-// Bind HTTP immediately so Fly's post-start socket check sees :3000 (cleanup/Discord can follow).
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[SERVER] Server running on port ${PORT}`);
+// Bind HTTP immediately so Fly's post-start socket check sees the internal port (cleanup/Discord can follow).
+server.listen(PORT, HOST, () => {
+  console.log(`[SERVER] Listening on http://${HOST}:${PORT}`);
   console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
 
   PeriodicCleanupService.start();

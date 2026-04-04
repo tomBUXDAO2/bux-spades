@@ -65,6 +65,9 @@ const io = new Server(server, {
   transports: ['polling', 'websocket']
 });
 
-const PORT = process.env.PORT || 3000;
+// Fly.io and other PaaS: must bind 0.0.0.0 (not localhost) for the proxy to reach the app.
+const rawPort = process.env.PORT;
+const PORT = Number.parseInt(String(rawPort ?? ''), 10) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
-export { app, server, io, PORT };
+export { app, server, io, PORT, HOST };
