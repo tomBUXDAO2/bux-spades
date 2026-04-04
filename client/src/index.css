@@ -22,25 +22,25 @@
   }
 
   body {
-    @apply bg-slate-900 text-slate-200;
+    @apply bg-slate-950 text-slate-200 font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
   /* Full-screen styles for game table only */
   :fullscreen {
-    background-color: #1f2937;
+    background-color: #070b14;
   }
   
   :-webkit-full-screen {
-    background-color: #1f2937;
+    background-color: #070b14;
   }
   
   :-moz-full-screen {
-    background-color: #1f2937;
+    background-color: #070b14;
   }
   
   :-ms-fullscreen {
-    background-color: #1f2937;
+    background-color: #070b14;
   }
 }
 

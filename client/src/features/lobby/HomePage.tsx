@@ -806,7 +806,7 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen bg-lobby-mesh">
       <Header onOpenMyStats={handleOpenMyStats} />
       <ClosurePopup
         message={closureMessage}

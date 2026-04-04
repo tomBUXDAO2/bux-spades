@@ -16,19 +16,19 @@ const MobileToggle: React.FC<MobileToggleProps> = ({ mobileTab, onToggle }) => {
   }
   
   return (
-    <div className="flex justify-center items-center pt-4 pb-1 px-4">
-      <span className={`text-sm font-bold mr-2 ${mobileTab === 'lobby' ? 'text-white' : 'text-slate-400'}`}>Lobby</span>
+    <div className="flex items-center justify-center px-4 pb-1 pt-4">
+      <span className={`mr-2 text-sm font-semibold ${mobileTab === 'lobby' ? 'bg-gradient-to-r from-cyan-200 to-teal-200 bg-clip-text text-transparent' : 'text-slate-500'}`}>Lobby</span>
       <div
-        className="relative inline-flex items-center w-16 h-8 bg-slate-700 rounded-full cursor-pointer"
+        className="relative inline-flex h-8 w-16 cursor-pointer items-center rounded-full border border-white/10 bg-slate-900/60 shadow-inner"
         onClick={onToggle}
         style={{ userSelect: 'none' }}
       >
         <div
-          className={`absolute top-1 left-1 w-6 h-6 bg-indigo-600 rounded-full shadow-md transition-transform duration-200 ${mobileTab === 'chat' ? 'translate-x-8' : ''}`}
+          className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-gradient-to-br from-cyan-400 to-teal-600 shadow-md shadow-cyan-950/50 transition-transform duration-200 ${mobileTab === 'chat' ? 'translate-x-8' : ''}`}
           style={{ transform: mobileTab === 'chat' ? 'translateX(32px)' : 'translateX(0)' }}
         ></div>
       </div>
-      <span className={`text-sm font-bold ml-2 ${mobileTab === 'chat' ? 'text-white' : 'text-slate-400'}`}>Chat</span>
+      <span className={`ml-2 text-sm font-semibold ${mobileTab === 'chat' ? 'bg-gradient-to-r from-cyan-200 to-teal-200 bg-clip-text text-transparent' : 'text-slate-500'}`}>Chat</span>
     </div>
   );
 };

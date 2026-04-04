@@ -101,7 +101,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   
   return (
     <div
-      className="bg-slate-800 rounded-lg flex flex-col lg:col-span-1 col-span-1 flex"
+      className="flex flex-col rounded-xl border border-white/10 bg-slate-950/45 shadow-lobby backdrop-blur-xl lg:col-span-1 col-span-1"
       style={{ 
         height: isSmallScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : (isMediumScreen ? `calc(100vh - 64px - 24px - ${mobileToggleHeight}px)` : (isLargeScreen ? `calc(100vh - 64px - 28px - ${mobileToggleHeight}px)` : (isExtraLargeScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : `calc(100vh - 64px - 32px - ${mobileToggleHeight}px)`))),
         padding: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : (screenWidth >= 640 ? '16px' : '8px'))))
@@ -111,7 +111,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       <div className="flex items-center justify-between mb-2 sm:mb-4">
         <div className="flex items-center gap-1 sm:gap-2">
           <button
-            className={`lobby-button flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'chat' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button flex items-center justify-center rounded-lg text-xs font-semibold transition sm:text-sm ${activeChatTab === 'chat' ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30' : 'border border-white/10 bg-white/5 hover:bg-white/10'}`}
             onClick={() => onSetActiveChatTab('chat')}
             aria-label="Chat"
             style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
@@ -119,7 +119,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             <img src="/chat.svg" alt="Chat" className="" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), filter: 'invert(1) brightness(2)' }} />
           </button>
           <button
-            className={`lobby-button flex items-center justify-center rounded-md text-xs sm:text-sm font-semibold transition ${activeChatTab === 'players' ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            className={`lobby-button flex items-center justify-center rounded-lg text-xs font-semibold transition sm:text-sm ${activeChatTab === 'players' ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30' : 'border border-white/10 bg-white/5 hover:bg-white/10'}`}
             onClick={() => onSetActiveChatTab('players')}
             aria-label="Players"
             style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
@@ -128,8 +128,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           </button>
         </div>
         <div className="flex items-center space-x-1">
-          <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></span>
-          <span className="text-slate-300 text-xs sm:text-sm font-medium" style={{ fontSize: `${14 * textScale}px` }}>{onlineCount} online</span>
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)] sm:h-2 sm:w-2"></span>
+          <span className="text-xs font-medium text-slate-300 sm:text-sm" style={{ fontSize: `${14 * textScale}px` }}>{onlineCount} online</span>
         </div>
       </div>
       {/* Tab Content */}
@@ -145,7 +145,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   key={msg.id || index}
                   className="w-full text-center my-2"
                 >
-                  <span className="text-orange-400 italic flex items-center justify-center gap-1" style={{ fontSize: `${14 * textScale}px` }}>
+                  <span className="flex items-center justify-center gap-1 italic text-amber-400/95" style={{ fontSize: `${14 * textScale}px` }}>
                     {msg.message}
                   </span>
                 </div>
@@ -168,7 +168,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       />
                     </div>
                   )}
-                  <div className={`max-w-[80%] ${user && msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
+                  <div className={`max-w-[80%] rounded-xl px-3 py-2 ${user && msg.userId === user.id ? 'bg-gradient-to-br from-cyan-600 to-teal-700 text-white shadow-md shadow-cyan-950/25' : 'border border-white/10 bg-slate-800/90 text-slate-100'}`}>
                     <div className="flex justify-between items-center mb-1">
                       {!(user && msg.userId === user.id) && (
                         <span className="font-medium text-xs opacity-80" style={{ fontSize: `${12 * textScale}px` }}>{msg.userName}</span>
@@ -208,7 +208,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 onChange={(e) => onSetNewMessage(e.target.value)}
                 placeholder={canSendChat ? 'Type a message...' : 'Sign in to chat'}
                 disabled={!canSendChat}
-                className="flex-1 min-w-0 bg-slate-700 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 pr-10 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ fontSize: `${14 * inputScale}px` }}
                 ref={inputRef}
               />
@@ -216,7 +216,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
-                  className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent transition hover:border-white/10 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
                   onClick={() => canSendChat && onSetShowEmojiPicker(!showEmojiPicker)}
                   disabled={!canSendChat}
@@ -235,7 +235,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               <button
                 type="submit"
                 disabled={!canSendChat}
-                className="flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 transition flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/35 transition hover:from-cyan-400 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
                 aria-label="Send"
               >
@@ -249,7 +249,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               <p className="text-slate-400 text-xs mt-2 text-center" style={{ fontSize: `${12 * textScale}px` }}>
                 <button
                   type="button"
-                  className="text-indigo-400 hover:underline font-medium"
+                  className="font-medium text-cyan-400 hover:text-cyan-300 hover:underline"
                   onClick={() => onRequestSignIn?.()}
                 >
                   Sign in
@@ -262,7 +262,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       ) : (
         <>
           {/* Friends summary row */}
-          <div className="bg-indigo-900 rounded mb-2 flex flex-col justify-center" style={{ minHeight: isSmallScreen ? '48px' : (isMediumScreen ? '56px' : (isLargeScreen ? '60px' : (isExtraLargeScreen ? '56px' : '64px'))), padding: isSmallScreen ? '8px 12px' : (isMediumScreen ? '8px 16px' : (isLargeScreen ? '8px 20px' : (isExtraLargeScreen ? '8px 16px' : '8px 24px'))) }}>
+          <div className="mb-2 flex flex-col justify-center rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/70 to-indigo-950/50" style={{ minHeight: isSmallScreen ? '48px' : (isMediumScreen ? '56px' : (isLargeScreen ? '60px' : (isExtraLargeScreen ? '56px' : '64px'))), padding: isSmallScreen ? '8px 12px' : (isMediumScreen ? '8px 16px' : (isLargeScreen ? '8px 20px' : (isExtraLargeScreen ? '8px 16px' : '8px 24px'))) }}>
             <div className="flex items-center justify-between" style={{ height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))) }}>
               <span className="flex items-center gap-2 text-slate-200 font-bold" style={{ fontSize: `${isSmallScreen ? 16 : (isMediumScreen ? 17 : (isLargeScreen ? 17.5 : (isExtraLargeScreen ? 17 : 18))) * textScale}px` }}>
                 <img src="/friend.svg" alt="Friends" style={{ width: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '30px' : (isExtraLargeScreen ? '28px' : '32px'))), filter: 'invert(1) brightness(2)' }} />
@@ -281,7 +281,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   value="all"
                   checked={playerFilter === 'all'}
                   onChange={() => onSetPlayerFilter('all')}
-                  className="accent-indigo-600"
+                  className="accent-cyan-500"
                 />
                 All
               </label>
@@ -292,7 +292,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   value="friends"
                   checked={playerFilter === 'friends'}
                   onChange={() => onSetPlayerFilter('friends')}
-                  className="accent-indigo-600"
+                  className="accent-cyan-500"
                 />
                 Friends
               </label>
@@ -303,7 +303,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   value="hide-blocked"
                   checked={playerFilter === 'hide-blocked'}
                   onChange={() => onSetPlayerFilter('hide-blocked')}
-                  className="accent-indigo-600"
+                  className="accent-cyan-500"
                 />
                 Hide Blocked
               </label>
@@ -341,7 +341,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 return 0;
               })
               .map(player => (
-                <div key={player.id} className="flex items-center gap-3 p-2 rounded bg-slate-700">
+                <div key={player.id} className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-900/50 p-2">
                   <img src={isPlayer(player) ? (player.avatarUrl || '/default-pfp.jpg') : isBot(player) ? (player.avatar || '/bot-avatar.jpg') : '/bot-avatar.jpg'} alt="" className="w-8 h-8 rounded-full border-2 border-slate-600" />
                   <span
                     className={`font-medium ${player.online ? 'text-green-400' : 'text-slate-300'} flex items-center cursor-pointer hover:underline`}
@@ -358,7 +358,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     {/* Watch button when player is at a table */}
                     {user && (player.activeGameId || player.inGame) && player.id !== user.id && (
                       <button
-                        className="flex items-center justify-center rounded-full bg-indigo-600 text-white border border-slate-300 hover:bg-indigo-700"
+                        className="flex items-center justify-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-sm hover:from-cyan-500 hover:to-teal-500"
                         style={{ fontSize: `${12 * textScale}px`, height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), paddingLeft: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))), paddingRight: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))) }}
                         title="Watch Table"
                         onClick={() => {

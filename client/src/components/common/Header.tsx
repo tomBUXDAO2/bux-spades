@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   };
 
   return (
-    <header className="bg-slate-800 border-b border-slate-700">
+    <header className="border-b border-white/10 bg-slate-950/70 backdrop-blur-xl shadow-lobby-sm">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -149,7 +149,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               <button
                 type="button"
                 onClick={() => openLoginModal()}
-                className="flex items-center gap-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-medium transition"
+                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 font-semibold text-white shadow-md shadow-cyan-950/40 transition hover:from-cyan-400 hover:to-teal-500"
                 style={{ fontSize: `${14 * textScale}px` }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,10 +161,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               <>
             {/* Coin Balance */}
             <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-slate-200 font-medium" style={{ fontSize: `${14 * textScale}px` }}>{user.coins?.toLocaleString() || '0'}</span>
+              <span className="bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text font-semibold text-transparent" style={{ fontSize: `${14 * textScale}px` }}>{user.coins?.toLocaleString() || '0'}</span>
             </div>
 
             {/* User Profile */}
@@ -193,14 +193,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg py-1 border border-slate-700 z-50">
+                <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-white/10 bg-slate-950/95 py-1 shadow-lobby backdrop-blur-xl">
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
                       handleChangeAvatarClick();
                     }}
                     disabled={isUploading}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isUploading ? 'Uploading...' : 'Change Avatar'}
                   </button>
@@ -209,7 +209,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                       setIsDropdownOpen(false);
                       if (onOpenMyStats) onOpenMyStats();
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-white/10"
                   >
                     My Stats
                   </button>
@@ -218,7 +218,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                       setIsDropdownOpen(false);
                       setIsGameRulesOpen(true);
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-white/10"
                   >
                     Game Rules
                   </button>
@@ -232,7 +232,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                           setIsDropdownOpen(false);
                           setIsAdminPanelOpen(true);
                         }}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 font-semibold"
+                        className="block w-full text-left px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-950/50"
                       >
                         ⚠️ ADMIN ONLY
                       </button>
@@ -243,14 +243,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                   <Link
                     to="/privacy"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-white/10"
                   >
                     Privacy Policy
                   </Link>
                   <Link
                     to="/terms"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-white/10"
                   >
                     Terms of Service
                   </Link>
@@ -260,7 +260,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                       setIsDropdownOpen(false);
                       logout();
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/50"
                   >
                     Logout
                   </button>

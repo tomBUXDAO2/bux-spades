@@ -96,7 +96,7 @@ const GameTile: React.FC<GameTileProps> = ({
   ];
 
   return (
-    <div className="bg-slate-800 rounded-lg p-4 hover:bg-slate-750 transition relative overflow-visible">
+    <div className="relative overflow-visible rounded-xl border border-white/10 bg-slate-950/40 p-4 shadow-lobby-sm backdrop-blur-sm transition hover:border-cyan-500/25 hover:shadow-lobby">
       {/* Game settings header - new layout */}
       <div className="flex items-center gap-2 text-sm mb-1">
         {getGameTypeBrick(game)}
@@ -112,8 +112,8 @@ const GameTile: React.FC<GameTileProps> = ({
       </div>
       {/* Line 2: Buy-in, game mode, and special bricks (stack specials if both present) */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-yellow-500 text-lg font-bold">{((game.buyIn ?? game.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
-        <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+        <span className="bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-lg font-bold text-transparent">{((game.buyIn ?? game.rules?.coinAmount ?? 100000) / 1000).toFixed(0)}k</span>
+        <svg className="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
         </svg>
         <span className="ml-2 text-xs font-bold text-slate-200 uppercase">{game.gameMode || (((game as any).format || (game as any).rules?.bidType) === 'SOLO' ? 'SOLO' : 'PARTNERS')}</span>
@@ -123,7 +123,7 @@ const GameTile: React.FC<GameTileProps> = ({
       {/* Table visualization, no negative margin */}
       <div className="relative h-44 mb-2">
         {/* Table background */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-28 bg-slate-700 rounded-full" />
+        <div className="absolute left-1/2 top-1/2 h-28 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-b from-slate-700/90 to-slate-800/90 ring-1 ring-white/10" />
         {/* Seats */}
         <div className="absolute inset-0">
           {seatMap.map(({ className, seat }) => {
@@ -139,11 +139,11 @@ const GameTile: React.FC<GameTileProps> = ({
                         <img
                           src={avatarSrc}
                           alt=""
-                          className="w-16 h-16 rounded-full border-2 border-slate-600"
+                          className="h-16 w-16 rounded-full border-2 border-white/15"
                         />
                       );
                     })()}
-                    <span className="text-xs text-slate-200 -mt-1 block bg-slate-800/80 px-2 py-0.5 rounded-full">
+                    <span className="-mt-1 block rounded-full border border-white/5 bg-slate-950/70 px-2 py-0.5 text-xs text-slate-200 backdrop-blur-sm">
                       {(() => {
                         const isBot = (player as any).isHuman === false || (player as any).type === 'bot' || String((player as any).username || '').startsWith('Bot');
                         return isBot ? `Bot ${seat + 1}` : ((player as any).username || (player as any).name || 'Player');
@@ -153,10 +153,10 @@ const GameTile: React.FC<GameTileProps> = ({
                 ) : (
                   <button
                     type="button"
-                    className={`w-16 h-16 rounded-full border text-slate-200 text-base flex items-center justify-center transition ${
+                    className={`flex h-16 w-16 items-center justify-center rounded-full border text-base text-slate-200 transition ${
                       canJoinOrWatch
-                        ? 'bg-slate-600 border-slate-300 hover:bg-slate-500'
-                        : 'bg-slate-700 border-slate-600 opacity-60 cursor-not-allowed'
+                        ? 'border-cyan-400/40 bg-gradient-to-br from-slate-600 to-slate-700 hover:border-cyan-400/60 hover:from-slate-500 hover:to-slate-600'
+                        : 'cursor-not-allowed border-white/10 bg-slate-800/80 opacity-60'
                     }`}
                     onClick={() => {
                       if (!canJoinOrWatch) {
@@ -186,10 +186,10 @@ const GameTile: React.FC<GameTileProps> = ({
         </div>
         <button
           type="button"
-          className={`px-3 py-1 text-xs rounded-full transition ${
+          className={`rounded-full px-3 py-1 text-xs transition ${
             canJoinOrWatch
-              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              ? 'border border-white/10 bg-white/5 text-slate-200 hover:border-cyan-500/30 hover:bg-cyan-950/40'
+              : 'cursor-not-allowed border border-white/5 bg-slate-900/50 text-slate-600'
           }`}
           onClick={() => {
             if (!canJoinOrWatch) {

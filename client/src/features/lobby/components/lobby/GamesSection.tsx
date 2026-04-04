@@ -55,7 +55,7 @@ const GamesSection: React.FC<GamesSectionProps> = ({
       className="space-y-2 sm:space-y-4 overflow-y-auto h-full lg:col-span-2 col-span-1 block p-2 sm:p-0"
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 18 : (isMediumScreen ? 20 : (isLargeScreen ? 22 : (isExtraLargeScreen ? 23 : (screenWidth >= 640 ? 24 : 20))))}px` }}>Available Games</h2>
+        <h2 className="bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-xl font-bold tracking-tight text-transparent sm:text-2xl" style={{ fontSize: `${isSmallScreen ? 18 : (isMediumScreen ? 20 : (isLargeScreen ? 22 : (isExtraLargeScreen ? 23 : (screenWidth >= 640 ? 24 : 20))))}px` }}>Available Games</h2>
         <button
           type="button"
           onClick={() => {
@@ -65,8 +65,10 @@ const GamesSection: React.FC<GamesSectionProps> = ({
             }
             onCreateGame();
           }}
-          className={`lobby-button px-2 py-1 sm:px-4 sm:py-2 rounded-md transition ${
-            canCreateGame ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-600 text-slate-300 cursor-not-allowed'
+          className={`lobby-button rounded-lg px-2 py-1 font-semibold transition sm:px-4 sm:py-2 ${
+            canCreateGame
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/35 hover:from-cyan-400 hover:to-teal-500'
+              : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
           }`}
           style={{ fontSize: `${14 * textScale}px` }}
         >
@@ -77,8 +79,10 @@ const GamesSection: React.FC<GamesSectionProps> = ({
       <div className="flex space-x-2 sm:space-x-4 mb-4">
         <button
           onClick={() => onFilterChange('waiting')}
-          className={`lobby-button px-2 py-1 sm:px-3 rounded-md ${
-            filter === 'waiting' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+          className={`lobby-button rounded-lg px-2 py-1 font-medium transition sm:px-3 ${
+            filter === 'waiting'
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/30'
+              : 'border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200'
           }`}
           style={{ fontSize: `${12 * textScale}px` }}
         >
@@ -86,8 +90,10 @@ const GamesSection: React.FC<GamesSectionProps> = ({
         </button>
         <button
           onClick={() => onFilterChange('in-progress')}
-          className={`lobby-button px-2 py-1 sm:px-3 rounded-md ${
-            filter === 'in-progress' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+          className={`lobby-button rounded-lg px-2 py-1 font-medium transition sm:px-3 ${
+            filter === 'in-progress'
+              ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-950/30'
+              : 'border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200'
           }`}
           style={{ fontSize: `${12 * textScale}px` }}
         >
@@ -95,7 +101,7 @@ const GamesSection: React.FC<GamesSectionProps> = ({
         </button>
         <button
           onClick={() => window.open('https://discord.gg/FyYAudHwfF', '_blank')}
-          className="lobby-button px-2 py-1 sm:px-3 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center space-x-1 sm:space-x-2 border border-white"
+          className="lobby-button flex items-center space-x-1 rounded-lg border border-indigo-400/30 bg-indigo-950/40 px-2 py-1 text-indigo-100 transition hover:border-indigo-400/50 hover:bg-indigo-950/70 sm:space-x-2 sm:px-3"
           style={{ fontSize: `${12 * textScale}px` }}
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -107,10 +113,10 @@ const GamesSection: React.FC<GamesSectionProps> = ({
 
       {isLoading ? (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400"></div>
         </div>
       ) : filteredGames.length === 0 ? (
-        <div className="text-center py-8 text-slate-400" style={{ fontSize: `${14 * textScale}px` }}>
+        <div className="py-8 text-center text-slate-500" style={{ fontSize: `${14 * textScale}px` }}>
           No games available. Why not create one?
         </div>
       ) : (
