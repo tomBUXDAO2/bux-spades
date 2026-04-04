@@ -24,11 +24,12 @@ npm run cap:android  # Opens Android Studio
 
 ### After making changes to the web app
 
-1. **Build** the web app: `npm run build`
-2. **Sync** to native projects: `npx cap sync`
-3. **Run** on device/simulator from Xcode or Android Studio
+1. **Build** for native: `npm run build:cap` (relative asset paths for the WebView), then **sync**: `npx cap sync`
+2. **Run** on device/simulator from Xcode or Android Studio
 
-Or use the shortcut: `npm run cap:sync` (builds + syncs)
+Or use the shortcut: `npm run cap:sync` (runs `build:cap` + syncs).
+
+For **web / Vercel** only, use `npm run build` (root `/` asset URLs so routes like `/auth/callback` work).
 
 ### Running on device
 

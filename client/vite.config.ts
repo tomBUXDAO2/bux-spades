@@ -7,9 +7,12 @@ dotenv.config();
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
 const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:3000';
 
+// Web (Vercel): must use "/" so deep routes like /auth/callback load /assets/* not /auth/assets/*.
+// Capacitor: set CAP_RELATIVE_BASE=true (see npm run build:cap) for file:// / WebView-friendly paths.
+const useRelativeBase = process.env.CAP_RELATIVE_BASE === 'true';
+
 export default defineConfig({
-  // Relative base path for Capacitor - ensures assets load in native WebView
-  base: './',
+  base: useRelativeBase ? './' : '/',
   plugins: [react()],
   resolve: {
     alias: {

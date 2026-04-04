@@ -13,8 +13,8 @@
     "cap:sync": "cd client && npm run cap:sync",
     "cap:ios": "cd client && npm run cap:ios",
     "cap:android": "cd client && npm run cap:android",
-    "apk:debug": "cd client && npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "ios:sync": "cd client && npm run build && npx cap sync ios",
+    "apk:debug": "cd client && npm run build:cap && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "ios:sync": "cd client && npm run build:cap && npx cap sync ios",
     "ios:open": "open client/ios/App/App.xcworkspace",
     "apk:release": "cd client && npm run cap:sync && cd android && ./gradlew assembleRelease"
   },
