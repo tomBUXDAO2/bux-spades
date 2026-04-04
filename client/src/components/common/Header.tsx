@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   };
 
   return (
-    <header className="border-b border-white/10 bg-slate-950/70 backdrop-blur-xl shadow-lobby-sm">
+    <header className="relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm backdrop-blur-xl">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
