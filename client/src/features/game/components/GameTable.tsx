@@ -12,7 +12,7 @@ import AdminPanel from '../../../components/admin/AdminPanel';
 // Extracted components
 import { useAudioManager } from '../../../components/game/components/AudioManager';
 import { PlayerHandRenderer, SpectatorHandRenderer, CardImage } from '../../../components/game/components/CardRenderer';
-import { getCardDimensions } from '../utils/cardUtils';
+import { getCardDimensions, getTrickCardReactKey } from '../utils/cardUtils';
 import { GameStatusOverlay } from '../../../components/game/components/GameStatusOverlay';
 import { ModalManager } from '../../../components/game/components/ModalManager';
 import { useGameEventHandlers } from '../../../components/game/components/GameEventHandlers';
@@ -1306,7 +1306,7 @@ export default function GameTableModular({
 
       return (
         <div
-          key={`trick-${seatIndex}-${card.suit}-${card.rank}`}
+          key={getTrickCardReactKey(card)}
           className={`${positions[displayPosition]} z-20`}
           style={{ pointerEvents: 'none' }}
         >

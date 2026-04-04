@@ -103,3 +103,21 @@ export const getSpectatorHandDimensions = (
     overlapOffset 
   };
 };
+
+/**
+ * Stable React key for a card on the trick pile. Must NOT include seatIndex —
+ * optimistic pending vs server payloads can disagree on seat and remount motion.
+ * Rank + normalized suit is unique among cards in play for one deal.
+ */
+export const getTrickCardReactKey = (card: { suit?: string; rank?: string | number }): string => {
+  const rank = String(card?.rank ?? '');
+  const raw = String(card?.suit ?? '');
+  const u = raw.toUpperCase();
+  let code = u;
+  if (u.includes('SPADE') || raw === '♠') code = 'S';
+  else if (u.includes('HEART') || raw === '♥') code = 'H';
+  else if (u.includes('DIAMOND') || raw === '♦') code = 'D';
+  else if (u.includes('CLUB') || raw === '♣') code = 'C';
+  else if (u.length <= 2) code = u.slice(0, 1);
+  return `trick-${code}-${rank}`;
+};

@@ -292,22 +292,24 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
           const isVisible = index < visibleCount;
           const dimUnplayable =
             (!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId;
+          const playableLift = isPlayable && !isPlayingCard;
+          const stackZ = playableLift ? 800 + index : index;
 
           return (
             <motion.div
               key={`${card.suit}${card.rank}`}
-              className={`relative ${isPlayable && !isPlayingCard ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'grayscale pointer-events-none' : ''}`}
+              className={`relative ${playableLift ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'pointer-events-none' : ''}`}
               style={{
                 width: `${cardDimensions.cardUIWidth}px`,
                 height: `${cardDimensions.cardUIHeight}px`,
                 marginLeft: index > 0 ? `${cardOverlapOffset}px` : '0',
-                zIndex: 50 + index,
+                zIndex: stackZ,
                 pointerEvents: 'auto',
                 filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
               }}
               initial={false}
               animate={{
-                opacity: !isVisible ? 0 : dimUnplayable ? 0.5 : 1,
+                opacity: !isVisible ? 0 : 1,
                 y: isVisible ? 0 : 14,
               }}
               transition={{
@@ -316,11 +318,11 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 damping: 28,
               }}
               whileHover={
-                isPlayable && !isPlayingCard
-                  ? { y: -10, scale: 1.03, zIndex: 80, transition: { type: 'spring', stiffness: 400, damping: 22 } }
+                playableLift
+                  ? { y: -10, scale: 1.03, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
                   : undefined
               }
-              whileTap={isPlayable && !isPlayingCard ? { scale: 0.97 } : undefined}
+              whileTap={playableLift ? { scale: 0.97 } : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -353,8 +355,11 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                     (!dealingComplete && index >= dealtCardCount)
                   }
                 />
-                {!isPlayable && gameState.currentPlayer === currentPlayerId && (
-                  <div className="absolute inset-0 bg-gray-600/40 rounded-lg" />
+                {dimUnplayable && (
+                  <div
+                    className="absolute inset-0 rounded-lg bg-slate-950/55 pointer-events-none ring-1 ring-black/20"
+                    aria-hidden
+                  />
                 )}
               </div>
             </motion.div>
