@@ -29,6 +29,26 @@ export const getWebSocketUrl = () => {
   return 'ws://localhost:3000';
 };
 
+export const createGuestSocketConfig = () => {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+  return {
+    transports: isMobile ? ['polling', 'websocket'] : ['websocket', 'polling'],
+    auth: { guest: true },
+    reconnection: true,
+    reconnectionAttempts: isMobile ? 10 : 8,
+    reconnectionDelay: isMobile ? 3000 : 2000,
+    reconnectionDelayMax: isMobile ? 10000 : 8000,
+    timeout: isMobile ? 30000 : 20000,
+    autoConnect: true,
+    forceNew: true,
+    upgrade: true,
+    rememberUpgrade: true,
+    closeOnBeforeunload: false,
+    extraHeaders: undefined
+  };
+};
+
 export const createSocketConfig = (token: string, userId: string, username: string, avatar?: string) => {
   // Detect mobile device for optimized settings
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);

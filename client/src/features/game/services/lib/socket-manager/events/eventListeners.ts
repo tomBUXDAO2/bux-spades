@@ -4,6 +4,7 @@ export interface SocketState {
   isConnected: boolean;
   isAuthenticated: boolean;
   isReady: boolean;
+  isGuestLobby: boolean;
   error: string | null;
 }
 
@@ -19,8 +20,10 @@ export interface SocketManagerCallbacks {
 
 export const setupSocketListeners = (
   socket: Socket,
-  callbacks: SocketManagerCallbacks
+  callbacks: SocketManagerCallbacks,
+  options?: { guestMode?: boolean }
 ): void => {
+  const guestMode = options?.guestMode === true;
   console.log('🔧 Setting up socket event listeners');
   console.log('🔧 Socket state:', {
     connected: socket.connected,
@@ -42,6 +45,12 @@ export const setupSocketListeners = (
       transport: socket?.io?.engine?.transport?.name
     });
     
+    if (guestMode) {
+      socket.emit('guest_lobby_connect');
+      callbacks.onConnect();
+      return;
+    }
+
     // Send authentication event with token
     const token = localStorage.getItem('sessionToken');
     if (token) {
@@ -86,6 +95,18 @@ export const setupSocketListeners = (
     callbacks.onConnect();
   });
 
+  if (guestMode) {
+    socket.on('guest_lobby_ready', () => {
+      callbacks.onStateChange({
+        isConnected: true,
+        isAuthenticated: false,
+        isReady: true,
+        isGuestLobby: true,
+        error: null
+      });
+    });
+  }
+
   // Handle authentication response
   socket.on('authenticated', (data) => {
     console.log('Socket authenticated successfully:', data);
@@ -116,6 +137,7 @@ export const setupSocketListeners = (
       isConnected: true,
       isAuthenticated: false,
       isReady: false,
+      isGuestLobby: false,
       error: error.message
     });
   });
@@ -137,6 +159,7 @@ export const setupSocketListeners = (
       isConnected: false,
       isAuthenticated: false,
       isReady: false,
+      isGuestLobby: false,
       error: `Disconnected: ${reason}`
     });
     

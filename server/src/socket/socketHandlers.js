@@ -21,6 +21,12 @@ export function setupSocketHandlers(io) {
       // NUCLEAR: No logging for performance
     // NUCLEAR: No logging for performance
 
+    // Read-only lobby: no JWT; can receive global lobby broadcasts (chat, online list)
+    socket.on('guest_lobby_connect', () => {
+      socket.isGuest = true;
+      socket.emit('guest_lobby_ready', {});
+    });
+
     // Authenticate socket with JWT token
     socket.on('authenticate', async (data) => {
       try {

@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { getWebSocketUrl, createSocketConfig } from '../connection/connectionManager';
+import { getWebSocketUrl, createSocketConfig, createGuestSocketConfig } from '../connection/connectionManager';
 import { setupSocketListeners, SocketState, SocketManagerCallbacks } from '../events/eventListeners';
 import { HeartbeatMonitor } from '../monitoring/heartbeatMonitor';
 import { SessionManager } from '../session/sessionManager';
@@ -11,6 +11,7 @@ export class SocketManager {
     isConnected: false,
     isAuthenticated: false,
     isReady: false,
+    isGuestLobby: false,
     error: null
   };
   private sessionManager: SessionManager;
@@ -55,6 +56,7 @@ export class SocketManager {
       isConnected: this.state.isConnected,
       isAuthenticated: this.state.isAuthenticated,
       isReady: this.state.isReady,
+      isGuestLobby: this.state.isGuestLobby,
       error: this.state.error
     };
   }
@@ -73,6 +75,7 @@ export class SocketManager {
     if (!token) {
       console.error('SocketManager: No session token found in any storage location');
       this.state.isReady = false;
+      this.state.isGuestLobby = false;
       this.notifyStateChange();
       return;
     }
@@ -98,15 +101,36 @@ export class SocketManager {
       wsUrl: wsUrl
     });
     
+    this.state.isGuestLobby = false;
     this.socket = io(wsUrl, config);
     this.heartbeatMonitor = new HeartbeatMonitor(this.socket);
 
-    this.setupSocketListeners();
+    this.setupSocketListeners(false);
     this.notifyStateChange();
     this.initialized = true;
   }
 
-  private setupSocketListeners(): void {
+  public initializeGuest(): void {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.state = {
+      isConnected: false,
+      isAuthenticated: false,
+      isReady: false,
+      isGuestLobby: false,
+      error: null
+    };
+    const wsUrl = getWebSocketUrl();
+    this.socket = io(wsUrl, createGuestSocketConfig());
+    this.heartbeatMonitor = new HeartbeatMonitor(this.socket);
+    this.setupSocketListeners(true);
+    this.notifyStateChange();
+    this.initialized = true;
+  }
+
+  private setupSocketListeners(guestMode: boolean): void {
     if (!this.socket || !this.heartbeatMonitor) return;
 
     const callbacks: SocketManagerCallbacks = {
@@ -121,6 +145,7 @@ export class SocketManager {
       },
       onAuthenticated: (data: { userId: string; activeGameId?: string }) => {
         this.state.isAuthenticated = true;
+        this.state.isGuestLobby = false;
         this.state.isReady = this.state.isConnected && this.state.isAuthenticated;
         console.log('SOCKET STATE AFTER AUTH:', { 
           isConnected: this.state.isConnected, 
@@ -133,6 +158,7 @@ export class SocketManager {
       onSessionInvalidated: (_data: { reason: string; message: string }) => {
         this.state.isAuthenticated = false;
         this.state.isReady = false;
+        this.state.isGuestLobby = false;
         this.state.error = 'Session invalidated';
         
         // Clear session data
@@ -150,6 +176,7 @@ export class SocketManager {
         console.log('[SOCKET MANAGER] Force logout triggered');
         this.state.isAuthenticated = false;
         this.state.isReady = false;
+        this.state.isGuestLobby = false;
         this.state.error = 'Logged out from another device';
         
         // Clear session data
@@ -176,7 +203,7 @@ export class SocketManager {
       }
     };
 
-    setupSocketListeners(this.socket, callbacks);
+    setupSocketListeners(this.socket, callbacks, { guestMode });
   }
 
   public getSocket(): Socket | null {
@@ -191,6 +218,7 @@ export class SocketManager {
     this.state.isConnected = false;
     this.state.isAuthenticated = false;
     this.state.isReady = false;
+    this.state.isGuestLobby = false;
     this.sessionManager.clearSession();
     this.heartbeatMonitor?.cleanup();
     this.notifyStateChange();
@@ -207,6 +235,7 @@ export class SocketManager {
     this.state.isConnected = false;
     this.state.isAuthenticated = false;
     this.state.isReady = false;
+    this.state.isGuestLobby = false;
 
     // Reinitialize if we have a session
     const session = this.sessionManager.getSession();

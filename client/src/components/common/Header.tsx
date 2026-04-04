@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLoginModal } from '@/features/auth/LoginModalContext';
 import GameRulesModal from '@/components/modals/GameRulesModal';
 import AdminPanel from '@/components/admin/AdminPanel';
 import { isAdmin } from '@/utils/adminUtils';
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   const { user, logout, updateProfile } = useAuth();
+  const { openLoginModal } = useLoginModal();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isGameRulesOpen, setIsGameRulesOpen] = useState(false);
@@ -143,12 +145,26 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
           </div>
           
           <div className="flex items-center space-x-6">
+            {!user ? (
+              <button
+                type="button"
+                onClick={() => openLoginModal()}
+                className="flex items-center gap-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-medium transition"
+                style={{ fontSize: `${14 * textScale}px` }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Sign in
+              </button>
+            ) : (
+              <>
             {/* Coin Balance */}
             <div className="flex items-center space-x-2">
               <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-slate-200 font-medium" style={{ fontSize: `${14 * textScale}px` }}>{user?.coins?.toLocaleString() || '0'}</span>
+              <span className="text-slate-200 font-medium" style={{ fontSize: `${14 * textScale}px` }}>{user.coins?.toLocaleString() || '0'}</span>
             </div>
 
             {/* User Profile */}
@@ -159,11 +175,11 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
               >
                 <div className="flex items-center space-x-3">
                   <img
-                    src={user?.avatar || user?.avatarUrl || '/default-avatar.png'}
+                    src={user.avatar || user.avatarUrl || '/default-avatar.png'}
                     alt="Profile"
                     className="w-8 h-8 rounded-full bg-slate-700"
                   />
-                  <span className="text-slate-200 font-medium hidden sm:inline" style={{ fontSize: `${14 * textScale}px` }}>{user?.username || 'Loading...'}</span>
+                  <span className="text-slate-200 font-medium hidden sm:inline" style={{ fontSize: `${14 * textScale}px` }}>{user.username || 'Loading...'}</span>
                 </div>
                 <svg
                   className={`w-5 h-5 text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
@@ -251,6 +267,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
                 </div>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
       </div>

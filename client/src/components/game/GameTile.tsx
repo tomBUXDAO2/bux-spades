@@ -5,9 +5,17 @@ interface GameTileProps {
   game: GameState;
   onJoinGame: (gameId: string, seatIndex: number) => void;
   onWatchGame: (gameId: string) => void;
+  canJoinOrWatch?: boolean;
+  onNeedAuth?: () => void;
 }
 
-const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) => {
+const GameTile: React.FC<GameTileProps> = ({
+  game,
+  onJoinGame,
+  onWatchGame,
+  canJoinOrWatch = true,
+  onNeedAuth
+}) => {
   const getGameTypeBrick = (game: GameState) => {
     const type = (game as any).format || (game as any).rules?.bidType || 'REGULAR';
     let color = 'bg-green-600';
@@ -144,8 +152,19 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
                   </div>
                 ) : (
                   <button
-                    className="w-16 h-16 rounded-full bg-slate-600 border border-slate-300 text-slate-200 text-base flex items-center justify-center hover:bg-slate-500 transition"
-                    onClick={() => onJoinGame(game.id, seat)}
+                    type="button"
+                    className={`w-16 h-16 rounded-full border text-slate-200 text-base flex items-center justify-center transition ${
+                      canJoinOrWatch
+                        ? 'bg-slate-600 border-slate-300 hover:bg-slate-500'
+                        : 'bg-slate-700 border-slate-600 opacity-60 cursor-not-allowed'
+                    }`}
+                    onClick={() => {
+                      if (!canJoinOrWatch) {
+                        onNeedAuth?.();
+                        return;
+                      }
+                      onJoinGame(game.id, seat);
+                    }}
                   >
                     JOIN
                   </button>
@@ -165,7 +184,21 @@ const GameTile: React.FC<GameTileProps> = ({ game, onJoinGame, onWatchGame }) =>
             {game.status === 'WAITING' ? 'WAITING' : 'IN PROGRESS'}
           </span>
         </div>
-        <button className="px-3 py-1 bg-slate-700 text-slate-300 text-xs rounded-full hover:bg-slate-600 transition" onClick={() => onWatchGame(game.id)}>
+        <button
+          type="button"
+          className={`px-3 py-1 text-xs rounded-full transition ${
+            canJoinOrWatch
+              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+          }`}
+          onClick={() => {
+            if (!canJoinOrWatch) {
+              onNeedAuth?.();
+              return;
+            }
+            onWatchGame(game.id);
+          }}
+        >
           Watch
         </button>
       </div>

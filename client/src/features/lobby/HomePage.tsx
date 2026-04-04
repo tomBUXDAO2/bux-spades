@@ -10,11 +10,10 @@ import GameTile from '@/components/game/GameTile';
 import GamesSection from '@/features/lobby/components/lobby/GamesSection';
 import ChatSection from '@/features/lobby/components/lobby/ChatSection';
 import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
-import Picker from '@emoji-mart/react';
-import data from '@emoji-mart/data';
 import type { GameState, Player, Bot } from "../../types/game";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSocket } from '@/features/auth/SocketContext';
+import { useLoginModal } from '@/features/auth/LoginModalContext';
 import { api } from '@/services/lib/api';
 import { useWindowSize } from '@/hooks/useWindowSize';
 
@@ -39,7 +38,9 @@ function isBot(p: any): p is Bot {
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
-  const { socket, isAuthenticated } = useSocket();
+  const { socket, isAuthenticated, isGuestLobby } = useSocket();
+  const { openLoginModal } = useLoginModal();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isLandscape } = useWindowSize();
   
   // Detect screen width for responsive padding
@@ -62,11 +63,7 @@ const HomePage: React.FC = () => {
   
   // Determine if we're in portrait mode
   const isPortrait = !isLandscape;
-  
-  if (!user) {
-    console.log('HomePage - No user, showing loading');
-    return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="text-white text-2xl">Loading...</div></div>;
-  }
+
   const [isCreateGameModalOpen, setIsCreateGameModalOpen] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -88,6 +85,15 @@ const HomePage: React.FC = () => {
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; player: any; action: 'add_friend' | 'remove_friend' | 'block_user' | 'unblock_user' }>({ open: false, player: null, action: 'add_friend' });
   const onlineIdsRef = useRef<string[]>([]);
   const [closureMessage, setClosureMessage] = useState('');
+
+  const canParticipate = Boolean(user && isAuthenticated);
+
+  useEffect(() => {
+    if (searchParams.get('signin') === '1') {
+      openLoginModal();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, openLoginModal]);
 
   // Show table closure message if present (set by TablePage before redirect)
   useEffect(() => {
@@ -236,8 +242,8 @@ const HomePage: React.FC = () => {
 
   // Socket event handlers
   useEffect(() => {
-    if (!socket || !isAuthenticated) {
-      console.log('Socket not ready or not authenticated');
+    if (!socket || (!isAuthenticated && !isGuestLobby)) {
+      console.log('Socket not ready for lobby (need auth or guest lobby)');
       return;
     }
 
@@ -248,6 +254,7 @@ const HomePage: React.FC = () => {
       setGames(updatedGames);
       setIsLoading(false);
       
+      if (!user) return;
       // Also refetch user data to update activeGameId for watch buttons
       api.get('/api/auth/users')
         .then(res => res.json())
@@ -331,6 +338,7 @@ const HomePage: React.FC = () => {
     };
 
     const handleFriendAdded = () => {
+      if (!user) return;
       console.log('Friend added, refreshing player list');
       api.get('/api/auth/users')
         .then(res => res.json())
@@ -386,6 +394,10 @@ const HomePage: React.FC = () => {
     // Allow players list to request a watch by userId (resolve gameId from current games list)
     const handleWatchUserGame = (ev: any) => {
       try {
+        if (!canParticipate) {
+          openLoginModal();
+          return;
+        }
         const targetUserId = ev?.detail?.userId;
         if (!targetUserId) return;
         const targetGame = (games || []).find((g: any) => Array.isArray(g.players) && g.players.some((p: any) => p && ((p.id || p.userId) === targetUserId)));
@@ -408,7 +420,7 @@ const HomePage: React.FC = () => {
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
       window.removeEventListener('watchUserGame', handleWatchUserGame as EventListener);
     };
-  }, [socket, isAuthenticated, user, navigate]);
+  }, [socket, isAuthenticated, isGuestLobby, user, navigate, canParticipate, openLoginModal]);
 
   // Single consolidated periodic games refresh
   useEffect(() => {
@@ -441,6 +453,27 @@ const HomePage: React.FC = () => {
   }, [user, isAuthenticated]);
 
   useEffect(() => {
+    if (user) return;
+
+    const refreshGames = async () => {
+      try {
+        const response = await api.get('/api/games');
+        if (response.ok) {
+          const data = await response.json();
+          const gamesArray = Array.isArray(data) ? data : (data.games || []);
+          setGames(gamesArray);
+        }
+      } catch (e) {
+        console.error('[GUEST GAMES REFRESH]', e);
+      }
+    };
+
+    refreshGames();
+    const interval = setInterval(refreshGames, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
@@ -448,6 +481,7 @@ const HomePage: React.FC = () => {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canParticipate) return;
     if (!newMessage.trim()) return;
     setNewMessage('');
     if (socket) {
@@ -456,6 +490,7 @@ const HomePage: React.FC = () => {
   };
 
   const handleCreateGame = async (settings: any) => {
+    if (!user) return;
     setIsCreateGameModalOpen(false);
     
     // INSTANT FEEDBACK: Navigate immediately to loading state
@@ -550,12 +585,17 @@ const HomePage: React.FC = () => {
 
   // Handler to watch a game as an observer
   const handleWatchGame = (gameId: string) => {
+    if (!canParticipate) {
+      openLoginModal();
+      return;
+    }
     navigate(`/table/${gameId}?spectate=1`);
   };
 
 
   // Handler to open stats for current user
   const handleOpenMyStats = async () => {
+    if (!user) return;
     try {
       // Fetch user stats from the server with ALL mode for initial load
       const response = await api.get(`/api/users/${user.id}/stats?gameMode=ALL`);
@@ -667,13 +707,16 @@ const HomePage: React.FC = () => {
     }, 0);
   };
 
-  // Fetch real users for the lobby
+  // Fetch real users for the lobby (authenticated only)
   useEffect(() => {
+    if (!user) {
+      setOnlinePlayers([]);
+      return;
+    }
     api.get('/api/auth/users')
       .then(res => res.json())
       .then((data) => {
-        // Handle the correct response format: { users: [...] }
-        const users = data.users || data; // Fallback to direct array for compatibility
+        const users = data.users || data;
         const filtered = Array.isArray(users)
           ? users.filter((u: any) => !(
               (u && typeof u === 'object' && 'type' in u && u.type === 'bot') ||
@@ -795,6 +838,9 @@ const HomePage: React.FC = () => {
                   onCreateGame={() => setIsCreateGameModalOpen(true)}
                   onJoinGame={handleJoinGame}
                   onWatchGame={handleWatchGame}
+                  canCreateGame={canParticipate}
+                  canJoinOrWatch={canParticipate}
+                  onNeedAuth={openLoginModal}
                 />
               </div>
             )
@@ -809,6 +855,9 @@ const HomePage: React.FC = () => {
               onCreateGame={() => setIsCreateGameModalOpen(true)}
               onJoinGame={handleJoinGame}
               onWatchGame={handleWatchGame}
+              canCreateGame={canParticipate}
+              canJoinOrWatch={canParticipate}
+              onNeedAuth={openLoginModal}
             />
           )}
 
@@ -826,6 +875,8 @@ const HomePage: React.FC = () => {
                   onlinePlayers={onlinePlayers}
                   playerFilter={playerFilter}
                   user={user}
+                  canSendChat={canParticipate}
+                  onRequestSignIn={openLoginModal}
                   chatContainerRef={chatContainerRef}
                   inputRef={inputRef}
                   onSetActiveChatTab={setActiveChatTab}
@@ -853,6 +904,8 @@ const HomePage: React.FC = () => {
               onlinePlayers={onlinePlayers}
               playerFilter={playerFilter}
               user={user}
+              canSendChat={canParticipate}
+              onRequestSignIn={openLoginModal}
               chatContainerRef={chatContainerRef}
               inputRef={inputRef}
               onSetActiveChatTab={setActiveChatTab}
@@ -901,3 +954,4 @@ const HomePage: React.FC = () => {
 };
 
 export default HomePage; 
+ 

@@ -4,7 +4,6 @@ import {
   createBrowserRouter,
   Navigate,
   Outlet,
-  useLocation,
   useParams,
   useNavigate,
 } from 'react-router-dom';
@@ -19,16 +18,17 @@ import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
-import TournamentLobby from '@/features/tournament/TournamentLobby';
 import TournamentLobbyModal from './components/modals/TournamentLobbyModal';
 import { SocketProvider } from '@/features/auth/SocketContext';
+import { LoginModalProvider, useLoginModal } from '@/features/auth/LoginModalContext';
+import LoginModal from '@/features/auth/components/LoginModal';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import ForceLogoutModal from './components/modals/ForceLogoutModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { preloadImages } from './services/utils/imagePreloader';
 
-// Placeholder components - these will be implemented later
+// Placeholder route components
 const Profile = () => <div>Profile Page</div>;
 const Game = () => <div>Game Page</div>;
 
@@ -61,19 +61,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 const TournamentLobbyRoute: React.FC = () => {
   const { tournamentId } = useParams<{ tournamentId: string }>();
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   const [showModal, setShowModal] = useState(true);
 
   useEffect(() => {
-    // When modal closes, navigate back to the appropriate page
     if (!showModal) {
-      if (user) {
-        navigate('/');
-      } else {
-        navigate('/login');
-      }
+      navigate('/');
     }
-  }, [showModal, navigate, user]);
+  }, [showModal, navigate]);
 
   if (!tournamentId) {
     return <Navigate to="/" />;
@@ -86,10 +81,8 @@ const TournamentLobbyRoute: React.FC = () => {
         <h2 className="text-2xl font-semibold text-white">Loading...</h2>
       </div>
     </div>
-  ) : user ? (
-    <HomePage />
   ) : (
-    <Login />
+    <HomePage />
   );
 
   return (
@@ -144,7 +137,7 @@ const router = createBrowserRouter(
         },
         {
           path: "",
-          element: <ProtectedRoute><HomePage /></ProtectedRoute>
+          element: <HomePage />
         },
         {
           path: "profile",
@@ -181,6 +174,7 @@ const router = createBrowserRouter(
 );
 
 const AppWithSocket: React.FC = () => {
+  const { isLoginModalOpen, closeLoginModal } = useLoginModal();
   const { showSessionInvalidatedModal, setShowSessionInvalidatedModal } = useAuth();
   const { showInstallPrompt, dismissPrompt } = usePWAInstall();
   const [showForceLogoutModal, setShowForceLogoutModal] = useState(false);
@@ -207,6 +201,7 @@ const AppWithSocket: React.FC = () => {
   return (
     <SocketProvider>
       <RouterProvider router={router} />
+      <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />
       <SessionInvalidatedModal
         isOpen={showSessionInvalidatedModal}
         onClose={() => {
@@ -236,9 +231,11 @@ const AppWithSocket: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthContextProvider>
-      <AppWithSocket />
+      <LoginModalProvider>
+        <AppWithSocket />
+      </LoginModalProvider>
     </AuthContextProvider>
   );
 };
 
-export default App; 
+export default App;

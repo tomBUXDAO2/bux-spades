@@ -23,7 +23,9 @@ interface ChatSectionProps {
   showEmojiPicker: boolean;
   onlinePlayers: any[];
   playerFilter: 'all' | 'friends' | 'hide-blocked';
-  user: any;
+  user: any | null;
+  canSendChat: boolean;
+  onRequestSignIn?: () => void;
   chatContainerRef: React.RefObject<HTMLDivElement>;
   inputRef: React.RefObject<HTMLInputElement>;
   onSetActiveChatTab: (tab: 'chat' | 'players') => void;
@@ -57,6 +59,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   onlinePlayers,
   playerFilter,
   user,
+  canSendChat,
+  onRequestSignIn,
   chatContainerRef,
   inputRef,
   onSetActiveChatTab,
@@ -148,9 +152,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               ) : (
                 <div
                   key={msg.id || index}
-                  className={`mb-2 flex items-start ${msg.userId === user.id ? 'justify-end' : ''}`}
+                  className={`mb-2 flex items-start ${user && msg.userId === user.id ? 'justify-end' : ''}`}
                 >
-                  {msg.userId !== user.id && (
+                  {!(user && msg.userId === user.id) && (
                     <div className={`w-8 h-8 mr-2 rounded-full overflow-hidden flex-shrink-0`}>
                       <img 
                         src={msg.userAvatar || getUserAvatar(msg.userId)} 
@@ -164,16 +168,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       />
                     </div>
                   )}
-                  <div className={`max-w-[80%] ${msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
+                  <div className={`max-w-[80%] ${user && msg.userId === user.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg px-3 py-2`}>
                     <div className="flex justify-between items-center mb-1">
-                      {msg.userId !== user.id && (
+                      {!(user && msg.userId === user.id) && (
                         <span className="font-medium text-xs opacity-80" style={{ fontSize: `${12 * textScale}px` }}>{msg.userName}</span>
                       )}
                       <span className="text-xs opacity-75 ml-auto" style={{ fontSize: `${12 * textScale}px` }}> {formatTime(msg.timestamp)}</span>
                     </div>
                     <p style={{ fontSize: `${14 * textScale}px` }}>{msg.message}</p>
                   </div>
-                  {msg.userId === user.id && (
+                  {user && msg.userId === user.id && (
                     <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
                       <img 
                         src={msg.userAvatar || getUserAvatar(msg.userId)} 
@@ -202,8 +206,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 type="text"
                 value={newMessage}
                 onChange={(e) => onSetNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 min-w-0 bg-slate-700 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+                placeholder={canSendChat ? 'Type a message...' : 'Sign in to chat'}
+                disabled={!canSendChat}
+                className="flex-1 min-w-0 bg-slate-700 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ fontSize: `${14 * inputScale}px` }}
                 ref={inputRef}
               />
@@ -211,15 +216,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
-                  className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-slate-600 transition"
+                  className="flex items-center justify-center w-10 h-10 rounded-md hover:bg-slate-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
-                  onClick={() => onSetShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => canSendChat && onSetShowEmojiPicker(!showEmojiPicker)}
+                  disabled={!canSendChat}
                   tabIndex={-1}
                 >
                   <span role="img" aria-label="emoji" style={{ fontSize: `${24 * inputScale}px` }}>😊</span>
                 </button>
                 {/* Emoji Picker Dropdown */}
-                {showEmojiPicker && (
+                {showEmojiPicker && canSendChat && (
                   <div className="absolute right-0 bottom-12 z-50">
                     <Picker data={data} onEmojiSelect={onSelectEmoji} theme="dark" />
                   </div>
@@ -228,7 +234,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               {/* Send Button as Icon (right-pointing) */}
               <button
                 type="submit"
-                className="flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 transition flex-shrink-0"
+                disabled={!canSendChat}
+                className="flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 transition flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
                 aria-label="Send"
               >
@@ -238,6 +245,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 </svg>
               </button>
             </div>
+            {!canSendChat && (
+              <p className="text-slate-400 text-xs mt-2 text-center" style={{ fontSize: `${12 * textScale}px` }}>
+                <button
+                  type="button"
+                  className="text-indigo-400 hover:underline font-medium"
+                  onClick={() => onRequestSignIn?.()}
+                >
+                  Sign in
+                </button>
+                {' '}to send messages
+              </p>
+            )}
           </form>
         </>
       ) : (
@@ -337,7 +356,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   </span>
                   <div className="flex gap-2 ml-auto items-center">
                     {/* Watch button when player is at a table */}
-                    {(player.activeGameId || player.inGame) && player.id !== user.id && (
+                    {user && (player.activeGameId || player.inGame) && player.id !== user.id && (
                       <button
                         className="flex items-center justify-center rounded-full bg-indigo-600 text-white border border-slate-300 hover:bg-indigo-700"
                         style={{ fontSize: `${12 * textScale}px`, height: isSmallScreen ? '28px' : (isMediumScreen ? '30px' : (isLargeScreen ? '31px' : (isExtraLargeScreen ? '31.5px' : '32px'))), paddingLeft: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))), paddingRight: isSmallScreen ? '6px' : (isMediumScreen ? '8px' : (isLargeScreen ? '8px' : (isExtraLargeScreen ? '8px' : '10px'))) }}
@@ -355,7 +374,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       </button>
                     )}
                     {/* Hide action buttons for self */}
-                    {player.id !== user.id && (
+                    {user && player.id !== user.id && (
                         player.status === 'blocked' ? (
                         <>
                           <span className="text-slate-400 mr-2 flex items-center h-8" style={{ fontSize: `${12 * textScale}px` }}>unblock?</span>

@@ -8,6 +8,7 @@ interface SocketContextType {
   isConnected: boolean;
   isAuthenticated: boolean;
   isReady: boolean;
+  isGuestLobby: boolean;
   error: string | null;
 }
 
@@ -16,6 +17,7 @@ const SocketContext = createContext<SocketContextType>({
   isConnected: false,
   isAuthenticated: false,
   isReady: false,
+  isGuestLobby: false,
   error: null
 });
 
@@ -28,47 +30,34 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isConnected: false,
     isAuthenticated: false,
     isReady: false,
+    isGuestLobby: false,
     error: null as string | null
   });
 
   useEffect(() => {
-    console.log('SOCKET CONTEXT - User changed:', user);
-    if (!user) {
-      console.log('SOCKET CONTEXT - No user, clearing socket');
-      setSocket(null);
-      setState({
-        isConnected: false,
-        isAuthenticated: false,
-        isReady: false,
-        error: null
-      });
-      return;
-    }
-
-    console.log('SOCKET CONTEXT - Initializing socket for user:', { id: user.id, username: user.username });
     const socketManager = getSocketManager();
-    socketManager.onStateChange((newState) => {
-      console.log('SOCKET CONTEXT - State changed:', newState);
-      setState(newState);
+
+    const onChange = () => {
+      const next = socketManager.getState();
+      setState({
+        isConnected: next.isConnected,
+        isAuthenticated: next.isAuthenticated,
+        isReady: next.isReady,
+        isGuestLobby: next.isGuestLobby,
+        error: next.error
+      });
       setSocket(socketManager.getSocket());
-    });
+    };
 
-    socketManager.initialize(user.id, user.username, user.avatarUrl || undefined);
+    socketManager.onStateChange(onChange);
 
-    // Ensure we auto-join any active game room after authentication
-    socketManager.onStateChange((s) => {
-      if (s.isReady) {
-        try {
-          const stored = localStorage.getItem('activeGameId');
-          if (stored) {
-            const sock = socketManager.getSocket();
-            if (sock && sock.connected) {
-              // sock.emit('join_game', { gameId: activeGameId }); // User already in game
-            }
-          }
-        } catch {}
-      }
-    });
+    if (!user) {
+      console.log('SOCKET CONTEXT - Guest lobby socket');
+      socketManager.initializeGuest();
+    } else {
+      console.log('SOCKET CONTEXT - Initializing socket for user:', { id: user.id, username: user.username });
+      socketManager.initialize(user.id, user.username, user.avatarUrl || undefined);
+    }
 
     return () => {
       socketManager.disconnect();
@@ -83,4 +72,4 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       {children}
     </SocketContext.Provider>
   );
-}; 
+};

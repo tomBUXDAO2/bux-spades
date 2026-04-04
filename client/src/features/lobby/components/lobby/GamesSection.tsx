@@ -12,6 +12,9 @@ interface GamesSectionProps {
   onCreateGame: () => void;
   onJoinGame: (gameId: string, seatIndex: number) => void;
   onWatchGame: (gameId: string) => void;
+  canCreateGame: boolean;
+  canJoinOrWatch: boolean;
+  onNeedAuth?: () => void;
 }
 
 const GamesSection: React.FC<GamesSectionProps> = ({
@@ -23,7 +26,10 @@ const GamesSection: React.FC<GamesSectionProps> = ({
   onFilterChange,
   onCreateGame,
   onJoinGame,
-  onWatchGame
+  onWatchGame,
+  canCreateGame,
+  canJoinOrWatch,
+  onNeedAuth
 }) => {
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = React.useState(window.innerWidth);
@@ -51,8 +57,17 @@ const GamesSection: React.FC<GamesSectionProps> = ({
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-200" style={{ fontSize: `${isSmallScreen ? 18 : (isMediumScreen ? 20 : (isLargeScreen ? 22 : (isExtraLargeScreen ? 23 : (screenWidth >= 640 ? 24 : 20))))}px` }}>Available Games</h2>
         <button
-          onClick={onCreateGame}
-          className="lobby-button px-2 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+          type="button"
+          onClick={() => {
+            if (!canCreateGame) {
+              onNeedAuth?.();
+              return;
+            }
+            onCreateGame();
+          }}
+          className={`lobby-button px-2 py-1 sm:px-4 sm:py-2 rounded-md transition ${
+            canCreateGame ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-600 text-slate-300 cursor-not-allowed'
+          }`}
           style={{ fontSize: `${14 * textScale}px` }}
         >
           Create Game
@@ -112,6 +127,8 @@ const GamesSection: React.FC<GamesSectionProps> = ({
               game={game} 
               onJoinGame={onJoinGame}
               onWatchGame={onWatchGame}
+              canJoinOrWatch={canJoinOrWatch}
+              onNeedAuth={onNeedAuth}
             />
           ))}
         </div>
