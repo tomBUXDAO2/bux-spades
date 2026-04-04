@@ -104,6 +104,25 @@ export const getSpectatorHandDimensions = (
   };
 };
 
+/** Normalize suit for comparisons and trick keys (Unicode vs SPADES vs S). */
+export const normalizeTrickSuitCode = (card: { suit?: string }): string => {
+  const raw = String(card?.suit ?? '');
+  const u = raw.toUpperCase();
+  if (u.includes('SPADE') || raw === '♠') return 'S';
+  if (u.includes('HEART') || raw === '♥') return 'H';
+  if (u.includes('DIAMOND') || raw === '♦') return 'D';
+  if (u.includes('CLUB') || raw === '♣') return 'C';
+  if (u.length <= 2) return u.slice(0, 1).toUpperCase();
+  return u;
+};
+
+export const cardsMatchForTrick = (
+  a: { suit?: string; rank?: string | number },
+  b: { suit?: string; rank?: string | number }
+): boolean =>
+  String(a?.rank ?? '') === String(b?.rank ?? '') &&
+  normalizeTrickSuitCode(a) === normalizeTrickSuitCode(b);
+
 /**
  * Stable React key for a card on the trick pile. Must NOT include seatIndex —
  * optimistic pending vs server payloads can disagree on seat and remount motion.
@@ -111,13 +130,19 @@ export const getSpectatorHandDimensions = (
  */
 export const getTrickCardReactKey = (card: { suit?: string; rank?: string | number }): string => {
   const rank = String(card?.rank ?? '');
-  const raw = String(card?.suit ?? '');
-  const u = raw.toUpperCase();
-  let code = u;
-  if (u.includes('SPADE') || raw === '♠') code = 'S';
-  else if (u.includes('HEART') || raw === '♥') code = 'H';
-  else if (u.includes('DIAMOND') || raw === '♦') code = 'D';
-  else if (u.includes('CLUB') || raw === '♣') code = 'C';
-  else if (u.length <= 2) code = u.slice(0, 1);
-  return `trick-${code}-${rank}`;
+  return `trick-${normalizeTrickSuitCode(card)}-${rank}`;
+};
+
+/** Trick cards from a card_played (or similar) socket payload. */
+export const getTrickArrayFromSocketPayload = (cardData: {
+  gameState?: { play?: { currentTrick?: unknown }; currentTrickCards?: unknown };
+  currentTrick?: unknown;
+}): any[] => {
+  const g = cardData?.gameState;
+  const fromGame =
+    (Array.isArray(g?.play?.currentTrick) && g.play.currentTrick) ||
+    (Array.isArray(g?.currentTrickCards) && g.currentTrickCards) ||
+    [];
+  if (fromGame.length) return fromGame as any[];
+  return Array.isArray(cardData?.currentTrick) ? (cardData.currentTrick as any[]) : [];
 };

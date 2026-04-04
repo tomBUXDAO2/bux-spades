@@ -10,6 +10,10 @@ import {
   mergeServerStatePreservingOptimisticHand,
   resetCardPlayDebounce
 } from "../../../features/game/utils/playCardUtils";
+import {
+  cardsMatchForTrick,
+  getTrickArrayFromSocketPayload
+} from "../../../features/game/utils/cardUtils";
 
 const deriveCardPlayed = (data: any) => {
   if (data?.cardPlayed) return { ...data.cardPlayed, inferred: false };
@@ -453,9 +457,25 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         const isMyPlay =
           (cardData.cardPlayed && cardData.cardPlayed.userId === user?.id) ||
           (derivedCard && !derivedCard.rejected && derivedCard.userId === user?.id);
+        // Only clear pending once the payload's trick includes our card. Clearing earlier
+        // drops the optimistic trick card before React applies gameState, unmounting motion
+        // and replaying the entrance animation a split second later.
         if (isMyPlay) {
-          setPendingPlayedCard(null);
-          console.log('🎮 Cleared pending played card - server confirmed play for user:', user?.id);
+          const played =
+            (cardData.cardPlayed?.card && {
+              suit: cardData.cardPlayed.card.suit,
+              rank: cardData.cardPlayed.card.rank
+            }) ||
+            (derivedCard && !derivedCard.rejected
+              ? { suit: derivedCard.suit, rank: derivedCard.rank }
+              : null);
+          const trick = getTrickArrayFromSocketPayload(cardData);
+          const inTrick =
+            played && trick.some((c: any) => cardsMatchForTrick(c, played));
+          if (inTrick) {
+            setPendingPlayedCard(null);
+            console.log('🎮 Cleared pending played card - trick in payload includes play for user:', user?.id);
+          }
         }
       };
       

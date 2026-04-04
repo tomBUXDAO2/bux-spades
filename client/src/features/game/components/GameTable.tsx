@@ -12,7 +12,7 @@ import AdminPanel from '../../../components/admin/AdminPanel';
 // Extracted components
 import { useAudioManager } from '../../../components/game/components/AudioManager';
 import { PlayerHandRenderer, SpectatorHandRenderer, CardImage } from '../../../components/game/components/CardRenderer';
-import { getCardDimensions, getTrickCardReactKey } from '../utils/cardUtils';
+import { getCardDimensions, getTrickCardReactKey, cardsMatchForTrick } from '../utils/cardUtils';
 import { GameStatusOverlay } from '../../../components/game/components/GameStatusOverlay';
 import { ModalManager } from '../../../components/game/components/ModalManager';
 import { useGameEventHandlers } from '../../../components/game/components/GameEventHandlers';
@@ -100,6 +100,8 @@ export default function GameTableModular({
   const dealGenerationRef = useRef(0);
   const dealPrimedKeyRef = useRef<string | null>(null);
   const pendingPlayedCardRef = useRef<Card | null>(null);
+  /** Trick pile keys that already ran entrance motion (avoids replay if a node remounts). */
+  const trickEntranceCompletedRef = useRef<Set<string>>(new Set());
   
   // Modal states
   const [showHandSummary, setShowHandSummary] = useState(false);
@@ -142,6 +144,10 @@ export default function GameTableModular({
     pendingPlayedCardRef.current = pendingPlayedCard;
     optimisticSocketMergeRef.current = pendingPlayedCard;
   }, [pendingPlayedCard]);
+
+  useEffect(() => {
+    trickEntranceCompletedRef.current.clear();
+  }, [gameState.id, gameState.currentRound]);
 
   const scheduleDealAnimation = useCallback(() => {
     cardsRevealedDuringBiddingRef.current = false;
@@ -1260,8 +1266,8 @@ export default function GameTableModular({
     
     // INSTANT RENDERING: Add pending played card for immediate feedback
     if (pendingPlayedCard && mySeatIndex >= 0) {
-      const pendingCardExists = displayTrick.some((c: any) => 
-        c.suit === pendingPlayedCard.suit && c.rank === pendingPlayedCard.rank
+      const pendingCardExists = displayTrick.some((c: any) =>
+        cardsMatchForTrick(c, pendingPlayedCard)
       );
       if (!pendingCardExists) {
         displayTrick = [...displayTrick, { ...pendingPlayedCard, seatIndex: mySeatIndex }];
@@ -1304,15 +1310,21 @@ export default function GameTableModular({
               ? { x: 0, y: -36 }
               : { x: 36, y: 0 };
 
+      const trickMotionKey = getTrickCardReactKey(card);
+      const skipTrickEntrance = trickEntranceCompletedRef.current.has(trickMotionKey);
+
       return (
         <div
-          key={getTrickCardReactKey(card)}
+          key={trickMotionKey}
           className={`${positions[displayPosition]} z-20`}
           style={{ pointerEvents: 'none' }}
         >
           <motion.div
             className="relative"
-            initial={{ opacity: 0, scale: 0.88, ...enterFrom }}
+            initial={skipTrickEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
+            onAnimationComplete={() => {
+              trickEntranceCompletedRef.current.add(trickMotionKey);
+            }}
             animate={{
               opacity: animatingTrick ? 0.82 : 1,
               scale: isWinningCard ? 1.05 : 1,
