@@ -62,6 +62,80 @@ interface GameTableModularProps {
   isStarting?: boolean;
 }
 
+/** Trick pile card: key on motion + mark entrance "done" on unmount so a fast remount skips repeat spring. */
+function TrickTableCard({
+  trickMotionKey,
+  trickEntranceCompletedRef,
+  displayPosition,
+  positions,
+  tableCardWidth,
+  tableCardHeight,
+  card,
+  animatingTrick,
+  isWinningCard,
+}: {
+  trickMotionKey: string;
+  trickEntranceCompletedRef: React.MutableRefObject<Set<string>>;
+  displayPosition: number;
+  positions: Record<number, string>;
+  tableCardWidth: number;
+  tableCardHeight: number;
+  card: Card;
+  animatingTrick: boolean;
+  isWinningCard: boolean;
+}) {
+  const skipEntrance = trickEntranceCompletedRef.current.has(trickMotionKey);
+  useEffect(() => {
+    return () => {
+      trickEntranceCompletedRef.current.add(trickMotionKey);
+    };
+  }, [trickMotionKey, trickEntranceCompletedRef]);
+
+  const enterFrom =
+    displayPosition === 0
+      ? { x: 0, y: 36 }
+      : displayPosition === 1
+        ? { x: -36, y: 0 }
+        : displayPosition === 2
+          ? { x: 0, y: -36 }
+          : { x: 36, y: 0 };
+
+  return (
+    <motion.div
+      className={`${positions[displayPosition]} z-20`}
+      style={{ pointerEvents: 'none' }}
+      initial={skipEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
+      animate={{
+        opacity: animatingTrick ? 0.82 : 1,
+        scale: isWinningCard ? 1.05 : 1,
+        x: 0,
+        y: 0,
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 420,
+        damping: 28,
+        mass: 0.85,
+      }}
+    >
+      <div className="relative">
+        <CardImage
+          card={card}
+          width={tableCardWidth}
+          height={tableCardHeight}
+          className="shadow-lg"
+          alt={`${card.rank}${card.suit}`}
+        />
+        {isWinningCard && (
+          <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
+            ✓
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function GameTableModular({ 
   game, 
   joinGame, 
@@ -1273,6 +1347,14 @@ export default function GameTableModular({
         displayTrick = [...displayTrick, { ...pendingPlayedCard, seatIndex: mySeatIndex }];
       }
     }
+
+    const seenTrickKeys = new Set<string>();
+    displayTrick = displayTrick.filter((c: any) => {
+      const k = getTrickCardReactKey(c);
+      if (seenTrickKeys.has(k)) return false;
+      seenTrickKeys.add(k);
+      return true;
+    });
     
     // Return null if no cards to display (check AFTER adding pending card)
     if (!displayTrick.length) {
@@ -1301,57 +1383,21 @@ export default function GameTableModular({
       
       const isWinningCard = (testAnimatingTrick || animatingTrick) && (testTrickWinner !== null || trickWinner !== null) && seatIndex === (testTrickWinner ?? trickWinner);
 
-      const enterFrom =
-        displayPosition === 0
-          ? { x: 0, y: 36 }
-          : displayPosition === 1
-            ? { x: -36, y: 0 }
-            : displayPosition === 2
-              ? { x: 0, y: -36 }
-              : { x: 36, y: 0 };
-
       const trickMotionKey = getTrickCardReactKey(card);
-      const skipTrickEntrance = trickEntranceCompletedRef.current.has(trickMotionKey);
 
       return (
-        <div
+        <TrickTableCard
           key={trickMotionKey}
-          className={`${positions[displayPosition]} z-20`}
-          style={{ pointerEvents: 'none' }}
-        >
-          <motion.div
-            className="relative"
-            initial={skipTrickEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
-            onAnimationComplete={() => {
-              trickEntranceCompletedRef.current.add(trickMotionKey);
-            }}
-            animate={{
-              opacity: animatingTrick ? 0.82 : 1,
-              scale: isWinningCard ? 1.05 : 1,
-              x: 0,
-              y: 0,
-            }}
-            transition={{
-              type: 'spring',
-              stiffness: 420,
-              damping: 28,
-              mass: 0.85,
-            }}
-          >
-            <CardImage
-              card={card}
-              width={tableCardWidth}
-              height={tableCardHeight}
-              className="shadow-lg"
-              alt={`${card.rank}${card.suit}`}
-            />
-            {isWinningCard && (
-              <div className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
-                ✓
-              </div>
-            )}
-          </motion.div>
-        </div>
+          trickMotionKey={trickMotionKey}
+          trickEntranceCompletedRef={trickEntranceCompletedRef}
+          displayPosition={displayPosition}
+          positions={positions}
+          tableCardWidth={tableCardWidth}
+          tableCardHeight={tableCardHeight}
+          card={card}
+          animatingTrick={animatingTrick}
+          isWinningCard={isWinningCard}
+        />
       );
     }) : [];
   };

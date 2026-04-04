@@ -116,11 +116,22 @@ export const normalizeTrickSuitCode = (card: { suit?: string }): string => {
   return u;
 };
 
+/** Canonical rank for comparisons / keys (server vs client may differ). */
+export const normalizeRankForTrick = (rank: string | number | undefined): string => {
+  const s = String(rank ?? '').trim().toUpperCase();
+  if (s === '10' || s === 'T' || s === 'TEN') return '10';
+  if (s === 'ACE') return 'A';
+  if (s === 'KING') return 'K';
+  if (s === 'QUEEN') return 'Q';
+  if (s === 'JACK') return 'J';
+  return s;
+};
+
 export const cardsMatchForTrick = (
   a: { suit?: string; rank?: string | number },
   b: { suit?: string; rank?: string | number }
 ): boolean =>
-  String(a?.rank ?? '') === String(b?.rank ?? '') &&
+  normalizeRankForTrick(a?.rank) === normalizeRankForTrick(b?.rank) &&
   normalizeTrickSuitCode(a) === normalizeTrickSuitCode(b);
 
 /**
@@ -129,8 +140,7 @@ export const cardsMatchForTrick = (
  * Rank + normalized suit is unique among cards in play for one deal.
  */
 export const getTrickCardReactKey = (card: { suit?: string; rank?: string | number }): string => {
-  const rank = String(card?.rank ?? '');
-  return `trick-${normalizeTrickSuitCode(card)}-${rank}`;
+  return `trick-${normalizeTrickSuitCode(card)}-${normalizeRankForTrick(card?.rank)}`;
 };
 
 /** Trick cards from a card_played (or similar) socket payload. */
