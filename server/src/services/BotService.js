@@ -1082,8 +1082,7 @@ class BotService {
     const { trick, leadSuit } = ctx;
     if (!leadSuit) return true;
     if (card.suit !== leadSuit) return false;
-    const spadeInTrick = trick.some(c => c.suit === 'SPADES');
-    if (spadeInTrick) return false;
+    if (leadSuit !== 'SPADES' && trick.some(c => c.suit === 'SPADES')) return false;
     const highestLead = this.currentHighestOfSuit(ctx, leadSuit);
     return !highestLead || this.getCardValue(card.rank) > this.getCardValue(highestLead.rank);
   }

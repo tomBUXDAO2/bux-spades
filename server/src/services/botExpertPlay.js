@@ -113,8 +113,10 @@ export function highestInSuit(trick, suit) {
 export function minimalWinningInLeadSuit(trick, hand, leadSuit) {
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (!leadCards.length) return null;
-  const spadePlayed = trick.some((c) => c.suit === 'SPADES');
-  if (spadePlayed) return null;
+  // Trumped side-suit lead: spades in trick beat lead suit — can't win with lead suit
+  if (leadSuit !== 'SPADES' && trick.some((c) => c.suit === 'SPADES')) {
+    return null;
+  }
   const hi = highestInSuit(trick, leadSuit);
   const need = hi ? cardValue(hi.rank) : 0;
   for (const c of sortAsc(leadCards)) {
@@ -361,14 +363,21 @@ function playCoverNil(ctx) {
       const nonSp = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
       return (nonSp.length ? nonSp : sortAsc(hand))[0];
     }
+    // Nil partner is winning the trick — must take it if possible (e.g. spade lead + nil played 8♠, we have 10♠)
     const leadCards = hand.filter((c) => c.suit === leadSuit);
     if (leadCards.length) {
       const q = leadCards.find((c) => c.rank === 'Q');
       const k = leadCards.find((c) => c.rank === 'K');
       const a = leadCards.find((c) => c.rank === 'A');
       if (q && k && a) return q;
-      const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
+      let win = minimalWinningInLeadSuit(trick, hand, leadSuit);
+      if (!win && leadSuit === 'SPADES') {
+        win = minimalWinningSpade(trick, hand);
+      }
       if (win) return win;
+      for (const c of sortDesc(leadCards)) {
+        if (wouldWinWithCard(trick, c, seatIndex)) return c;
+      }
       return sortAsc(leadCards)[0];
     }
     const cut = minimalWinningSpade(trick, hand);
