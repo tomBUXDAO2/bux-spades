@@ -677,6 +677,23 @@ class BiddingHandler {
     }
   }
 
+  getBiddingOrder(dealer) {
+    return [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
+  }
+
+  /** Partner's bid if partner bid earlier in auction (Whiz / nil loosen rules). */
+  partnerBidIfActedBefore(gameState, seatIndex) {
+    const bids = gameState.bidding?.bids || [];
+    const order = this.getBiddingOrder(gameState.dealer || 0);
+    const myIdx = order.indexOf(seatIndex);
+    const pSeat = (seatIndex + 2) % 4;
+    const pIdx = order.indexOf(pSeat);
+    if (myIdx < 0 || pIdx < 0 || pIdx >= myIdx) return null;
+    const b = bids[pSeat];
+    if (b === null || b === undefined) return null;
+    return b;
+  }
+
   /**
    * UNIFIED BOT BID CALCULATION - Single source of truth for all bot bids
    */
@@ -698,17 +715,32 @@ class BiddingHandler {
       // else fall through to standard logic for the last bidder
     }
     if (gameState.format === 'WHIZ') {
-      // WHIZ game bot logic - must bid spades or nil
-      const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-      if (numSpades === 0) {
-        return 0; // Must bid nil if no spades
-      } else if (numSpades >= 4) {
-        return numSpades; // Must bid spades if 4+
-      } else {
-        // 1-3 spades: choose nil or spades based on hand strength
-        const hasHighCards = hand.some(card => ['A', 'K', 'Q'].includes(card.rank));
-        return hasHighCards ? numSpades : 0; // Bid spades if strong, nil if weak
+      const nSp = hand.filter((card) => card.suit === 'SPADES').length;
+      const bids = gameState.bidding?.bids || [];
+      const pSeat = (seatIndex + 2) % 4;
+      const partnerNil = bids[pSeat] === 0;
+      const partnerEarlyBid = this.partnerBidIfActedBefore(gameState, seatIndex);
+      if (nSp === 0) {
+        return 0;
       }
+      if (nSp >= 4) {
+        if (
+          nSp === 4 &&
+          partnerEarlyBid != null &&
+          Number(partnerEarlyBid) >= 5 &&
+          !this.botService.cannotBidNilWhizHand(hand, partnerNil, partnerEarlyBid, nSp)
+        ) {
+          const highs = hand.filter((c) => ['A', 'K', 'Q', 'J', '10'].includes(c.rank)).length;
+          if (highs <= 3) return 0;
+        }
+        return nSp;
+      }
+      if (this.botService.cannotBidNilWhizHand(hand, partnerNil, partnerEarlyBid, nSp)) {
+        return nSp;
+      }
+      const highs = hand.filter((c) => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
+      if (highs <= 4) return 0;
+      return nSp;
     } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
       // SUICIDE game bot logic - proper team-based bidding
       console.log(`[BIDDING] SUICIDE game bot logic for seat ${seatIndex}`);
@@ -765,7 +797,16 @@ class BiddingHandler {
       const numAces = hand.filter(card => card.rank === 'A').length;
       return numAces * 3;
     } else {
-      // Simple bot logic for other game types - INDEPENDENT of other players' bids
+      const partnerEarlyBid = this.partnerBidIfActedBefore(gameState, seatIndex);
+      const pb =
+        partnerEarlyBid != null && Number.isFinite(Number(partnerEarlyBid))
+          ? Number(partnerEarlyBid)
+          : null;
+      const highs = hand.filter((c) => ['A', 'K', 'Q', 'J', '10'].includes(c.rank)).length;
+      if (!this.botService.cannotBidNilShape(hand, pb) && highs <= 4 && numSpades <= 3) {
+        console.log(`[BIDDING] Standard nil candidate (partner early bid ${pb})`);
+        return 0;
+      }
       console.log(`[BIDDING] Simple bot logic - numSpades: ${numSpades}, hand: ${hand.map(c => c.suit + c.rank).join(',')}`);
       return numSpades > 0 ? numSpades : 2;
     }
