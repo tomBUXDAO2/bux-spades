@@ -1110,6 +1110,32 @@ class BotService {
     return null;
   }
 
+  /** Partner winning — follow suit with lowest card that does not steal the book. */
+  lowestLeadSuitRespectingPartnerWin(ctx, hand) {
+    const { trick, leadSuit, partnerSeat, seatIndex } = ctx;
+    if (!leadSuit || !trick?.length || this.provisionalTrickWinnerSeat(trick) !== partnerSeat) {
+      return null;
+    }
+    const leadCards = hand.filter(c => c.suit === leadSuit);
+    if (!leadCards.length) return null;
+    const losers = leadCards.filter(c => !this.wouldSeatTakeTrickWithCard(trick, c, seatIndex));
+    if (losers.length) return this.sortByRankAsc(losers)[0];
+    return this.sortByRankAsc(leadCards)[0];
+  }
+
+  /** Partner winning — void: sluff high non-spade, or lowest spade that loses; else minimal spade. */
+  voidSluffWhenPartnerWinning(ctx, hand) {
+    const { trick, partnerSeat, seatIndex } = ctx;
+    if (!trick?.length || this.provisionalTrickWinnerSeat(trick) !== partnerSeat) return null;
+    const hi = this.sortByRankDesc(hand.filter(c => c.suit !== 'SPADES'));
+    if (hi.length) return hi[0];
+    const sp = this.sortByRankAsc(hand.filter(c => c.suit === 'SPADES'));
+    for (const s of sp) {
+      if (!this.wouldSeatTakeTrickWithCard(trick, s, seatIndex)) return s;
+    }
+    return sp.length ? sp[0] : null;
+  }
+
   playHighPressure(ctx) {
     const { hand, isLeading, leadSuit, trick, partnerSeat, partnerHasPlayed, partnerCard, spadesBroken } = ctx;
     const suits = this.groupBySuit(hand);
@@ -1139,20 +1165,16 @@ class BotService {
     // Following
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length > 0) {
+      const duckPartner = this.lowestLeadSuitRespectingPartnerWin(ctx, hand);
+      if (duckPartner !== null) return duckPartner;
       const winning = this.minimalWinningFollowing(ctx, hand);
-      if (winning) {
-        // Do not over partner's sure win
-        if (partnerHasPlayed && this.provisionalTrickWinnerSeat(trick) === partnerSeat) {
-          return this.sortByRankAsc(leadCards)[0];
-        }
-        return winning;
-      }
-      // cannot win -> dump lowest of lead suit
+      if (winning) return winning;
       return this.sortByRankAsc(leadCards)[0];
     }
 
     // Void in lead suit
-    // If opponent currently winning, try to cut with minimal spade that wins
+    const sluffPartner = this.voidSluffWhenPartnerWinning(ctx, hand);
+    if (sluffPartner) return sluffPartner;
     const cut = this.minimalSpadeToWin(ctx, hand);
     if (cut) return cut;
     // Else dump lowest losing (prefer non-spades)
@@ -1185,16 +1207,15 @@ class BotService {
     // Following
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length > 0) {
-      // If partner is winning, support them by dumping
-      if (partnerHasPlayed && this.provisionalTrickWinnerSeat(trick) === partnerSeat) {
-        return this.sortByRankAsc(leadCards)[0];
-      }
-      // Try to win, else play high to force opponents to use good cards
+      const duckPartner = this.lowestLeadSuitRespectingPartnerWin(ctx, hand);
+      if (duckPartner !== null) return duckPartner;
       const win = this.minimalWinningFollowing(ctx, hand);
       return win || this.sortByRankDesc(leadCards)[0];
     }
     // Void: apply special rules first
-    
+    const sluffPartner = this.voidSluffWhenPartnerWinning(ctx, hand);
+    if (sluffPartner) return sluffPartner;
+
     // ASSASSIN: Must cut with spades when void
     if (specialRules.assassin) {
       const spades = hand.filter(c => c.suit === 'SPADES');

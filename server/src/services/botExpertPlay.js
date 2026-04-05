@@ -260,6 +260,31 @@ function partnerWinning(trick, partnerSeat) {
   return trick.length > 0 && provisionalWinnerSeat(trick) === partnerSeat;
 }
 
+/** Following lead suit: lowest card that does not take partner's book; else minimal forced steal. */
+function lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat) {
+  const leadCards = hand.filter((c) => c.suit === leadSuit);
+  if (!leadCards.length || !partnerWinning(trick, partnerSeat)) return null;
+  const losers = leadCards.filter((c) => !wouldWinWithCard(trick, c, seatIndex));
+  if (losers.length) return sortAsc(losers)[0];
+  return sortAsc(leadCards)[0];
+}
+
+/**
+ * Void in lead: partner already winning — sluff high non-spade; if only spades, lowest spade that loses
+ * to partner's winner, else smallest spade (minimal overcut when forced).
+ */
+function voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat) {
+  if (!partnerWinning(trick, partnerSeat)) return null;
+  const hiDump = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
+  if (hiDump.length) return hiDump[0];
+  const spades = sortAsc(hand.filter((c) => c.suit === 'SPADES'));
+  if (!spades.length) return null;
+  for (const s of spades) {
+    if (!wouldWinWithCard(trick, s, seatIndex)) return s;
+  }
+  return spades[0];
+}
+
 function oppNilWinning(trick, oppNilSeat) {
   return oppNilSeat != null && trick.length && provisionalWinnerSeat(trick) === oppNilSeat;
 }
@@ -418,8 +443,7 @@ function playDefendOppNil(ctx) {
     spadesBroken,
     oppNilSeat,
     takeAllMode,
-    game,
-    cautiousMode
+    game
   } = ctx;
 
   if (isLeading) {
@@ -465,25 +489,39 @@ function playDefendOppNil(ctx) {
 
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
-    if (partnerWinning(trick, partnerSeat)) return sortAsc(leadCards)[0];
+    const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
+    if (duck !== null) return duck;
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
     return takeAllMode ? sortDesc(leadCards)[0] : sortAsc(leadCards)[0];
+  }
+
+  const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+  if (partnerVoid) return partnerVoid;
+
+  const oppTeamWinning =
+    trick.length > 0 &&
+    (() => {
+      const w = provisionalWinnerSeat(trick);
+      return w !== null && w !== seatIndex && w !== partnerSeat;
+    })();
+  const needBookForContract = teamNeedsTricks(ctx);
+
+  // Prefer not breaking spades vs their nil — unless we still need tricks for our bid.
+  if (needBookForContract && oppTeamWinning) {
+    const cut = minimalWinningSpade(trick, hand);
+    if (cut) return cut;
   }
 
   if (!spadesBroken) {
     const nonSp = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
     if (nonSp.length) return nonSp[0];
   }
-  if (takeAllMode) {
+  if (takeAllMode || needBookForContract) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
   }
   const sp = hand.filter((c) => c.suit === 'SPADES');
-  if (cautiousMode && partnerWinning(trick, partnerSeat) && sp.length && !spadesBroken) {
-    const mid = pickMidSpade(sp);
-    if (mid) return mid;
-  }
   if (sp.length && spadesBroken) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
@@ -525,11 +563,15 @@ function playAggressive(ctx) {
 
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
-    if (partnerWinning(trick, partnerSeat)) return sortAsc(leadCards)[0];
+    const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
+    if (duck !== null) return duck;
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
     return sortAsc(leadCards)[0];
   }
+
+  const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+  if (partnerVoid) return partnerVoid;
 
   const oppWinning =
     trick.length &&
@@ -560,9 +602,15 @@ function playCautious(ctx) {
 
   if (contractLocked && cautiousMode) {
     const leadCards = hand.filter((c) => c.suit === leadSuit);
-    if (leadCards.length) return sortAsc(leadCards)[0];
+    if (leadCards.length) {
+      const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
+      if (duck !== null) return duck;
+      return sortAsc(leadCards)[0];
+    }
     const dump = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
     if (dump.length) return dump[0];
+    const pv = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+    if (pv) return pv;
   }
 
   if (isLeading) {
@@ -583,11 +631,8 @@ function playCautious(ctx) {
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
     if (partnerWinning(trick, partnerSeat)) {
-      if (bagPressure) {
-        const los = leadCards.filter((c) => !wouldWinWithCard(trick, c, seatIndex));
-        if (los.length) return sortAsc(los)[0];
-      }
-      return sortAsc(leadCards)[0];
+      const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
+      if (duck !== null) return duck;
     }
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win && !bagPressure) return win;
@@ -595,14 +640,10 @@ function playCautious(ctx) {
     return sortAsc(leadCards)[0];
   }
 
+  const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+  if (partnerVoid) return partnerVoid;
+
   const sp = hand.filter((c) => c.suit === 'SPADES');
-  if (partnerWinning(trick, partnerSeat) && sp.length && !spadesBroken) {
-    if (ctx.isFirstTrickOfHand) {
-      const hi = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
-      if (hi.length) return hi[0];
-    }
-    return pickMidSpade(sp) || sortAsc(sp)[0];
-  }
   if (sp.length && spadesBroken) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
