@@ -49,8 +49,11 @@ export const getCardOverlapOffset = (
   opts?: CardDimensionOpts
 ): number => {
   const width = window.innerWidth;
-  const sidePad = isMobile ? 8 : 0;
-  const availableWidth = (isMobile ? width : width * 0.7) - sidePad;
+  /** Must match GameTable `useSlideOutGameChat` (width < 1024): game column is full width, not 70%. */
+  const gameColumnFullWidth = width < 1024;
+  const useFullWidthForHand = isMobile || gameColumnFullWidth;
+  const sidePad = useFullWidthForHand ? 16 : 0;
+  const availableWidth = (useFullWidthForHand ? width : width * 0.7) - sidePad;
 
   const cardDimensions = getCardDimensions(isMobile, scaleFactor, opts);
   const cardWidth = cardDimensions.cardUIWidth;

@@ -105,16 +105,7 @@ export default function TestTablePageModular() {
 
   return (
     <>
-      <style>
-        {`
-          /* Test table specific styles - minimal fixes */
-          .test-table-page .fixed.inset-0 {
-            height: 100vh !important;
-          }
-        `}
-      </style>
-      
-      <div className="table-page relative test-table-page">
+      <div className="table-page relative">
         <LandscapePrompt />
         
         <FullScreenToggle isVisible={true} />

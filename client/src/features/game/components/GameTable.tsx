@@ -1679,7 +1679,7 @@ export default function GameTableModular({
   return (
     <>
       <LandscapePrompt />
-      <div className="fixed inset-0 bg-gray-900">
+      <div className="fixed inset-0 z-0 min-h-[100dvh] h-[100dvh] bg-gray-900">
         {/* Main content area - full height */}
         <div className="flex h-full min-h-0">
           {/* Game table area - add padding on top and bottom */}
