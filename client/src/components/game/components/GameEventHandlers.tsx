@@ -272,7 +272,7 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
       setTimeout(() => {
         console.log('🎮 Showing hand summary after delay');
         onHandCompleted(data);
-      }, 600);
+      }, 380);
     };
     
     socket.on('round_complete', roundCompletedHandler);

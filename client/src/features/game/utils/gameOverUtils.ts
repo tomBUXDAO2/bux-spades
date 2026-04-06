@@ -108,7 +108,8 @@ export const handleGameOver = async (
   callbacks: GameOverCallbacks
 ) => {
   storeFinalScores(data, gameMode, callbacks);
-  await callGameCompletionAPI(gameId, data);
   resetGameState(callbacks);
   showGameResultModal(data.winningTeam, callbacks);
+  // Do not block the winners modal on the completion API (network can take seconds).
+  void callGameCompletionAPI(gameId, data);
 };

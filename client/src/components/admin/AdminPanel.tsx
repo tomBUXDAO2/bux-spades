@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 
 interface Game {
@@ -1149,7 +1150,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  return (
+  // Portal to body so position:fixed is viewport-relative. Nesting under header (backdrop-filter)
+  // or other transformed ancestors would shrink the containing block and vertically center in ~header height.
+  return createPortal(
     <>
       {/* Backdrop */}
       <div 
@@ -1157,11 +1160,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
         onClick={onClose}
       />
 
-      {/* Admin Panel */}
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}>
+      {/* Admin Panel — scroll outer shell + min-h-full so tall content stays centered and never clips above the viewport */}
+      <div
+        className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain"
+        style={{ padding: isPortrait ? '8px' : `${16 * paddingScale}px` }}
+      >
+        <div className="flex min-h-full items-center justify-center">
         <div 
-          className="bg-slate-900 rounded-lg shadow-2xl border border-red-500/50 w-full max-w-4xl overflow-hidden"
-          style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : '90vh' }}
+          className="bg-slate-900 rounded-lg shadow-2xl border border-red-500/50 w-full max-w-4xl overflow-hidden my-auto"
+          style={{ maxHeight: isPortrait ? 'calc(100vh - 16px)' : 'min(90vh, calc(100dvh - 32px))' }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -2177,8 +2184,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             )}
           </div>
         </div>
+        </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 };
 

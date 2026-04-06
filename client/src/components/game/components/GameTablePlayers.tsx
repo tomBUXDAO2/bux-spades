@@ -247,46 +247,30 @@ export default function GameTablePlayers({
       const partner = gameState.players[partnerPosition];
       const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
-      
-      // Calculate team totals
-      const teamBid = bidCount + partnerBid;
+
+      const contribTeamBid = (b: unknown) => {
+        if (b === null || b === undefined) return 0;
+        const n = Number(b);
+        if (!Number.isFinite(n) || n < 0) return 0;
+        return n;
+      };
+      const teamBid = contribTeamBid(rawBid) + contribTeamBid(partnerBid);
       const teamMade = madeCount + partnerMade;
-      
-      // Check if either player bid nil
-      const playerBidNil = bidCount === 0;
-      const partnerBidNil = partnerBid === 0;
-      
-      if (playerBidNil) {
-        // This player bid nil
-        if (madeCount > 0) {
-          madeStatus = '❌'; // Failed nil - won a trick
-        } else {
-          // Nil bidder stays blank unless they win a trick
-          madeStatus = null;
-        }
-      } else if (partnerBidNil) {
-        // Partner bid nil, this player has regular bid
-        // Stay blank until team bid is definitely made or failed (including tricks nil wins)
-        if (teamMade >= teamBid) {
-          madeStatus = '✅'; // Team made their bid (including any tricks nil won)
-        } else if (teamMade + tricksLeft < teamBid) {
-          madeStatus = '❌'; // Team cannot make their bid
-        } else {
-          madeStatus = null; // Still in progress
-        }
+      const isNilTypeBid =
+        bidCount === 0 || (isBlindNil && (bidCount === -1 || rawBid === -1));
+
+      const teamMadeContract = teamBid > 0 && teamMade >= teamBid;
+      const teamCannotMakeContract = teamBid > 0 && teamMade + tricksLeft < teamBid;
+
+      if (isNilTypeBid && madeCount > 0) {
+        madeStatus = '❌'; // Failed nil — took a trick
+      } else if (teamCannotMakeContract) {
+        // Impossible for the team to make the combined bid: show ❌ on BOTH partners
+        madeStatus = '❌';
+      } else if (teamMadeContract) {
+        madeStatus = '✅'; // Team made the contract (including successful nil + partner tricks)
       } else {
-        // Neither player bid nil - standard team logic
-        if (teamBid > 0) {
-          if (teamMade >= teamBid) {
-            madeStatus = '✅'; // Team made their bid
-          } else if (teamMade + tricksLeft < teamBid) {
-            madeStatus = '❌'; // Team cannot make their bid
-          } else {
-            madeStatus = null; // Still possible to make bid
-          }
-        } else {
-          madeStatus = null; // No bid
-        }
+        madeStatus = null;
       }
     } else if (isSoloGame) {
       // Solo game logic (individual player)
