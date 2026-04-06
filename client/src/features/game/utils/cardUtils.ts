@@ -39,6 +39,20 @@ export const getCardDimensions = (
   return { cardUIWidth, cardUIHeight };
 };
 
+/** Reference count for hand fan spacing; shorter hands reuse this overlap and stay centered. */
+export const HAND_FAN_REFERENCE_CARD_COUNT = 13;
+
+/**
+ * Overlap between adjacent hand cards, always derived from a full 13-card fan.
+ * Shorter hands keep the same spacing and group in the center (do not stretch to full width).
+ */
+export const getHandFanOverlapOffset = (
+  scaleFactor: number,
+  isMobile: boolean,
+  opts?: CardDimensionOpts
+): number =>
+  getCardOverlapOffset(scaleFactor, isMobile, HAND_FAN_REFERENCE_CARD_COUNT, opts);
+
 /**
  * Calculate card overlap offset so N cards span the available width (fan / stacked hand).
  */
@@ -85,16 +99,17 @@ export const getCardVisibility = (
 };
 
 /**
- * Calculate spectator hand dimensions - MUST MATCH FACE-UP CARD DIMENSIONS
+ * Calculate spectator hand dimensions - MUST MATCH FACE-UP CARD DIMENSIONS.
+ * Overlap always matches a 13-card fan regardless of actual hand size.
  */
 export const getSpectatorHandDimensions = (
   isMobile: boolean,
   scaleFactor: number,
-  numCards: number = 13,
+  _numCards: number = 13,
   opts?: CardDimensionOpts
 ): CardDimensions & { overlapOffset: number } => {
   const cardDimensions = getCardDimensions(isMobile, scaleFactor, opts);
-  const overlapOffset = getCardOverlapOffset(scaleFactor, isMobile, numCards, opts);
+  const overlapOffset = getHandFanOverlapOffset(scaleFactor, isMobile, opts);
 
   return {
     cardUIWidth: cardDimensions.cardUIWidth,

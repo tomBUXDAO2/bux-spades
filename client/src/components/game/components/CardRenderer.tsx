@@ -7,7 +7,7 @@ import { isCompactGameLayout } from '../../../hooks/windowLayout';
 import type { Card, GameState, Player, Bot } from "../../../types/game";
 import {
   getCardDimensions,
-  getCardOverlapOffset,
+  getHandFanOverlapOffset,
   getCardVisibility,
   getSpectatorHandDimensions,
   type CardDimensionOpts,
@@ -293,7 +293,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   }
   
   const cardDimensions = getCardDimensions(isMobile, scaleFactor, handOpts);
-  const cardOverlapOffset = getCardOverlapOffset(scaleFactor, isMobile, sortedHand.length, handOpts);
+  const cardOverlapOffset = getHandFanOverlapOffset(scaleFactor, isMobile, handOpts);
   const { showAllCards, visibleCount } = getCardVisibility(sortedHand, gameState.status, dealingComplete, dealtCardCount);
   const peekHalfH = Math.ceil(cardDimensions.cardUIHeight / 2);
   const handStripHeight = isMobile
@@ -326,7 +326,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
       <div
         className={`flex h-full w-full ${isMobile ? 'items-end justify-center' : 'items-center justify-center'}`}
       >
-        <div className="flex items-center">
+        <div className="flex shrink-0 items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
           // Respect rule engine: do not block cards that are deemed playable
           const onLead = Array.isArray(currentTrick) && currentTrick.length === 0;
@@ -487,7 +487,7 @@ export const SpectatorHandRenderer: React.FC<{
       <div
         className={`flex h-full w-full ${isMobile ? 'items-end justify-center' : 'items-center justify-center'}`}
       >
-        <div className="flex items-center">
+        <div className="flex shrink-0 items-center">
         {Array.isArray(bottomPlayerHand) && bottomPlayerHand.map((card: Card, index: number) => (
           <div
             key={`${card.suit}${card.rank}`}
