@@ -1711,7 +1711,7 @@ export default function GameTableModular({
             {!mobileGameChatOpen && (
               <button
                 type="button"
-                className="fixed right-0 top-1/2 z-[52] flex -translate-y-1/2 touch-manipulation flex-col items-center gap-1 rounded-l-xl border border-r-0 border-white/15 bg-slate-900/95 py-3 pl-2 pr-1 shadow-lg backdrop-blur-md active:bg-slate-800"
+                className="fixed right-0 top-[68%] z-[52] flex -translate-y-1/2 touch-manipulation flex-col items-center gap-1 rounded-l-xl border border-r-0 border-white/15 bg-slate-900/95 py-3 pl-2 pr-1 shadow-lg backdrop-blur-md active:bg-slate-800"
                 onClick={() => {
                   setMobileGameChatOpen(true);
                   setMobileGameChatUnread(0);
