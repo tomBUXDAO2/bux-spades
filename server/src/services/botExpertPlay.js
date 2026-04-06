@@ -48,6 +48,13 @@ export function isNilBid(b) {
   return Number(b) === 0;
 }
 
+/** Redis/JSON may use string seat indices — required for partner/win checks */
+export function normSeat(s) {
+  if (s === null || s === undefined || s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function collectPlayedCards(game, currentTrick) {
   const out = [];
   const completed = game?.play?.completedTricks || [];
@@ -78,8 +85,10 @@ export function inferVoidsFromTricks(game, currentTrick) {
     const leadSuit = cards[0].suit;
     for (const c of cards) {
       if (c.seatIndex == null) continue;
+      const si = normSeat(c.seatIndex);
+      if (si == null || si < 0 || si > 3) continue;
       if (c.suit !== leadSuit) {
-        voids[c.seatIndex].add(leadSuit);
+        voids[si].add(leadSuit);
       }
     }
   };
@@ -95,13 +104,15 @@ export function provisionalWinnerSeat(trick) {
   const leadSuit = trick[0].suit;
   const spades = trick.filter((c) => c.suit === 'SPADES');
   const pool = spades.length > 0 ? spades : trick.filter((c) => c.suit === leadSuit);
-  if (pool.length === 0) return trick[0].seatIndex;
-  return pool.reduce((best, c) => (cardValue(c.rank) > cardValue(best.rank) ? c : best)).seatIndex;
+  if (pool.length === 0) return normSeat(trick[0].seatIndex);
+  const raw = pool.reduce((best, c) => (cardValue(c.rank) > cardValue(best.rank) ? c : best)).seatIndex;
+  return normSeat(raw);
 }
 
 export function wouldWinWithCard(trick, card, seatIndex) {
-  const hyp = trick.concat([{ suit: card.suit, rank: card.rank, seatIndex }]);
-  return provisionalWinnerSeat(hyp) === seatIndex;
+  const si = normSeat(seatIndex);
+  const hyp = trick.concat([{ suit: card.suit, rank: card.rank, seatIndex: si }]);
+  return normSeat(provisionalWinnerSeat(hyp)) === normSeat(seatIndex);
 }
 
 export function highestInSuit(trick, suit) {
@@ -161,7 +172,7 @@ export function countNilFollowsInSuit(game, nilSeat, suit) {
     if (cards.length < 2) continue;
     const leadSuit = cards[0].suit;
     if (leadSuit !== suit) continue;
-    const played = cards.find((c) => c.seatIndex === nilSeat);
+    const played = cards.find((c) => normSeat(c.seatIndex) === normSeat(nilSeat));
     if (played && played.suit === leadSuit) n++;
   }
   return n;
@@ -172,7 +183,7 @@ export function buildExpertContext(base) {
   const isLeading = trick.length === 0;
   const leadSuit = isLeading ? null : trick[0].suit;
   const partnerSeat = base.partnerSeat ?? (base.seatIndex + 2) % 4;
-  const partnerHasPlayed = trick.some((c) => c.seatIndex === partnerSeat);
+  const partnerHasPlayed = trick.some((c) => normSeat(c.seatIndex) === normSeat(partnerSeat));
 
   const {
     game,
@@ -188,15 +199,18 @@ export function buildExpertContext(base) {
   const cautiousMode = tableTotal <= 10;
   const aggressiveTable = tableTotal >= 12;
 
-  const myBid = bidsBySeat[seatIndex];
-  const partnerBid = bidsBySeat[partnerSeat];
-  const selfNil = isNilBid(myBid);
-  const partnerNil = isNilBid(partnerBid);
+  const myBid = bidsBySeat?.[seatIndex];
+  const partnerBid = bidsBySeat?.[partnerSeat];
+  const partnerPl = game?.players?.[partnerSeat];
+  const myPl = game?.players?.[seatIndex];
+  const selfNil = isNilBid(myBid) || myPl?.isNil === true;
+  const partnerNil = isNilBid(partnerBid) || partnerPl?.isNil === true;
 
+  const bidsSafe = Array.isArray(bidsBySeat) ? bidsBySeat : [];
   const oppSeats = [0, 1, 2, 3].filter((s) => s !== seatIndex && s !== partnerSeat);
-  const oppNilSeat = oppSeats.find((s) => isNilBid(bidsBySeat[s])) ?? null;
+  const oppNilSeat = oppSeats.find((s) => isNilBid(bidsSafe[s])) ?? null;
 
-  const nilSeats = [0, 1, 2, 3].filter((s) => isNilBid(bidsBySeat[s]));
+  const nilSeats = [0, 1, 2, 3].filter((s) => isNilBid(bidsSafe[s]));
   const team0Nil = nilSeats.some((s) => s % 2 === 0);
   const team1Nil = nilSeats.some((s) => s % 2 === 1);
   const doubleNil = team0Nil && team1Nil;
@@ -257,7 +271,8 @@ export function buildExpertContext(base) {
 }
 
 function partnerWinning(trick, partnerSeat) {
-  return trick.length > 0 && provisionalWinnerSeat(trick) === partnerSeat;
+  if (!trick.length) return false;
+  return normSeat(provisionalWinnerSeat(trick)) === normSeat(partnerSeat);
 }
 
 /** Following lead suit: lowest card that does not take partner's book; else minimal forced steal. */
@@ -286,7 +301,11 @@ function voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat) {
 }
 
 function oppNilWinning(trick, oppNilSeat) {
-  return oppNilSeat != null && trick.length && provisionalWinnerSeat(trick) === oppNilSeat;
+  return (
+    oppNilSeat != null &&
+    trick.length &&
+    normSeat(provisionalWinnerSeat(trick)) === normSeat(oppNilSeat)
+  );
 }
 
 /** Spades remaining in play (approx): 13 minus spades seen */
@@ -351,6 +370,10 @@ function playCoverNil(ctx) {
     partnerHasPlayed
   } = ctx;
 
+  const partnerPlayedInTrick = trick.some(
+    (c) => normSeat(c.seatIndex) === normSeat(partnerSeat)
+  );
+
   if (isLeading) {
     const suits = groupBySuit(hand);
     const nonSp = ['HEARTS', 'DIAMONDS', 'CLUBS'];
@@ -374,7 +397,7 @@ function playCoverNil(ctx) {
     return sortDesc(hand)[0];
   }
 
-  if (partnerHasPlayed) {
+  if (partnerHasPlayed || partnerPlayedInTrick) {
     const nilWinning = partnerWinning(trick, partnerSeat);
     if (!nilWinning) {
       if (aggressiveTable) {
@@ -411,7 +434,9 @@ function playCoverNil(ctx) {
     return (nonSp.length ? nonSp : sortAsc(hand))[0];
   }
 
-  const nilLed = trick.length && trick[0].seatIndex === partnerSeat;
+  const nilLed =
+    trick.length > 0 &&
+    normSeat(trick[0].seatIndex) === normSeat(partnerSeat);
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
     if (nilLed) return sortAsc(leadCards)[0];
@@ -502,8 +527,12 @@ function playDefendOppNil(ctx) {
   const oppTeamWinning =
     trick.length > 0 &&
     (() => {
-      const w = provisionalWinnerSeat(trick);
-      return w !== null && w !== seatIndex && w !== partnerSeat;
+      const w = normSeat(provisionalWinnerSeat(trick));
+      return (
+        w != null &&
+        w !== normSeat(seatIndex) &&
+        w !== normSeat(partnerSeat)
+      );
     })();
   const needBookForContract = teamNeedsTricks(ctx);
 
@@ -573,10 +602,12 @@ function playAggressive(ctx) {
   const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
   if (partnerVoid) return partnerVoid;
 
+  const wSeat = normSeat(provisionalWinnerSeat(trick));
   const oppWinning =
     trick.length &&
-    provisionalWinnerSeat(trick) !== seatIndex &&
-    provisionalWinnerSeat(trick) !== partnerSeat;
+    wSeat != null &&
+    wSeat !== normSeat(seatIndex) &&
+    wSeat !== normSeat(partnerSeat);
   if (oppWinning && !spadesBroken) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;

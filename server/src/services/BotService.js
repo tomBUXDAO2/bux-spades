@@ -3,7 +3,7 @@ import { GameLoggingService } from './GameLoggingService.js';
 import { BotUserService } from './BotUserService.js';
 import { prisma } from '../config/database.js';
 import SpadesRuleService from './SpadesRuleService.js';
-import { expertChooseCard } from './botExpertPlay.js';
+import { expertChooseCard, normSeat } from './botExpertPlay.js';
 
 class BotService {
   constructor() {
@@ -968,8 +968,12 @@ class BotService {
     const positionInTrick = trick.length; // 0 lead, 1 second, 2 third, 3 last
     const isLeading = positionInTrick === 0;
     const isLast = positionInTrick === 3;
-    const partnerHasPlayed = trick.some(c => c.seatIndex === partnerSeat);
-    const partnerCard = partnerHasPlayed ? trick.find(c => c.seatIndex === partnerSeat) : null;
+    const partnerHasPlayed = trick.some(
+      (c) => normSeat(c.seatIndex) === normSeat(partnerSeat)
+    );
+    const partnerCard = partnerHasPlayed
+      ? trick.find((c) => normSeat(c.seatIndex) === normSeat(partnerSeat))
+      : null;
 
     const scenario = (game.players[seatIndex]?.isNil || isNilBid(myBid))
       ? 'self_nil'
@@ -1054,7 +1058,7 @@ class BotService {
   /** If this seat plays `card`, would they take the trick? */
   wouldSeatTakeTrickWithCard(trick, card, seatIndex) {
     const hyp = trick.concat([{ suit: card.suit, rank: card.rank, seatIndex }]);
-    return this.provisionalTrickWinnerSeat(hyp) === seatIndex;
+    return normSeat(this.provisionalTrickWinnerSeat(hyp)) === normSeat(seatIndex);
   }
 
   /** Highest legal card that does not win the trick for nil; fallback to lowest if forced to win. */
@@ -1074,8 +1078,13 @@ class BotService {
 
   partnerNilCurrentlyWinningTrick(ctx) {
     const { trick, partnerSeat, partnerHasPlayed } = ctx;
-    if (!partnerHasPlayed || trick.length === 0) return false;
-    return this.provisionalTrickWinnerSeat(trick) === partnerSeat;
+    const partnerOnTrick = trick.some(
+      (c) => normSeat(c.seatIndex) === normSeat(partnerSeat)
+    );
+    if ((!partnerHasPlayed && !partnerOnTrick) || trick.length === 0) return false;
+    return (
+      normSeat(this.provisionalTrickWinnerSeat(trick)) === normSeat(partnerSeat)
+    );
   }
 
   canWinFollowing(ctx, card) {
@@ -1297,7 +1306,9 @@ class BotService {
       return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
     }
     // Following before nil partner plays: if nil partner LED, duck low and save cover cards
-    const nilPartnerLed = trick.length > 0 && trick[0].seatIndex === partnerSeat;
+    const nilPartnerLed =
+      trick.length > 0 &&
+      normSeat(trick[0].seatIndex) === normSeat(partnerSeat);
     const leadCards = hand.filter(c => c.suit === leadSuit);
     if (leadCards.length) {
       if (nilPartnerLed) {
