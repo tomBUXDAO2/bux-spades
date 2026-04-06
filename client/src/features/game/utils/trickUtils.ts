@@ -15,10 +15,39 @@ export interface OrderedPlayersResult {
 }
 
 /**
- * Get table positions for trick cards
+ * Get table positions for trick cards.
+ * One slot per display seat — card sits near that seat (south/west/north/east).
+ *
+ * On mobile, left/right use a larger inset (26%) so wide trick cards clear side avatars.
+ * Top/bottom use a *smaller* inset than sides: if north/south use the same large % as east/west,
+ * both vertical cards sit too close to the middle and overlap once trick cards are scaled up.
  */
-/** One slot per display seat — card sits near that seat (south/west/north/east). */
-export const getTrickCardPositions = (): TrickCardPositions => {
+export const getTrickCardPositions = (mobile?: boolean, viewportHeight?: number): TrickCardPositions => {
+  if (mobile) {
+    const h = viewportHeight ?? 800;
+    if (h < 440) {
+      return {
+        0: 'absolute bottom-[6%] left-1/2 -translate-x-1/2',
+        1: 'absolute left-[26%] top-1/2 -translate-y-1/2',
+        2: 'absolute left-1/2 top-[6%] -translate-x-1/2',
+        3: 'absolute right-[26%] top-1/2 -translate-y-1/2',
+      };
+    }
+    if (h < 520) {
+      return {
+        0: 'absolute bottom-[9%] left-1/2 -translate-x-1/2',
+        1: 'absolute left-[26%] top-1/2 -translate-y-1/2',
+        2: 'absolute left-1/2 top-[9%] -translate-x-1/2',
+        3: 'absolute right-[26%] top-1/2 -translate-y-1/2',
+      };
+    }
+    return {
+      0: 'absolute bottom-[12%] left-1/2 -translate-x-1/2',
+      1: 'absolute left-[26%] top-1/2 -translate-y-1/2',
+      2: 'absolute left-1/2 top-[12%] -translate-x-1/2',
+      3: 'absolute right-[26%] top-1/2 -translate-y-1/2',
+    };
+  }
   return {
     0: 'absolute bottom-[20%] left-1/2 -translate-x-1/2',
     1: 'absolute left-[20%] top-1/2 -translate-y-1/2',

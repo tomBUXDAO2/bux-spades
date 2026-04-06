@@ -4,9 +4,8 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import GameTable from '@/features/game/components/GameTable';
 import type { GameState } from "../types/game";
-import { createMockGame } from './TestTablePage/components/MockGameData';
-import { isMobileOrTablet, isBot } from './TestTablePage/components/DeviceDetection';
-import { requestFullScreen, exitFullScreen } from './TestTablePage/components/FullScreenManager';
+import { createUiTestMockGame } from './TestTablePage/components/MockGameData';
+import { isBot } from './TestTablePage/components/DeviceDetection';
 import { TestModeIndicator } from './TestTablePage/components/TestModeIndicator';
 import { FullScreenToggle } from './TestTablePage/components/FullScreenToggle';
 import LandscapePrompt from '../LandscapePrompt';
@@ -15,7 +14,9 @@ import TableInactivityModal from '../components/modals/TableInactivityModal';
 export default function TestTablePageModular() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [game, setGame] = useState<GameState>(createMockGame());
+  const [game, setGame] = useState<GameState>(() =>
+    createUiTestMockGame(user!.id, user?.username ?? "You")
+  );
   const [showStartWarning, setShowStartWarning] = useState(false);
   const [showBotWarning, setShowBotWarning] = useState(false);
   const [emptySeats, setEmptySeats] = useState(0);
@@ -30,12 +31,6 @@ export default function TestTablePageModular() {
     const botPlayersCount = (gameState.players || []).filter((p: any) => p && isBot(p)).length;
     setEmptySeats(emptySeatsCount);
     setBotCount(botPlayersCount);
-  };
-
-  // Handle game state updates
-  const handleGameStateUpdate = (newGameState: GameState) => {
-    setGame(newGameState);
-    updateModalState(newGameState);
   };
 
   // Handle joining game
@@ -81,7 +76,11 @@ export default function TestTablePageModular() {
     navigate('/');
   };
 
-  // Initialize game state
+  useEffect(() => {
+    if (!user?.id) return;
+    setGame(createUiTestMockGame(user.id, user.username ?? "You"));
+  }, [user?.id, user?.username]);
+
   useEffect(() => {
     updateModalState(game);
   }, [game]);
@@ -134,8 +133,6 @@ export default function TestTablePageModular() {
           emptySeats={emptySeats}
           botCount={botCount}
           isSpectator={false}
-          testAnimatingTrick={true}
-          testTrickWinner={1}
         />
       </div>
 

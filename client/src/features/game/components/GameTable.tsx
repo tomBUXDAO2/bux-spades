@@ -1,7 +1,7 @@
 // Modularized GameTable component
 // This is a simplified version that uses the extracted components
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import type { GameState, Card, Player, Bot } from '../../../types/game';
 import type { ChatMessage } from '../../../features/chat/Chat';
@@ -74,6 +74,7 @@ function TrickTableCard({
   animatingTrick,
   isWinningCard,
   isMobile,
+  mobileNsAnchor,
 }: {
   trickMotionKey: string;
   trickEntranceCompletedRef: React.MutableRefObject<Set<string>>;
@@ -85,6 +86,8 @@ function TrickTableCard({
   animatingTrick: boolean;
   isWinningCard: boolean;
   isMobile: boolean;
+  /** Mobile: pixel top + column center X (table coords); N/S sit in two side-by-side card-width columns. */
+  mobileNsAnchor?: { top: number; centerXpx: number };
 }) {
   const skipEntrance = trickEntranceCompletedRef.current.has(trickMotionKey);
   useEffect(() => {
@@ -102,9 +105,26 @@ function TrickTableCard({
           ? { x: 0, y: -22 }
           : { x: 22, y: 0 };
 
+  const useMeasuredNorthSouth =
+    mobileNsAnchor != null && (displayPosition === 0 || displayPosition === 2);
+  const positionClass = useMeasuredNorthSouth
+    ? 'absolute z-20 pointer-events-none'
+    : `${positions[displayPosition]} z-20 pointer-events-none`;
+
   // Position on a non-motion wrapper so Tailwind transforms are not overwritten by Framer Motion's x/y.
   return (
-    <div className={`${positions[displayPosition]} z-20 pointer-events-none`}>
+    <div
+      className={positionClass}
+      style={
+        useMeasuredNorthSouth
+          ? {
+              top: mobileNsAnchor.top,
+              left: mobileNsAnchor.centerXpx,
+              transform: 'translateX(-50%)',
+            }
+          : undefined
+      }
+    >
       <motion.div
         initial={skipEntrance ? false : { opacity: 0, scale: isMobile ? 0.94 : 0.88, ...enterFrom }}
         animate={{
@@ -179,6 +199,18 @@ export default function GameTableModular({
   const pendingPlayedCardRef = useRef<Card | null>(null);
   /** Trick pile keys that already ran entrance motion (avoids replay if a node remounts). */
   const trickEntranceCompletedRef = useRef<Set<string>>(new Set());
+  const tableSurfaceRef = useRef<HTMLDivElement>(null);
+  const northPlayerSlotRef = useRef<HTMLDivElement>(null);
+  const southPlayerSlotRef = useRef<HTMLDivElement>(null);
+  /** Mobile: north/south trick cards sized from measured gap between player slots (see useLayoutEffect). */
+  const [mobileTrickFit, setMobileTrickFit] = useState<{
+    cardW: number;
+    cardH: number;
+    northTop: number;
+    southTop: number;
+    northCenterXpx: number;
+    southCenterXpx: number;
+  } | null>(null);
   
   // Modal states
   const [showHandSummary, setShowHandSummary] = useState(false);
@@ -328,8 +360,14 @@ export default function GameTableModular({
     isMyTurn: gameState.currentPlayer === propUser?.id
   });
   const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
-  const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
+  /** Compact layouts use full-size game tokens; width-based scaling made S10 vs Note inconsistent. */
+  const scaleFactor = isMobile ? 1 : getScaleFactor(windowSize);
+  /** Match `PlayerHandRenderer` strip (`peekHalfH + 14`) so the rail is not taller than the cards (no dead band under the table). */
+  const mobileHandRailHeightPx = useMemo(() => {
+    const { cardUIHeight } = getCardDimensions(true, 1, { mobileHandPeeking: true });
+    return Math.ceil(cardUIHeight / 2) + 14;
+  }, []);
   /** Phones in landscape are often ≥900px wide; still use slide-out chat so the table isn’t squeezed. */
   const useSlideOutGameChat = windowSize.width < 1024;
   const isVerySmallScreen = windowSize.height <= 349;
@@ -348,6 +386,76 @@ export default function GameTableModular({
   const occupiedSeats = playersArray.filter(Boolean).length;
   const computedEmptySeats = Math.max(0, 4 - occupiedSeats);
   const computedBotCount = playersArray.filter((p: any) => p && p.type === 'bot').length;
+
+  const remeasureMobileTrickFit = useCallback(() => {
+    if (!windowSize.isMobile) {
+      setMobileTrickFit(null);
+      return;
+    }
+    const table = tableSurfaceRef.current;
+    const northEl = northPlayerSlotRef.current;
+    const southEl = southPlayerSlotRef.current;
+    if (!table || !northEl || !southEl) return;
+    const tr = table.getBoundingClientRect();
+    const nr = northEl.getBoundingClientRect();
+    const sr = southEl.getBoundingClientRect();
+    const northBottomRel = nr.bottom - tr.top;
+    const southTopRel = sr.top - tr.top;
+    const gap = Math.max(0, southTopRel - northBottomRel);
+    const tw = tr.width;
+    const pad = 4;
+    const colGapPx = 6;
+    const horizontalMaxH = Math.max(40, Math.floor(tw * 0.22 * (77 / 55)));
+    // North/south trick cards use separate columns (different centerX); height = 65% of N–S gap, capped by table width.
+    const cardH = Math.min(
+      horizontalMaxH,
+      Math.max(36, Math.floor(0.65 * gap) - 2)
+    );
+    const cardW = Math.max(36, Math.floor(cardH * (55 / 77)));
+    const cx = tw / 2;
+    const northCenterXpx = cx - colGapPx / 2 - cardW / 2;
+    const southCenterXpx = cx + colGapPx / 2 + cardW / 2;
+    const northTop = northBottomRel + pad;
+    const southTop = southTopRel - pad - cardH;
+    setMobileTrickFit({
+      cardW,
+      cardH,
+      northTop,
+      southTop,
+      northCenterXpx,
+      southCenterXpx,
+    });
+  }, [windowSize.isMobile]);
+
+  useLayoutEffect(() => {
+    if (!isMobile || gameState.status !== 'PLAYING') {
+      setMobileTrickFit(null);
+      return;
+    }
+    const run = () => {
+      remeasureMobileTrickFit();
+    };
+    run();
+    const t = window.setTimeout(run, 0);
+    const t2 = window.setTimeout(run, 80);
+    const table = tableSurfaceRef.current;
+    const ro = new ResizeObserver(run);
+    if (table) ro.observe(table);
+    window.addEventListener('resize', run);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(t2);
+      ro.disconnect();
+      window.removeEventListener('resize', run);
+    };
+  }, [
+    isMobile,
+    gameState.status,
+    remeasureMobileTrickFit,
+    windowSize.width,
+    windowSize.height,
+    occupiedSeats,
+  ]);
   
   // Event handlers
   const handleNewHandStarted = () => {
@@ -1333,17 +1441,28 @@ export default function GameTableModular({
     const handCardDimensions = getCardDimensions(isMobile, scaleFactor);
     let tableCardWidth, tableCardHeight;
     
-    if (isMobile) {
-      // On mobile, use 80% of hand card size
-      tableCardWidth = Math.floor(handCardDimensions.cardUIWidth * 0.8);
-      tableCardHeight = Math.floor(handCardDimensions.cardUIHeight * 0.8);
+    if (isMobile && mobileTrickFit) {
+      tableCardWidth = mobileTrickFit.cardW;
+      tableCardHeight = mobileTrickFit.cardH;
+    } else if (isMobile) {
+      const landscape = windowSize.width > windowSize.height;
+      const mult = landscape ? 1.22 : 1.08;
+      tableCardWidth = Math.floor(handCardDimensions.cardUIWidth * mult);
+      tableCardHeight = Math.floor(handCardDimensions.cardUIHeight * mult);
     } else {
-      // On desktop, use same size as hand cards
       tableCardWidth = handCardDimensions.cardUIWidth;
       tableCardHeight = handCardDimensions.cardUIHeight;
     }
-    
-    const positions = getTrickCardPositions();
+
+    const positions: Record<number, string> =
+      isMobile && mobileTrickFit
+        ? {
+            0: '',
+            1: 'absolute left-[22%] top-1/2 -translate-y-1/2',
+            2: '',
+            3: 'absolute right-[22%] top-1/2 -translate-y-1/2',
+          }
+        : getTrickCardPositions(isMobile, windowSize.height);
     const { seatOrderedPlayers, mySeatIndex, referenceSeatIndex, orderedPlayers } = getOrderedPlayersForTrick(gameState, propUser?.id || '');
     
     // INSTANT RENDERING: Add pending played card for immediate feedback
@@ -1406,6 +1525,15 @@ export default function GameTableModular({
           animatingTrick={animatingTrick}
           isWinningCard={isWinningCard}
           isMobile={isMobile}
+          mobileNsAnchor={
+            mobileTrickFit
+              ? displayPosition === 2
+                ? { top: mobileTrickFit.northTop, centerXpx: mobileTrickFit.northCenterXpx }
+                : displayPosition === 0
+                  ? { top: mobileTrickFit.southTop, centerXpx: mobileTrickFit.southCenterXpx }
+                  : undefined
+              : undefined
+          }
         />
       );
     }) : [];
@@ -1553,16 +1681,21 @@ export default function GameTableModular({
       <LandscapePrompt />
       <div className="fixed inset-0 bg-gray-900">
         {/* Main content area - full height */}
-        <div className="flex h-full">
+        <div className="flex h-full min-h-0">
           {/* Game table area - add padding on top and bottom */}
-          <div className={`${useSlideOutGameChat ? 'w-full min-w-0' : 'w-[70%]'} p-2 flex flex-col h-full`}>
-            {/* Game table with more space top and bottom */}
-            <div className="relative mb-2" style={{
+          <div
+            className={`${useSlideOutGameChat ? 'w-full min-w-0' : 'w-[70%]'} flex h-full min-h-0 flex-col px-2 pt-2 pb-0`}
+          >
+            {/* Table grows; hand rail is fixed % / px at bottom (no overlapping calc(100%-X) + separate hand height). */}
+            <div
+              ref={tableSurfaceRef}
+              className={`relative min-h-0 flex-1 ${isMobile ? 'mb-0' : 'mb-2'}`}
+              style={{
               background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
               borderRadius: `${Math.floor(64 * scaleFactor)}px`,
               border: `${Math.floor(2 * scaleFactor)}px solid #855f31`,
-              height: isMobile ? 'calc(100% - 80px)' : (window.innerWidth >= 900 ? 'calc(100% - 100px)' : 'calc(100% - 200px)')
-            }}>
+            }}
+            >
               {/* Trick cards overlay - covers the whole table area */}
               <div className="absolute inset-0 pointer-events-none z-20">
                 {renderTrickCards()}
@@ -1591,6 +1724,8 @@ export default function GameTableModular({
         
               {/* Players around the table */}
               <GameTablePlayers
+                northPlayerSlotRef={northPlayerSlotRef}
+                southPlayerSlotRef={southPlayerSlotRef}
                 gameState={gameState}
                 user={propUser}
                 orderedPlayers={orderedPlayers}
@@ -1651,10 +1786,16 @@ export default function GameTableModular({
 
             {/* Cards area - show for actual players or face-down cards for spectators */}
             {(myPlayerIndex !== -1 || (myPlayerIndex === -1 && gameState.status !== "WAITING")) && (
-              <div className="relative mb-0 mt-auto rounded-lg border border-white/10 bg-slate-900/40 backdrop-blur-sm" 
-                   style={{ 
-                        height: `${Math.floor((window.innerWidth < 900 ? 77 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168)) * scaleFactor + 20)}px`
-                   }}>
+              <div
+                className={`relative mb-0 mt-0 shrink-0 rounded-lg border border-white/10 bg-slate-900/40 backdrop-blur-sm ${isMobile ? 'rounded-t-none border-t-0' : ''}`}
+                style={
+                  isMobile
+                    ? { height: `${mobileHandRailHeightPx}px` }
+                    : {
+                        height: `${Math.floor((window.innerWidth >= 900 && window.innerWidth <= 1300 ? 140 : 168) * scaleFactor + 20)}px`,
+                      }
+                }
+              >
                 {myPlayerIndex !== -1 ? (
                   <PlayerHandRenderer
                     gameState={gameState}

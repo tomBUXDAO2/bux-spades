@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isCompactGameLayout } from './windowLayout';
 
 interface WindowSize {
   width: number;
@@ -11,17 +12,19 @@ export const useWindowSize = (): WindowSize => {
   const [windowSize, setWindowSize] = useState<WindowSize>({
     width: window.innerWidth,
     height: window.innerHeight,
-    isMobile: window.innerWidth < 900,
+    isMobile: isCompactGameLayout(window.innerWidth, window.innerHeight),
     isLandscape: window.innerWidth > window.innerHeight
   });
 
   useEffect(() => {
     const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
       setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-        isMobile: window.innerWidth < 900,
-        isLandscape: window.innerWidth > window.innerHeight
+        width: w,
+        height: h,
+        isMobile: isCompactGameLayout(w, h),
+        isLandscape: w > h
       });
     };
 

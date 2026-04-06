@@ -3,9 +3,21 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { isCompactGameLayout } from '../../../hooks/windowLayout';
 import type { Card, GameState, Player, Bot } from "../../../types/game";
-import { getCardDimensions, getCardOverlapOffset, getCardVisibility, getSpectatorHandDimensions } from '../../../features/game/utils/cardUtils';
+import {
+  getCardDimensions,
+  getCardOverlapOffset,
+  getCardVisibility,
+  getSpectatorHandDimensions,
+  type CardDimensionOpts,
+} from '../../../features/game/utils/cardUtils';
 import { sortCards, getPlayableCards, hasSpadeBeenPlayed } from '../../../features/game/utils/gameUtils';
+
+/** Soft left-edge darkening between stacked hand cards (mobile + desktop). */
+const HAND_OVERLAP_FADE_SHADOW =
+  'inset 36px 0 44px -18px rgba(0, 0, 0, 0.16), inset 20px 0 30px -10px rgba(0, 0, 0, 0.12), inset 8px 0 18px -4px rgba(0, 0, 0, 0.08)';
+const HAND_STRIP_AMBIENT_SHADOW = 'drop-shadow(0 10px 28px rgba(0, 0, 0, 0.45))';
 
 interface CardRendererProps {
   gameState: GameState;
@@ -37,13 +49,14 @@ function shouldUseBitmapPlayingCards(): boolean {
 }
 
 // Optimized card image component - no loading states during gameplay
-export const CardImage = ({ card, width, height, className, alt, faceDown = false }: {
+export const CardImage = ({ card, width, height, className, alt, faceDown = false, style }: {
   card: Card;
   width: number;
   height: number;
   className?: string;
   alt?: string;
   faceDown?: boolean;
+  style?: React.CSSProperties;
 }) => {
   const useBitmap = shouldUseBitmapPlayingCards();
   const imgW = Math.max(1, Math.round(width) - 2);
@@ -53,7 +66,7 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
     return (
       <div
         className={`${className} bg-blue-800 border-4 border-white rounded-lg relative overflow-hidden`}
-        style={{ width: Math.round(width), height: Math.round(height) }}
+        style={{ width: Math.round(width), height: Math.round(height), ...style }}
       >
         <div className="absolute inset-0 opacity-20">
           <div className="absolute inset-0" style={{
@@ -79,6 +92,7 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
           margin: 0,
           borderRadius: '8px',
           display: 'block',
+          ...style,
         }}
       />
     );
@@ -112,25 +126,24 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
   const isTableCard = width <= 70; // Table cards are typically 60-70px wide, hand cards are larger
   const isVerySmallTableCard = height <= 65; // Very small table cards need extra small text
   
-  // Check if we're on mobile (small screen)
-  const isMobile = window.innerWidth < 900;
+  const isMobileLayout = isCompactGameLayout(window.innerWidth, window.innerHeight);
   
   // Adjust sizing based on card type and screen size
   const cornerRankSize = isTableCard 
-    ? (isVerySmallTableCard ? 'text-xs' : (isMobile ? 'text-xs' : 'text-sm'))
-    : (isMobile ? 'text-xl' : 'text-base');
+    ? (isVerySmallTableCard ? 'text-xs' : (isMobileLayout ? 'text-xs' : 'text-sm'))
+    : (isMobileLayout ? 'text-xl' : 'text-base');
   const cornerSuitSize = isTableCard 
-    ? (isVerySmallTableCard ? 'text-xs' : (isMobile ? 'text-xs' : 'text-xs'))
-    : (isMobile ? 'text-lg' : 'text-xs');
+    ? (isVerySmallTableCard ? 'text-xs' : (isMobileLayout ? 'text-xs' : 'text-xs'))
+    : (isMobileLayout ? 'text-lg' : 'text-xs');
   const centerSuitSize = isTableCard 
-    ? (isVerySmallTableCard ? 'text-base' : (isMobile ? 'text-lg' : 'text-2xl'))
-    : (isMobile ? 'text-3xl' : 'text-3xl');
+    ? (isVerySmallTableCard ? 'text-base' : (isMobileLayout ? 'text-lg' : 'text-2xl'))
+    : (isMobileLayout ? 'text-3xl' : 'text-3xl');
   const cornerPosition = isTableCard 
-    ? (isVerySmallTableCard ? 'top-0.5 left-0.5' : (isMobile ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5'))
-    : (isMobile ? 'top-1 left-1' : 'top-1 left-1');
+    ? (isVerySmallTableCard ? 'top-0.5 left-0.5' : (isMobileLayout ? 'top-0.5 left-0.5' : 'top-0.5 left-0.5'))
+    : (isMobileLayout ? 'top-1 left-1' : 'top-1 left-1');
   const cornerWidth = isTableCard 
-    ? (isVerySmallTableCard ? 'w-2' : (isMobile ? 'w-3' : 'w-5'))
-    : (isMobile ? 'w-6' : 'w-6');
+    ? (isVerySmallTableCard ? 'w-2' : (isMobileLayout ? 'w-3' : 'w-5'))
+    : (isMobileLayout ? 'w-6' : 'w-6');
 
   return (
     <div
@@ -139,6 +152,7 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
         width: Math.round(width),
         height: Math.round(height),
         WebkitFontSmoothing: 'antialiased',
+        ...style,
       }}
       title={alt || `${card.rank}${card.suit}`}
     >
@@ -192,7 +206,8 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
   isPlayingCard = false
 }) => {
   if (!myHand || myHand.length === 0) return null;
-  
+
+  const handOpts: CardDimensionOpts | undefined = isMobile ? { mobileHandPeeking: true } : undefined;
   const sortedHand = sortCards(myHand);
   const isLeadingTrick = currentTrick && Array.isArray(currentTrick) && currentTrick.length === 0;
   const playableCards = gameState.status === "PLAYING" && myHand ? getPlayableCards(gameState, myHand, isLeadingTrick, trickCompleted, currentTrick) : [];
@@ -277,24 +292,40 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
     effectivePlayableCards = playableCards;
   }
   
-  const cardDimensions = getCardDimensions(isMobile, scaleFactor);
-  const cardOverlapOffset = getCardOverlapOffset(scaleFactor, isMobile);
+  const cardDimensions = getCardDimensions(isMobile, scaleFactor, handOpts);
+  const cardOverlapOffset = getCardOverlapOffset(scaleFactor, isMobile, sortedHand.length, handOpts);
   const { showAllCards, visibleCount } = getCardVisibility(sortedHand, gameState.status, dealingComplete, dealtCardCount);
+  const peekHalfH = Math.ceil(cardDimensions.cardUIHeight / 2);
+  const handStripHeight = isMobile
+    ? peekHalfH + 14
+    : Math.floor(window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188);
 
   return (
     <div
-      className="absolute inset-x-0 flex justify-center"
+      className={`absolute flex justify-center ${isMobile ? '' : 'inset-x-0'}`}
       style={{
-        top: '50%',
-        transform: 'translateY(-50%)',
-        height: `${Math.floor((isMobile ? 111 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188)))}px`,
+        ...(isMobile
+          ? {
+              bottom: 0,
+              top: 'auto',
+              left: '50%',
+              width: '100vw',
+              maxWidth: '100dvw',
+              transform: 'translateX(-50%)',
+            }
+          : { top: '50%', left: 0, right: 0, transform: 'translateY(-50%)' }),
+        height: `${handStripHeight}px`,
         paddingTop: '0px',
+        paddingBottom: '0px',
         overflow: 'visible',
         pointerEvents: 'none',
         zIndex: 50,
+        filter: HAND_STRIP_AMBIENT_SHADOW,
       }}
     >
-      <div className="flex items-center justify-center h-full w-full">
+      <div
+        className={`flex h-full w-full ${isMobile ? 'items-end justify-center' : 'items-center justify-center'}`}
+      >
         <div className="flex items-center">
         {(sortedHand && Array.isArray(sortedHand) ? sortedHand : []).map((card: Card, index: number) => {
           // Respect rule engine: do not block cards that are deemed playable
@@ -319,7 +350,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
               className={`relative ${playableLift ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'pointer-events-none' : ''}`}
               style={{
                 width: `${cardDimensions.cardUIWidth}px`,
-                height: `${cardDimensions.cardUIHeight}px`,
+                height: `${isMobile ? peekHalfH : cardDimensions.cardUIHeight}px`,
                 marginLeft: index > 0 ? `${cardOverlapOffset}px` : '0',
                 zIndex: stackZ,
                 pointerEvents: 'auto',
@@ -359,13 +390,15 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
               }}
             >
               <div
-                className="relative m-0 rounded-lg p-0"
+                className={`relative m-0 rounded-lg p-0 ${isMobile ? 'overflow-hidden' : ''}`}
                 style={{
                   padding: 0,
                   margin: 0,
                   lineHeight: 0,
                   boxSizing: 'border-box',
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
+                  boxShadow: index > 0 ? HAND_OVERLAP_FADE_SHADOW : 'none',
+                  width: `${cardDimensions.cardUIWidth}px`,
+                  height: isMobile ? `${peekHalfH}px` : undefined,
                 }}
               >
                 <CardImage
@@ -373,6 +406,11 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   width={cardDimensions.cardUIWidth}
                   height={cardDimensions.cardUIHeight}
                   className={isPlayable ? 'hover:opacity-95' : ''}
+                  style={
+                    index > 0
+                      ? { filter: 'drop-shadow(-12px 0 20px rgba(0, 0, 0, 0.22))' }
+                      : undefined
+                  }
                   alt={`${card.rank}${card.suit}`}
                   faceDown={
                     // CRITICAL: During PLAYING, hand cards should NEVER be face down
@@ -409,43 +447,72 @@ export const SpectatorHandRenderer: React.FC<{
   const bottomPlayerHand = (gameState as any)?.hands?.[bottomPlayerIndex] || [];
   
   if (!bottomPlayerHand || bottomPlayerHand.length === 0) return null;
-  
-  const spectatorHandDimensions = getSpectatorHandDimensions(isMobile, scaleFactor);
+
+  const handOpts: CardDimensionOpts | undefined = isMobile ? { mobileHandPeeking: true } : undefined;
+  const spectatorHandDimensions = getSpectatorHandDimensions(
+    isMobile,
+    scaleFactor,
+    bottomPlayerHand.length,
+    handOpts
+  );
   const { cardUIWidth, cardUIHeight, overlapOffset } = spectatorHandDimensions;
+  const peekHalfH = Math.ceil(cardUIHeight / 2);
+  const handStripHeight = isMobile
+    ? peekHalfH + 14
+    : Math.floor(window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188);
 
   return (
     <div
-      className="absolute inset-x-0 flex justify-center"
+      className={`absolute flex justify-center ${isMobile ? '' : 'inset-x-0'}`}
       style={{
-        top: '50%',
-        transform: 'translateY(-50%)',
-        height: `${Math.floor((isMobile ? 111 : (window.innerWidth >= 900 && window.innerWidth <= 1300 ? 160 : 188)))}px`,
+        ...(isMobile
+          ? {
+              bottom: 0,
+              top: 'auto',
+              left: '50%',
+              width: '100vw',
+              maxWidth: '100dvw',
+              transform: 'translateX(-50%)',
+            }
+          : { top: '50%', left: 0, right: 0, transform: 'translateY(-50%)' }),
+        height: `${handStripHeight}px`,
         paddingTop: '0px',
+        paddingBottom: '0px',
         overflow: 'visible',
         pointerEvents: 'none',
         zIndex: 50,
+        filter: HAND_STRIP_AMBIENT_SHADOW,
       }}
     >
-      <div className="flex items-center justify-center h-full w-full">
+      <div
+        className={`flex h-full w-full ${isMobile ? 'items-end justify-center' : 'items-center justify-center'}`}
+      >
         <div className="flex items-center">
         {Array.isArray(bottomPlayerHand) && bottomPlayerHand.map((card: Card, index: number) => (
           <div
             key={`${card.suit}${card.rank}`}
-            className="relative rounded-lg"
+            className={`relative m-0 rounded-lg p-0 ${isMobile ? 'overflow-hidden' : ''}`}
             style={{
               width: `${cardUIWidth}px`,
-              height: `${cardUIHeight}px`,
+              height: `${isMobile ? peekHalfH : cardUIHeight}px`,
               marginLeft: index > 0 ? `${overlapOffset}px` : '0',
               zIndex: 50 + index,
               pointerEvents: 'auto',
-              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
+              lineHeight: 0,
+              boxSizing: 'border-box',
+              boxShadow: index > 0 ? HAND_OVERLAP_FADE_SHADOW : 'none',
             }}
           >
             <CardImage
               card={card}
               width={cardUIWidth}
               height={cardUIHeight}
-              className="shadow-xl"
+              className=""
+              style={
+                index > 0
+                  ? { filter: 'drop-shadow(-12px 0 20px rgba(0, 0, 0, 0.22))' }
+                  : undefined
+              }
               alt="Face down card"
               faceDown={true}
             />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type RefObject } from 'react';
 import { FaRobot, FaMinus } from 'react-icons/fa';
 import type { GameState, Player, Bot } from "../../../types/game";
 import PlayerProfileDropdown from './PlayerProfileDropdown';
@@ -35,6 +35,9 @@ interface GameTablePlayersProps {
   isPlayer: (player: any) => player is Player;
   isBot: (player: any) => player is Bot;
   onOpenAdminPanel?: () => void;
+  /** Refs on screen-north (position 2) / south (position 0) wrappers for trick-card layout measurement */
+  northPlayerSlotRef?: RefObject<HTMLDivElement | null>;
+  southPlayerSlotRef?: RefObject<HTMLDivElement | null>;
 }
 
 export default function GameTablePlayers({
@@ -64,7 +67,9 @@ export default function GameTablePlayers({
   isPlayer,
   isBot,
   pendingBid,
-  onOpenAdminPanel
+  onOpenAdminPanel,
+  northPlayerSlotRef,
+  southPlayerSlotRef,
 }: GameTablePlayersProps) {
   
   const renderPlayerPosition = (position: number) => {
@@ -383,8 +388,11 @@ export default function GameTablePlayers({
     // Debug avatar loading
     if (isHuman && player.id === user?.id) {
     }
+    const seatRef =
+      position === 2 ? northPlayerSlotRef : position === 0 ? southPlayerSlotRef : undefined;
+
     return (
-      <div className={`absolute ${getPositionClasses(position)} z-30`}>
+      <div ref={seatRef} className={`absolute ${getPositionClasses(position)} z-30`}>
         <div className={`
           ${playerGradient} rounded-xl
           ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}

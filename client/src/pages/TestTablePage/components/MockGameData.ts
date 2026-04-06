@@ -1,84 +1,80 @@
-import type { GameState, Card, Rank, Suit } from "../../../types/game";
+import type { GameState, Card, Player, Bot, Suit, Rank } from "../../../types/game";
 
-export const createMockGame = (): GameState => {
-  // Create the hands array first with realistic mixed card distributions
-  const hands = [
-    [
-      { rank: 'A', suit: '♠' },
-      { rank: 'K', suit: '♠' },
-      { rank: 'Q', suit: '♠' },
-      { rank: 'J', suit: '♠' },
-      { rank: '10', suit: '♠' },
-      { rank: 'A', suit: '♥' },
-      { rank: 'K', suit: '♥' },
-      { rank: 'Q', suit: '♥' },
-      { rank: 'A', suit: '♦' },
-      { rank: 'K', suit: '♦' },
-      { rank: 'A', suit: '♣' },
-      { rank: 'K', suit: '♣' },
-      { rank: 'Q', suit: '♣' }
-    ],
-    [
-      { rank: '9', suit: '♠' },
-      { rank: '8', suit: '♠' },
-      { rank: '7', suit: '♠' },
-      { rank: '6', suit: '♠' },
-      { rank: '5', suit: '♠' },
-      { rank: 'J', suit: '♥' },
-      { rank: '10', suit: '♥' },
-      { rank: '9', suit: '♥' },
-      { rank: '8', suit: '♥' },
-      { rank: 'Q', suit: '♦' },
-      { rank: 'J', suit: '♦' },
-      { rank: '10', suit: '♦' },
-      { rank: 'J', suit: '♣' }
-    ],
-    [
-      { rank: '4', suit: '♠' },
-      { rank: '3', suit: '♠' },
-      { rank: '2', suit: '♠' },
-      { rank: '7', suit: '♥' },
-      { rank: '6', suit: '♥' },
-      { rank: '5', suit: '♥' },
-      { rank: '4', suit: '♥' },
-      { rank: '3', suit: '♥' },
-      { rank: '2', suit: '♥' },
-      { rank: '9', suit: '♦' },
-      { rank: '8', suit: '♦' },
-      { rank: '7', suit: '♦' },
-      { rank: '6', suit: '♦' }
-    ],
-    [
-      { rank: '5', suit: '♦' },
-      { rank: '4', suit: '♦' },
-      { rank: '3', suit: '♦' },
-      { rank: '2', suit: '♦' },
-      { rank: '9', suit: '♣' },
-      { rank: '8', suit: '♣' },
-      { rank: '7', suit: '♣' },
-      { rank: '6', suit: '♣' },
-      { rank: '5', suit: '♣' },
-      { rank: '4', suit: '♣' },
-      { rank: '3', suit: '♣' },
-      { rank: '2', suit: '♣' },
-      { rank: '10', suit: '♣' }
-    ]
+const SUITS: Suit[] = ["SPADES", "HEARTS", "DIAMONDS", "CLUBS"];
+const RANKS: Rank[] = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+
+function buildFullDeck(): Card[] {
+  const deck: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({ suit, rank });
+    }
+  }
+  return deck;
+}
+
+export const uiTestBotId = (seat: 1 | 2 | 3) => `ui-test-bot-${seat}`;
+
+/**
+ * Static table for /test-table: logged-in user at seat 0, three bots, full 13-card hands,
+ * a full trick (four cards, seats 0–3) on the table for layout tuning. No server or socket.
+ */
+export function createUiTestMockGame(humanUserId: string, humanDisplayName = "You"): GameState {
+  const deck = buildFullDeck();
+  const hands: Card[][] = [0, 1, 2, 3].map((i) => deck.slice(i * 13, (i + 1) * 13));
+
+  const currentTrickFour: Card[] = [
+    { suit: "HEARTS", rank: "7", seatIndex: 0 },
+    { suit: "HEARTS", rank: "J", seatIndex: 1 },
+    { suit: "HEARTS", rank: "Q", seatIndex: 2 },
+    { suit: "HEARTS", rank: "3", seatIndex: 3 },
   ];
 
+  const human: Player = {
+    id: humanUserId,
+    userId: humanUserId,
+    name: humanDisplayName,
+    username: humanDisplayName,
+    avatarUrl: "/default-pfp.jpg",
+    seatIndex: 0,
+    position: 0,
+    team: 0,
+    isDealer: false,
+    hand: hands[0],
+    bid: 3,
+    tricks: 0,
+    type: "human",
+  };
+
+  const bots: Bot[] = ([1, 2, 3] as const).map((seat) => ({
+    id: uiTestBotId(seat),
+    username: `Bot ${seat}`,
+    avatar: "/default-pfp.jpg",
+    type: "bot" as const,
+    position: seat,
+    seatIndex: seat,
+    hand: hands[seat],
+    bid: 3,
+    tricks: 0,
+    team: seat === 1 || seat === 3 ? 1 : 0,
+    isDealer: seat === 3,
+  }));
+
   return {
-    id: 'test-game-1',
-    status: 'PLAYING',
-    gameMode: 'PARTNERS',
-    currentPlayer: 'user-1',
-    currentTrick: [],
+    id: "ui-test-table",
+    status: "PLAYING",
+    gameMode: "PARTNERS",
+    currentPlayer: uiTestBotId(2),
+    currentTrick: currentTrickFour,
+    currentTrickCards: currentTrickFour,
     completedTricks: [],
     rules: {
-      gameType: 'REGULAR',
+      gameType: "REGULAR",
       allowNil: true,
       allowBlindNil: true,
       numHands: 8,
       coinAmount: 100,
-      bidType: 'REGULAR'
+      bidType: "REGULAR",
     },
     round: 1,
     currentRound: 1,
@@ -89,72 +85,21 @@ export const createMockGame = (): GameState => {
     team1Bags: 0,
     team2Bags: 0,
     rated: false,
-    creatorId: 'user-1',
-    hands: hands,
-    players: [
-      {
-        id: 'user-1',
-        name: 'Test Player 1',
-        username: 'Test Player 1',
-        avatarUrl: '/default-pfp.jpg',
-        seatIndex: 0,
-        position: 0,
-        team: 0,
-        isDealer: false,
-        hand: hands[0] as Card[],
-        bid: 3,
-        tricks: 0,
-      },
-      {
-        id: 'user-2',
-        name: 'Test Player 2',
-        username: 'Test Player 2',
-        avatarUrl: '/default-pfp.jpg',
-        seatIndex: 1,
-        position: 1,
-        team: 1,
-        isDealer: false,
-        hand: hands[1] as Card[],
-        bid: 2,
-        tricks: 0,
-      },
-      {
-        id: 'user-3',
-        name: 'Test Player 3',
-        username: 'Test Player 3',
-        avatarUrl: '/default-pfp.jpg',
-        seatIndex: 2,
-        position: 2,
-        team: 0,
-        isDealer: false,
-        hand: hands[2] as Card[],
-        bid: 4,
-        tricks: 0,
-      },
-      {
-        id: 'user-4',
-        name: 'Test Player 4',
-        username: 'Test Player 4',
-        avatarUrl: '/default-pfp.jpg',
-        seatIndex: 3,
-        position: 3,
-        team: 1,
-        isDealer: false,
-        hand: hands[3] as Card[],
-        bid: 4,
-        tricks: 0,
-      }
-    ],
+    creatorId: humanUserId,
+    hands,
+    players: [human, bots[0], bots[1], bots[2]],
     bidding: {
       currentBidderIndex: 0,
-      bids: [3, 2, 4, 4],
-      totalBids: 13
+      bids: [3, 3, 3, 4],
+      totalBids: 13,
     },
     play: {
-      currentPlayerIndex: 0,
-      currentTrick: [],
+      currentPlayerIndex: 2,
+      currentTrick: currentTrickFour,
       tricks: [],
-      leadSuit: null
+      leadSuit: "HEARTS",
+      spadesBroken: false,
+      completedTricks: [],
     },
   };
-};
+}
