@@ -328,6 +328,8 @@ export default function GameTableModular({
   const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
   const scaleFactor = getScaleFactor(windowSize);
   const isMobile = windowSize.isMobile;
+  /** Phones in landscape are often ≥900px wide; still use slide-out chat so the table isn’t squeezed. */
+  const useSlideOutGameChat = windowSize.width < 1024;
   const isVerySmallScreen = windowSize.height <= 349;
   const isLeague = gameState.isLeague || false;
   const isHost = isLeague && gameState.players?.[0]?.id === propUser?.id;
@@ -1506,13 +1508,13 @@ export default function GameTableModular({
   }, [gameState.id]);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!useSlideOutGameChat) {
       setMobileGameChatOpen(false);
     }
-  }, [isMobile]);
+  }, [useSlideOutGameChat]);
 
   useEffect(() => {
-    if (!isMobile || mobileGameChatOpen || !propUser?.id || !gameState?.id || !socket) return;
+    if (!useSlideOutGameChat || mobileGameChatOpen || !propUser?.id || !gameState?.id || !socket) return;
 
     const uid = propUser.id;
     const gid = gameState.id;
@@ -1539,7 +1541,7 @@ export default function GameTableModular({
       window.removeEventListener('gameMessage', onGameMessage as EventListener);
       socket.off('lobby_chat_message', onLobbyMessage);
     };
-  }, [isMobile, mobileGameChatOpen, propUser?.id, gameState?.id, socket]);
+  }, [useSlideOutGameChat, mobileGameChatOpen, propUser?.id, gameState?.id, socket]);
   
   const chatReady = Boolean(gameState?.id);
   
@@ -1550,7 +1552,7 @@ export default function GameTableModular({
         {/* Main content area - full height */}
         <div className="flex h-full">
           {/* Game table area - add padding on top and bottom */}
-          <div className={`${isMobile ? 'w-full min-w-0' : 'w-[70%]'} p-2 flex flex-col h-full`}>
+          <div className={`${useSlideOutGameChat ? 'w-full min-w-0' : 'w-[70%]'} p-2 flex flex-col h-full`}>
             {/* Game table with more space top and bottom */}
             <div className="relative mb-2" style={{
               background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
@@ -1679,7 +1681,7 @@ export default function GameTableModular({
           </div>
 
           {/* Chat — desktop: fixed column; mobile: slide-out (see below) */}
-          {!isMobile && (
+          {!useSlideOutGameChat && (
             <div className="w-[30%] h-full overflow-visible">
               {chatReady ? (
                 <Chat 
@@ -1703,8 +1705,8 @@ export default function GameTableModular({
           )}
         </div>
 
-        {/* Mobile: floating chat tab + slide-over panel (full-width table when closed) */}
-        {isMobile && chatReady && (
+        {/* Narrow viewports: floating chat tab + slide-over (full-width table; landscape phones included) */}
+        {useSlideOutGameChat && chatReady && (
           <>
             {!mobileGameChatOpen && (
               <button
@@ -1767,7 +1769,7 @@ export default function GameTableModular({
             </div>
           </>
         )}
-        {isMobile && !chatReady && (
+        {useSlideOutGameChat && !chatReady && (
           <div className="pointer-events-none fixed bottom-2 right-2 z-[52] rounded-lg bg-slate-800/90 px-2 py-1 text-xs text-slate-400">
             Connecting chat…
           </div>
