@@ -36,8 +36,8 @@ interface GameTablePlayersProps {
   isBot: (player: any) => player is Bot;
   onOpenAdminPanel?: () => void;
   /** Refs on screen-north (position 2) / south (position 0) wrappers for trick-card layout measurement */
-  northPlayerSlotRef?: RefObject<HTMLDivElement | null>;
-  southPlayerSlotRef?: RefObject<HTMLDivElement | null>;
+  northPlayerSlotRef?: RefObject<HTMLDivElement>;
+  southPlayerSlotRef?: RefObject<HTMLDivElement>;
 }
 
 export default function GameTablePlayers({

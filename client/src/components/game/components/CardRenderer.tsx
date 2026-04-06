@@ -168,7 +168,7 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
       </div>
 
       {/* Bottom right corner (rotated) */}
-      <div className={`absolute ${isTableCard ? (isMobile ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobile ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
+      <div className={`absolute ${isTableCard ? (isMobileLayout ? 'bottom-0.5 right-0.5' : 'bottom-0.5 right-0.5') : (isMobileLayout ? 'bottom-1 right-1' : 'bottom-1 right-1')} font-bold ${cornerWidth} text-center transform rotate-180`}>
         <div className={`${suitColor} leading-tight ${cornerRankSize}`} style={{ fontSize: isVerySmallTableCard ? '0.6rem' : '0.8rem' }}>{card.rank}</div>
         <div className={`${suitColor} leading-tight ${cornerSuitSize}`} style={{ fontSize: isVerySmallTableCard ? '0.4rem' : '0.6rem' }}>{suitSymbol}</div>
       </div>
