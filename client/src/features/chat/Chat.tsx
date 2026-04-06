@@ -33,6 +33,9 @@ interface ChatProps {
   gameMessages?: Record<string, ChatMessage>;
   isSpectator?: boolean;
   onPlayerClick?: (player: Player) => void;
+  /** Mobile slide-out: hide left border / extra chrome */
+  embeddedInDrawer?: boolean;
+  onCloseDrawer?: () => void;
 }
 
 export default function Chat({
@@ -48,7 +51,9 @@ export default function Chat({
   lobbyMessages = [],
   gameMessages = {},
   isSpectator = false,
-  onPlayerClick
+  onPlayerClick,
+  embeddedInDrawer = false,
+  onCloseDrawer
 }: ChatProps) {
   
   // Use the chat hooks for all state management and event handling
@@ -100,7 +105,11 @@ export default function Chat({
 
   return (
     <>
-      <div className="flex h-full flex-col border-l border-white/10 bg-slate-950/45 shadow-lobby-sm backdrop-blur-xl">
+      <div
+        className={`flex h-full min-h-0 flex-col bg-slate-950/45 shadow-lobby-sm backdrop-blur-xl ${
+          embeddedInDrawer ? '' : 'border-l border-white/10'
+        }`}
+      >
         {/* Chat Header */}
         <ChatHeader
           activeTab={activeTab}
@@ -109,6 +118,7 @@ export default function Chat({
           onToggleChatType={onToggleChatType}
           chatType={chatType}
           isMobile={isMobile}
+          onCloseDrawer={onCloseDrawer}
         />
 
         {/* Chat Content */}

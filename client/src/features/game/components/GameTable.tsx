@@ -260,6 +260,9 @@ export default function GameTableModular({
   const [chatType, setChatType] = useState<'game' | 'lobby'>('game');
   const [lobbyMessages, setLobbyMessages] = useState<ChatMessage[]>([]);
   const [recentChatMessages, setRecentChatMessages] = useState<Record<string, ChatMessage>>({});
+  /** Mobile: chat as slide-out so the table can use full width */
+  const [mobileGameChatOpen, setMobileGameChatOpen] = useState(false);
+  const [mobileGameChatUnread, setMobileGameChatUnread] = useState(0);
   
   // Emoji states
   const [emojiReactions, setEmojiReactions] = useState<Record<string, { emoji: string; timestamp: number }>>({});
@@ -1497,6 +1500,46 @@ export default function GameTableModular({
       socket.off('player_ready_update', handleLeagueReadyUpdate);
     };
   }, [socket, gameState.id]);
+
+  useEffect(() => {
+    setMobileGameChatUnread(0);
+  }, [gameState.id]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileGameChatOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || mobileGameChatOpen || !propUser?.id || !gameState?.id || !socket) return;
+
+    const uid = propUser.id;
+    const gid = gameState.id;
+
+    const onGameMessage = (event: Event) => {
+      const e = event as CustomEvent<{ gameId?: string; message?: { userId?: string } }>;
+      const detail = e.detail;
+      if (!detail?.gameId || detail.gameId !== gid || !detail.message) return;
+      const mid = detail.message.userId;
+      if (mid === 'system' || !mid || mid === uid) return;
+      setMobileGameChatUnread((n) => n + 1);
+    };
+
+    const onLobbyMessage = (data: { userId?: string }) => {
+      if (data?.userId && data.userId !== 'system' && data.userId !== uid) {
+        setMobileGameChatUnread((n) => n + 1);
+      }
+    };
+
+    window.addEventListener('gameMessage', onGameMessage as EventListener);
+    socket.on('lobby_chat_message', onLobbyMessage);
+
+    return () => {
+      window.removeEventListener('gameMessage', onGameMessage as EventListener);
+      socket.off('lobby_chat_message', onLobbyMessage);
+    };
+  }, [isMobile, mobileGameChatOpen, propUser?.id, gameState?.id, socket]);
   
   const chatReady = Boolean(gameState?.id);
   
@@ -1507,7 +1550,7 @@ export default function GameTableModular({
         {/* Main content area - full height */}
         <div className="flex h-full">
           {/* Game table area - add padding on top and bottom */}
-          <div className="w-[70%] p-2 flex flex-col h-full">
+          <div className={`${isMobile ? 'w-full min-w-0' : 'w-[70%]'} p-2 flex flex-col h-full`}>
             {/* Game table with more space top and bottom */}
             <div className="relative mb-2" style={{
               background: 'radial-gradient(circle at center, #316785 0%, #1a3346 100%)',
@@ -1635,10 +1678,77 @@ export default function GameTableModular({
             )}
           </div>
 
-          {/* Chat area - 30%, full height */}
-          <div className="w-[30%] h-full overflow-visible">
-            {chatReady ? (
-              <Chat 
+          {/* Chat — desktop: fixed column; mobile: slide-out (see below) */}
+          {!isMobile && (
+            <div className="w-[30%] h-full overflow-visible">
+              {chatReady ? (
+                <Chat 
+                  gameId={gameState.id}
+                  userId={propUser?.id || ''}
+                  userName={propUser?.username || 'Unknown'}
+                  players={sanitizedPlayers.filter((p): p is Player => isPlayer(p))}
+                  userAvatar={propUser?.avatarUrl || propUser?.avatar}
+                  chatType={chatType}
+                  onToggleChatType={() => setChatType(chatType === 'game' ? 'lobby' : 'game')}
+                  lobbyMessages={lobbyMessages}
+                  gameMessages={recentChatMessages}
+                  spectators={(gameState as any).spectators || []}
+                  isSpectator={isSpectator}
+                  onPlayerClick={handleViewPlayerStats}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-lg text-slate-400">Connecting chat...</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile: floating chat tab + slide-over panel (full-width table when closed) */}
+        {isMobile && chatReady && (
+          <>
+            {!mobileGameChatOpen && (
+              <button
+                type="button"
+                className="fixed right-0 top-1/2 z-[52] flex -translate-y-1/2 touch-manipulation flex-col items-center gap-1 rounded-l-xl border border-r-0 border-white/15 bg-slate-900/95 py-3 pl-2 pr-1 shadow-lg backdrop-blur-md active:bg-slate-800"
+                onClick={() => {
+                  setMobileGameChatOpen(true);
+                  setMobileGameChatUnread(0);
+                }}
+                aria-label={
+                  mobileGameChatUnread > 0
+                    ? `Open chat, ${mobileGameChatUnread} unread`
+                    : 'Open chat'
+                }
+              >
+                <span className="relative inline-flex">
+                  <img
+                    src="/chat.svg"
+                    alt=""
+                    className="h-7 w-7"
+                    style={{ filter: 'invert(1) brightness(2)' }}
+                  />
+                  {mobileGameChatUnread > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-red-600 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-slate-900">
+                      {mobileGameChatUnread > 9 ? '9+' : mobileGameChatUnread}
+                    </span>
+                  )}
+                </span>
+              </button>
+            )}
+            {mobileGameChatOpen && (
+              <button
+                type="button"
+                className="fixed inset-0 z-[50] bg-black/50"
+                aria-label="Close chat"
+                onClick={() => setMobileGameChatOpen(false)}
+              />
+            )}
+            <div
+              className={`fixed inset-y-0 right-0 z-[51] flex w-[min(92vw,22rem)] max-w-full flex-col border-l border-white/10 bg-slate-950 shadow-2xl transition-transform duration-200 ease-out ${
+                mobileGameChatOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
+              }`}
+            >
+              <Chat
                 gameId={gameState.id}
                 userId={propUser?.id || ''}
                 userName={propUser?.username || 'Unknown'}
@@ -1651,12 +1761,17 @@ export default function GameTableModular({
                 spectators={(gameState as any).spectators || []}
                 isSpectator={isSpectator}
                 onPlayerClick={handleViewPlayerStats}
+                embeddedInDrawer
+                onCloseDrawer={() => setMobileGameChatOpen(false)}
               />
-            ) : (
-              <div className="flex h-full items-center justify-center text-lg text-slate-400">Connecting chat...</div>
-            )}
+            </div>
+          </>
+        )}
+        {isMobile && !chatReady && (
+          <div className="pointer-events-none fixed bottom-2 right-2 z-[52] rounded-lg bg-slate-800/90 px-2 py-1 text-xs text-slate-400">
+            Connecting chat…
           </div>
-        </div>
+        )}
 
       {/* Table Details Modal */}
       <TableDetailsModal

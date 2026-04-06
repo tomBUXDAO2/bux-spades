@@ -11,6 +11,8 @@ interface ChatHeaderProps {
   chatType: 'game' | 'lobby';
   isMobile: boolean;
   scaleFactor?: number;
+  /** When set (e.g. game table mobile drawer), show a close control to collapse the panel */
+  onCloseDrawer?: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -20,7 +22,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onToggleChatType,
   chatType,
   isMobile,
-  scaleFactor = 1
+  scaleFactor = 1,
+  onCloseDrawer
 }) => {
   // Scale down for different screen widths
   const screenWidth = window.innerWidth;
@@ -119,6 +122,16 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </div>
         )}
       </div>
+      {onCloseDrawer && (
+        <button
+          type="button"
+          onClick={onCloseDrawer}
+          className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-slate-100 hover:bg-white/10"
+          aria-label="Close chat"
+        >
+          Close
+        </button>
+      )}
     </div>
   );
 };
