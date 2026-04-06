@@ -73,6 +73,7 @@ function TrickTableCard({
   card,
   animatingTrick,
   isWinningCard,
+  isMobile,
 }: {
   trickMotionKey: string;
   trickEntranceCompletedRef: React.MutableRefObject<Set<string>>;
@@ -83,6 +84,7 @@ function TrickTableCard({
   card: Card;
   animatingTrick: boolean;
   isWinningCard: boolean;
+  isMobile: boolean;
 }) {
   const skipEntrance = trickEntranceCompletedRef.current.has(trickMotionKey);
   useEffect(() => {
@@ -104,10 +106,10 @@ function TrickTableCard({
   return (
     <div className={`${positions[displayPosition]} z-20 pointer-events-none`}>
       <motion.div
-        initial={skipEntrance ? false : { opacity: 0, scale: 0.88, ...enterFrom }}
+        initial={skipEntrance ? false : { opacity: 0, scale: isMobile ? 0.94 : 0.88, ...enterFrom }}
         animate={{
           opacity: animatingTrick ? 0.82 : 1,
-          scale: isWinningCard ? 1.05 : 1,
+          scale: isWinningCard ? (isMobile ? 1.02 : 1.05) : 1,
           x: 0,
           y: 0,
         }}
@@ -1403,6 +1405,7 @@ export default function GameTableModular({
           card={card}
           animatingTrick={animatingTrick}
           isWinningCard={isWinningCard}
+          isMobile={isMobile}
         />
       );
     }) : [];

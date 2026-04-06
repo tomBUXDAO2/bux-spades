@@ -37,6 +37,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   // Apply extra large scaling for 750-799px screens
   const isExtraLargeScreen = screenWidth >= 750 && screenWidth <= 799;
   const textScale = isSmallScreen ? 0.85 : (isMediumScreen ? 0.9 : (isLargeScreen ? 0.95 : (isExtraLargeScreen ? 0.98 : 1)));
+  // Heavy backdrop-blur on HiDPR / narrow viewports softens text; use a lighter blur on smaller screens.
+  const headerBackdropBlur = screenWidth < 1024 ? 'backdrop-blur-md' : 'backdrop-blur-xl';
   
   // Check if user is admin
   const userIsAdmin = isAdmin(user?.discordId);
@@ -133,7 +135,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   };
 
   return (
-    <header className="relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm backdrop-blur-xl">
+    <header className={`relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm ${headerBackdropBlur}`}>
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -193,7 +195,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 z-50 mt-2 w-48 rounded-xl border border-white/10 bg-slate-950/95 py-1 shadow-lobby backdrop-blur-xl">
+                <div className={`absolute right-0 z-50 mt-2 w-48 rounded-xl border border-white/10 bg-slate-950/95 py-1 shadow-lobby ${headerBackdropBlur}`}>
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);

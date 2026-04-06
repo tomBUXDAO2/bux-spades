@@ -24,6 +24,18 @@ interface CardRendererProps {
   isPlayingCard?: boolean;
 }
 
+/** PNG cards scale cleanly; CSS rank/suit on tiny cards + HiDPR + parent transforms looks blurry. */
+function shouldUseBitmapPlayingCards(): boolean {
+  if (typeof window === 'undefined') return true;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (w >= 900 && h > 449) return true;
+  if (w < 1024) return true;
+  if (h <= 480) return true;
+  if (window.devicePixelRatio >= 2) return true;
+  return false;
+}
+
 // Optimized card image component - no loading states during gameplay
 export const CardImage = ({ card, width, height, className, alt, faceDown = false }: {
   card: Card;
@@ -33,14 +45,15 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
   alt?: string;
   faceDown?: boolean;
 }) => {
-  // Check if we're on a large screen (>= 900px width AND > 449px height)
-  const isLargeScreen = window.innerWidth >= 900 && window.innerHeight > 449;
+  const useBitmap = shouldUseBitmapPlayingCards();
+  const imgW = Math.max(1, Math.round(width) - 2);
+  const imgH = Math.max(1, Math.round(height));
 
   if (faceDown) {
     return (
       <div
         className={`${className} bg-blue-800 border-4 border-white rounded-lg relative overflow-hidden`}
-        style={{ width, height }}
+        style={{ width: Math.round(width), height: Math.round(height) }}
       >
         <div className="absolute inset-0 opacity-20">
           <div className="absolute inset-0" style={{
@@ -51,26 +64,27 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
     );
   }
 
-  // Use optimized PNG images for large screens, CSS for small screens
-  if (isLargeScreen) {
+  if (useBitmap) {
     return (
       <img
         src={`/optimized/cards/${getCardImage(card)}`}
         alt={alt || `${card.rank}${card.suit}`}
         className={className}
-        style={{ 
-          width: width - 2, 
-          height, 
-          objectFit: 'contain', 
-          padding: 0, 
-          margin: 0, 
-          borderRadius: '8px'
+        draggable={false}
+        style={{
+          width: imgW,
+          height: imgH,
+          objectFit: 'contain',
+          padding: 0,
+          margin: 0,
+          borderRadius: '8px',
+          display: 'block',
         }}
       />
     );
   }
 
-  // CSS-based cards for small screens
+  // CSS-based cards (low-DPR desktop windows only in practice)
   const getSuitSymbol = (suit: string) => {
     const suitMap: Record<string, string> = {
       "♠": "♠️", "Spades": "♠️", "spades": "♠️", "SPADES": "♠️", "Spade": "♠️", "spade": "♠️", "SPADE": "♠️", "S": "♠️",
@@ -120,8 +134,12 @@ export const CardImage = ({ card, width, height, className, alt, faceDown = fals
 
   return (
     <div
-      className={`${className} bg-white rounded-lg relative overflow-hidden`}
-      style={{ width, height }}
+      className={`${className} bg-white relative overflow-hidden rounded-lg antialiased`}
+      style={{
+        width: Math.round(width),
+        height: Math.round(height),
+        WebkitFontSmoothing: 'antialiased',
+      }}
       title={alt || `${card.rank}${card.suit}`}
     >
       {/* Top left corner */}
@@ -305,7 +323,6 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 marginLeft: index > 0 ? `${cardOverlapOffset}px` : '0',
                 zIndex: stackZ,
                 pointerEvents: 'auto',
-                filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
               }}
               initial={false}
               animate={{
@@ -319,10 +336,12 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
               }}
               whileHover={
                 playableLift
-                  ? { y: -10, scale: 1.03, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
+                  ? isMobile
+                    ? { y: -8, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
+                    : { y: -10, scale: 1.03, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
                   : undefined
               }
-              whileTap={playableLift ? { scale: 0.97 } : undefined}
+              whileTap={playableLift && !isMobile ? { scale: 0.97 } : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -339,12 +358,21 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 e.stopPropagation();
               }}
             >
-              <div className="relative p-0 m-0" style={{ padding: 0, margin: 0, lineHeight: 0, boxSizing: 'border-box' }}>
+              <div
+                className="relative m-0 rounded-lg p-0"
+                style={{
+                  padding: 0,
+                  margin: 0,
+                  lineHeight: 0,
+                  boxSizing: 'border-box',
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
+                }}
+              >
                 <CardImage
                   card={card}
                   width={cardDimensions.cardUIWidth}
                   height={cardDimensions.cardUIHeight}
-                  className={`shadow-xl ${isPlayable ? 'hover:shadow-lg' : ''}`}
+                  className={isPlayable ? 'hover:opacity-95' : ''}
                   alt={`${card.rank}${card.suit}`}
                   faceDown={
                     // CRITICAL: During PLAYING, hand cards should NEVER be face down
@@ -403,14 +431,14 @@ export const SpectatorHandRenderer: React.FC<{
         {Array.isArray(bottomPlayerHand) && bottomPlayerHand.map((card: Card, index: number) => (
           <div
             key={`${card.suit}${card.rank}`}
-            className="relative"
+            className="relative rounded-lg"
             style={{
               width: `${cardUIWidth}px`,
               height: `${cardUIHeight}px`,
               marginLeft: index > 0 ? `${overlapOffset}px` : '0',
               zIndex: 50 + index,
               pointerEvents: 'auto',
-              filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.45)',
             }}
           >
             <CardImage
