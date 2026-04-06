@@ -50,6 +50,17 @@ export const getLeadSuit = (trick: Card[] | undefined): Suit | null => {
 };
 
 /**
+ * Tricks still to be fully completed this hand (includes the trick in progress).
+ * Uses play.completedTricks — not play.tricks (which is not populated in live state).
+ */
+export const getTricksRemainingInHand = (game: GameState | Record<string, unknown>): number => {
+  if ((game as any)?.status !== 'PLAYING') return 13;
+  const completed = (game as any)?.play?.completedTricks;
+  const done = Array.isArray(completed) ? completed.length : 0;
+  return Math.max(0, 13 - done);
+};
+
+/**
  * Check if spades have been broken in the game
  */
 // Track round number per game to detect new rounds

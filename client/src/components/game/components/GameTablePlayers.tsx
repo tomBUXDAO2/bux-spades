@@ -5,6 +5,7 @@ import PlayerProfileDropdown from './PlayerProfileDropdown';
 import EmojiReaction from './EmojiReaction';
 import CoinDebitAnimation from './CoinDebitAnimation';
 import { abbreviateBotName } from '../../../utils/botUtils';
+import { getTricksRemainingInHand } from '../../../features/game/utils/gameUtils';
 
 interface GameTablePlayersProps {
   gameState: GameState;
@@ -232,7 +233,7 @@ export default function GameTablePlayers({
     const hasBid = rawBid !== null && rawBid !== undefined;
     
     let madeStatus = null;
-    const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
+    const tricksLeft = getTricksRemainingInHand(gameState);
     const formatBid = (bid: number | null, isBlindNil: boolean = false) => {
       if (bid === null || bid === undefined) return "0";
       if (bid === -1) return "bn";

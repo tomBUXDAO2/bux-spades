@@ -1,4 +1,5 @@
 import type { GameState, Player, Bot } from "../../../types/game";
+import { getTricksRemainingInHand } from "../../../features/game/utils/gameUtils";
 
 interface PlayerStatusProps {
   gameState: GameState;
@@ -98,7 +99,7 @@ export const getPlayerBidInfo = (gameState: GameState, player: Player | Bot | nu
                  (gameState as any).players?.[actualSeatIndex]?.bid ||
                  player.bid;
   const isBlindNil = (gameState as any).players?.[actualSeatIndex]?.isBlindNil || player.isBlindNil || false;
-  const tricksLeft = gameState.status === 'PLAYING' ? 13 - ((gameState as any).play?.tricks?.length || 0) : 13;
+  const tricksLeft = getTricksRemainingInHand(gameState);
   
   const formatBid = (bid: number | null, isBlindNil: boolean = false) => {
     if (bid === null || bid === undefined) return '?';
