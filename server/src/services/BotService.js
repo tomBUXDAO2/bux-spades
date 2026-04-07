@@ -3,7 +3,15 @@ import { GameLoggingService } from './GameLoggingService.js';
 import { BotUserService } from './BotUserService.js';
 import { prisma } from '../config/database.js';
 import SpadesRuleService from './SpadesRuleService.js';
-import { expertChooseCard, normSeat, lowestSluffNotWinning } from './botExpertPlay.js';
+import {
+  expertChooseCard,
+  normSeat,
+  lowestSluffNotWinning,
+  lowestLosingInLeadSuit,
+  collectPlayedCards,
+  countSpadesPlayed,
+  SPADES_SAVE_TRUMP_THRESHOLD
+} from './botExpertPlay.js';
 
 class BotService {
   constructor() {
@@ -970,6 +978,12 @@ class BotService {
 
     const tricksTakenBySeat = game.trickWins || [0,0,0,0];
     const teamTricks = (tricksTakenBySeat[seatIndex] || 0) + (tricksTakenBySeat[partnerSeat] || 0);
+    const myTeamKey = seatIndex % 2;
+    const myTeamBags =
+      myTeamKey === 0 ? (game.team1Bags ?? 0) : (game.team2Bags ?? 0);
+    const teamBid =
+      (Number.isFinite(Number(myBid)) ? Number(myBid) : 0) +
+      (Number.isFinite(Number(partnerBid)) ? Number(partnerBid) : 0);
 
     const trick = currentTrickCards || [];
     const leadSuit = trick.length > 0 ? trick[0].suit : null;
@@ -986,6 +1000,9 @@ class BotService {
     const scenario = (game.players[seatIndex]?.isNil || isNilBid(myBid))
       ? 'self_nil'
       : ((partner?.isNil || isNilBid(partnerBid)) ? 'cover_nil' : (tableBidTotal >= 12 ? 'high_pressure' : 'normal'));
+
+    const played = collectPlayedCards(game, trick);
+    const spadesRemainingApprox = Math.max(0, 13 - countSpadesPlayed(played));
 
     return {
       game,
@@ -1008,8 +1025,31 @@ class BotService {
       partnerCard,
       scenario,
       specialRules: game.specialRules || {},
-      allHands
+      allHands,
+      myTeamBags,
+      teamBid,
+      bagPressure: myTeamBags >= 8,
+      severeBagPressure: myTeamBags >= 9,
+      spadesRemainingApprox
     };
+  }
+
+  /** Contract met + bag risk: prefer dumps over overtricks (non-nil scenarios only). */
+  static shouldDumpForBagsCtx(ctx) {
+    if (!ctx || ctx.scenario === 'self_nil' || ctx.scenario === 'cover_nil') return false;
+    const bags = ctx.myTeamBags ?? 0;
+    if (bags < 8) return false;
+    const bid = ctx.teamBid ?? 0;
+    if (bid <= 0) return false;
+    return (ctx.teamTricks ?? 0) >= bid;
+  }
+
+  static teamNeedsBidBooks(ctx) {
+    return (ctx.teamTricks ?? 0) < (ctx.teamBid ?? 0);
+  }
+
+  static preferSaveTrumpSluff(ctx) {
+    return (ctx.spadesRemainingApprox ?? 0) >= SPADES_SAVE_TRUMP_THRESHOLD;
   }
 
   // =====================
@@ -1154,9 +1194,23 @@ class BotService {
   }
 
   playHighPressure(ctx) {
-    const { hand, isLeading, leadSuit, trick, partnerSeat, partnerHasPlayed, partnerCard, spadesBroken } = ctx;
+    const { hand, isLeading, leadSuit, trick, partnerSeat, partnerHasPlayed, partnerCard, spadesBroken, seatIndex } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
+      if (BotService.shouldDumpForBagsCtx(ctx)) {
+        let bestS = null;
+        let bestL = 0;
+        for (const s of ['HEARTS', 'DIAMONDS', 'CLUBS']) {
+          const len = (suits[s] || []).length;
+          if (len > bestL) {
+            bestL = len;
+            bestS = s;
+          }
+        }
+        if (bestS) return this.sortByRankAsc(suits[bestS])[0];
+        const legal = hand.filter((c) => c.suit !== 'SPADES' || spadesBroken);
+        return this.sortByRankAsc(legal.length ? legal : hand)[0];
+      }
       // Lead Aces first (prefer non-spade unless only spades or broken)
       const nonSpades = ['HEARTS','DIAMONDS','CLUBS'];
       for (const s of nonSpades) {
@@ -1184,9 +1238,17 @@ class BotService {
     if (leadCards.length > 0) {
       const duckPartner = this.lowestLeadSuitRespectingPartnerWin(ctx, hand);
       if (duckPartner !== null) return duckPartner;
+      if (BotService.shouldDumpForBagsCtx(ctx)) {
+        const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
+        if (dump) return dump;
+      }
       const winning = this.minimalWinningFollowing(ctx, hand);
       if (winning) return winning;
       return this.sortByRankAsc(leadCards)[0];
+    }
+
+    if (BotService.shouldDumpForBagsCtx(ctx) && !BotService.teamNeedsBidBooks(ctx)) {
+      return lowestSluffNotWinning(trick, hand, seatIndex, BotService.preferSaveTrumpSluff(ctx));
     }
 
     // Void in lead suit — high team bids (12+): dump lowest when not taking the book (nil uses self_nil/cover_nil)
@@ -1194,7 +1256,7 @@ class BotService {
       trick.length > 0 &&
       normSeat(this.provisionalTrickWinnerSeat(trick)) === normSeat(partnerSeat)
     ) {
-      return lowestSluffNotWinning(trick, hand, seatIndex);
+      return lowestSluffNotWinning(trick, hand, seatIndex, BotService.preferSaveTrumpSluff(ctx));
     }
     const cut = this.minimalSpadeToWin(ctx, hand);
     if (cut) return cut;
@@ -1204,7 +1266,18 @@ class BotService {
   }
 
   playNormalPressure(ctx) {
-    const { hand, isLeading, leadSuit, trick, partnerSeat, partnerHasPlayed, partnerCard, specialRules, spadesBroken } = ctx;
+    const {
+      hand,
+      isLeading,
+      leadSuit,
+      trick,
+      partnerSeat,
+      partnerHasPlayed,
+      partnerCard,
+      specialRules,
+      spadesBroken,
+      seatIndex
+    } = ctx;
     const suits = this.groupBySuit(hand);
     if (isLeading) {
       // ASSASSIN: Must lead spades if broken and have spades
@@ -1217,7 +1290,22 @@ class BotService {
           console.log(`[BOT SERVICE][AI_V2] ASSASSIN: Bot has no spades to lead with!`);
         }
       }
-      
+
+      if (BotService.shouldDumpForBagsCtx(ctx)) {
+        let bestS = null;
+        let bestL = 0;
+        for (const s of ['HEARTS', 'DIAMONDS', 'CLUBS']) {
+          const len = (suits[s] || []).length;
+          if (len > bestL) {
+            bestL = len;
+            bestS = s;
+          }
+        }
+        if (bestS) return this.sortByRankAsc(suits[bestS])[0];
+        const legal = hand.filter((c) => c.suit !== 'SPADES' || spadesBroken);
+        return this.sortByRankAsc(legal.length ? legal : hand)[0];
+      }
+
       // Lead safe low from longest non-spade; avoid leading easy overtake
       let bestSuit = null; let bestLen = 0;
       ['HEARTS','DIAMONDS','CLUBS'].forEach(s => { const len=(suits[s]||[]).length; if (len>bestLen){bestLen=len; bestSuit=s;} });
@@ -1230,9 +1318,18 @@ class BotService {
     if (leadCards.length > 0) {
       const duckPartner = this.lowestLeadSuitRespectingPartnerWin(ctx, hand);
       if (duckPartner !== null) return duckPartner;
+      if (BotService.shouldDumpForBagsCtx(ctx)) {
+        const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
+        if (dump) return dump;
+      }
       const win = this.minimalWinningFollowing(ctx, hand);
       return win || this.sortByRankDesc(leadCards)[0];
     }
+
+    if (BotService.shouldDumpForBagsCtx(ctx) && !BotService.teamNeedsBidBooks(ctx)) {
+      return lowestSluffNotWinning(trick, hand, seatIndex, BotService.preferSaveTrumpSluff(ctx));
+    }
+
     // Void: apply special rules first
     const sluffPartner = this.voidSluffWhenPartnerWinning(ctx, hand);
     if (sluffPartner) return sluffPartner;

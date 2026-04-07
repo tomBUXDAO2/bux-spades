@@ -8,6 +8,9 @@ const RANK_ORDER = {
   J: 11, Q: 12, K: 13, A: 14
 };
 
+/** When at least this many spades are still unplayed (approx), void sluffs prefer losing side suits before losing spades. */
+export const SPADES_SAVE_TRUMP_THRESHOLD = 5;
+
 export function cardValue(rank) {
   return RANK_ORDER[rank] ?? 0;
 }
@@ -115,12 +118,44 @@ export function wouldWinWithCard(trick, card, seatIndex) {
   return normSeat(provisionalWinnerSeat(hyp)) === normSeat(seatIndex);
 }
 
-/** When you cannot (or should not) win, dump the lowest card. If every card wins, play lowest anyway. */
-export function lowestSluffNotWinning(trick, hand, seatIndex) {
+/**
+ * When you cannot (or should not) win, dump the lowest card. If every card wins, play lowest anyway.
+ * If preferSaveTrump, use the lowest losing non-spade before any losing spade (keeps trump for later cuts).
+ */
+export function lowestSluffNotWinning(trick, hand, seatIndex, preferSaveTrump = false) {
   const si = normSeat(seatIndex);
   const losers = hand.filter((c) => !wouldWinWithCard(trick, c, si));
-  if (losers.length) return sortAsc(losers)[0];
+  if (losers.length) {
+    if (preferSaveTrump) {
+      const nonSp = sortAsc(losers.filter((c) => c.suit !== 'SPADES'));
+      if (nonSp.length) return nonSp[0];
+    }
+    return sortAsc(losers)[0];
+  }
   return sortAsc(hand)[0];
+}
+
+function preferSaveTrumpFromCtx(ctx) {
+  return (ctx.spadesRemainingApprox ?? 0) >= SPADES_SAVE_TRUMP_THRESHOLD;
+}
+
+/** Lowest card in lead suit that does not win the current trick (for bag / contract-made dumps). */
+export function lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex) {
+  if (!leadSuit) return null;
+  const si = normSeat(seatIndex);
+  const leadCards = hand.filter((c) => c.suit === leadSuit);
+  const losers = leadCards.filter((c) => !wouldWinWithCard(trick, c, si));
+  if (!losers.length) return null;
+  return sortAsc(losers)[0];
+}
+
+/** Spades already played this hand (completed tricks + current trick). */
+export function countSpadesPlayed(played) {
+  let n = 0;
+  for (const c of played || []) {
+    if (normalizeCard(c).suit === 'SPADES') n++;
+  }
+  return n;
 }
 
 export function highestInSuit(trick, suit) {
@@ -237,13 +272,17 @@ export function buildExpertContext(base) {
   const myTeamBags =
     teamKey === 0 ? game.team1Bags ?? 0 : game.team2Bags ?? 0;
   const bagPressure = myTeamBags >= 8;
+  const severeBagPressure = myTeamBags >= 9;
 
   const trickWins = game.trickWins || [0, 0, 0, 0];
   const teamTricks = (trickWins[seatIndex] || 0) + (trickWins[partnerSeat] || 0);
   const teamBid =
     (Number.isFinite(Number(myBid)) ? Number(myBid) : 0) +
     (Number.isFinite(Number(partnerBid)) ? Number(partnerBid) : 0);
-  const contractLocked = cautiousMode && teamTricks >= teamBid;
+  const contractMade = teamBid > 0 && teamTricks >= teamBid;
+  const contractLocked = cautiousMode && contractMade;
+  const spadesPlayedCount = countSpadesPlayed(played);
+  const spadesRemainingApprox = Math.max(0, 13 - spadesPlayedCount);
   const tricksCompletedCount = (game?.play?.completedTricks || []).length;
   const isFirstTrickOfHand = tricksCompletedCount === 0;
 
@@ -269,9 +308,12 @@ export function buildExpertContext(base) {
     voids,
     partnerVoidSuits,
     bagPressure,
+    severeBagPressure,
     teamTricks,
     teamBid,
+    contractMade,
     contractLocked,
+    spadesRemainingApprox,
     tricksCompletedCount,
     isFirstTrickOfHand,
     allHands: allHands || null
@@ -281,6 +323,14 @@ export function buildExpertContext(base) {
 function partnerWinning(trick, partnerSeat) {
   if (!trick.length) return false;
   return normSeat(provisionalWinnerSeat(trick)) === normSeat(partnerSeat);
+}
+
+/** Contract already made + bag risk: dump instead of grabbing overtricks (nil paths excluded). */
+function shouldDumpForBags(ctx) {
+  if (ctx.selfNil || ctx.partnerNil) return false;
+  if (!ctx.bagPressure && !ctx.severeBagPressure) return false;
+  if (!ctx.teamBid || ctx.teamBid <= 0) return false;
+  return ctx.teamTricks >= ctx.teamBid;
 }
 
 /** Following lead suit: lowest card that does not take partner's book; else minimal forced steal. */
@@ -538,9 +588,17 @@ function playDefendOppNil(ctx) {
   if (leadCards.length) {
     const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
     if (duck !== null) return duck;
+    if (shouldDumpForBags(ctx)) {
+      const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
+      if (dump) return dump;
+    }
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
     return takeAllMode ? sortDesc(leadCards)[0] : sortAsc(leadCards)[0];
+  }
+
+  if (shouldDumpForBags(ctx) && !teamNeedsTricks(ctx)) {
+    return lowestSluffNotWinning(trick, hand, seatIndex, preferSaveTrumpFromCtx(ctx));
   }
 
   const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
@@ -565,8 +623,10 @@ function playDefendOppNil(ctx) {
   }
 
   if (!spadesBroken) {
-    const nonSp = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
-    if (nonSp.length) return nonSp[0];
+    const nonSp = hand.filter((c) => c.suit !== 'SPADES');
+    if (nonSp.length) {
+      return shouldDumpForBags(ctx) ? sortAsc(nonSp)[0] : sortDesc(nonSp)[0];
+    }
   }
   if (takeAllMode || needBookForContract) {
     const cut = minimalWinningSpade(trick, hand);
@@ -593,6 +653,23 @@ function playAggressive(ctx) {
     aggressiveTable
   } = ctx;
   if (isLeading) {
+    if (shouldDumpForBags(ctx)) {
+      const suits = groupBySuit(hand);
+      let bestS = null;
+      let bestL = 0;
+      for (const s of ['HEARTS', 'DIAMONDS', 'CLUBS']) {
+        const len = (suits[s] || []).length;
+        if (len > bestL) {
+          bestL = len;
+          bestS = s;
+        }
+      }
+      if (bestS) return sortAsc(suits[bestS])[0];
+      return (
+        sortAsc(hand.filter((c) => c.suit !== 'SPADES' || spadesBroken))[0] ||
+        sortAsc(hand)[0]
+      );
+    }
     const suits = groupBySuit(hand);
     const nonSp = ['HEARTS', 'DIAMONDS', 'CLUBS'];
     for (const s of nonSp) {
@@ -625,16 +702,24 @@ function playAggressive(ctx) {
   if (leadCards.length) {
     const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
     if (duck !== null) return duck;
+    if (shouldDumpForBags(ctx)) {
+      const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
+      if (dump) return dump;
+    }
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
     return sortAsc(leadCards)[0];
+  }
+
+  if (shouldDumpForBags(ctx) && !teamNeedsTricks(ctx)) {
+    return lowestSluffNotWinning(trick, hand, seatIndex, preferSaveTrumpFromCtx(ctx));
   }
 
   // Table 12–13: void with partner winning — dump lowest losers, not high cards (nil paths use other plays)
   let partnerVoid = null;
   if (partnerWinning(trick, partnerSeat)) {
     partnerVoid = aggressiveTable
-      ? lowestSluffNotWinning(trick, hand, seatIndex)
+      ? lowestSluffNotWinning(trick, hand, seatIndex, preferSaveTrumpFromCtx(ctx))
       : voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
   }
   if (partnerVoid) return partnerVoid;
@@ -675,8 +760,8 @@ function playCautious(ctx) {
       if (duck !== null) return duck;
       return sortAsc(leadCards)[0];
     }
-    const dump = sortDesc(hand.filter((c) => c.suit !== 'SPADES'));
-    if (dump.length) return dump[0];
+    const dumpLow = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
+    if (dumpLow.length) return dumpLow[0];
     const pv = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
     if (pv) return pv;
   }
@@ -702,10 +787,18 @@ function playCautious(ctx) {
       const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
       if (duck !== null) return duck;
     }
+    if (shouldDumpForBags(ctx)) {
+      const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
+      if (dump) return dump;
+    }
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win && !bagPressure) return win;
     if (win && bagPressure && teamNeedsTricks(ctx)) return win;
     return sortAsc(leadCards)[0];
+  }
+
+  if (shouldDumpForBags(ctx) && !teamNeedsTricks(ctx)) {
+    return lowestSluffNotWinning(trick, hand, seatIndex, preferSaveTrumpFromCtx(ctx));
   }
 
   const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
