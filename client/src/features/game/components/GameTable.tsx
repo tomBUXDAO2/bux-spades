@@ -33,7 +33,7 @@ import { getScaleFactor } from '../utils/scaleUtils';
 import { handleGameOver } from '../utils/gameOverUtils';
 import { handlePlayCard, optimisticSocketMergeRef } from '../utils/playCardUtils';
 import { handleBid } from '../utils/bidUtils';
-import { allBiddingSeatsHaveBids, isSequentialAutoBidFormat } from '../utils/forcedBidFormats';
+import { isSequentialAutoBidFormat } from '../utils/forcedBidFormats';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
 import { useSocket } from '../../../features/auth/SocketContext';
@@ -1047,21 +1047,18 @@ export default function GameTableModular({
     isBot
   });
   
-  // Reveal hand during bidding; never flip back face-down after a reveal in this phase
+  // Bidding: hide until your turn (or blind-nil choice). After reveal or after you bid — never hide again this phase.
   useEffect(() => {
     const hands = (gameState as any)?.hands;
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
 
     if (gameState?.status === 'BIDDING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
-      const forcedAuto = isSequentialAutoBidFormat(gameState);
-      const allBidsIn = allBiddingSeatsHaveBids(gameState);
       const isMyTurn = gameState?.currentPlayer === currentPlayerId;
       const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
       const haveBid = myBid !== null && myBid !== undefined;
       const allowBlindNil = (gameState as any)?.rules?.allowBlindNil || (gameState as any)?.blindNilAllowed;
 
-      if (forcedAuto && dealingComplete && allBidsIn) {
-        setCardsRevealed(true);
+      if (haveBid) {
         cardsRevealedDuringBiddingRef.current = true;
       }
 
@@ -1072,21 +1069,17 @@ export default function GameTableModular({
         allowBlindNil,
         blindNilDismissed,
         showBlindNilModal,
-        forcedAuto,
-        allBidsIn,
         gameStateRules: (gameState as any)?.rules,
         gameStateBlindNilAllowed: (gameState as any)?.blindNilAllowed
       });
 
+      if (cardsRevealedDuringBiddingRef.current) {
+        setCardsRevealed(true);
+        return;
+      }
+
       if (!isMyTurn) {
-        if (!cardsRevealedDuringBiddingRef.current) {
-          setCardsRevealed(false);
-          console.log(
-            '[CARD REVEAL] Face down — not my turn',
-            gameState?.currentPlayer,
-            currentPlayerId
-          );
-        }
+        setCardsRevealed(false);
         return;
       }
 
@@ -1102,16 +1095,11 @@ export default function GameTableModular({
         !haveBid &&
         !cardsRevealedDuringBiddingRef.current &&
         !showBlindNilModal &&
-        dealingComplete &&
-        (!forcedAuto || allBidsIn)
+        dealingComplete
       ) {
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
         console.log('[CARD REVEAL] Revealing cards — my turn to bid');
-      }
-
-      if (cardsRevealedDuringBiddingRef.current && isMyTurn && !showBlindNilModal && dealingComplete) {
-        setCardsRevealed(true);
       }
     }
 
@@ -1127,8 +1115,6 @@ export default function GameTableModular({
     gameState?.currentPlayer,
     (gameState as any)?.hands,
     (gameState as any)?.bidding?.bids,
-    (gameState as any)?.format,
-    (gameState as any)?.gimmickVariant,
     currentPlayerId,
     mySeatIndex,
     showBlindNilModal,
