@@ -1069,9 +1069,9 @@ export class GameService {
           }
         }
         
-        // CRITICAL: Ensure hands data is included from Redis
+        // CRITICAL: Ensure hands data is included from Redis (ignore [[],[],[],[]] — length 4 but no cards)
         const playerHands = await redisGameState.getPlayerHands(gameId);
-        if (playerHands && playerHands.length > 0) {
+        if (playerHands && playerHands.some((hand) => hand && hand.length > 0)) {
           cachedGameState.hands = playerHands;
           cachedGameState.playerHands = playerHands; // Also set playerHands field
           console.log(`[GAME SERVICE] Updated hands from Redis:`, playerHands.map((hand, i) => `Seat ${i}: ${hand.length} cards`));
