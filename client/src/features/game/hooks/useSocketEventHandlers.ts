@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, type Dispatch, type SetStateAction } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import { playBidSound, playCardSound } from '../../../components/game/components/AudioManager';
 import type { GameState } from "../../../types/game";
@@ -13,7 +13,7 @@ interface UseSocketEventHandlersProps {
   gameId: string;
   userId: string;
   gameState: GameState | null;
-  setGameState: (state: GameState | null) => void;
+  setGameState: Dispatch<SetStateAction<GameState | null>>;
   setIsLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setHasAttemptedJoin: (attempted: boolean) => void;

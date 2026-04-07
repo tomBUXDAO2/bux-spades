@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import type { GameState } from "../../../types/game";
 
@@ -8,7 +8,7 @@ interface UseOptimizedSocketEventHandlersProps {
   gameId: string;
   userId: string;
   gameState: GameState | null;
-  setGameState: (state: GameState | null) => void;
+  setGameState: Dispatch<SetStateAction<GameState | null>>;
   setIsLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setHasAttemptedJoin: (attempted: boolean) => void;
@@ -436,7 +436,7 @@ export const useOptimizedSocketEventHandlers = ({
     (payload: any) => {
       if (!payload || payload.gameId !== gameId || !Array.isArray(payload.awayUserIds)) return;
       const away = new Set<string>(payload.awayUserIds);
-      (setGameState as React.Dispatch<React.SetStateAction<GameState | null>>)((prev) => {
+      setGameState((prev) => {
         if (!prev?.players) return prev;
         return {
           ...prev,

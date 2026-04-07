@@ -1728,7 +1728,7 @@ export default function GameTableModular({
 
   const subSeatSecondsLeft =
     subSeatApproval != null
-      ? Math.max(0, Math.ceil((subSeatApproval.expiresAt - Date.now()) / 1000)) + subSeatUiTick * 0
+      ? Math.max(0, Math.ceil((subSeatApproval.expiresAt - Date.now()) / 1000))
       : 0;
   
   return (
