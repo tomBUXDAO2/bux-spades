@@ -432,6 +432,23 @@ export const useOptimizedSocketEventHandlers = ({
     }
   }, [gameId, setError, setIsLoading]);
 
+  const handleGamePresenceUpdate = useCallback(
+    (payload: any) => {
+      if (!payload || payload.gameId !== gameId || !Array.isArray(payload.awayUserIds)) return;
+      const away = new Set<string>(payload.awayUserIds);
+      (setGameState as React.Dispatch<React.SetStateAction<GameState | null>>)((prev) => {
+        if (!prev?.players) return prev;
+        return {
+          ...prev,
+          players: prev.players.map((p: any) =>
+            p && (p.userId || p.id) ? { ...p, isAway: away.has(p.userId || p.id) } : p
+          )
+        };
+      });
+    },
+    [gameId, setGameState]
+  );
+
   useEffect(() => {
     if (Array.isArray(currentGameState?.bidding?.bids)) {
       previousBidsRef.current = [...currentGameState.bidding.bids];
@@ -448,6 +465,7 @@ export const useOptimizedSocketEventHandlers = ({
     round_started: handleRoundStarted,
     game_started: handleGameStarted,
     game_deleted: handleGameDeleted,
+    game_presence_update: handleGamePresenceUpdate,
     error: handleSocketError
   }), [
     handleGameJoined,
@@ -458,6 +476,7 @@ export const useOptimizedSocketEventHandlers = ({
     handleRoundStarted,
     handleGameStarted,
     handleGameDeleted,
+    handleGamePresenceUpdate,
     handleSocketError
   ]);
 

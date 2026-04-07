@@ -500,6 +500,20 @@ export const useSocketEventHandlers = ({
       }
     };
 
+    const handleGamePresenceUpdate = (payload: any) => {
+      if (!payload || payload.gameId !== gameId || !Array.isArray(payload.awayUserIds)) return;
+      const away = new Set<string>(payload.awayUserIds);
+      setGameState((prev: GameState | null) => {
+        if (!prev?.players) return prev;
+        return {
+          ...prev,
+          players: prev.players.map((p: any) =>
+            p && (p.userId || p.id) ? { ...p, isAway: away.has(p.userId || p.id) } : p
+          )
+        } as GameState;
+      });
+    };
+
     // Add socket event listeners
     if (socket) {
       socket.on('game_joined', handleGameJoined);
@@ -512,6 +526,7 @@ export const useSocketEventHandlers = ({
       socket.on('game_started', handleGameStarted);
       // Game completion handled in GameEventHandlers.tsx
       socket.on('game_deleted', handleGameDeleted);
+      socket.on('game_presence_update', handleGamePresenceUpdate);
       // Error handling consolidated - handled in GameEventHandlers.tsx
     }
     
@@ -531,6 +546,7 @@ export const useSocketEventHandlers = ({
         socket.off('game_started', handleGameStarted);
         // Game completion handled in GameEventHandlers.tsx
         socket.off('game_deleted', handleGameDeleted);
+        socket.off('game_presence_update', handleGamePresenceUpdate);
         // Error handling consolidated - handled in GameEventHandlers.tsx
       }
     };

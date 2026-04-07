@@ -3,7 +3,7 @@ import { prisma } from '../../../config/database.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { BotService } from '../../../services/BotService.js';
 import { SystemMessageHandler } from '../chat/systemMessageHandler.js';
-import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { scheduleHumanBiddingTurn, scheduleHumanPlayingTurn } from '../../../services/humanTurnScheduler.js';
 // CONSOLIDATED: SmartCacheService removed - using GameService directly
 import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
 
@@ -173,17 +173,8 @@ class GameStartHandler {
             // Trigger bot bid immediately
             await biddingHandler.triggerBotBidIfNeeded(gameId);
           } else if (currentPlayer && currentPlayer.isHuman) {
-            console.log(`[GAME START] Current player is human, starting timer for bidding`);
-            // Start timer for human player
-            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
-            const biddingHandler = new BiddingHandler(this.io, this.socket);
-            const shouldApplyTimer = biddingHandler.shouldApplyBiddingTimer(game);
-            if (shouldApplyTimer) {
-              console.log(`[GAME START] Starting timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-              playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'bidding');
-            } else {
-              console.log(`[GAME START] Timer not applicable for this game format/situation`);
-            }
+            console.log(`[GAME START] Current player is human, scheduling bidding turn`);
+            await scheduleHumanBiddingTurn(this.io, gameId, currentPlayer, game);
           } else {
             console.log(`[GAME START] Current player not found or invalid`);
           }
@@ -196,8 +187,8 @@ class GameStartHandler {
       if (gameState.status === 'PLAYING' && gameState.currentPlayer) {
         const currentPlayer = gameState.players.find(p => p && p.userId === gameState.currentPlayer);
         if (currentPlayer && currentPlayer.isHuman) {
-          console.log(`[GAME START] 🕐 Starting card play timer for human player ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, currentPlayer.userId, currentPlayer.seatIndex, 'playing');
+          console.log(`[GAME START] 🕐 Scheduling card play turn for human ${currentPlayer.userId} (seat ${currentPlayer.seatIndex})`);
+          await scheduleHumanPlayingTurn(gameId, currentPlayer);
         }
       }
     } catch (error) {

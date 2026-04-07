@@ -185,6 +185,56 @@ export function setupSocketHandlers(io) {
     // Card play events
     socket.on('play_card', (data) => cardPlayHandler.handlePlayCard(data));
 
+    socket.on('player_im_back', async (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const gameId = data?.gameId;
+      const userId = socket.userId;
+      if (!gameId) {
+        socket.emit('error', { message: 'Game ID required' });
+        return;
+      }
+      try {
+        const { gamePresenceService } = await import('../services/GamePresenceService.js');
+        const { GameService } = await import('../services/GameService.js');
+        const { resumeTimerAfterImBack } = await import('../services/humanTurnScheduler.js');
+        const { emitPersonalizedGameEvent } = await import('../services/SocketGameBroadcastService.js');
+        await gamePresenceService.clearAway(gameId, userId);
+        const awayUserIds = await gamePresenceService.getAwayUserIds(gameId);
+        io.to(gameId).emit('game_presence_update', { gameId, awayUserIds });
+        await resumeTimerAfterImBack(io, gameId, userId);
+        const state = await GameService.getGameStateForClient(gameId);
+        if (state) {
+          emitPersonalizedGameEvent(io, gameId, 'game_update', state);
+        }
+      } catch (e) {
+        console.error('[SOCKET] player_im_back error:', e);
+        socket.emit('error', { message: 'Failed to clear away status' });
+      }
+    });
+
+    socket.on('request_sub_seat', async (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const { SubSeatHandler } = await import('../modules/socket-handlers/sub-seat/subSeatHandler.js');
+      const h = new SubSeatHandler(io, socket);
+      await h.handleRequestSubSeat(data);
+    });
+
+    socket.on('respond_sub_seat', async (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const { SubSeatHandler } = await import('../modules/socket-handlers/sub-seat/subSeatHandler.js');
+      const h = new SubSeatHandler(io, socket);
+      await h.handleRespondSubSeat(data);
+    });
+
     // Chat events
     socket.on('game_message', (data) => {
       gameChatHandler.handleGameMessage(data);

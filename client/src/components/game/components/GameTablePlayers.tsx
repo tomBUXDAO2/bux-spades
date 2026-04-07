@@ -35,6 +35,11 @@ interface GameTablePlayersProps {
   isPlayer: (player: any) => player is Player;
   isBot: (player: any) => player is Bot;
   onOpenAdminPanel?: () => void;
+  /** Clear AWAY server-side (current user only) */
+  onImBack?: () => void;
+  /** Spectator requesting to replace bot / away player */
+  isSpectating?: boolean;
+  onRequestSubSeat?: (seatIndex: number) => void;
   /** Refs on screen-north (position 2) / south (position 0) wrappers for trick-card layout measurement */
   northPlayerSlotRef?: RefObject<HTMLDivElement>;
   southPlayerSlotRef?: RefObject<HTMLDivElement>;
@@ -68,6 +73,9 @@ export default function GameTablePlayers({
   isBot,
   pendingBid,
   onOpenAdminPanel,
+  onImBack,
+  isSpectating = false,
+  onRequestSubSeat,
   northPlayerSlotRef,
   southPlayerSlotRef,
 }: GameTablePlayersProps) {
@@ -384,6 +392,7 @@ export default function GameTablePlayers({
     
     const displayName = isHuman ? player.username : abbreviateBotName(player.username);
     const displayAvatar = isHuman ? player.avatarUrl : '/bot-avatar.jpg';
+    const isAway = isHuman && Boolean((player as Player).isAway);
     
     // Debug avatar loading
     if (isHuman && player.id === user?.id) {
@@ -418,8 +427,13 @@ export default function GameTablePlayers({
                         alt={displayName}
                         width={avatarWidth}
                         height={avatarHeight}
-                        className="rounded-full object-cover"
+                        className={`rounded-full object-cover ${isAway ? 'opacity-40' : ''}`}
                       />
+                      {isAway && (
+                        <div className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 whitespace-nowrap rounded bg-black/70 px-1 text-[6px] font-bold text-amber-200 sm:text-[7px]">
+                          AWAY
+                        </div>
+                      )}
                       {/* Emoji reaction overlay */}
                       {emojiReactions[player.id] && (
                         <EmojiReaction
@@ -545,6 +559,27 @@ export default function GameTablePlayers({
                   {madeStatus}
                 </span>
               </div>
+              {isAway && user?.id && player.id === user.id && onImBack && gameState.status !== 'WAITING' && (
+                <button
+                  type="button"
+                  onClick={onImBack}
+                  className="mt-0.5 rounded bg-emerald-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-emerald-600 sm:text-[8px]"
+                >
+                  I&apos;m back
+                </button>
+              )}
+              {isSpectating &&
+                onRequestSubSeat &&
+                (gameState.status === 'BIDDING' || gameState.status === 'PLAYING') &&
+                (isBot(player) || (isHuman && isAway)) && (
+                  <button
+                    type="button"
+                    onClick={() => onRequestSubSeat(actualSeatIndex)}
+                    className="mt-0.5 rounded bg-amber-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-amber-600 sm:text-[8px]"
+                  >
+                    Request seat
+                  </button>
+                )}
             </div>
             {/* playedCard && (
               <div className="flex justify-center mt-2">

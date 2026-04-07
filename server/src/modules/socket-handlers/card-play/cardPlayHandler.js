@@ -7,6 +7,8 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
+import { gamePresenceService } from '../../../services/GamePresenceService.js';
+import { scheduleHumanPlayingTurn, scheduleAwayHumanPlayingLead } from '../../../services/humanTurnScheduler.js';
 import { PerformanceMiddleware } from '../../../middleware/PerformanceMiddleware.js';
 
 /**
@@ -51,6 +53,8 @@ class CardPlayHandler {
           this.socket.emit('error', { message: 'Not your turn' });
           return;
         }
+
+        await gamePresenceService.clearTimeoutStreak(gameId, userId);
 
         // Process the card play in database
         await this.processCardPlay(gameId, userId, card, false);
@@ -246,10 +250,10 @@ class CardPlayHandler {
             // This prevents the 4th card from flickering - it will be shown through trick_complete event instead
             console.log(`[CARD PLAY] Skipping card_played event for 4th card to prevent flickering`);
 
-            // Start timer for winning player if they are human (skip if round just completed)
+            // Timer or AWAY autoplay for trick winner (skip if round just completed)
             if (winningPlayer && winningPlayer.isHuman && !trickResult.isRoundComplete) {
-              console.log(`[CARD PLAY] Starting timer for winning player ${winningPlayer.userId} (seat ${winningPlayer.seatIndex})`);
-              playerTimerService.startPlayerTimer(gameId, winningPlayer.userId, winningPlayer.seatIndex, 'playing');
+              console.log(`[CARD PLAY] Scheduling playing turn for winner ${winningPlayer.userId} (seat ${winningPlayer.seatIndex})`);
+              await scheduleHumanPlayingTurn(gameId, winningPlayer);
             }
 
             // Get the completed trick cards before updating game state
@@ -483,8 +487,8 @@ class CardPlayHandler {
         });
         
         if (currentPlayerForTimer && currentPlayerForTimer.isHuman) {
-          console.log(`[CARD PLAY] 🕐 STARTING TIMER for human player ${currentPlayerForTimer.userId} (seat ${currentPlayerForTimer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, currentPlayerForTimer.userId, currentPlayerForTimer.seatIndex, 'playing');
+          console.log(`[CARD PLAY] 🕐 Scheduling turn for human ${currentPlayerForTimer.userId} (seat ${currentPlayerForTimer.seatIndex})`);
+          await scheduleHumanPlayingTurn(gameId, currentPlayerForTimer);
         } else {
           console.log(`[CARD PLAY] ❌ NO TIMER - Player not found or not human:`, {
             player: currentPlayerForTimer,
@@ -741,6 +745,7 @@ class CardPlayHandler {
       
       // Trigger bot play if next player is a bot
       this.triggerBotPlayIfNeeded(gameId);
+      await scheduleAwayHumanPlayingLead(gameId);
       
     } catch (error) {
       console.error('[CARD PLAY] Error starting new trick after clear:', error);

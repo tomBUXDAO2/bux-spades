@@ -611,6 +611,18 @@ export class GameService {
     return sanitizedState;
   }
 
+  /** Merge Redis presence (e.g. isAway) onto players before sanitize. */
+  static async attachPresenceToGameState(gameId, state) {
+    if (!state?.players?.length) return state;
+    try {
+      const { gamePresenceService } = await import('./GamePresenceService.js');
+      await gamePresenceService.attachToPlayers(gameId, state.players);
+    } catch (e) {
+      console.error('[GAME SERVICE] attachPresenceToGameState failed:', e);
+    }
+    return state;
+  }
+
   /**
    * Get current trick cards from database
    */
@@ -716,6 +728,7 @@ export class GameService {
           }
         }
         
+        await this.attachPresenceToGameState(gameId, cachedGameState);
         return cachedGameState;
       }
       
@@ -739,6 +752,7 @@ export class GameService {
         // CRITICAL FIX: For WAITING games, skip all database queries - just return cached state
         if (cachedGameState.status === 'WAITING') {
           console.log(`[GAME SERVICE] Game ${gameId} is WAITING, returning cached state without database queries`);
+          await this.attachPresenceToGameState(gameId, cachedGameState);
           return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
         }
         
@@ -754,6 +768,7 @@ export class GameService {
           }
           // Use full state instead of cached state and return it immediately
           console.log(`[GAME SERVICE] Using full database state for ${gameId}`);
+          await this.attachPresenceToGameState(gameId, fullGameState);
           return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
         }
         
@@ -909,6 +924,7 @@ export class GameService {
         }
         
         // Returning cached state from Redis
+        await this.attachPresenceToGameState(gameId, cachedGameState);
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(cachedGameState, userId) : cachedGameState;
       }
@@ -956,6 +972,7 @@ export class GameService {
         // Cache the full state in Redis for future requests
         await redisGameState.setGameState(gameId, fullGameState);
         console.log(`[GAME SERVICE] Cached full game state in Redis for game ${gameId} with currentPlayer: ${fullGameState.currentPlayer}`);
+        await this.attachPresenceToGameState(gameId, fullGameState);
         // CRITICAL: Sanitize game state to only show user's own cards
         return userId ? this.sanitizeGameStateForUser(fullGameState, userId) : fullGameState;
       }
@@ -1400,8 +1417,18 @@ export class GameService {
 
       // Build seatIndex -> userId map
       const seatToUserId = Array.from({length: 4}, () => null);
-      game.players.forEach(p => { seatToUserId[p.seatIndex] = p.userId; });
-      
+      game.players.forEach((p) => {
+        if (
+          p.seatIndex != null &&
+          typeof p.seatIndex === 'number' &&
+          p.seatIndex >= 0 &&
+          p.seatIndex < 4 &&
+          !p.isSpectator
+        ) {
+          seatToUserId[p.seatIndex] = p.userId;
+        }
+      });
+
       console.log(`[GAME SERVICE] Deal hands - seatToUserId mapping:`, seatToUserId);
       console.log(`[GAME SERVICE] Deal hands - game.players:`, game.players.map(p => ({
         seatIndex: p.seatIndex,
@@ -1483,6 +1510,13 @@ export class GameService {
           bidderSeatUserId: seatToUserId[bidderSeat]
         });
 
+        const { statsAttributionService: statsAttr } = await import('./StatsAttributionService.js');
+        try {
+          await statsAttr.initFromDealIfEmpty(gameId, seatToUserId);
+        } catch (e) {
+          console.warn('[GAME SERVICE] statsAttribution init skipped:', e?.message || e);
+        }
+
         // Persist RoundHandSnapshot and PlayerRoundStats for each occupied seat
         await prisma.$transaction(async (tx) => {
         for (let seatIndex = 0; seatIndex < 4; seatIndex++) {
@@ -1500,9 +1534,14 @@ export class GameService {
 
           // Ensure player stats row exists for the round when a user is seated
           if (userId) {
+            const statsUserId = await statsAttr.resolveStatsUserIdForNewRoundSeat(
+              gameId,
+              seatIndex,
+              userId
+            );
             await tx.playerRoundStats.upsert({
               where: {
-                roundId_userId: { roundId: round.id, userId }
+                roundId_userId: { roundId: round.id, userId: statsUserId }
               },
               update: {},
               create: {
@@ -1515,7 +1554,7 @@ export class GameService {
                 madeNil: false,
                 madeBlindNil: false,
                 round: { connect: { id: round.id } },
-                user: { connect: { id: userId } }
+                user: { connect: { id: statsUserId } }
               }
             });
           }

@@ -7,7 +7,35 @@ import EventService from './EventService.js';
  * All scoring logic is computed from database state
  */
 export class ScoringService {
-  
+  /**
+   * User IDs whose UserStats should refresh after game end.
+   * Rated: one per seat 0–3 = pinned stats owner or seated human (excludes substitute-only actors).
+   * Not rated: unique userIds on all GamePlayer rows (legacy behavior).
+   */
+  static async resolveStatsRefreshUserIds(gameId, game, players) {
+    const seatedHumans = players.filter(
+      (p) =>
+        p.isHuman &&
+        !p.isSpectator &&
+        p.seatIndex != null &&
+        p.seatIndex >= 0 &&
+        p.seatIndex < 4
+    );
+    if (game.isRated) {
+      const { statsAttributionService } = await import('./StatsAttributionService.js');
+      const owners = await statsAttributionService.getOwnersArray(gameId);
+      const ids = new Set();
+      for (let s = 0; s < 4; s++) {
+        const pinned = owners && owners[s];
+        const seatedHere = seatedHumans.find((p) => p.seatIndex === s);
+        const uid = pinned || seatedHere?.userId;
+        if (uid) ids.add(uid);
+      }
+      return [...ids];
+    }
+    return [...new Set(players.map((p) => p.userId).filter(Boolean))];
+  }
+
   /**
    * Calculate and update scores for a completed round
    * @param {string} gameId - The game ID
@@ -524,7 +552,7 @@ export class ScoringService {
       // Get game info
       const game = await prisma.game.findUnique({
         where: { id: gameId },
-        select: { currentRound: true, mode: true, eventId: true }
+        select: { currentRound: true, mode: true, eventId: true, isRated: true }
       });
 
       if (!game) {
@@ -549,7 +577,7 @@ export class ScoringService {
 
       const gamePlayersForEvent = await prisma.gamePlayer.findMany({
         where: { gameId },
-        select: { userId: true, seatIndex: true }
+        select: { userId: true, seatIndex: true, isSpectator: true, isHuman: true }
       });
 
       // Create game result - only team scores for partners games
@@ -614,6 +642,7 @@ export class ScoringService {
       try {
         const redisSessionService = (await import('./RedisSessionService.js')).default;
         for (const player of gamePlayersForEvent) {
+          if (!player.userId) continue;
           await redisSessionService.clearActiveGame(player.userId);
           console.log(`[SCORING] Cleared activeGameId for player ${player.userId}`);
         }
@@ -640,16 +669,29 @@ export class ScoringService {
         // Don't throw - Discord posting failure shouldn't break game completion
       }
 
-      // Update user stats for all players
+      // Refresh UserStats for attributed users (rated: seat owners, not substitutes)
       try {
+        const statsUserIds = await this.resolveStatsRefreshUserIds(gameId, game, gamePlayersForEvent);
         const { StatsService } = await import('./StatsService.js');
-        for (const player of gamePlayersForEvent) {
-          await StatsService.updateUserStats(player.userId);
+        for (const userId of statsUserIds) {
+          await StatsService.updateUserStats(userId);
         }
-        console.log(`[SCORING] Updated stats for ${gamePlayersForEvent.length} players`);
+        console.log(
+          `[SCORING] Updated stats for ${statsUserIds.length} user(s)${game.isRated ? ' (rated attribution)' : ''}`
+        );
       } catch (statsError) {
         console.error('[SCORING] Error updating user stats:', statsError);
         // Don't throw - stats update failure shouldn't break game completion
+      }
+
+      // Clear rated/sub-seat Redis keys for this game (no longer needed after completion)
+      try {
+        const { statsAttributionService } = await import('./StatsAttributionService.js');
+        await statsAttributionService.clearForGame(gameId);
+        const { subSeatService } = await import('./SubSeatService.js');
+        await subSeatService.clearForGame(gameId);
+      } catch (redisCleanError) {
+        console.error('[SCORING] Error clearing game Redis keys:', redisCleanError);
       }
     } catch (error) {
       console.error('[SCORING] Error completing game:', error);

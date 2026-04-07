@@ -320,6 +320,14 @@ export default function GameTableModular({
     seatIndex: -1,
     expiresAt: 0
   });
+
+  const [subSeatApproval, setSubSeatApproval] = useState<{
+    gameId: string;
+    seatIndex: number;
+    spectatorUsername: string;
+    expiresAt: number;
+  } | null>(null);
+  const [, setSubSeatUiTick] = useState(0);
   
   // Refs
   const infoRef = useRef<HTMLDivElement>(null);
@@ -339,6 +347,14 @@ export default function GameTableModular({
   const currentPlayerId = propUser?.id;
   
   const myPlayerIndex = gameState.players ? gameState.players?.findIndex(p => p && (p.id === propUser?.id || p.userId === propUser?.id)) : -1;
+
+  const spectatorsList = ((gameState as any).spectators || []) as Array<{ id?: string; userId?: string }>;
+  const isSpectating =
+    myPlayerIndex === -1 &&
+    Boolean(
+      propUser?.id &&
+        spectatorsList.some((s) => s && (s.userId === propUser.id || s.id === propUser.id))
+    );
   
   // Get the current player's seatIndex, not array index
   const myPlayer = gameState.players ? gameState.players.find(p => p && (p.id === propUser?.id || p.userId === propUser?.id)) : null;
@@ -1635,6 +1651,40 @@ export default function GameTableModular({
   }, [socket, gameState.id]);
 
   useEffect(() => {
+    if (!socket || !gameState?.id) return;
+    const gid = gameState.id;
+    const uid = propUser?.id;
+    const onReq = (p: any) => {
+      if (!p || p.gameId !== gid || p.approverUserId !== uid) return;
+      setSubSeatApproval({
+        gameId: p.gameId,
+        seatIndex: p.seatIndex,
+        spectatorUsername: p.spectatorUsername || 'Player',
+        expiresAt: p.expiresAt || Date.now() + 10000
+      });
+    };
+    const onRes = (p: any) => {
+      if (!p || p.gameId !== gid) return;
+      setSubSeatApproval(null);
+    };
+    socket.on('sub_seat_request', onReq);
+    socket.on('sub_seat_resolved', onRes);
+    return () => {
+      socket.off('sub_seat_request', onReq);
+      socket.off('sub_seat_resolved', onRes);
+    };
+  }, [socket, gameState?.id, propUser?.id]);
+
+  useEffect(() => {
+    if (!subSeatApproval) return;
+    const t = setInterval(() => {
+      setSubSeatUiTick((n) => n + 1);
+      setSubSeatApproval((prev) => (prev && Date.now() >= prev.expiresAt ? null : prev));
+    }, 500);
+    return () => clearInterval(t);
+  }, [subSeatApproval]);
+
+  useEffect(() => {
     setMobileGameChatUnread(0);
   }, [gameState.id]);
 
@@ -1675,10 +1725,53 @@ export default function GameTableModular({
   }, [useSlideOutGameChat, mobileGameChatOpen, propUser?.id, gameState?.id, socket]);
   
   const chatReady = Boolean(gameState?.id);
+
+  const subSeatSecondsLeft =
+    subSeatApproval != null
+      ? Math.max(0, Math.ceil((subSeatApproval.expiresAt - Date.now()) / 1000)) + subSeatUiTick * 0
+      : 0;
   
   return (
     <>
       <LandscapePrompt />
+      {subSeatApproval && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-600 bg-slate-900 p-5 text-center text-white shadow-2xl">
+            <p className="mb-1 text-lg font-semibold">Seat request</p>
+            <p className="mb-3 text-sm text-slate-300">
+              <span className="font-medium text-white">{subSeatApproval.spectatorUsername}</span> wants to take seat{' '}
+              <span className="font-mono">{subSeatApproval.seatIndex + 1}</span>.
+            </p>
+            <p className="mb-4 text-xs text-amber-200/90">Time left: {subSeatSecondsLeft}s</p>
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold hover:bg-emerald-600"
+                onClick={() => {
+                  if (socket) {
+                    socket.emit('respond_sub_seat', { gameId: subSeatApproval.gameId, approved: true });
+                  }
+                  setSubSeatApproval(null);
+                }}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold hover:bg-slate-500"
+                onClick={() => {
+                  if (socket) {
+                    socket.emit('respond_sub_seat', { gameId: subSeatApproval.gameId, approved: false });
+                  }
+                  setSubSeatApproval(null);
+                }}
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="fixed inset-0 z-0 min-h-[100dvh] h-[100dvh] bg-gray-900">
         {/* Main content area - full height */}
         <div className="flex h-full min-h-0">
@@ -1753,6 +1846,17 @@ export default function GameTableModular({
                 isPlayer={isPlayer}
                 isBot={isBot}
                 onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+                onImBack={() => {
+                  if (socket && gameState?.id) {
+                    socket.emit('player_im_back', { gameId: gameState.id });
+                  }
+                }}
+                isSpectating={isSpectating}
+                onRequestSubSeat={(seatIndex) => {
+                  if (socket && gameState?.id) {
+                    socket.emit('request_sub_seat', { gameId: gameState.id, seatIndex });
+                  }
+                }}
               />
 
               {/* Game Status Overlay */}

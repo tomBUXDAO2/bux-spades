@@ -1,5 +1,6 @@
 import { GameService } from '../../../services/GameService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
+import { gamePresenceService } from '../../../services/GamePresenceService.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import redisGameState from '../../../services/RedisGameStateService.js';
 
@@ -43,13 +44,31 @@ class GameDisconnectHandler {
 
       // Handle different game phases
       if (game.status === 'PLAYING' && game.currentPlayer === userId) {
-        console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-play timer`);
-        // Start timer for auto-play if it's their turn
-        playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'playing');
+        const away = await gamePresenceService.isAway(gameId, userId);
+        if (away) {
+          console.log(`[GAME DISCONNECT] Player ${userId} is AWAY on turn — immediate auto-play`);
+          setImmediate(() => {
+            playerTimerService
+              .runAutoActionImmediate(gameId, userId, 'playing')
+              .catch((err) => console.error('[GAME DISCONNECT] away auto-play failed:', err));
+          });
+        } else {
+          console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-play timer`);
+          playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'playing');
+        }
       } else if (game.status === 'BIDDING' && game.currentPlayer === userId) {
-        console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-bid timer`);
-        // Start timer for auto-bid if it's their turn to bid
-        playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'bidding');
+        const away = await gamePresenceService.isAway(gameId, userId);
+        if (away) {
+          console.log(`[GAME DISCONNECT] Player ${userId} is AWAY on bid — immediate auto-bid`);
+          setImmediate(() => {
+            playerTimerService
+              .runAutoActionImmediate(gameId, userId, 'bidding')
+              .catch((err) => console.error('[GAME DISCONNECT] away auto-bid failed:', err));
+          });
+        } else {
+          console.log(`[GAME DISCONNECT] Player ${userId} is current player, starting auto-bid timer`);
+          playerTimerService.startPlayerTimer(gameId, userId, player.seatIndex, 'bidding');
+        }
       }
 
       // Emit player disconnected event to other players

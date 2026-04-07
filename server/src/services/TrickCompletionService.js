@@ -702,13 +702,29 @@ export class TrickCompletionService {
 
           if (isHuman) {
             try {
-              const { playerTimerService } = await import('./PlayerTimerService.js');
+              const { scheduleHumanBiddingTurn } = await import('./humanTurnScheduler.js');
+              const humanPlayer =
+                currentPlayerLive ||
+                (currentPlayerFromState
+                  ? {
+                      userId:
+                        currentPlayerFromState.userId ||
+                        currentPlayerFromState.id ||
+                        updatedGameState.currentPlayer,
+                      isHuman: true,
+                      seatIndex: currentPlayerFromState.seatIndex ?? seatIndex
+                    }
+                  : {
+                      userId: updatedGameState.currentPlayer,
+                      isHuman: true,
+                      seatIndex
+                    });
               console.log(
-                `[TRICK COMPLETION] Starting bidding timer for human player ${updatedGameState.currentPlayer} (seat ${seatIndex})`
+                `[TRICK COMPLETION] Scheduling bidding turn for human ${humanPlayer.userId} (seat ${humanPlayer.seatIndex})`
               );
-              playerTimerService.startPlayerTimer(gameId, updatedGameState.currentPlayer, seatIndex, 'bidding');
+              await scheduleHumanBiddingTurn(io, gameId, humanPlayer, updatedGameState);
             } catch (timerError) {
-              console.error('[TRICK COMPLETION] Failed to start bidding timer for new round:', timerError);
+              console.error('[TRICK COMPLETION] Failed to schedule bidding for new round:', timerError);
             }
             console.log(`[TRICK COMPLETION] Current player is human, bot bidding trigger not required`);
           } else {

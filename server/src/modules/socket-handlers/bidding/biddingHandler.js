@@ -7,6 +7,12 @@ import { prisma } from '../../../config/database.js';
 import redisGameState from '../../../services/RedisGameStateService.js';
 import { playerTimerService } from '../../../services/PlayerTimerService.js';
 import { emitPersonalizedGameEvent } from '../../../services/SocketGameBroadcastService.js';
+import { gamePresenceService } from '../../../services/GamePresenceService.js';
+import { scheduleHumanBiddingTurn, scheduleHumanPlayingTurn } from '../../../services/humanTurnScheduler.js';
+import {
+  shouldApplyBiddingTimer as shouldApplyBiddingTimerRule,
+  isSuicideBidForced as isSuicideBidForcedRule
+} from '../../../services/biddingTimerRules.js';
 
 /**
  * DATABASE-FIRST BIDDING HANDLER
@@ -45,6 +51,8 @@ class BiddingHandler {
         this.socket.emit('error', { message: 'Not your turn to bid' });
         return;
       }
+
+      await gamePresenceService.clearTimeoutStreak(gameId, userId);
 
       // Process the bid in database
       await this.processBid(gameId, userId, bid, isNil, isBlindNil);
@@ -270,10 +278,16 @@ class BiddingHandler {
       }
 
       // Update bid in database first (synchronous)
+      const { statsAttributionService } = await import('../../../services/StatsAttributionService.js');
+      const statsUserId = await statsAttributionService.resolveStatsUserId(
+        gameId,
+        player.seatIndex,
+        userId
+      );
       await this.loggingService.logBid(
         gameId,
         currentRound.id,
-        userId,
+        statsUserId,
         player.seatIndex,
         bid,
         isBlindNil
@@ -396,15 +410,10 @@ class BiddingHandler {
           }
         });
 
-        // Start timer for next player if they are human and timer should apply
+        // Start timer for next human (or autoplay if AWAY)
         if (nextPlayer && nextPlayer.isHuman) {
-          const shouldApplyTimer = this.shouldApplyBiddingTimer(gameState);
-          if (shouldApplyTimer) {
-            console.log(`[BIDDING] Starting timer for human player ${nextPlayer.userId} (seat ${nextPlayer.seatIndex})`);
-            playerTimerService.startPlayerTimer(gameId, nextPlayer.userId, nextPlayer.seatIndex, 'bidding');
-          } else {
-            console.log(`[BIDDING] Timer not applicable for this game format/situation`);
-          }
+          console.log(`[BIDDING] Scheduling bidding turn for human ${nextPlayer.userId} (seat ${nextPlayer.seatIndex})`);
+          await scheduleHumanBiddingTurn(this.io, gameId, nextPlayer, gameState);
         } else if (nextPlayer && !nextPlayer.isHuman) {
           console.log(`[BIDDING] Next player is bot - NO TIMER needed, bot will bid immediately`);
         }
@@ -550,20 +559,19 @@ class BiddingHandler {
         
         emitPersonalizedGameEvent(this.io, gameId, 'round_started', updatedGameState);
 
-        // Start timer for first player if they are human (card play - always apply)
+        // Card play: timer or AWAY autoplay for first human
         if (firstPlayer && firstPlayer.isHuman) {
-          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (seat ${firstPlayer.seatIndex})`);
-          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
+          console.log(`[BIDDING] Scheduling playing turn for first player ${firstPlayer.userId} (seat ${firstPlayer.seatIndex})`);
+          await scheduleHumanPlayingTurn(gameId, firstPlayer);
         }
       } catch (error) {
         console.error(`[BIDDING] Error getting game state for client:`, error);
         // Fallback: emit minimal round started event
         emitPersonalizedGameEvent(this.io, gameId, 'round_started', { status: 'PLAYING', currentPlayer: firstPlayer?.userId });
 
-        // Still start timer even in fallback
         if (firstPlayer && firstPlayer.isHuman) {
-          console.log(`[BIDDING] Starting card play timer for first player ${firstPlayer.userId} (fallback)`);
-          playerTimerService.startPlayerTimer(gameId, firstPlayer.userId, firstPlayer.seatIndex, 'playing');
+          console.log(`[BIDDING] Scheduling playing turn for first player ${firstPlayer.userId} (fallback)`);
+          await scheduleHumanPlayingTurn(gameId, firstPlayer);
         }
       }
 
@@ -915,72 +923,12 @@ class BiddingHandler {
     }
   }
 
-  /**
-   * Determine if bidding timer should be applied for current game state
-   * @returns {boolean} - true if timer should be applied
-   */
   shouldApplyBiddingTimer(gameState) {
-    const format = gameState.format;
-    const gimmickVariant = gameState.gimmickVariant;
-    
-    // Forced-bid formats that NEVER need timers during bidding
-    const alwaysForcedFormats = ['MIRROR', 'BID3', 'BIDHEARTS', 'CRAZY_ACES'];
-    
-    if (alwaysForcedFormats.includes(format) || alwaysForcedFormats.includes(gimmickVariant)) {
-      console.log(`[BIDDING TIMER] Format ${format || gimmickVariant} is always forced - no timer`);
-      return false;
-    }
-    
-    // SUICIDE: Check if current player's bid is forced
-    if (gimmickVariant === 'SUICIDE') {
-      const isForced = this.isSuicideBidForced(gameState);
-      console.log(`[BIDDING TIMER] SUICIDE bid is ${isForced ? 'forced' : 'not forced'}`);
-      return !isForced;
-    }
-    
-    // Apply timer for REGULAR and WHIZ
-    console.log(`[BIDDING TIMER] Format ${format} - applying timer`);
-    return true;
+    return shouldApplyBiddingTimerRule(gameState);
   }
 
-  /**
-   * Check if current player's bid is forced in SUICIDE
-   * @returns {boolean} - true if bid is forced (partner bid non-nil)
-   */
   isSuicideBidForced(gameState) {
-    try {
-      // Find current player
-      const currentPlayerIndex = gameState.players.findIndex(p => p.userId === gameState.currentPlayer);
-      if (currentPlayerIndex === -1) {
-        console.log(`[BIDDING TIMER] Current player not found`);
-        return false;
-      }
-
-      // Find partner (opposite seat)
-      const partnerIndex = (currentPlayerIndex + 2) % 4;
-      
-      // Get bidding state from gameState
-      const bids = gameState.bidding?.bids || [];
-      const partnerBid = bids[partnerIndex];
-      
-      console.log(`[BIDDING TIMER] SUICIDE check - current player seat ${currentPlayerIndex}, partner seat ${partnerIndex}, partner bid: ${partnerBid}`);
-      
-      // If partner hasn't bid yet, bid is not forced (they might bid nil)
-      if (partnerBid === undefined || partnerBid === null) {
-        return false;
-      }
-      
-      // If partner bid nil (0), current player can choose
-      if (partnerBid === 0) {
-        return false;
-      }
-      
-      // Partner bid non-nil, so current player MUST bid nil (forced)
-      return true;
-    } catch (error) {
-      console.error('[BIDDING TIMER] Error checking SUICIDE forced bid:', error);
-      return false;
-    }
+    return isSuicideBidForcedRule(gameState);
   }
 }
 

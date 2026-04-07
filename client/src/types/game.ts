@@ -29,6 +29,8 @@ export interface Player {
   username?: string;
   type?: 'human' | 'bot';
   isBlindNil?: boolean;
+  /** Server: two consecutive turn timeouts while human */
+  isAway?: boolean;
 }
 
 export interface Bot {

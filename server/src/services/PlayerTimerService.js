@@ -87,7 +87,7 @@ class PlayerTimerService {
       phase
     });
 
-    this.handleTimeout(gameId, playerId, phase)
+    this.handleTimeout(gameId, playerId, phase, { skipPresenceTracking: true })
       .catch(error => {
         console.error('[PLAYER TIMER] ❌ Error during forced timeout:', error);
         this.clearTimer(gameId);
@@ -96,8 +96,10 @@ class PlayerTimerService {
 
   /**
    * Handle timer expiration - trigger auto-action
+   * @param {{ skipPresenceTracking?: boolean }} options - set for forced timeout (disconnect path uses normal timer)
    */
-  async handleTimeout(gameId, playerId, phase) {
+  async handleTimeout(gameId, playerId, phase, options = {}) {
+    const { skipPresenceTracking = false } = options;
     try {
       console.log(`[PLAYER TIMER] ⏰ TIMEOUT TRIGGERED for game ${gameId}, player ${playerId}, phase ${phase}`);
 
@@ -118,6 +120,15 @@ class PlayerTimerService {
 
       console.log(`[PLAYER TIMER] ✅ Player ${playerId} is still current player, proceeding with auto-action`);
 
+      if (!skipPresenceTracking) {
+        const { gamePresenceService } = await import('./GamePresenceService.js');
+        const { newlyAway } = await gamePresenceService.recordTimeout(gameId, playerId);
+        if (newlyAway && this.io) {
+          const awayUserIds = await gamePresenceService.getAwayUserIds(gameId);
+          this.io.to(gameId).emit('game_presence_update', { gameId, awayUserIds });
+        }
+      }
+
       // Trigger auto-action based on phase
       if (phase === 'bidding') {
         console.log(`[PLAYER TIMER] 🎯 Triggering auto-bid for player ${playerId}`);
@@ -133,6 +144,32 @@ class PlayerTimerService {
       console.log(`[PLAYER TIMER] ✅ Auto-action completed for player ${playerId}`);
     } catch (error) {
       console.error('[PLAYER TIMER] ❌ Error handling timeout:', error);
+      this.clearTimer(gameId);
+    }
+  }
+
+  /**
+   * Autoplay immediately (AWAY humans) without incrementing timeout streak.
+   */
+  async runAutoActionImmediate(gameId, playerId, phase) {
+    try {
+      const game = await GameService.getGame(gameId);
+      if (!game) {
+        this.clearTimer(gameId);
+        return;
+      }
+      if (game.currentPlayer !== playerId) {
+        this.clearTimer(gameId);
+        return;
+      }
+      if (phase === 'bidding') {
+        await this.autoBid(game, playerId);
+      } else if (phase === 'playing') {
+        await this.autoPlay(game, playerId);
+      }
+      this.clearTimer(gameId);
+    } catch (error) {
+      console.error('[PLAYER TIMER] ❌ runAutoActionImmediate error:', error);
       this.clearTimer(gameId);
     }
   }
