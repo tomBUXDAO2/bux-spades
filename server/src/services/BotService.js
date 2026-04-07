@@ -53,14 +53,20 @@ class BotService {
     
     // Create bot user in database
     const botUser = await BotUserService.createBotUser(botId, gameId);
-    
+
+    const gameRow = await prisma.game.findUnique({
+      where: { id: gameId },
+      select: { mode: true }
+    });
+    const teamIndex = gameRow?.mode === 'SOLO' ? seatIndex : seatIndex % 2;
+
     // Create GamePlayer record
     await prisma.gamePlayer.create({
       data: {
         gameId: gameId,
         userId: botUser.id,
         seatIndex: seatIndex,
-        teamIndex: seatIndex % 2,
+        teamIndex,
         isHuman: false,
         joinedAt: new Date()
       }
@@ -72,7 +78,7 @@ class BotService {
       avatarUrl: botUser.avatarUrl || botAvatars[seatIndex] || 'https://api.dicebear.com/7.x/bottts/svg?seed=default',
       type: 'bot',
       seatIndex: seatIndex,
-      team: seatIndex % 2, // Team 0 or 1
+      team: teamIndex,
       hand: [],
       bid: null,
       tricks: 0,
@@ -99,14 +105,16 @@ class BotService {
     
     // Create bot user in database
     const botUser = await BotUserService.createBotUser(botId, game.id);
-    
+
+    const teamIndex = game.mode === 'SOLO' ? seatIndex : seatIndex % 2;
+
     // Create GamePlayer record
     await prisma.gamePlayer.create({
       data: {
         gameId: game.id,
         userId: botUser.id,
         seatIndex: seatIndex,
-        teamIndex: seatIndex % 2,
+        teamIndex,
         isHuman: false,
         joinedAt: new Date()
       }
@@ -118,7 +126,7 @@ class BotService {
       avatarUrl: botUser.avatarUrl || botAvatars[seatIndex] || 'https://api.dicebear.com/7.x/bottts/svg?seed=default',
       type: 'bot',
       seatIndex: seatIndex,
-      team: seatIndex % 2, // Team 0 or 1
+      team: teamIndex,
       hand: [],
       bid: null,
       tricks: 0,

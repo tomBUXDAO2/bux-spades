@@ -403,21 +403,125 @@ class GameJoinHandler {
       }
       
       // Handle regular players (non-spectators)
-      // Remove player from database
+      const seatedGp = await prisma.gamePlayer.findFirst({
+        where: {
+          gameId,
+          userId,
+          isSpectator: false,
+          seatIndex: { not: null }
+        },
+        select: { seatIndex: true }
+      });
+      const vacatedSeat = seatedGp?.seatIndex ?? null;
+
+      const dbGameForLeave = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { status: true, isRated: true }
+      });
+
+      const otherSeatedHumans = await prisma.gamePlayer.count({
+        where: {
+          gameId,
+          isHuman: true,
+          leftAt: null,
+          isSpectator: false,
+          userId: { not: userId }
+        }
+      });
+
+      const midGame =
+        dbGameForLeave && ['BIDDING', 'PLAYING'].includes(dbGameForLeave.status);
+
+      let replacedWithBot = null;
+      if (vacatedSeat != null && midGame && otherSeatedHumans > 0) {
+        try {
+          replacedWithBot = await GameService.replaceSeatedHumanWithBotInPlace(gameId, userId);
+        } catch (e) {
+          console.error('[GAME LEAVE] replaceSeatedHumanWithBotInPlace failed:', e);
+        }
+      }
+
+      if (replacedWithBot?.ok) {
+        playerTimerService.clearTimerForPlayer(gameId, userId);
+
+        const redisSessionService = (await import('../../../services/RedisSessionService.js')).default;
+        await redisSessionService.clearActiveGame(userId);
+        console.log(`[GAME LEAVE] Cleared activeGameId after in-place bot replacement for ${userId}`);
+
+        const shouldCleanupAfterReplace = await GameCleanupService.checkAndCleanupGame(gameId, null);
+        if (shouldCleanupAfterReplace) {
+          this.io.to(gameId).emit('game_deleted', { gameId });
+          try {
+            await GameCleanupService.deleteOrphanBotUsers();
+          } catch {}
+          this.socket.leave(gameId);
+          return;
+        }
+
+        try {
+          const { PlayAgainHandler } = await import('../play-again/playAgainHandler.js');
+          const playAgainHandler = new PlayAgainHandler(this.io, null);
+          await playAgainHandler.handlePlayerLeft(gameId, userId);
+        } catch (err) {
+          console.error('[GAME LEAVE] Error notifying play again handler:', err);
+        }
+
+        this.socket.leave(gameId);
+
+        const redisGameState = (await import('../../../services/RedisGameStateService.js')).default;
+        const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+        if (freshGameState) {
+          await redisGameState.setGameState(gameId, freshGameState);
+        }
+
+        const updatedState = await GameService.getGameStateForClient(gameId);
+        this.io.to(gameId).emit('player_left', { gameId, userId });
+        if (updatedState) {
+          emitPersonalizedGameEvent(this.io, gameId, 'game_update', updatedState);
+        }
+
+        try {
+          const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
+          const systemHandler = new SystemMessageHandler(this.io, this.socket);
+          systemHandler.handlePlayerLeft(gameId, playerUsername);
+          systemHandler.handleBotAdded(gameId, replacedWithBot.botUsername, replacedWithBot.seatIndex);
+        } catch (err) {
+          console.error('[GAME LEAVE] Error sending system messages:', err);
+        }
+
+        if (replacedWithBot.wasTheirTurn) {
+          if (replacedWithBot.status === 'BIDDING') {
+            const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+            const biddingHandler = new BiddingHandler(this.io, this.socket);
+            await biddingHandler.triggerBotBidIfNeeded(gameId);
+          } else if (replacedWithBot.status === 'PLAYING') {
+            const { CardPlayHandler } = await import('../card-play/cardPlayHandler.js');
+            const cardPlayHandler = new CardPlayHandler(this.io, this.socket);
+            await cardPlayHandler.triggerBotPlayIfNeeded(gameId);
+          }
+        }
+
+        try {
+          await GameCleanupService.deleteOrphanBotUsers();
+        } catch {}
+        return;
+      }
+
+      // Remove player from database (lobby / finished / last human / replace not applicable)
       await GameService.leaveGame(gameId, userId);
       console.log(`[GAME LEAVE] User ${userId} removed from database for game ${gameId}`);
-      
+
       // CRITICAL FIX: Clear activeGameId from user's session so they don't get redirected back
       const redisSessionService = (await import('../../../services/RedisSessionService.js')).default;
       await redisSessionService.clearActiveGame(userId);
       console.log(`[GAME LEAVE] Cleared activeGameId from session for user ${userId}`);
-      
+
       // Check if game should be cleaned up (unrated games with no human players)
       // Use DB-only check to avoid depending on derived state
       console.log(`[GAME LEAVE] Checking if game ${gameId} should be cleaned up...`);
       const shouldCleanup = await GameCleanupService.checkAndCleanupGame(gameId, null);
       console.log(`[GAME LEAVE] Cleanup result for game ${gameId}: ${shouldCleanup}`);
-      
+
       if (shouldCleanup) {
         console.log(`[GAME LEAVE] Game ${gameId} was cleaned up due to no human players`);
         // Emit game deleted event to all players
@@ -431,6 +535,48 @@ class GameJoinHandler {
         return;
       } else {
         console.log(`[GAME LEAVE] Game ${gameId} was NOT cleaned up - either rated or has human players remaining`);
+      }
+
+      // WAITING: keep four seats filled with bots when at least one human remains
+      if (
+        vacatedSeat != null &&
+        dbGameForLeave?.status === 'WAITING' &&
+        otherSeatedHumans > 0
+      ) {
+        try {
+          if (dbGameForLeave.isRated) {
+            await prisma.gamePlayer.updateMany({
+              where: { gameId, userId },
+              data: {
+                isSpectator: true,
+                seatIndex: null,
+                teamIndex: null
+              }
+            });
+          }
+          const seatTaken = await prisma.gamePlayer.findFirst({
+            where: {
+              gameId,
+              seatIndex: vacatedSeat,
+              isSpectator: false
+            }
+          });
+          if (!seatTaken) {
+            const botPlayer = await this.botService.createBotPlayer(gameId, vacatedSeat);
+            const redisGs = (await import('../../../services/RedisGameStateService.js')).default;
+            const updatedGameState = await GameService.getFullGameStateFromDatabase(gameId);
+            if (updatedGameState) {
+              await redisGs.setGameState(gameId, updatedGameState);
+            }
+            try {
+              const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
+              const system = new SystemMessageHandler(this.io, this.socket);
+              system.handleBotAdded(gameId, botPlayer.username, vacatedSeat);
+            } catch {}
+          }
+        } catch (e) {
+          console.error('[GAME LEAVE] WAITING seat bot refill failed:', e);
+        }
       }
 
       // Notify play again handler if player is leaving during play again wait

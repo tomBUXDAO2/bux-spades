@@ -554,6 +554,135 @@ export class GameService {
   }
 
   /**
+   * Mid-game (BIDDING/PLAYING): turn a leaving human's seat into a bot in-place so Redis hands
+   * and seat indices stay valid. Does not call leaveGame (row is updated, not deleted).
+   */
+  static async replaceSeatedHumanWithBotInPlace(gameId, leavingUserId) {
+    const gp = await prisma.gamePlayer.findFirst({
+      where: {
+        gameId,
+        userId: leavingUserId,
+        isSpectator: false,
+        seatIndex: { not: null }
+      }
+    });
+    if (!gp) {
+      return { ok: false, reason: 'not_seated' };
+    }
+
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      select: {
+        status: true,
+        mode: true,
+        isRated: true,
+        currentRound: true,
+        currentPlayer: true
+      }
+    });
+    if (!game || !['BIDDING', 'PLAYING'].includes(game.status)) {
+      return { ok: false, reason: 'not_mid_game' };
+    }
+
+    const others = await prisma.gamePlayer.count({
+      where: {
+        gameId,
+        isHuman: true,
+        leftAt: null,
+        isSpectator: false,
+        userId: { not: leavingUserId }
+      }
+    });
+    if (others === 0) {
+      return { ok: false, reason: 'last_human' };
+    }
+
+    const { BotUserService } = await import('./BotUserService.js');
+    const { statsAttributionService } = await import('./StatsAttributionService.js');
+
+    const seatIndex = gp.seatIndex;
+    const teamIndex = game.mode === 'SOLO' ? seatIndex : seatIndex % 2;
+    const botId = `bot_replace_${seatIndex}_${Date.now()}`;
+    const botUser = await BotUserService.createBotUser(botId, gameId);
+
+    let activeRoundId = null;
+    if (game.currentRound != null) {
+      const r = await prisma.round.findUnique({
+        where: {
+          gameId_roundNumber: { gameId, roundNumber: game.currentRound }
+        },
+        select: { id: true }
+      });
+      activeRoundId = r?.id ?? null;
+    }
+
+    const wasTheirTurn = game.currentPlayer === leavingUserId;
+
+    await prisma.$transaction(async (tx) => {
+      if (activeRoundId) {
+        const migrated = await tx.playerRoundStats.updateMany({
+          where: { roundId: activeRoundId, userId: leavingUserId },
+          data: { userId: botUser.id, seatIndex, teamIndex }
+        });
+        if (migrated.count === 0) {
+          await tx.playerRoundStats.create({
+            data: {
+              roundId: activeRoundId,
+              userId: botUser.id,
+              seatIndex,
+              teamIndex,
+              bid: null,
+              isBlindNil: false,
+              tricksWon: 0,
+              bagsThisRound: 0,
+              madeNil: false,
+              madeBlindNil: false
+            }
+          });
+        }
+      }
+
+      await tx.gamePlayer.update({
+        where: { id: gp.id },
+        data: {
+          userId: botUser.id,
+          isHuman: false,
+          leftAt: null,
+          teamIndex
+        }
+      });
+
+      if (wasTheirTurn) {
+        await tx.game.update({
+          where: { id: gameId },
+          data: { currentPlayer: botUser.id }
+        });
+      }
+    });
+
+    if (game.isRated) {
+      const owners = await statsAttributionService.getOwnersArray(gameId);
+      if (owners && owners[seatIndex] === leavingUserId) {
+        const next = [...owners];
+        next[seatIndex] = botUser.id;
+        await statsAttributionService.setOwnersArray(gameId, next);
+      }
+    }
+
+    console.log(
+      `[GAME SERVICE] Replaced leaving human ${leavingUserId} with bot ${botUser.id} at seat ${seatIndex} in ${gameId}`
+    );
+    return {
+      ok: true,
+      botUserId: botUser.id,
+      botUsername: botUser.username,
+      seatIndex,
+      wasTheirTurn,
+      status: game.status
+    };
+  }
+
+  /**
    * Sanitize game state for a specific user - only show their own cards
    */
   static sanitizeGameStateForUser(gameState, userId) {
@@ -709,17 +838,18 @@ export class GameService {
               
               // Also update player bids in the players array
               if (cachedGameState.players) {
-                cachedGameState.players = cachedGameState.players.map(p => ({
-                  ...p,
-                  bid: bids[p.seatIndex] || null
-                }));
+                cachedGameState.players = cachedGameState.players.map((p) =>
+                  p ? { ...p, bid: bids[p.seatIndex] ?? null } : p
+                );
               }
               
               console.log(`[GAME SERVICE] Updated bidding from database:`, {
                 gameId,
                 bids,
                 bidding: cachedGameState.bidding,
-                players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
+                players: cachedGameState.players?.map((p) =>
+                  p ? { seatIndex: p.seatIndex, bid: p.bid } : null
+                )
               });
             }
           } catch (error) {
@@ -870,17 +1000,18 @@ export class GameService {
             
             // Also update player bids in the players array
             if (cachedGameState.players) {
-              cachedGameState.players = cachedGameState.players.map(p => ({
-                ...p,
-                bid: bids[p.seatIndex] || null
-              }));
+              cachedGameState.players = cachedGameState.players.map((p) =>
+                p ? { ...p, bid: bids[p.seatIndex] ?? null } : p
+              );
             }
             
             console.log(`[GAME SERVICE] Updated bidding from database:`, {
               gameId,
               bids,
               bidding: cachedGameState.bidding,
-              players: cachedGameState.players?.map(p => ({ seatIndex: p.seatIndex, bid: p.bid }))
+              players: cachedGameState.players?.map((p) =>
+                p ? { seatIndex: p.seatIndex, bid: p.bid } : null
+              )
             });
           }
           } catch (error) {
@@ -960,10 +1091,9 @@ export class GameService {
           
           // Also update player bids in the players array
           if (fullGameState.players) {
-            fullGameState.players = fullGameState.players.map(p => ({
-              ...p,
-              bid: bids[p.seatIndex] || null
-            }));
+            fullGameState.players = fullGameState.players.map((p) =>
+              p ? { ...p, bid: bids[p.seatIndex] ?? null } : p
+            );
           }
           
           console.log(`[GAME SERVICE] Database bidding data - bids:`, bids);

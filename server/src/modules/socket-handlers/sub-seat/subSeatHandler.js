@@ -65,7 +65,14 @@ async function executeApprovedSwap(io, gameId, pending) {
 
   const game = await prisma.game.findUnique({
     where: { id: gameId },
-    select: { currentPlayer: true, status: true, isRated: true, mode: true, createdById: true }
+    select: {
+      currentPlayer: true,
+      status: true,
+      isRated: true,
+      mode: true,
+      createdById: true,
+      currentRound: true
+    }
   });
   if (!game) {
     throw new Error('Game not found');
@@ -92,7 +99,41 @@ async function executeApprovedSwap(io, gameId, pending) {
 
   const teamIndex = game.mode === 'SOLO' ? seatIndex : seatIndex % 2;
 
+  let activeRoundId = null;
+  if (game.currentRound != null) {
+    const r = await prisma.round.findUnique({
+      where: {
+        gameId_roundNumber: { gameId, roundNumber: game.currentRound }
+      },
+      select: { id: true }
+    });
+    activeRoundId = r?.id ?? null;
+  }
+
   await prisma.$transaction(async (tx) => {
+    if (isBot && activeRoundId) {
+      const migrated = await tx.playerRoundStats.updateMany({
+        where: { roundId: activeRoundId, userId: targetUserId },
+        data: { userId: spectatorUserId, seatIndex, teamIndex }
+      });
+      if (migrated.count === 0) {
+        await tx.playerRoundStats.create({
+          data: {
+            roundId: activeRoundId,
+            userId: spectatorUserId,
+            seatIndex,
+            teamIndex,
+            bid: null,
+            isBlindNil: false,
+            tricksWon: 0,
+            bagsThisRound: 0,
+            madeNil: false,
+            madeBlindNil: false
+          }
+        });
+      }
+    }
+
     if (isBot) {
       await tx.gamePlayer.delete({ where: { id: targetGp.id } });
       await tx.user.deleteMany({ where: { id: targetUserId } }).catch(() => {});
@@ -121,6 +162,15 @@ async function executeApprovedSwap(io, gameId, pending) {
       });
     }
   });
+
+  if (game.isRated && isBot) {
+    const owners = await statsAttributionService.getOwnersArray(gameId);
+    if (owners && owners[seatIndex] === targetUserId) {
+      const next = [...owners];
+      next[seatIndex] = spectatorUserId;
+      await statsAttributionService.setOwnersArray(gameId, next);
+    }
+  }
 
   clearSeatTimer(gameId);
 
@@ -208,7 +258,10 @@ export class SubSeatHandler {
       return;
     }
 
-    const target = gameState.players[seatIndex];
+    const players = gameState.players || [];
+    const target = Array.isArray(players)
+      ? players.find((p) => p && p.seatIndex === seatIndex)
+      : null;
     if (!target) {
       this.socket.emit('error', { message: 'Seat is empty' });
       return;
