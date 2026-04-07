@@ -270,6 +270,14 @@ class BiddingHandler {
           console.log(`[BIDDING] SUICIDE auto-correct: forcing nil bid`);
           bid = 0;
           isNil = true;
+        } else if (gameState.format === 'MIRROR') {
+          const hands = await redisGameState.getPlayerHands(gameId);
+          const playerHand = hands?.[player.seatIndex] || [];
+          const n = playerHand.filter(
+            (c) => c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠'
+          ).length;
+          console.log(`[BIDDING] MIRROR auto-correct: received ${bid}, forcing ${n}`);
+          bid = n;
         } else {
           // Non-forced modes: keep error
           this.socket?.emit?.('error', { message: validation.message });

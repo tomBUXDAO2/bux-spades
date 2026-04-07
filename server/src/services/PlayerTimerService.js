@@ -198,10 +198,20 @@ class PlayerTimerService {
       }
 
       const hand = hands[seatIndex];
+      const suitSpade = (c) =>
+        c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠' || c.suit === 'spades';
+      const numSpades = hand.filter(suitSpade).length;
+
       // Handle forced variants first
       const forcedBid = game.gimmickVariant || game.formatForced;
+      const gameFormat = game.format || 'REGULAR';
       let botBid;
-      if (forcedBid === 'BIDHEARTS' || forcedBid === 'BID HEARTS') {
+
+      if (gameFormat === 'MIRROR') {
+        botBid = numSpades;
+      } else if (gameFormat === 'WHIZ') {
+        botBid = numSpades > 0 ? numSpades : 0;
+      } else if (forcedBid === 'BIDHEARTS' || forcedBid === 'BID HEARTS') {
         const numHearts = hand.filter(card => card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥').length;
         botBid = numHearts;
       } else if (forcedBid === 'BID3' || forcedBid === 'BID 3') {
@@ -212,7 +222,6 @@ class PlayerTimerService {
         const numAces = hand.filter(card => card.rank === 'A').length;
         botBid = numAces * 3;
       } else {
-        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
         botBid = numSpades > 0 ? numSpades : 2;
       }
       

@@ -183,7 +183,14 @@ export const useOptimizedSocketEventHandlers = ({
       if (biddingData.gameState) {
         // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
         const newState = normalizeGameState(biddingData.gameState);
-        
+        if (
+          newState &&
+          currentGameState?.currentRound != null &&
+          (newState.currentRound === undefined || newState.currentRound === null)
+        ) {
+          (newState as any).currentRound = currentGameState.currentRound;
+        }
+
         // Defensive: If we have existing state and new state has nulls, preserve the old bids
         // BUT ONLY if we're in the same round - don't preserve bids across rounds
         if (currentGameState?.bidding?.bids && newState?.bidding?.bids && 

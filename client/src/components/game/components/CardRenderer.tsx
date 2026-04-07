@@ -358,12 +358,13 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
               initial={false}
               animate={{
                 opacity: !isVisible ? 0 : 1,
-                y: isVisible ? 0 : 14,
+                y: isVisible ? 0 : 18,
+                rotate: isVisible ? 0 : -2,
               }}
               transition={{
                 type: 'spring',
-                stiffness: 320,
-                damping: 28,
+                stiffness: 400,
+                damping: 24,
               }}
               whileHover={
                 playableLift

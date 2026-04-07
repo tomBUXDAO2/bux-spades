@@ -33,6 +33,7 @@ import { getScaleFactor } from '../utils/scaleUtils';
 import { handleGameOver } from '../utils/gameOverUtils';
 import { handlePlayCard, optimisticSocketMergeRef } from '../utils/playCardUtils';
 import { handleBid } from '../utils/bidUtils';
+import { allBiddingSeatsHaveBids, isSequentialAutoBidFormat } from '../utils/forcedBidFormats';
 import { getUserTeam } from '../utils/gameUtils';
 import { getReadyButtonData, getStartGameButtonData, getPlayerStatusData } from '../utils/leagueUtils';
 import { useSocket } from '../../../features/auth/SocketContext';
@@ -248,6 +249,8 @@ export default function GameTableModular({
   const [lastNonEmptyTrick, setLastNonEmptyTrick] = useState<Card[]>([]);
   const [pendingPlayedCard, setPendingPlayedCard] = useState<Card | null>(null);
   const [pendingBid, setPendingBid] = useState<{ playerId: string; bid: number } | null>(null);
+  /** Prevents double emit for mirror / bid3 / bid hearts / crazy aces (e.g. React Strict Mode). */
+  const lastForcedAutoBidKeyRef = useRef<string>('');
 
   useEffect(() => {
     pendingPlayedCardRef.current = pendingPlayedCard;
@@ -376,6 +379,23 @@ export default function GameTableModular({
     isMyTurn: gameState.currentPlayer === propUser?.id
   });
   const orderedPlayers = rotatePlayersForCurrentView(sanitizedPlayers, currentPlayer, propUser?.id);
+
+  useEffect(() => {
+    if (!pendingBid || gameState.status !== 'BIDDING') return;
+    const players = gameState.players || [];
+    const p = players.find(
+      (x): x is Player | Bot =>
+        !!x && (x.id === pendingBid.playerId || x.userId === pendingBid.playerId)
+    );
+    const seat = p?.seatIndex;
+    if (seat == null || seat < 0) return;
+    const bids = (gameState as any)?.bidding?.bids;
+    const b = Array.isArray(bids) ? bids[seat] : undefined;
+    if (b !== null && b !== undefined) {
+      setPendingBid(null);
+    }
+  }, [gameState.status, (gameState as any)?.bidding?.bids, pendingBid, gameState.players]);
+
   const isMobile = windowSize.isMobile;
   /** Compact layouts use full-size game tokens; width-based scaling made S10 vs Note inconsistent. */
   const scaleFactor = isMobile ? 1 : getScaleFactor(windowSize);
@@ -833,7 +853,17 @@ export default function GameTableModular({
   };
   
   const handleSocketError = (error: { message: string }) => {
-    if (typeof error?.message === 'string' && error.message.includes('spades')) {
+    const msg = typeof error?.message === 'string' ? error.message : '';
+    if (
+      msg.includes('bid') ||
+      msg.includes('turn to bid') ||
+      msg.includes('Mirror game') ||
+      msg.includes('Must bid')
+    ) {
+      setPendingBid(null);
+      lastForcedAutoBidKeyRef.current = '';
+    }
+    if (msg.includes('spades')) {
       setPendingPlayedCard(null);
       alert(error.message);
     }
@@ -1017,20 +1047,24 @@ export default function GameTableModular({
     isBot
   });
   
-  // Reveal my cards and enable bidding when it's my turn in BIDDING and hands are present
+  // Reveal hand during bidding; never flip back face-down after a reveal in this phase
   useEffect(() => {
     const hands = (gameState as any)?.hands;
-    // CRITICAL FIX: Use mySeatIndex instead of myPlayerIndex to access hands
     const myHandArr = Array.isArray(hands) && mySeatIndex >= 0 ? hands[mySeatIndex] : null;
-    
-    // During BIDDING: Handle blind nil flow
+
     if (gameState?.status === 'BIDDING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
+      const forcedAuto = isSequentialAutoBidFormat(gameState);
+      const allBidsIn = allBiddingSeatsHaveBids(gameState);
       const isMyTurn = gameState?.currentPlayer === currentPlayerId;
       const myBid = (gameState as any)?.bidding?.bids?.[mySeatIndex];
       const haveBid = myBid !== null && myBid !== undefined;
       const allowBlindNil = (gameState as any)?.rules?.allowBlindNil || (gameState as any)?.blindNilAllowed;
-      
-      // DEBUG: Log blind nil conditions
+
+      if (forcedAuto && dealingComplete && allBidsIn) {
+        setCardsRevealed(true);
+        cardsRevealedDuringBiddingRef.current = true;
+      }
+
       console.log('[BLIND NIL DEBUG]', {
         isMyTurn,
         haveBid,
@@ -1038,58 +1072,69 @@ export default function GameTableModular({
         allowBlindNil,
         blindNilDismissed,
         showBlindNilModal,
+        forcedAuto,
+        allBidsIn,
         gameStateRules: (gameState as any)?.rules,
         gameStateBlindNilAllowed: (gameState as any)?.blindNilAllowed
       });
-      
-      // CRITICAL: Cards must stay face down until it's YOUR turn to bid
-      // This applies to ALL players, not just the current bidder
+
       if (!isMyTurn) {
-        // If it's NOT my turn, ensure cards stay face down
-        setCardsRevealed(false);
-        console.log('[CARD REVEAL] Keeping cards face down - not my turn, currentPlayer:', gameState?.currentPlayer, 'myUserId:', currentPlayerId);
-        return; // Don't process further if it's not my turn
+        if (!cardsRevealedDuringBiddingRef.current) {
+          setCardsRevealed(false);
+          console.log(
+            '[CARD REVEAL] Face down — not my turn',
+            gameState?.currentPlayer,
+            currentPlayerId
+          );
+        }
+        return;
       }
-      
-      // Only process card revealing logic if it's MY turn
-      // BLIND NIL LOGIC: Show blind nil modal before revealing cards
+
       if (isMyTurn && !haveBid && !cardsRevealedDuringBiddingRef.current && allowBlindNil && !blindNilDismissed) {
         console.log('[BLIND NIL] Showing blind nil modal - cards stay face down');
         setShowBlindNilModal(true);
-        // CRITICAL: Don't reveal cards yet - wait for blind nil decision
         setCardsRevealed(false);
         return;
       }
-      
-      // Only after deal animation completes: reveal when it's your turn (avoids face-up flash mid-deal)
+
       if (
         isMyTurn &&
         !haveBid &&
         !cardsRevealedDuringBiddingRef.current &&
         !showBlindNilModal &&
-        dealingComplete
+        dealingComplete &&
+        (!forcedAuto || allBidsIn)
       ) {
         setCardsRevealed(true);
         cardsRevealedDuringBiddingRef.current = true;
-        console.log('[CARD REVEAL] Revealing cards - it is my turn to bid');
+        console.log('[CARD REVEAL] Revealing cards — my turn to bid');
       }
-      
-      // Keep cards revealed ONLY if they were revealed during THIS bidding phase AND it's still your turn
+
       if (cardsRevealedDuringBiddingRef.current && isMyTurn && !showBlindNilModal && dealingComplete) {
         setCardsRevealed(true);
       }
     }
-    
-    // During PLAYING: reveal cards for all players
+
     if (gameState?.status === 'PLAYING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
       setCardsRevealed(true);
     }
-    
-    // Never flip cards back to face down if they were revealed during bidding (after deal finished)
+
     if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING' && dealingComplete) {
       setCardsRevealed(true);
     }
-  }, [gameState?.status, gameState?.currentPlayer, (gameState as any)?.hands, (gameState as any)?.bidding?.bids, currentPlayerId, mySeatIndex, showBlindNilModal, blindNilDismissed, dealingComplete]);
+  }, [
+    gameState?.status,
+    gameState?.currentPlayer,
+    (gameState as any)?.hands,
+    (gameState as any)?.bidding?.bids,
+    (gameState as any)?.format,
+    (gameState as any)?.gimmickVariant,
+    currentPlayerId,
+    mySeatIndex,
+    showBlindNilModal,
+    blindNilDismissed,
+    dealingComplete
+  ]);
   
   // Game action handlers
   const [isPlayingCard, setIsPlayingCard] = useState(false);
@@ -1128,14 +1173,27 @@ export default function GameTableModular({
   };
   
   const handleBidWrapper = (bid: number) => {
-    console.log('[SIMPLE HUMAN BID] Human bid:', currentPlayerId, 'bid:', bid);
-    
-    // Simple: just show the bid and let server handle the rest
-    if (currentPlayerId) {
-      setPendingBid({ playerId: currentPlayerId, bid });
+    if (!currentPlayerId || gameState.currentPlayer !== currentPlayerId) {
+      console.warn('[BID] Ignored — not current bidder', {
+        currentPlayerId,
+        serverTurn: gameState.currentPlayer
+      });
+      return;
     }
-    
-    // Let server handle the rest
+
+    const forced = isSequentialAutoBidFormat(gameState);
+    const dedupeKey = `${gameState.id}:${String(gameState.currentRound)}:${currentPlayerId}`;
+    if (forced && lastForcedAutoBidKeyRef.current === dedupeKey) {
+      console.warn('[BID] Ignored duplicate forced-format bid', dedupeKey);
+      return;
+    }
+    if (forced) {
+      lastForcedAutoBidKeyRef.current = dedupeKey;
+    }
+
+    console.log('[SIMPLE HUMAN BID] Human bid:', currentPlayerId, 'bid:', bid);
+    setPendingBid({ playerId: currentPlayerId, bid });
+
     handleBid(bid, currentPlayerId, currentPlayer, gameState, socket, {
       playBidSound,
       setCardsRevealed,
@@ -1184,6 +1242,7 @@ export default function GameTableModular({
       // CRITICAL FIX: Only reset the ref when ENTERING bidding phase (not already in it)
       if (prevStatus !== 'BIDDING') {
         cardsRevealedDuringBiddingRef.current = false;
+        lastForcedAutoBidKeyRef.current = '';
       }
     } else {
       setIsBiddingPhase(false);

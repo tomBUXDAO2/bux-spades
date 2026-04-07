@@ -427,11 +427,24 @@ export default function GameTablePlayers({
                         alt={displayName}
                         width={avatarWidth}
                         height={avatarHeight}
-                        className={`rounded-full object-cover ${isAway ? 'opacity-40' : ''}`}
+                        className={`rounded-full object-cover ${isAway ? 'opacity-45' : ''}`}
                       />
                       {isAway && (
-                        <div className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-1/2 whitespace-nowrap rounded bg-black/70 px-1 text-[6px] font-bold text-amber-200 sm:text-[7px]">
-                          AWAY
+                        <div
+                          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-full bg-black/50 ring-2 ring-amber-500/60"
+                          aria-label="Away"
+                        >
+                          <span
+                            className="font-black uppercase tracking-tight text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+                            style={{
+                              fontSize: isVerySmallScreen
+                                ? Math.max(8, avatarWidth * 0.22)
+                                : Math.max(10, avatarWidth * 0.2),
+                              lineHeight: 1,
+                            }}
+                          >
+                            AWAY
+                          </span>
                         </div>
                       )}
                       {/* Emoji reaction overlay */}

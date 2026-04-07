@@ -213,10 +213,10 @@ export const BiddingOverlay: React.FC<{
   // Use ref to prevent infinite bid loops - tracks if we've already called onBid
   const autoBidSentRef = React.useRef(false);
   
-  // Reset the ref when the current player changes
+  // Reset when turn or round changes (avoids stale locks; helps React Strict Mode double-invoke)
   React.useEffect(() => {
     autoBidSentRef.current = false;
-  }, [gameState.currentPlayer]);
+  }, [gameState.currentPlayer, (gameState as any).currentRound]);
 
   // Auto-bid for MIRROR games (must bid number of spades)
   React.useEffect(() => {

@@ -210,7 +210,14 @@ export const useSocketEventHandlers = ({
         if (biddingData.gameState) {
           // CRITICAL FIX: Prevent bid corruption by preserving existing bids if new data has nulls
           const newState = normalizeGameState(biddingData.gameState);
-          
+          if (
+            newState &&
+            currentGameState?.currentRound != null &&
+            (newState.currentRound === undefined || newState.currentRound === null)
+          ) {
+            (newState as any).currentRound = currentGameState.currentRound;
+          }
+
           // CRITICAL FIX: Log the currentPlayer from server to debug the issue
           console.log('[BIDDING UPDATE] Server currentPlayer:', biddingData.gameState.currentPlayer);
           console.log('[BIDDING UPDATE] My userId:', userId);
