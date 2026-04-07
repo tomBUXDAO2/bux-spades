@@ -604,6 +604,20 @@ export default function GameTableModular({
 
     setHandSummaryData(fallbackSummary);
     setShowHandSummary(true);
+    // Table bid/made badges read gameState.bidding + player.tricks — server payload still has the
+    // finished hand; clear so UI shows 0/0 while summary is open and after close until new_hand_started.
+    setPendingBid(null);
+    setGameState((prev: GameState) => {
+      const players = (prev.players || []).map((p) =>
+        p ? { ...p, tricks: 0, bid: undefined } : p
+      );
+      const prevBidding = prev.bidding || {};
+      return {
+        ...prev,
+        players,
+        bidding: { ...prevBidding, bids: [null, null, null, null] }
+      };
+    });
   };
   
   useEffect(() => {
