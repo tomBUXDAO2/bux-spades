@@ -389,6 +389,21 @@ class GameJoinHandler {
         
         // Emit spectator left event
         this.io.to(gameId).emit('spectator_left', { gameId, userId });
+
+        // Refresh Redis + broadcast so spectators are not left in cached `players` / `spectators`
+        try {
+          const redisGs = (await import('../../../services/RedisGameStateService.js')).default;
+          const fresh = await GameService.getFullGameStateFromDatabase(gameId);
+          if (fresh) {
+            await redisGs.setGameState(gameId, fresh);
+          }
+          const updatedState = await GameService.getGameStateForClient(gameId);
+          if (updatedState) {
+            emitPersonalizedGameEvent(this.io, gameId, 'game_update', updatedState);
+          }
+        } catch (e) {
+          console.error('[GAME LEAVE] Spectator leave: failed to refresh game state:', e);
+        }
         
         // Send system message for spectator leaving
         try {

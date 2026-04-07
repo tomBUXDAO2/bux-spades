@@ -704,7 +704,9 @@ export class GameService {
       return sanitizedState;
     }
 
-    const userPlayer = sanitizedState.players?.find(p => p && p.userId === userId);
+    const userPlayer = sanitizedState.players?.find(
+      (p) => p && p.userId === userId && !p.isSpectator
+    );
 
     if (!userPlayer || userPlayer.seatIndex === undefined || userPlayer.seatIndex === null || userPlayer.seatIndex < 0) {
       scrubAllHands();
@@ -797,7 +799,8 @@ export class GameService {
       const cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
         console.log(`[GAME SERVICE] Using cached game state for game ${gameId} - INSTANT LOAD`);
-        
+        this.normalizePlayerSlotsForClient(cachedGameState);
+
         // Only get hands data from Redis - no database calls
         const playerHands = await redisGameState.getPlayerHands(gameId);
         if (playerHands && playerHands.length > 0) {
@@ -872,6 +875,49 @@ export class GameService {
   }
 
   /**
+   * 4-slot `players` must never contain spectators — client seat logic assumes seated players only.
+   * Mutates state in place.
+   */
+  static normalizePlayerSlotsForClient(state) {
+    if (!state || !Array.isArray(state.players)) return state;
+    if (state.players.length === 4) {
+      state.players = state.players.map((p) => (p && p.isSpectator ? null : p));
+    }
+    return state;
+  }
+
+  /** Split DB GamePlayer rows into 4 seat slots + spectators (never mix spectators into players). */
+  static mapDbGamePlayersToClientSlots(dbPlayers) {
+    const players = [null, null, null, null];
+    const spectators = [];
+    if (!Array.isArray(dbPlayers)) {
+      return { players, spectators };
+    }
+    for (const p of dbPlayers) {
+      if (!p) continue;
+      const row = {
+        id: p.userId,
+        userId: p.userId,
+        username: p.user?.username,
+        avatarUrl: p.user?.avatarUrl,
+        seatIndex: p.seatIndex,
+        teamIndex: p.teamIndex,
+        isHuman: p.isHuman,
+        isSpectator: !!p.isSpectator,
+        type: p.isHuman ? 'human' : 'bot',
+        bid: null,
+        tricks: 0
+      };
+      if (p.isSpectator) {
+        spectators.push(row);
+      } else if (p.seatIndex != null && p.seatIndex >= 0 && p.seatIndex < 4) {
+        players[p.seatIndex] = { ...row, isSpectator: false };
+      }
+    }
+    return { players, spectators };
+  }
+
+  /**
    * Get game state for client - Redis first, database fallback
    */
   static async getGameStateForClient(gameId, userId = null) {
@@ -879,6 +925,7 @@ export class GameService {
       // REAL-TIME: Try to get game state from Redis first (instant)
       let cachedGameState = await redisGameState.getGameState(gameId);
       if (cachedGameState) {
+        this.normalizePlayerSlotsForClient(cachedGameState);
         // CRITICAL FIX: For WAITING games, skip all database queries - just return cached state
         if (cachedGameState.status === 'WAITING') {
           console.log(`[GAME SERVICE] Game ${gameId} is WAITING, returning cached state without database queries`);
@@ -939,7 +986,9 @@ export class GameService {
               suit: card.suit,
               rank: card.rank,
               seatIndex: card.seatIndex,
-              playerId: cachedGameState.players.find(p => p.seatIndex === card.seatIndex)?.userId
+              playerId: cachedGameState.players.find(
+                (p) => p && p.seatIndex === card.seatIndex
+              )?.userId
             }));
             // Also store in Redis for future requests
             await redisGameState.setCurrentTrick(gameId, currentTrickCards);
@@ -1038,19 +1087,9 @@ export class GameService {
             include: { user: true }
           });
           if (dbPlayers && dbPlayers.length > 0) {
-            cachedGameState.players = dbPlayers.map(p => ({
-              id: p.id,
-              userId: p.userId,
-              username: p.user?.username,
-              avatarUrl: p.user?.avatarUrl,
-              seatIndex: p.seatIndex,
-              teamIndex: p.teamIndex,
-              isHuman: p.isHuman,
-              isSpectator: p.isSpectator,
-              type: p.isHuman ? 'human' : 'bot',
-              bid: null,
-              tricks: 0
-            }));
+            const mapped = this.mapDbGamePlayersToClientSlots(dbPlayers);
+            cachedGameState.players = mapped.players;
+            cachedGameState.spectators = mapped.spectators;
           }
         }
         
@@ -1375,7 +1414,11 @@ export class GameService {
         
         if (player.isSpectator) {
           spectatorsArray.push(playerData);
-        } else {
+        } else if (
+          player.seatIndex != null &&
+          player.seatIndex >= 0 &&
+          player.seatIndex < 4
+        ) {
           playersArray[player.seatIndex] = playerData;
         }
       });
