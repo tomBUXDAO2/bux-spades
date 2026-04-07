@@ -48,7 +48,8 @@ export function tableBidTotalFromBids(bidsBySeat) {
 
 export function isNilBid(b) {
   if (b === null || b === undefined || b === '') return false;
-  return Number(b) === 0;
+  const n = Number(b);
+  return n === 0;
 }
 
 /** Redis/JSON may use string seat indices — required for partner/win checks */
@@ -246,8 +247,12 @@ export function buildExpertContext(base) {
   const partnerBid = bidsBySeat?.[partnerSeat];
   const partnerPl = game?.players?.[partnerSeat];
   const myPl = game?.players?.[seatIndex];
-  const selfNil = isNilBid(myBid) || myPl?.isNil === true;
-  const partnerNil = isNilBid(partnerBid) || partnerPl?.isNil === true;
+  const selfNil =
+    isNilBid(myBid) || myPl?.isNil === true || myPl?.isBlindNil === true;
+  const partnerNil =
+    isNilBid(partnerBid) ||
+    partnerPl?.isNil === true ||
+    partnerPl?.isBlindNil === true;
 
   const bidsSafe = Array.isArray(bidsBySeat) ? bidsBySeat : [];
   const oppSeats = [0, 1, 2, 3].filter((s) => s !== seatIndex && s !== partnerSeat);
@@ -381,7 +386,7 @@ export function spadesRemainingCount(played, hand) {
 // --- Play branches ---
 
 function playSelfNil(ctx) {
-  const { hand, trick, seatIndex, leadSuit, isLeading, takeAllMode, cautiousMode } = ctx;
+  const { hand, trick, seatIndex, leadSuit, isLeading } = ctx;
   if (isLeading) {
     const nonSp = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
     if (nonSp.length) return nonSp[0];
@@ -401,14 +406,7 @@ function playSelfNil(ctx) {
   if (mySp.length) {
     const pick = nilPickHighestLosing(trick, seatIndex, mySp);
     if (pick) return pick;
-    if (cautiousMode) {
-      const mustWin = mySp.every((c) => wouldWinWithCard(trick, c, seatIndex));
-      if (mustWin) return sortDesc(mySp)[0];
-    }
-    if (takeAllMode) {
-      const w = minimalWinningSpade(trick, hand);
-      if (w) return w;
-    }
+    // Forced to win with every spade: play lowest (never minimalWinning / high spades).
     return sortAsc(mySp)[0];
   }
   return sortDesc(hand)[0];
@@ -542,6 +540,10 @@ function playDefendOppNil(ctx) {
     takeAllMode,
     game
   } = ctx;
+
+  // Must never run defend-nil tactics while we (or partner) are on nil — double-nil mis-routing used to do this.
+  if (ctx.selfNil) return playSelfNil(ctx);
+  if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
 
   if (isLeading) {
     const suits = groupBySuit(hand);
@@ -818,9 +820,10 @@ function teamNeedsTricks(ctx) {
 }
 
 function playDoubleNil(ctx) {
+  // Own nil always beats “attack their nil” — behind used to call playDefendOppNil and bots would win books.
+  if (ctx.selfNil) return playSelfNil(ctx);
+  if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
   if (ctx.weAreAhead) {
-    if (ctx.selfNil) return playSelfNil(ctx);
-    if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
     return playCautious(ctx);
   }
   if (ctx.oppNilSeat != null) {

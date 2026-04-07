@@ -997,9 +997,15 @@ class BotService {
       ? trick.find((c) => normSeat(c.seatIndex) === normSeat(partnerSeat))
       : null;
 
-    const scenario = (game.players[seatIndex]?.isNil || isNilBid(myBid))
-      ? 'self_nil'
-      : ((partner?.isNil || isNilBid(partnerBid)) ? 'cover_nil' : (tableBidTotal >= 12 ? 'high_pressure' : 'normal'));
+    const pl = game.players?.[seatIndex];
+    const scenario =
+      pl?.isNil || pl?.isBlindNil || isNilBid(myBid)
+        ? 'self_nil'
+        : partner?.isNil || partner?.isBlindNil || isNilBid(partnerBid)
+          ? 'cover_nil'
+          : tableBidTotal >= 12
+            ? 'high_pressure'
+            : 'normal';
 
     const played = collectPlayedCards(game, trick);
     const spadesRemainingApprox = Math.max(0, 13 - countSpadesPlayed(played));
