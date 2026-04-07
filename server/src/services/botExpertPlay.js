@@ -115,6 +115,14 @@ export function wouldWinWithCard(trick, card, seatIndex) {
   return normSeat(provisionalWinnerSeat(hyp)) === normSeat(seatIndex);
 }
 
+/** When you cannot (or should not) win, dump the lowest card. If every card wins, play lowest anyway. */
+export function lowestSluffNotWinning(trick, hand, seatIndex) {
+  const si = normSeat(seatIndex);
+  const losers = hand.filter((c) => !wouldWinWithCard(trick, c, si));
+  if (losers.length) return sortAsc(losers)[0];
+  return sortAsc(hand)[0];
+}
+
 export function highestInSuit(trick, suit) {
   const inS = trick.filter((c) => c.suit === suit);
   if (!inS.length) return null;
@@ -414,6 +422,11 @@ function playCoverNil(ctx) {
     // Nil partner is winning the trick — must take it if possible (e.g. spade lead + nil played 8♠, we have 10♠)
     const leadCards = hand.filter((c) => c.suit === leadSuit);
     if (leadCards.length) {
+      // Last to play: lowest card that wins the trick in lead suit (cover nil efficiently)
+      if (trick.length === 3) {
+        const winners = leadCards.filter((c) => wouldWinWithCard(trick, c, seatIndex));
+        if (winners.length) return sortAsc(winners)[0];
+      }
       const q = leadCards.find((c) => c.rank === 'Q');
       const k = leadCards.find((c) => c.rank === 'K');
       const a = leadCards.find((c) => c.rank === 'A');
@@ -427,6 +440,15 @@ function playCoverNil(ctx) {
         if (wouldWinWithCard(trick, c, seatIndex)) return c;
       }
       return sortAsc(leadCards)[0];
+    }
+    // Void in lead: last to play — lowest winning spade if possible, else lowest spade
+    if (trick.length === 3) {
+      const spades = sortAsc(hand.filter((c) => c.suit === 'SPADES'));
+      if (spades.length) {
+        const winSp = minimalWinningSpade(trick, hand);
+        if (winSp) return winSp;
+        return spades[0];
+      }
     }
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
@@ -560,7 +582,16 @@ function playDefendOppNil(ctx) {
 }
 
 function playAggressive(ctx) {
-  const { hand, trick, partnerSeat, leadSuit, isLeading, spadesBroken, seatIndex } = ctx;
+  const {
+    hand,
+    trick,
+    partnerSeat,
+    leadSuit,
+    isLeading,
+    spadesBroken,
+    seatIndex,
+    aggressiveTable
+  } = ctx;
   if (isLeading) {
     const suits = groupBySuit(hand);
     const nonSp = ['HEARTS', 'DIAMONDS', 'CLUBS'];
@@ -599,7 +630,13 @@ function playAggressive(ctx) {
     return sortAsc(leadCards)[0];
   }
 
-  const partnerVoid = voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+  // Table 12–13: void with partner winning — dump lowest losers, not high cards (nil paths use other plays)
+  let partnerVoid = null;
+  if (partnerWinning(trick, partnerSeat)) {
+    partnerVoid = aggressiveTable
+      ? lowestSluffNotWinning(trick, hand, seatIndex)
+      : voidWhenPartnerWinning(trick, hand, seatIndex, partnerSeat);
+  }
   if (partnerVoid) return partnerVoid;
 
   const wSeat = normSeat(provisionalWinnerSeat(trick));

@@ -3,7 +3,7 @@ import { GameLoggingService } from './GameLoggingService.js';
 import { BotUserService } from './BotUserService.js';
 import { prisma } from '../config/database.js';
 import SpadesRuleService from './SpadesRuleService.js';
-import { expertChooseCard, normSeat } from './botExpertPlay.js';
+import { expertChooseCard, normSeat, lowestSluffNotWinning } from './botExpertPlay.js';
 
 class BotService {
   constructor() {
@@ -1189,14 +1189,18 @@ class BotService {
       return this.sortByRankAsc(leadCards)[0];
     }
 
-    // Void in lead suit
-    const sluffPartner = this.voidSluffWhenPartnerWinning(ctx, hand);
-    if (sluffPartner) return sluffPartner;
+    // Void in lead suit — high team bids (12+): dump lowest when not taking the book (nil uses self_nil/cover_nil)
+    if (
+      trick.length > 0 &&
+      normSeat(this.provisionalTrickWinnerSeat(trick)) === normSeat(partnerSeat)
+    ) {
+      return lowestSluffNotWinning(trick, hand, seatIndex);
+    }
     const cut = this.minimalSpadeToWin(ctx, hand);
     if (cut) return cut;
-    // Else dump lowest losing (prefer non-spades)
+    // Cannot win — lowest dump (prefer non-spades when sluffing)
     const nonSp = hand.filter(c => c.suit !== 'SPADES');
-    return this.sortByRankAsc(nonSp.length?nonSp:hand)[0];
+    return this.sortByRankAsc(nonSp.length ? nonSp : hand)[0];
   }
 
   playNormalPressure(ctx) {
@@ -1298,6 +1302,13 @@ class BotService {
       // Need to win to cover
       const leadCards = hand.filter(c => c.suit === leadSuit);
       if (leadCards.length) {
+        // Last to play: lowest card that wins the trick (beats partner / current winner)
+        if (trick.length === 3) {
+          const winners = leadCards.filter((c) =>
+            this.wouldSeatTakeTrickWithCard(trick, c, seatIndex)
+          );
+          if (winners.length) return this.sortByRankAsc(winners)[0];
+        }
         // If holding QKA, prefer Q to take control
         const q = leadCards.find(c => c.rank === 'Q');
         const k = leadCards.find(c => c.rank === 'K');
@@ -1307,7 +1318,15 @@ class BotService {
         if (win) return win;
         return this.sortByRankAsc(leadCards)[0];
       }
-      // Void: try to win with minimal spade; else dump lowest
+      // Void in lead: last to play — lowest winning spade, else lowest spade
+      if (trick.length === 3) {
+        const spades = this.sortByRankAsc(hand.filter((c) => c.suit === 'SPADES'));
+        if (spades.length) {
+          const winSp = this.minimalSpadeToWin(ctx, hand);
+          if (winSp) return winSp;
+          return spades[0];
+        }
+      }
       const cut = this.minimalSpadeToWin(ctx, hand);
       if (cut) return cut;
       const nonSp = hand.filter(c => c.suit !== 'SPADES');
