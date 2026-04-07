@@ -1314,11 +1314,25 @@ export default function GameTableModular({
     setTrickWinner(null);
     setAnimatingTrick(false);
     setTrickCompleted(false);
+    // Clear stale bid/made immediately — server may take a moment before new_hand_started
+    setGameState((prev: GameState) => {
+      const players = (prev.players || []).map((p) =>
+        p ? { ...p, tricks: 0, bid: undefined } : p
+      );
+      const prevBidding = prev.bidding || {};
+      const rawBids = prevBidding.bids;
+      const bids = Array.isArray(rawBids) ? [null, null, null, null] : rawBids;
+      return {
+        ...prev,
+        players,
+        bidding: { ...prevBidding, bids }
+      };
+    });
     if (socket && gameState.id) {
       console.log('[HAND SUMMARY] Continuing to next round for game:', gameState.id);
       socket.emit('hand_summary_continue', { gameId: gameState.id });
     }
-  }, [socket, gameState.id]);
+  }, [socket, gameState.id, setGameState]);
   
   const handleViewPlayerStats = (player: any) => {
     setSelectedPlayer(player);

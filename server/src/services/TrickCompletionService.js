@@ -13,6 +13,91 @@ import { emitPersonalizedGameEvent } from './SocketGameBroadcastService.js';
 export class TrickCompletionService {
   // Mutex to prevent duplicate round creation
   static startingRounds = new Set();
+
+  /** After 13 tricks, game stays PLAYING until hand summary continue — detect that state. */
+  static async isWaitingForHandSummaryContinue(gameId) {
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      select: { status: true, currentRound: true }
+    });
+    if (!game || game.status !== 'PLAYING' || !game.currentRound) return false;
+    const round = await prisma.round.findFirst({
+      where: { gameId, roundNumber: game.currentRound },
+      include: { _count: { select: { tricks: true } } }
+    });
+    return !!(round && round._count.tricks >= 13);
+  }
+
+  /** Seated human players (non-spectator) with a socket currently in the game room. */
+  static async countSeatedHumansInGameRoom(gameId, io) {
+    if (!io) return 0;
+    let sockets = [];
+    try {
+      sockets = await io.in(gameId).fetchSockets();
+    } catch (e) {
+      console.error('[TRICK COMPLETION] fetchSockets failed:', e?.message || e);
+      return 0;
+    }
+    const seatedHumans = await prisma.gamePlayer.findMany({
+      where: { gameId, isHuman: true, isSpectator: { not: true } },
+      select: { userId: true }
+    });
+    const allowed = new Set(seatedHumans.map((p) => p.userId).filter(Boolean));
+    let n = 0;
+    for (const s of sockets) {
+      const uid = s.userId || s.data?.userId;
+      if (uid && allowed.has(uid)) n++;
+    }
+    return n;
+  }
+
+  /**
+   * If the hand ended but no client sent hand_summary_continue, bots (or an empty room) deadlock.
+   * Schedule: (1) soon when no humans in room, (2) safety net so games never hang indefinitely.
+   */
+  static scheduleAutoContinueAfterHandSummary(gameId, io) {
+    if (!io || !gameId) return;
+    const noHumanDelayMs = Number(process.env.HAND_SUMMARY_AUTO_CONTINUE_MS || 2500);
+    const safetyDelayMs = Number(process.env.HAND_SUMMARY_SAFETY_CONTINUE_MS || 60000);
+
+    setTimeout(() => {
+      this.tryAutoContinueFromHandSummary(gameId, io, 'no_humans').catch((e) =>
+        console.error('[TRICK COMPLETION] no_humans auto-continue error:', e)
+      );
+    }, noHumanDelayMs);
+
+    setTimeout(() => {
+      this.tryAutoContinueFromHandSummary(gameId, io, 'safety_net').catch((e) =>
+        console.error('[TRICK COMPLETION] safety_net auto-continue error:', e)
+      );
+    }, safetyDelayMs);
+  }
+
+  static async tryAutoContinueFromHandSummary(gameId, io, reason) {
+    if (!io) return;
+    if (this.startingRounds.has(gameId)) {
+      console.log(`[TRICK COMPLETION] Auto-continue skipped (${reason}): round start already in progress`);
+      return;
+    }
+    const waiting = await this.isWaitingForHandSummaryContinue(gameId);
+    if (!waiting) {
+      console.log(`[TRICK COMPLETION] Auto-continue skipped (${reason}): not between hands`);
+      return;
+    }
+    if (reason === 'no_humans') {
+      const humans = await this.countSeatedHumansInGameRoom(gameId, io);
+      if (humans > 0) {
+        console.log(`[TRICK COMPLETION] Auto-continue skipped (no_humans): ${humans} human(s) still in room`);
+        return;
+      }
+    }
+    console.log(`[TRICK COMPLETION] Server auto-continuing after hand summary (${reason}) for game ${gameId}`);
+    try {
+      await this.startNewRound(gameId, io);
+    } catch (e) {
+      console.error(`[TRICK COMPLETION] Auto-continue startNewRound failed:`, e?.message || e);
+    }
+  }
   /**
    * Check if a trick is complete (4 cards) and handle completion if it is
    * @param {string} gameId - The game ID
@@ -256,44 +341,34 @@ export class TrickCompletionService {
       
       if (gameComplete.isComplete) {
         console.log(`[TRICK COMPLETION] Game is complete! Winner: ${gameComplete.winner}, Reason: ${gameComplete.reason}`);
-        // Complete the game
-        await ScoringService.completeGame(gameId, gameComplete.winner, gameComplete.reason);
-        
-        // Emit game complete event if io is provided
+
+        // Emit game_complete BEFORE completeGame so clients are not blocked by coins, stats, Discord, etc.
         if (io) {
-          console.log(`[TRICK COMPLETION] io instance available, emitting game_complete event`);
-          // CRITICAL FIX: Use the running totals directly from calculateRoundScores
-          // The scores object now includes team0RunningTotal and team1RunningTotal
-          // This ensures we have the correct final scores including the last round
-          // DO NOT use getGameStateForClient here as it may have stale scores from cache
-          
-          // Get the RoundScore we just created - this has the correct final scores
+          console.log(`[TRICK COMPLETION] io instance available, emitting game_complete (before completion side-effects)`);
+
           const currentRoundScore = await prisma.roundScore.findUnique({
             where: { id: roundId } // RoundScore.id = roundId
           });
 
-          // CRITICAL: Use running totals from scores object FIRST (most reliable)
-          // Then fall back to RoundScore query (should match)
-          // DO NOT use finalGameState scores as they may be stale
           const finalTeam1Score = scores.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? 0;
           const finalTeam2Score = scores.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? 0;
-          
+
           console.log(`[TRICK COMPLETION] Final scores - scores object: team0RunningTotal=${scores.team0RunningTotal}, team1RunningTotal=${scores.team1RunningTotal}`);
           console.log(`[TRICK COMPLETION] Final scores - RoundScore query: team0RunningTotal=${currentRoundScore?.team0RunningTotal}, team1RunningTotal=${currentRoundScore?.team1RunningTotal}`);
           console.log(`[TRICK COMPLETION] Final scores - USING: team0RunningTotal=${finalTeam1Score}, team1RunningTotal=${finalTeam2Score}`);
 
-          // Get game state for client (but we'll override the scores)
           const finalGameState = await GameService.getGameStateForClient(gameId);
-          
-          // For solo games, get player running totals from RoundScore
-          const finalPlayerScores = (finalGameState?.gameMode === 'SOLO' && currentRoundScore) ? [
-            currentRoundScore.player0Running ?? 0,
-            currentRoundScore.player1Running ?? 0,
-            currentRoundScore.player2Running ?? 0,
-            currentRoundScore.player3Running ?? 0
-          ] : undefined;
 
-          // CRITICAL: Override the scores in finalGameState with the correct final scores
+          const finalPlayerScores =
+            finalGameState?.gameMode === 'SOLO' && currentRoundScore
+              ? [
+                  currentRoundScore.player0Running ?? 0,
+                  currentRoundScore.player1Running ?? 0,
+                  currentRoundScore.player2Running ?? 0,
+                  currentRoundScore.player3Running ?? 0
+                ]
+              : undefined;
+
           if (finalGameState) {
             finalGameState.team1TotalScore = finalTeam1Score;
             finalGameState.team2TotalScore = finalTeam2Score;
@@ -302,18 +377,16 @@ export class TrickCompletionService {
             }
             finalGameState.team1Bags = scores.team0Bags ?? finalGameState.team1Bags ?? 0;
             finalGameState.team2Bags = scores.team1Bags ?? finalGameState.team2Bags ?? 0;
+            finalGameState.status = 'FINISHED';
           }
-          
-          // Update Redis cache with correct final scores immediately
-          // Use the already-imported redisGameState service; dynamic import here
-          // was resolving to an incorrect path in production and throwing.
+
           if (finalGameState) {
             await redisGameState.setGameState(gameId, finalGameState);
-            console.log(`[TRICK COMPLETION] Updated Redis cache with correct final scores`);
+            console.log(`[TRICK COMPLETION] Updated Redis cache with final scores (pre-completion)`);
           }
-          
+
           console.log(`[TRICK COMPLETION] Emitting game_complete with final scores: team1Score=${finalTeam1Score}, team2Score=${finalTeam2Score}`);
-          
+
           emitPersonalizedGameEvent(io, gameId, 'game_complete', finalGameState, {
             winner: gameComplete.winner,
             reason: gameComplete.reason,
@@ -329,7 +402,14 @@ export class TrickCompletionService {
         } else {
           console.error(`[TRICK COMPLETION] CRITICAL: io instance is null/undefined, cannot emit game_complete!`);
         }
-        
+
+        try {
+          await ScoringService.completeGame(gameId, gameComplete.winner, gameComplete.reason);
+        } catch (completeErr) {
+          console.error(`[TRICK COMPLETION] completeGame failed after game_complete was emitted:`, completeErr?.message || completeErr);
+          throw completeErr;
+        }
+
         // Note: we do NOT return here; we still want to emit round_complete below
       }
 
@@ -339,6 +419,8 @@ export class TrickCompletionService {
       if (io) {
         console.log(`[TRICK COMPLETION] Emitting round_complete event (gameComplete.isComplete=${gameComplete.isComplete})`);
         console.log(`[TRICK COMPLETION] Delaying round_complete event to allow trick animation to complete`);
+
+        const scheduleAutoContinue = !gameComplete.isComplete;
         
         // CRITICAL: Stop any player timers until next round actually starts
         try {
@@ -496,10 +578,16 @@ export class TrickCompletionService {
             const emitPayload = { extraPayload: { scores: baseSummary } };
             console.log(`[TRICK COMPLETION] Emit payload structure:`, JSON.stringify(emitPayload, null, 2));
             safeEmit(emitPayload);
+            if (scheduleAutoContinue) {
+              TrickCompletionService.scheduleAutoContinueAfterHandSummary(gameId, io);
+            }
           } catch (roundCompleteError) {
             console.error('[TRICK COMPLETION] Error preparing round_complete event:', roundCompleteError);
             // CRITICAL FIX: Pass scores in extraPayload so emitPersonalizedGameEvent can properly spread it
             safeEmit({ extraPayload: { scores: scores ?? {} } });
+            if (scheduleAutoContinue) {
+              TrickCompletionService.scheduleAutoContinueAfterHandSummary(gameId, io);
+            }
           }
         }, 380); // Brief delay so final trick can finish before round_complete
       } else {
