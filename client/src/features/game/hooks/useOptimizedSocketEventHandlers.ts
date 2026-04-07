@@ -404,11 +404,7 @@ export const useOptimizedSocketEventHandlers = ({
     console.log('🎮 Game started event received:', gameData);
     if (gameData && gameData.gameId === gameId) {
       setGameState(normalizeGameState(gameData.gameState));
-      
-      // Play card dealing sound effect when cards are dealt
-      import('../../../services/utils/soundUtils').then(({ playCardDealingSound }) => {
-        playCardDealingSound();
-      });
+      // Deal sounds + stagger are owned by GameTable (synced to face-down deal animation)
     }
   }, [gameId, setGameState]);
 

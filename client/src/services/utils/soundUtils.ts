@@ -4,6 +4,7 @@
 
 export {
   playCardSound,
+  playCardDealTickSound,
   playBidSound,
   playWinSound,
   playCheeringSound,

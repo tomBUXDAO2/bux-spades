@@ -343,6 +343,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
             (!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId;
           const playableLift = isPlayable && !isPlayingCard;
           const stackZ = playableLift ? 800 + index : index;
+          const dealingFan = gameState.status === 'BIDDING' && !dealingComplete;
 
           return (
             <motion.div
@@ -358,13 +359,16 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
               initial={false}
               animate={{
                 opacity: !isVisible ? 0 : 1,
-                y: isVisible ? 0 : 18,
-                rotate: isVisible ? 0 : -2,
+                y: isVisible ? 0 : dealingFan ? 10 : 18,
+                x: dealingFan ? (isVisible ? 0 : -36 - index * 3) : 0,
+                rotate: isVisible ? 0 : dealingFan ? -6 : -2,
+                scale: isVisible ? 1 : dealingFan ? 0.94 : 1,
               }}
               transition={{
                 type: 'spring',
-                stiffness: 400,
-                damping: 24,
+                stiffness: dealingFan ? 320 : 400,
+                damping: dealingFan ? 22 : 24,
+                mass: dealingFan ? 0.85 : 1,
               }}
               whileHover={
                 playableLift

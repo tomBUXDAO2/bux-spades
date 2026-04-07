@@ -192,6 +192,24 @@ export const playCardSound = () => {
   }
 };
 
+/**
+ * One-shot card.wav for each deal step — does not interrupt the main playCardSound buffer,
+ * so rapid deal ticks (13 in a row) are audible.
+ */
+export const playCardDealTickSound = () => {
+  try {
+    ensureAudioInitialized();
+    if (!isSoundEnabled()) return;
+    const el = createAudioElement('/sounds/card.wav', 0.26);
+    if (!el) return;
+    el.play().catch((err) => {
+      audioDebugLog('playCardDealTickSound() rejected', { error: String(err) });
+    });
+  } catch (error) {
+    console.log('Card deal tick audio failed:', error);
+  }
+};
+
 // Sound utility for bid
 export const playBidSound = () => {
   try {
@@ -332,18 +350,13 @@ export const playEmojiSound = (emoji: string) => {
   }
 };
 
-export const playCardDealingSound = () => {
+/** Legacy: 13 tick sounds; prefer GameTable-scheduled ticks synced to UI. */
+export const playCardDealingSound = (intervalMs = 92) => {
   try {
     ensureAudioInitialized();
     if (!isSoundEnabled()) return;
-
-    // Play card.wav 13 times (one for each card) with staggered timing
     for (let i = 0; i < 13; i++) {
-      setTimeout(() => {
-        const tempAudio = createAudioElement('/sounds/card.wav', 0.3);
-        if (!tempAudio) return;
-        tempAudio.play().catch(err => console.log('Card dealing audio play failed:', err));
-      }, i * 100); // 100ms delay between each card sound
+      setTimeout(() => playCardDealTickSound(), i * intervalMs);
     }
   } catch (error) {
     console.log('Card dealing audio not supported or failed to load:', error);
@@ -402,6 +415,7 @@ export const useAudioManager = () => {
 
   return {
     playCardSound,
+    playCardDealTickSound,
     playBidSound,
     playWinSound,
     playCheeringSound,

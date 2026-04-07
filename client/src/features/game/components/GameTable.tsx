@@ -184,7 +184,7 @@ export default function GameTableModular({
   const windowSize = useWindowSize();
   
   // Audio management
-  const { playCardSound, playBidSound, playWinSound } = useAudioManager();
+  const { playCardSound, playCardDealTickSound, playBidSound, playWinSound } = useAudioManager();
   
   // Game state
   const [gameState, setGameState] = useState(game);
@@ -261,6 +261,14 @@ export default function GameTableModular({
     trickEntranceCompletedRef.current.clear();
   }, [gameState.id, gameState.currentRound]);
 
+  const playCardDealTickSoundRef = useRef(playCardDealTickSound);
+  useEffect(() => {
+    playCardDealTickSoundRef.current = playCardDealTickSound;
+  }, [playCardDealTickSound]);
+
+  /** ms between each face-down card (left → right) + card tick sound; ~1.25s total */
+  const DEAL_MS_PER_CARD = 96;
+
   const scheduleDealAnimation = useCallback(() => {
     cardsRevealedDuringBiddingRef.current = false;
     dealGenerationRef.current += 1;
@@ -269,21 +277,16 @@ export default function GameTableModular({
     setDealingComplete(false);
     setDealtCardCount(0);
     setBiddingReady(false);
-    try {
-      const { playCardDealingSound } = require('@/components/game/components/AudioManager');
-      playCardDealingSound();
-    } catch {
-      /* optional */
-    }
     for (let i = 0; i < 13; i++) {
-      setTimeout(() => {
+      window.setTimeout(() => {
         if (dealGenerationRef.current !== gen) return;
+        playCardDealTickSoundRef.current();
         setDealtCardCount(i + 1);
         if (i === 12) {
           setDealingComplete(true);
           setBiddingReady(true);
         }
-      }, i * 100);
+      }, i * DEAL_MS_PER_CARD);
     }
   }, []);
   
@@ -511,8 +514,7 @@ export default function GameTableModular({
           play: data.activeGameState.play,
           rules: data.activeGameState.rules
         }));
-        setDealingComplete(true);
-        setBiddingReady(true);
+        // Deal stagger + sounds run from BIDDING+hands effect (do not skip animation on rejoin)
         // CRITICAL FIX: Let the useEffect handle card reveal logic
         // Don't set cardsRevealed here - let the useEffect handle it properly
         // setIsStarting(false); // Using prop from parent
