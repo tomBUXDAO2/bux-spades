@@ -13,7 +13,7 @@ const PrivacyPolicy: React.FC = () => {
             <section>
               <h2 className="text-2xl font-semibold text-slate-200 mt-8 mb-4">1. Introduction</h2>
               <p>
-                Welcome to BUX Spades ("we," "our," or "us"). This Privacy Policy explains how we collect, 
+                Welcome to BUX Spades ("we," "our," or "us"), operated by Thomas James Garner. This Privacy Policy explains how we collect, 
                 use, disclose, and safeguard your information when you use our service. Please read this 
                 privacy policy carefully.
               </p>
@@ -157,6 +157,9 @@ const PrivacyPolicy: React.FC = () => {
               <p>
                 If you have any questions about this Privacy Policy or wish to exercise your rights, 
                 please contact us at:
+              </p>
+              <p className="mt-2">
+                Operator: Thomas James Garner
               </p>
               <p className="mt-2">
                 Email: <a href="mailto:buxdao@gmail.com" className="text-blue-400 hover:text-blue-300 underline">buxdao@gmail.com</a>

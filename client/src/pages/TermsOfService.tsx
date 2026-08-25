@@ -13,7 +13,7 @@ const TermsOfService: React.FC = () => {
             <section>
               <h2 className="text-2xl font-semibold text-slate-200 mt-8 mb-4">1. Acceptance of Terms</h2>
               <p>
-                By accessing and using BUX Spades ("the Service"), you accept and agree to be bound by 
+                By accessing and using BUX Spades ("the Service"), operated by Thomas James Garner, you accept and agree to be bound by 
                 the terms and provision of this agreement. If you do not agree to abide by the above, 
                 please do not use this service.
               </p>
@@ -139,6 +139,9 @@ const TermsOfService: React.FC = () => {
               <h2 className="text-2xl font-semibold text-slate-200 mt-8 mb-4">13. Contact Information</h2>
               <p>
                 If you have any questions about these Terms of Service, please contact us at:
+              </p>
+              <p className="mt-2">
+                Operator: Thomas James Garner
               </p>
               <p className="mt-2">
                 Email: <a href="mailto:buxdao@gmail.com" className="text-blue-400 hover:text-blue-300 underline">buxdao@gmail.com</a>
