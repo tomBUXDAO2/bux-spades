@@ -58,7 +58,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     const clientId = import.meta.env.VITE_FACEBOOK_APP_ID;
     const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
     const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/facebook/callback`);
-    const scope = encodeURIComponent('public_profile,email');
+    const scope = encodeURIComponent('public_profile');
     const stateParam = isCapacitor() ? '&state=capacitor' : '';
     if (!clientId) {
       setError('Facebook app ID not configured');

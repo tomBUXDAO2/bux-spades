@@ -228,7 +228,7 @@ router.get('/facebook/callback', async (req, res) => {
     const accessToken = tokenData.access_token;
 
     // Get user info from Facebook
-    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,email,picture.type(large)&access_token=${accessToken}`);
+    const userResponse = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,picture.type(large)&access_token=${accessToken}`);
 
     if (!userResponse.ok) {
       throw new Error('Failed to get user info');
