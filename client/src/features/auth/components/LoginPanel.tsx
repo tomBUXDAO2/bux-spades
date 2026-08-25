@@ -53,6 +53,31 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     }
   };
 
+  const handleFacebookLogin = async () => {
+    setError(null);
+    const clientId = import.meta.env.VITE_FACEBOOK_APP_ID;
+    const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
+    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/facebook/callback`);
+    const scope = encodeURIComponent('public_profile,email');
+    const stateParam = isCapacitor() ? '&state=capacitor' : '';
+    if (!clientId) {
+      setError('Facebook app ID not configured');
+      return;
+    }
+    const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${stateParam}`;
+    try {
+      if (isCapacitor()) {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: facebookAuthUrl });
+      } else {
+        window.location.href = facebookAuthUrl;
+      }
+    } catch (err) {
+      console.error('Facebook login failed:', err);
+      setError('Failed to redirect to Facebook login. Please try again.');
+    }
+  };
+
   const discordButton = (
     <button
       type="button"
@@ -70,15 +95,14 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   const facebookButton = (
     <button
       type="button"
-      onClick={(e) => e.preventDefault()}
-      disabled
-      className="w-full inline-flex justify-center items-center py-3 px-4 border border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-400 bg-slate-800 cursor-not-allowed"
+      onClick={handleFacebookLogin}
+      disabled={isLoading}
+      className="w-full inline-flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#1877F2] hover:bg-[#166FE5] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1877F2] focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     >
-      <svg className="w-5 h-5 mr-2 shrink-0 opacity-60" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <svg className="w-5 h-5 mr-2 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
-      Facebook
-      <span className="ml-2 text-xs font-normal text-slate-500">Coming soon</span>
+      Continue with Facebook
     </button>
   );
 
