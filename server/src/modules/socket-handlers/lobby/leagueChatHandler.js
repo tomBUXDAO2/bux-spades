@@ -7,7 +7,10 @@ function firstName(username) {
 }
 
 export class LeagueChatHandler {
-  /** @type {Map<string, Map<string, { userId: string, username: string, avatarUrl: string|null }>>} */
+  /**
+   * leagueId -> userId -> presence entry (may have multiple sockets for same user)
+   * @type {Map<string, Map<string, { userId: string, username: string, avatarUrl: string|null, sockets: Set<string> }>>}
+   */
   static roomPresence = new Map();
 
   constructor(io, socket) {
@@ -18,7 +21,11 @@ export class LeagueChatHandler {
   static getPresenceList(leagueId) {
     const room = LeagueChatHandler.roomPresence.get(leagueId);
     if (!room) return [];
-    return Array.from(room.values());
+    return Array.from(room.values()).map(({ userId, username, avatarUrl }) => ({
+      userId,
+      username,
+      avatarUrl
+    }));
   }
 
   static emitPresence(io, leagueId) {
@@ -54,27 +61,37 @@ export class LeagueChatHandler {
 
       if (!this.socket.leagueRooms) this.socket.leagueRooms = new Set();
 
-      const alreadyHere = LeagueChatHandler.roomPresence.get(leagueId)?.has(userId);
-      this.socket.join(`league_${leagueId}`);
+      await this.socket.join(`league_${leagueId}`);
       this.socket.leagueRooms.add(leagueId);
 
       if (member.role === 'OWNER' || member.role === 'ADMIN') {
-        this.socket.join(`league_admins_${leagueId}`);
+        await this.socket.join(`league_admins_${leagueId}`);
       }
 
       if (!LeagueChatHandler.roomPresence.has(leagueId)) {
         LeagueChatHandler.roomPresence.set(leagueId, new Map());
       }
-      LeagueChatHandler.roomPresence.get(leagueId).set(userId, {
-        userId: user.id,
-        username: user.username,
-        avatarUrl: user.avatarUrl
-      });
+      const room = LeagueChatHandler.roomPresence.get(leagueId);
+      const existing = room.get(userId);
+      const isFirstSocket = !existing || existing.sockets.size === 0;
+
+      if (existing) {
+        existing.sockets.add(this.socket.id);
+        existing.username = user.username;
+        existing.avatarUrl = user.avatarUrl;
+      } else {
+        room.set(userId, {
+          userId: user.id,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+          sockets: new Set([this.socket.id])
+        });
+      }
 
       this.socket.emit('league_room_joined', { leagueId });
       LeagueChatHandler.emitPresence(this.io, leagueId);
 
-      if (!alreadyHere) {
+      if (isFirstSocket) {
         LeagueChatHandler.emitSystemMessage(
           this.io,
           leagueId,
@@ -104,16 +121,24 @@ export class LeagueChatHandler {
       return;
     }
 
-    const user = room.get(userId);
+    const entry = room.get(userId);
+    entry.sockets.delete(this.socket.id);
+
+    // Another tab/socket still in the room — stay present, no leave message
+    if (entry.sockets.size > 0) {
+      LeagueChatHandler.emitPresence(this.io, leagueId);
+      return;
+    }
+
     room.delete(userId);
     if (room.size === 0) LeagueChatHandler.roomPresence.delete(leagueId);
 
     LeagueChatHandler.emitPresence(this.io, leagueId);
-    if (announce && user) {
+    if (announce && entry) {
       LeagueChatHandler.emitSystemMessage(
         this.io,
         leagueId,
-        `${firstName(user.username)} left the room`
+        `${firstName(entry.username)} left the room`
       );
     }
   }
@@ -152,7 +177,22 @@ export class LeagueChatHandler {
         return;
       }
       await LeagueService.deleteChatMessage(leagueId, userId, messageId);
-      this.io.to(`league_${leagueId}`).emit('league_chat_deleted', { leagueId, messageId });
+
+      const admin = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true }
+      });
+
+      this.io.to(`league_${leagueId}`).emit('league_chat_deleted', {
+        leagueId,
+        messageId,
+        deletedBy: firstName(admin?.username)
+      });
+      LeagueChatHandler.emitSystemMessage(
+        this.io,
+        leagueId,
+        `${firstName(admin?.username)} deleted a message`
+      );
     } catch (error) {
       this.socket.emit('error', { message: error.message || 'Failed to delete message' });
     }

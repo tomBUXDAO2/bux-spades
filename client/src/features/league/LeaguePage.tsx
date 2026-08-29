@@ -213,22 +213,31 @@ const LeaguePage: React.FC = () => {
 
   useEffect(() => {
     if (!socket || !leagueId || !league?.isMember) return;
+
+    let cancelled = false;
     socket.emit('join_league_room', { leagueId });
 
     const onMessage = (msg: ChatMessage) => {
+      if (cancelled) return;
       if (msg.leagueId && msg.leagueId !== leagueId) return;
       setChatMessages((prev) => [...prev, msg]);
     };
     const onDeleted = (payload: { leagueId?: string; messageId: string }) => {
+      if (cancelled) return;
       if (payload.leagueId && payload.leagueId !== leagueId) return;
       setChatMessages((prev) => prev.filter((m) => m.id !== payload.messageId));
       setSelectedMessageId((id) => (id === payload.messageId ? null : id));
     };
-    const onPresence = (payload: { leagueId?: string; users: { userId: string }[] }) => {
+    const onPresence = (payload: {
+      leagueId?: string;
+      users: { userId: string; username?: string }[];
+    }) => {
+      if (cancelled) return;
       if (payload.leagueId && payload.leagueId !== leagueId) return;
       setRoomOnlineIds((payload.users || []).map((u) => u.userId));
     };
     const onGlobalOnline = (ids: string[]) => {
+      if (cancelled) return;
       setGlobalOnlineIds(Array.isArray(ids) ? ids : []);
     };
     const onMembership = () => {
@@ -237,32 +246,35 @@ const LeaguePage: React.FC = () => {
       if (isAdmin) loadAdminData();
     };
     const refreshFriends = () => loadMembers();
+    const onJoinRequest = () => loadAdminData();
 
     socket.on('league_chat_message', onMessage);
     socket.on('league_chat_deleted', onDeleted);
     socket.on('league_online_users', onPresence);
     socket.on('online_users', onGlobalOnline);
     socket.on('league_membership_updated', onMembership);
-    socket.on('league_join_request', () => loadAdminData());
+    socket.on('league_join_request', onJoinRequest);
     socket.on('friendAdded', refreshFriends);
     socket.on('friendRemoved', refreshFriends);
     socket.on('userBlocked', refreshFriends);
     socket.on('userUnblocked', refreshFriends);
 
     const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+      if (cancelled) return;
       setGlobalOnlineIds(Array.isArray(event.detail) ? event.detail : []);
     };
     window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
 
     const interval = setInterval(loadGames, 8000);
     return () => {
+      cancelled = true;
       socket.emit('leave_league_room', { leagueId });
       socket.off('league_chat_message', onMessage);
       socket.off('league_chat_deleted', onDeleted);
       socket.off('league_online_users', onPresence);
       socket.off('online_users', onGlobalOnline);
       socket.off('league_membership_updated', onMembership);
-      socket.off('league_join_request');
+      socket.off('league_join_request', onJoinRequest);
       socket.off('friendAdded', refreshFriends);
       socket.off('friendRemoved', refreshFriends);
       socket.off('userBlocked', refreshFriends);
@@ -270,7 +282,10 @@ const LeaguePage: React.FC = () => {
       window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
       clearInterval(interval);
     };
-  }, [socket, leagueId, league?.isMember, isAdmin, loadGames, loadLeague, loadMembers, loadAdminData]);
+    // Intentionally omit loader fns from deps — their identity churn was re-joining the room
+    // and racing leave/join so system enter messages never fired.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, leagueId, league?.isMember]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });

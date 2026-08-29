@@ -8,6 +8,7 @@ import { LeagueService } from '../services/LeagueService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
+import { LeagueChatHandler } from '../modules/socket-handlers/lobby/leagueChatHandler.js';
 
 const router = express.Router();
 
@@ -293,7 +294,20 @@ router.delete('/:leagueId/chat/:messageId', authenticateToken, async (req, res) 
       req.params.messageId
     );
     if (io) {
-      io.to(`league_${req.params.leagueId}`).emit('league_chat_deleted', result);
+      const admin = await prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { username: true }
+      });
+      const name = String(admin?.username || 'Admin').trim().split(/\s+/)[0] || 'Admin';
+      io.to(`league_${req.params.leagueId}`).emit('league_chat_deleted', {
+        ...result,
+        deletedBy: name
+      });
+      LeagueChatHandler.emitSystemMessage(
+        io,
+        req.params.leagueId,
+        `${name} deleted a message`
+      );
     }
     res.json(result);
   } catch (error) {
