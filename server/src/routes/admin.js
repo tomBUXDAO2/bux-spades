@@ -678,13 +678,47 @@ router.post('/leagues', authenticateToken, isAdmin, async (req, res) => {
       name,
       ownerUserId: resolvedOwnerId,
       bgColor,
-      logoUrl
+      logoUrl,
+      requireJoinApproval: req.body.requireJoinApproval !== false
     });
     res.status(201).json(league);
   } catch (error) {
     console.error('[ADMIN] Error creating league:', error);
     const status = error.status || 500;
     res.status(status).json({ error: error.message || 'Failed to create league' });
+  }
+});
+
+router.get('/leagues/create-requests', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { LeagueService } = await import('../services/LeagueService.js');
+    const requests = await LeagueService.listCreateRequests();
+    res.json(requests);
+  } catch (error) {
+    console.error('[ADMIN] Error listing league create requests:', error);
+    res.status(500).json({ error: error.message || 'Failed to list requests' });
+  }
+});
+
+router.post('/leagues/create-requests/:requestId/approve', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { LeagueService } = await import('../services/LeagueService.js');
+    const result = await LeagueService.approveCreateRequest(req.params.requestId, req.userId);
+    res.json(result);
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Failed to approve' });
+  }
+});
+
+router.post('/leagues/create-requests/:requestId/reject', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { LeagueService } = await import('../services/LeagueService.js');
+    const result = await LeagueService.rejectCreateRequest(req.params.requestId);
+    res.json(result);
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Failed to reject' });
   }
 });
 

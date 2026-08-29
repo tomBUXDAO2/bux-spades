@@ -77,7 +77,7 @@ export class LeagueService {
     return Boolean(member?.mutedUntil && new Date(member.mutedUntil) > new Date());
   }
 
-  static async createLeague({ name, ownerUserId, bgColor, logoUrl }) {
+  static async createLeague({ name, ownerUserId, bgColor, logoUrl, requireJoinApproval = true }) {
     const owner = await this.requireFacebookUser(ownerUserId);
     let slug = slugify(name);
     const existing = await prisma.league.findUnique({ where: { slug } });
@@ -92,6 +92,7 @@ export class LeagueService {
         ownerId: owner.id,
         bgColor: bgColor || '#0f172a',
         logoUrl: logoUrl || null,
+        requireJoinApproval: requireJoinApproval !== false,
         members: {
           create: {
             userId: owner.id,
@@ -108,6 +109,99 @@ export class LeagueService {
     return league;
   }
 
+  static async submitCreateRequest({ requesterId, name, logoUrl, requireJoinApproval = true }) {
+    await this.requireFacebookUser(requesterId);
+    const trimmed = String(name || '').trim();
+    if (!trimmed) {
+      const err = new Error('League name is required');
+      err.status = 400;
+      throw err;
+    }
+
+    const pending = await prisma.leagueCreateRequest.findFirst({
+      where: { requesterId, status: 'PENDING' }
+    });
+    if (pending) {
+      const err = new Error('You already have a pending league create request');
+      err.status = 400;
+      throw err;
+    }
+
+    return prisma.leagueCreateRequest.create({
+      data: {
+        name: trimmed,
+        logoUrl: logoUrl || null,
+        requireJoinApproval: requireJoinApproval !== false,
+        requesterId,
+        status: 'PENDING'
+      },
+      include: {
+        requester: { select: { id: true, username: true, avatarUrl: true, facebookId: true } }
+      }
+    });
+  }
+
+  static async listCreateRequests() {
+    const requests = await prisma.leagueCreateRequest.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        requester: { select: { id: true, username: true, avatarUrl: true, facebookId: true } }
+      }
+    });
+    return requests.map((r) => ({
+      ...r,
+      facebookProfileUrl: facebookProfileUrl(r.requester.facebookId)
+    }));
+  }
+
+  static async approveCreateRequest(requestId, adminUserId) {
+    const request = await prisma.leagueCreateRequest.findFirst({
+      where: { id: requestId, status: 'PENDING' }
+    });
+    if (!request) {
+      const err = new Error('Create request not found');
+      err.status = 404;
+      throw err;
+    }
+
+    const league = await this.createLeague({
+      name: request.name,
+      ownerUserId: request.requesterId,
+      logoUrl: request.logoUrl,
+      requireJoinApproval: request.requireJoinApproval
+    });
+
+    await prisma.leagueCreateRequest.update({
+      where: { id: request.id },
+      data: { status: 'APPROVED', approvedLeagueId: league.id }
+    });
+
+    return { league, requestId: request.id, approvedBy: adminUserId };
+  }
+
+  static async rejectCreateRequest(requestId) {
+    const request = await prisma.leagueCreateRequest.findFirst({
+      where: { id: requestId, status: 'PENDING' }
+    });
+    if (!request) {
+      const err = new Error('Create request not found');
+      err.status = 404;
+      throw err;
+    }
+    await prisma.leagueCreateRequest.update({
+      where: { id: request.id },
+      data: { status: 'REJECTED' }
+    });
+    return { success: true };
+  }
+
+  static async getMyPendingCreateRequest(userId) {
+    return prisma.leagueCreateRequest.findFirst({
+      where: { requesterId: userId, status: 'PENDING' }
+    });
+  }
+
   static async listLeaguesForUser(userId) {
     const user = userId
       ? await prisma.user.findUnique({
@@ -117,47 +211,64 @@ export class LeagueService {
       : null;
 
     if (!user?.facebookId) {
-      return { requiresFacebook: true, leagues: [] };
+      return { requiresFacebook: true, leagues: [], pendingCreateRequest: null };
     }
 
-    const leagues = await prisma.league.findMany({
-      orderBy: { name: 'asc' },
-      include: {
-        owner: { select: { id: true, username: true, avatarUrl: true } },
-        members: {
-          where: { userId: user.id },
-          select: { role: true, mutedUntil: true, timeoutUntil: true }
-        },
-        joinRequests: {
-          where: { userId: user.id, status: 'PENDING' },
-          select: { id: true, status: true }
-        },
-        _count: { select: { members: true } }
-      }
-    });
+    try {
+      const [leagues, pendingCreateRequest] = await Promise.all([
+        prisma.league.findMany({
+          orderBy: { name: 'asc' },
+          include: {
+            owner: { select: { id: true, username: true, avatarUrl: true } },
+            members: {
+              where: { userId: user.id },
+              select: { role: true, mutedUntil: true, timeoutUntil: true }
+            },
+            joinRequests: {
+              where: { userId: user.id, status: 'PENDING' },
+              select: { id: true, status: true }
+            },
+            _count: { select: { members: true } }
+          }
+        }),
+        this.getMyPendingCreateRequest(user.id).catch(() => null)
+      ]);
 
-    return {
-      requiresFacebook: false,
-      leagues: leagues.map((league) => {
-        const membership = league.members[0] || null;
-        const pendingRequest = league.joinRequests[0] || null;
-        return {
-          id: league.id,
-          name: league.name,
-          slug: league.slug,
-          bgColor: league.bgColor,
-          logoUrl: league.logoUrl,
-          owner: league.owner,
-          memberCount: league._count.members,
-          isMember: Boolean(membership),
-          role: membership?.role || null,
-          mutedUntil: membership?.mutedUntil || null,
-          timeoutUntil: membership?.timeoutUntil || null,
-          pendingRequest: Boolean(pendingRequest),
-          pendingRequestId: pendingRequest?.id || null
-        };
-      })
-    };
+      return {
+        requiresFacebook: false,
+        pendingCreateRequest,
+        leagues: leagues.map((league) => {
+          const membership = league.members[0] || null;
+          const pendingRequest = league.joinRequests[0] || null;
+          return {
+            id: league.id,
+            name: league.name,
+            slug: league.slug,
+            bgColor: league.bgColor,
+            logoUrl: league.logoUrl,
+            requireJoinApproval: league.requireJoinApproval,
+            owner: league.owner,
+            memberCount: league._count.members,
+            isMember: Boolean(membership),
+            role: membership?.role || null,
+            mutedUntil: membership?.mutedUntil || null,
+            timeoutUntil: membership?.timeoutUntil || null,
+            pendingRequest: Boolean(pendingRequest),
+            pendingRequestId: pendingRequest?.id || null
+          };
+        })
+      };
+    } catch (error) {
+      // Missing migration on the connected DB
+      if (error?.code === 'P2021' || /does not exist/i.test(error?.message || '')) {
+        const err = new Error(
+          'League tables are not set up on this database yet. Run prisma db push against the production DATABASE_URL.'
+        );
+        err.status = 503;
+        throw err;
+      }
+      throw error;
+    }
   }
 
   static async getLeague(leagueId, viewerId = null) {
@@ -189,6 +300,7 @@ export class LeagueService {
       slug: league.slug,
       bgColor: league.bgColor,
       logoUrl: league.logoUrl,
+      requireJoinApproval: league.requireJoinApproval,
       owner: league.owner,
       memberCount: league._count.members,
       isMember: Boolean(membership),
@@ -232,6 +344,24 @@ export class LeagueService {
       throw err;
     }
 
+    // Open leagues: join instantly without admin approval
+    if (league.requireJoinApproval === false) {
+      await prisma.leagueMember.create({
+        data: { leagueId, userId, role: 'MEMBER' }
+      });
+      await prisma.leagueJoinRequest.upsert({
+        where: { leagueId_userId: { leagueId, userId } },
+        create: { leagueId, userId, status: 'APPROVED' },
+        update: { status: 'APPROVED', updatedAt: new Date() }
+      });
+      return {
+        instantJoin: true,
+        leagueId,
+        userId,
+        status: 'APPROVED'
+      };
+    }
+
     const request = await prisma.leagueJoinRequest.upsert({
       where: { leagueId_userId: { leagueId, userId } },
       create: { leagueId, userId, status: 'PENDING' },
@@ -244,6 +374,7 @@ export class LeagueService {
 
     return {
       ...request,
+      instantJoin: false,
       facebookProfileUrl: facebookProfileUrl(request.user.facebookId)
     };
   }

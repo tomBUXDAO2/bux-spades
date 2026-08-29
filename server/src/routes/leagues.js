@@ -54,6 +54,33 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// Create-league requests (FB users) — must be before /:leagueId
+router.post('/create-requests', authenticateToken, logoUpload.single('logo'), async (req, res) => {
+  try {
+    let logoUrl = req.body.logoUrl || null;
+    if (req.file) {
+      const relativePath = `/uploads/leagues/${req.file.filename}`;
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      logoUrl = host ? `${protocol}://${host}${relativePath}` : relativePath;
+    }
+    const requireJoinApproval = !(
+      req.body.requireJoinApproval === 'false' ||
+      req.body.requireJoinApproval === false ||
+      req.body.requireJoinApproval === '0'
+    );
+    const request = await LeagueService.submitCreateRequest({
+      requesterId: req.userId,
+      name: req.body.name,
+      logoUrl,
+      requireJoinApproval
+    });
+    res.status(201).json(request);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.get('/:leagueId', authenticateToken, async (req, res) => {
   try {
     const league = await LeagueService.getLeague(req.params.leagueId, req.userId);

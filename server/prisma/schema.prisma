@@ -30,6 +30,7 @@ model User {
   leagueMemberships       LeagueMember[]
   leagueJoinRequests      LeagueJoinRequest[]
   leagueChatMessages      LeagueChatMessage[]
+  leagueCreateRequests    LeagueCreateRequest[]
 }
 
 model UserStats {
@@ -610,21 +611,40 @@ enum LeagueJoinRequestStatus {
 }
 
 model League {
-  id           String              @id @default(cuid())
-  name         String
-  slug         String              @unique
-  ownerId      String
-  bgColor      String              @default("#0f172a")
-  logoUrl      String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  owner        User                @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members      LeagueMember[]
-  joinRequests LeagueJoinRequest[]
-  chatMessages LeagueChatMessage[]
-  games        Game[]
+  id                   String                @id @default(cuid())
+  name                 String
+  slug                 String                @unique
+  ownerId              String
+  bgColor              String                @default("#0f172a")
+  logoUrl              String?
+  requireJoinApproval  Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  owner                User                  @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members              LeagueMember[]
+  joinRequests         LeagueJoinRequest[]
+  chatMessages         LeagueChatMessage[]
+  games                Game[]
+  createRequests       LeagueCreateRequest[] @relation("ApprovedLeague")
 
   @@index([ownerId])
+}
+
+model LeagueCreateRequest {
+  id                   String                  @id @default(cuid())
+  name                 String
+  logoUrl              String?
+  requireJoinApproval  Boolean                 @default(true)
+  requesterId          String
+  status               LeagueJoinRequestStatus @default(PENDING)
+  approvedLeagueId     String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  requester            User                    @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  approvedLeague       League?                 @relation("ApprovedLeague", fields: [approvedLeagueId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([requesterId])
 }
 
 model LeagueMember {
