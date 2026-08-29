@@ -12,6 +12,8 @@ interface HeaderProps {
   leftContent?: React.ReactNode;
   /** Extra classes on the outer header (e.g. transparent for themed league pages). */
   className?: string;
+  /** Skip the centered container so content sits flush with page padding. */
+  fullWidth?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className }) => {
