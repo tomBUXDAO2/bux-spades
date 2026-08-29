@@ -927,7 +927,7 @@ const LeaguePage: React.FC = () => {
                             />
                             <span
                               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 ${
-                                online ? 'bg-green-500' : 'bg-slate-500'
+                                online ? 'bg-green-500' : 'bg-red-500'
                               }`}
                               title={online ? 'Online' : 'Offline'}
                             />
@@ -939,13 +939,6 @@ const LeaguePage: React.FC = () => {
                             onClick={() => openMemberStats(m)}
                           >
                             <span className="truncate">{firstName(m.user.username)}</span>
-                            <span
-                              className={`text-[10px] font-semibold uppercase tracking-wide ${
-                                online ? 'text-green-400' : 'text-slate-500'
-                              }`}
-                            >
-                              {online ? 'Online' : 'Offline'}
-                            </span>
                             {status === 'friend' && (
                               <img
                                 src="/friend.svg"
