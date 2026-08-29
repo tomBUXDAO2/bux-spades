@@ -3,7 +3,13 @@
   "short_name": "Bux Spades",
   "description": "A modern multiplayer Spades card game",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "focus-existing", "auto"]
+  },
   "background_color": "#1f2937",
   "theme_color": "#3b82f6",
   "orientation": "any",
@@ -26,6 +32,5 @@
     }
   ],
   "categories": ["games", "entertainment"],
-  "lang": "en",
-  "scope": "/"
-} 
+  "lang": "en"
+}

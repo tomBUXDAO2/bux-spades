@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isStandalonePwa } from '../utils/displayMode';
 
 const isCapacitor = () =>
   typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
@@ -39,6 +40,14 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
       setError('Discord client ID not configured');
       return;
     }
+    // Mark pending OAuth so AuthCallback can nudge users back into the home-screen app
+    if (isStandalonePwa()) {
+      try {
+        localStorage.setItem('oauthFromPwa', '1');
+      } catch {
+        /* ignore */
+      }
+    }
     const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${state}`;
     try {
       if (isCapacitor()) {
@@ -63,6 +72,13 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     if (!clientId) {
       setError('Facebook app ID not configured');
       return;
+    }
+    if (isStandalonePwa()) {
+      try {
+        localStorage.setItem('oauthFromPwa', '1');
+      } catch {
+        /* ignore */
+      }
     }
     const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${stateParam}`;
     try {

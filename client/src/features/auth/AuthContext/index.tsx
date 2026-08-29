@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 import { useUserState } from './hooks/useUserState';
 import { useAuthMethods } from './hooks/useAuthMethods';
 import { useProfileManagement } from './hooks/useProfileManagement';
+import { AUTH_BROADCAST_CHANNEL } from '../utils/displayMode';
 
 interface User {
   id: string;
@@ -88,6 +89,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   }, [fetchProfile, setLoading, setUser]);
+
+  // Rehydrate when OAuth finishes in another same-origin context (browser tab ↔ PWA)
+  useEffect(() => {
+    const applyToken = (token: string, userData?: unknown) => {
+      try {
+        localStorage.setItem('sessionToken', token);
+        if (userData) {
+          localStorage.setItem('userData', JSON.stringify(userData));
+        }
+      } catch {
+        /* ignore quota */
+      }
+      fetchProfile();
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sessionToken' && e.newValue) {
+        fetchProfile();
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const token = localStorage.getItem('sessionToken');
+      if (token) fetchProfile();
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type === 'session' && typeof ev.data.token === 'string') {
+          applyToken(ev.data.token, ev.data.userData);
+        }
+      };
+    } catch {
+      /* unsupported */
+    }
+
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      try {
+        bc?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [fetchProfile]);
 
   return (
     <AuthContext.Provider
