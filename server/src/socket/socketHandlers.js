@@ -48,7 +48,7 @@ export function setupSocketHandlers(io) {
           
           // Find and disconnect the old socket
           const oldSocket = io.sockets.sockets.get(previousSession.socketId);
-          if (oldSocket) {
+          if (oldSocket && oldSocket.connected) {
             // Emit force logout event to old device
             oldSocket.emit('force_logout', { 
               reason: 'multiple_logins',
@@ -57,6 +57,9 @@ export function setupSocketHandlers(io) {
             // Disconnect old socket
             oldSocket.disconnect(true);
             console.log(`[SESSION] Disconnected old socket ${previousSession.socketId} for user ${userId}`);
+          } else {
+            // Stale Redis session / reconnect — replace quietly without alarming the client
+            console.log(`[SESSION] Previous socket ${previousSession.socketId} already gone; replacing session quietly`);
           }
         }
         
