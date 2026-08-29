@@ -67,21 +67,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Initialize auth state
   useEffect(() => {
-    // Browser tab after PWA OAuth — must not keep/use any leftover JWT or it will
-    // socket-authenticate and force-logout the real home-screen app session.
-    if (typeof window !== 'undefined' && window.location.pathname === '/auth/return-to-app') {
-      try {
-        localStorage.removeItem('sessionToken');
-        localStorage.removeItem('userData');
-        localStorage.removeItem('activeGameId');
-      } catch {
-        /* ignore */
-      }
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
     const token = localStorage.getItem('sessionToken');
     if (token) {
       // First try to load user data from localStorage for immediate display

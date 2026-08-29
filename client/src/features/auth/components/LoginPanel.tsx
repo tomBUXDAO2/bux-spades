@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
+import { api } from '@/services/lib/api';
 import { isStandalonePwa, isAndroidBrowser, openOAuthUrl, OAUTH_DEVICE_ID_KEY } from '../utils/displayMode';
+import { facebookSdkLogin } from '../utils/facebookSdk';
 
 const isCapacitor = () =>
   typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
@@ -11,7 +14,8 @@ export interface LoginPanelProps {
 }
 
 const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) => {
-  const [isLoading] = useState(false);
+  const { setUser } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState(false);
   const [waitingForHandoff, setWaitingForHandoff] = useState(false);
@@ -45,7 +49,6 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
 
   const buildOAuthState = (): string => {
     if (isCapacitor()) return '&state=capacitor';
-    // Installed PWA needs server handoff — Android cannot keep Facebook inside the app.
     if (isStandalonePwa()) {
       const deviceId =
         (typeof crypto !== 'undefined' && crypto.randomUUID
@@ -72,6 +75,64 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     openOAuthUrl(url);
   };
 
+  const finishWithJwt = (token: string, user: any) => {
+    localStorage.setItem('sessionToken', token);
+    try {
+      localStorage.removeItem(OAUTH_DEVICE_ID_KEY);
+    } catch {
+      /* ignore */
+    }
+    const userData = { ...user, sessionToken: token, isAuthenticated: true };
+    try {
+      localStorage.setItem('userData', JSON.stringify(userData));
+    } catch {
+      /* ignore */
+    }
+    setUser(userData);
+    onClose?.();
+    if (window.location.pathname !== '/' || window.location.search.includes('signin')) {
+      window.location.href = '/';
+    }
+  };
+
+  // Facebook mobile SDK often returns via redirect with #access_token=… — finish login in-place
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (!hash.includes('access_token=')) return;
+
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const accessToken = params.get('access_token');
+    if (!accessToken) return;
+
+    window.history.replaceState({}, '', window.location.pathname + window.location.search);
+
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await api.post('/api/auth/facebook/token', { accessToken });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.token) {
+          throw new Error(data.error || 'Facebook login failed');
+        }
+        if (!cancelled) finishWithJwt(data.token, data.user || {});
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('Facebook hash login failed:', err);
+          setError(err?.message || 'Facebook login failed. Please try again.');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDiscordLogin = async () => {
     setDiscordError(false);
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
@@ -95,14 +156,37 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   const handleFacebookLogin = async () => {
     setError(null);
     const clientId = import.meta.env.VITE_FACEBOOK_APP_ID;
-    const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
-    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/facebook/callback`);
-    const scope = encodeURIComponent('public_profile');
-    const stateParam = buildOAuthState();
     if (!clientId) {
       setError('Facebook app ID not configured');
       return;
     }
+
+    // Android installed PWA cannot complete OAuth redirects back into the app.
+    // Use the Facebook JS SDK so the access token returns to this page, then exchange on our server.
+    const androidPwa = isStandalonePwa() && isAndroidBrowser() && !isCapacitor();
+    if (androidPwa) {
+      setIsLoading(true);
+      try {
+        const accessToken = await facebookSdkLogin(clientId);
+        const res = await api.post('/api/auth/facebook/token', { accessToken });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.token) {
+          throw new Error(data.error || 'Facebook login failed');
+        }
+        finishWithJwt(data.token, data.user || {});
+      } catch (err: any) {
+        console.error('Facebook SDK login failed:', err);
+        setError(err?.message || 'Facebook login failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
+    const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/facebook/callback`);
+    const scope = encodeURIComponent('public_profile');
+    const stateParam = buildOAuthState();
     const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${stateParam}`;
     try {
       await startOAuth(facebookAuthUrl);
@@ -136,7 +220,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
       <svg className="w-5 h-5 mr-2 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
       </svg>
-      Continue with Facebook
+      {isLoading ? 'Signing in…' : 'Continue with Facebook'}
     </button>
   );
 

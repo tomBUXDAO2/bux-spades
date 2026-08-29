@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 import axios from '../AuthContext/hooks/AxiosConfig';
 
 /**
- * Desktop / in-browser OAuth return. PWA OAuth uses /auth/return-to-app + server handoff instead.
+ * OAuth return with ?token= — stores JWT and loads profile.
  */
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();

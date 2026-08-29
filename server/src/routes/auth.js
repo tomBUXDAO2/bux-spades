@@ -19,16 +19,99 @@ async function redirectAfterOAuth(res, { state, jwtToken }) {
     return res.redirect(`buxspades://auth/callback?token=${jwtToken}`);
   }
 
-  // Home-screen PWA: browser tab cannot share localStorage with the installed app.
-  // Stash JWT under the device id the PWA created before leaving for OAuth.
+  // Home-screen PWA: stash JWT under device id; PWA claims it when focused again.
+  // Redirect browser to home (no interstitial page).
   if (pwaDeviceId) {
     await storeHandoffToken(pwaDeviceId, jwtToken);
     console.log(`[OAUTH HANDOFF] Stored token for device ${pwaDeviceId.slice(0, 8)}…`);
-    return res.redirect(`${CLIENT_URL()}/auth/return-to-app`);
+    return res.redirect(`${CLIENT_URL()}/`);
   }
 
   return res.redirect(`${CLIENT_URL()}/auth/callback?token=${jwtToken}`);
 }
+
+async function upsertFacebookUserAndIssueJwt(facebookUser) {
+  const user = await prisma.user.upsert({
+    where: { facebookId: facebookUser.id },
+    update: {
+      username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
+      avatarUrl: facebookUser.picture?.data?.url || null,
+    },
+    create: {
+      facebookId: facebookUser.id,
+      username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
+      avatarUrl: facebookUser.picture?.data?.url || null,
+      coins: 5000000,
+    }
+  });
+
+  const jwtToken = jwt.sign(
+    { userId: user.id, facebookId: user.facebookId },
+    process.env.JWT_SECRET || 'fallback-secret',
+    { expiresIn: '7d' }
+  );
+
+  return { user, jwtToken };
+}
+
+/**
+ * In-app Facebook login for Android PWAs (JS SDK access token).
+ * Avoids OAuth redirect breakout that cannot return into the installed app.
+ */
+router.post('/facebook/token', async (req, res) => {
+  try {
+    const accessToken = String(req.body?.accessToken || '').trim();
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Missing Facebook access token' });
+    }
+
+    const appId = process.env.FACEBOOK_APP_ID;
+    const appSecret = process.env.FACEBOOK_APP_SECRET;
+    if (!appId || !appSecret) {
+      return res.status(503).json({ error: 'Facebook login is not configured' });
+    }
+
+    // Confirm token is for our app
+    const debugRes = await fetch(
+      `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`
+    );
+    if (!debugRes.ok) {
+      return res.status(401).json({ error: 'Invalid Facebook token' });
+    }
+    const debugJson = await debugRes.json();
+    const data = debugJson?.data;
+    if (!data?.is_valid || String(data.app_id) !== String(appId)) {
+      return res.status(401).json({ error: 'Facebook token is not valid for this app' });
+    }
+
+    const userRes = await fetch(
+      `https://graph.facebook.com/v18.0/me?fields=id,name,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`
+    );
+    if (!userRes.ok) {
+      return res.status(401).json({ error: 'Failed to fetch Facebook profile' });
+    }
+    const facebookUser = await userRes.json();
+    if (!facebookUser?.id) {
+      return res.status(401).json({ error: 'Facebook profile missing id' });
+    }
+
+    const { user, jwtToken } = await upsertFacebookUserAndIssueJwt(facebookUser);
+    res.json({
+      token: jwtToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        facebookId: user.facebookId,
+        coins: user.coins,
+        isAuthenticated: true
+      }
+    });
+  } catch (error) {
+    console.error('[FACEBOOK TOKEN] Error:', error);
+    res.status(500).json({ error: 'Facebook login failed' });
+  }
+});
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -276,28 +359,7 @@ router.get('/facebook/callback', async (req, res) => {
 
     const facebookUser = await userResponse.json();
 
-    // Create or update user in database
-    const user = await prisma.user.upsert({
-      where: { facebookId: facebookUser.id },
-      update: {
-        username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
-        avatarUrl: facebookUser.picture?.data?.url || null,
-      },
-      create: {
-        facebookId: facebookUser.id,
-        username: facebookUser.name || facebookUser.email || `Facebook User ${facebookUser.id}`,
-        avatarUrl: facebookUser.picture?.data?.url || null,
-        coins: 5000000, // Starting coins
-      }
-    });
-
-    // Create JWT token
-    const jwtToken = jwt.sign(
-      { userId: user.id, facebookId: user.facebookId },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '7d' }
-    );
-
+    const { jwtToken } = await upsertFacebookUserAndIssueJwt(facebookUser);
     await redirectAfterOAuth(res, { state, jwtToken });
 
   } catch (error) {

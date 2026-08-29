@@ -34,29 +34,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     error: null as string | null
   });
 
-  const isReturnToApp =
-    typeof window !== 'undefined' && window.location.pathname === '/auth/return-to-app';
-
   useEffect(() => {
-    // Do not open an authenticated (or even guest) socket on the post-OAuth browser
-    // interstitial — leftover JWTs here were force-logging out the PWA.
-    if (isReturnToApp) {
-      try {
-        getSocketManager().disconnect();
-      } catch {
-        /* ignore */
-      }
-      setSocket(null);
-      setState({
-        isConnected: false,
-        isAuthenticated: false,
-        isReady: false,
-        isGuestLobby: false,
-        error: null
-      });
-      return;
-    }
-
     const socketManager = getSocketManager();
 
     const onChange = () => {
@@ -84,7 +62,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       socketManager.disconnect();
     };
-  }, [user, isReturnToApp]);
+  }, [user]);
 
   return (
     <SocketContext.Provider value={{
