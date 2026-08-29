@@ -146,11 +146,19 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className, 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 min-w-0">
             {leftContent ?? (
-              <img
-                src="/optimized/bux-spades.png"
-                alt="BUX"
-                className="h-8 w-auto"
-              />
+              <Link to="/" className="flex items-center gap-2 min-w-0 no-underline">
+                <img
+                  src="/optimized/bux-spades.png"
+                  alt="BUX Spades"
+                  className="h-8 w-auto shrink-0"
+                />
+                <span
+                  className="hidden truncate font-semibold tracking-tight text-slate-100 sm:inline"
+                  style={{ fontSize: `${16 * textScale}px` }}
+                >
+                  BUX Spades
+                </span>
+              </Link>
             )}
           </div>
           
