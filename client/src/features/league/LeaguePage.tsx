@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useSocket } from '@/features/auth/SocketContext';
 import { api, apiFetch } from '@/services/lib/api';
+import Header from '@/components/common/Header';
 import CreateGameModal from '@/components/game/CreateGameModal';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
+import FriendBlockConfirmModal from '@/components/modals/FriendBlockConfirmModal';
 import GameTile from '@/components/game/GameTile';
 
 type LeagueInfo = {
@@ -27,6 +31,7 @@ type ChatMessage = {
   userAvatar?: string;
   message: string;
   timestamp: number;
+  leagueId?: string;
 };
 
 type JoinRequest = {
@@ -42,23 +47,39 @@ type LeagueMember = {
   mutedUntil?: string | null;
   timeoutUntil?: string | null;
   user: { id: string; username: string; avatarUrl?: string | null; facebookId?: string | null };
+  /** friend | blocked | not_friend — from /api/auth/users */
+  status?: string;
+  online?: boolean;
 };
+
+type ConfirmAction = 'add_friend' | 'remove_friend' | 'block_user' | 'unblock_user';
+
+function firstName(name?: string | null) {
+  const part = String(name || 'Player').trim().split(/\s+/)[0];
+  return part || 'Player';
+}
+
+function formatTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 const LeaguePage: React.FC = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, isAuthenticated } = useSocket();
 
   const [league, setLeague] = useState<LeagueInfo | null>(null);
   const [games, setGames] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [members, setMembers] = useState<LeagueMember[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
   const [themeName, setThemeName] = useState('');
@@ -66,13 +87,21 @@ const LeaguePage: React.FC = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [savingTheme, setSavingTheme] = useState(false);
   const [playerStats, setPlayerStats] = useState<{ open: boolean; player: any }>({ open: false, player: null });
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    player: any;
+    action: ConfirmAction;
+  }>({ open: false, player: null, action: 'add_friend' });
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = league?.role === 'OWNER' || league?.role === 'ADMIN';
   const isOwner = league?.role === 'OWNER';
   const isMuted = Boolean(league?.mutedUntil && new Date(league.mutedUntil) > new Date());
   const isTimedOut = Boolean(league?.timeoutUntil && new Date(league.timeoutUntil) > new Date());
   const theme = league?.bgColor || '#0f172a';
+  const onlineCount = onlineUserIds.length;
 
   const loadLeague = useCallback(async () => {
     if (!leagueId) return;
@@ -104,11 +133,35 @@ const LeaguePage: React.FC = () => {
     setChatMessages(Array.isArray(data) ? data : []);
   }, [leagueId]);
 
+  const mergeFriendStatus = useCallback(async (list: LeagueMember[]) => {
+    try {
+      const res = await api.get('/api/auth/users');
+      if (!res.ok) return list.map((m) => ({ ...m, status: m.status || 'not_friend' }));
+      const data = await res.json();
+      const users = data.users || data;
+      const byId = new Map<string, any>(
+        Array.isArray(users) ? users.map((u: any) => [u.id, u]) : []
+      );
+      return list.map((m) => {
+        const u = byId.get(m.userId);
+        return {
+          ...m,
+          status: u?.status || 'not_friend'
+        };
+      });
+    } catch {
+      return list.map((m) => ({ ...m, status: m.status || 'not_friend' }));
+    }
+  }, []);
+
   const loadMembers = useCallback(async () => {
     if (!leagueId) return;
     const memRes = await api.get(`/api/leagues/${leagueId}/members`);
-    if (memRes.ok) setMembers(await memRes.json());
-  }, [leagueId]);
+    if (!memRes.ok) return;
+    const list = await memRes.json();
+    const withStatus = await mergeFriendStatus(Array.isArray(list) ? list : []);
+    setMembers(withStatus);
+  }, [leagueId, mergeFriendStatus]);
 
   const loadAdminData = useCallback(async () => {
     if (!leagueId || !isAdmin) return;
@@ -149,24 +202,51 @@ const LeaguePage: React.FC = () => {
   useEffect(() => {
     if (!socket || !leagueId || !league?.isMember) return;
     socket.emit('join_league_room', { leagueId });
+
     const onMessage = (msg: ChatMessage) => {
-      if ((msg as any).leagueId && (msg as any).leagueId !== leagueId) return;
+      if (msg.leagueId && msg.leagueId !== leagueId) return;
       setChatMessages((prev) => [...prev, msg]);
+    };
+    const onDeleted = (payload: { leagueId?: string; messageId: string }) => {
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      setChatMessages((prev) => prev.filter((m) => m.id !== payload.messageId));
+      setSelectedMessageId((id) => (id === payload.messageId ? null : id));
+    };
+    const onPresence = (payload: { leagueId?: string; users: { userId: string }[] }) => {
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      const ids = (payload.users || []).map((u) => u.userId);
+      setOnlineUserIds(ids);
+      setMembers((prev) => prev.map((m) => ({ ...m, online: ids.includes(m.userId) })));
     };
     const onMembership = () => {
       loadLeague();
       loadMembers();
       if (isAdmin) loadAdminData();
     };
+    const refreshFriends = () => loadMembers();
+
     socket.on('league_chat_message', onMessage);
+    socket.on('league_chat_deleted', onDeleted);
+    socket.on('league_online_users', onPresence);
     socket.on('league_membership_updated', onMembership);
     socket.on('league_join_request', () => loadAdminData());
+    socket.on('friendAdded', refreshFriends);
+    socket.on('friendRemoved', refreshFriends);
+    socket.on('userBlocked', refreshFriends);
+    socket.on('userUnblocked', refreshFriends);
+
     const interval = setInterval(loadGames, 8000);
     return () => {
       socket.emit('leave_league_room', { leagueId });
       socket.off('league_chat_message', onMessage);
+      socket.off('league_chat_deleted', onDeleted);
+      socket.off('league_online_users', onPresence);
       socket.off('league_membership_updated', onMembership);
       socket.off('league_join_request');
+      socket.off('friendAdded', refreshFriends);
+      socket.off('friendRemoved', refreshFriends);
+      socket.off('userBlocked', refreshFriends);
+      socket.off('userUnblocked', refreshFriends);
       clearInterval(interval);
     };
   }, [socket, leagueId, league?.isMember, isAdmin, loadGames, loadLeague, loadMembers, loadAdminData]);
@@ -180,6 +260,32 @@ const LeaguePage: React.FC = () => {
     if (!socket || !leagueId || !newMessage.trim() || isMuted) return;
     socket.emit('league_message', { leagueId, message: newMessage.trim() });
     setNewMessage('');
+    setShowEmojiPicker(false);
+  };
+
+  const handleSelectEmoji = (emoji: any) => {
+    const input = inputRef.current;
+    const emojiChar = emoji.native || emoji.colons || '';
+    if (!input) {
+      setNewMessage((prev) => prev + emojiChar);
+      return;
+    }
+    const start = input.selectionStart ?? newMessage.length;
+    const end = input.selectionEnd ?? newMessage.length;
+    const updated = newMessage.slice(0, start) + emojiChar + newMessage.slice(end);
+    setNewMessage(updated);
+    requestAnimationFrame(() => {
+      input.focus();
+      const pos = start + emojiChar.length;
+      input.setSelectionRange(pos, pos);
+    });
+  };
+
+  const deleteMessage = (messageId?: string) => {
+    if (!messageId || !socket || !leagueId || !isAdmin) return;
+    if (!window.confirm('Delete this message?')) return;
+    socket.emit('delete_league_message', { leagueId, messageId });
+    setSelectedMessageId(null);
   };
 
   const handleCreateGame = async (settings: any) => {
@@ -234,7 +340,8 @@ const LeaguePage: React.FC = () => {
       form.append('bgColor', themeColor);
       if (logoFile) form.append('logo', logoFile);
       const token = localStorage.getItem('sessionToken');
-      const apiBase = import.meta.env.VITE_API_URL ||
+      const apiBase =
+        import.meta.env.VITE_API_URL ||
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:3000'
           : 'https://bux-spades-server.fly.dev');
@@ -281,7 +388,42 @@ const LeaguePage: React.FC = () => {
       }
     }
     await loadAdminData();
+    await loadMembers();
     await loadLeague();
+  };
+
+  const handleConfirmFriendAction = () => {
+    if (!confirmModal.player || !socket) return;
+    if (!isAuthenticated || !socket.connected) {
+      alert('Not connected. Please try again.');
+      return;
+    }
+    const player = confirmModal.player;
+    const targetUserId = player.id || player.userId;
+    if (confirmModal.action === 'add_friend') {
+      socket.emit('add_friend', { targetUserId });
+    } else if (confirmModal.action === 'remove_friend') {
+      socket.emit('remove_friend', { targetUserId });
+    } else if (confirmModal.action === 'block_user') {
+      socket.emit('block_user', { targetUserId });
+    } else if (confirmModal.action === 'unblock_user') {
+      socket.emit('unblock_user', { targetUserId });
+    }
+    setConfirmModal({ open: false, player: null, action: 'add_friend' });
+  };
+
+  const openMemberStats = (m: LeagueMember) => {
+    setPlayerStats({
+      open: true,
+      player: {
+        id: m.user.id,
+        username: m.user.username,
+        avatar: m.user.avatarUrl,
+        avatarUrl: m.user.avatarUrl,
+        stats: {} as any,
+        status: m.status || 'not_friend'
+      }
+    });
   };
 
   if (loading) {
@@ -303,6 +445,32 @@ const LeaguePage: React.FC = () => {
     );
   }
 
+  const headerLeft = (
+    <div className="flex items-center gap-2 min-w-0">
+      <Link
+        to="/"
+        className="shrink-0 rounded-lg border border-white/15 bg-black/20 px-2 py-1 text-xs text-white/90 hover:bg-black/30"
+      >
+        ← Lobby
+      </Link>
+      {league?.logoUrl && (
+        <img
+          src={league.logoUrl}
+          alt=""
+          className="h-9 w-9 shrink-0 rounded-lg object-cover border border-white/25"
+        />
+      )}
+      <div className="min-w-0">
+        <div className="truncate text-base font-bold text-white drop-shadow sm:text-lg">{league?.name}</div>
+        <div className="truncate text-[10px] text-white/70 sm:text-xs">
+          {league?.memberCount} members
+          {isTimedOut ? ' · timed out' : ''}
+          {isMuted ? ' · muted' : ''}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div
       className="min-h-screen text-white"
@@ -310,25 +478,26 @@ const LeaguePage: React.FC = () => {
         background: `radial-gradient(1200px 600px at 10% -10%, ${theme}cc, transparent), linear-gradient(165deg, ${theme} 0%, #020617 55%)`
       }}
     >
-      <header
-        className="flex items-center gap-3 border-b border-white/10 px-4 py-3 backdrop-blur-md"
-        style={{ backgroundColor: `${theme}dd` }}
-      >
-        <Link to="/" className="rounded-lg border border-white/15 bg-black/20 px-2 py-1 text-sm text-white/90 hover:bg-black/30">
-          ← Lobby
-        </Link>
-        {league?.logoUrl && (
-          <img src={league.logoUrl} alt="" className="h-11 w-11 rounded-lg object-cover border border-white/25 shadow" />
-        )}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold tracking-tight truncate drop-shadow">{league?.name}</h1>
-          <p className="text-xs text-white/80">
-            {league?.memberCount} members · league room
-            {isTimedOut ? ' · timed out from tables' : ''}
-            {isMuted ? ' · muted in chat' : ''}
-          </p>
-        </div>
-      </header>
+      <div className="border-b border-white/10" style={{ backgroundColor: `${theme}dd` }}>
+        <Header
+          className="!bg-transparent !border-0 !shadow-none"
+          leftContent={headerLeft}
+          onOpenMyStats={() =>
+            user &&
+            setPlayerStats({
+              open: true,
+              player: {
+                id: user.id,
+                username: user.username,
+                avatar: user.avatarUrl || user.avatar,
+                avatarUrl: user.avatarUrl || user.avatar,
+                stats: {} as any,
+                status: 'not_friend'
+              }
+            })
+          }
+        />
+      </div>
 
       {error && (
         <div className="mx-4 mt-3 rounded-lg border border-rose-500/40 bg-rose-950/50 px-3 py-2 text-sm text-rose-100">
@@ -441,7 +610,6 @@ const LeaguePage: React.FC = () => {
                           <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'unmute')}>Unmute</button>
                           <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '1h' })}>Timeout 1h</button>
                           <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '24h' })}>Timeout 24h</button>
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { minutes: 30 })}>Timeout 30m</button>
                           <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'clear-timeout')}>Clear timeout</button>
                           {isOwner && m.role === 'MEMBER' && (
                             <button type="button" className="rounded bg-violet-700/80 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}>Make admin</button>
@@ -499,53 +667,148 @@ const LeaguePage: React.FC = () => {
             className="flex flex-1 flex-col rounded-xl border border-white/15 p-3 backdrop-blur shadow-lg"
             style={{ backgroundColor: `${theme}b3` }}
           >
-            <div className="mb-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSideTab('chat')}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'chat' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setSideTab('members')}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'members' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
-              >
-                Members ({members.length || league?.memberCount || 0})
-              </button>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSideTab('chat')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'chat' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
+                >
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSideTab('members')}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'members' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
+                >
+                  Members ({members.length || league?.memberCount || 0})
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
+                <span className="text-xs font-medium text-white/85">{onlineCount} online</span>
+              </div>
             </div>
 
             {sideTab === 'chat' ? (
               <>
-                <div className="flex-1 space-y-2 overflow-y-auto rounded-lg bg-black/15 p-2">
+                <div className="flex-1 space-y-3 overflow-y-auto rounded-lg bg-black/15 p-2">
                   {chatMessages.length === 0 && (
                     <p className="text-center text-sm text-white/60 py-6">No messages yet in this league.</p>
                   )}
-                  {chatMessages.map((msg, i) => (
-                    <div key={msg.id || i} className="text-sm">
-                      <span className="font-medium text-cyan-100">{msg.userName}: </span>
-                      <span className="text-white/95">{msg.message}</span>
-                    </div>
-                  ))}
+                  {chatMessages.map((msg, i) =>
+                    msg.userId === 'system' ? (
+                      <div key={msg.id || i} className="w-full text-center my-1">
+                        <span className="italic text-amber-300/95 text-sm">{msg.message}</span>
+                      </div>
+                    ) : (
+                      <div
+                        key={msg.id || i}
+                        className={`flex items-start gap-2 ${user && msg.userId === user.id ? 'justify-end' : ''}`}
+                      >
+                        {!(user && msg.userId === user.id) && (
+                          <img
+                            src={msg.userAvatar || '/default-pfp.jpg'}
+                            alt=""
+                            className="h-8 w-8 rounded-full object-cover shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                            }}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          className={`max-w-[80%] rounded-xl px-3 py-2 text-left ${
+                            user && msg.userId === user.id
+                              ? 'bg-gradient-to-br from-cyan-600 to-teal-700 text-white'
+                              : 'border border-white/10 bg-black/35 text-white'
+                          } ${isAdmin && selectedMessageId === msg.id ? 'ring-2 ring-rose-400' : ''}`}
+                          onClick={() => {
+                            if (!isAdmin || !msg.id || msg.id.startsWith('system-')) return;
+                            setSelectedMessageId((id) => (id === msg.id ? null : msg.id || null));
+                          }}
+                        >
+                          <div className="mb-0.5 flex items-center justify-between gap-2">
+                            {!(user && msg.userId === user.id) && (
+                              <span className="text-xs font-medium opacity-80">{firstName(msg.userName)}</span>
+                            )}
+                            <span className="text-[10px] opacity-70 ml-auto">{formatTime(msg.timestamp)}</span>
+                          </div>
+                          <p className="text-sm break-words">{msg.message}</p>
+                          {isAdmin && selectedMessageId === msg.id && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="mt-2 inline-block rounded bg-rose-700 px-2 py-0.5 text-[10px] font-semibold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteMessage(msg.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.stopPropagation();
+                                  deleteMessage(msg.id);
+                                }
+                              }}
+                            >
+                              Delete message
+                            </span>
+                          )}
+                        </button>
+                        {user && msg.userId === user.id && (
+                          <img
+                            src={msg.userAvatar || user.avatarUrl || user.avatar || '/default-pfp.jpg'}
+                            alt=""
+                            className="h-8 w-8 rounded-full object-cover shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                            }}
+                          />
+                        )}
+                      </div>
+                    )
+                  )}
                   <div ref={chatEndRef} />
                 </div>
-                <form onSubmit={sendMessage} className="mt-2 flex gap-2">
-                  <input
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={isMuted}
-                    placeholder={isMuted ? 'You are muted' : 'Message this league…'}
-                    className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isMuted || !newMessage.trim()}
-                    className="rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-40"
-                    style={{ backgroundColor: theme }}
-                  >
-                    Send
-                  </button>
+                <form onSubmit={sendMessage} className="mt-2 relative">
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={inputRef}
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      disabled={isMuted}
+                      placeholder={isMuted ? 'You are muted' : 'Message this league…'}
+                      className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
+                    />
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        disabled={isMuted}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent hover:border-white/10 hover:bg-white/5 disabled:opacity-40"
+                        onClick={() => !isMuted && setShowEmojiPicker((v) => !v)}
+                      >
+                        <span role="img" aria-label="emoji" className="text-xl">
+                          😊
+                        </span>
+                      </button>
+                      {showEmojiPicker && !isMuted && (
+                        <div className="absolute right-0 bottom-12 z-50">
+                          <Picker data={data} onEmojiSelect={handleSelectEmoji} theme="dark" />
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isMuted || !newMessage.trim()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg disabled:opacity-40"
+                      style={{ backgroundColor: theme }}
+                      aria-label="Send"
+                    >
+                      <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4l16 8-16 8 4-8z" />
+                      </svg>
+                    </button>
+                  </div>
                 </form>
               </>
             ) : (
@@ -553,38 +816,159 @@ const LeaguePage: React.FC = () => {
                 {members.length === 0 && (
                   <p className="text-center text-sm text-white/60 py-6">No members loaded.</p>
                 )}
-                {members.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-left hover:bg-black/30"
-                    onClick={() =>
-                      setPlayerStats({
-                        open: true,
-                        player: {
-                          id: m.user.id,
-                          username: m.user.username,
-                          avatar: m.user.avatarUrl,
-                          stats: {} as any,
-                          status: 'not_friend'
-                        }
-                      })
-                    }
-                  >
-                    <img
-                      src={m.user.avatarUrl || '/default-pfp.jpg'}
-                      alt=""
-                      className="h-8 w-8 rounded-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/default-pfp.jpg';
-                      }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{m.user.username}</div>
-                      <div className="text-[10px] uppercase tracking-wide text-white/60">{m.role}</div>
-                    </div>
-                  </button>
-                ))}
+                {[...members]
+                  .sort((a, b) => {
+                    if (Boolean(b.online) !== Boolean(a.online)) return Number(b.online) - Number(a.online);
+                    if (a.status === 'friend' && b.status !== 'friend') return -1;
+                    if (b.status === 'friend' && a.status !== 'friend') return 1;
+                    return 0;
+                  })
+                  .map((m) => {
+                    const isSelf = user?.id === m.userId;
+                    const status = m.status || 'not_friend';
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-2"
+                      >
+                        <img
+                          src={m.user.avatarUrl || '/default-pfp.jpg'}
+                          alt=""
+                          className="h-8 w-8 rounded-full object-cover shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className={`min-w-0 flex-1 text-left text-sm font-medium hover:underline ${m.online ? 'text-emerald-300' : 'text-white/90'}`}
+                          onClick={() => openMemberStats(m)}
+                        >
+                          <span className="truncate inline-flex items-center gap-1.5">
+                            {firstName(m.user.username)}
+                            {m.online && <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />}
+                            {status === 'friend' && (
+                              <img src="/friend.svg" alt="Friend" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                            )}
+                            {(m.role === 'ADMIN' || m.role === 'OWNER') && (
+                              <span className="text-[9px] uppercase tracking-wide text-amber-200/90">{m.role}</span>
+                            )}
+                          </span>
+                        </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {isOwner && !isSelf && m.role === 'MEMBER' && (
+                            <button
+                              type="button"
+                              title="Make admin"
+                              className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
+                              onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}
+                            >
+                              +Admin
+                            </button>
+                          )}
+                          {isOwner && !isSelf && m.role === 'ADMIN' && (
+                            <button
+                              type="button"
+                              title="Remove admin"
+                              className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
+                              onClick={() => moderate(m.userId, 'role', { role: 'MEMBER' })}
+                            >
+                              −Admin
+                            </button>
+                          )}
+                          {!isSelf && status === 'blocked' && (
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
+                              title="Unblock"
+                              onClick={() =>
+                                setConfirmModal({
+                                  open: true,
+                                  player: { id: m.userId, username: m.user.username },
+                                  action: 'unblock_user'
+                                })
+                              }
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                <circle cx="12" cy="12" r="11" />
+                                <path d="M6 18L18 6" strokeWidth="2.5" />
+                              </svg>
+                            </button>
+                          )}
+                          {!isSelf && status === 'friend' && (
+                            <>
+                              <button
+                                type="button"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600"
+                                title="Remove Friend"
+                                onClick={() =>
+                                  setConfirmModal({
+                                    open: true,
+                                    player: { id: m.userId, username: m.user.username },
+                                    action: 'remove_friend'
+                                  })
+                                }
+                              >
+                                <img src="/remove-friend.svg" alt="" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                              </button>
+                              <button
+                                type="button"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
+                                title="Block"
+                                onClick={() =>
+                                  setConfirmModal({
+                                    open: true,
+                                    player: { id: m.userId, username: m.user.username },
+                                    action: 'block_user'
+                                  })
+                                }
+                              >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="11" />
+                                  <path d="M4 4L20 20M20 4L4 20" strokeWidth="2.5" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                          {!isSelf && status !== 'friend' && status !== 'blocked' && (
+                            <>
+                              <button
+                                type="button"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600"
+                                title="Add Friend"
+                                onClick={() =>
+                                  setConfirmModal({
+                                    open: true,
+                                    player: { id: m.userId, username: m.user.username },
+                                    action: 'add_friend'
+                                  })
+                                }
+                              >
+                                <img src="/add-friend.svg" alt="" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                              </button>
+                              <button
+                                type="button"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
+                                title="Block"
+                                onClick={() =>
+                                  setConfirmModal({
+                                    open: true,
+                                    player: { id: m.userId, username: m.user.username },
+                                    action: 'block_user'
+                                  })
+                                }
+                              >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="11" />
+                                  <path d="M4 4L20 20M20 4L4 20" strokeWidth="2.5" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -602,6 +986,14 @@ const LeaguePage: React.FC = () => {
         onClose={() => setPlayerStats({ open: false, player: null })}
         player={playerStats.player}
         leagueId={leagueId}
+      />
+
+      <FriendBlockConfirmModal
+        isOpen={confirmModal.open}
+        action={confirmModal.action}
+        username={confirmModal.player?.username || 'Unknown User'}
+        onConfirm={handleConfirmFriendAction}
+        onClose={() => setConfirmModal({ open: false, player: null, action: 'add_friend' })}
       />
     </div>
   );

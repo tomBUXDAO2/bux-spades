@@ -8,9 +8,13 @@ import { isAdmin } from '@/utils/adminUtils';
 
 interface HeaderProps {
   onOpenMyStats?: () => void;
+  /** When set, replaces the default BUX logo on the left (e.g. league branding). */
+  leftContent?: React.ReactNode;
+  /** Extra classes on the outer header (e.g. transparent for themed league pages). */
+  className?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
+const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className }) => {
   const { user, logout, updateProfile } = useAuth();
   const { openLoginModal } = useLoginModal();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -135,15 +139,17 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats }) => {
   };
 
   return (
-    <header className={`relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm ${headerBackdropBlur}`}>
+    <header className={`relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm ${headerBackdropBlur} ${className || ''}`}>
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <img 
-                              src="/optimized/bux-spades.png" 
-              alt="BUX"
-              className="h-8 w-auto" 
-            />
+          <div className="flex items-center space-x-2 min-w-0">
+            {leftContent ?? (
+              <img
+                src="/optimized/bux-spades.png"
+                alt="BUX"
+                className="h-8 w-auto"
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-6">

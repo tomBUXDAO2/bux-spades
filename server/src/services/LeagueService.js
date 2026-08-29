@@ -598,6 +598,20 @@ export class LeagueService {
     };
   }
 
+  static async deleteChatMessage(leagueId, actorId, messageId) {
+    await this.assertAdmin(leagueId, actorId);
+    const existing = await prisma.leagueChatMessage.findFirst({
+      where: { id: messageId, leagueId }
+    });
+    if (!existing) {
+      const err = new Error('Message not found');
+      err.status = 404;
+      throw err;
+    }
+    await prisma.leagueChatMessage.delete({ where: { id: messageId } });
+    return { leagueId, messageId };
+  }
+
   static parseTimeoutDuration(body) {
     if (body?.until) {
       const until = new Date(body.until);

@@ -322,6 +322,14 @@ export function setupSocketHandlers(io) {
       const handler = new LeagueChatHandler(io, socket);
       handler.handleLeagueMessage(data);
     });
+    socket.on('delete_league_message', (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const handler = new LeagueChatHandler(io, socket);
+      handler.handleDeleteLeagueMessage(data);
+    });
 
     // Emoji reaction events
     socket.on('emoji_reaction', (data) => {
@@ -405,6 +413,13 @@ export function setupSocketHandlers(io) {
       // Handle user going offline for lobby
       lobbyChatHandler.socket = socket;
       lobbyChatHandler.handleUserOffline();
+
+      try {
+        const leagueHandler = new LeagueChatHandler(io, socket);
+        await leagueHandler.handleDisconnect();
+      } catch (error) {
+        console.error('[DISCONNECT] Error leaving league rooms:', error);
+      }
       
       // CRITICAL: Handle game disconnection
       if (socket.userId) {

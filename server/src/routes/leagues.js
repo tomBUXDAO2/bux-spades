@@ -285,6 +285,22 @@ router.get('/:leagueId/chat', authenticateToken, async (req, res) => {
   }
 });
 
+router.delete('/:leagueId/chat/:messageId', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueService.deleteChatMessage(
+      req.params.leagueId,
+      req.userId,
+      req.params.messageId
+    );
+    if (io) {
+      io.to(`league_${req.params.leagueId}`).emit('league_chat_deleted', result);
+    }
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.patch('/:leagueId/theme', authenticateToken, logoUpload.single('logo'), async (req, res) => {
   try {
     let logoUrl;
