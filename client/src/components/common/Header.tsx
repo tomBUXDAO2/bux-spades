@@ -16,7 +16,7 @@ interface HeaderProps {
   fullWidth?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className }) => {
+const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className, fullWidth }) => {
   const { user, logout, updateProfile } = useAuth();
   const { openLoginModal } = useLoginModal();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -142,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenMyStats, leftContent, className }
 
   return (
     <header className={`relative z-40 border-b border-white/10 bg-slate-950/70 shadow-lobby-sm ${headerBackdropBlur} ${className || ''}`}>
-      <div className="container mx-auto px-4 py-3">
+      <div className={`${fullWidth ? 'w-full px-4' : 'container mx-auto px-4'} py-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 min-w-0">
             {leftContent ?? (

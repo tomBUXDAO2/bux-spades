@@ -481,6 +481,7 @@ const LeaguePage: React.FC = () => {
       <div className="border-b border-white/10" style={{ backgroundColor: `${theme}dd` }}>
         <Header
           className="!bg-transparent !border-0 !shadow-none"
+          fullWidth
           leftContent={headerLeft}
           onOpenMyStats={() =>
             user &&
