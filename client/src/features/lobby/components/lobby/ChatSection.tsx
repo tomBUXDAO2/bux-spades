@@ -102,7 +102,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   
   return (
     <div
-      className="flex flex-col rounded-xl border border-white/10 bg-slate-950/45 shadow-lobby backdrop-blur-xl lg:col-span-1 col-span-1"
+      className="flex flex-col rounded-xl border border-white/10 bg-slate-950/45 shadow-lobby backdrop-blur-xl col-span-1 min-w-0"
       style={{ 
         height: isSmallScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : (isMediumScreen ? `calc(100vh - 64px - 24px - ${mobileToggleHeight}px)` : (isLargeScreen ? `calc(100vh - 64px - 28px - ${mobileToggleHeight}px)` : (isExtraLargeScreen ? `calc(100vh - 64px - 16px - ${mobileToggleHeight}px)` : `calc(100vh - 64px - 32px - ${mobileToggleHeight}px)`))),
         padding: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : (screenWidth >= 640 ? '16px' : '8px'))))
@@ -130,11 +130,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           <button
             className={`lobby-button flex items-center justify-center rounded-lg text-xs font-semibold transition sm:text-sm ${activeChatTab === 'rooms' ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30' : 'border border-white/10 bg-white/5 hover:bg-white/10'}`}
             onClick={() => onSetActiveChatTab('rooms')}
-            aria-label="Rooms"
+            aria-label="League"
             title="League rooms"
-            style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
+            style={{
+              minWidth: isSmallScreen ? '48px' : (isMediumScreen ? '56px' : (isLargeScreen ? '64px' : (isExtraLargeScreen ? '72px' : '80px'))),
+              height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))),
+              paddingLeft: '6px',
+              paddingRight: '6px',
+              fontSize: isSmallScreen ? '9px' : (isMediumScreen ? '10px' : '11px'),
+              letterSpacing: '0.04em'
+            }}
           >
-            <span style={{ fontSize: isSmallScreen ? '14px' : (isMediumScreen ? '16px' : '18px') }}>🏠</span>
+            LEAGUE
           </button>
         </div>
         <div className="flex items-center space-x-1">

@@ -807,7 +807,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-lobby-mesh">
-      <Header onOpenMyStats={handleOpenMyStats} />
+      <Header fullWidth onOpenMyStats={handleOpenMyStats} />
       <ClosurePopup
         message={closureMessage}
         onClose={() => setClosureMessage('')}
@@ -819,10 +819,21 @@ const HomePage: React.FC = () => {
         onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
       />
 
-      <main className="container mx-auto h-[calc(100vh-64px-32px)]" style={{ paddingTop: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingBottom: isSmallScreen ? '0px' : (isMediumScreen ? '8px' : (isLargeScreen ? '12px' : (isExtraLargeScreen ? '8px' : '16px'))), paddingLeft: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))), paddingRight: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}>
+      <main
+        className="w-full h-[calc(100vh-64px-32px)] px-4"
+        style={{
+          paddingTop: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))),
+          paddingBottom: isSmallScreen ? '0px' : (isMediumScreen ? '8px' : (isLargeScreen ? '12px' : (isExtraLargeScreen ? '8px' : '16px')))
+        }}
+      >
         <div
-          className={isPortrait ? "h-full" : "grid h-full lg:grid-cols-3 grid-cols-2"}
-          style={{ height: '100%', gap: isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))) }}
+          className={isPortrait ? 'h-full' : 'grid h-full grid-cols-3'}
+          style={{
+            height: '100%',
+            gap: isPortrait
+              ? undefined
+              : (isSmallScreen ? '8px' : (isMediumScreen ? '12px' : (isLargeScreen ? '14px' : (isExtraLargeScreen ? '12px' : '16px'))))
+          }}
         >
           {/* Games Section */}
           {isPortrait ? (
