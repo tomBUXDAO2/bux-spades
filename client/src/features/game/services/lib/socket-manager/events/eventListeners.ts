@@ -24,6 +24,21 @@ export const setupSocketListeners = (
   options?: { guestMode?: boolean }
 ): void => {
   const guestMode = options?.guestMode === true;
+  const urlSpectate = (): boolean => {
+    try {
+      return new URL(window.location.href).searchParams.get('spectate') === '1';
+    } catch {
+      return false;
+    }
+  };
+  const tableGameIdFromUrl = (): string | null => {
+    try {
+      const m = window.location.pathname.match(/^\/table\/([^/]+)/);
+      return m?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  };
   console.log('🔧 Setting up socket event listeners');
   console.log('🔧 Socket state:', {
     connected: socket.connected,
@@ -85,7 +100,7 @@ export const setupSocketListeners = (
           // Triple-check before actually joining
           const finalActiveGameId = localStorage.getItem('activeGameId');
           if (finalActiveGameId === activeGameId && socket && socket.connected) {
-            socket.emit('join_game', { gameId: activeGameId });
+            socket.emit('join_game', { gameId: activeGameId, spectate: urlSpectate() });
           } else {
           }
         }, 200);
@@ -209,6 +224,7 @@ export const setupSocketListeners = (
     
     // If server sent an activeGameId, user was in a game - redirect them there
     // CRITICAL FIX: Only redirect if user is actually a player (not spectator)
+    let isSeatedPlayer = false;
     if (data.activeGameId) {
       console.log('[AUTH] User has active game:', data.activeGameId);
       
@@ -217,6 +233,7 @@ export const setupSocketListeners = (
       const isPlayer = userGame?.players?.some((p: any) => p && p.id === data.userId && !p.isSpectator);
       
       if (isPlayer) {
+        isSeatedPlayer = true;
         console.log('[AUTH] User is a player, redirecting to active game table');
         localStorage.setItem('activeGameId', data.activeGameId);
         // Redirect to table if not already there
@@ -233,7 +250,13 @@ export const setupSocketListeners = (
     
     // Ensure we are in the current game room post-auth
     try {
-      const activeGameId = data.activeGameId || localStorage.getItem('activeGameId');
+      const spectate = urlSpectate();
+      const tableGameId = tableGameIdFromUrl();
+      // Prefer the table we're already on; otherwise only rejoin seated-player sessions
+      const activeGameId =
+        tableGameId ||
+        (isSeatedPlayer ? data.activeGameId : null) ||
+        localStorage.getItem('activeGameId');
       if (activeGameId && socket && socket.connected) {
         // Check if we've recently failed to join this game
         const lastFailedJoin = localStorage.getItem('lastFailedJoin');
@@ -246,7 +269,7 @@ export const setupSocketListeners = (
           return;
         }
         
-        socket.emit('join_game', { gameId: activeGameId });
+        socket.emit('join_game', { gameId: activeGameId, spectate });
       }
     } catch {}
     

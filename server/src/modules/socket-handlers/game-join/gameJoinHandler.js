@@ -124,10 +124,19 @@ class GameJoinHandler {
       const player = players.find(p => p && p.userId === userId && !p.isSpectator);
       if (!player) {
         const seatedCount = players.filter(Boolean).length;
+        const alreadySpectator =
+          (Array.isArray(baseGameState.spectators) &&
+            baseGameState.spectators.some((s) => s && (s.userId === userId || s.id === userId))) ||
+          !!(await prisma.gamePlayer.findFirst({
+            where: { gameId, userId, isSpectator: true },
+            select: { id: true }
+          }));
+
         // Watching a running/full table should always spectate — even if the client
-        // forgot ?spectate=1 (e.g. league Watch button).
+        // forgot ?spectate=1 (e.g. league Watch button). Also allow rejoin if already a DB spectator.
         const shouldSpectate =
           !!spectate ||
+          alreadySpectator ||
           baseGameState.status === 'BIDDING' ||
           baseGameState.status === 'PLAYING' ||
           (baseGameState.status === 'WAITING' && seatedCount >= 4);
@@ -371,10 +380,24 @@ class GameJoinHandler {
       let isSpectator = false;
       try {
         const gameState = await GameService.getGameStateForClient(gameId);
-        const player = gameState?.players?.find(p => p && p.userId === userId);
-        if (player) {
-          playerUsername = player.username;
-          isSpectator = player.isSpectator || false;
+        const seated = gameState?.players?.find(p => p && p.userId === userId && !p.isSpectator);
+        const spec = gameState?.spectators?.find(
+          (s) => s && (s.userId === userId || s.id === userId)
+        );
+        if (seated) {
+          playerUsername = seated.username || 'Player';
+        } else if (spec) {
+          playerUsername = spec.username || 'Player';
+          isSpectator = true;
+        } else {
+          const dbSpec = await prisma.gamePlayer.findFirst({
+            where: { gameId, userId, isSpectator: true },
+            include: { user: { select: { username: true } } }
+          });
+          if (dbSpec) {
+            isSpectator = true;
+            playerUsername = dbSpec.user?.username || 'Player';
+          }
         }
       } catch (err) {
         console.error('[GAME LEAVE] Error getting player info:', err);

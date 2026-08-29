@@ -24,15 +24,37 @@ export const useGameStateManagement = (gameId: string, userId: string) => {
 
   // Auto-join game when socket is ready and we haven't attempted join yet
   useEffect(() => {
-    if (isReady && socket && gameId && userId && !hasAttemptedJoin) {
-      const spectate = (() => {
-        try { return new URL(window.location.href).searchParams.get('spectate') === '1'; } catch { return false; }
-      })();
-      console.log('🎮 Auto-joining game:', { gameId, userId, spectate, socketId: socket.id });
-      setHasAttemptedJoin(true);
-      socket.emit('join_game', { gameId, userId, spectate });
+    if (!isReady || !socket || !gameId || !userId || hasAttemptedJoin) return;
+
+    const spectate = (() => {
+      try { return new URL(window.location.href).searchParams.get('spectate') === '1'; } catch { return false; }
+    })();
+    console.log('🎮 Auto-joining game:', { gameId, userId, spectate, socketId: socket.id });
+    setHasAttemptedJoin(true);
+    socket.emit('join_game', { gameId, userId, spectate });
+
+    // Same pattern as joinGame(): timeout lives on window so this effect's
+    // re-run (after setHasAttemptedJoin) does not clear it via cleanup.
+    if ((window as any).gameJoinTimeout) {
+      clearTimeout((window as any).gameJoinTimeout);
     }
+    (window as any).gameJoinTimeout = setTimeout(() => {
+      console.log('🎮 Auto-join timeout waiting for game_joined, allowing retry');
+      setHasAttemptedJoin(false);
+      setIsLoading(false);
+      setError('Connection timeout - retrying...');
+    }, 5000);
   }, [isReady, socket, gameId, userId, hasAttemptedJoin]);
+
+  // Clear join timeout on unmount / game change
+  useEffect(() => {
+    return () => {
+      if ((window as any).gameJoinTimeout) {
+        clearTimeout((window as any).gameJoinTimeout);
+        (window as any).gameJoinTimeout = null;
+      }
+    };
+  }, [gameId]);
 
   // Debug: Log game state changes (display-only) - only log major state changes
   useEffect(() => {

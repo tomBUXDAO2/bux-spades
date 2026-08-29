@@ -75,7 +75,21 @@ export const useSocketEventHandlers = ({
         setIsLoading(false);
         setError(null);
         setHasAttemptedJoin(true);
-        localStorage.setItem('activeGameId', gameId);
+        const isSpectating =
+          gameData.spectate === true ||
+          (() => {
+            try {
+              return new URL(window.location.href).searchParams.get('spectate') === '1';
+            } catch {
+              return false;
+            }
+          })();
+        if (isSpectating) {
+          // Spectators must not be treated as active seated players on reconnect
+          localStorage.removeItem('activeGameId');
+        } else {
+          localStorage.setItem('activeGameId', gameId);
+        }
         
         // Clear timeout if it exists
         if ((window as any).gameJoinTimeout) {
@@ -536,7 +550,8 @@ export const useSocketEventHandlers = ({
       // Game completion handled in GameEventHandlers.tsx
       socket.on('game_deleted', handleGameDeleted);
       socket.on('game_presence_update', handleGamePresenceUpdate);
-      // Error handling consolidated - handled in GameEventHandlers.tsx
+      // Must register during load — GameEventHandlers only mounts after game_joined
+      socket.on('error', handleSocketError);
     }
     
     // Cleanup
@@ -556,7 +571,7 @@ export const useSocketEventHandlers = ({
         // Game completion handled in GameEventHandlers.tsx
         socket.off('game_deleted', handleGameDeleted);
         socket.off('game_presence_update', handleGamePresenceUpdate);
-        // Error handling consolidated - handled in GameEventHandlers.tsx
+        socket.off('error', handleSocketError);
       }
     };
   }, [socket, isReady, gameId, userId, setGameState, setIsLoading, setError, setHasAttemptedJoin]);

@@ -155,20 +155,23 @@ export function setupSocketHandlers(io) {
     const playAgainHandler = new PlayAgainHandler(io, socket);
     console.log(`[SOCKET] Handlers initialized for socket ${socket.id}`);
 
-    // Simple per-socket debounce map for join_game to avoid rapid repeat loops
-    const joinDebounce = new Map(); // gameId -> timestamp
+    // Per-socket debounce for join_game; key by gameId+spectate so a failed
+    // non-spectate join cannot swallow the real spectate join within 1s.
+    const joinDebounce = new Map(); // key -> timestamp
 
     // Game join/leave events
     socket.on('join_game', (data) => {
       try {
         const gameId = data?.gameId;
+        const spectateKey = data?.spectate ? '1' : '0';
+        const key = gameId ? `${gameId}:${spectateKey}` : undefined;
         const now = Date.now();
-        const last = gameId ? joinDebounce.get(gameId) : undefined;
-        if (gameId && last && (now - last) < 1000) {
-          console.log(`[SOCKET] Debounced join_game for ${gameId} on socket ${socket.id}`);
+        const last = key ? joinDebounce.get(key) : undefined;
+        if (key && last && (now - last) < 1000) {
+          console.log(`[SOCKET] Debounced join_game for ${key} on socket ${socket.id}`);
           return;
         }
-        if (gameId) joinDebounce.set(gameId, now);
+        if (key) joinDebounce.set(key, now);
       } catch {}
       gameJoinHandler.handleJoinGame(data);
     });
