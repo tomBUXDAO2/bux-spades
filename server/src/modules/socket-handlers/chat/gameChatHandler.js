@@ -1,6 +1,7 @@
 import { GameService } from '../../../services/GameService.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { prisma } from '../../../config/database.js';
+import { sanitizeChatMessage } from '../../../utils/chatGif.js';
 
 class GameChatHandler {
   constructor(io, socket) {
@@ -24,9 +25,11 @@ class GameChatHandler {
       }
 
       // Extract the actual message text from the message object
-      const messageText = message.message || message;
-      if (!messageText || messageText.trim().length === 0) {
-        this.socket.emit('error', { message: 'Message cannot be empty' });
+      let messageText;
+      try {
+        messageText = sanitizeChatMessage(message.message || message);
+      } catch (err) {
+        this.socket.emit('error', { message: err.message || 'Invalid message' });
         return;
       }
 
@@ -67,7 +70,7 @@ class GameChatHandler {
           userId: 'system',
           userName: 'System',
           userAvatar: null,
-          message: messageText.trim(),
+          message: messageText,
           timestamp: new Date().toISOString(),
           gameId: gameId,
           isGameMessage: true,
@@ -101,7 +104,7 @@ class GameChatHandler {
         userId: user.id,
         userName: user.username,
         userAvatar: user.avatarUrl,
-        message: messageText.trim(),
+        message: messageText,
         timestamp: new Date().toISOString(),
         gameId: gameId,
         isGameMessage: true

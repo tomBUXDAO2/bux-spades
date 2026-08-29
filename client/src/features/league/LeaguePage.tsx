@@ -12,6 +12,8 @@ import FriendBlockConfirmModal from '@/components/modals/FriendBlockConfirmModal
 import GameTile from '@/components/game/GameTile';
 import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
 import { useWindowSize } from '@/hooks/useWindowSize';
+import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
+import { GifPicker } from '@/features/chat/components/GifPicker';
 
 type LeagueInfo = {
   id: string;
@@ -78,6 +80,7 @@ const LeaguePage: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -302,6 +305,14 @@ const LeaguePage: React.FC = () => {
     socket.emit('league_message', { leagueId, message: newMessage.trim() });
     setNewMessage('');
     setShowEmojiPicker(false);
+    setShowGifPicker(false);
+  };
+
+  const sendGif = (url: string) => {
+    if (!socket || !leagueId || !url || isMuted) return;
+    socket.emit('league_message', { leagueId, message: url });
+    setShowEmojiPicker(false);
+    setShowGifPicker(false);
   };
 
   const handleSelectEmoji = (emoji: any) => {
@@ -795,7 +806,7 @@ const LeaguePage: React.FC = () => {
                             )}
                             <span className="text-[10px] opacity-70 ml-auto">{formatTime(msg.timestamp)}</span>
                           </div>
-                          <p className="text-sm break-words">{msg.message}</p>
+                          <ChatMessageBody message={msg.message} textClassName="text-sm break-words" />
                           {isAdmin && selectedMessageId === msg.id && (
                             <span
                               role="button"
@@ -846,7 +857,11 @@ const LeaguePage: React.FC = () => {
                         type="button"
                         disabled={isMuted}
                         className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent hover:border-white/10 hover:bg-white/5 disabled:opacity-40"
-                        onClick={() => !isMuted && setShowEmojiPicker((v) => !v)}
+                        onClick={() => {
+                          if (isMuted) return;
+                          setShowGifPicker(false);
+                          setShowEmojiPicker((v) => !v);
+                        }}
                       >
                         <span role="img" aria-label="emoji" className="text-xl">
                           😊
@@ -857,6 +872,26 @@ const LeaguePage: React.FC = () => {
                           <Picker data={data} onEmojiSelect={handleSelectEmoji} theme="dark" />
                         </div>
                       )}
+                    </div>
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        disabled={isMuted}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[11px] font-bold tracking-wide text-white/80 hover:border-white/10 hover:bg-white/5 disabled:opacity-40"
+                        onClick={() => {
+                          if (isMuted) return;
+                          setShowEmojiPicker(false);
+                          setShowGifPicker((v) => !v);
+                        }}
+                        aria-label="GIF"
+                      >
+                        GIF
+                      </button>
+                      <GifPicker
+                        open={showGifPicker && !isMuted}
+                        onClose={() => setShowGifPicker(false)}
+                        onSelect={sendGif}
+                      />
                     </div>
                     <button
                       type="submit"

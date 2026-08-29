@@ -4,6 +4,8 @@ import data from '@emoji-mart/data';
 import type { Player, Bot } from "../../../../types/game";
 import { abbreviateBotName } from "../../../../utils/botUtils";
 import RoomsTab from './RoomsTab';
+import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
+import { GifPicker } from '@/features/chat/components/GifPicker';
 
 interface ChatMessage {
   id?: string;
@@ -34,6 +36,7 @@ interface ChatSectionProps {
   onSetShowEmojiPicker: (show: boolean) => void;
   onSetPlayerFilter: (filter: 'all' | 'friends' | 'hide-blocked') => void;
   onSendMessage: (e: React.FormEvent) => void;
+  onSendGif: (url: string) => void;
   onSelectEmoji: (emoji: any) => void;
   onOpenPlayerStats: (player: any) => void;
   onWatchGame: (gameId: string) => void;
@@ -69,6 +72,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   onSetShowEmojiPicker,
   onSetPlayerFilter,
   onSendMessage,
+  onSendGif,
   onSelectEmoji,
   onOpenPlayerStats,
   onWatchGame,
@@ -76,6 +80,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   formatTime,
   getUserAvatar
 }) => {
+  const [showGifPicker, setShowGifPicker] = React.useState(false);
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = React.useState(window.innerWidth);
   
@@ -194,7 +199,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       )}
                       <span className="text-xs opacity-75 ml-auto" style={{ fontSize: `${12 * textScale}px` }}> {formatTime(msg.timestamp)}</span>
                     </div>
-                    <p style={{ fontSize: `${14 * textScale}px` }}>{msg.message}</p>
+                    <ChatMessageBody
+                      message={msg.message}
+                      style={{ fontSize: `${14 * textScale}px` }}
+                      className="mt-1 max-h-40 max-w-full rounded-md"
+                    />
                   </div>
                   {user && msg.userId === user.id && (
                     <div className={`w-8 h-8 ml-2 rounded-full overflow-hidden flex-shrink-0`}>
@@ -237,7 +246,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                   type="button"
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent transition hover:border-white/10 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px` }}
-                  onClick={() => canSendChat && onSetShowEmojiPicker(!showEmojiPicker)}
+                  onClick={() => {
+                    if (!canSendChat) return;
+                    setShowGifPicker(false);
+                    onSetShowEmojiPicker(!showEmojiPicker);
+                  }}
                   disabled={!canSendChat}
                   tabIndex={-1}
                 >
@@ -249,6 +262,29 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     <Picker data={data} onEmojiSelect={onSelectEmoji} theme="dark" />
                   </div>
                 )}
+              </div>
+              {/* GIF Picker Button */}
+              <div className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-xs font-bold tracking-wide text-slate-300 transition hover:border-white/10 hover:bg-white/5 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ width: `${40 * inputScale}px`, height: `${40 * inputScale}px`, fontSize: `${11 * inputScale}px` }}
+                  onClick={() => {
+                    if (!canSendChat) return;
+                    onSetShowEmojiPicker(false);
+                    setShowGifPicker((v) => !v);
+                  }}
+                  disabled={!canSendChat}
+                  tabIndex={-1}
+                  aria-label="GIF"
+                >
+                  GIF
+                </button>
+                <GifPicker
+                  open={showGifPicker && canSendChat}
+                  onClose={() => setShowGifPicker(false)}
+                  onSelect={onSendGif}
+                />
               </div>
               {/* Send Button as Icon (right-pointing) */}
               <button

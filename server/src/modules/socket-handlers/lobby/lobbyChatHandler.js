@@ -1,4 +1,5 @@
 import { prisma } from '../../../config/databaseFirst.js';
+import { sanitizeChatMessage } from '../../../utils/chatGif.js';
 
 class LobbyChatHandler {
   // CRITICAL: Static Set shared across ALL instances to track online users
@@ -19,8 +20,11 @@ class LobbyChatHandler {
         return;
       }
 
-      if (!message || message.trim().length === 0) {
-        this.socket.emit('error', { message: 'Message cannot be empty' });
+      let text;
+      try {
+        text = sanitizeChatMessage(message);
+      } catch (err) {
+        this.socket.emit('error', { message: err.message || 'Invalid message' });
         return;
       }
 
@@ -40,7 +44,7 @@ class LobbyChatHandler {
         userId: user.id,
         userName: user.username,
         userAvatar: user.avatarUrl,
-        message: message.trim(),
+        message: text,
         timestamp: Date.now(),
         isLobbyMessage: true
       };

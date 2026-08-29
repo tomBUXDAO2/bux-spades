@@ -3,6 +3,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import type { ChatMessage } from "../../../Chat";
+import { ChatMessageBody } from '../../ChatMessageBody';
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -137,7 +138,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 )}
                 <span className="opacity-75 ml-auto" style={{ fontSize: fontSizes.timestamp }}> {formatTimestamp(message.timestamp)}</span>
               </div>
-              <p style={{ fontSize: fontSizes.messageText }}>{message.message}</p>
+              <ChatMessageBody message={message.message} style={{ fontSize: fontSizes.messageText }} />
             </div>
             {isCurrentUser && (
               <div className={`${isMobile ? 'w-6 h-6 ml-1.5' : 'w-8 h-8 ml-2'} rounded-full overflow-hidden flex-shrink-0`}>

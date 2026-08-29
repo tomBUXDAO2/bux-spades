@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
+import { GifPicker } from '@/features/chat/components/GifPicker';
 
 interface EmojiData {
   native: string;
@@ -37,7 +38,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
+  const gifButtonRef = useRef<HTMLButtonElement>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isGifPickerOpen, setIsGifPickerOpen] = useState(false);
   
   // Scale down for different screen widths
   const screenWidth = window.innerWidth;
@@ -107,7 +110,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={`Type a ${chatType} message...`}
-            className="w-full rounded-lg border border-white/10 bg-slate-900/60 pr-10 text-slate-100 placeholder:text-slate-500 backdrop-blur-sm focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            className="w-full rounded-lg border border-white/10 bg-slate-900/60 pr-16 text-slate-100 placeholder:text-slate-500 backdrop-blur-sm focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
             style={getInputStyles()}
             disabled={!isConnected || !isAuthenticated}
           />
@@ -116,14 +119,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <button
             ref={emojiButtonRef}
             type="button"
-            onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
+            onClick={() => {
+              setIsGifPickerOpen(false);
+              setIsEmojiPickerOpen(!isEmojiPickerOpen);
+            }}
             className="absolute top-1/2 -translate-y-1/2 transform text-slate-500 transition-colors hover:text-cyan-300"
             style={{
-              right: `${8 * scale}px`
+              right: `${36 * scale}px`
             }}
             disabled={!isConnected || !isAuthenticated}
           >
             😀
+          </button>
+
+          <button
+            ref={gifButtonRef}
+            type="button"
+            onClick={() => {
+              setIsEmojiPickerOpen(false);
+              setIsGifPickerOpen((v) => !v);
+            }}
+            className="absolute top-1/2 -translate-y-1/2 transform text-[10px] font-bold tracking-wide text-slate-500 transition-colors hover:text-cyan-300"
+            style={{
+              right: `${8 * scale}px`
+            }}
+            disabled={!isConnected || !isAuthenticated}
+            aria-label="GIF"
+          >
+            GIF
           </button>
           
           {/* Emoji picker - rendered via portal */}
@@ -147,6 +170,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 perLine={8}
                 emojiSize={isMobile ? 20 : 24}
                 maxFrequentRows={2}
+              />
+            </div>,
+            document.body
+          )}
+
+          {isGifPickerOpen && gifButtonRef.current && createPortal(
+            <div
+              className="fixed z-[99999]"
+              style={{
+                top: gifButtonRef.current.getBoundingClientRect().top - 10,
+                left: Math.max(8, gifButtonRef.current.getBoundingClientRect().right - 320),
+                transform: 'translateY(-100%)'
+              }}
+            >
+              <GifPicker
+                open
+                onClose={() => setIsGifPickerOpen(false)}
+                onSelect={(url) => {
+                  onSendMessage(url);
+                  setIsGifPickerOpen(false);
+                }}
+                className="relative w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/15 bg-slate-950/95 shadow-xl backdrop-blur-xl"
               />
             </div>,
             document.body

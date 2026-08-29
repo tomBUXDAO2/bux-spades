@@ -1,4 +1,5 @@
 import { prisma } from '../config/databaseFirst.js';
+import { sanitizeChatMessage } from '../utils/chatGif.js';
 
 function slugify(name) {
   const base = String(name || '')
@@ -575,14 +576,9 @@ export class LeagueService {
       err.status = 403;
       throw err;
     }
-    const text = String(message || '').trim();
-    if (!text) {
-      const err = new Error('Message cannot be empty');
-      err.status = 400;
-      throw err;
-    }
+    const text = sanitizeChatMessage(message).slice(0, 1000);
     const created = await prisma.leagueChatMessage.create({
-      data: { leagueId, userId, message: text.slice(0, 1000) },
+      data: { leagueId, userId, message: text },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } }
       }

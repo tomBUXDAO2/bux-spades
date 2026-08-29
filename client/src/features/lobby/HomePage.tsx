@@ -489,6 +489,12 @@ const HomePage: React.FC = () => {
     }
   };
 
+  const handleSendGif = (url: string) => {
+    if (!canParticipate || !socket || !url) return;
+    socket.emit('lobby_message', { message: url });
+    setShowEmojiPicker(false);
+  };
+
   const handleCreateGame = async (settings: any) => {
     if (!user) return;
     setIsCreateGameModalOpen(false);
@@ -895,6 +901,7 @@ const HomePage: React.FC = () => {
                   onSetShowEmojiPicker={setShowEmojiPicker}
                   onSetPlayerFilter={setPlayerFilter}
                   onSendMessage={handleSendMessage}
+                  onSendGif={handleSendGif}
                   onSelectEmoji={handleSelectEmoji}
                   onOpenPlayerStats={handleOpenPlayerStats}
                   onWatchGame={handleWatchGame}
@@ -924,6 +931,7 @@ const HomePage: React.FC = () => {
               onSetShowEmojiPicker={setShowEmojiPicker}
               onSetPlayerFilter={setPlayerFilter}
               onSendMessage={handleSendMessage}
+              onSendGif={handleSendGif}
               onSelectEmoji={handleSelectEmoji}
               onOpenPlayerStats={handleOpenPlayerStats}
               onWatchGame={handleWatchGame}
