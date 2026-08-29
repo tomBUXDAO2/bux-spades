@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { isStandalonePwa } from '../utils/displayMode';
+import { isStandalonePwa, isAndroidBrowser, openOAuthUrl, OAUTH_DEVICE_ID_KEY } from '../utils/displayMode';
 
 const isCapacitor = () =>
   typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
@@ -31,10 +31,9 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   }, []);
 
   useEffect(() => {
-    if (!isStandalonePwa()) return;
     const check = () => {
       try {
-        setWaitingForHandoff(!!localStorage.getItem('oauthDeviceId') && !localStorage.getItem('sessionToken'));
+        setWaitingForHandoff(!!localStorage.getItem(OAUTH_DEVICE_ID_KEY) && !localStorage.getItem('sessionToken'));
       } catch {
         setWaitingForHandoff(false);
       }
@@ -46,6 +45,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
 
   const buildOAuthState = (): string => {
     if (isCapacitor()) return '&state=capacitor';
+    // Installed PWA needs server handoff — Android cannot keep Facebook inside the app.
     if (isStandalonePwa()) {
       const deviceId =
         (typeof crypto !== 'undefined' && crypto.randomUUID
@@ -53,7 +53,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
           : `d${Date.now()}${Math.random().toString(36).slice(2)}`
         ).replace(/-/g, '');
       try {
-        localStorage.setItem('oauthDeviceId', deviceId);
+        localStorage.setItem(OAUTH_DEVICE_ID_KEY, deviceId);
         localStorage.removeItem('oauthFromPwa');
       } catch {
         /* ignore */
@@ -61,6 +61,15 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
       return `&state=${encodeURIComponent(`pwa.${deviceId}`)}`;
     }
     return '';
+  };
+
+  const startOAuth = async (url: string) => {
+    if (isCapacitor()) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+      return;
+    }
+    openOAuthUrl(url);
   };
 
   const handleDiscordLogin = async () => {
@@ -76,12 +85,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     }
     const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${state}`;
     try {
-      if (isCapacitor()) {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: discordAuthUrl });
-      } else {
-        window.location.href = discordAuthUrl;
-      }
+      await startOAuth(discordAuthUrl);
     } catch (err) {
       console.error('Discord login failed:', err);
       setError('Failed to redirect to Discord login. Please try again.');
@@ -101,12 +105,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     }
     const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${stateParam}`;
     try {
-      if (isCapacitor()) {
-        const { Browser } = await import('@capacitor/browser');
-        await Browser.open({ url: facebookAuthUrl });
-      } else {
-        window.location.href = facebookAuthUrl;
-      }
+      await startOAuth(facebookAuthUrl);
     } catch (err) {
       console.error('Facebook login failed:', err);
       setError('Failed to redirect to Facebook login. Please try again.');
@@ -151,8 +150,9 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   const waitingBlock = waitingForHandoff ? (
     <div className="rounded-md bg-cyan-950/60 border border-cyan-500/30 p-3">
       <p className="text-sm text-cyan-100 text-center leading-relaxed">
-        Waiting for Facebook… Finish login in the browser, then come back here — we&apos;ll sign you in
-        automatically.
+        {isAndroidBrowser()
+          ? 'Complete Facebook in the browser tab, then come back here — stay on this screen and we will sign you in automatically.'
+          : 'Waiting for Facebook… Finish login, then return here — we will sign you in automatically.'}
       </p>
     </div>
   ) : null;

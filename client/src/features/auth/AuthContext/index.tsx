@@ -2,8 +2,7 @@ import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useUserState } from './hooks/useUserState';
 import { useAuthMethods } from './hooks/useAuthMethods';
 import { useProfileManagement } from './hooks/useProfileManagement';
-import { AUTH_BROADCAST_CHANNEL } from '../utils/displayMode';
-import { isStandalonePwa } from '../utils/displayMode';
+import { AUTH_BROADCAST_CHANNEL, OAUTH_DEVICE_ID_KEY } from '../utils/displayMode';
 import { api } from '@/services/lib/api';
 
 interface User {
@@ -161,15 +160,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchProfile]);
 
-  // PWA OAuth handoff: claim JWT the server stored under the device id from before Facebook redirect
+  // OAuth handoff: claim JWT whenever a device id is pending (Android PWA must stay alive via window.open)
   const claimingRef = useRef(false);
   useEffect(() => {
-    if (!isStandalonePwa()) return;
-
     const claimHandoff = async () => {
       if (claimingRef.current) return;
       if (localStorage.getItem('sessionToken')) return;
-      const deviceId = localStorage.getItem('oauthDeviceId');
+      const deviceId = localStorage.getItem(OAUTH_DEVICE_ID_KEY);
       if (!deviceId) return;
 
       claimingRef.current = true;
@@ -179,9 +176,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await res.json().catch(() => ({}));
         if (!data?.token) return;
         localStorage.setItem('sessionToken', data.token);
-        localStorage.removeItem('oauthDeviceId');
+        localStorage.removeItem(OAUTH_DEVICE_ID_KEY);
         await fetchProfile();
-        // Drop sign-in query if present
         try {
           const url = new URL(window.location.href);
           if (url.searchParams.has('signin')) {
@@ -199,7 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     claimHandoff();
-    const interval = window.setInterval(claimHandoff, 2000);
+    const interval = window.setInterval(claimHandoff, 1500);
     const onVis = () => {
       if (document.visibilityState === 'visible') claimHandoff();
     };
