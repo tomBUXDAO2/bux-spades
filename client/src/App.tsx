@@ -11,6 +11,7 @@ import { CapacitorAuthHandler } from '@/features/auth/CapacitorAuthHandler';
 import { AuthProvider as AuthContextProvider, useAuth } from '@/features/auth/AuthContext';
 import Register from '@/features/auth/components/Register';
 import AuthCallback from '@/features/auth/components/AuthCallback';
+import ReturnToApp from '@/features/auth/components/ReturnToApp';
 import HomePage from '@/features/lobby/HomePage';
 import TablePage from './pages/TablePage';
 import TestTablePage from './pages/TestTablePage';
@@ -123,6 +124,10 @@ const router = createBrowserRouter(
         {
           path: "auth/callback",
           element: <AuthCallback />
+        },
+        {
+          path: "auth/return-to-app",
+          element: <ReturnToApp />
         },
         {
           path: "facebook-verification",

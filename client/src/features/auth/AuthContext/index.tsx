@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useUserState } from './hooks/useUserState';
 import { useAuthMethods } from './hooks/useAuthMethods';
 import { useProfileManagement } from './hooks/useProfileManagement';
 import { AUTH_BROADCAST_CHANNEL } from '../utils/displayMode';
+import { isStandalonePwa } from '../utils/displayMode';
+import { api } from '@/services/lib/api';
 
 interface User {
   id: string;
@@ -141,6 +143,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         /* ignore */
       }
+    };
+  }, [fetchProfile]);
+
+  // PWA OAuth handoff: claim JWT the server stored under the device id from before Facebook redirect
+  const claimingRef = useRef(false);
+  useEffect(() => {
+    if (!isStandalonePwa()) return;
+
+    const claimHandoff = async () => {
+      if (claimingRef.current) return;
+      if (localStorage.getItem('sessionToken')) return;
+      const deviceId = localStorage.getItem('oauthDeviceId');
+      if (!deviceId) return;
+
+      claimingRef.current = true;
+      try {
+        const res = await api.get(`/api/auth/handoff/claim?deviceId=${encodeURIComponent(deviceId)}`);
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (!data?.token) return;
+        localStorage.setItem('sessionToken', data.token);
+        localStorage.removeItem('oauthDeviceId');
+        await fetchProfile();
+        // Drop sign-in query if present
+        try {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has('signin')) {
+            url.searchParams.delete('signin');
+            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+          }
+        } catch {
+          /* ignore */
+        }
+      } catch (err) {
+        console.warn('[AUTH] Handoff claim failed:', err);
+      } finally {
+        claimingRef.current = false;
+      }
+    };
+
+    claimHandoff();
+    const interval = window.setInterval(claimHandoff, 2000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') claimHandoff();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
     };
   }, [fetchProfile]);
 

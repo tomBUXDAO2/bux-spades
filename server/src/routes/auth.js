@@ -2,11 +2,33 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import { prisma } from '../config/databaseFirst.js';
+import { parsePwaDeviceId, storeHandoffToken, claimHandoffToken } from '../utils/oauthHandoff.js';
 
 // NUCLEAR SOLUTION: Disable expensive database queries entirely
 const DISABLE_EXPENSIVE_QUERIES = false;
 
 const router = express.Router();
+
+const CLIENT_URL = () => process.env.CLIENT_URL || 'https://www.bux-spades.pro';
+
+async function redirectAfterOAuth(res, { state, jwtToken }) {
+  const isCapacitor = state === 'capacitor';
+  const pwaDeviceId = parsePwaDeviceId(state);
+
+  if (isCapacitor) {
+    return res.redirect(`buxspades://auth/callback?token=${jwtToken}`);
+  }
+
+  // Home-screen PWA: browser tab cannot share localStorage with the installed app.
+  // Stash JWT under the device id the PWA created before leaving for OAuth.
+  if (pwaDeviceId) {
+    await storeHandoffToken(pwaDeviceId, jwtToken);
+    console.log(`[OAUTH HANDOFF] Stored token for device ${pwaDeviceId.slice(0, 8)}…`);
+    return res.redirect(`${CLIENT_URL()}/auth/return-to-app`);
+  }
+
+  return res.redirect(`${CLIENT_URL()}/auth/callback?token=${jwtToken}`);
+}
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -190,6 +212,24 @@ router.get('/blocked', authenticateToken, async (req, res) => {
   }
 });
 
+// One-time claim for PWA OAuth handoff (device id created in the installed app before redirect)
+router.get('/handoff/claim', async (req, res) => {
+  try {
+    const deviceId = String(req.query.deviceId || '').trim();
+    if (!deviceId || deviceId.length < 8 || deviceId.length > 80) {
+      return res.status(400).json({ error: 'Invalid device id' });
+    }
+    const token = await claimHandoffToken(deviceId);
+    if (!token) {
+      return res.status(404).json({ error: 'No pending login' });
+    }
+    res.json({ token });
+  } catch (error) {
+    console.error('[OAUTH HANDOFF] Claim error:', error);
+    res.status(500).json({ error: 'Failed to claim login' });
+  }
+});
+
 // Facebook OAuth callback
 router.get('/facebook/callback', async (req, res) => {
   try {
@@ -198,7 +238,7 @@ router.get('/facebook/callback', async (req, res) => {
 
     if (error) {
       console.error('[FACEBOOK OAUTH] Authorization error:', error);
-      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=authorization_failed`;
+      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${CLIENT_URL()}/?signin=1&error=authorization_failed`;
       return res.redirect(loginUrl);
     }
 
@@ -258,16 +298,12 @@ router.get('/facebook/callback', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Redirect to client with token (Capacitor uses buxspades:// deep link)
-    const redirectUrl = isCapacitor
-      ? `buxspades://auth/callback?token=${jwtToken}`
-      : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback?token=${jwtToken}`;
-    res.redirect(redirectUrl);
+    await redirectAfterOAuth(res, { state, jwtToken });
 
   } catch (error) {
     console.error('[FACEBOOK OAUTH] Error in callback:', error);
     const isCapacitor = req.query?.state === 'capacitor';
-    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=oauth_error`;
+    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${CLIENT_URL()}/?signin=1&error=oauth_error`;
     res.redirect(loginUrl);
   }
 });
@@ -280,7 +316,7 @@ router.get('/discord/callback', async (req, res) => {
 
     if (error) {
       console.error('[DISCORD OAUTH] Authorization error:', error);
-      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=authorization_failed`;
+      const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=authorization_failed' : `${CLIENT_URL()}/?signin=1&error=authorization_failed`;
       return res.redirect(loginUrl);
     }
 
@@ -346,16 +382,12 @@ router.get('/discord/callback', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Redirect to client with token (Capacitor app uses buxspades:// deep link)
-    const redirectUrl = isCapacitor
-      ? `buxspades://auth/callback?token=${jwtToken}`
-      : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/auth/callback?token=${jwtToken}`;
-    res.redirect(redirectUrl);
+    await redirectAfterOAuth(res, { state, jwtToken });
 
   } catch (error) {
     console.error('[DISCORD OAUTH] Error in callback:', error);
     const isCapacitor = req.query?.state === 'capacitor';
-    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${process.env.CLIENT_URL || 'https://www.bux-spades.pro'}/?signin=1&error=oauth_error`;
+    const loginUrl = isCapacitor ? 'buxspades://auth/callback?error=oauth_error' : `${CLIENT_URL()}/?signin=1&error=oauth_error`;
     res.redirect(loginUrl);
   }
 });

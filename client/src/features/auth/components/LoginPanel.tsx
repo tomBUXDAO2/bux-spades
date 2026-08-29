@@ -14,6 +14,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
   const [isLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState(false);
+  const [waitingForHandoff, setWaitingForHandoff] = useState(false);
 
   // Use window.location, not useSearchParams: LoginModal renders outside RouterProvider.
   useEffect(() => {
@@ -29,24 +30,49 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     }
   }, []);
 
+  useEffect(() => {
+    if (!isStandalonePwa()) return;
+    const check = () => {
+      try {
+        setWaitingForHandoff(!!localStorage.getItem('oauthDeviceId') && !localStorage.getItem('sessionToken'));
+      } catch {
+        setWaitingForHandoff(false);
+      }
+    };
+    check();
+    const id = window.setInterval(check, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const buildOAuthState = (): string => {
+    if (isCapacitor()) return '&state=capacitor';
+    if (isStandalonePwa()) {
+      const deviceId =
+        (typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `d${Date.now()}${Math.random().toString(36).slice(2)}`
+        ).replace(/-/g, '');
+      try {
+        localStorage.setItem('oauthDeviceId', deviceId);
+        localStorage.removeItem('oauthFromPwa');
+      } catch {
+        /* ignore */
+      }
+      return `&state=${encodeURIComponent(`pwa.${deviceId}`)}`;
+    }
+    return '';
+  };
+
   const handleDiscordLogin = async () => {
     setDiscordError(false);
     const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID;
     const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
     const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/discord/callback`);
     const scope = encodeURIComponent('identify email');
-    const state = isCapacitor() ? '&state=capacitor' : '';
+    const state = buildOAuthState();
     if (!clientId) {
       setError('Discord client ID not configured');
       return;
-    }
-    // Mark pending OAuth so AuthCallback can nudge users back into the home-screen app
-    if (isStandalonePwa()) {
-      try {
-        localStorage.setItem('oauthFromPwa', '1');
-      } catch {
-        /* ignore */
-      }
     }
     const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${state}`;
     try {
@@ -68,17 +94,10 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
     const serverUrl = import.meta.env.PROD ? 'https://bux-spades-server.fly.dev' : 'http://localhost:3000';
     const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/facebook/callback`);
     const scope = encodeURIComponent('public_profile');
-    const stateParam = isCapacitor() ? '&state=capacitor' : '';
+    const stateParam = buildOAuthState();
     if (!clientId) {
       setError('Facebook app ID not configured');
       return;
-    }
-    if (isStandalonePwa()) {
-      try {
-        localStorage.setItem('oauthFromPwa', '1');
-      } catch {
-        /* ignore */
-      }
     }
     const facebookAuthUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}${stateParam}`;
     try {
@@ -129,6 +148,15 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
       </div>
     ) : null;
 
+  const waitingBlock = waitingForHandoff ? (
+    <div className="rounded-md bg-cyan-950/60 border border-cyan-500/30 p-3">
+      <p className="text-sm text-cyan-100 text-center leading-relaxed">
+        Waiting for Facebook… Finish login in the browser, then come back here — we&apos;ll sign you in
+        automatically.
+      </p>
+    </div>
+  ) : null;
+
   /** Header sign-in: overlay with auth actions only */
   const modalInner = (
     <div className="w-full max-w-sm mx-auto space-y-5 pt-1">
@@ -136,6 +164,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
         Sign in
       </h2>
       {errorBlock}
+      {waitingBlock}
       <div className="space-y-3">
         {discordButton}
         {facebookButton}
@@ -161,6 +190,7 @@ const LoginPanel: React.FC<LoginPanelProps> = ({ variant = 'page', onClose }) =>
       </div>
 
       {errorBlock}
+      {waitingBlock}
 
       <div className="mt-8 space-y-3">
         {discordButton}
