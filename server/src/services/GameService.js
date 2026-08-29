@@ -42,7 +42,9 @@ export class GameService {
         }
       }
       
-      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague || gameData.leagueId);
+      // isLeague = Discord/event ready-overlay tables only.
+      // Private Facebook leagues use leagueId and must NOT enable the ready overlay.
+      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague);
 
       const dbGame = await prisma.game.create({
         data: {
@@ -317,6 +319,32 @@ export class GameService {
           throw error;
         }
       }
+    }
+  }
+
+  /**
+   * Private Facebook league games lose league affiliation if a bot is seated
+   * before kickoff — they become normal lobby tables (and leave league stats).
+   */
+  static async clearPrivateLeagueIfBotJoined(gameId) {
+    try {
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { id: true, status: true, leagueId: true }
+      });
+      if (!game?.leagueId || game.status !== 'WAITING') return null;
+
+      const updated = await prisma.game.update({
+        where: { id: gameId },
+        data: { leagueId: null }
+      });
+      console.log(
+        `[GAME SERVICE] Cleared leagueId from game ${gameId} after bot joined (was ${game.leagueId})`
+      );
+      return updated;
+    } catch (error) {
+      console.error('[GAME SERVICE] Error clearing leagueId after bot join:', error);
+      return null;
     }
   }
 
@@ -1207,6 +1235,9 @@ export class GameService {
               },
               orderBy: { seatIndex: 'asc' }
             },
+            league: {
+              select: { id: true, name: true }
+            },
             rounds: {
               include: {
                 tricks: {
@@ -1451,7 +1482,10 @@ export class GameService {
           ...game.specialRules,
           secretAssassinSeat: game.specialRules?.secretAssassinSeat
         },
-        isLeague: game.isLeague,
+        // Private FB leagues use leagueId; never show Discord ready overlay for those
+        isLeague: game.leagueId ? false : game.isLeague,
+        leagueId: game.leagueId || null,
+        leagueName: game.league?.name || null,
         isRated: game.isRated,
         currentPlayer: game.currentPlayer,
         currentRound: game.currentRound,

@@ -94,6 +94,7 @@ class BotService {
     };
 
     console.log(`[BOT SERVICE] Created bot ${bot.username} for seat ${seatIndex}`);
+    await GameService.clearPrivateLeagueIfBotJoined(gameId);
     return bot;
   }
 
@@ -143,6 +144,9 @@ class BotService {
 
     game.players[seatIndex] = bot;
     console.log(`[BOT SERVICE] Added bot ${bot.username} to seat ${seatIndex}`);
+    if (game?.id) {
+      await GameService.clearPrivateLeagueIfBotJoined(game.id);
+    }
     return bot;
   }
 

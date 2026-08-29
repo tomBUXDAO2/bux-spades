@@ -50,7 +50,7 @@ router.get('/', optionalAuth, async (req, res) => {
       mode: game.mode,
       format: game.format,
       gimmickVariant: game.gimmickVariant,
-      isLeague: game.isLeague,
+      isLeague: game.leagueId ? false : game.isLeague,
       leagueId: game.leagueId || null,
       isRated: game.isRated,
       status: game.status,
@@ -151,7 +151,8 @@ router.post('/', authenticateToken, async (req, res) => {
       format: dbFormat, // Use mapped format
       gimmickVariant: gimmickVariant, // Use processed gimmick variant
       leagueId,
-      isLeague: Boolean(leagueId),
+      // Do not set isLeague for private FB leagues — that flag is Discord ready-overlay only
+      isLeague: leagueId ? false : Boolean(req.body.isLeague),
       maxPoints: req.body.maxPoints || 200,
       minPoints: req.body.minPoints || -100,
       buyIn: req.body.buyIn || 0,
@@ -200,7 +201,7 @@ router.post('/', authenticateToken, async (req, res) => {
       mode: game.mode,
       format: game.format,
       gimmickVariant: game.gimmickVariant,
-      isLeague: game.isLeague,
+      isLeague: game.leagueId ? false : game.isLeague,
       leagueId: game.leagueId || null,
       isRated: game.isRated,
       status: game.status,
