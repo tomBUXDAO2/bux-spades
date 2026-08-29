@@ -10,6 +10,8 @@ import CreateGameModal from '@/components/game/CreateGameModal';
 import PlayerStatsModal from '@/components/modals/PlayerStatsModal';
 import FriendBlockConfirmModal from '@/components/modals/FriendBlockConfirmModal';
 import GameTile from '@/components/game/GameTile';
+import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 type LeagueInfo = {
   id: string;
@@ -68,6 +70,8 @@ const LeaguePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket, isAuthenticated } = useSocket();
+  const { isLandscape } = useWindowSize();
+  const isPortrait = !isLandscape;
 
   const [league, setLeague] = useState<LeagueInfo | null>(null);
   const [games, setGames] = useState<any[]>([]);
@@ -81,6 +85,7 @@ const LeaguePage: React.FC = () => {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [roomOnlineIds, setRoomOnlineIds] = useState<string[]>([]);
   const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
+  const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
@@ -542,8 +547,25 @@ const LeaguePage: React.FC = () => {
         </div>
       )}
 
-      <main className="grid gap-4 p-4 lg:grid-cols-3 min-h-[calc(100vh-72px)]">
-        <section className="lg:col-span-2 space-y-4">
+      <MobileToggle
+        mobileTab={mobileTab}
+        onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
+      />
+
+      <main
+        className={
+          isPortrait
+            ? 'flex flex-col gap-4 p-4 min-h-0'
+            : 'grid gap-4 p-4 lg:grid-cols-3 min-h-[calc(100vh-72px)]'
+        }
+        style={
+          isPortrait
+            ? { height: 'calc(100vh - 64px - 56px)', maxHeight: 'calc(100dvh - 64px - 56px)' }
+            : undefined
+        }
+      >
+        {(!isPortrait || mobileTab === 'lobby') && (
+        <section className={`lg:col-span-2 space-y-4 ${isPortrait ? 'overflow-y-auto min-h-0 flex-1' : ''}`}>
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold drop-shadow">Available Games</h2>
             <button
@@ -698,10 +720,12 @@ const LeaguePage: React.FC = () => {
             </div>
           )}
         </section>
+        )}
 
-        <aside className="flex flex-col min-h-[480px]">
+        {(!isPortrait || mobileTab === 'chat') && (
+        <aside className={`flex flex-col ${isPortrait ? 'flex-1 min-h-0' : 'min-h-[480px]'}`}>
           <div
-            className="flex flex-1 flex-col rounded-xl border border-white/15 p-3 backdrop-blur shadow-lg"
+            className="flex flex-1 flex-col rounded-xl border border-white/15 p-3 backdrop-blur shadow-lg min-h-0"
             style={{ backgroundColor: `${theme}b3` }}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -1083,6 +1107,7 @@ const LeaguePage: React.FC = () => {
             )}
           </div>
         </aside>
+        )}
       </main>
 
       <CreateGameModal
