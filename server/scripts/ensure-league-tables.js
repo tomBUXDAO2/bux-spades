@@ -1,0 +1,95 @@
+/**
+ * Idempotent: create League* tables on the connected DATABASE_URL.
+ * Safe for Fly Postgres (does not drop columns / drift-diff).
+ * Usage: node scripts/ensure-league-tables.js
+ */
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const statements = [
+  `DO $$ BEGIN
+    CREATE TYPE "LeagueMemberRole" AS ENUM ('OWNER', 'ADMIN', 'MEMBER');
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `DO $$ BEGIN
+    CREATE TYPE "LeagueJoinRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "League" (
+    "id" TEXT PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL UNIQUE,
+    "ownerId" TEXT NOT NULL,
+    "bgColor" TEXT NOT NULL DEFAULT '#0f172a',
+    "logoUrl" TEXT,
+    "requireJoinApproval" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueMember" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "role" "LeagueMemberRole" NOT NULL DEFAULT 'MEMBER',
+    "mutedUntil" TIMESTAMP(3),
+    "timeoutUntil" TIMESTAMP(3),
+    "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueJoinRequest" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "status" "LeagueJoinRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueChatMessage" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueCreateRequest" (
+    "id" TEXT PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "logoUrl" TEXT,
+    "requireJoinApproval" BOOLEAN NOT NULL DEFAULT true,
+    "requesterId" TEXT NOT NULL,
+    "status" "LeagueJoinRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "approvedLeagueId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "leagueId" TEXT`,
+  `ALTER TABLE "League" ADD COLUMN IF NOT EXISTS "requireJoinApproval" BOOLEAN NOT NULL DEFAULT true`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,
+  `CREATE INDEX IF NOT EXISTS "Game_leagueId_idx" ON "Game"("leagueId")`,
+  `CREATE INDEX IF NOT EXISTS "LeagueCreateRequest_status_createdAt_idx" ON "LeagueCreateRequest"("status", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "LeagueCreateRequest_requesterId_idx" ON "LeagueCreateRequest"("requesterId")`
+];
+
+async function main() {
+  for (const sql of statements) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (e) {
+      console.error('Statement failed:', e.message);
+      throw e;
+    }
+  }
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT to_regclass('public."League"')::text AS league,
+            to_regclass('public."LeagueCreateRequest"')::text AS create_req`
+  );
+  console.log('OK', rows[0]);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
