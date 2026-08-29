@@ -1,23 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
+function isMobileOrTabletDevice() {
+  if (typeof window === 'undefined') return false;
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    window.innerWidth <= 1024
+  );
+}
+
+async function lockLandscape() {
+  try {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (orientation: string) => Promise<void>;
+    };
+    if (orientation?.lock) {
+      await orientation.lock('landscape');
+    }
+  } catch {
+    // Browsers often require fullscreen / user gesture; LandscapePrompt UI covers the rest.
+  }
+}
+
+function unlockOrientation() {
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * On game table routes (mobile): try to lock landscape; if still portrait, show rotate overlay.
+ * Lobby / league stay free to rotate (app/PWA orientation is "any").
+ */
 const LandscapePrompt: React.FC = () => {
   const [isPortrait, setIsPortrait] = useState(false);
   const location = useLocation();
-
-  // Only show landscape prompt on game table pages
   const isGameTablePage = location.pathname.includes('/table/');
 
   useEffect(() => {
+    if (!isGameTablePage || !isMobileOrTabletDevice()) {
+      return;
+    }
+
+    lockLandscape();
+
+    return () => {
+      unlockOrientation();
+    };
+  }, [isGameTablePage]);
+
+  useEffect(() => {
     const checkOrientation = () => {
-      const isPortraitMode = window.innerHeight > window.innerWidth;
-      setIsPortrait(isPortraitMode);
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
 
-    // Check on mount
     checkOrientation();
-
-    // Listen for orientation changes
     window.addEventListener('resize', checkOrientation);
     window.addEventListener('orientationchange', checkOrientation);
 
@@ -27,8 +66,7 @@ const LandscapePrompt: React.FC = () => {
     };
   }, []);
 
-  // Only show if we're on a game table page AND in portrait mode
-  if (!isGameTablePage || !isPortrait) {
+  if (!isGameTablePage || !isPortrait || !isMobileOrTabletDevice()) {
     return null;
   }
 
@@ -37,12 +75,12 @@ const LandscapePrompt: React.FC = () => {
       <div className="text-center p-8 max-w-md">
         <div className="mb-6">
           <svg
-            className="w-16 h-16 mx-auto mb-4 text-blue-500 animate-spin" 
+            className="w-16 h-16 mx-auto mb-4 text-blue-500 animate-spin"
             fill="none"
             viewBox="0 0 24 24"
           >
             <path
-              stroke="currentColor" 
+              stroke="currentColor"
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
@@ -63,4 +101,4 @@ const LandscapePrompt: React.FC = () => {
   );
 };
 
-export default LandscapePrompt; 
+export default LandscapePrompt;
