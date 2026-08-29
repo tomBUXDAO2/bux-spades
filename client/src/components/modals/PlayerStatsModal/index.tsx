@@ -44,16 +44,18 @@ interface PlayerStatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   player: Player | null;
+  leagueId?: string;
 }
 
 const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ 
   isOpen, 
   onClose, 
-  player 
+  player,
+  leagueId
 }) => {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   
-  const { currentStats } = usePlayerStatsData(isOpen, player, mode);
+  const { currentStats } = usePlayerStatsData(isOpen, player, mode, leagueId);
 
   if (!isOpen || !player) return null;
 

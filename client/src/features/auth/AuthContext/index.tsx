@@ -10,6 +10,7 @@ interface User {
   avatar: string | null;
   avatarUrl?: string; // Support both avatar and avatarUrl properties
   discordId?: string; // Discord ID for admin authentication
+  facebookId?: string | null;
   coins: number;
   isAuthenticated?: boolean;
   stats?: {

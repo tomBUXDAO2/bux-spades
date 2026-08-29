@@ -3,6 +3,7 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import type { Player, Bot } from "../../../../types/game";
 import { abbreviateBotName } from "../../../../utils/botUtils";
+import RoomsTab from './RoomsTab';
 
 interface ChatMessage {
   id?: string;
@@ -16,7 +17,7 @@ interface ChatMessage {
 
 interface ChatSectionProps {
   mobileTab: 'lobby' | 'chat';
-  activeChatTab: 'chat' | 'players';
+  activeChatTab: 'chat' | 'players' | 'rooms';
   onlineCount: number;
   chatMessages: ChatMessage[];
   newMessage: string;
@@ -28,7 +29,7 @@ interface ChatSectionProps {
   onRequestSignIn?: () => void;
   chatContainerRef: React.RefObject<HTMLDivElement>;
   inputRef: React.RefObject<HTMLInputElement>;
-  onSetActiveChatTab: (tab: 'chat' | 'players') => void;
+  onSetActiveChatTab: (tab: 'chat' | 'players' | 'rooms') => void;
   onSetNewMessage: (message: string) => void;
   onSetShowEmojiPicker: (show: boolean) => void;
   onSetPlayerFilter: (filter: 'all' | 'friends' | 'hide-blocked') => void;
@@ -126,6 +127,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           >
             <img src="/players.svg" alt="Players" className="" style={{ width: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), height: isSmallScreen ? '16px' : (isMediumScreen ? '18px' : (isLargeScreen ? '20px' : (isExtraLargeScreen ? '22px' : '24px'))), filter: 'invert(1) brightness(2)' }} />
           </button>
+          <button
+            className={`lobby-button flex items-center justify-center rounded-lg text-xs font-semibold transition sm:text-sm ${activeChatTab === 'rooms' ? 'bg-gradient-to-r from-cyan-500 to-teal-600 shadow-md shadow-cyan-950/30' : 'border border-white/10 bg-white/5 hover:bg-white/10'}`}
+            onClick={() => onSetActiveChatTab('rooms')}
+            aria-label="Rooms"
+            title="League rooms"
+            style={{ width: isSmallScreen ? '32px' : (isMediumScreen ? '36px' : (isLargeScreen ? '42px' : (isExtraLargeScreen ? '48px' : '80px'))), height: isSmallScreen ? '24px' : (isMediumScreen ? '28px' : (isLargeScreen ? '32px' : (isExtraLargeScreen ? '36px' : '40px'))) }}
+          >
+            <span style={{ fontSize: isSmallScreen ? '14px' : (isMediumScreen ? '16px' : '18px') }}>🏠</span>
+          </button>
         </div>
         <div className="flex items-center space-x-1">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)] sm:h-2 sm:w-2"></span>
@@ -133,7 +143,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
       </div>
       {/* Tab Content */}
-      {activeChatTab === 'chat' ? (
+      {activeChatTab === 'rooms' ? (
+        <RoomsTab user={user} textScale={textScale} />
+      ) : activeChatTab === 'chat' ? (
         <>
           <div
             ref={chatContainerRef}

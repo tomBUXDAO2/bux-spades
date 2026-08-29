@@ -72,7 +72,7 @@ const HomePage: React.FC = () => {
   const [filter, setFilter] = useState('waiting');
   const [isLoading, setIsLoading] = useState(true);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [activeChatTab, setActiveChatTab] = useState<'chat' | 'players'>('chat');
+  const [activeChatTab, setActiveChatTab] = useState<'chat' | 'players' | 'rooms'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [onlinePlayers, setOnlinePlayers] = useState<any[]>([]);
   const onlineCount = Array.isArray(onlinePlayers) ? onlinePlayers.filter(p => p.online || p.inGame === true).length : 0;

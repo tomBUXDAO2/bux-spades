@@ -6,6 +6,7 @@ import adminRoutes from './admin.js';
 import performanceRoutes from './performance.js';
 import { eventRoutes } from './events.js';
 import { tournamentRoutes } from './tournaments.js';
+import leagueRoutes from './leagues.js';
 
 export function setupRoutes(app) {
   // Health check
@@ -23,6 +24,7 @@ export function setupRoutes(app) {
   app.use('/api/users', statsRoutes); // Stats routes (handles /api/users/:userId/stats)
   app.use('/api/events', eventRoutes);
   app.use('/api/tournaments', tournamentRoutes); // Tournament routes (public)
+  app.use('/api/leagues', leagueRoutes);
   app.use('/api/admin', adminRoutes); // Admin routes
   app.use('/api/performance', performanceRoutes); // Performance monitoring
 

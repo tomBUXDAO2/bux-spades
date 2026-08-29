@@ -12,6 +12,7 @@ router.get('/user/:userId', async (req, res) => {
       mode = 'ALL',        // ALL, PARTNERS, SOLO
       format = 'ALL',      // ALL, REGULAR, WHIZ, MIRROR, GIMMICK
       league = null,       // null = all, true = league only, false = non-league only
+      leagueId = null,     // specific private Facebook league
       gimmick = null       // null = all, specific variant
     } = req.query;
 
@@ -19,6 +20,7 @@ router.get('/user/:userId', async (req, res) => {
       mode,
       format,
       isLeague: league === 'true' ? true : league === 'false' ? false : null,
+      leagueId: leagueId || null,
       gimmickVariant: gimmick
     };
 
@@ -47,6 +49,7 @@ router.get('/:userId/stats', async (req, res) => {
       mode = 'ALL',
       format = 'ALL',
       league = null,
+      leagueId = null,
       gimmick = null,
       gameMode = 'ALL' // Support both 'mode' and 'gameMode' query params
     } = req.query;
@@ -55,6 +58,7 @@ router.get('/:userId/stats', async (req, res) => {
       mode: mode === 'ALL' ? gameMode : mode, // Use gameMode if mode is ALL
       format,
       isLeague: league === 'true' ? true : league === 'false' ? false : null,
+      leagueId: leagueId || null,
       gimmickVariant: gimmick
     };
 

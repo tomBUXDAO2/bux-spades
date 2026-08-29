@@ -26,6 +26,10 @@ model User {
   tournamentRegistrations TournamentRegistration[]
   tournamentPartners      TournamentRegistration[] @relation("TournamentPartner")
   eventStats              EventParticipantStat[]
+  ownedLeagues            League[]                 @relation("LeagueOwner")
+  leagueMemberships       LeagueMember[]
+  leagueJoinRequests      LeagueJoinRequest[]
+  leagueChatMessages      LeagueChatMessage[]
 }
 
 model UserStats {
@@ -181,6 +185,8 @@ model Game {
   lastActionAt    DateTime?
   eventId         String?
   event           Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  leagueId        String?
+  league          League?         @relation(fields: [leagueId], references: [id], onDelete: SetNull)
   EventGame       EventGame[]
   players         GamePlayer[]
   result          GameResult?
@@ -192,6 +198,8 @@ model Game {
   @@index([currentPlayer])
   @@index([isRated, status])
   @@index([eventId])
+  @@index([leagueId])
+  @@index([leagueId, status])
 }
 
 model GamePlayer {
@@ -587,4 +595,78 @@ enum MatchStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+}
+
+enum LeagueMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum LeagueJoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model League {
+  id           String              @id @default(cuid())
+  name         String
+  slug         String              @unique
+  ownerId      String
+  bgColor      String              @default("#0f172a")
+  logoUrl      String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  owner        User                @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members      LeagueMember[]
+  joinRequests LeagueJoinRequest[]
+  chatMessages LeagueChatMessage[]
+  games        Game[]
+
+  @@index([ownerId])
+}
+
+model LeagueMember {
+  id           String           @id @default(cuid())
+  leagueId     String
+  userId       String
+  role         LeagueMemberRole @default(MEMBER)
+  mutedUntil   DateTime?
+  timeoutUntil DateTime?
+  joinedAt     DateTime         @default(now())
+  league       League           @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+  @@index([userId])
+  @@index([leagueId])
+}
+
+model LeagueJoinRequest {
+  id        String                   @id @default(cuid())
+  leagueId  String
+  userId    String
+  status    LeagueJoinRequestStatus  @default(PENDING)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  league    League                   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+  @@index([leagueId, status])
+  @@index([userId])
+}
+
+model LeagueChatMessage {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId, createdAt])
+  @@index([userId])
 }

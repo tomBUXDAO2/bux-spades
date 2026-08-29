@@ -38,32 +38,62 @@ interface Player {
   id?: string;
 }
 
-export const usePlayerStatsData = (isOpen: boolean, player: Player | null, mode: 'all' | 'partners' | 'solo') => {
+export const usePlayerStatsData = (
+  isOpen: boolean,
+  player: Player | null,
+  mode: 'all' | 'partners' | 'solo',
+  leagueId?: string
+) => {
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
 
-  // Fetch stats when mode changes or player changes
   useEffect(() => {
     if (!isOpen || !player || !player.id) return;
 
     const fetchStats = async () => {
       try {
         const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
-        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
-        console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
+        const leagueParam = leagueId ? `&leagueId=${encodeURIComponent(leagueId)}` : '';
+        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}${leagueParam}`;
         const response = await api.get(url);
         const data = await response.json();
-        const stats = data.stats || data;
-        console.log('[PLAYER STATS MODAL] Received stats:', stats);
-        setCurrentStats(stats);
+        const raw = data.data || data.stats || data;
+        // Map DetailedStatsService shape onto modal fields when needed
+        const mapped: PlayerStats = {
+          gamesPlayed: raw.gamesPlayed ?? raw.totalGames ?? 0,
+          gamesWon: raw.gamesWon ?? 0,
+          totalBags: raw.totalBags ?? raw.bags?.total,
+          bagsPerGame: raw.bagsPerGame ?? raw.bags?.perGame,
+          nilsBid: raw.nilsBid ?? raw.nils?.bid ?? 0,
+          nilsMade: raw.nilsMade ?? raw.nils?.made ?? 0,
+          blindNilsBid: raw.blindNilsBid ?? raw.blindNils?.bid ?? 0,
+          blindNilsMade: raw.blindNilsMade ?? raw.blindNils?.made ?? 0,
+          regPlayed: raw.regPlayed ?? raw.formatBreakdown?.regular?.played,
+          regWon: raw.regWon ?? raw.formatBreakdown?.regular?.won,
+          whizPlayed: raw.whizPlayed ?? raw.formatBreakdown?.whiz?.played,
+          whizWon: raw.whizWon ?? raw.formatBreakdown?.whiz?.won,
+          mirrorPlayed: raw.mirrorPlayed ?? raw.formatBreakdown?.mirror?.played,
+          mirrorWon: raw.mirrorWon ?? raw.formatBreakdown?.mirror?.won,
+          gimmickPlayed: raw.gimmickPlayed ?? raw.formatBreakdown?.gimmick?.played,
+          gimmickWon: raw.gimmickWon ?? raw.formatBreakdown?.gimmick?.won,
+          partnersGamesPlayed: raw.partnersGamesPlayed ?? raw.modeBreakdown?.partners?.played,
+          partnersGamesWon: raw.partnersGamesWon ?? raw.modeBreakdown?.partners?.won,
+          soloGamesPlayed: raw.soloGamesPlayed ?? raw.modeBreakdown?.solo?.played,
+          soloGamesWon: raw.soloGamesWon ?? raw.modeBreakdown?.solo?.won,
+          totalCoinsWon: raw.totalCoinsWon ?? raw.totalCoins,
+          screamerPlayed: raw.screamerPlayed,
+          screamerWon: raw.screamerWon,
+          assassinPlayed: raw.assassinPlayed,
+          assassinWon: raw.assassinWon
+        };
+        setCurrentStats(mapped);
       } catch (error) {
         console.error('Error fetching player stats:', error);
-        // Fallback to original stats
         setCurrentStats(player.stats);
       }
     };
 
     fetchStats();
-  }, [isOpen, player, mode]);
+  }, [isOpen, player, mode, leagueId]);
 
   return {
     currentStats,

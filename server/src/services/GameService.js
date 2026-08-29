@@ -42,7 +42,7 @@ export class GameService {
         }
       }
       
-      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague);
+      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague || gameData.leagueId);
 
       const dbGame = await prisma.game.create({
         data: {
@@ -60,6 +60,7 @@ export class GameService {
           blindNilAllowed: gameData.blindNilAllowed || false,
           specialRules: gameData.specialRules,
           eventId: gameData.eventId || null,
+          leagueId: gameData.leagueId || null,
           status: 'WAITING',
           dealer: Math.floor(Math.random() * 4), // Random dealer 0-3
           currentRound: 1,
@@ -320,14 +321,24 @@ export class GameService {
   }
 
   // Get all active games - database only
-  static async getActiveGames() {
+  static async getActiveGames({ leagueId = undefined } = {}) {
     try {
+      const where = {
+        status: {
+          in: ['WAITING', 'BIDDING', 'PLAYING']
+        }
+      };
+
+      // Main lobby: only games without a private leagueId.
+      // League lobby: only that league's games.
+      if (leagueId) {
+        where.leagueId = leagueId;
+      } else {
+        where.leagueId = null;
+      }
+
       const dbGames = await prisma.game.findMany({
-        where: {
-          status: {
-            in: ['WAITING', 'BIDDING', 'PLAYING']
-          }
-        },
+        where,
         orderBy: { createdAt: 'desc' }
       });
 

@@ -7,6 +7,7 @@ import { GameChatHandler } from '../modules/socket-handlers/chat/gameChatHandler
 import { BotManagementHandler } from '../modules/socket-handlers/bot-management/botManagementHandler.js';
 import ReadyHandler from '../modules/socket-handlers/ready/readyHandler.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
+import { LeagueChatHandler } from '../modules/socket-handlers/lobby/leagueChatHandler.js';
 import { FriendBlockHandler } from '../modules/socket-handlers/friends/friendBlockHandler.js';
 import { PlayAgainHandler } from '../modules/socket-handlers/play-again/playAgainHandler.js';
 import redisSessionService from '../services/RedisSessionService.js';
@@ -300,6 +301,27 @@ export function setupSocketHandlers(io) {
       handler.handleLobbyMessage(data);
     });
 
+    // Private league chat / rooms
+    socket.on('join_league_room', (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const handler = new LeagueChatHandler(io, socket);
+      handler.handleJoinLeagueRoom(data);
+    });
+    socket.on('leave_league_room', (data) => {
+      const handler = new LeagueChatHandler(io, socket);
+      handler.handleLeaveLeagueRoom(data);
+    });
+    socket.on('league_message', (data) => {
+      if (!socket.authenticated) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+      const handler = new LeagueChatHandler(io, socket);
+      handler.handleLeagueMessage(data);
+    });
 
     // Emoji reaction events
     socket.on('emoji_reaction', (data) => {

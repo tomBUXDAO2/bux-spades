@@ -650,4 +650,42 @@ router.get('/game-details/:gameId', authenticateToken, isAdmin, async (req, res)
   }
 });
 
+// Create a private Facebook league and assign owner (site admin only)
+router.post('/leagues', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { name, ownerUserId, ownerFacebookId, bgColor, logoUrl } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'League name is required' });
+    }
+
+    let resolvedOwnerId = ownerUserId;
+    if (!resolvedOwnerId && ownerFacebookId) {
+      const owner = await prisma.user.findUnique({
+        where: { facebookId: String(ownerFacebookId) },
+        select: { id: true }
+      });
+      if (!owner) {
+        return res.status(404).json({ error: 'Owner Facebook user not found — they must log in with Facebook first' });
+      }
+      resolvedOwnerId = owner.id;
+    }
+    if (!resolvedOwnerId) {
+      return res.status(400).json({ error: 'ownerUserId or ownerFacebookId is required' });
+    }
+
+    const { LeagueService } = await import('../services/LeagueService.js');
+    const league = await LeagueService.createLeague({
+      name,
+      ownerUserId: resolvedOwnerId,
+      bgColor,
+      logoUrl
+    });
+    res.status(201).json(league);
+  } catch (error) {
+    console.error('[ADMIN] Error creating league:', error);
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Failed to create league' });
+  }
+});
+
 export default router;

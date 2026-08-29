@@ -17,6 +17,8 @@ import TestTablePage from './pages/TestTablePage';
 import FacebookVerification from './pages/FacebookVerification';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import LeaguePage from '@/features/league/LeaguePage';
+import AdminCreateLeaguePage from './pages/AdminCreateLeaguePage';
 import TournamentLobbyModal from './components/modals/TournamentLobbyModal';
 import { SocketProvider } from '@/features/auth/SocketContext';
 import { LoginModalProvider, useLoginModal } from '@/features/auth/LoginModalContext';
@@ -137,6 +139,14 @@ const router = createBrowserRouter(
         {
           path: "",
           element: <HomePage />
+        },
+        {
+          path: "league/:leagueId",
+          element: <ProtectedRoute><LeaguePage /></ProtectedRoute>
+        },
+        {
+          path: "admin/leagues",
+          element: <ProtectedRoute><AdminCreateLeaguePage /></ProtectedRoute>
         },
         {
           path: "profile",

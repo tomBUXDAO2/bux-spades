@@ -8,6 +8,7 @@ export class DetailedStatsService {
         mode = 'ALL',        // ALL, PARTNERS, SOLO
         format = 'ALL',      // ALL, REGULAR, WHIZ, MIRROR, GIMMICK
         isLeague = null,     // null = all, true = league only, false = non-league only
+        leagueId = null,     // specific private league (Facebook leagues)
         gimmickVariant = null // null = all, specific variant
       } = filters;
 
@@ -24,7 +25,9 @@ export class DetailedStatsService {
         gameWhere.format = format;
       }
 
-      if (isLeague !== null) {
+      if (leagueId) {
+        gameWhere.leagueId = leagueId;
+      } else if (isLeague !== null) {
         gameWhere.isLeague = isLeague;
       }
 
@@ -42,13 +45,13 @@ export class DetailedStatsService {
       const bagsStats = await this.getBagsStats(userId, gameWhere);
       
       // Get format breakdown
-      const formatBreakdown = await this.getFormatBreakdown(userId, mode, isLeague);
+      const formatBreakdown = await this.getFormatBreakdown(userId, mode, isLeague, leagueId);
       
       // Get special rules breakdown
-      const specialRulesBreakdown = await this.getSpecialRulesBreakdown(userId, mode, isLeague);
+      const specialRulesBreakdown = await this.getSpecialRulesBreakdown(userId, mode, isLeague, leagueId);
       
       // Get mode breakdown (if showing all modes)
-      const modeBreakdown = mode === 'ALL' ? await this.getModeBreakdown(userId, format, isLeague) : null;
+      const modeBreakdown = mode === 'ALL' ? await this.getModeBreakdown(userId, format, isLeague, leagueId) : null;
 
       return {
         // Basic stats
@@ -257,7 +260,7 @@ export class DetailedStatsService {
   }
 
   // Get format breakdown (Regular, Whiz, Mirror, Gimmick)
-  static async getFormatBreakdown(userId, mode = 'ALL', isLeague = null) {
+  static async getFormatBreakdown(userId, mode = 'ALL', isLeague = null, leagueId = null) {
     const formats = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'];
     const breakdown = {};
 
@@ -266,7 +269,7 @@ export class DetailedStatsService {
         status: 'FINISHED',
         format,
         ...(mode !== 'ALL' && { mode }),
-        ...(isLeague !== null && { isLeague })
+        ...(leagueId ? { leagueId } : (isLeague !== null && { isLeague }))
       };
 
       const stats = await this.getGameStats(userId, gameWhere);
@@ -282,7 +285,7 @@ export class DetailedStatsService {
   }
 
   // Get special rules breakdown (Screamer, Assassin, etc.)
-  static async getSpecialRulesBreakdown(userId, mode = 'ALL', isLeague = null) {
+  static async getSpecialRulesBreakdown(userId, mode = 'ALL', isLeague = null, leagueId = null) {
     // This would require checking the specialRules JSON field
     // For now, returning placeholder structure
     return {
@@ -292,7 +295,7 @@ export class DetailedStatsService {
   }
 
   // Get mode breakdown (Partners, Solo)
-  static async getModeBreakdown(userId, format = 'ALL', isLeague = null) {
+  static async getModeBreakdown(userId, format = 'ALL', isLeague = null, leagueId = null) {
     const modes = ['PARTNERS', 'SOLO'];
     const breakdown = {};
 
@@ -301,7 +304,7 @@ export class DetailedStatsService {
         status: 'FINISHED',
         mode,
         ...(format !== 'ALL' && { format }),
-        ...(isLeague !== null && { isLeague })
+        ...(leagueId ? { leagueId } : (isLeague !== null && { isLeague }))
       };
 
       const stats = await this.getGameStats(userId, gameWhere);

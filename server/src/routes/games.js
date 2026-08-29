@@ -5,14 +5,40 @@ import { GameService } from '../services/GameService.js';
 import redisGameState from '../services/RedisGameStateService.js';
 import { prisma } from '../config/database.js';
 import { emitPersonalizedGameEvent } from '../services/SocketGameBroadcastService.js';
+import { authenticateToken } from '../middleware/auth.js';
+import { LeagueService } from '../services/LeagueService.js';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
+// Optional auth — populates req.userId when Bearer token present (ignores invalid tokens)
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return next();
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret', (err, decoded) => {
+    if (!err && decoded) {
+      req.user = decoded;
+      req.userId = decoded.userId;
+    }
+    next();
+  });
+}
+
 // Get all active games (ONLY from database)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
+    const leagueId = req.query.leagueId ? String(req.query.leagueId) : undefined;
+
+    if (leagueId) {
+      if (!req.userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      await LeagueService.assertCanPlay(leagueId, req.userId);
+    }
+
     // Load games ONLY from database
-    const dbGames = await GameService.getActiveGames();
+    const dbGames = await GameService.getActiveGames({ leagueId });
     console.log(`[API] Found ${dbGames.length} games in database`);
     
     console.log(`[API] Returning ${dbGames.length} database games only`);
@@ -25,6 +51,7 @@ router.get('/', async (req, res) => {
       format: game.format,
       gimmickVariant: game.gimmickVariant,
       isLeague: game.isLeague,
+      leagueId: game.leagueId || null,
       isRated: game.isRated,
       status: game.status,
       minPoints: game.minPoints,
@@ -50,7 +77,8 @@ router.get('/', async (req, res) => {
     res.json(clientGames);
   } catch (error) {
     console.error('[API] Error getting games:', error);
-    res.status(500).json({ error: 'Failed to get games' });
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Failed to get games' });
   }
 });
 
@@ -73,7 +101,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new game
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     // Map client format codes to database format names
     const formatMapping = {
@@ -108,15 +136,22 @@ router.post('/', async (req, res) => {
       // Regular format mapping
       dbFormat = formatMapping[clientFormat] || clientFormat;
     }
+
+    const leagueId = req.body.leagueId || null;
+    if (leagueId) {
+      await LeagueService.assertCanPlay(leagueId, req.userId);
+    }
     
     const gameData = {
       id: `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdById: req.body.creatorId || req.body.createdById || 'system', // Use creatorId from client
+      createdById: req.body.creatorId || req.body.createdById || req.userId,
       createdByUsername: req.body.creatorName || req.body.createdByUsername || 'Unknown',
       createdByAvatar: req.body.creatorImage || req.body.createdByAvatar || null,
       mode: req.body.mode || 'PARTNERS',
       format: dbFormat, // Use mapped format
       gimmickVariant: gimmickVariant, // Use processed gimmick variant
+      leagueId,
+      isLeague: Boolean(leagueId),
       maxPoints: req.body.maxPoints || 200,
       minPoints: req.body.minPoints || -100,
       buyIn: req.body.buyIn || 0,
@@ -166,6 +201,7 @@ router.post('/', async (req, res) => {
       format: game.format,
       gimmickVariant: game.gimmickVariant,
       isLeague: game.isLeague,
+      leagueId: game.leagueId || null,
       isRated: game.isRated,
       status: game.status,
       minPoints: game.minPoints,
@@ -182,30 +218,40 @@ router.post('/', async (req, res) => {
     res.json(clientGame);
   } catch (error) {
     console.error('[API] Error creating game:', error);
-    res.status(500).json({ error: 'Failed to create game', message: error?.message || 'unknown' });
+    const status = error.status || 500;
+    res.status(status).json({ error: 'Failed to create game', message: error?.message || 'unknown' });
   }
 });
 
 // Join game
-router.post('/:id/join', async (req, res) => {
+router.post('/:id/join', authenticateToken, async (req, res) => {
   try {
     const gameId = req.params.id;
     const { id: userId, username, avatar, seat } = req.body;
+    const joinUserId = userId || req.userId;
 
-    console.log(`[API] Join request - gameId: ${gameId}, userId: ${userId}, seat: ${seat}`);
+    console.log(`[API] Join request - gameId: ${gameId}, userId: ${joinUserId}, seat: ${seat}`);
 
-    if (!userId) {
+    if (!joinUserId) {
       return res.status(400).json({ error: 'User ID required' });
     }
 
+    const existingGame = await prisma.game.findUnique({
+      where: { id: gameId },
+      select: { leagueId: true }
+    });
+    if (existingGame?.leagueId) {
+      await LeagueService.assertCanPlay(existingGame.leagueId, joinUserId);
+    }
+
     // Use GameService to join the game (handles database operations)
-    const result = await GameService.joinGame(gameId, userId, seat);
+    const result = await GameService.joinGame(gameId, joinUserId, seat);
     
     if (!result.success) {
       return res.status(400).json({ error: result.error || 'Failed to join game' });
     }
 
-    console.log(`[API] User ${userId} successfully joined game ${gameId} at seat ${result.seatIndex}`);
+    console.log(`[API] User ${joinUserId} successfully joined game ${gameId} at seat ${result.seatIndex}`);
 
     // Update Redis cache and emit socket event
     try {
@@ -236,7 +282,8 @@ router.post('/:id/join', async (req, res) => {
     });
   } catch (error) {
     console.error('[API] Error joining game:', error);
-    res.status(500).json({ error: error.message || 'Failed to join game' });
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Failed to join game' });
   }
 });
 
