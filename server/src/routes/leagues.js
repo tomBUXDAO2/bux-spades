@@ -73,6 +73,7 @@ router.post('/create-requests', authenticateToken, logoUpload.single('logo'), as
       requesterId: req.userId,
       name: req.body.name,
       logoUrl,
+      bgColor: req.body.bgColor,
       requireJoinApproval
     });
     res.status(201).json(request);

@@ -109,7 +109,7 @@ export class LeagueService {
     return league;
   }
 
-  static async submitCreateRequest({ requesterId, name, logoUrl, requireJoinApproval = true }) {
+  static async submitCreateRequest({ requesterId, name, logoUrl, bgColor, requireJoinApproval = true }) {
     await this.requireFacebookUser(requesterId);
     const trimmed = String(name || '').trim();
     if (!trimmed) {
@@ -127,10 +127,15 @@ export class LeagueService {
       throw err;
     }
 
+    const color = typeof bgColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(bgColor.trim())
+      ? bgColor.trim()
+      : '#0f172a';
+
     return prisma.leagueCreateRequest.create({
       data: {
         name: trimmed,
         logoUrl: logoUrl || null,
+        bgColor: color,
         requireJoinApproval: requireJoinApproval !== false,
         requesterId,
         status: 'PENDING'
@@ -169,6 +174,7 @@ export class LeagueService {
       name: request.name,
       ownerUserId: request.requesterId,
       logoUrl: request.logoUrl,
+      bgColor: request.bgColor,
       requireJoinApproval: request.requireJoinApproval
     });
 

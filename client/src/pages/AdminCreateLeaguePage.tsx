@@ -95,6 +95,9 @@ const AdminCreateLeaguePage: React.FC = () => {
                   by {r.requester?.username}
                   {r.requireJoinApproval === false ? ' · open join' : ' · join approval on'}
                 </div>
+                {r.bgColor && (
+                  <div className="h-4 w-full rounded border border-white/10" style={{ background: r.bgColor }} />
+                )}
                 {r.facebookProfileUrl && (
                   <a href={r.facebookProfileUrl} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:underline">
                     Facebook profile

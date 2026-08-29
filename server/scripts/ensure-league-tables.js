@@ -62,6 +62,7 @@ const statements = [
   )`,
   `ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "leagueId" TEXT`,
   `ALTER TABLE "League" ADD COLUMN IF NOT EXISTS "requireJoinApproval" BOOLEAN NOT NULL DEFAULT true`,
+  `ALTER TABLE "LeagueCreateRequest" ADD COLUMN IF NOT EXISTS "bgColor" TEXT NOT NULL DEFAULT '#0f172a'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,
   `CREATE INDEX IF NOT EXISTS "Game_leagueId_idx" ON "Game"("leagueId")`,

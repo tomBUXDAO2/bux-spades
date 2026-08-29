@@ -634,6 +634,7 @@ model LeagueCreateRequest {
   id                   String                  @id @default(cuid())
   name                 String
   logoUrl              String?
+  bgColor              String                  @default("#0f172a")
   requireJoinApproval  Boolean                 @default(true)
   requesterId          String
   status               LeagueJoinRequestStatus @default(PENDING)

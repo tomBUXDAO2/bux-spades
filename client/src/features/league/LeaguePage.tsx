@@ -59,7 +59,8 @@ const LeaguePage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [members, setMembers] = useState<LeagueMember[]>([]);
-  const [adminTab, setAdminTab] = useState<'requests' | 'members' | 'theme'>('requests');
+  const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
+  const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
   const [themeName, setThemeName] = useState('');
   const [themeColor, setThemeColor] = useState('#0f172a');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -71,6 +72,7 @@ const LeaguePage: React.FC = () => {
   const isOwner = league?.role === 'OWNER';
   const isMuted = Boolean(league?.mutedUntil && new Date(league.mutedUntil) > new Date());
   const isTimedOut = Boolean(league?.timeoutUntil && new Date(league.timeoutUntil) > new Date());
+  const theme = league?.bgColor || '#0f172a';
 
   const loadLeague = useCallback(async () => {
     if (!leagueId) return;
@@ -102,15 +104,18 @@ const LeaguePage: React.FC = () => {
     setChatMessages(Array.isArray(data) ? data : []);
   }, [leagueId]);
 
+  const loadMembers = useCallback(async () => {
+    if (!leagueId) return;
+    const memRes = await api.get(`/api/leagues/${leagueId}/members`);
+    if (memRes.ok) setMembers(await memRes.json());
+  }, [leagueId]);
+
   const loadAdminData = useCallback(async () => {
     if (!leagueId || !isAdmin) return;
-    const [reqRes, memRes] = await Promise.all([
-      api.get(`/api/leagues/${leagueId}/join-requests`),
-      api.get(`/api/leagues/${leagueId}/members`)
-    ]);
+    const reqRes = await api.get(`/api/leagues/${leagueId}/join-requests`);
     if (reqRes.ok) setJoinRequests(await reqRes.json());
-    if (memRes.ok) setMembers(await memRes.json());
-  }, [leagueId, isAdmin]);
+    await loadMembers();
+  }, [leagueId, isAdmin, loadMembers]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +130,7 @@ const LeaguePage: React.FC = () => {
           setLoading(false);
           return;
         }
-        await Promise.all([loadGames(), loadChat()]);
+        await Promise.all([loadGames(), loadChat(), loadMembers()]);
       } catch (e: any) {
         if (!cancelled) setError(e.message || 'Failed to load league');
       } finally {
@@ -135,7 +140,7 @@ const LeaguePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [loadLeague, loadGames, loadChat]);
+  }, [loadLeague, loadGames, loadChat, loadMembers]);
 
   useEffect(() => {
     if (isAdmin) loadAdminData();
@@ -150,7 +155,8 @@ const LeaguePage: React.FC = () => {
     };
     const onMembership = () => {
       loadLeague();
-      loadAdminData();
+      loadMembers();
+      if (isAdmin) loadAdminData();
     };
     socket.on('league_chat_message', onMessage);
     socket.on('league_membership_updated', onMembership);
@@ -163,7 +169,7 @@ const LeaguePage: React.FC = () => {
       socket.off('league_join_request');
       clearInterval(interval);
     };
-  }, [socket, leagueId, league?.isMember, loadGames, loadLeague, loadAdminData]);
+  }, [socket, leagueId, league?.isMember, isAdmin, loadGames, loadLeague, loadMembers, loadAdminData]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -301,22 +307,25 @@ const LeaguePage: React.FC = () => {
     <div
       className="min-h-screen text-white"
       style={{
-        background: `linear-gradient(160deg, ${league?.bgColor || '#0f172a'} 0%, #020617 70%)`
+        background: `radial-gradient(1200px 600px at 10% -10%, ${theme}cc, transparent), linear-gradient(165deg, ${theme} 0%, #020617 55%)`
       }}
     >
-      <header className="flex items-center gap-3 border-b border-white/10 px-4 py-3 backdrop-blur-md bg-black/20">
-        <Link to="/" className="text-slate-300 hover:text-white text-sm">
+      <header
+        className="flex items-center gap-3 border-b border-white/10 px-4 py-3 backdrop-blur-md"
+        style={{ backgroundColor: `${theme}dd` }}
+      >
+        <Link to="/" className="rounded-lg border border-white/15 bg-black/20 px-2 py-1 text-sm text-white/90 hover:bg-black/30">
           ← Lobby
         </Link>
         {league?.logoUrl && (
-          <img src={league.logoUrl} alt="" className="h-10 w-10 rounded-lg object-cover border border-white/20" />
+          <img src={league.logoUrl} alt="" className="h-11 w-11 rounded-lg object-cover border border-white/25 shadow" />
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold truncate">{league?.name}</h1>
-          <p className="text-xs text-slate-300">
-            {league?.memberCount} members
-            {isTimedOut ? ' · You are timed out from tables' : ''}
-            {isMuted ? ' · Muted in chat' : ''}
+          <h1 className="text-xl font-bold tracking-tight truncate drop-shadow">{league?.name}</h1>
+          <p className="text-xs text-white/80">
+            {league?.memberCount} members · league room
+            {isTimedOut ? ' · timed out from tables' : ''}
+            {isMuted ? ' · muted in chat' : ''}
           </p>
         </div>
       </header>
@@ -327,22 +336,23 @@ const LeaguePage: React.FC = () => {
         </div>
       )}
 
-      <main className="grid gap-4 p-4 lg:grid-cols-3">
+      <main className="grid gap-4 p-4 lg:grid-cols-3 min-h-[calc(100vh-72px)]">
         <section className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">League tables</h2>
+            <h2 className="text-lg font-semibold drop-shadow">Available Games</h2>
             <button
               type="button"
               disabled={isTimedOut}
               onClick={() => setIsCreateOpen(true)}
-              className="rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow disabled:opacity-40"
+              style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
             >
               Create Game
             </button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {games.length === 0 ? (
-              <p className="text-slate-400 text-sm">No games yet. Create one for the league.</p>
+              <p className="text-white/70 text-sm">No games in this league yet. Create one.</p>
             ) : (
               games.map((game) => (
                 <GameTile
@@ -355,47 +365,19 @@ const LeaguePage: React.FC = () => {
               ))
             )}
           </div>
-        </section>
-
-        <aside className="flex flex-col gap-4">
-          <div className="flex h-[420px] flex-col rounded-xl border border-white/10 bg-slate-950/50 p-3 backdrop-blur">
-            <h3 className="mb-2 text-sm font-semibold text-slate-200">League chat</h3>
-            <div className="flex-1 space-y-2 overflow-y-auto">
-              {chatMessages.map((msg, i) => (
-                <div key={msg.id || i} className="text-sm">
-                  <span className="font-medium text-cyan-300">{msg.userName}: </span>
-                  <span className="text-slate-200">{msg.message}</span>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-            <form onSubmit={sendMessage} className="mt-2 flex gap-2">
-              <input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                disabled={isMuted}
-                placeholder={isMuted ? 'You are muted' : 'Message league…'}
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900/70 px-3 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={isMuted || !newMessage.trim()}
-                className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold disabled:opacity-40"
-              >
-                Send
-              </button>
-            </form>
-          </div>
 
           {isAdmin && (
-            <div className="rounded-xl border border-white/10 bg-slate-950/50 p-3 backdrop-blur">
+            <div
+              className="rounded-xl border border-white/15 p-3 backdrop-blur"
+              style={{ backgroundColor: `${theme}99` }}
+            >
               <div className="mb-3 flex gap-2 text-xs">
-                {(['requests', 'members', ...(isOwner ? (['theme'] as const) : [])] as const).map((tab) => (
+                {(['requests', 'moderation', ...(isOwner ? (['theme'] as const) : [])] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setAdminTab(tab)}
-                    className={`rounded-md px-2 py-1 capitalize ${adminTab === tab ? 'bg-cyan-600' : 'bg-white/5'}`}
+                    className={`rounded-md px-2 py-1 capitalize ${adminTab === tab ? 'bg-white/25 font-semibold' : 'bg-black/20'}`}
                   >
                     {tab}
                   </button>
@@ -405,17 +387,17 @@ const LeaguePage: React.FC = () => {
               {adminTab === 'requests' && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {joinRequests.length === 0 && (
-                    <p className="text-xs text-slate-400">No pending requests</p>
+                    <p className="text-xs text-white/70">No pending join requests</p>
                   )}
                   {joinRequests.map((r) => (
-                    <div key={r.id} className="rounded-lg border border-white/10 p-2 text-sm">
+                    <div key={r.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
                       <div className="font-medium">{r.user.username}</div>
                       {r.facebookProfileUrl && (
                         <a
                           href={r.facebookProfileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs text-cyan-400 hover:underline"
+                          className="text-xs text-cyan-200 hover:underline"
                         >
                           View Facebook profile
                         </a>
@@ -445,30 +427,13 @@ const LeaguePage: React.FC = () => {
                 </div>
               )}
 
-              {adminTab === 'members' && (
+              {adminTab === 'moderation' && (
                 <div className="space-y-2 max-h-72 overflow-y-auto">
                   {members.map((m) => (
-                    <div key={m.id} className="rounded-lg border border-white/10 p-2 text-sm">
+                    <div key={m.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
                       <div className="flex justify-between gap-2">
-                        <button
-                          type="button"
-                          className="text-left font-medium hover:underline"
-                          onClick={() =>
-                            setPlayerStats({
-                              open: true,
-                              player: {
-                                id: m.user.id,
-                                username: m.user.username,
-                                avatar: m.user.avatarUrl,
-                                stats: {} as any,
-                                status: 'not_friend'
-                              }
-                            })
-                          }
-                        >
-                          {m.user.username}
-                        </button>
-                        <span className="text-xs text-slate-400">{m.role}</span>
+                        <span className="font-medium">{m.user.username}</span>
+                        <span className="text-xs text-white/70">{m.role}</span>
                       </div>
                       {m.role !== 'OWNER' && (
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -509,24 +474,120 @@ const LeaguePage: React.FC = () => {
               {adminTab === 'theme' && isOwner && (
                 <div className="space-y-3 text-sm">
                   <label className="block">
-                    <span className="text-xs text-slate-400">Name</span>
-                    <input value={themeName} onChange={(e) => setThemeName(e.target.value)} className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1" />
+                    <span className="text-xs text-white/70">Name</span>
+                    <input value={themeName} onChange={(e) => setThemeName(e.target.value)} className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1" />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-slate-400">Background color</span>
-                    <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded border border-white/10 bg-slate-900" />
+                    <span className="text-xs text-white/70">Colour theme</span>
+                    <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded border border-white/15 bg-black/30" />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-slate-400">Logo</span>
+                    <span className="text-xs text-white/70">Logo</span>
                     <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
                   </label>
-                  <button type="button" disabled={savingTheme} onClick={saveTheme} className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  <button type="button" disabled={savingTheme} onClick={saveTheme} className="rounded-lg bg-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-50">
                     {savingTheme ? 'Saving…' : 'Save theme'}
                   </button>
                 </div>
               )}
             </div>
           )}
+        </section>
+
+        <aside className="flex flex-col min-h-[480px]">
+          <div
+            className="flex flex-1 flex-col rounded-xl border border-white/15 p-3 backdrop-blur shadow-lg"
+            style={{ backgroundColor: `${theme}b3` }}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSideTab('chat')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'chat' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setSideTab('members')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${sideTab === 'members' ? 'bg-white/25' : 'bg-black/20 hover:bg-black/30'}`}
+              >
+                Members ({members.length || league?.memberCount || 0})
+              </button>
+            </div>
+
+            {sideTab === 'chat' ? (
+              <>
+                <div className="flex-1 space-y-2 overflow-y-auto rounded-lg bg-black/15 p-2">
+                  {chatMessages.length === 0 && (
+                    <p className="text-center text-sm text-white/60 py-6">No messages yet in this league.</p>
+                  )}
+                  {chatMessages.map((msg, i) => (
+                    <div key={msg.id || i} className="text-sm">
+                      <span className="font-medium text-cyan-100">{msg.userName}: </span>
+                      <span className="text-white/95">{msg.message}</span>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <form onSubmit={sendMessage} className="mt-2 flex gap-2">
+                  <input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={isMuted}
+                    placeholder={isMuted ? 'You are muted' : 'Message this league…'}
+                    className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isMuted || !newMessage.trim()}
+                    className="rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-40"
+                    style={{ backgroundColor: theme }}
+                  >
+                    Send
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="flex-1 space-y-2 overflow-y-auto rounded-lg bg-black/15 p-2">
+                {members.length === 0 && (
+                  <p className="text-center text-sm text-white/60 py-6">No members loaded.</p>
+                )}
+                {members.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-2 text-left hover:bg-black/30"
+                    onClick={() =>
+                      setPlayerStats({
+                        open: true,
+                        player: {
+                          id: m.user.id,
+                          username: m.user.username,
+                          avatar: m.user.avatarUrl,
+                          stats: {} as any,
+                          status: 'not_friend'
+                        }
+                      })
+                    }
+                  >
+                    <img
+                      src={m.user.avatarUrl || '/default-pfp.jpg'}
+                      alt=""
+                      className="h-8 w-8 rounded-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{m.user.username}</div>
+                      <div className="text-[10px] uppercase tracking-wide text-white/60">{m.role}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </aside>
       </main>
 

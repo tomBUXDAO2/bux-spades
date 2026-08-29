@@ -32,6 +32,7 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createLogo, setCreateLogo] = useState<File | null>(null);
+  const [createBgColor, setCreateBgColor] = useState('#0f172a');
   const [requireJoinApproval, setRequireJoinApproval] = useState(true);
   const [submittingCreate, setSubmittingCreate] = useState(false);
 
@@ -83,6 +84,7 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
     try {
       const form = new FormData();
       form.append('name', createName.trim());
+      form.append('bgColor', createBgColor);
       form.append('requireJoinApproval', requireJoinApproval ? 'true' : 'false');
       if (createLogo) form.append('logo', createLogo);
 
@@ -101,6 +103,7 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
       setShowCreateModal(false);
       setCreateName('');
       setCreateLogo(null);
+      setCreateBgColor('#0f172a');
       setRequireJoinApproval(true);
       await loadLeagues();
     } catch (err: any) {
@@ -254,6 +257,24 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(e) => setCreateLogo(e.target.files?.[0] || null)}
                 className="mt-1 block w-full text-xs text-slate-400"
+              />
+            </label>
+            <label className="block text-sm text-slate-300">
+              Colour theme
+              <div className="mt-1 flex items-center gap-3">
+                <input
+                  type="color"
+                  value={createBgColor}
+                  onChange={(e) => setCreateBgColor(e.target.value)}
+                  className="h-10 w-14 cursor-pointer rounded border border-white/10 bg-transparent"
+                />
+                <span className="text-xs text-slate-400">
+                  Used for the league page background, header, and chat panel
+                </span>
+              </div>
+              <div
+                className="mt-2 h-8 rounded-lg border border-white/10"
+                style={{ background: `linear-gradient(90deg, ${createBgColor}, #020617)` }}
               />
             </label>
             <fieldset className="space-y-2 text-sm text-slate-300">
