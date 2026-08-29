@@ -46,9 +46,10 @@ interface PlayerStatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   player: Player | null;
+  leagueId?: string;
 }
 
-const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player }) => {
+const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, player, leagueId }) => {
   const [mode, setMode] = useState<'all' | 'partners' | 'solo'>('all');
   const [currentStats, setCurrentStats] = useState<PlayerStats | null>(null);
   
@@ -93,7 +94,8 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     const fetchStats = async () => {
       try {
         const gameModeParam = mode === 'all' ? 'ALL' : mode.toUpperCase();
-        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}`;
+        const leagueParam = leagueId ? `&leagueId=${encodeURIComponent(leagueId)}` : '';
+        const url = `/api/users/${player.id}/stats?gameMode=${gameModeParam}${leagueParam}`;
         console.log('[PLAYER STATS MODAL] Fetching stats with URL:', url, 'Mode:', mode, 'GameModeParam:', gameModeParam);
         const response = await api.get(url);
         const result = await response.json();
@@ -133,7 +135,7 @@ const PlayerStatsModal: React.FC<PlayerStatsModalProps> = ({ isOpen, onClose, pl
     };
 
     fetchStats();
-  }, [isOpen, player, mode]);
+  }, [isOpen, player, mode, leagueId]);
 
   if (!isOpen || !player) return null;
 
