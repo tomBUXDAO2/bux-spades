@@ -81,6 +81,7 @@ const LeaguePage: React.FC = () => {
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
+  const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
   const [themeName, setThemeName] = useState('');
   const [themeColor, setThemeColor] = useState('#0f172a');
@@ -813,164 +814,231 @@ const LeaguePage: React.FC = () => {
                 </form>
               </>
             ) : (
-              <div className="flex-1 space-y-2 overflow-y-auto rounded-lg bg-black/15 p-2">
-                {members.length === 0 && (
-                  <p className="text-center text-sm text-white/60 py-6">No members loaded.</p>
-                )}
-                {[...members]
-                  .sort((a, b) => {
-                    if (Boolean(b.online) !== Boolean(a.online)) return Number(b.online) - Number(a.online);
-                    if (a.status === 'friend' && b.status !== 'friend') return -1;
-                    if (b.status === 'friend' && a.status !== 'friend') return 1;
-                    return 0;
-                  })
-                  .map((m) => {
-                    const isSelf = user?.id === m.userId;
-                    const status = m.status || 'not_friend';
-                    return (
-                      <div
-                        key={m.id}
-                        className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2 py-2"
-                      >
-                        <img
-                          src={m.user.avatarUrl || '/default-pfp.jpg'}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover shrink-0"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/default-pfp.jpg';
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className={`min-w-0 flex-1 text-left text-sm font-medium hover:underline ${m.online ? 'text-emerald-300' : 'text-white/90'}`}
-                          onClick={() => openMemberStats(m)}
+              <>
+                <div className="mb-2 flex flex-col justify-center rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/70 to-indigo-950/50 px-4 py-2 min-h-[64px]">
+                  <div className="flex items-center justify-between h-8">
+                    <span className="flex items-center gap-2 text-slate-200 font-bold text-base">
+                      <img
+                        src="/friend.svg"
+                        alt="Friends"
+                        className="h-7 w-7"
+                        style={{ filter: 'invert(1) brightness(2)' }}
+                      />
+                      Friends: {members.filter((m) => m.status === 'friend').length}
+                    </span>
+                    <span className="flex items-center gap-1 text-slate-300 font-medium text-sm">
+                      <span className="inline-block w-2 h-2 bg-green-500 rounded-full" />
+                      {members.filter((m) => m.status === 'friend' && m.online).length} Online
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-4 text-sm text-slate-300">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="leaguePlayerFilter"
+                        value="all"
+                        checked={playerFilter === 'all'}
+                        onChange={() => setPlayerFilter('all')}
+                        className="accent-cyan-500"
+                      />
+                      All
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="leaguePlayerFilter"
+                        value="friends"
+                        checked={playerFilter === 'friends'}
+                        onChange={() => setPlayerFilter('friends')}
+                        className="accent-cyan-500"
+                      />
+                      Friends
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="leaguePlayerFilter"
+                        value="hide-blocked"
+                        checked={playerFilter === 'hide-blocked'}
+                        onChange={() => setPlayerFilter('hide-blocked')}
+                        className="accent-cyan-500"
+                      />
+                      Hide Blocked
+                    </label>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2 overflow-y-auto mb-1">
+                  {members.length === 0 && (
+                    <p className="text-center text-sm text-slate-400 py-4">No members found.</p>
+                  )}
+                  {[...members]
+                    .filter((m) => {
+                      if (playerFilter === 'friends') return m.status === 'friend';
+                      if (playerFilter === 'hide-blocked') return m.status !== 'blocked';
+                      return true;
+                    })
+                    .sort((a, b) => {
+                      if (a.status === 'friend' && b.status !== 'friend') return -1;
+                      if (b.status === 'friend' && a.status !== 'friend') return 1;
+                      if (Boolean(b.online) !== Boolean(a.online)) return Number(b.online) - Number(a.online);
+                      if (playerFilter === 'all') {
+                        if (a.status === 'blocked' && b.status !== 'blocked') return 1;
+                        if (b.status === 'blocked' && a.status !== 'blocked') return -1;
+                      }
+                      return 0;
+                    })
+                    .map((m) => {
+                      const isSelf = user?.id === m.userId;
+                      const status = m.status || 'not_friend';
+                      return (
+                        <div
+                          key={m.id}
+                          className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-900/50 p-2"
                         >
-                          <span className="truncate inline-flex items-center gap-1.5">
-                            {firstName(m.user.username)}
-                            {m.online && <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />}
+                          <img
+                            src={m.user.avatarUrl || '/default-pfp.jpg'}
+                            alt=""
+                            className="h-8 w-8 rounded-full border-2 border-slate-600 object-cover shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                            }}
+                          />
+                          <span
+                            className={`font-medium text-sm flex items-center cursor-pointer hover:underline min-w-0 ${
+                              m.online ? 'text-green-400' : 'text-slate-300'
+                            }`}
+                            onClick={() => openMemberStats(m)}
+                          >
+                            <span className="truncate">{firstName(m.user.username)}</span>
+                            {m.online && (
+                              <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full shrink-0" />
+                            )}
                             {status === 'friend' && (
-                              <img src="/friend.svg" alt="Friend" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                              <img
+                                src="/friend.svg"
+                                alt="Friend"
+                                className="ml-2 h-5 w-5 shrink-0"
+                                style={{ filter: 'invert(1) brightness(2)' }}
+                              />
                             )}
                             {(m.role === 'ADMIN' || m.role === 'OWNER') && (
-                              <span className="text-[9px] uppercase tracking-wide text-amber-200/90">{m.role}</span>
+                              <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-200/90 shrink-0">
+                                {m.role}
+                              </span>
                             )}
                           </span>
-                        </button>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {isOwner && !isSelf && m.role === 'MEMBER' && (
-                            <button
-                              type="button"
-                              title="Make admin"
-                              className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
-                              onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}
-                            >
-                              +Admin
-                            </button>
-                          )}
-                          {isOwner && !isSelf && m.role === 'ADMIN' && (
-                            <button
-                              type="button"
-                              title="Remove admin"
-                              className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
-                              onClick={() => moderate(m.userId, 'role', { role: 'MEMBER' })}
-                            >
-                              −Admin
-                            </button>
-                          )}
-                          {!isSelf && status === 'blocked' && (
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
-                              title="Unblock"
-                              onClick={() =>
-                                setConfirmModal({
-                                  open: true,
-                                  player: { id: m.userId, username: m.user.username },
-                                  action: 'unblock_user'
-                                })
-                              }
-                            >
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
-                                <circle cx="12" cy="12" r="11" />
-                                <path d="M6 18L18 6" strokeWidth="2.5" />
-                              </svg>
-                            </button>
-                          )}
-                          {!isSelf && status === 'friend' && (
-                            <>
+                          <div className="ml-auto flex shrink-0 items-center gap-2">
+                            {isOwner && !isSelf && m.role === 'MEMBER' && (
                               <button
                                 type="button"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600"
-                                title="Remove Friend"
-                                onClick={() =>
-                                  setConfirmModal({
-                                    open: true,
-                                    player: { id: m.userId, username: m.user.username },
-                                    action: 'remove_friend'
-                                  })
-                                }
+                                title="Make admin"
+                                className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
+                                onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}
                               >
-                                <img src="/remove-friend.svg" alt="" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
+                                +Admin
                               </button>
+                            )}
+                            {isOwner && !isSelf && m.role === 'ADMIN' && (
                               <button
                                 type="button"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
-                                title="Block"
-                                onClick={() =>
-                                  setConfirmModal({
-                                    open: true,
-                                    player: { id: m.userId, username: m.user.username },
-                                    action: 'block_user'
-                                  })
-                                }
+                                title="Remove admin"
+                                className="rounded bg-violet-700/80 px-1.5 py-1 text-[9px] font-semibold"
+                                onClick={() => moderate(m.userId, 'role', { role: 'MEMBER' })}
                               >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="11" />
-                                  <path d="M4 4L20 20M20 4L4 20" strokeWidth="2.5" />
-                                </svg>
+                                −Admin
                               </button>
-                            </>
-                          )}
-                          {!isSelf && status !== 'friend' && status !== 'blocked' && (
-                            <>
-                              <button
-                                type="button"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600"
-                                title="Add Friend"
-                                onClick={() =>
-                                  setConfirmModal({
-                                    open: true,
-                                    player: { id: m.userId, username: m.user.username },
-                                    action: 'add_friend'
-                                  })
-                                }
-                              >
-                                <img src="/add-friend.svg" alt="" className="h-4 w-4" style={{ filter: 'invert(1) brightness(2)' }} />
-                              </button>
-                              <button
-                                type="button"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600"
-                                title="Block"
-                                onClick={() =>
-                                  setConfirmModal({
-                                    open: true,
-                                    player: { id: m.userId, username: m.user.username },
-                                    action: 'block_user'
-                                  })
-                                }
-                              >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="11" />
-                                  <path d="M4 4L20 20M20 4L4 20" strokeWidth="2.5" />
-                                </svg>
-                              </button>
-                            </>
-                          )}
+                            )}
+                            {!isSelf && status === 'blocked' ? (
+                              <>
+                                <span className="text-slate-400 text-xs mr-1">unblock?</span>
+                                <button
+                                  type="button"
+                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500"
+                                  title="Unblock"
+                                  onClick={() =>
+                                    setConfirmModal({
+                                      open: true,
+                                      player: { id: m.userId, username: m.user.username },
+                                      action: 'unblock_user'
+                                    })
+                                  }
+                                >
+                                  <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="11" />
+                                    <path d="M6 18L18 6" strokeWidth="2.5" />
+                                  </svg>
+                                </button>
+                              </>
+                            ) : (
+                              !isSelf && (
+                                <>
+                                  {status === 'friend' ? (
+                                    <button
+                                      type="button"
+                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 border border-slate-300 hover:bg-red-700"
+                                      title="Remove Friend"
+                                      onClick={() =>
+                                        setConfirmModal({
+                                          open: true,
+                                          player: { id: m.userId, username: m.user.username },
+                                          action: 'remove_friend'
+                                        })
+                                      }
+                                    >
+                                      <img
+                                        src="/remove-friend.svg"
+                                        alt="Remove Friend"
+                                        className="h-5 w-5"
+                                        style={{ filter: 'invert(1) brightness(2)' }}
+                                      />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 border border-slate-300 hover:bg-green-700"
+                                      title="Add Friend"
+                                      onClick={() =>
+                                        setConfirmModal({
+                                          open: true,
+                                          player: { id: m.userId, username: m.user.username },
+                                          action: 'add_friend'
+                                        })
+                                      }
+                                    >
+                                      <img
+                                        src="/add-friend.svg"
+                                        alt="Add Friend"
+                                        className="h-5 w-5"
+                                        style={{ filter: 'invert(1) brightness(2)' }}
+                                      />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-600 border border-slate-300 hover:bg-slate-500"
+                                    title="Block"
+                                    onClick={() =>
+                                      setConfirmModal({
+                                        open: true,
+                                        player: { id: m.userId, username: m.user.username },
+                                        action: 'block_user'
+                                      })
+                                    }
+                                  >
+                                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2">
+                                      <circle cx="12" cy="12" r="11" />
+                                      <path d="M4 4L20 20M20 4L4 20" strokeWidth="2.5" />
+                                    </svg>
+                                  </button>
+                                </>
+                              )
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-              </div>
+                      );
+                    })}
+                </div>
+              </>
             )}
           </div>
         </aside>
