@@ -151,9 +151,9 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
           disabled={Boolean(pendingCreateRequest)}
           onClick={() => setShowCreateModal(true)}
           className="rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
-          title={pendingCreateRequest ? 'You already have a pending create request' : 'Request to create a league'}
+          title={pendingCreateRequest ? 'You already have a pending create request' : 'Create a league'}
         >
-          {pendingCreateRequest ? 'Create pending…' : 'Request league'}
+          {pendingCreateRequest ? 'Create pending…' : 'Create league'}
         </button>
       </div>
 
@@ -235,7 +235,7 @@ const RoomsTab: React.FC<RoomsTabProps> = ({ user, textScale = 1 }) => {
             className="w-full max-w-md space-y-3 rounded-xl border border-white/10 bg-slate-950 p-4 shadow-xl"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-white">Request a league</h3>
+              <h3 className="text-base font-semibold text-white">Create a league</h3>
               <button type="button" className="text-slate-400 hover:text-white" onClick={() => setShowCreateModal(false)}>
                 ✕
               </button>
