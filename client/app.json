@@ -3,7 +3,7 @@
     "name": "Bux Spades",
     "slug": "bux-spades",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./public/optimized/bux-spades.png",
     "userInterfaceStyle": "light",
     "splash": {
