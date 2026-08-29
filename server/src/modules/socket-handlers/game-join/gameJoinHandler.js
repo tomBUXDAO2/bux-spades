@@ -120,10 +120,20 @@ class GameJoinHandler {
       }
 
       // Check if player is in the game (handle null players)
-      const player = baseGameState.players.find(p => p && p.userId === userId && !p.isSpectator);
+      const players = Array.isArray(baseGameState.players) ? baseGameState.players : [];
+      const player = players.find(p => p && p.userId === userId && !p.isSpectator);
       if (!player) {
-        // If not a seated player, allow spectating when requested
-        if (spectate) {
+        const seatedCount = players.filter(Boolean).length;
+        // Watching a running/full table should always spectate — even if the client
+        // forgot ?spectate=1 (e.g. league Watch button).
+        const shouldSpectate =
+          !!spectate ||
+          baseGameState.status === 'BIDDING' ||
+          baseGameState.status === 'PLAYING' ||
+          (baseGameState.status === 'WAITING' && seatedCount >= 4);
+
+        // If not a seated player, allow spectating when requested / appropriate
+        if (shouldSpectate) {
           console.log(`[GAME JOIN] User ${userId} spectating game ${gameId}`);
           
           // Check if already a spectator in database
@@ -163,6 +173,8 @@ class GameJoinHandler {
               // Continue anyway - they can still spectate via socket
             }
           }
+          // Treat rest of handler as spectate so we don't set activeGameId as a player
+          data.spectate = true;
         } else {
           // CRITICAL: If user is not found, check if they are the game creator
           const game = await GameService.getGame(gameId);
@@ -179,18 +191,21 @@ class GameJoinHandler {
             console.log(`[GAME JOIN] User ${userId} not in game ${gameId}, clearing active game from session`);
             // Clear the invalid active game from session instead of erroring
             await redisSessionService.updateActiveGame(userId, null);
-            this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.' });
+            this.socket.emit('error', { message: 'You are not in this game. Please join via the lobby first.', gameId });
             return;
           }
         }
       }
+
+      // Re-read spectate after possible auto-spectate upgrade
+      const isSpectating = !!(data?.spectate || spectate);
 
       // Join the socket room
       this.socket.join(gameId);
       console.log(`[GAME JOIN] User ${userId} joined room for game ${gameId}`);
 
       // Update active game in session (only for seated players)
-      if (!spectate) {
+      if (!isSpectating) {
         await redisSessionService.updateActiveGame(userId, gameId);
       }
       console.log(`[SESSION] Updated active game for user ${userId} to ${gameId}`);
@@ -209,7 +224,7 @@ class GameJoinHandler {
       // Emit game_joined event with personalised state
       console.log(`[GAME JOIN] Emitting game_joined event for user ${userId} in game ${gameId}`);
       emitPersonalizedGameEventToSocket(this.socket, 'game_joined', gameId, baseGameState, {
-        spectate: !!spectate
+        spectate: isSpectating
       });
       console.log(`[GAME JOIN] game_joined event emitted successfully for ${gameId}`);
       
@@ -231,7 +246,7 @@ class GameJoinHandler {
         const { SystemMessageHandler } = await import('../chat/systemMessageHandler.js');
         const systemHandler = new SystemMessageHandler(this.io, this.socket);
         
-        if (spectate) {
+        if (isSpectating) {
           // Get username from game state or user
           const user = await prisma.user.findUnique({ where: { id: userId } });
           const username = user?.username || 'Someone';
@@ -245,7 +260,7 @@ class GameJoinHandler {
 
       // Re-read DB: authenticate can race ahead of disconnect's markPlayerDisconnected, so auth may skip
       // markPlayerReconnected/clearTimer. Join always runs after both; fix stale disconnect + timer here.
-      if (!spectate) {
+      if (!isSpectating) {
         const gpRow = await prisma.gamePlayer.findFirst({
           where: { gameId, userId, isSpectator: false },
           select: { leftAt: true }
@@ -261,7 +276,7 @@ class GameJoinHandler {
       
     } catch (error) {
       console.error('[GAME JOIN] Error in handleJoinGame:', error);
-      this.socket.emit('error', { message: 'Failed to join game' });
+      this.socket.emit('error', { message: 'Failed to join game', gameId: data?.gameId });
     }
   }
 

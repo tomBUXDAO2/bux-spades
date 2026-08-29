@@ -410,6 +410,9 @@ export const useOptimizedSocketEventHandlers = ({
 
   const handleSocketError = useCallback((error: any) => {
     console.log('🎮 Socket error in useGameState:', error);
+
+    // Always clear loading so we never buffer forever on join errors
+    setIsLoading(false);
     
     // Don't treat "not in game" errors as fatal - just redirect to lobby
     if (error.message && error.message.includes('not in this game')) {
@@ -422,7 +425,6 @@ export const useOptimizedSocketEventHandlers = ({
     }
     
     setError(error.message || 'Socket connection error');
-    setIsLoading(false);
   }, [setError, setIsLoading]);
 
   const handleGameDeleted = useCallback((gameData: any) => {

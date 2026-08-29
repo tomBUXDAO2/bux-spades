@@ -203,7 +203,7 @@ export default function GameTableWrapper({ onLeaveTable }: GameTableWrapperProps
 
   // Handle error state - only route to lobby for terminal errors; otherwise stay on table
   if (error) {
-    const isTerminal = /not a member|game not found|deleted/i.test(error || '');
+    const isTerminal = /not a member|not in this game|game not found|deleted/i.test(error || '');
     const isTimeout = /timeout|retrying/i.test(error || '');
     
     if (isTerminal) {

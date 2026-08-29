@@ -587,7 +587,7 @@ const LeaguePage: React.FC = () => {
                   key={game.id}
                   game={game}
                   onJoinGame={(id, seat) => joinGame(id, seat)}
-                  onWatchGame={(id) => navigate(`/table/${id}`)}
+                  onWatchGame={(id) => navigate(`/table/${id}?spectate=1`)}
                   canJoinOrWatch={!isTimedOut}
                 />
               ))
