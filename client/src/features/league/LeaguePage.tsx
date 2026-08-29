@@ -79,7 +79,8 @@ const LeaguePage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [members, setMembers] = useState<LeagueMember[]>([]);
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [roomOnlineIds, setRoomOnlineIds] = useState<string[]>([]);
+  const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
@@ -102,7 +103,17 @@ const LeaguePage: React.FC = () => {
   const isMuted = Boolean(league?.mutedUntil && new Date(league.mutedUntil) > new Date());
   const isTimedOut = Boolean(league?.timeoutUntil && new Date(league.timeoutUntil) > new Date());
   const theme = league?.bgColor || '#0f172a';
-  const onlineCount = onlineUserIds.length;
+
+  const isMemberOnline = useCallback(
+    (userId: string) => roomOnlineIds.includes(userId) || globalOnlineIds.includes(userId),
+    [roomOnlineIds, globalOnlineIds]
+  );
+
+  const membersWithPresence = members.map((m) => ({
+    ...m,
+    online: isMemberOnline(m.userId)
+  }));
+  const onlineCount = membersWithPresence.filter((m) => m.online).length;
 
   const loadLeague = useCallback(async () => {
     if (!leagueId) return;
@@ -215,9 +226,10 @@ const LeaguePage: React.FC = () => {
     };
     const onPresence = (payload: { leagueId?: string; users: { userId: string }[] }) => {
       if (payload.leagueId && payload.leagueId !== leagueId) return;
-      const ids = (payload.users || []).map((u) => u.userId);
-      setOnlineUserIds(ids);
-      setMembers((prev) => prev.map((m) => ({ ...m, online: ids.includes(m.userId) })));
+      setRoomOnlineIds((payload.users || []).map((u) => u.userId));
+    };
+    const onGlobalOnline = (ids: string[]) => {
+      setGlobalOnlineIds(Array.isArray(ids) ? ids : []);
     };
     const onMembership = () => {
       loadLeague();
@@ -229,6 +241,7 @@ const LeaguePage: React.FC = () => {
     socket.on('league_chat_message', onMessage);
     socket.on('league_chat_deleted', onDeleted);
     socket.on('league_online_users', onPresence);
+    socket.on('online_users', onGlobalOnline);
     socket.on('league_membership_updated', onMembership);
     socket.on('league_join_request', () => loadAdminData());
     socket.on('friendAdded', refreshFriends);
@@ -236,18 +249,25 @@ const LeaguePage: React.FC = () => {
     socket.on('userBlocked', refreshFriends);
     socket.on('userUnblocked', refreshFriends);
 
+    const handleOnlineUsersUpdated = (event: CustomEvent<string[]>) => {
+      setGlobalOnlineIds(Array.isArray(event.detail) ? event.detail : []);
+    };
+    window.addEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
+
     const interval = setInterval(loadGames, 8000);
     return () => {
       socket.emit('leave_league_room', { leagueId });
       socket.off('league_chat_message', onMessage);
       socket.off('league_chat_deleted', onDeleted);
       socket.off('league_online_users', onPresence);
+      socket.off('online_users', onGlobalOnline);
       socket.off('league_membership_updated', onMembership);
       socket.off('league_join_request');
       socket.off('friendAdded', refreshFriends);
       socket.off('friendRemoved', refreshFriends);
       socket.off('userBlocked', refreshFriends);
       socket.off('userUnblocked', refreshFriends);
+      window.removeEventListener('online_users_updated', handleOnlineUsersUpdated as EventListener);
       clearInterval(interval);
     };
   }, [socket, leagueId, league?.isMember, isAdmin, loadGames, loadLeague, loadMembers, loadAdminData]);
@@ -824,11 +844,11 @@ const LeaguePage: React.FC = () => {
                         className="h-7 w-7"
                         style={{ filter: 'invert(1) brightness(2)' }}
                       />
-                      Friends: {members.filter((m) => m.status === 'friend').length}
+                      Friends: {membersWithPresence.filter((m) => m.status === 'friend').length}
                     </span>
                     <span className="flex items-center gap-1 text-slate-300 font-medium text-sm">
                       <span className="inline-block w-2 h-2 bg-green-500 rounded-full" />
-                      {members.filter((m) => m.status === 'friend' && m.online).length} Online
+                      {membersWithPresence.filter((m) => m.status === 'friend' && m.online).length} Online
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-4 text-sm text-slate-300">
@@ -868,10 +888,10 @@ const LeaguePage: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex-1 space-y-2 overflow-y-auto mb-1">
-                  {members.length === 0 && (
+                  {membersWithPresence.length === 0 && (
                     <p className="text-center text-sm text-slate-400 py-4">No members found.</p>
                   )}
-                  {[...members]
+                  {[...membersWithPresence]
                     .filter((m) => {
                       if (playerFilter === 'friends') return m.status === 'friend';
                       if (playerFilter === 'hide-blocked') return m.status !== 'blocked';
@@ -890,39 +910,52 @@ const LeaguePage: React.FC = () => {
                     .map((m) => {
                       const isSelf = user?.id === m.userId;
                       const status = m.status || 'not_friend';
+                      const online = Boolean(m.online);
                       return (
                         <div
                           key={m.id}
                           className="flex items-center gap-3 rounded-lg border border-white/5 bg-slate-900/50 p-2"
                         >
-                          <img
-                            src={m.user.avatarUrl || '/default-pfp.jpg'}
-                            alt=""
-                            className="h-8 w-8 rounded-full border-2 border-slate-600 object-cover shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '/default-pfp.jpg';
-                            }}
-                          />
+                          <div className="relative shrink-0">
+                            <img
+                              src={m.user.avatarUrl || '/default-pfp.jpg'}
+                              alt=""
+                              className="h-8 w-8 rounded-full border-2 border-slate-600 object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/default-pfp.jpg';
+                              }}
+                            />
+                            <span
+                              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 ${
+                                online ? 'bg-green-500' : 'bg-slate-500'
+                              }`}
+                              title={online ? 'Online' : 'Offline'}
+                            />
+                          </div>
                           <span
-                            className={`font-medium text-sm flex items-center cursor-pointer hover:underline min-w-0 ${
-                              m.online ? 'text-green-400' : 'text-slate-300'
+                            className={`font-medium text-sm flex flex-wrap items-center cursor-pointer hover:underline min-w-0 gap-x-1.5 ${
+                              online ? 'text-green-400' : 'text-slate-300'
                             }`}
                             onClick={() => openMemberStats(m)}
                           >
                             <span className="truncate">{firstName(m.user.username)}</span>
-                            {m.online && (
-                              <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full shrink-0" />
-                            )}
+                            <span
+                              className={`text-[10px] font-semibold uppercase tracking-wide ${
+                                online ? 'text-green-400' : 'text-slate-500'
+                              }`}
+                            >
+                              {online ? 'Online' : 'Offline'}
+                            </span>
                             {status === 'friend' && (
                               <img
                                 src="/friend.svg"
                                 alt="Friend"
-                                className="ml-2 h-5 w-5 shrink-0"
+                                className="h-5 w-5 shrink-0"
                                 style={{ filter: 'invert(1) brightness(2)' }}
                               />
                             )}
                             {(m.role === 'ADMIN' || m.role === 'OWNER') && (
-                              <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-200/90 shrink-0">
+                              <span className="text-[9px] uppercase tracking-wide text-amber-200/90 shrink-0">
                                 {m.role}
                               </span>
                             )}
