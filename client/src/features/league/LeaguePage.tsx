@@ -14,6 +14,9 @@ import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
 import { useWindowSize } from '@/hooks/useWindowSize';
 import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
 import { GifPicker } from '@/features/chat/components/GifPicker';
+import LeagueSectionSelect from '@/features/league/components/LeagueSectionSelect';
+import LeagueSectionPlaceholder from '@/features/league/components/LeagueSectionPlaceholder';
+import type { LeagueMainSection } from '@/features/league/leagueSections';
 
 type LeagueInfo = {
   id: string;
@@ -89,6 +92,9 @@ const LeaguePage: React.FC = () => {
   const [roomOnlineIds, setRoomOnlineIds] = useState<string[]>([]);
   const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
+  const [mainSection, setMainSection] = useState<LeagueMainSection>('lobby');
+  /** Wired when announcements ship; badge hidden while 0. */
+  const [announcementsUnread] = useState(0);
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
@@ -577,158 +583,173 @@ const LeaguePage: React.FC = () => {
       >
         {(!isPortrait || mobileTab === 'lobby') && (
         <section className={`lg:col-span-2 space-y-4 ${isPortrait ? 'overflow-y-auto min-h-0 flex-1' : ''}`}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold drop-shadow">Available Games</h2>
-            <button
-              type="button"
-              disabled={isTimedOut}
-              onClick={() => setIsCreateOpen(true)}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow disabled:opacity-40"
-              style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
-            >
-              Create Game
-            </button>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {games.length === 0 ? (
-              <p className="text-white/70 text-sm">No games in this league yet. Create one.</p>
-            ) : (
-              games.map((game) => (
-                <GameTile
-                  key={game.id}
-                  game={game}
-                  onJoinGame={(id, seat) => joinGame(id, seat)}
-                  onWatchGame={(id) => navigate(`/table/${id}?spectate=1`)}
-                  canJoinOrWatch={!isTimedOut}
-                />
-              ))
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <LeagueSectionSelect
+              value={mainSection}
+              onChange={setMainSection}
+              announcementsUnread={announcementsUnread}
+              theme={theme}
+            />
+            {mainSection === 'lobby' && (
+              <button
+                type="button"
+                disabled={isTimedOut}
+                onClick={() => setIsCreateOpen(true)}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow disabled:opacity-40"
+                style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
+              >
+                Create Game
+              </button>
             )}
           </div>
 
-          {isAdmin && (
-            <div
-              className="rounded-xl border border-white/15 p-3 backdrop-blur"
-              style={{ backgroundColor: `${theme}99` }}
-            >
-              <div className="mb-3 flex gap-2 text-xs">
-                {(['requests', 'moderation', ...(isOwner ? (['theme'] as const) : [])] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setAdminTab(tab)}
-                    className={`rounded-md px-2 py-1 capitalize ${adminTab === tab ? 'bg-white/25 font-semibold' : 'bg-black/20'}`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+          {mainSection === 'lobby' ? (
+            <>
+              <h2 className="text-lg font-semibold drop-shadow">Available Games</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {games.length === 0 ? (
+                  <p className="text-white/70 text-sm">No games in this league yet. Create one.</p>
+                ) : (
+                  games.map((game) => (
+                    <GameTile
+                      key={game.id}
+                      game={game}
+                      onJoinGame={(id, seat) => joinGame(id, seat)}
+                      onWatchGame={(id) => navigate(`/table/${id}?spectate=1`)}
+                      canJoinOrWatch={!isTimedOut}
+                    />
+                  ))
+                )}
               </div>
 
-              {adminTab === 'requests' && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {joinRequests.length === 0 && (
-                    <p className="text-xs text-white/70">No pending join requests</p>
-                  )}
-                  {joinRequests.map((r) => (
-                    <div key={r.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
-                      <div className="font-medium">{r.user.username}</div>
-                      {r.facebookProfileUrl && (
-                        <a
-                          href={r.facebookProfileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-cyan-200 hover:underline"
-                        >
-                          View Facebook profile
-                        </a>
-                      )}
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          className="rounded bg-emerald-600 px-2 py-1 text-xs"
-                          onClick={() =>
-                            api.post(`/api/leagues/${leagueId}/join-requests/${r.id}/approve`, {}).then(loadAdminData)
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className="rounded bg-rose-700 px-2 py-1 text-xs"
-                          onClick={() =>
-                            api.post(`/api/leagues/${leagueId}/join-requests/${r.id}/reject`, {}).then(loadAdminData)
-                          }
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {isAdmin && (
+                <div
+                  className="rounded-xl border border-white/15 p-3 backdrop-blur"
+                  style={{ backgroundColor: `${theme}99` }}
+                >
+                  <div className="mb-3 flex gap-2 text-xs">
+                    {(['requests', 'moderation', ...(isOwner ? (['theme'] as const) : [])] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setAdminTab(tab)}
+                        className={`rounded-md px-2 py-1 capitalize ${adminTab === tab ? 'bg-white/25 font-semibold' : 'bg-black/20'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
 
-              {adminTab === 'moderation' && (
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {members.map((m) => (
-                    <div key={m.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
-                      <div className="flex justify-between gap-2">
-                        <span className="font-medium">{m.user.username}</span>
-                        <span className="text-xs text-white/70">{m.role}</span>
-                      </div>
-                      {m.role !== 'OWNER' && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'mute', { preset: '24h' })}>Mute 24h</button>
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'unmute')}>Unmute</button>
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '1h' })}>Timeout 1h</button>
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '24h' })}>Timeout 24h</button>
-                          <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'clear-timeout')}>Clear timeout</button>
-                          {isOwner && m.role === 'MEMBER' && (
-                            <button type="button" className="rounded bg-violet-700/80 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}>Make admin</button>
+                  {adminTab === 'requests' && (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {joinRequests.length === 0 && (
+                        <p className="text-xs text-white/70">No pending join requests</p>
+                      )}
+                      {joinRequests.map((r) => (
+                        <div key={r.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
+                          <div className="font-medium">{r.user.username}</div>
+                          {r.facebookProfileUrl && (
+                            <a
+                              href={r.facebookProfileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-cyan-200 hover:underline"
+                            >
+                              View Facebook profile
+                            </a>
                           )}
-                          {isOwner && m.role === 'ADMIN' && (
-                            <button type="button" className="rounded bg-violet-700/80 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'role', { role: 'MEMBER' })}>Demote</button>
-                          )}
-                          <button
-                            type="button"
-                            className="rounded bg-amber-700/80 px-2 py-0.5 text-[10px]"
-                            onClick={async () => {
-                              const gameId = window.prompt('Game id to remove this player from:');
-                              if (!gameId || !leagueId) return;
-                              await api.post(`/api/leagues/${leagueId}/tables/${gameId}/remove-player`, {
-                                userId: m.userId
-                              });
-                              await loadGames();
-                            }}
-                          >
-                            Remove from table
-                          </button>
-                          <button type="button" className="rounded bg-rose-700 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'kick')}>Kick</button>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              className="rounded bg-emerald-600 px-2 py-1 text-xs"
+                              onClick={() =>
+                                api.post(`/api/leagues/${leagueId}/join-requests/${r.id}/approve`, {}).then(loadAdminData)
+                              }
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded bg-rose-700 px-2 py-1 text-xs"
+                              onClick={() =>
+                                api.post(`/api/leagues/${leagueId}/join-requests/${r.id}/reject`, {}).then(loadAdminData)
+                              }
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {adminTab === 'theme' && isOwner && (
-                <div className="space-y-3 text-sm">
-                  <label className="block">
-                    <span className="text-xs text-white/70">Name</span>
-                    <input value={themeName} onChange={(e) => setThemeName(e.target.value)} className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1" />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs text-white/70">Colour theme</span>
-                    <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded border border-white/15 bg-black/30" />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs text-white/70">Logo</span>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
-                  </label>
-                  <button type="button" disabled={savingTheme} onClick={saveTheme} className="rounded-lg bg-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-50">
-                    {savingTheme ? 'Saving…' : 'Save theme'}
-                  </button>
+                  {adminTab === 'moderation' && (
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {members.map((m) => (
+                        <div key={m.id} className="rounded-lg border border-white/15 bg-black/20 p-2 text-sm">
+                          <div className="flex justify-between gap-2">
+                            <span className="font-medium">{m.user.username}</span>
+                            <span className="text-xs text-white/70">{m.role}</span>
+                          </div>
+                          {m.role !== 'OWNER' && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'mute', { preset: '24h' })}>Mute 24h</button>
+                              <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'unmute')}>Unmute</button>
+                              <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '1h' })}>Timeout 1h</button>
+                              <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'timeout', { preset: '24h' })}>Timeout 24h</button>
+                              <button type="button" className="rounded bg-white/10 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'clear-timeout')}>Clear timeout</button>
+                              {isOwner && m.role === 'MEMBER' && (
+                                <button type="button" className="rounded bg-violet-700/80 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'role', { role: 'ADMIN' })}>Make admin</button>
+                              )}
+                              {isOwner && m.role === 'ADMIN' && (
+                                <button type="button" className="rounded bg-violet-700/80 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'role', { role: 'MEMBER' })}>Demote</button>
+                              )}
+                              <button
+                                type="button"
+                                className="rounded bg-amber-700/80 px-2 py-0.5 text-[10px]"
+                                onClick={async () => {
+                                  const gameId = window.prompt('Game id to remove this player from:');
+                                  if (!gameId || !leagueId) return;
+                                  await api.post(`/api/leagues/${leagueId}/tables/${gameId}/remove-player`, {
+                                    userId: m.userId
+                                  });
+                                  await loadGames();
+                                }}
+                              >
+                                Remove from table
+                              </button>
+                              <button type="button" className="rounded bg-rose-700 px-2 py-0.5 text-[10px]" onClick={() => moderate(m.userId, 'kick')}>Kick</button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {adminTab === 'theme' && isOwner && (
+                    <div className="space-y-3 text-sm">
+                      <label className="block">
+                        <span className="text-xs text-white/70">Name</span>
+                        <input value={themeName} onChange={(e) => setThemeName(e.target.value)} className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1" />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs text-white/70">Colour theme</span>
+                        <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded border border-white/15 bg-black/30" />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs text-white/70">Logo</span>
+                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
+                      </label>
+                      <button type="button" disabled={savingTheme} onClick={saveTheme} className="rounded-lg bg-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                        {savingTheme ? 'Saving…' : 'Save theme'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
+          ) : (
+            <LeagueSectionPlaceholder section={mainSection} theme={theme} />
           )}
         </section>
         )}
