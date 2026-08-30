@@ -37,6 +37,23 @@ const IosShareIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+/** Google Play Store mark */
+const PlayStoreLogo: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <path fill="#EA4335" d="M3.6 2.4c-.4.2-.6.6-.6 1.1v17c0 .5.2.9.6 1.1l9.4-9.6L3.6 2.4z" />
+    <path fill="#FBBC04" d="M16.1 14.9l-3.1-3.1-9.4 9.6c.3.4.8.4 1.3.2l11.2-6.7z" />
+    <path fill="#4285F4" d="M20.7 10.7c.5.3.5 1.1 0 1.4l-2.8 1.7-3.1-3.1 3.1-3.1 2.8 3.1z" />
+    <path fill="#34A853" d="M13 12.2l3.1-3.1L4.9 2.4c-.5-.3-1-.2-1.3.2L13 12.2z" />
+  </svg>
+);
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.buxspades.app';
+
 const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) => {
   const { handleInstall, deferredPrompt } = usePWAInstall();
   const [platform, setPlatform] = useState<'ios' | 'android' | 'other'>('other');
@@ -53,6 +70,11 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
   }, []);
 
   const handleInstallClick = async () => {
+    if (platform === 'android') {
+      window.open(PLAY_STORE_URL, '_blank', 'noopener,noreferrer');
+      onClose();
+      return;
+    }
     if (deferredPrompt) {
       await handleInstall();
     } else if (platform === 'ios') {
@@ -70,17 +92,19 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
             <div className="mb-3 flex justify-center sm:mb-4">
               <AppleLogo className="h-12 w-12 text-slate-100 sm:h-14 sm:w-14" />
             </div>
-          ) : (
-            <div className="mb-3 text-4xl sm:mb-4 sm:text-6xl">
-              {platform === 'android' ? '🤖' : '💻'}
+          ) : platform === 'android' ? (
+            <div className="mb-3 flex justify-center sm:mb-4">
+              <PlayStoreLogo className="h-12 w-12 sm:h-14 sm:w-14" />
             </div>
+          ) : (
+            <div className="mb-3 text-4xl sm:mb-4 sm:text-6xl">💻</div>
           )}
 
           <h2 className="mb-3 text-xl font-bold text-slate-200 sm:mb-4 sm:text-2xl">
             {platform === 'ios'
               ? 'Add to Home Screen'
               : platform === 'android'
-                ? 'Install on Android'
+                ? 'Install from Play Store'
                 : 'Install App'}
           </h2>
 
@@ -115,40 +139,41 @@ const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) =>
                   The Share button lives in Safari’s own menu bar — not inside BUX Spades.
                 </p>
               </div>
+            ) : platform === 'android' ? (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-950/30 p-3 text-left sm:p-4">
+                <p className="text-xs leading-relaxed text-amber-100/95 sm:text-sm">
+                  The app is in <span className="font-semibold text-amber-50">beta testing</span>.
+                  Play Store / Play Protect may warn that it’s unsafe or unrecognised — that’s
+                  expected. Tap <span className="font-semibold text-amber-50">Install anyway</span>{' '}
+                  and trust the app to continue.
+                </p>
+              </div>
             ) : (
               <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3 text-left backdrop-blur-sm sm:p-4">
                 <h3 className="text-sm font-semibold text-slate-200 sm:text-base">How to install:</h3>
                 <ol className="list-inside list-decimal space-y-1 text-xs sm:text-sm">
-                  {platform === 'android' ? (
-                    <>
-                      <li>Tap the menu button ⋮</li>
-                      <li>Tap &quot;Add to Home screen&quot;</li>
-                      <li>Tap &quot;Add&quot; to install</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>Look for the install button in your browser</li>
-                      <li>Or use the browser menu to add to home screen</li>
-                    </>
-                  )}
+                  <li>Look for the install button in your browser</li>
+                  <li>Or use the browser menu to add to home screen</li>
                 </ol>
               </div>
             )}
 
-            <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 p-2 sm:p-3">
-              <p className="text-xs text-cyan-200/90 sm:text-sm">
-                Once installed, the app opens full-screen and feels like a native app.
-              </p>
-            </div>
+            {platform !== 'android' && (
+              <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 p-2 sm:p-3">
+                <p className="text-xs text-cyan-200/90 sm:text-sm">
+                  Once installed, the app opens full-screen and feels like a native app.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 space-y-2 sm:mt-8 sm:space-y-3">
-            {platform === 'android' && deferredPrompt && (
+            {platform === 'android' && (
               <button
                 onClick={handleInstallClick}
                 className="w-full rounded-lg bg-gradient-to-r from-cyan-500 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-cyan-950/25 transition hover:from-cyan-400 hover:to-teal-500 sm:px-6 sm:py-3 sm:text-base"
               >
-                Install Now
+                Install
               </button>
             )}
 
