@@ -52,7 +52,8 @@ const PlayStoreLogo: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.buxspades.app';
+const PLAY_STORE_URL =
+  'https://play.google.com/apps/internaltest/4701353733702518358';
 
 const PWAInstallModal: React.FC<PWAInstallModalProps> = ({ isOpen, onClose }) => {
   const { handleInstall, deferredPrompt } = usePWAInstall();
