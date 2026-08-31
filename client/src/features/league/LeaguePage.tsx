@@ -967,6 +967,24 @@ const LeaguePage: React.FC = () => {
               isAdmin={Boolean(isAdmin)}
               onUnreadChange={setAnnouncementsUnread}
             />
+          ) : mainSection === 'stats' && leagueId ? (
+            <LeagueStatsPanel
+              leagueId={leagueId}
+              theme={theme}
+              onOpenPlayer={(u) =>
+                setPlayerStats({
+                  open: true,
+                  player: {
+                    id: u.id,
+                    username: u.username,
+                    avatar: u.avatarUrl,
+                    avatarUrl: u.avatarUrl,
+                    stats: {} as any,
+                    status: 'not_friend'
+                  }
+                })
+              }
+            />
           ) : (
             <LeagueSectionPlaceholder section={mainSection} theme={theme} />
           )}
