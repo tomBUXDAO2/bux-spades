@@ -16,6 +16,7 @@ import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
 import { GifPicker } from '@/features/chat/components/GifPicker';
 import LeagueSectionSelect from '@/features/league/components/LeagueSectionSelect';
 import LeagueSectionPlaceholder from '@/features/league/components/LeagueSectionPlaceholder';
+import LeagueAnnouncementsPanel from '@/features/league/components/LeagueAnnouncementsPanel';
 import type { LeagueMainSection } from '@/features/league/leagueSections';
 
 type LeagueInfo = {
@@ -105,8 +106,8 @@ const LeaguePage: React.FC = () => {
   const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
   const [mainSection, setMainSection] = useState<LeagueMainSection>('lobby');
-  /** Wired when announcements ship; badge hidden while 0. */
-  const [announcementsUnread] = useState(0);
+  const [announcementsUnread, setAnnouncementsUnread] = useState(0);
+  const mainSectionRef = useRef<LeagueMainSection>('lobby');
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'wallet' | 'theme'>('requests');
@@ -135,6 +136,10 @@ const LeaguePage: React.FC = () => {
   const isMuted = Boolean(league?.mutedUntil && new Date(league.mutedUntil) > new Date());
   const isTimedOut = Boolean(league?.timeoutUntil && new Date(league.timeoutUntil) > new Date());
   const theme = league?.bgColor || '#0f172a';
+
+  useEffect(() => {
+    mainSectionRef.current = mainSection;
+  }, [mainSection]);
 
   const isMemberOnline = useCallback(
     (userId: string) => roomOnlineIds.includes(userId) || globalOnlineIds.includes(userId),
@@ -277,6 +282,17 @@ const LeaguePage: React.FC = () => {
           return;
         }
         await Promise.all([loadGames(), loadChat(), loadMembers()]);
+        try {
+          const ur = await api.get(`/api/leagues/${leagueId}/announcements/unread-count`);
+          if (ur.ok) {
+            const ud = await ur.json();
+            if (!cancelled && typeof ud.unreadCount === 'number') {
+              setAnnouncementsUnread(ud.unreadCount);
+            }
+          }
+        } catch {
+          /* optional */
+        }
       } catch (e: any) {
         if (!cancelled) setError(e.message || 'Failed to load league');
       } finally {
@@ -340,6 +356,13 @@ const LeaguePage: React.FC = () => {
       }
       if (isAdmin) loadWalletLedger();
     };
+    const onAnnouncementCreated = (payload: { leagueId?: string }) => {
+      if (cancelled) return;
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      if (mainSectionRef.current !== 'announcements') {
+        setAnnouncementsUnread((n) => n + 1);
+      }
+    };
 
     socket.on('league_chat_message', onMessage);
     socket.on('league_chat_deleted', onDeleted);
@@ -348,6 +371,7 @@ const LeaguePage: React.FC = () => {
     socket.on('league_membership_updated', onMembership);
     socket.on('league_join_request', onJoinRequest);
     socket.on('league_wallet_updated', onWalletUpdated);
+    socket.on('league_announcement_created', onAnnouncementCreated);
     socket.on('friendAdded', refreshFriends);
     socket.on('friendRemoved', refreshFriends);
     socket.on('userBlocked', refreshFriends);
@@ -370,6 +394,7 @@ const LeaguePage: React.FC = () => {
       socket.off('league_membership_updated', onMembership);
       socket.off('league_join_request', onJoinRequest);
       socket.off('league_wallet_updated', onWalletUpdated);
+      socket.off('league_announcement_created', onAnnouncementCreated);
       socket.off('friendAdded', refreshFriends);
       socket.off('friendRemoved', refreshFriends);
       socket.off('userBlocked', refreshFriends);
@@ -933,6 +958,13 @@ const LeaguePage: React.FC = () => {
                 </div>
               )}
             </>
+          ) : mainSection === 'announcements' && leagueId ? (
+            <LeagueAnnouncementsPanel
+              leagueId={leagueId}
+              theme={theme}
+              isAdmin={Boolean(isAdmin)}
+              onUnreadChange={setAnnouncementsUnread}
+            />
           ) : (
             <LeagueSectionPlaceholder section={mainSection} theme={theme} />
           )}

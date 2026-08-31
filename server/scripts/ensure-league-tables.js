@@ -83,6 +83,33 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS "LeagueWalletLedger_leagueId_createdAt_idx" ON "LeagueWalletLedger"("leagueId", "createdAt")`,
   `CREATE INDEX IF NOT EXISTS "LeagueWalletLedger_creditedUserId_idx" ON "LeagueWalletLedger"("creditedUserId")`,
   `UPDATE "League" SET "lastMonthlyCreditYm" = to_char((CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), 'YYYY-MM') WHERE "lastMonthlyCreditYm" IS NULL`,
+  `CREATE TABLE IF NOT EXISTS "LeagueAnnouncement" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "authorId" TEXT NOT NULL,
+    "title" TEXT,
+    "body" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueAnnouncementReaction" (
+    "id" TEXT PRIMARY KEY,
+    "announcementId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "emoji" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS "LeagueAnnouncementRead" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "lastReadAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "LeagueAnnouncement_leagueId_createdAt_idx" ON "LeagueAnnouncement"("leagueId", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "LeagueAnnouncement_authorId_idx" ON "LeagueAnnouncement"("authorId")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueAnnouncementReaction_announcementId_userId_emoji_key" ON "LeagueAnnouncementReaction"("announcementId", "userId", "emoji")`,
+  `CREATE INDEX IF NOT EXISTS "LeagueAnnouncementReaction_announcementId_idx" ON "LeagueAnnouncementReaction"("announcementId")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueAnnouncementRead_leagueId_userId_key" ON "LeagueAnnouncementRead"("leagueId", "userId")`,
   `ALTER TABLE "LeagueCreateRequest" ADD COLUMN IF NOT EXISTS "bgColor" TEXT NOT NULL DEFAULT '#0f172a'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,

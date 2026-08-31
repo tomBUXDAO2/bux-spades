@@ -33,6 +33,9 @@ model User {
   leagueCreateRequests    LeagueCreateRequest[]
   leagueWalletCredits     LeagueWalletLedger[]     @relation("LeagueWalletCreditedUser")
   leagueWalletActions     LeagueWalletLedger[]     @relation("LeagueWalletActor")
+  leagueAnnouncements     LeagueAnnouncement[]
+  leagueAnnouncementReactions LeagueAnnouncementReaction[]
+  leagueAnnouncementReads LeagueAnnouncementRead[]
 }
 
 model UserStats {
@@ -638,6 +641,8 @@ model League {
   games                Game[]
   createRequests       LeagueCreateRequest[] @relation("ApprovedLeague")
   walletLedger         LeagueWalletLedger[]
+  announcements        LeagueAnnouncement[]
+  announcementReads    LeagueAnnouncementRead[]
 
   @@index([ownerId])
 }
@@ -659,6 +664,49 @@ model LeagueWalletLedger {
 
   @@index([leagueId, createdAt])
   @@index([creditedUserId])
+}
+
+model LeagueAnnouncement {
+  id        String                       @id @default(cuid())
+  leagueId  String
+  authorId  String
+  title     String?
+  body      String
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+  league    League                       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  author    User                         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions LeagueAnnouncementReaction[]
+
+  @@index([leagueId, createdAt])
+  @@index([authorId])
+}
+
+model LeagueAnnouncementReaction {
+  id             String             @id @default(cuid())
+  announcementId String
+  userId         String
+  emoji          String
+  createdAt      DateTime           @default(now())
+  announcement   LeagueAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId, emoji])
+  @@index([announcementId])
+  @@index([userId])
+}
+
+/** Per-member cursor: announcements newer than lastReadAt count as unread. */
+model LeagueAnnouncementRead {
+  id         String   @id @default(cuid())
+  leagueId   String
+  userId     String
+  lastReadAt DateTime @default(now())
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+  @@index([userId])
 }
 
 model LeagueCreateRequest {

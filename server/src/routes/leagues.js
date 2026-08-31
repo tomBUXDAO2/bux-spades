@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
 import { LeagueService } from '../services/LeagueService.js';
 import { LeagueWalletService } from '../services/LeagueWalletService.js';
+import { LeagueAnnouncementService } from '../services/LeagueAnnouncementService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
@@ -311,6 +312,99 @@ router.post('/:leagueId/wallet/credit', authenticateToken, async (req, res) => {
         coinBalance: result.coinBalance
       });
     }
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/announcements', authenticateToken, async (req, res) => {
+  try {
+    const data = await LeagueAnnouncementService.list(req.params.leagueId, req.userId, {
+      limit: req.query.limit
+    });
+    res.json(data);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/announcements/unread-count', authenticateToken, async (req, res) => {
+  try {
+    const unreadCount = await LeagueAnnouncementService.getUnreadCount(
+      req.params.leagueId,
+      req.userId
+    );
+    res.json({ unreadCount });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/announcements', authenticateToken, async (req, res) => {
+  try {
+    const announcement = await LeagueAnnouncementService.create(req.params.leagueId, req.userId, {
+      title: req.body.title,
+      body: req.body.body
+    });
+    if (io) {
+      io.to(`league_${req.params.leagueId}`).emit('league_announcement_created', {
+        leagueId: req.params.leagueId,
+        announcement
+      });
+    }
+    res.status(201).json(announcement);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.delete('/:leagueId/announcements/:announcementId', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueAnnouncementService.remove(
+      req.params.leagueId,
+      req.userId,
+      req.params.announcementId
+    );
+    if (io) {
+      io.to(`league_${req.params.leagueId}`).emit('league_announcement_deleted', {
+        leagueId: req.params.leagueId,
+        announcementId: result.id
+      });
+    }
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post(
+  '/:leagueId/announcements/:announcementId/reactions',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const announcement = await LeagueAnnouncementService.toggleReaction(
+        req.params.leagueId,
+        req.userId,
+        req.params.announcementId,
+        req.body.emoji
+      );
+      if (io) {
+        io.to(`league_${req.params.leagueId}`).emit('league_announcement_updated', {
+          leagueId: req.params.leagueId,
+          announcement
+        });
+      }
+      res.json(announcement);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
+
+router.post('/:leagueId/announcements/mark-read', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueAnnouncementService.markRead(req.params.leagueId, req.userId);
     res.json(result);
   } catch (error) {
     handleError(res, error);
