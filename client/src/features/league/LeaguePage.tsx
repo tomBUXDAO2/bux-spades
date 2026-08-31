@@ -17,6 +17,7 @@ import { GifPicker } from '@/features/chat/components/GifPicker';
 import LeagueSectionSelect from '@/features/league/components/LeagueSectionSelect';
 import LeagueSectionPlaceholder from '@/features/league/components/LeagueSectionPlaceholder';
 import LeagueAnnouncementsPanel from '@/features/league/components/LeagueAnnouncementsPanel';
+import LeagueStatsPanel from '@/features/league/components/LeagueStatsPanel';
 import type { LeagueMainSection } from '@/features/league/leagueSections';
 
 type LeagueInfo = {

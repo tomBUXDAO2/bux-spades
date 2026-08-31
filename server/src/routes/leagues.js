@@ -7,6 +7,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { LeagueService } from '../services/LeagueService.js';
 import { LeagueWalletService } from '../services/LeagueWalletService.js';
 import { LeagueAnnouncementService } from '../services/LeagueAnnouncementService.js';
+import { LeagueStatsService } from '../services/LeagueStatsService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
@@ -406,6 +407,22 @@ router.post('/:leagueId/announcements/mark-read', authenticateToken, async (req,
   try {
     const result = await LeagueAnnouncementService.markRead(req.params.leagueId, req.userId);
     res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/stats', authenticateToken, async (req, res) => {
+  try {
+    const data = await LeagueStatsService.getStandings(req.params.leagueId, req.userId, {
+      mode: req.query.mode,
+      format: req.query.format,
+      sortBy: req.query.sortBy,
+      sortDir: req.query.sortDir,
+      minGames: req.query.minGames,
+      search: req.query.search
+    });
+    res.json(data);
   } catch (error) {
     handleError(res, error);
   }
