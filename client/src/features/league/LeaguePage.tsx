@@ -29,6 +29,18 @@ type LeagueInfo = {
   mutedUntil?: string | null;
   timeoutUntil?: string | null;
   memberCount: number;
+  coinBalance?: number;
+};
+
+type WalletLedgerEntry = {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  note?: string | null;
+  createdAt: string;
+  actor?: { id: string; username: string } | null;
+  creditedUser?: { id: string; username: string } | null;
 };
 
 type ChatMessage = {
@@ -97,7 +109,12 @@ const LeaguePage: React.FC = () => {
   const [announcementsUnread] = useState(0);
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
-  const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'theme'>('requests');
+  const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'wallet' | 'theme'>('requests');
+  const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([]);
+  const [creditUserId, setCreditUserId] = useState('');
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditNote, setCreditNote] = useState('');
+  const [crediting, setCrediting] = useState(false);
   const [themeName, setThemeName] = useState('');
   const [themeColor, setThemeColor] = useState('#0f172a');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -196,6 +213,42 @@ const LeaguePage: React.FC = () => {
     await loadMembers();
   }, [leagueId, isAdmin, loadMembers]);
 
+  const loadWalletLedger = useCallback(async () => {
+    if (!leagueId || !isAdmin) return;
+    const res = await api.get(`/api/leagues/${leagueId}/wallet/ledger`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setWalletLedger(Array.isArray(data) ? data : []);
+  }, [leagueId, isAdmin]);
+
+  const creditWinner = async () => {
+    if (!leagueId || !creditUserId) return;
+    const amount = Math.floor(Number(creditAmount));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Enter a positive coin amount');
+      return;
+    }
+    setCrediting(true);
+    setError(null);
+    try {
+      const res = await api.post(`/api/leagues/${leagueId}/wallet/credit`, {
+        userId: creditUserId,
+        amount,
+        note: creditNote.trim() || undefined
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Credit failed');
+      setLeague((prev) => (prev ? { ...prev, coinBalance: data.coinBalance } : prev));
+      setCreditAmount('');
+      setCreditNote('');
+      await loadWalletLedger();
+    } catch (e: any) {
+      setError(e.message || 'Credit failed');
+    } finally {
+      setCrediting(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -224,6 +277,10 @@ const LeaguePage: React.FC = () => {
   useEffect(() => {
     if (isAdmin) loadAdminData();
   }, [isAdmin, loadAdminData]);
+
+  useEffect(() => {
+    if (isAdmin && adminTab === 'wallet') loadWalletLedger();
+  }, [isAdmin, adminTab, loadWalletLedger]);
 
   useEffect(() => {
     if (!socket || !leagueId || !league?.isMember) return;
@@ -261,6 +318,14 @@ const LeaguePage: React.FC = () => {
     };
     const refreshFriends = () => loadMembers();
     const onJoinRequest = () => loadAdminData();
+    const onWalletUpdated = (payload: { leagueId?: string; coinBalance?: number }) => {
+      if (cancelled) return;
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      if (typeof payload.coinBalance === 'number') {
+        setLeague((prev) => (prev ? { ...prev, coinBalance: payload.coinBalance } : prev));
+      }
+      if (isAdmin) loadWalletLedger();
+    };
 
     socket.on('league_chat_message', onMessage);
     socket.on('league_chat_deleted', onDeleted);
@@ -268,6 +333,7 @@ const LeaguePage: React.FC = () => {
     socket.on('online_users', onGlobalOnline);
     socket.on('league_membership_updated', onMembership);
     socket.on('league_join_request', onJoinRequest);
+    socket.on('league_wallet_updated', onWalletUpdated);
     socket.on('friendAdded', refreshFriends);
     socket.on('friendRemoved', refreshFriends);
     socket.on('userBlocked', refreshFriends);
@@ -289,6 +355,7 @@ const LeaguePage: React.FC = () => {
       socket.off('online_users', onGlobalOnline);
       socket.off('league_membership_updated', onMembership);
       socket.off('league_join_request', onJoinRequest);
+      socket.off('league_wallet_updated', onWalletUpdated);
       socket.off('friendAdded', refreshFriends);
       socket.off('friendRemoved', refreshFriends);
       socket.off('userBlocked', refreshFriends);
@@ -522,6 +589,7 @@ const LeaguePage: React.FC = () => {
         <div className="truncate text-base font-bold text-white drop-shadow sm:text-lg">{league?.name}</div>
         <div className="truncate text-[10px] text-white/70 sm:text-xs">
           {league?.memberCount} members
+          {typeof league?.coinBalance === 'number' ? ` · ${league.coinBalance.toLocaleString()} league coins` : ''}
           {isTimedOut ? ' · timed out' : ''}
           {isMuted ? ' · muted' : ''}
         </div>
@@ -628,7 +696,14 @@ const LeaguePage: React.FC = () => {
                   style={{ backgroundColor: `${theme}99` }}
                 >
                   <div className="mb-3 flex gap-2 text-xs">
-                    {(['requests', 'moderation', ...(isOwner ? (['theme'] as const) : [])] as const).map((tab) => (
+                    {(
+                      [
+                        'requests',
+                        'moderation',
+                        'wallet',
+                        ...(isOwner ? (['theme'] as const) : [])
+                      ] as const
+                    ).map((tab) => (
                       <button
                         key={tab}
                         type="button"
@@ -723,6 +798,101 @@ const LeaguePage: React.FC = () => {
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {adminTab === 'wallet' && (
+                    <div className="space-y-3 text-sm">
+                      <div className="rounded-lg border border-white/15 bg-black/25 px-3 py-2">
+                        <div className="text-xs text-white/70">League balance</div>
+                        <div className="text-xl font-semibold text-amber-200">
+                          {(league?.coinBalance ?? 0).toLocaleString()} coins
+                        </div>
+                        <p className="mt-1 text-[11px] text-white/60">
+                          +100 auto-credited each month (UTC). Unused coins roll over.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 rounded-lg border border-white/15 bg-black/20 p-2">
+                        <div className="text-xs font-semibold text-white/80">Credit winner</div>
+                        <label className="block">
+                          <span className="text-[11px] text-white/60">Member</span>
+                          <select
+                            value={creditUserId}
+                            onChange={(e) => setCreditUserId(e.target.value)}
+                            className="mt-1 w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-xs"
+                          >
+                            <option value="">Select member…</option>
+                            {members.map((m) => (
+                              <option key={m.userId} value={m.userId}>
+                                {m.user.username}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-[11px] text-white/60">Amount</span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={creditAmount}
+                            onChange={(e) => setCreditAmount(e.target.value)}
+                            className="mt-1 w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-xs"
+                            placeholder="e.g. 50"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-[11px] text-white/60">Note (optional)</span>
+                          <input
+                            value={creditNote}
+                            onChange={(e) => setCreditNote(e.target.value)}
+                            className="mt-1 w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 text-xs"
+                            placeholder="Tournament 1st place"
+                            maxLength={280}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={crediting || !creditUserId || !creditAmount}
+                          onClick={creditWinner}
+                          className="rounded-lg bg-amber-600/90 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                        >
+                          {crediting ? 'Crediting…' : 'Credit coins'}
+                        </button>
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-xs font-semibold text-white/80">Recent ledger</div>
+                        <div className="max-h-48 space-y-1 overflow-y-auto">
+                          {walletLedger.length === 0 ? (
+                            <p className="text-[11px] text-white/60">No ledger entries yet.</p>
+                          ) : (
+                            walletLedger.map((row) => (
+                              <div
+                                key={row.id}
+                                className="rounded border border-white/10 bg-black/25 px-2 py-1.5 text-[11px]"
+                              >
+                                <div className="flex justify-between gap-2">
+                                  <span className="font-medium capitalize text-white/90">
+                                    {row.type.replace(/_/g, ' ').toLowerCase()}
+                                  </span>
+                                  <span className={row.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                                    {row.amount >= 0 ? '+' : ''}
+                                    {row.amount}
+                                  </span>
+                                </div>
+                                <div className="text-white/55">
+                                  bal {row.balanceAfter}
+                                  {row.creditedUser ? ` · → ${row.creditedUser.username}` : ''}
+                                  {row.actor ? ` · by ${row.actor.username}` : ''}
+                                </div>
+                                {row.note && <div className="text-white/70">{row.note}</div>}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 

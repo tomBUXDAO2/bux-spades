@@ -86,25 +86,33 @@ export class LeagueService {
       slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
     }
 
-    const league = await prisma.league.create({
-      data: {
-        name: name.trim(),
-        slug,
-        ownerId: owner.id,
-        bgColor: bgColor || '#0f172a',
-        logoUrl: logoUrl || null,
-        requireJoinApproval: requireJoinApproval !== false,
-        members: {
-          create: {
-            userId: owner.id,
-            role: 'OWNER'
+    const { LeagueWalletService } = await import('./LeagueWalletService.js');
+
+    const league = await prisma.$transaction(async (tx) => {
+      const created = await tx.league.create({
+        data: {
+          name: name.trim(),
+          slug,
+          ownerId: owner.id,
+          bgColor: bgColor || '#0f172a',
+          logoUrl: logoUrl || null,
+          requireJoinApproval: requireJoinApproval !== false,
+          members: {
+            create: {
+              userId: owner.id,
+              role: 'OWNER'
+            }
           }
         }
-      },
-      include: {
-        owner: { select: { id: true, username: true, avatarUrl: true, facebookId: true } },
-        _count: { select: { members: true } }
-      }
+      });
+      await LeagueWalletService.seedOpeningBalance(tx, created.id);
+      return tx.league.findUnique({
+        where: { id: created.id },
+        include: {
+          owner: { select: { id: true, username: true, avatarUrl: true, facebookId: true } },
+          _count: { select: { members: true } }
+        }
+      });
     });
 
     return league;
@@ -308,6 +316,7 @@ export class LeagueService {
       bgColor: league.bgColor,
       logoUrl: league.logoUrl,
       requireJoinApproval: league.requireJoinApproval,
+      coinBalance: league.coinBalance,
       owner: league.owner,
       memberCount: league._count.members,
       isMember: Boolean(membership),

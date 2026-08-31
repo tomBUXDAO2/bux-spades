@@ -62,6 +62,25 @@ const statements = [
   )`,
   `ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "leagueId" TEXT`,
   `ALTER TABLE "League" ADD COLUMN IF NOT EXISTS "requireJoinApproval" BOOLEAN NOT NULL DEFAULT true`,
+  `ALTER TABLE "League" ADD COLUMN IF NOT EXISTS "coinBalance" INTEGER NOT NULL DEFAULT 100`,
+  `ALTER TABLE "League" ADD COLUMN IF NOT EXISTS "lastMonthlyCreditYm" TEXT`,
+  `DO $$ BEGIN
+    CREATE TYPE "LeagueWalletLedgerType" AS ENUM ('MONTHLY_ALLOWANCE', 'CREDIT_WINNER', 'ADJUSTMENT');
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  `CREATE TABLE IF NOT EXISTS "LeagueWalletLedger" (
+    "id" TEXT PRIMARY KEY,
+    "leagueId" TEXT NOT NULL,
+    "type" "LeagueWalletLedgerType" NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "balanceAfter" INTEGER NOT NULL,
+    "note" TEXT,
+    "actorUserId" TEXT,
+    "creditedUserId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "LeagueWalletLedger_leagueId_createdAt_idx" ON "LeagueWalletLedger"("leagueId", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "LeagueWalletLedger_creditedUserId_idx" ON "LeagueWalletLedger"("creditedUserId")`,
+  `UPDATE "League" SET "lastMonthlyCreditYm" = to_char((CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), 'YYYY-MM') WHERE "lastMonthlyCreditYm" IS NULL`,
   `ALTER TABLE "LeagueCreateRequest" ADD COLUMN IF NOT EXISTS "bgColor" TEXT NOT NULL DEFAULT '#0f172a'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,

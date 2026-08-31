@@ -23,6 +23,9 @@ server.listen(PORT, HOST, async () => {
     const { PeriodicCleanupService } = await import('./services/PeriodicCleanupService.js');
     PeriodicCleanupService.start();
 
+    const { startLeagueWalletScheduler } = await import('./services/LeagueWalletScheduler.js');
+    startLeagueWalletScheduler();
+
     if (process.env.DISCORD_BOT_TOKEN) {
       const { startDiscordBot } = await import('./discord/bot.js');
       startDiscordBot().catch((error) => {
@@ -51,6 +54,8 @@ process.on('SIGINT', async () => {
   try {
     const { PeriodicCleanupService } = await import('./services/PeriodicCleanupService.js');
     PeriodicCleanupService.stop();
+    const { stopLeagueWalletScheduler } = await import('./services/LeagueWalletScheduler.js');
+    stopLeagueWalletScheduler();
     const { playerTimerService } = await import('./services/PlayerTimerService.js');
     playerTimerService.clearAllTimers();
   } catch (e) {

@@ -31,6 +31,8 @@ model User {
   leagueJoinRequests      LeagueJoinRequest[]
   leagueChatMessages      LeagueChatMessage[]
   leagueCreateRequests    LeagueCreateRequest[]
+  leagueWalletCredits     LeagueWalletLedger[]     @relation("LeagueWalletCreditedUser")
+  leagueWalletActions     LeagueWalletLedger[]     @relation("LeagueWalletActor")
 }
 
 model UserStats {
@@ -610,6 +612,12 @@ enum LeagueJoinRequestStatus {
   REJECTED
 }
 
+enum LeagueWalletLedgerType {
+  MONTHLY_ALLOWANCE
+  CREDIT_WINNER
+  ADJUSTMENT
+}
+
 model League {
   id                   String                @id @default(cuid())
   name                 String
@@ -618,6 +626,9 @@ model League {
   bgColor              String                @default("#0f172a")
   logoUrl              String?
   requireJoinApproval  Boolean               @default(true)
+  coinBalance          Int                   @default(100)
+  /** YYYY-MM of last monthly +100 credit (prevents double credit). */
+  lastMonthlyCreditYm  String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   owner                User                  @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Restrict)
@@ -626,8 +637,28 @@ model League {
   chatMessages         LeagueChatMessage[]
   games                Game[]
   createRequests       LeagueCreateRequest[] @relation("ApprovedLeague")
+  walletLedger         LeagueWalletLedger[]
 
   @@index([ownerId])
+}
+
+model LeagueWalletLedger {
+  id              String                 @id @default(cuid())
+  leagueId        String
+  type            LeagueWalletLedgerType
+  amount          Int
+  /** League balance after this entry. */
+  balanceAfter    Int
+  note            String?
+  actorUserId     String?
+  creditedUserId  String?
+  createdAt       DateTime               @default(now())
+  league          League                 @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  actor           User?                  @relation("LeagueWalletActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  creditedUser    User?                  @relation("LeagueWalletCreditedUser", fields: [creditedUserId], references: [id], onDelete: SetNull)
+
+  @@index([leagueId, createdAt])
+  @@index([creditedUserId])
 }
 
 model LeagueCreateRequest {

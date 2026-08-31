@@ -5,6 +5,7 @@ import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
 import { LeagueService } from '../services/LeagueService.js';
+import { LeagueWalletService } from '../services/LeagueWalletService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
@@ -272,6 +273,45 @@ router.post('/:leagueId/tables/:gameId/remove-player', authenticateToken, async 
     }
 
     res.json({ success: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/wallet', authenticateToken, async (req, res) => {
+  try {
+    const wallet = await LeagueWalletService.getWallet(req.params.leagueId, req.userId);
+    res.json(wallet);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/wallet/ledger', authenticateToken, async (req, res) => {
+  try {
+    const ledger = await LeagueWalletService.getLedger(req.params.leagueId, req.userId, {
+      limit: req.query.limit
+    });
+    res.json(ledger);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/wallet/credit', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueWalletService.creditWinner(req.params.leagueId, req.userId, {
+      userId: req.body.userId,
+      amount: req.body.amount,
+      note: req.body.note
+    });
+    if (io) {
+      io.to(`league_${req.params.leagueId}`).emit('league_wallet_updated', {
+        leagueId: req.params.leagueId,
+        coinBalance: result.coinBalance
+      });
+    }
+    res.json(result);
   } catch (error) {
     handleError(res, error);
   }
