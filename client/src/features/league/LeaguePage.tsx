@@ -638,12 +638,12 @@ const LeaguePage: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen text-white"
+      className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden text-white"
       style={{
         background: `radial-gradient(1200px 600px at 10% -10%, ${theme}cc, transparent), linear-gradient(165deg, ${theme} 0%, #020617 55%)`
       }}
     >
-      <div className="border-b border-white/10" style={{ backgroundColor: `${theme}dd` }}>
+      <div className="shrink-0 border-b border-white/10" style={{ backgroundColor: `${theme}dd` }}>
         <Header
           className="!bg-transparent !border-0 !shadow-none"
           fullWidth
@@ -666,30 +666,31 @@ const LeaguePage: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mx-4 mt-3 rounded-lg border border-rose-500/40 bg-rose-950/50 px-3 py-2 text-sm text-rose-100">
+        <div className="mx-4 mt-3 shrink-0 rounded-lg border border-rose-500/40 bg-rose-950/50 px-3 py-2 text-sm text-rose-100">
           {error}
         </div>
       )}
 
-      <MobileToggle
-        mobileTab={mobileTab}
-        onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
-      />
+      <div className="shrink-0">
+        <MobileToggle
+          mobileTab={mobileTab}
+          onToggle={() => setMobileTab(mobileTab === 'lobby' ? 'chat' : 'lobby')}
+        />
+      </div>
 
       <main
         className={
           isPortrait
-            ? 'flex flex-col gap-4 p-4 min-h-0'
-            : 'grid gap-4 p-4 lg:grid-cols-3 min-h-[calc(100vh-72px)]'
-        }
-        style={
-          isPortrait
-            ? { height: 'calc(100vh - 64px - 56px)', maxHeight: 'calc(100dvh - 64px - 56px)' }
-            : undefined
+            ? 'flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4'
+            : 'grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-3'
         }
       >
         {(!isPortrait || mobileTab === 'lobby') && (
-        <section className={`lg:col-span-2 space-y-4 ${isPortrait ? 'overflow-y-auto min-h-0 flex-1' : ''}`}>
+        <section
+          className={`flex min-h-0 flex-col space-y-4 overflow-y-auto lg:col-span-2 ${
+            isPortrait ? 'flex-1' : 'h-full max-h-full'
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <LeagueSectionSelect
               value={mainSection}
@@ -972,9 +973,9 @@ const LeaguePage: React.FC = () => {
         )}
 
         {(!isPortrait || mobileTab === 'chat') && (
-        <aside className={`flex flex-col ${isPortrait ? 'flex-1 min-h-0' : 'min-h-[480px]'}`}>
+        <aside className={`flex min-h-0 flex-col overflow-hidden ${isPortrait ? 'flex-1' : 'h-full max-h-full'}`}>
           <div
-            className="flex flex-1 flex-col rounded-xl border border-white/15 p-3 backdrop-blur shadow-lg min-h-0"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/15 p-3 shadow-lg backdrop-blur"
             style={{ backgroundColor: `${theme}b3` }}
           >
             <div className="mb-2 flex items-center justify-between gap-2">
