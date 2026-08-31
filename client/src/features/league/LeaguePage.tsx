@@ -19,6 +19,7 @@ import LeagueSectionPlaceholder from '@/features/league/components/LeagueSection
 import LeagueAnnouncementsPanel from '@/features/league/components/LeagueAnnouncementsPanel';
 import LeagueStatsPanel from '@/features/league/components/LeagueStatsPanel';
 import LeagueEventsPanel from '@/features/league/components/LeagueEventsPanel';
+import LeagueTournamentsPanel from '@/features/league/components/LeagueTournamentsPanel';
 import type { LeagueMainSection } from '@/features/league/leagueSections';
 
 type LeagueInfo = {
@@ -1001,6 +1002,16 @@ const LeaguePage: React.FC = () => {
               }}
               onJoinGame={(id, seat) => joinGame(id, seat)}
               onWatchGame={(id) => navigate(`/table/${id}?spectate=1`)}
+            />
+          ) : mainSection === 'tournaments' && leagueId && user?.id ? (
+            <LeagueTournamentsPanel
+              leagueId={leagueId}
+              theme={theme}
+              isAdmin={Boolean(isAdmin)}
+              isTimedOut={isTimedOut}
+              currentUserId={user.id}
+              members={members}
+              onOpenTable={(gameId) => navigate(`/table/${gameId}`)}
             />
           ) : (
             <LeagueSectionPlaceholder section={mainSection} theme={theme} />

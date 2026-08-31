@@ -9,6 +9,7 @@ import { LeagueWalletService } from '../services/LeagueWalletService.js';
 import { LeagueAnnouncementService } from '../services/LeagueAnnouncementService.js';
 import { LeagueStatsService } from '../services/LeagueStatsService.js';
 import { LeagueEventService } from '../services/LeagueEventService.js';
+import { LeagueTournamentService } from '../services/LeagueTournamentService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
@@ -506,6 +507,172 @@ router.post('/:leagueId/events/:eventId/cancel', authenticateToken, async (req, 
     handleError(res, error);
   }
 });
+
+router.get('/:leagueId/tournaments', authenticateToken, async (req, res) => {
+  try {
+    const tournaments = await LeagueTournamentService.list(req.params.leagueId, req.userId);
+    res.json({ tournaments });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments', authenticateToken, logoUpload.single('banner'), async (req, res) => {
+  try {
+    let bannerUrl = req.body.bannerUrl || null;
+    if (req.file) {
+      const relativePath = `/uploads/leagues/${req.file.filename}`;
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      bannerUrl = host ? `${protocol}://${host}${relativePath}` : relativePath;
+    }
+
+    const tournament = await LeagueTournamentService.create(req.params.leagueId, req.userId, {
+      ...req.body,
+      bannerUrl,
+      firstPlaceCoins: req.body.firstPlaceCoins,
+      secondPlaceCoins: req.body.secondPlaceCoins,
+      nilAllowed: req.body.nilAllowed !== 'false' && req.body.nilAllowed !== false,
+      blindNilAllowed: req.body.blindNilAllowed === 'true' || req.body.blindNilAllowed === true
+    });
+    res.status(201).json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/tournaments/:tournamentId', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.get(
+      req.params.leagueId,
+      req.params.tournamentId,
+      req.userId
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/register', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.register(
+      req.params.leagueId,
+      req.params.tournamentId,
+      req.userId,
+      { partnerId: req.body.partnerId || null }
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/unregister', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.unregister(
+      req.params.leagueId,
+      req.params.tournamentId,
+      req.userId
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/close', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.closeRegistration(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/start', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.start(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/cancel', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.cancel(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/admin-pair', authenticateToken, async (req, res) => {
+  try {
+    const tournament = await LeagueTournamentService.adminPairOrSub(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId,
+      {
+        userId: req.body.userId,
+        partnerId: req.body.partnerId || null,
+        asSub: Boolean(req.body.asSub)
+      }
+    );
+    res.json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post(
+  '/:leagueId/tournaments/:tournamentId/matches/:matchId/ready',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.markReady(
+        req.params.leagueId,
+        req.params.tournamentId,
+        req.params.matchId,
+        req.userId
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
+
+router.post(
+  '/:leagueId/tournaments/:tournamentId/matches/:matchId/open-table',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.forceOpenTable(
+        req.params.leagueId,
+        req.userId,
+        req.params.tournamentId,
+        req.params.matchId
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
 
 router.get('/:leagueId/chat', authenticateToken, async (req, res) => {
   try {

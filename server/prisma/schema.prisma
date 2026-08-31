@@ -548,11 +548,17 @@ model Tournament {
   specialRules      Json?                    // { specialRule1: string[], specialRule2: string[] }
   discordMessageId  String?
   discordChannelId  String?
+  /** When set, this tournament belongs to a private FB league room. */
+  leagueId          String?
   status            TournamentStatus         @default(REGISTRATION_OPEN)
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
   registrations     TournamentRegistration[]
   matches           TournamentMatch[]
+  league            League?                  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@index([leagueId, status])
+  @@index([status, startTime])
 }
 
 model TournamentRegistration {
@@ -649,6 +655,7 @@ model League {
   announcements        LeagueAnnouncement[]
   announcementReads    LeagueAnnouncementRead[]
   events               Event[]
+  tournaments          Tournament[]
 
   @@index([ownerId])
 }

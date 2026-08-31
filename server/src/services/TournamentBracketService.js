@@ -62,18 +62,18 @@ export class TournamentBracketService {
         },
       });
 
-      // Step 4: Update Discord embed to show registration is closed
-      try {
-        const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
-        const { client } = await import('../discord/bot.js');
-        if (client && client.isReady()) {
-          await DiscordTournamentService.updateTournamentEmbed(client, updatedTournament);
-          // Post a new message announcing bracket is finalized
-          await DiscordTournamentService.postBracketFinalizedEmbed(client, updatedTournament, teams);
+      // Step 4: Discord embeds only for global Discord tournaments
+      if (!updatedTournament.leagueId) {
+        try {
+          const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
+          const { client } = await import('../discord/bot.js');
+          if (client && client.isReady()) {
+            await DiscordTournamentService.updateTournamentEmbed(client, updatedTournament);
+            await DiscordTournamentService.postBracketFinalizedEmbed(client, updatedTournament, teams);
+          }
+        } catch (discordError) {
+          console.error('[TOURNAMENT BRACKET] Error updating Discord embed:', discordError);
         }
-      } catch (discordError) {
-        console.error('[TOURNAMENT BRACKET] Error updating Discord embed:', discordError);
-        // Don't fail bracket generation if Discord fails
       }
 
       return { teams, bracketGenerated: true };
@@ -402,7 +402,15 @@ export class TournamentBracketService {
    * Advance bracket after a match completes
    */
   static async advanceBracket(tournamentId, completedMatch, winnerTeamId) {
-    const nextRound = completedMatch.round + (completedMatch.round < 1000 ? 100 : 0);
+    // Single elim uses rounds 1,2,3… Double winners use 100,200,… Losers 101+, GF 1000+
+    let nextRound;
+    if (completedMatch.round >= 1000) {
+      nextRound = completedMatch.round + 1;
+    } else if (completedMatch.round >= 100) {
+      nextRound = completedMatch.round + 100;
+    } else {
+      nextRound = completedMatch.round + 1;
+    }
     const nextMatchNumber = Math.ceil(completedMatch.matchNumber / 2);
 
     // Find the next match
@@ -414,11 +422,12 @@ export class TournamentBracketService {
       },
     });
 
+    let updatedNextMatch = null;
     if (nextMatch) {
       // Determine which slot (team1 or team2) based on match number
       const isFirstSlot = completedMatch.matchNumber % 2 === 1;
       
-      await prisma.tournamentMatch.update({
+      updatedNextMatch = await prisma.tournamentMatch.update({
         where: { id: nextMatch.id },
         data: {
           [isFirstSlot ? 'team1Id' : 'team2Id']: winnerTeamId,
@@ -435,14 +444,24 @@ export class TournamentBracketService {
     });
 
     if (remainingMatches === 0) {
-      // Tournament complete - find winner
-      const finalMatch = await prisma.tournamentMatch.findFirst({
-        where: {
-          tournamentId,
-          round: { gte: 1000 }, // Grand finals or final round
-        },
-        orderBy: { round: 'desc' },
-      });
+      // Prefer grand final (double) else highest completed round (single)
+      const finalMatch =
+        (await prisma.tournamentMatch.findFirst({
+          where: {
+            tournamentId,
+            round: { gte: 1000 },
+            status: 'COMPLETED',
+          },
+          orderBy: { round: 'desc' },
+        })) ||
+        (await prisma.tournamentMatch.findFirst({
+          where: {
+            tournamentId,
+            status: 'COMPLETED',
+            winnerId: { not: null },
+          },
+          orderBy: { round: 'desc' },
+        }));
 
       if (finalMatch && finalMatch.winnerId) {
         await prisma.tournament.update({
@@ -450,8 +469,11 @@ export class TournamentBracketService {
           data: { status: 'COMPLETED' },
         });
         
-        // Return winner info for Discord embed
-        return { completed: true, winnerTeamId: finalMatch.winnerId };
+        return {
+          completed: true,
+          winnerTeamId: finalMatch.winnerId,
+          nextMatch: updatedNextMatch,
+        };
       }
     }
     
@@ -471,15 +493,15 @@ export class TournamentBracketService {
     
     // If only one team left and no pending matches, they're the winner
     if (activeTeams.size === 1 && remainingMatches === 0) {
-      const winnerTeamId = Array.from(activeTeams)[0];
+      const onlyWinner = Array.from(activeTeams)[0];
       await prisma.tournament.update({
         where: { id: tournamentId },
         data: { status: 'COMPLETED' },
       });
-      return { completed: true, winnerTeamId };
+      return { completed: true, winnerTeamId: onlyWinner, nextMatch: updatedNextMatch };
     }
-    
-    return { completed: false };
+
+    return { completed: false, nextMatch: updatedNextMatch };
   }
 }
 

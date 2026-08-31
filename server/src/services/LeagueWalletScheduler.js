@@ -1,5 +1,6 @@
 import { LeagueWalletService } from './LeagueWalletService.js';
 import { LeagueEventService } from './LeagueEventService.js';
+import { LeagueTournamentService } from './LeagueTournamentService.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -19,12 +20,17 @@ export function startLeagueWalletScheduler() {
     } catch (error) {
       console.error('[LEAGUE EVENT SCHEDULER] Tick error:', error);
     }
+    try {
+      await LeagueTournamentService.tickAll();
+    } catch (error) {
+      console.error('[LEAGUE TOURNAMENT SCHEDULER] Tick error:', error);
+    }
   };
 
   // Run soon after boot, then hourly (idempotent per YYYY-MM).
   setTimeout(tick, 15_000);
   intervalId = setInterval(tick, HOUR_MS);
-  console.log('[LEAGUE WALLET SCHEDULER] Started (hourly monthly-allowance + event status check)');
+  console.log('[LEAGUE WALLET SCHEDULER] Started (hourly wallet + event + tournament checks)');
 }
 
 export function stopLeagueWalletScheduler() {

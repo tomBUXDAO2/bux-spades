@@ -121,6 +121,9 @@ const statements = [
       ALTER TYPE "EventCriterionType" ADD VALUE 'MOST_LOSSES';
     END IF;
   END $$;`,
+  `ALTER TABLE "Tournament" ADD COLUMN IF NOT EXISTS "leagueId" TEXT`,
+  `CREATE INDEX IF NOT EXISTS "Tournament_leagueId_status_idx" ON "Tournament"("leagueId", "status")`,
+  `CREATE INDEX IF NOT EXISTS "Tournament_status_startTime_idx" ON "Tournament"("status", "startTime")`,
   `ALTER TABLE "LeagueCreateRequest" ADD COLUMN IF NOT EXISTS "bgColor" TEXT NOT NULL DEFAULT '#0f172a'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,

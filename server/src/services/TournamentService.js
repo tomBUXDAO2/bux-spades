@@ -32,6 +32,7 @@ export class TournamentService {
       gimmickVariant = null,
       specialRule1 = null,
       specialRule2 = null,
+      leagueId = null,
     } = data || {};
 
     if (!name || typeof name !== 'string') {
@@ -110,6 +111,7 @@ export class TournamentService {
         prizes: prizesData,
         bannerUrl,
         specialRules: Object.keys(specialRules).length > 0 ? specialRules : null,
+        leagueId: leagueId || null,
         status: 'REGISTRATION_OPEN',
       },
       include: {
@@ -147,11 +149,14 @@ export class TournamentService {
   }
 
   static async getTournaments(filters = {}) {
-    const { status, limit = 50 } = filters;
+    const { status, limit = 50, leagueId } = filters;
     
     const where = {};
     if (status) {
       where.status = status;
+    }
+    if (leagueId !== undefined) {
+      where.leagueId = leagueId;
     }
 
     return prisma.tournament.findMany({

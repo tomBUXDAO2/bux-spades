@@ -637,6 +637,23 @@ export class ScoringService {
           console.error('[SCORING] Error recording event completion stats:', eventError);
         }
       }
+
+      // League-room tournament match advancement (Discord path only handles isLeague games)
+      if (String(gameId).startsWith('tournament_')) {
+        try {
+          const gameWithResult = await prisma.game.findUnique({
+            where: { id: gameId },
+            include: {
+              players: true,
+              result: true
+            }
+          });
+          const { LeagueTournamentService } = await import('./LeagueTournamentService.js');
+          await LeagueTournamentService.handleMatchGameComplete(gameId, gameWithResult);
+        } catch (tournamentError) {
+          console.error('[SCORING] Error advancing league tournament:', tournamentError);
+        }
+      }
       
       // CRITICAL FIX: Clear activeGameId from all players' sessions so they don't get redirected back
       try {
