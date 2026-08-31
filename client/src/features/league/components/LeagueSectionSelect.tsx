@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   LEAGUE_SECTION_OPTIONS,
   type LeagueMainSection,
-} from './leagueSections';
+} from '../leagueSections';
 
 type Props = {
   value: LeagueMainSection;
