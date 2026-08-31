@@ -111,6 +111,7 @@ const LeaguePage: React.FC = () => {
   const [playerFilter, setPlayerFilter] = useState<'all' | 'friends' | 'hide-blocked'>('all');
   const [adminTab, setAdminTab] = useState<'requests' | 'moderation' | 'wallet' | 'theme'>('requests');
   const [walletLedger, setWalletLedger] = useState<WalletLedgerEntry[]>([]);
+  const [monthlyAllowance, setMonthlyAllowance] = useState(100_000_000);
   const [creditUserId, setCreditUserId] = useState('');
   const [creditAmount, setCreditAmount] = useState('');
   const [creditNote, setCreditNote] = useState('');
@@ -215,10 +216,23 @@ const LeaguePage: React.FC = () => {
 
   const loadWalletLedger = useCallback(async () => {
     if (!leagueId || !isAdmin) return;
-    const res = await api.get(`/api/leagues/${leagueId}/wallet/ledger`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setWalletLedger(Array.isArray(data) ? data : []);
+    const [ledgerRes, walletRes] = await Promise.all([
+      api.get(`/api/leagues/${leagueId}/wallet/ledger`),
+      api.get(`/api/leagues/${leagueId}/wallet`)
+    ]);
+    if (ledgerRes.ok) {
+      const data = await ledgerRes.json();
+      setWalletLedger(Array.isArray(data) ? data : []);
+    }
+    if (walletRes.ok) {
+      const wallet = await walletRes.json();
+      if (typeof wallet.coinBalance === 'number') {
+        setLeague((prev) => (prev ? { ...prev, coinBalance: wallet.coinBalance } : prev));
+      }
+      if (typeof wallet.monthlyAllowance === 'number') {
+        setMonthlyAllowance(wallet.monthlyAllowance);
+      }
+    }
   }, [leagueId, isAdmin]);
 
   const creditWinner = async () => {
@@ -809,7 +823,8 @@ const LeaguePage: React.FC = () => {
                           {(league?.coinBalance ?? 0).toLocaleString()} coins
                         </div>
                         <p className="mt-1 text-[11px] text-white/60">
-                          +100,000,000 auto-credited each month (UTC). Unused coins roll over.
+                          +{monthlyAllowance.toLocaleString()} auto-credited each month (UTC). Unused coins
+                          roll over.
                         </p>
                       </div>
 
