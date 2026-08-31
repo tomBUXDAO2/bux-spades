@@ -18,6 +18,7 @@ import LeagueSectionSelect from '@/features/league/components/LeagueSectionSelec
 import LeagueSectionPlaceholder from '@/features/league/components/LeagueSectionPlaceholder';
 import LeagueAnnouncementsPanel from '@/features/league/components/LeagueAnnouncementsPanel';
 import LeagueStatsPanel from '@/features/league/components/LeagueStatsPanel';
+import LeagueEventsPanel from '@/features/league/components/LeagueEventsPanel';
 import type { LeagueMainSection } from '@/features/league/leagueSections';
 
 type LeagueInfo = {
@@ -101,6 +102,7 @@ const LeaguePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createEventId, setCreateEventId] = useState<string | null>(null);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [members, setMembers] = useState<LeagueMember[]>([]);
   const [roomOnlineIds, setRoomOnlineIds] = useState<string[]>([]);
@@ -465,6 +467,7 @@ const LeaguePage: React.FC = () => {
       allowBlindNil: settings.specialRules?.allowBlindNil ?? false,
       specialRules: settings.specialRules,
       leagueId,
+      ...(createEventId ? { eventId: createEventId } : {}),
       creatorId: user.id,
       creatorName: user.username,
       creatorImage: user.avatarUrl || user.avatar
@@ -476,6 +479,7 @@ const LeaguePage: React.FC = () => {
     }
     const game = await res.json();
     setIsCreateOpen(false);
+    setCreateEventId(null);
     await loadGames();
     if (game?.id) navigate(`/table/${game.id}`);
   };
@@ -985,6 +989,19 @@ const LeaguePage: React.FC = () => {
                 })
               }
             />
+          ) : mainSection === 'events' && leagueId ? (
+            <LeagueEventsPanel
+              leagueId={leagueId}
+              theme={theme}
+              isAdmin={Boolean(isAdmin)}
+              isTimedOut={isTimedOut}
+              onCreateEventTable={(eventId) => {
+                setCreateEventId(eventId);
+                setIsCreateOpen(true);
+              }}
+              onJoinGame={(id, seat) => joinGame(id, seat)}
+              onWatchGame={(id) => navigate(`/table/${id}?spectate=1`)}
+            />
           ) : (
             <LeagueSectionPlaceholder section={mainSection} theme={theme} />
           )}
@@ -1405,7 +1422,10 @@ const LeaguePage: React.FC = () => {
 
       <CreateGameModal
         isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreateEventId(null);
+        }}
         onCreateGame={handleCreateGame}
       />
 

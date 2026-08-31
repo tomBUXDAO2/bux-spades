@@ -8,6 +8,7 @@ import { LeagueService } from '../services/LeagueService.js';
 import { LeagueWalletService } from '../services/LeagueWalletService.js';
 import { LeagueAnnouncementService } from '../services/LeagueAnnouncementService.js';
 import { LeagueStatsService } from '../services/LeagueStatsService.js';
+import { LeagueEventService } from '../services/LeagueEventService.js';
 import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
@@ -423,6 +424,84 @@ router.get('/:leagueId/stats', authenticateToken, async (req, res) => {
       search: req.query.search
     });
     res.json(data);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/events', authenticateToken, async (req, res) => {
+  try {
+    const events = await LeagueEventService.list(req.params.leagueId, req.userId);
+    res.json({ events });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/events', authenticateToken, logoUpload.single('banner'), async (req, res) => {
+  try {
+    let bannerUrl = req.body.bannerUrl || null;
+    if (req.file) {
+      const relativePath = `/uploads/leagues/${req.file.filename}`;
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      bannerUrl = host ? `${protocol}://${host}${relativePath}` : relativePath;
+    }
+
+    let criteria = req.body.criteria;
+    if (typeof criteria === 'string') {
+      try {
+        criteria = JSON.parse(criteria);
+      } catch {
+        return res.status(400).json({ error: 'Invalid criteria JSON' });
+      }
+    }
+    let filters = req.body.filters;
+    if (typeof filters === 'string') {
+      try {
+        filters = JSON.parse(filters);
+      } catch {
+        filters = null;
+      }
+    }
+
+    const event = await LeagueEventService.create(req.params.leagueId, req.userId, {
+      name: req.body.name,
+      description: req.body.description,
+      timezone: req.body.timezone || 'UTC',
+      startsAt: req.body.startsAt,
+      endsAt: req.body.endsAt,
+      bannerUrl,
+      filters,
+      criteria
+    });
+    res.status(201).json(event);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get('/:leagueId/events/:eventId', authenticateToken, async (req, res) => {
+  try {
+    const event = await LeagueEventService.get(
+      req.params.leagueId,
+      req.params.eventId,
+      req.userId
+    );
+    res.json(event);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/events/:eventId/cancel', authenticateToken, async (req, res) => {
+  try {
+    const event = await LeagueEventService.cancel(
+      req.params.leagueId,
+      req.userId,
+      req.params.eventId
+    );
+    res.json(event);
   } catch (error) {
     handleError(res, error);
   }

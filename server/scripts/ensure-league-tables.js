@@ -110,6 +110,17 @@ const statements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueAnnouncementReaction_announcementId_userId_emoji_key" ON "LeagueAnnouncementReaction"("announcementId", "userId", "emoji")`,
   `CREATE INDEX IF NOT EXISTS "LeagueAnnouncementReaction_announcementId_idx" ON "LeagueAnnouncementReaction"("announcementId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueAnnouncementRead_leagueId_userId_key" ON "LeagueAnnouncementRead"("leagueId", "userId")`,
+  `ALTER TABLE "Event" ADD COLUMN IF NOT EXISTS "leagueId" TEXT`,
+  `CREATE INDEX IF NOT EXISTS "Event_leagueId_status_idx" ON "Event"("leagueId", "status")`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_enum e
+      JOIN pg_type t ON e.enumtypid = t.oid
+      WHERE t.typname = 'EventCriterionType' AND e.enumlabel = 'MOST_LOSSES'
+    ) THEN
+      ALTER TYPE "EventCriterionType" ADD VALUE 'MOST_LOSSES';
+    END IF;
+  END $$;`,
   `ALTER TABLE "LeagueCreateRequest" ADD COLUMN IF NOT EXISTS "bgColor" TEXT NOT NULL DEFAULT '#0f172a'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueMember_leagueId_userId_key" ON "LeagueMember"("leagueId", "userId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "LeagueJoinRequest_leagueId_userId_key" ON "LeagueJoinRequest"("leagueId", "userId")`,

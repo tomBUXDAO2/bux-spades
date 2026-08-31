@@ -353,6 +353,8 @@ model Event {
   status       EventStatus            @default(SCHEDULED)
   bannerUrl    String?
   filters      Json?
+  /** When set, this event belongs to a private FB league room. */
+  leagueId     String?
   createdById  String?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
@@ -360,10 +362,12 @@ model Event {
   EventGame    EventGame[]
   participants EventParticipantStat[]
   Game         Game[]
+  league       League?                @relation(fields: [leagueId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([startsAt])
   @@index([endsAt])
+  @@index([leagueId, status])
 }
 
 model EventGame {
@@ -452,6 +456,7 @@ enum EventStatus {
 enum EventCriterionType {
   MOST_WINS
   MOST_GAMES_PLAYED
+  MOST_LOSSES
   HIGHEST_WIN_PERCENT
   GAMES_PLAYED_MILESTONE
   GAMES_WON_MILESTONE
@@ -643,6 +648,7 @@ model League {
   walletLedger         LeagueWalletLedger[]
   announcements        LeagueAnnouncement[]
   announcementReads    LeagueAnnouncementRead[]
+  events               Event[]
 
   @@index([ownerId])
 }

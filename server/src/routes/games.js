@@ -7,6 +7,7 @@ import { prisma } from '../config/database.js';
 import { emitPersonalizedGameEvent } from '../services/SocketGameBroadcastService.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { LeagueService } from '../services/LeagueService.js';
+import { EventService } from '../services/EventService.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -29,6 +30,7 @@ function optionalAuth(req, res, next) {
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const leagueId = req.query.leagueId ? String(req.query.leagueId) : undefined;
+    const eventId = req.query.eventId ? String(req.query.eventId) : undefined;
 
     if (leagueId) {
       if (!req.userId) {
@@ -38,7 +40,7 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     // Load games ONLY from database
-    const dbGames = await GameService.getActiveGames({ leagueId });
+    const dbGames = await GameService.getActiveGames({ leagueId, eventId });
     console.log(`[API] Found ${dbGames.length} games in database`);
     
     console.log(`[API] Returning ${dbGames.length} database games only`);
@@ -138,8 +140,18 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const leagueId = req.body.leagueId || null;
+    const eventId = req.body.eventId || null;
     if (leagueId) {
       await LeagueService.assertCanPlay(leagueId, req.userId);
+    }
+    if (eventId) {
+      const event = await prisma.event.findUnique({ where: { id: eventId } });
+      if (!event || event.status !== 'ACTIVE') {
+        return res.status(400).json({ error: 'Event is not active' });
+      }
+      if (leagueId && event.leagueId && event.leagueId !== leagueId) {
+        return res.status(400).json({ error: 'Event does not belong to this league' });
+      }
     }
     
     const gameData = {
@@ -151,6 +163,7 @@ router.post('/', authenticateToken, async (req, res) => {
       format: dbFormat, // Use mapped format
       gimmickVariant: gimmickVariant, // Use processed gimmick variant
       leagueId,
+      eventId,
       // Do not set isLeague for private FB leagues — that flag is Discord ready-overlay only
       isLeague: leagueId ? false : Boolean(req.body.isLeague),
       maxPoints: req.body.maxPoints || 200,
@@ -181,6 +194,14 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // CONSOLIDATED: GameManager removed - using GameService directly
     const game = await GameService.createGame(gameData);
+
+    if (eventId) {
+      try {
+        await EventService.tagGame(eventId, game.id, true);
+      } catch (tagErr) {
+        console.error('[API] Failed to tag event game:', tagErr);
+      }
+    }
     
     // CRITICAL: Update Redis cache with the new game (creator is already added by GameService.createGame)
     try {

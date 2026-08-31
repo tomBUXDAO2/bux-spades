@@ -75,6 +75,7 @@ export class EventService {
     const existing = await tx.event.findFirst({
       where: {
         status: { in: ACTIVE_STATUSES },
+        leagueId: null,
       },
     });
 
@@ -104,6 +105,7 @@ export class EventService {
       bannerUrl = null,
       filters = null,
       criteria = [],
+      leagueId = null,
     } = data || {};
 
     if (!name || typeof name !== 'string') {
@@ -126,7 +128,10 @@ export class EventService {
     const status = this.determineInitialStatus(startDate, endDate);
 
     return prisma.$transaction(async (tx) => {
-      await this.ensureNoActiveEvent(tx);
+      // Global Discord events remain single-active; league rooms may run many concurrent events.
+      if (!leagueId) {
+        await this.ensureNoActiveEvent(tx);
+      }
 
       const event = await tx.event.create({
         data: {
@@ -138,6 +143,7 @@ export class EventService {
           status,
           bannerUrl,
           filters: sanitizedFilters,
+          leagueId: leagueId || null,
           createdById: createdById || null,
           criteria: sanitizedCriteria.length
             ? {

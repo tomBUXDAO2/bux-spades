@@ -42,9 +42,13 @@ export class GameService {
         }
       }
       
-      // isLeague = Discord/event ready-overlay tables only.
-      // Private Facebook leagues use leagueId and must NOT enable the ready overlay.
-      const isLeague = gameData.eventId ? true : Boolean(gameData.isLeague);
+      // isLeague = Discord ready-overlay tables only.
+      // Private Facebook leagues use leagueId (event tables included) and must NOT enable that overlay.
+      const isLeague = gameData.leagueId
+        ? false
+        : gameData.eventId
+          ? true
+          : Boolean(gameData.isLeague);
 
       const dbGame = await prisma.game.create({
         data: {
@@ -349,7 +353,7 @@ export class GameService {
   }
 
   // Get all active games - database only
-  static async getActiveGames({ leagueId = undefined } = {}) {
+  static async getActiveGames({ leagueId = undefined, eventId = undefined } = {}) {
     try {
       const where = {
         status: {
@@ -359,10 +363,17 @@ export class GameService {
 
       // Main lobby: only games without a private leagueId.
       // League lobby: only that league's games.
+      // Event lobby: only that event's tables (still scoped to league when provided).
       if (leagueId) {
         where.leagueId = leagueId;
       } else {
         where.leagueId = null;
+      }
+      if (eventId) {
+        where.eventId = eventId;
+      } else if (leagueId) {
+        // League main lobby should not show event-only tables.
+        where.eventId = null;
       }
 
       const dbGames = await prisma.game.findMany({
