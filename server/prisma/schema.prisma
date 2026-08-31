@@ -626,8 +626,8 @@ model League {
   bgColor              String                @default("#0f172a")
   logoUrl              String?
   requireJoinApproval  Boolean               @default(true)
-  coinBalance          Int                   @default(100)
-  /** YYYY-MM of last monthly +100 credit (prevents double credit). */
+  coinBalance          Int                   @default(100000000)
+  /** YYYY-MM of last monthly allowance credit (prevents double credit). */
   lastMonthlyCreditYm  String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt

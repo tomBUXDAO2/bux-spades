@@ -809,7 +809,7 @@ const LeaguePage: React.FC = () => {
                           {(league?.coinBalance ?? 0).toLocaleString()} coins
                         </div>
                         <p className="mt-1 text-[11px] text-white/60">
-                          +100 auto-credited each month (UTC). Unused coins roll over.
+                          +100,000,000 auto-credited each month (UTC). Unused coins roll over.
                         </p>
                       </div>
 

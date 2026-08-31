@@ -1,7 +1,7 @@
 import { prisma } from '../config/databaseFirst.js';
 import { LeagueService } from './LeagueService.js';
 
-export const LEAGUE_MONTHLY_ALLOWANCE = 100;
+export const LEAGUE_MONTHLY_ALLOWANCE = 100_000_000;
 
 export function currentCreditYm(date = new Date()) {
   const y = date.getUTCFullYear();
@@ -145,7 +145,7 @@ export class LeagueWalletService {
     });
   }
 
-  /** Idempotent monthly +100 for all leagues that have not been credited this UTC month. */
+  /** Idempotent monthly allowance for all leagues that have not been credited this UTC month. */
   static async runMonthlyAllowances(now = new Date()) {
     const ym = currentCreditYm(now);
     const due = await prisma.league.findMany({
