@@ -207,6 +207,10 @@ class PlayerTimerService {
       const gameFormat = game.format || 'REGULAR';
       let botBid;
 
+      // Import BiddingHandler early so suicide (and processBid) share one instance
+      const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
+      const biddingHandler = new BiddingHandler(this.io, null);
+
       if (gameFormat === 'MIRROR') {
         botBid = numSpades;
       } else if (gameFormat === 'WHIZ') {
@@ -222,36 +226,13 @@ class PlayerTimerService {
         const numAces = hand.filter(card => card.rank === 'A').length;
         botBid = numAces * 3;
       } else if (forcedBid === 'SUICIDE') {
-        const currentBids = game.bidding?.bids || [null, null, null, null];
-        const dealer = game.dealer || 0;
-        const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
-        const currentBidderIndex = biddingOrder.indexOf(seatIndex);
-        const partnerSeatIndex = (seatIndex + 2) % 4;
-        const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
-        const partnerBid = currentBids[partnerSeatIndex];
-        const partnerHasBid = partnerBid !== undefined && partnerBid !== null;
-        const hasAceSpades = hand.some(
-          (c) =>
-            (c.suit === 'SPADES' || c.suit === 'S' || c.suit === '♠') && c.rank === 'A'
-        );
-        if (partnerBidderIndex < currentBidderIndex && partnerHasBid && partnerBid !== 0) {
-          botBid = hasAceSpades ? 1 : 0;
-        } else if (partnerBidderIndex < currentBidderIndex && partnerHasBid && partnerBid === 0) {
-          botBid = Math.max(4, numSpades > 0 ? numSpades : 4);
-        } else if (hasAceSpades) {
-          botBid = Math.max(4, numSpades > 0 ? numSpades : 4);
-        } else {
-          botBid = 0; // timeout: take the team nil when available
-        }
+        // Same rules as bots: never nil if partner already niled; min 4 / Ace of Spades handling
+        botBid = await biddingHandler.calculateUnifiedBotBid(game, seatIndex, hand, numSpades);
       } else {
         botBid = numSpades > 0 ? numSpades : 2;
       }
       
       console.log(`[PLAYER TIMER] 🎯 Auto-bid calculated: ${botBid} for player ${player.username || player.user?.username}`);
-
-      // Import BiddingHandler dynamically to avoid circular dependency
-      const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
-      const biddingHandler = new BiddingHandler(this.io, null);
       
       console.log(`[PLAYER TIMER] 🎯 Calling processBid with bid: ${botBid}`);
       // Process bid (this will advance to next player)
