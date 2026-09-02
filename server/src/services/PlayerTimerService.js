@@ -225,9 +225,15 @@ class PlayerTimerService {
       } else if (forcedBid === 'CRAZY ACES' || forcedBid === 'CRAZY_ACES') {
         const numAces = hand.filter(card => card.rank === 'A').length;
         botBid = numAces * 3;
-      } else if (forcedBid === 'SUICIDE') {
-        // Same rules as bots: never nil if partner already niled; min 4 / Ace of Spades handling
+      } else if (forcedBid === 'SUICIDE' || biddingHandler.isSuicideGame?.(game) || gameFormat === 'SUICIDE') {
+        if (!game.gimmickVariant) game.gimmickVariant = 'SUICIDE';
+        if (game.format === 'SUICIDE' || !game.format) game.format = 'GIMMICK';
         botBid = await biddingHandler.calculateUnifiedBotBid(game, seatIndex, hand, numSpades);
+        // Safety: never leave a 2/3 timeout bid through for Suicide
+        if (botBid > 0 && botBid < 4 && botBid !== 1) {
+          console.log(`[PLAYER TIMER] SUICIDE clamping bid ${botBid} → 4`);
+          botBid = 4;
+        }
       } else {
         botBid = numSpades > 0 ? numSpades : 2;
       }

@@ -84,9 +84,10 @@ class BiddingHandler {
     const numAces = playerHand.filter(card => card.rank === 'A').length;
     
     // Handle gimmick games
-    if (forcedBid) {
+    if (forcedBid || this.isSuicideGame(gameState)) {
+      const gimmick = forcedBid || gameState.gimmickVariant || 'SUICIDE';
       // Joker Whiz: first 3 bidders must follow Whiz rules, last bidder regular
-      if (forcedBid === 'JOKER') {
+      if (gimmick === 'JOKER') {
         // If this player is the last in bidding order, allow any regular bid
         try {
           const dealer = gameState.dealer ?? 0;
@@ -118,7 +119,7 @@ class BiddingHandler {
         // Last bidder: any regular bid 0-13 is allowed
         return { valid: bid >= 0 && bid <= 13, message: 'Joker Whiz: last bidder can bid any amount' };
       }
-      switch (forcedBid) {
+      switch (gimmick) {
         case 'SUICIDE':
           return await this.validateSuicideBid(gameState, player, bid, isNil, isBlindNil);
         case 'BID4NIL':
@@ -149,6 +150,18 @@ class BiddingHandler {
       default:
         return { valid: false, message: 'Invalid game type' };
     }
+  }
+
+  /**
+   * True when this table is Suicide gimmick (Redis caches sometimes omit variant).
+   */
+  isSuicideGame(gameState) {
+    const variant =
+      gameState?.gimmickVariant ||
+      gameState?.rules?.gimmickType ||
+      gameState?.forcedBid ||
+      gameState?.formatForced;
+    return variant === 'SUICIDE' || gameState?.format === 'SUICIDE';
   }
 
   /**
@@ -349,7 +362,7 @@ class BiddingHandler {
           const forced = numAces * 3;
           console.log(`[BIDDING] CRAZY ACES auto-correct: forcing bid ${forced}`);
           bid = forced;
-        } else if (forcedBid === 'SUICIDE') {
+        } else if (forcedBid === 'SUICIDE' || this.isSuicideGame(gameState)) {
           const hands = await redisGameState.getPlayerHands(gameId);
           const playerHand = hands?.[player.seatIndex] || [];
           const currentBids = await this.getSeatIndexedBids(gameId, gameState);
@@ -365,8 +378,15 @@ class BiddingHandler {
             bid = constraints.minNonNil ?? 4;
           } else if (bid > 0 && bid < (constraints.minNonNil ?? 4)) {
             bid = constraints.minNonNil ?? 4;
-          } else {
+          } else if (!validation.valid) {
             bid = constraints.canNil ? 0 : (constraints.minNonNil ?? 4);
+          }
+          // Hard floor: non-nil suicide bids must be >= 4 (except forced Ace-of-Spades bid 1)
+          if (bid !== 0 && bid !== 1 && bid < 4) {
+            bid = 4;
+          }
+          if (bid === 1 && constraints.forcedBid !== 1) {
+            bid = 4;
           }
           isNil = bid === 0;
           console.log(`[BIDDING] SUICIDE auto-correct: forcing bid ${bid}`);
@@ -382,6 +402,35 @@ class BiddingHandler {
           // Non-forced modes: keep error
           this.socket?.emit?.('error', { message: validation.message });
           return;
+        }
+      }
+
+      // Always enforce Suicide floors even if a stale path marked the bid "valid"
+      if (this.isSuicideGame(gameState)) {
+        const hands = await redisGameState.getPlayerHands(gameId);
+        const playerHand = hands?.[player.seatIndex] || [];
+        const currentBids = await this.getSeatIndexedBids(gameId, gameState);
+        const constraints = this.resolveSuicideBidConstraints(
+          gameState,
+          player.seatIndex,
+          currentBids,
+          playerHand
+        );
+        const before = bid;
+        if (constraints.forcedBid !== null && constraints.forcedBid !== undefined) {
+          bid = constraints.forcedBid;
+        } else if (bid === 0 && !constraints.canNil) {
+          bid = 4;
+        } else if (bid > 0 && bid < 4) {
+          // Only bid 1 is allowed under 4, and only when Ace-of-Spades force applies
+          bid = constraints.forcedBid === 1 ? 1 : 4;
+        }
+        if (bid === 1 && constraints.forcedBid !== 1) {
+          bid = 4;
+        }
+        isNil = bid === 0;
+        if (before !== bid) {
+          console.log(`[BIDDING] SUICIDE floor enforced: ${before} → ${bid}`);
         }
       }
 
@@ -732,6 +781,17 @@ class BiddingHandler {
         }
       }
 
+      // Redis caches often omit format/gimmickVariant — hydrate from DB so Suicide rules apply
+      if (!gameState.gimmickVariant || !gameState.format || gameState.dealer == null) {
+        const dbGame = await GameService.getGameForAction(gameId);
+        if (dbGame) {
+          gameState.format = gameState.format || dbGame.format;
+          gameState.gimmickVariant = gameState.gimmickVariant || dbGame.gimmickVariant;
+          if (gameState.dealer == null) gameState.dealer = dbGame.dealer;
+          if (!gameState.id) gameState.id = dbGame.id;
+        }
+      }
+
       console.log(`[BIDDING] Current player ID: ${gameState.currentPlayer}`);
       console.log(`[BIDDING] All players in game:`, gameState.players.map(p => p ? ({ 
         id: p.id || p.userId, 
@@ -869,7 +929,7 @@ class BiddingHandler {
       const highs = hand.filter((c) => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
       if (highs <= 4) return 0;
       return nSp;
-    } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
+    } else if (this.isSuicideGame(gameState)) {
       // SUICIDE: one nil per team when possible; non-nil >= 4; Ace of Spades cannot nil (forced 1 if partner already bid)
       console.log(`[BIDDING] SUICIDE game bot logic for seat ${seatIndex}`);
       const currentBids = await this.getSeatIndexedBids(gameState.id, gameState);
@@ -877,7 +937,8 @@ class BiddingHandler {
       const nSp = hand.filter(
         (card) => card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠'
       ).length;
-      const nonNilBid = Math.max(constraints.minNonNil ?? 4, nSp > 0 ? nSp : 4);
+      // Never return 1–3 except forced Ace-of-Spades bid 1
+      const nonNilBid = Math.max(4, nSp > 0 ? nSp : 4);
 
       if (constraints.forcedBid !== null && constraints.forcedBid !== undefined) {
         console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} forced bid ${constraints.forcedBid}`);
