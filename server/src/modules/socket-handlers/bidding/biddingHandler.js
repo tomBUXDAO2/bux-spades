@@ -152,63 +152,106 @@ class BiddingHandler {
   }
 
   /**
-   * Validate SUICIDE game bid - exactly 1 person from each team must bid nil
+   * Ace of Spades check (suit variants from Redis / client)
    */
-  async validateSuicideBid(gameState, player, bid, isNil, isBlindNil) {
-    // Get current bids from Redis
-    const currentBids = await redisGameState.getPlayerBids(gameState.id);
-    
-    // Determine bidding order based on dealer
+  handHasAceSpades(hand = []) {
+    return hand.some(
+      (card) =>
+        (card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠') &&
+        card.rank === 'A'
+    );
+  }
+
+  /**
+   * Resolve what a SUICIDE bidder must bid given partner/order/hand.
+   * Returns { forcedBid } when the seat has no choice, else { minNonNil, canNil }.
+   */
+  resolveSuicideBidConstraints(gameState, seatIndex, currentBids, hand) {
     const dealer = gameState.dealer || 0;
     const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
-    
-    // Find current bidder's position in bidding order
-    const currentBidderIndex = biddingOrder.indexOf(player.seatIndex);
-    
-    // Determine teams
-    const isTeam1 = player.seatIndex === 0 || player.seatIndex === 2;
-    const partnerSeatIndex = isTeam1 ? 
-      (player.seatIndex === 0 ? 2 : 0) : 
-      (player.seatIndex === 1 ? 3 : 1);
-    
-    // Find partner's position in bidding order
+    const currentBidderIndex = biddingOrder.indexOf(seatIndex);
+    const partnerSeatIndex = (seatIndex + 2) % 4;
     const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
-    
-    // Check if partner already bid
-    const partnerBid = currentBids[partnerSeatIndex];
+    const partnerBid = currentBids?.[partnerSeatIndex];
+    const partnerHasBid = partnerBid !== undefined && partnerBid !== null;
     const partnerBidNil = partnerBid === 0;
-    
-    // Determine if current bidder must bid nil
-    let mustBidNil = false;
-    let canBidNil = true;
-    
-    if (partnerBidderIndex < currentBidderIndex) {
-      // Partner already bid
-      if (!partnerBidNil) {
-        // Partner didn't bid nil, so current player must bid nil
-        mustBidNil = true;
-      }
-    } else {
-      // Partner hasn't bid yet, so current player can choose
-      // But they need to consider if they want to force their partner to bid nil
-      canBidNil = true;
+    const hasAceSpades = this.handHasAceSpades(hand);
+
+    // Partner already bid non-nil → must nil, or bid 1 if holding Ace of Spades
+    if (partnerBidderIndex < currentBidderIndex && partnerHasBid && !partnerBidNil) {
+      return { forcedBid: hasAceSpades ? 1 : 0, hasAceSpades };
     }
-    
-    // Validate the bid
-    if (mustBidNil) {
-      if (bid === 0) {
-        return { valid: true, message: 'Suicide game: Valid nil bid' };
-      } else {
-        return { valid: false, message: 'Suicide game: Must bid nil since partner didn\'t bid nil' };
-      }
-    } else {
-      // Player can bid whatever they want (0-13)
-      if (bid >= 0 && bid <= 13) {
-        return { valid: true, message: 'Suicide game: Valid bid' };
-      } else {
-        return { valid: false, message: 'Suicide game: Bid must be between 0-13' };
-      }
+
+    // Partner already bid nil → must bid at least 4 (cannot nil)
+    if (partnerBidderIndex < currentBidderIndex && partnerHasBid && partnerBidNil) {
+      return { forcedBid: null, minNonNil: 4, canNil: false, hasAceSpades };
     }
+
+    // Partner has not bid yet — nil (unless Ace of Spades) or at least 4
+    return {
+      forcedBid: null,
+      minNonNil: 4,
+      canNil: !hasAceSpades,
+      hasAceSpades
+    };
+  }
+
+  /**
+   * Validate SUICIDE game bid:
+   * - Exactly one partner per team should bid nil (when possible)
+   * - Non-nil bids must be at least 4
+   * - Cannot nil with Ace of Spades; if nil is forced and hold Ace of Spades, must bid 1
+   */
+  async validateSuicideBid(gameState, player, bid, isNil, isBlindNil) {
+    const currentBids = await redisGameState.getPlayerBids(gameState.id);
+    const hands = await redisGameState.getPlayerHands(gameState.id);
+    const playerHand = hands?.[player.seatIndex] || [];
+    const constraints = this.resolveSuicideBidConstraints(
+      gameState,
+      player.seatIndex,
+      currentBids,
+      playerHand
+    );
+
+    if (constraints.forcedBid !== null && constraints.forcedBid !== undefined) {
+      if (bid === constraints.forcedBid) {
+        return {
+          valid: true,
+          message:
+            constraints.forcedBid === 0
+              ? 'Suicide game: Valid nil bid'
+              : 'Suicide game: Forced bid 1 (Ace of Spades, cannot nil)'
+        };
+      }
+      return {
+        valid: false,
+        message:
+          constraints.forcedBid === 0
+            ? 'Suicide game: Must bid nil since partner didn\'t bid nil'
+            : 'Suicide game: Must bid 1 (hold Ace of Spades, cannot nil)'
+      };
+    }
+
+    if (bid === 0) {
+      if (!constraints.canNil) {
+        return {
+          valid: false,
+          message: constraints.hasAceSpades
+            ? 'Suicide game: Cannot bid nil while holding Ace of Spades'
+            : 'Suicide game: Partner already bid nil; you must bid at least 4'
+        };
+      }
+      return { valid: true, message: 'Suicide game: Valid nil bid' };
+    }
+
+    const min = constraints.minNonNil ?? 4;
+    if (bid >= min && bid <= 13) {
+      return { valid: true, message: 'Suicide game: Valid bid' };
+    }
+    return {
+      valid: false,
+      message: `Suicide game: Bid nil or at least ${min}`
+    };
   }
 
   /**
@@ -265,11 +308,27 @@ class BiddingHandler {
           const forced = numAces * 3;
           console.log(`[BIDDING] CRAZY ACES auto-correct: forcing bid ${forced}`);
           bid = forced;
-        } else if (forcedBid === 'SUICIDE' && isNil !== true) {
-          // In suicide, one must bid nil – if invalid, default this player to nil
-          console.log(`[BIDDING] SUICIDE auto-correct: forcing nil bid`);
-          bid = 0;
-          isNil = true;
+        } else if (forcedBid === 'SUICIDE') {
+          const hands = await redisGameState.getPlayerHands(gameId);
+          const playerHand = hands?.[player.seatIndex] || [];
+          const currentBids = await redisGameState.getPlayerBids(gameId);
+          const constraints = this.resolveSuicideBidConstraints(
+            gameState,
+            player.seatIndex,
+            currentBids,
+            playerHand
+          );
+          if (constraints.forcedBid !== null && constraints.forcedBid !== undefined) {
+            bid = constraints.forcedBid;
+          } else if (bid === 0 && !constraints.canNil) {
+            bid = constraints.minNonNil ?? 4;
+          } else if (bid > 0 && bid < (constraints.minNonNil ?? 4)) {
+            bid = constraints.minNonNil ?? 4;
+          } else {
+            bid = constraints.canNil ? 0 : (constraints.minNonNil ?? 4);
+          }
+          isNil = bid === 0;
+          console.log(`[BIDDING] SUICIDE auto-correct: forcing bid ${bid}`);
         } else if (gameState.format === 'MIRROR') {
           const hands = await redisGameState.getPlayerHands(gameId);
           const playerHand = hands?.[player.seatIndex] || [];
@@ -758,50 +817,31 @@ class BiddingHandler {
       if (highs <= 4) return 0;
       return nSp;
     } else if (gameState.format === 'GIMMICK' && gameState.gimmickVariant === 'SUICIDE') {
-      // SUICIDE game bot logic - proper team-based bidding
+      // SUICIDE: one nil per team when possible; non-nil >= 4; Ace of Spades cannot nil (forced 1 if partner already bid)
       console.log(`[BIDDING] SUICIDE game bot logic for seat ${seatIndex}`);
-      
-      // Get current bids from database - use CURRENT round, not previous
-      const currentBids = gameState.rounds[gameState.currentRound]?.playerStats?.map(stat => stat.bid) || [null, null, null, null];
-      
-      // Determine bidding order based on dealer
-      const dealer = gameState.dealer || 0;
-      const biddingOrder = [(dealer + 1) % 4, (dealer + 2) % 4, (dealer + 3) % 4, (dealer + 4) % 4];
-      
-      // Find current bot's position in bidding order
-      const currentBidderIndex = biddingOrder.indexOf(seatIndex);
-      
-      // Determine teams
-      const isTeam1 = seatIndex === 0 || seatIndex === 2;
-      const partnerSeatIndex = isTeam1 ? 
-        (seatIndex === 0 ? 2 : 0) : 
-        (seatIndex === 1 ? 3 : 1);
-      
-      // Find partner's position in bidding order
-      const partnerBidderIndex = biddingOrder.indexOf(partnerSeatIndex);
-      
-      // Check if partner already bid
-      const partnerBid = currentBids[partnerSeatIndex];
-      const partnerBidNil = partnerBid === 0;
-      
-      if (partnerBidderIndex < currentBidderIndex) {
-        // Partner already bid
-        if (!partnerBidNil) {
-          // Partner didn't bid nil, so current bot MUST bid nil
-          console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} MUST bid nil (partner at seat ${partnerSeatIndex} bid ${partnerBid})`);
-          return 0;
-        } else {
-          // Partner bid nil, so current bot can bid anything
-          console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} can bid anything (partner at seat ${partnerSeatIndex} bid nil)`);
-          const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-          return numSpades > 0 ? numSpades : 2;
-        }
-      } else {
-        // Partner hasn't bid yet - this is bidder 1 or 2
-        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} is bidder 1 or 2, can bid anything`);
-        const numSpades = hand.filter(card => card.suit === 'SPADES').length;
-        return numSpades > 0 ? numSpades : 2;
+      const currentBids =
+        gameState.bidding?.bids ||
+        gameState.rounds[gameState.currentRound]?.playerStats?.map((stat) => stat.bid) ||
+        [null, null, null, null];
+      const constraints = this.resolveSuicideBidConstraints(gameState, seatIndex, currentBids, hand);
+      if (constraints.forcedBid !== null && constraints.forcedBid !== undefined) {
+        console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} forced bid ${constraints.forcedBid}`);
+        return constraints.forcedBid;
       }
+      const nSp = hand.filter(
+        (card) => card.suit === 'SPADES' || card.suit === 'S' || card.suit === '♠'
+      ).length;
+      const nonNilBid = Math.max(constraints.minNonNil ?? 4, nSp > 0 ? nSp : 4);
+      if (constraints.canNil) {
+        // Prefer nil on weak hands; otherwise bid at least 4
+        const highCards = hand.filter((c) => ['A', 'K', 'Q', 'J'].includes(c.rank)).length;
+        if (highCards <= 3 && nSp <= 2) {
+          console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} choosing nil`);
+          return 0;
+        }
+      }
+      console.log(`[BIDDING] SUICIDE bot at seat ${seatIndex} bidding ${nonNilBid}`);
+      return nonNilBid;
     } else if (gameState.format === 'GIMMICK' && (gameState.gimmickVariant === 'BID4NIL' || gameState.gimmickVariant === '4 OR NIL')) {
       // 4 OR NIL game bot logic
       return this.calculate4OrNilBotBid(hand);

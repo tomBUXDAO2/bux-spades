@@ -24,14 +24,14 @@ export function countAces(hand: Card[]): number {
 /**
  * Determines if a player can bid nil based on the game type and their hand
  */
-export function canBidNil(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string): boolean {
+export function canBidNil(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string, hasAceSpades?: boolean): boolean {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
       case 'SUICIDE':
-        return true; // One partner from each team must bid nil
+        return !hasAceSpades; // Cannot nil with Ace of Spades
       case 'BID4NIL':
-        return true; // Can bid 4 or nil
+        return !hasAceSpades; // Can bid 4 or nil (no Ace of Spades)
       case 'BID3':
         return false; // Must bid exactly 3
       case 'BIDHEARTS':
@@ -60,12 +60,18 @@ export function canBidNil(gameType: BiddingOption, numSpades: number, gameMode?:
 /**
  * Returns the valid bid range for a player based on game type and hand
  */
-export function getValidBidRange(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number): { min: number; max: number } {
+export function getValidBidRange(gameType: BiddingOption, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number, hasAceSpades?: boolean, partnerBid?: number | null): { min: number; max: number } {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
-      case 'SUICIDE':
-        return { min: 0, max: 0 }; // Must bid nil
+      case 'SUICIDE': {
+        // Partner already bid non-nil → forced nil, or forced 1 with Ace of Spades
+        if (partnerBid !== undefined && partnerBid !== null && partnerBid > 0) {
+          return hasAceSpades ? { min: 1, max: 1 } : { min: 0, max: 0 };
+        }
+        // Otherwise nil (if allowed) or at least 4
+        return { min: hasAceSpades ? 4 : 0, max: 13 };
+      }
       case 'BID4NIL':
         return { min: 0, max: 4 }; // Can bid 0 (nil) or 4
       case 'BID3':
@@ -96,12 +102,17 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, gam
 /**
  * Validates if a bid is legal for the given game type and player's hand
  */
-export function isValidBid(gameType: BiddingOption, bid: number, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number): boolean {
+export function isValidBid(gameType: BiddingOption, bid: number, numSpades: number, gameMode?: GameMode, forcedBid?: string, numHearts?: number, numAces?: number, hasAceSpades?: boolean, partnerBid?: number | null): boolean {
   // Handle gimmick games first
   if (forcedBid) {
     switch (forcedBid) {
-      case 'SUICIDE':
-        return bid === 0; // Must bid nil
+      case 'SUICIDE': {
+        if (partnerBid !== undefined && partnerBid !== null && partnerBid > 0) {
+          return hasAceSpades ? bid === 1 : bid === 0;
+        }
+        if (bid === 0) return !hasAceSpades && partnerBid !== 0;
+        return bid >= 4 && bid <= 13;
+      }
       case 'BID4NIL':
         return bid === 0 || bid === 4; // Can bid 0 (nil) or 4
       case 'BID3':

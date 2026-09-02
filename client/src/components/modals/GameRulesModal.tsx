@@ -200,7 +200,7 @@ const GameRulesModal: React.FC<GameRulesModalProps> = ({ isOpen, onClose }) => {
                 
                 <div>
                   <h3 className="font-semibold text-blue-400" style={{ fontSize: `${16 * textScale}px` }}>Suicide (Partners Only)</h3>
-                  <p style={{ fontSize: `${14 * textScale}px` }}>1 partner from each team MUST bid nil</p>
+                  <p style={{ fontSize: `${14 * textScale}px` }}>One partner from each team must bid nil. Non-nil bids must be at least 4. You cannot nil with the Ace of Spades — if your partner already bid and you hold it, you must bid 1.</p>
                 </div>
 
                 <div>

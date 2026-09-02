@@ -201,13 +201,15 @@ export const BiddingOverlay: React.FC<{
   
   // Get partner bid for Suicide games
   let partnerBid: number | undefined;
-  let mustBidNil = false;
+  let suicideForcedBid: number | null = null;
   if (((gameState as any).forcedBid === 'SUICIDE' || (gameState as any).gimmickVariant === 'SUICIDE') && (gameState as any).bidding && (gameState as any).bidding.bids) {
     const partnerIndex = (currentPlayerIndex + 2) % 4;
     partnerBid = (gameState as any).bidding.bids[partnerIndex];
     
-    // Check if player must bid nil (partner didn't bid nil)
-    mustBidNil = partnerBid !== undefined && partnerBid !== 0 && partnerBid !== null;
+    // Partner bid non-nil → forced nil, or forced 1 if holding Ace of Spades
+    if (partnerBid !== undefined && partnerBid !== 0 && partnerBid !== null) {
+      suicideForcedBid = hasAceSpades ? 1 : 0;
+    }
   }
 
   // Use ref to prevent infinite bid loops - tracks if we've already called onBid
@@ -238,14 +240,14 @@ export const BiddingOverlay: React.FC<{
     }
   }, [gimmickType, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, currentPlayerHand, onBid]);
 
-  // Auto-bid nil for SUICIDE games when forced
+  // Auto-bid for SUICIDE when partner already forced the nil (or bid 1 with Ace of Spades)
   React.useEffect(() => {
-    if (!autoBidSentRef.current && mustBidNil && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
-      console.log('[SUICIDE] Auto-bidding nil - partner bid:', partnerBid);
+    if (!autoBidSentRef.current && suicideForcedBid !== null && gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete) {
+      console.log('[SUICIDE] Auto-bidding', suicideForcedBid, '- partner bid:', partnerBid, 'hasAceSpades:', hasAceSpades);
       autoBidSentRef.current = true;
-      onBid(0); // Auto-bid nil
+      onBid(suicideForcedBid);
     }
-  }, [mustBidNil, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, partnerBid, onBid]);
+  }, [suicideForcedBid, gameState.status, gameState.currentPlayer, currentPlayerId, dealingComplete, partnerBid, hasAceSpades, onBid]);
 
   // Auto-bid 3 for BID 3 games
   React.useEffect(() => {
@@ -277,7 +279,7 @@ export const BiddingOverlay: React.FC<{
       />
       
       {/* Bidding Interface */}
-      {!showBlindNilModal && !mustBidNil && !(gimmickType === 'BID 3' || gimmickType === 'BID3') && !(gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') && gameType !== 'MIRROR' && !(gimmickType === 'BIDHEARTS' || gimmickType === 'BID HEARTS') && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete)) && (
+      {!showBlindNilModal && suicideForcedBid === null && !(gimmickType === 'BID 3' || gimmickType === 'BID3') && !(gimmickType === 'CRAZY ACES' || gimmickType === 'CRAZY_ACES') && gameType !== 'MIRROR' && !(gimmickType === 'BIDHEARTS' || gimmickType === 'BID HEARTS') && (cardsRevealed || (gameState.status === "BIDDING" && gameState.currentPlayer === currentPlayerId && dealingComplete)) && (
         <BiddingInterface
           onBid={onBid}
           gameType={gameType}
@@ -285,7 +287,11 @@ export const BiddingOverlay: React.FC<{
           numHearts={numHearts}
           playerId={currentPlayerId}
           currentPlayerTurn={gameState.currentPlayer}
-          allowNil={gameState.rules?.allowNil}
+          allowNil={
+            ((gameState as any).gimmickVariant === 'SUICIDE' || (gameState as any).forcedBid === 'SUICIDE')
+              ? !(hasAceSpades || partnerBid === 0)
+              : gameState.rules?.allowNil
+          }
           hasAceSpades={hasAceSpades}
           gimmickType={(gameState as any).gimmickVariant || (gameState as any).rules?.gimmickType}
           partnerBid={partnerBid}

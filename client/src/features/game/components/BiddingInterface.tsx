@@ -78,19 +78,76 @@ export default function BiddingInterface({
 
   // For SUICIDE games, implement suicide bidding logic
   if (gimmickType === "SUICIDE") {
-    const isFirstPartner = partnerBid === undefined;
-    const partnerBidSomething = partnerBid !== undefined && partnerBid > 0;
-    
-    // If partner bid something, we must nil (no modal, auto-bid)
-    if (!isFirstPartner && partnerBidSomething) {
-      console.log('[SUICIDE DEBUG] Partner bid something, auto-bidding nil');
-      setIsSubmitting(true);
-      onBid(0); // Force nil
+    const partnerHasBid = partnerBid !== undefined && partnerBid !== null;
+    const partnerBidSomething = partnerHasBid && partnerBid > 0;
+    const holdsAce =
+      hasAceSpades ||
+      (currentPlayerHand
+        ? currentPlayerHand.some((card) => card.suit === "SPADES" && card.rank === "A")
+        : false);
+
+    // Partner bid non-nil → GameStatusOverlay auto-bids nil (or 1 with Ace of Spades)
+    if (partnerBidSomething) {
       return null;
     }
-    
-    // If first partner or partner bid nil, use standard bidding modal
-    // Fall through to regular bidding interface (no special handling needed)
+
+    // First of team (or partner already niled): show UI with nil (if allowed) and bids 4-13 only
+    const canNil = allowNil !== false && !holdsAce && !(partnerHasBid && partnerBid === 0);
+    return (
+      <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
+        <div className={`${modalContentClass} w-[420px] md:w-[400px] sm:w-[360px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 max-sm:p-2 shadow-xl`}>
+          <div className="text-center mb-2 max-sm:mb-1">
+            <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
+            {partnerBidValue !== undefined && partnerBidValue !== null && (
+              <p className="text-sm max-sm:text-xs text-blue-300">Partner bid: {partnerBidValue === 0 ? 'Nil' : partnerBidValue}</p>
+            )}
+            <p className="text-xs max-sm:text-[10px] text-gray-300 mt-1">Non-nil bids must be at least 4</p>
+          </div>
+
+          <div className="space-y-2 max-sm:space-y-1.5">
+            <div className="flex justify-center gap-2 max-sm:gap-1">
+              {canNil && (
+                <button
+                  onClick={() => setSelectedBid(0)}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+                >
+                  Nil
+                </button>
+              )}
+              {[4, 5, 6, 7, 8, 9].map((bid) => (
+                <button
+                  key={bid}
+                  onClick={() => setSelectedBid(bid)}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+                >
+                  {bid}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-center gap-2 max-sm:gap-1">
+              {[10, 11, 12, 13].map((bid) => (
+                <button
+                  key={bid}
+                  onClick={() => setSelectedBid(bid)}
+                  className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center flex-shrink-0 ${selectedBid === bid ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-black ring-2 ring-yellow-200 shadow-lg' : 'bg-gray-700/80 hover:bg-gray-600/90 text-white'}`}
+                >
+                  {bid}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => selectedBid !== null && handleSubmit(selectedBid)}
+                disabled={selectedBid === null}
+                className={`${bottomButtonClass} px-8 h-9 md:px-6 md:h-8 sm:px-4 sm:h-7 max-sm:px-3 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${selectedBid !== null ? 'bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}`}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // For WHIZ games, compact inline bidding modal
