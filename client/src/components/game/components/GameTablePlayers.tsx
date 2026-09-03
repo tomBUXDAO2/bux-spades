@@ -107,14 +107,13 @@ export default function GameTablePlayers({
         'right-0 top-1/2 -translate-y-1/2'     // East (right)
       ];
       
-      // Apply responsive adjustments
+      // Mobile: inset west/east so name + bid clear camera punch-holes
       if (windowSize.width < 768) {
-        // Tighter positioning for smaller screens - also at edge
         const mobilePositions = [
           'bottom-0 left-1/2 -translate-x-1/2',  // South
-          'left-0 top-1/2 -translate-y-1/2',     // West
+          'left-2 top-1/2 -translate-y-1/2',     // West
           'top-0 left-1/2 -translate-x-1/2',     // North
-          'right-0 top-1/2 -translate-y-1/2'     // East
+          'right-2 top-1/2 -translate-y-1/2'     // East
         ];
         return mobilePositions[pos];
       }

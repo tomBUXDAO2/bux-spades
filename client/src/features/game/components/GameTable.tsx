@@ -1850,9 +1850,17 @@ export default function GameTableModular({
       <div className="fixed inset-0 z-0 min-h-[100dvh] h-[100dvh] bg-gray-900">
         {/* Main content area - full height */}
         <div className="flex h-full min-h-0">
-          {/* Game table area - add padding on top and bottom */}
+          {/* Game table area - side padding on mobile clears camera/notch cutouts */}
           <div
-            className={`${useSlideOutGameChat ? 'w-full min-w-0' : 'w-[70%]'} flex h-full min-h-0 flex-col px-2 pt-2 pb-0`}
+            className={`${useSlideOutGameChat ? 'w-full min-w-0' : 'w-[70%]'} flex h-full min-h-0 flex-col ${isMobile ? 'pt-2 pb-0' : 'px-2 pt-2 pb-0'}`}
+            style={
+              isMobile
+                ? {
+                    paddingLeft: 'max(1.5rem, env(safe-area-inset-left, 0px))',
+                    paddingRight: 'max(1.5rem, env(safe-area-inset-right, 0px))',
+                  }
+                : undefined
+            }
           >
             {/* Table grows; hand rail is fixed % / px at bottom (no overlapping calc(100%-X) + separate hand height). */}
             <div
