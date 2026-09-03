@@ -61,4 +61,55 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+});
+
+// ─── Web Push ────────────────────────────────────────────────────────────────
+
+// Receive push message from server and show a notification
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload = {};
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: event.data.text(), body: '' };
+  }
+
+  const title = payload.title || 'Bux Spades';
+  const options = {
+    body: payload.body || '',
+    icon: '/favicon_io/android-chrome-192x192.png',
+    badge: '/favicon_io/favicon-32x32.png',
+    data: payload.data || {},
+    tag: payload.data?.type || 'bux-spades',
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Handle notification click – open (or focus) the target route
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const route = event.notification.data?.route || '/';
+  const targetUrl = new URL(route, self.location.origin).href;
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        // Focus an existing window if one matches
+        for (const client of windowClients) {
+          if (client.url === targetUrl && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Otherwise open a new window
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
+  );
 }); 

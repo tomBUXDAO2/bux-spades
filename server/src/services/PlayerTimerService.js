@@ -2,6 +2,7 @@ import { GameService } from './GameService.js';
 import redisGameState from './RedisGameStateService.js';
 import { BotService } from './BotService.js';
 import { pushNotificationService } from './PushNotificationService.js';
+import { webPushNotificationService } from './WebPushNotificationService.js';
 import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 
 /**
@@ -47,7 +48,7 @@ class PlayerTimerService {
         const game = await GameService.getGameForAction(gameId);
         const round = game?.currentRound ?? 0;
 
-        await pushNotificationService.sendToUser({
+        const turnPayload = {
           userId: playerId,
           title: 'Your turn',
           body: 'Tap to continue your game',
@@ -59,7 +60,12 @@ class PlayerTimerService {
             round: String(round)
           },
           dedupeKey: `push:dedupe:turn:${gameId}:${playerId}:${phase}:${round}`
-        });
+        };
+
+        await Promise.all([
+          pushNotificationService.sendToUser(turnPayload),
+          webPushNotificationService.sendToUser(turnPayload),
+        ]);
       } catch (e) {
         console.warn('[PUSH] turn notification failed:', e?.message || e);
       }

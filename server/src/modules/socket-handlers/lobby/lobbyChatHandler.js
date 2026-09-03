@@ -1,6 +1,7 @@
 import { prisma } from '../../../config/databaseFirst.js';
 import { sanitizeChatMessage } from '../../../utils/chatGif.js';
 import { pushNotificationService } from '../../../services/PushNotificationService.js';
+import { webPushNotificationService } from '../../../services/WebPushNotificationService.js';
 
 class LobbyChatHandler {
   // CRITICAL: Static Set shared across ALL instances to track online users
@@ -62,7 +63,7 @@ class LobbyChatHandler {
           (uid) => uid !== userId && !LobbyChatHandler.connectedUsers.has(uid)
         );
 
-        await pushNotificationService.sendToUsers({
+        const pushPayload = {
           userIds: offlineRecipients,
           title: `New lobby message`,
           body: text?.slice(0, 90),
@@ -72,7 +73,12 @@ class LobbyChatHandler {
             messageId: chatMessage.id
           },
           dedupeKeyPrefix: 'push:dedupe:lobby_chat'
-        });
+        };
+
+        await Promise.all([
+          pushNotificationService.sendToUsers(pushPayload),
+          webPushNotificationService.sendToUsers(pushPayload),
+        ]);
       } catch (e) {
         console.warn('[PUSH] Lobby chat push failed:', e?.message || e);
       }

@@ -1,6 +1,7 @@
 import { prisma } from '../../../config/databaseFirst.js';
 import { LeagueService } from '../../../services/LeagueService.js';
 import { pushNotificationService } from '../../../services/PushNotificationService.js';
+import { webPushNotificationService } from '../../../services/WebPushNotificationService.js';
 import { LobbyChatHandler } from './lobbyChatHandler.js';
 
 function firstName(username) {
@@ -177,7 +178,7 @@ export class LeagueChatHandler {
           (uid) => uid !== userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
         );
 
-        await pushNotificationService.sendToUsers({
+        const leagueChatPayload = {
           userIds: offlineRecipients,
           title: `New league chat`,
           body: chatMessage?.message?.slice(0, 90),
@@ -188,7 +189,12 @@ export class LeagueChatHandler {
             messageId: chatMessage.id
           },
           dedupeKeyPrefix: `push:dedupe:league_chat:${leagueId}:${chatMessage.id}`
-        });
+        };
+
+        await Promise.all([
+          pushNotificationService.sendToUsers(leagueChatPayload),
+          webPushNotificationService.sendToUsers(leagueChatPayload),
+        ]);
       } catch (e) {
         console.warn('[PUSH] League chat push failed:', e?.message || e);
       }

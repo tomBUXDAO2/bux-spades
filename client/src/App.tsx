@@ -29,6 +29,7 @@ import PWAInstallModal from './components/modals/PWAInstallModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { preloadImages } from './services/utils/imagePreloader';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useWebPushNotifications } from './hooks/useWebPushNotifications';
 
 // Placeholder route components
 const Profile = () => <div>Profile Page</div>;
@@ -189,8 +190,10 @@ const AppWithSocket: React.FC = () => {
   const { showInstallPrompt, dismissPrompt } = usePWAInstall();
   const [showForceLogoutModal, setShowForceLogoutModal] = useState(false);
   
-  // Register native push notifications + handle taps
+  // Register native push notifications + handle taps (Android Capacitor)
   usePushNotifications();
+  // Register Web Push for browser / installed PWA
+  useWebPushNotifications();
 
   // Preload images on app start
   useEffect(() => {
