@@ -56,6 +56,7 @@
     "cap:run:ios": "npx cap run ios",
     "cap:run:android": "npx cap run android",
     "apk:debug": "npm run build:cap && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "aab:release": "npm run build:cap && npx cap sync android && cd android && ./gradlew bundleRelease",
     "optimize-images": "node scripts/optimize-images.js"
   },
   "devDependencies": {

@@ -8,14 +8,20 @@ import { useAuth } from '@/features/auth/AuthContext';
  * Skipped entirely on native Capacitor (which uses FCM via usePushNotifications).
  */
 export function useWebPushNotifications() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const registeredRef = useRef(false);
 
   useEffect(() => {
+    // Reset on logout so a fresh login can retry permission
+    if (!user?.id) {
+      registeredRef.current = false;
+      return;
+    }
+
     const init = async () => {
       // Native Android/iOS uses Capacitor FCM instead
       if (Capacitor.isNativePlatform()) return;
-      if (!user?.id) return;
+      if (loading) return;
       if (registeredRef.current) return;
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
@@ -53,7 +59,7 @@ export function useWebPushNotifications() {
     };
 
     init();
-  }, [user?.id]);
+  }, [user?.id, loading]);
 }
 
 /** Convert VAPID public key from URL-safe base64 to Uint8Array */
