@@ -7,6 +7,7 @@
     "@capacitor/android": "^5.7.8",
     "@capacitor/app": "^5.0.8",
     "@capacitor/browser": "^5.2.1",
+    "@capacitor/push-notifications": "^5.0.1",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
     "@capacitor/ios": "^5.7.8",

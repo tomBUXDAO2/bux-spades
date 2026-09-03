@@ -1,5 +1,6 @@
 import { prisma } from '../../../config/databaseFirst.js';
 import { sanitizeChatMessage } from '../../../utils/chatGif.js';
+import { pushNotificationService } from '../../../services/PushNotificationService.js';
 
 class LobbyChatHandler {
   // CRITICAL: Static Set shared across ALL instances to track online users
@@ -52,6 +53,29 @@ class LobbyChatHandler {
       // Broadcast to all connected users in lobby
       this.io.emit('lobby_chat_message', chatMessage);
       console.log(`[LOBBY CHAT] User ${user.username} sent message: ${message}`);
+
+      // Push to offline users (app closed/backgrounded => socket disconnected)
+      // Requirement: notify for all lobby chat messages.
+      try {
+        const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+        const offlineRecipients = tokenUserIds.filter(
+          (uid) => uid !== userId && !LobbyChatHandler.connectedUsers.has(uid)
+        );
+
+        await pushNotificationService.sendToUsers({
+          userIds: offlineRecipients,
+          title: `New lobby message`,
+          body: text?.slice(0, 90),
+          data: {
+            type: 'lobby_chat_message',
+            route: '/',
+            messageId: chatMessage.id
+          },
+          dedupeKeyPrefix: 'push:dedupe:lobby_chat'
+        });
+      } catch (e) {
+        console.warn('[PUSH] Lobby chat push failed:', e?.message || e);
+      }
 
     } catch (error) {
       console.error('[LOBBY CHAT] Error handling message:', error);

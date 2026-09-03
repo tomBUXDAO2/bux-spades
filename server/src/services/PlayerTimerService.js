@@ -1,6 +1,8 @@
 import { GameService } from './GameService.js';
 import redisGameState from './RedisGameStateService.js';
 import { BotService } from './BotService.js';
+import { pushNotificationService } from './PushNotificationService.js';
+import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 
 /**
  * Service to manage turn timers for human players
@@ -35,6 +37,33 @@ class PlayerTimerService {
     }
 
     console.log(`[PLAYER TIMER] 🕐 STARTING TIMER for player ${playerId} (seat ${playerIndex}) in ${phase} phase`);
+
+    // Push "your turn" if user is offline (app closed/backgrounded -> socket disconnected)
+    // Use phase + currentRound for basic dedupe.
+    void (async () => {
+      try {
+        if (LobbyChatHandler.connectedUsers.has(playerId)) return;
+
+        const game = await GameService.getGameForAction(gameId);
+        const round = game?.currentRound ?? 0;
+
+        await pushNotificationService.sendToUser({
+          userId: playerId,
+          title: 'Your turn',
+          body: 'Tap to continue your game',
+          data: {
+            type: 'your_turn',
+            route: `/table/${gameId}`,
+            gameId: gameId,
+            phase: phase,
+            round: String(round)
+          },
+          dedupeKey: `push:dedupe:turn:${gameId}:${playerId}:${phase}:${round}`
+        });
+      } catch (e) {
+        console.warn('[PUSH] turn notification failed:', e?.message || e);
+      }
+    })();
 
     // Clear any existing timer for this game
     this.clearTimer(gameId);

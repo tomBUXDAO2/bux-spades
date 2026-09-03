@@ -1,5 +1,7 @@
 import { prisma } from '../../../config/databaseFirst.js';
 import { LeagueService } from '../../../services/LeagueService.js';
+import { pushNotificationService } from '../../../services/PushNotificationService.js';
+import { LobbyChatHandler } from './lobbyChatHandler.js';
 
 function firstName(username) {
   const part = String(username || 'Player').trim().split(/\s+/)[0];
@@ -162,6 +164,34 @@ export class LeagueChatHandler {
 
       const chatMessage = await LeagueService.postChatMessage(leagueId, userId, message);
       this.io.to(`league_${leagueId}`).emit('league_chat_message', chatMessage);
+
+      // Push to offline league members (app closed/backgrounded => socket disconnected)
+      try {
+        const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+        const tokenSet = new Set(tokenUserIds);
+
+        const members = await LeagueService.listMembers(leagueId, userId);
+        const memberUserIds = members.map((m) => m.userId);
+
+        const offlineRecipients = memberUserIds.filter(
+          (uid) => uid !== userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+        );
+
+        await pushNotificationService.sendToUsers({
+          userIds: offlineRecipients,
+          title: `New league chat`,
+          body: chatMessage?.message?.slice(0, 90),
+          data: {
+            type: 'league_chat_message',
+            route: `/league/${leagueId}`,
+            leagueId: leagueId,
+            messageId: chatMessage.id
+          },
+          dedupeKeyPrefix: `push:dedupe:league_chat:${leagueId}:${chatMessage.id}`
+        });
+      } catch (e) {
+        console.warn('[PUSH] League chat push failed:', e?.message || e);
+      }
     } catch (error) {
       this.socket.emit('error', { message: error.message || 'Failed to send league message' });
     }

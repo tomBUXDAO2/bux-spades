@@ -14,6 +14,8 @@ import { GameService } from '../services/GameService.js';
 import { prisma } from '../config/databaseFirst.js';
 import { io } from '../config/server.js';
 import { LeagueChatHandler } from '../modules/socket-handlers/lobby/leagueChatHandler.js';
+import { pushNotificationService } from '../services/PushNotificationService.js';
+import { LobbyChatHandler } from '../modules/socket-handlers/lobby/lobbyChatHandler.js';
 
 const router = express.Router();
 
@@ -356,6 +358,36 @@ router.post('/:leagueId/announcements', authenticateToken, async (req, res) => {
         announcement
       });
     }
+
+    // Push to offline league members when app is closed
+    try {
+      const leagueId = req.params.leagueId;
+      const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+      const tokenSet = new Set(tokenUserIds);
+
+      const members = await LeagueService.listMembers(leagueId, req.userId);
+      const memberUserIds = members.map((m) => m.userId);
+
+      const offlineRecipients = memberUserIds.filter(
+        (uid) => uid !== req.userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+      );
+
+      await pushNotificationService.sendToUsers({
+        userIds: offlineRecipients,
+        title: 'New league announcement',
+        body: (announcement?.title || announcement?.body || '').slice(0, 90),
+        data: {
+          type: 'league_announcement_created',
+          route: `/league/${leagueId}`,
+          leagueId: leagueId,
+          announcementId: announcement.id
+        },
+        dedupeKeyPrefix: `push:dedupe:announcement:${leagueId}:${announcement.id}`
+      });
+    } catch (e) {
+      console.warn('[PUSH] Announcement push failed:', e?.message || e);
+    }
+
     res.status(201).json(announcement);
   } catch (error) {
     handleError(res, error);
@@ -476,6 +508,34 @@ router.post('/:leagueId/events', authenticateToken, logoUpload.single('banner'),
       filters,
       criteria
     });
+
+    // Push to offline league members when app is closed
+    try {
+      const leagueId = req.params.leagueId;
+      const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+      const tokenSet = new Set(tokenUserIds);
+      const members = await LeagueService.listMembers(leagueId, req.userId);
+      const memberUserIds = members.map((m) => m.userId);
+      const offlineRecipients = memberUserIds.filter(
+        (uid) => uid !== req.userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+      );
+
+      await pushNotificationService.sendToUsers({
+        userIds: offlineRecipients,
+        title: 'New league event',
+        body: (event?.name || '').slice(0, 90),
+        data: {
+          type: 'league_event_created',
+          route: `/league/${leagueId}`,
+          leagueId: leagueId,
+          eventId: event.id
+        },
+        dedupeKeyPrefix: `push:dedupe:league_event:${leagueId}:${event.id}`
+      });
+    } catch (e) {
+      console.warn('[PUSH] Event push failed:', e?.message || e);
+    }
+
     res.status(201).json(event);
   } catch (error) {
     handleError(res, error);
@@ -502,6 +562,34 @@ router.post('/:leagueId/events/:eventId/cancel', authenticateToken, async (req, 
       req.userId,
       req.params.eventId
     );
+
+    // Push cancellation to offline members (optional but useful)
+    try {
+      const leagueId = req.params.leagueId;
+      const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+      const tokenSet = new Set(tokenUserIds);
+      const members = await LeagueService.listMembers(leagueId, req.userId);
+      const memberUserIds = members.map((m) => m.userId);
+      const offlineRecipients = memberUserIds.filter(
+        (uid) => uid !== req.userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+      );
+
+      await pushNotificationService.sendToUsers({
+        userIds: offlineRecipients,
+        title: 'League event cancelled',
+        body: (event?.name || '').slice(0, 90),
+        data: {
+          type: 'league_event_cancelled',
+          route: `/league/${leagueId}`,
+          leagueId: leagueId,
+          eventId: event.id
+        },
+        dedupeKeyPrefix: `push:dedupe:league_event_cancelled:${leagueId}:${event.id}`
+      });
+    } catch (e) {
+      console.warn('[PUSH] Event cancel push failed:', e?.message || e);
+    }
+
     res.json(event);
   } catch (error) {
     handleError(res, error);
@@ -588,6 +676,39 @@ router.post('/:leagueId/tournaments/:tournamentId/close', authenticateToken, asy
       req.userId,
       req.params.tournamentId
     );
+
+    // Push to offline tournament registrations when app is closed
+    try {
+      const tournamentId = req.params.tournamentId;
+      const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+      const tokenSet = new Set(tokenUserIds);
+
+      const recipientIds = new Set();
+      for (const reg of tournament?.registrations || []) {
+        if (reg.userId) recipientIds.add(reg.userId);
+        if (reg.partnerId) recipientIds.add(reg.partnerId);
+      }
+
+      const offlineRecipients = Array.from(recipientIds).filter(
+        (uid) => uid !== req.userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+      );
+
+      await pushNotificationService.sendToUsers({
+        userIds: offlineRecipients,
+        title: 'Tournament update',
+        body: 'Registration is closed',
+        data: {
+          type: 'tournament_registration_closed',
+          route: `/tournament/${tournamentId}`,
+          tournamentId: tournamentId,
+          leagueId: req.params.leagueId
+        },
+        dedupeKeyPrefix: `push:dedupe:tournament_registration_closed:${tournamentId}`
+      });
+    } catch (e) {
+      console.warn('[PUSH] Tournament close push failed:', e?.message || e);
+    }
+
     res.json(tournament);
   } catch (error) {
     handleError(res, error);
@@ -601,6 +722,39 @@ router.post('/:leagueId/tournaments/:tournamentId/start', authenticateToken, asy
       req.userId,
       req.params.tournamentId
     );
+
+    // Push to offline tournament registrations when app is closed
+    try {
+      const tournamentId = req.params.tournamentId;
+      const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+      const tokenSet = new Set(tokenUserIds);
+
+      const recipientIds = new Set();
+      for (const reg of tournament?.registrations || []) {
+        if (reg.userId) recipientIds.add(reg.userId);
+        if (reg.partnerId) recipientIds.add(reg.partnerId);
+      }
+
+      const offlineRecipients = Array.from(recipientIds).filter(
+        (uid) => uid !== req.userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+      );
+
+      await pushNotificationService.sendToUsers({
+        userIds: offlineRecipients,
+        title: 'Tournament started',
+        body: 'Good luck — tap to join the bracket',
+        data: {
+          type: 'tournament_started',
+          route: `/tournament/${tournamentId}`,
+          tournamentId: tournamentId,
+          leagueId: req.params.leagueId
+        },
+        dedupeKeyPrefix: `push:dedupe:tournament_started:${tournamentId}`
+      });
+    } catch (e) {
+      console.warn('[PUSH] Tournament start push failed:', e?.message || e);
+    }
+
     res.json(tournament);
   } catch (error) {
     handleError(res, error);

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "748560000781",
+    "project_id": "bux-spades-b4627",
+    "storage_bucket": "bux-spades-b4627.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:748560000781:android:510f93a6abe2f9e4e9f244",
+        "android_client_info": {
+          "package_name": "com.buxspades.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8bbCexTcPhmvBZyY0TU2npyL8PBbB2s0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

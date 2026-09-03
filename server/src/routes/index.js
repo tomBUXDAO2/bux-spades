@@ -8,6 +8,7 @@ import { eventRoutes } from './events.js';
 import { tournamentRoutes } from './tournaments.js';
 import leagueRoutes from './leagues.js';
 import gifRoutes from './gifs.js';
+import { pushRoutes } from './push.js';
 
 export function setupRoutes(app) {
   // Health check
@@ -27,6 +28,7 @@ export function setupRoutes(app) {
   app.use('/api/tournaments', tournamentRoutes); // Tournament routes (public)
   app.use('/api/leagues', leagueRoutes);
   app.use('/api/gifs', gifRoutes);
+  app.use('/api/push', pushRoutes);
   app.use('/api/admin', adminRoutes); // Admin routes
   app.use('/api/performance', performanceRoutes); // Performance monitoring
 
