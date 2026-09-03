@@ -26,6 +26,7 @@ import LoginModal from '@/features/auth/components/LoginModal';
 import SessionInvalidatedModal from './components/modals/SessionInvalidatedModal';
 import ForceLogoutModal from './components/modals/ForceLogoutModal';
 import PWAInstallModal from './components/modals/PWAInstallModal';
+import EnableNotificationsModal from './components/modals/EnableNotificationsModal';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { preloadImages } from './services/utils/imagePreloader';
 import { usePushNotifications } from './hooks/usePushNotifications';
@@ -192,8 +193,9 @@ const AppWithSocket: React.FC = () => {
   
   // Register native push notifications + handle taps (Android Capacitor)
   usePushNotifications();
-  // Register Web Push for browser / installed PWA
-  useWebPushNotifications();
+  // Register Web Push for browser / installed PWA (permission via in-app tap)
+  const { promptKind, enableNotifications, dismissPrompt: dismissWebPushPrompt } =
+    useWebPushNotifications();
 
   // Preload images on app start
   useEffect(() => {
@@ -239,6 +241,14 @@ const AppWithSocket: React.FC = () => {
       <PWAInstallModal
         isOpen={showInstallPrompt}
         onClose={dismissPrompt}
+      />
+      <EnableNotificationsModal
+        isOpen={!showInstallPrompt && promptKind !== null}
+        kind={promptKind === 'blocked' ? 'blocked' : 'ask'}
+        onEnable={() => {
+          void enableNotifications();
+        }}
+        onDismiss={dismissWebPushPrompt}
       />
     </SocketProvider>
   );
