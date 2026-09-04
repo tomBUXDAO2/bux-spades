@@ -23,6 +23,14 @@ export function isSuicideBidForced(gameState) {
   }
 }
 
+/** Formats where the bid is fully determined — server should auto-bid, not wait on the client. */
+export function isServerForcedBidFormat(gameState) {
+  const format = gameState?.format;
+  const gimmickVariant = gameState?.gimmickVariant;
+  const forced = ['MIRROR', 'BID3', 'BID 3', 'BIDHEARTS', 'BID HEARTS', 'CRAZY_ACES', 'CRAZY ACES'];
+  return forced.includes(format) || forced.includes(gimmickVariant);
+}
+
 export function shouldApplyBiddingTimer(gameState) {
   const format = gameState.format;
   const gimmickVariant = gameState.gimmickVariant;

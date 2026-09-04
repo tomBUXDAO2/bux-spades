@@ -1,13 +1,27 @@
 import { GameService } from './GameService.js';
 import { gamePresenceService } from './GamePresenceService.js';
 import { playerTimerService } from './PlayerTimerService.js';
-import { shouldApplyBiddingTimer } from './biddingTimerRules.js';
+import { shouldApplyBiddingTimer, isServerForcedBidFormat } from './biddingTimerRules.js';
 
 /**
  * After turn advances to a human bidder: autoplay if AWAY, else optional timer.
+ * Forced formats (BID3 / Mirror / etc.) auto-bid on the server so a client glitch
+ * cannot freeze the auction forever.
  */
 export async function scheduleHumanBiddingTurn(io, gameId, nextPlayer, gameStateForTimer) {
   if (!nextPlayer?.isHuman) return;
+
+  if (isServerForcedBidFormat(gameStateForTimer)) {
+    console.log(
+      `[HUMAN TURN SCHEDULER] Forced-bid format — server auto-bidding for ${nextPlayer.userId}`
+    );
+    setImmediate(() => {
+      playerTimerService
+        .runAutoActionImmediate(gameId, nextPlayer.userId, 'bidding')
+        .catch((err) => console.error('[HUMAN TURN SCHEDULER] forced auto-bid failed:', err));
+    });
+    return;
+  }
 
   const away = await gamePresenceService.isAway(gameId, nextPlayer.userId);
   if (away) {

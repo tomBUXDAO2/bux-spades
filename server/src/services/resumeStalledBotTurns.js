@@ -42,17 +42,25 @@ export async function resumeStalledBotTurns(io) {
         current.isHuman === false ||
         (current.user?.username && String(current.user.username).startsWith('Bot_'));
 
-      // BIDDING: always run bot-bid recovery — it also advances if currentPlayer
-      // already bid but the pointer never moved (common after deploy/sub).
+      // BIDDING: recover bot turns AND forced human auto-bids (BID3 etc.)
       if (game.status === 'BIDDING') {
         console.log(
           `[RESUME TURNS] Recovering bidding for ${game.id} (current seat ${current.seatIndex}, ${current.user?.username})`
         );
         const biddingHandler = new BiddingHandler(io, null);
-        setTimeout(() => {
-          biddingHandler.triggerBotBidIfNeeded(game.id).catch((err) => {
+        setTimeout(async () => {
+          try {
+            if (current.isHuman === false || looksLikeBot) {
+              await biddingHandler.triggerBotBidIfNeeded(game.id);
+            } else {
+              const { scheduleHumanBiddingTurn } = await import('./humanTurnScheduler.js');
+              const { GameService } = await import('./GameService.js');
+              const full = await GameService.getGame(game.id);
+              await scheduleHumanBiddingTurn(io, game.id, { ...current, isHuman: true }, full || game);
+            }
+          } catch (err) {
             console.error(`[RESUME TURNS] Bid recover failed for ${game.id}:`, err?.message || err);
-          });
+          }
         }, 500);
         continue;
       }
