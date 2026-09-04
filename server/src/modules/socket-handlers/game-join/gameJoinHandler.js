@@ -280,6 +280,57 @@ class GameJoinHandler {
           console.log(`[GAME JOIN] Cleared disconnect state and auto-play timer for user ${userId}`);
         }
       }
+
+      // Resume stalled turns after reconnect / deploy (timers are in-memory and bots may never
+      // have been re-triggered). Safe to call repeatedly — bot paths no-op if not a bot's turn.
+      if (
+        !isSpectating &&
+        player &&
+        (baseGameState.status === 'BIDDING' || baseGameState.status === 'PLAYING')
+      ) {
+        try {
+          const current = (baseGameState.players || []).find(
+            (p) => p && p.userId === baseGameState.currentPlayer
+          );
+          if (baseGameState.status === 'BIDDING') {
+            if (current && !current.isHuman) {
+              console.log(`[GAME JOIN] Resuming bot bid for ${gameId}`);
+              const { BiddingHandler } = await import('../bidding/biddingHandler.js');
+              const biddingHandler = new BiddingHandler(this.io, this.socket);
+              setTimeout(() => {
+                biddingHandler.triggerBotBidIfNeeded(gameId).catch((err) => {
+                  console.error('[GAME JOIN] Resume bot bid failed:', err);
+                });
+              }, 250);
+            } else if (current?.isHuman) {
+              const { scheduleHumanBiddingTurn } = await import(
+                '../../../services/humanTurnScheduler.js'
+              );
+              console.log(`[GAME JOIN] Resuming human bidding timer for ${gameId}`);
+              await scheduleHumanBiddingTurn(this.io, gameId, current, baseGameState);
+            }
+          } else if (baseGameState.status === 'PLAYING') {
+            if (current && !current.isHuman) {
+              console.log(`[GAME JOIN] Resuming bot play for ${gameId}`);
+              const { CardPlayHandler } = await import('../card-play/cardPlayHandler.js');
+              const cardPlayHandler = new CardPlayHandler(this.io, this.socket);
+              setTimeout(() => {
+                cardPlayHandler.triggerBotPlayIfNeeded(gameId).catch((err) => {
+                  console.error('[GAME JOIN] Resume bot play failed:', err);
+                });
+              }, 250);
+            } else if (current?.isHuman) {
+              const { scheduleHumanPlayingTurn } = await import(
+                '../../../services/humanTurnScheduler.js'
+              );
+              console.log(`[GAME JOIN] Resuming human play timer for ${gameId}`);
+              await scheduleHumanPlayingTurn(gameId, current);
+            }
+          }
+        } catch (resumeErr) {
+          console.error('[GAME JOIN] Error resuming turn:', resumeErr);
+        }
+      }
       
       console.log(`[GAME JOIN] User ${userId} successfully joined game ${gameId}`);
       

@@ -18,6 +18,12 @@ server.listen(PORT, HOST, async () => {
     const { playerTimerService } = await import('./services/PlayerTimerService.js');
     playerTimerService.setIO(io);
 
+    const { resumeStalledBotTurns } = await import('./services/resumeStalledBotTurns.js');
+    // Fire-and-forget: unstick BIDDING/PLAYING games waiting on bots after deploy
+    resumeStalledBotTurns(io).catch((err) => {
+      console.error('[SERVER] resumeStalledBotTurns failed:', err);
+    });
+
     console.log('[SERVER] Loaded existing games');
 
     const { PeriodicCleanupService } = await import('./services/PeriodicCleanupService.js');
