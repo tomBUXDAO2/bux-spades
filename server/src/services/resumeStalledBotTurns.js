@@ -42,27 +42,33 @@ export async function resumeStalledBotTurns(io) {
         current.isHuman === false ||
         (current.user?.username && String(current.user.username).startsWith('Bot_'));
 
-      if (!looksLikeBot) continue;
-
-      console.log(
-        `[RESUME TURNS] Resuming ${game.status} bot turn in ${game.id} (seat ${current.seatIndex}, ${current.user?.username})`
-      );
-
+      // BIDDING: always run bot-bid recovery — it also advances if currentPlayer
+      // already bid but the pointer never moved (common after deploy/sub).
       if (game.status === 'BIDDING') {
+        console.log(
+          `[RESUME TURNS] Recovering bidding for ${game.id} (current seat ${current.seatIndex}, ${current.user?.username})`
+        );
         const biddingHandler = new BiddingHandler(io, null);
         setTimeout(() => {
           biddingHandler.triggerBotBidIfNeeded(game.id).catch((err) => {
-            console.error(`[RESUME TURNS] Bot bid failed for ${game.id}:`, err?.message || err);
+            console.error(`[RESUME TURNS] Bid recover failed for ${game.id}:`, err?.message || err);
           });
         }, 500);
-      } else if (game.status === 'PLAYING') {
-        const cardPlayHandler = new CardPlayHandler(io, null);
-        setTimeout(() => {
-          cardPlayHandler.triggerBotPlayIfNeeded(game.id).catch((err) => {
-            console.error(`[RESUME TURNS] Bot play failed for ${game.id}:`, err?.message || err);
-          });
-        }, 500);
+        continue;
       }
+
+      if (!looksLikeBot) continue;
+
+      console.log(
+        `[RESUME TURNS] Resuming PLAYING bot turn in ${game.id} (seat ${current.seatIndex}, ${current.user?.username})`
+      );
+
+      const cardPlayHandler = new CardPlayHandler(io, null);
+      setTimeout(() => {
+        cardPlayHandler.triggerBotPlayIfNeeded(game.id).catch((err) => {
+          console.error(`[RESUME TURNS] Bot play failed for ${game.id}:`, err?.message || err);
+        });
+      }, 500);
     }
   } catch (e) {
     console.error('[RESUME TURNS] Failed:', e?.message || e);

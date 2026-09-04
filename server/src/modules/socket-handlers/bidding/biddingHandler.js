@@ -807,8 +807,29 @@ class BiddingHandler {
         seatIndex: currentPlayer.seatIndex 
       } : 'null');
       
-      if (!currentPlayer || currentPlayer.isHuman) {
-        console.log(`[BIDDING] Not triggering bot bid - currentPlayer is human or not found`);
+      if (!currentPlayer) {
+        console.log(`[BIDDING] Not triggering bot bid - currentPlayer not found`);
+        this.biddingBots.delete(gameId);
+        return;
+      }
+
+      // Stale currentPlayer: seat already has a bid but pointer never advanced (crash/deploy/sub)
+      const existingBidsEarly = await redisGameState.getPlayerBids(gameId);
+      if (
+        existingBidsEarly &&
+        existingBidsEarly[currentPlayer.seatIndex] !== null &&
+        existingBidsEarly[currentPlayer.seatIndex] !== undefined
+      ) {
+        console.log(
+          `[BIDDING] currentPlayer seat ${currentPlayer.seatIndex} already bid ${existingBidsEarly[currentPlayer.seatIndex]} — advancing`
+        );
+        this.biddingBots.delete(gameId);
+        await this.advancePastStaleBidder(gameId, gameState, existingBidsEarly);
+        return;
+      }
+
+      if (currentPlayer.isHuman) {
+        console.log(`[BIDDING] Not triggering bot bid - currentPlayer is human`);
         this.biddingBots.delete(gameId);
         return;
       }
@@ -839,14 +860,6 @@ class BiddingHandler {
         gameState.bidding.bids = latestBids;
         console.log(`[BIDDING] Updated gameState with latest bids from Redis:`, latestBids);
       }
-      
-      // CRITICAL: Check if this bot has already bid to prevent duplicate bids
-      const existingBids = await redisGameState.getPlayerBids(gameId);
-      if (existingBids && existingBids[currentPlayer.seatIndex] !== null && existingBids[currentPlayer.seatIndex] !== undefined) {
-        console.log(`[BIDDING] Bot ${playerUsername} has already bid ${existingBids[currentPlayer.seatIndex]}, skipping duplicate bid`);
-        this.biddingBots.delete(gameId);
-        return;
-      }
 
       // UNIFIED BOT BID CALCULATION - Single source of truth
       const botBid = await this.calculateUnifiedBotBid(gameState, currentPlayer.seatIndex, hand, numSpades);
@@ -862,6 +875,64 @@ class BiddingHandler {
       console.error('[BIDDING] Error in triggerBotBidIfNeeded:', error);
       // Remove from bidding bots set on error too
       this.biddingBots.delete(gameId);
+    }
+  }
+
+  /**
+   * currentPlayer points at someone who already bid (desync after crash/deploy/sub).
+   * Jump to the next seat that still needs a bid, or start the round if all done.
+   */
+  async advancePastStaleBidder(gameId, gameState, bids) {
+    try {
+      const seatBids = Array.isArray(bids) ? bids : [null, null, null, null];
+      const dealer = gameState.dealer ?? 0;
+      const order = this.getBiddingOrder(dealer);
+
+      const nextSeat = order.find(
+        (seat) => seatBids[seat] === null || seatBids[seat] === undefined
+      );
+
+      if (nextSeat === undefined) {
+        console.log(`[BIDDING] All seats have bids after stale currentPlayer — starting round`);
+        const game = await GameService.getGame(gameId);
+        const round = game?.rounds?.find((r) => r.roundNumber === game.currentRound);
+        if (round?.id) {
+          this.startRound(gameId, round.id);
+        }
+        return;
+      }
+
+      const nextPlayer = (gameState.players || []).find((p) => p && p.seatIndex === nextSeat);
+      if (!nextPlayer?.userId) {
+        console.error(`[BIDDING] advancePastStaleBidder: no player at seat ${nextSeat}`);
+        return;
+      }
+
+      console.log(
+        `[BIDDING] Advancing stale currentPlayer → seat ${nextSeat} (${nextPlayer.username || nextPlayer.userId})`
+      );
+
+      gameState.currentPlayer = nextPlayer.userId;
+      await redisGameState.setGameState(gameId, gameState);
+      await GameService.updateGame(gameId, { currentPlayer: nextPlayer.userId });
+
+      const updatedGameState = await GameService.getGameStateForClient(gameId);
+      if (updatedGameState) {
+        updatedGameState.currentPlayer = nextPlayer.userId;
+        emitPersonalizedGameEvent(this.io, gameId, 'bidding_update', updatedGameState);
+      }
+
+      if (!nextPlayer.isHuman) {
+        setTimeout(() => {
+          this.triggerBotBidIfNeeded(gameId).catch((err) => {
+            console.error('[BIDDING] advancePastStaleBidder bot trigger failed:', err);
+          });
+        }, 100);
+      } else {
+        await scheduleHumanBiddingTurn(this.io, gameId, nextPlayer, gameState);
+      }
+    } catch (e) {
+      console.error('[BIDDING] advancePastStaleBidder failed:', e?.message || e);
     }
   }
 
