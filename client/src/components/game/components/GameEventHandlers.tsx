@@ -7,6 +7,7 @@ import type { ChatMessage } from "../../../features/chat/Chat";
 import { normalizeGameState } from "../../../features/game/hooks/useGameStateNormalization";
 import { playCardSound } from "./AudioManager";
 import {
+  applyTrickCompleteGameState,
   mergeServerStatePreservingOptimisticHand,
   resetCardPlayDebounce
 } from "../../../features/game/utils/playCardUtils";
@@ -497,12 +498,11 @@ export const useGameEventHandlers = (props: GameEventHandlersProps) => {
         // Clear pending played card when trick completes
         setPendingPlayedCard(null);
         
-        // Update game state if provided
+        // Update game state if provided (preserve made counts if server sent stale zeros)
         if (data.gameState) {
-          setGameState((prevState: GameState) => ({
-            ...prevState,
-            ...data.gameState
-          }));
+          setGameState((prevState: GameState) =>
+            applyTrickCompleteGameState(prevState, data) || prevState
+          );
         }
         
         // Call the animation handler

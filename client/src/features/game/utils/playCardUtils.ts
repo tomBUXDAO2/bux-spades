@@ -9,6 +9,81 @@ import { normalizeGameState } from "../hooks/useGameStateNormalization";
  * When the server snapshot still includes a card we already removed optimistically
  * (race: trick_started / game_update before card_played), keep our hand row.
  */
+const sumPlayerTricks = (players: GameState['players'] | undefined): number =>
+  (players || []).reduce((sum, p) => sum + (p?.tricks || 0), 0);
+
+/** Resolve trick-winner seat from common trick_complete payload shapes. */
+export const resolveTrickWinnerSeat = (trickData: any): number | null => {
+  const raw =
+    trickData?.trickWinner ??
+    trickData?.trick?.winnerIndex ??
+    trickData?.trick?.winnerSeatIndex ??
+    trickData?.trick?.winningSeatIndex ??
+    trickData?.completedTrick?.winnerIndex ??
+    trickData?.completedTrick?.winnerSeatIndex ??
+    trickData?.completedTrick?.winningSeatIndex ??
+    trickData?.winnerIndex ??
+    trickData?.winnerSeatIndex ??
+    null;
+  if (typeof raw !== 'number' || Number.isNaN(raw) || raw < 0 || raw > 3) {
+    return null;
+  }
+  return raw;
+};
+
+/**
+ * Apply trick_complete gameState. If the server snapshot still has all made
+ * counts at 0 (stale Redis race), bump the winner from previous local counts.
+ */
+export const applyTrickCompleteGameState = (
+  prev: GameState | null | undefined,
+  trickData: any
+): GameState | null => {
+  if (!trickData?.gameState) {
+    return prev ?? null;
+  }
+  const next = normalizeGameState(trickData.gameState);
+  if (!prev?.players) return next;
+
+  const serverTricks = sumPlayerTricks(next.players);
+  const prevTricks = sumPlayerTricks(prev.players);
+  // Mid-hand stale payload: server sent all zeros while we already know tricks were taken,
+  // or first trick of the hand where server forgot to increment the winner.
+  const winnerSeat = resolveTrickWinnerSeat(trickData);
+  const looksStale =
+    serverTricks === 0 &&
+    (prevTricks > 0 || (typeof winnerSeat === 'number' && (prev.status === 'PLAYING' || next.status === 'PLAYING')));
+
+  if (!looksStale || winnerSeat === null) {
+    // Prefer server counts when they look real; if server is ahead, trust it.
+    if (serverTricks >= prevTricks) return next;
+    // Server behind but not all-zero — keep higher of prev/server per seat
+    return {
+      ...next,
+      players: (next.players || []).map((p, i) => {
+        if (!p) return p;
+        const prevP = prev.players?.[i] || prev.players?.find((x) => x && x.seatIndex === p.seatIndex);
+        const prevT = prevP?.tricks || 0;
+        const nextT = p.tricks || 0;
+        return nextT >= prevT ? p : { ...p, tricks: prevT };
+      })
+    } as GameState;
+  }
+
+  return {
+    ...next,
+    players: (next.players || []).map((p) => {
+      if (!p) return p;
+      const prevP =
+        prev.players?.find((x) => x && x.seatIndex === p.seatIndex) ||
+        prev.players?.[p.seatIndex];
+      const base = prevP?.tricks || 0;
+      const tricks = p.seatIndex === winnerSeat ? base + 1 : base;
+      return { ...p, tricks };
+    })
+  } as GameState;
+};
+
 export const mergeServerStatePreservingOptimisticHand = (
   prev: GameState,
   incoming: GameState | Record<string, unknown>,

@@ -155,6 +155,18 @@ export class TrickCompletionService {
       });
       
       try {
+        // Fast path: stamp tricksWon onto Redis players immediately so table badges
+        // update even if a concurrent getGameStateForClient raced the full rebuild.
+        const cachedForTricks = await redisGameState.getGameState(gameId);
+        if (cachedForTricks?.players) {
+          cachedForTricks.players = cachedForTricks.players.map((p) => {
+            if (!p) return p;
+            const stat = currentRoundStats.find((s) => s.seatIndex === p.seatIndex);
+            return { ...p, tricks: stat?.tricksWon ?? p.tricks ?? 0 };
+          });
+          await redisGameState.setGameState(gameId, cachedForTricks);
+        }
+
         // CRITICAL: Rebuild full game state from database to ensure completedTricks is updated
         // This ensures SpadesRuleService can find spades in completed tricks
         const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);

@@ -1004,10 +1004,7 @@ export class GameService {
         cachedGameState.status = lightweightState.status;
         cachedGameState.currentRound = lightweightState.currentRound;
         cachedGameState.currentTrick = lightweightState.currentTrick;
-        
-        // CRITICAL: Update Redis cache with corrected currentPlayer to prevent future null issues
-        await redisGameState.setGameState(gameId, cachedGameState);
-        console.log(`[GAME SERVICE] Updated Redis cache with corrected currentPlayer: ${lightweightState.currentPlayer}`);
+
         // CRITICAL: Always map gimmick variants to client-friendly format
         const gimmickVariantMapping = {
           'SUICIDE': 'SUICIDE',
@@ -1064,9 +1061,11 @@ export class GameService {
           cachedGameState.play.spadesBroken = false; // Default to false if not set
         }
         
-        // CRITICAL: Get fresh bidding data from database (single source of truth)
-        // OPTIMIZATION: Only fetch bidding data if we're in bidding phase
-        if (cachedGameState.status === 'BIDDING') {
+        // CRITICAL: Refresh bids (BIDDING) and tricksWon (PLAYING) from DB.
+        // Redis players[].tricks can go stale when concurrent getGameStateForClient
+        // writers race TrickCompletionService — table badges then stay at 0/bid mid-hand
+        // even though end-of-hand scoring (DB) is correct.
+        if (cachedGameState.status === 'BIDDING' || cachedGameState.status === 'PLAYING') {
           try {
             const currentRound = await prisma.round.findFirst({
               where: {
@@ -1077,7 +1076,9 @@ export class GameService {
                 playerStats: {
                   select: {
                     seatIndex: true,
-                    bid: true
+                    bid: true,
+                    tricksWon: true,
+                    isBlindNil: true
                   }
                 }
               }
@@ -1085,37 +1086,55 @@ export class GameService {
           
           if (currentRound && currentRound.playerStats) {
             const bids = Array.from({length: 4}, () => null);
+            const tricksBySeat = Array.from({length: 4}, () => 0);
+            const blindNilBySeat = Array.from({length: 4}, () => false);
             currentRound.playerStats.forEach(stat => {
               if (stat.seatIndex !== null && stat.seatIndex !== undefined) {
                 bids[stat.seatIndex] = stat.bid;
+                tricksBySeat[stat.seatIndex] = stat.tricksWon || 0;
+                blindNilBySeat[stat.seatIndex] = !!stat.isBlindNil;
               }
             });
             
-            cachedGameState.bidding = {
-              bids: bids,
-              currentBidderIndex: 0,
-              currentPlayer: cachedGameState.currentPlayer
-            };
+            if (cachedGameState.status === 'BIDDING') {
+              cachedGameState.bidding = {
+                bids: bids,
+                currentBidderIndex: 0,
+                currentPlayer: cachedGameState.currentPlayer
+              };
+            } else if (!cachedGameState.bidding) {
+              cachedGameState.bidding = {
+                bids: bids,
+                currentBidderIndex: 0,
+                currentPlayer: cachedGameState.currentPlayer
+              };
+            } else if (!Array.isArray(cachedGameState.bidding.bids)) {
+              cachedGameState.bidding.bids = bids;
+            }
             
-            // Also update player bids in the players array
             if (cachedGameState.players) {
               cachedGameState.players = cachedGameState.players.map((p) =>
-                p ? { ...p, bid: bids[p.seatIndex] ?? null } : p
+                p
+                  ? {
+                      ...p,
+                      bid: bids[p.seatIndex] ?? p.bid ?? null,
+                      tricks: tricksBySeat[p.seatIndex] ?? 0,
+                      isBlindNil: blindNilBySeat[p.seatIndex] || !!p.isBlindNil
+                    }
+                  : p
               );
             }
             
-            console.log(`[GAME SERVICE] Updated bidding from database:`, {
+            console.log(`[GAME SERVICE] Updated playerStats from database:`, {
               gameId,
+              status: cachedGameState.status,
               bids,
-              bidding: cachedGameState.bidding,
-              players: cachedGameState.players?.map((p) =>
-                p ? { seatIndex: p.seatIndex, bid: p.bid } : null
-              )
+              tricks: tricksBySeat
             });
           }
           } catch (error) {
-            console.error(`[GAME SERVICE] Error getting bidding data:`, error);
-            // Fallback to existing bidding data if database query fails
+            console.error(`[GAME SERVICE] Error refreshing bid/trick stats:`, error);
+            // Fallback to existing cached player data if database query fails
           }
         }
         
@@ -1126,9 +1145,6 @@ export class GameService {
           cachedGameState.playerHands = playerHands; // Also set playerHands field
           console.log(`[GAME SERVICE] Updated hands from Redis:`, playerHands.map((hand, i) => `Seat ${i}: ${hand.length} cards`));
         }
-        
-        // Use cached data as-is for performance - no database refresh needed
-        console.log(`[GAME SERVICE] Using cached game state for ${gameId} - no database refresh`);
         
         // CRITICAL: Ensure players data is included from database if not in cache
         if (!cachedGameState.players || cachedGameState.players.length === 0) {
@@ -1142,6 +1158,10 @@ export class GameService {
             cachedGameState.spectators = mapped.spectators;
           }
         }
+
+        // Write Redis AFTER refreshes so concurrent readers don't clobber tricksWon with stale zeros
+        await redisGameState.setGameState(gameId, cachedGameState);
+        console.log(`[GAME SERVICE] Updated Redis cache with corrected currentPlayer: ${lightweightState.currentPlayer}`);
         
         // Returning cached state from Redis
         await this.attachPresenceToGameState(gameId, cachedGameState);

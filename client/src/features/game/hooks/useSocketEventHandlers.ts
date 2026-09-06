@@ -3,6 +3,7 @@ import { normalizeGameState } from './useGameStateNormalization';
 import { playBidSound, playCardSound } from '../../../components/game/components/AudioManager';
 import type { GameState } from "../../../types/game";
 import {
+  applyTrickCompleteGameState,
   mergeServerStatePreservingOptimisticHand,
   optimisticSocketMergeRef
 } from '../utils/playCardUtils';
@@ -423,21 +424,17 @@ export const useSocketEventHandlers = ({
       if (trickData && trickData.gameId === gameId) {
         (setGameState as any)((prevState: any) => {
           if (!prevState) return prevState;
-          // Use the full gameState from the server if provided
           if (trickData.gameState) {
-            return normalizeGameState(trickData.gameState);
-          } else {
-            // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
-            // This prevents the 4th card from disappearing and re-rendering
-            return {
-              ...prevState,
-              play: {
-                ...prevState.play,
-                // Keep currentTrick intact for animation
-                tricks: trickData.tricks || []
-              }
-            };
+            return applyTrickCompleteGameState(prevState, trickData) || prevState;
           }
+          // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
+          return {
+            ...prevState,
+            play: {
+              ...prevState.play,
+              tricks: trickData.tricks || []
+            }
+          };
         });
       }
     };

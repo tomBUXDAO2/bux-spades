@@ -18,10 +18,18 @@ export function emitPersonalizedGameEvent(io, gameId, eventName, baseGameState, 
   }
 
   const {
-    extraPayload = {},
+    extraPayload: explicitExtraPayload,
     excludeSocketId,
-    includeSpectators = true
+    includeSpectators = true,
+    ...restOptions
   } = options;
+
+  // Call sites historically pass flat fields (trickWinner, currentTrick, …) as the
+  // 5th arg. Accept both `{ extraPayload: {...} }` and those flat fields.
+  const extraPayload =
+    explicitExtraPayload && typeof explicitExtraPayload === 'object'
+      ? explicitExtraPayload
+      : restOptions;
 
   const room = io?.sockets?.adapter?.rooms?.get(gameId);
   if (!room) {

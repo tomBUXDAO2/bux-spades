@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import type { GameState } from "../../../types/game";
+import { applyTrickCompleteGameState } from '../utils/playCardUtils';
 
 interface UseOptimizedSocketEventHandlersProps {
   socket: any;
@@ -326,24 +327,20 @@ export const useOptimizedSocketEventHandlers = ({
   const handleTrickComplete = useCallback((trickData: any) => {
     console.log('🎮 Trick complete event received:', trickData);
     if (trickData && trickData.gameId === gameId) {
-      const prevState = currentGameState;
-      if (!prevState) return;
-      
-      // Use the full gameState from the server if provided
-      if (trickData.gameState) {
-        setGameState(normalizeGameState(trickData.gameState));
-      } else {
+      setGameState((prevState) => {
+        if (!prevState) return prevState;
+        if (trickData.gameState) {
+          return applyTrickCompleteGameState(prevState, trickData) || prevState;
+        }
         // CRITICAL: Don't clear currentTrick immediately - let the animation handle it
-        // This prevents the 4th card from disappearing and re-rendering
-        setGameState({
+        return {
           ...prevState,
           play: {
             ...prevState.play,
-            // Keep currentTrick intact for animation
             tricks: trickData.tricks || []
           }
-        });
-      }
+        };
+      });
     }
   }, [gameId, setGameState]);
 
