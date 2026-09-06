@@ -12,6 +12,39 @@ import { normalizeGameState } from "../hooks/useGameStateNormalization";
 const sumPlayerTricks = (players: GameState['players'] | undefined): number =>
   (players || []).reduce((sum, p) => sum + (p?.tricks || 0), 0);
 
+const isSoloGameState = (state: GameState | null | undefined): boolean =>
+  !!state &&
+  ((state as any).gameMode === 'SOLO' || (state as any).rules?.gameType === 'SOLO');
+
+/**
+ * Solo corner scoreboard uses playerScores. Don't let a mid-hand server snapshot
+ * of [0,0,0,0] wipe running totals that were already shown after the last hand.
+ */
+export const preserveSoloScoreboard = (
+  prev: GameState | null | undefined,
+  next: GameState
+): GameState => {
+  if (!prev || (!isSoloGameState(next) && !isSoloGameState(prev))) return next;
+
+  const incoming = next.playerScores;
+  const prevScores = prev.playerScores;
+  const incomingAllZero =
+    Array.isArray(incoming) &&
+    incoming.length === 4 &&
+    incoming.every((s) => !s);
+  const prevHasScores =
+    Array.isArray(prevScores) && prevScores.some((s) => (s || 0) !== 0);
+
+  if (incomingAllZero && prevHasScores) {
+    return {
+      ...next,
+      playerScores: prevScores,
+      playerBags: Array.isArray(next.playerBags) ? next.playerBags : prev.playerBags
+    };
+  }
+  return next;
+};
+
 /** Resolve trick-winner seat from common trick_complete payload shapes. */
 export const resolveTrickWinnerSeat = (trickData: any): number | null => {
   const raw =
@@ -43,7 +76,7 @@ export const applyTrickCompleteGameState = (
     return prev ?? null;
   }
   const next = normalizeGameState(trickData.gameState);
-  if (!prev?.players) return next;
+  if (!prev?.players) return preserveSoloScoreboard(prev, next);
 
   const serverTricks = sumPlayerTricks(next.players);
   const prevTricks = sumPlayerTricks(prev.players);
@@ -56,9 +89,9 @@ export const applyTrickCompleteGameState = (
 
   if (!looksStale || winnerSeat === null) {
     // Prefer server counts when they look real; if server is ahead, trust it.
-    if (serverTricks >= prevTricks) return next;
+    if (serverTricks >= prevTricks) return preserveSoloScoreboard(prev, next);
     // Server behind but not all-zero — keep higher of prev/server per seat
-    return {
+    return preserveSoloScoreboard(prev, {
       ...next,
       players: (next.players || []).map((p, i) => {
         if (!p) return p;
@@ -67,10 +100,10 @@ export const applyTrickCompleteGameState = (
         const nextT = p.tricks || 0;
         return nextT >= prevT ? p : { ...p, tricks: prevT };
       })
-    } as GameState;
+    } as GameState);
   }
 
-  return {
+  return preserveSoloScoreboard(prev, {
     ...next,
     players: (next.players || []).map((p) => {
       if (!p) return p;
@@ -81,7 +114,7 @@ export const applyTrickCompleteGameState = (
       const tricks = p.seatIndex === winnerSeat ? base + 1 : base;
       return { ...p, tricks };
     })
-  } as GameState;
+  } as GameState);
 };
 
 export const mergeServerStatePreservingOptimisticHand = (
@@ -92,7 +125,7 @@ export const mergeServerStatePreservingOptimisticHand = (
 ): GameState => {
   const next = normalizeGameState(incoming as GameState);
   const pending = pendingRef?.current;
-  if (!pending || !userId) return next;
+  if (!pending || !userId) return preserveSoloScoreboard(prev, next);
 
   const me = next.players?.find(
     (p: any) => p && (p.id === userId || p.userId === userId)
@@ -105,7 +138,7 @@ export const mergeServerStatePreservingOptimisticHand = (
     !Array.isArray(nextHands?.[seat]) ||
     !Array.isArray(prevHands?.[seat])
   ) {
-    return next;
+    return preserveSoloScoreboard(prev, next);
   }
 
   const serverHas = nextHands[seat].some(
@@ -116,15 +149,15 @@ export const mergeServerStatePreservingOptimisticHand = (
   );
 
   if (serverHas && alreadyRemovedInPrev) {
-    return {
+    return preserveSoloScoreboard(prev, {
       ...next,
       hands: nextHands.map((h: Card[], i: number) =>
         i === seat ? prevHands[seat] : h
       ),
-    } as GameState;
+    } as GameState);
   }
 
-  return next;
+  return preserveSoloScoreboard(prev, next);
 };
 
 // Light debounce to prevent double-submits; reset when a new trick starts (see resetCardPlayDebounce)

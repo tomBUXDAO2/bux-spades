@@ -1137,6 +1137,27 @@ export class GameService {
             // Fallback to existing cached player data if database query fails
           }
         }
+
+        // SOLO scoreboard: keep playerScores/playerBags from latest RoundScore (not Redis-stale zeros)
+        if (
+          (cachedGameState.gameMode === 'SOLO' || cachedGameState.rules?.gameType === 'SOLO') &&
+          (cachedGameState.status === 'BIDDING' || cachedGameState.status === 'PLAYING')
+        ) {
+          try {
+            const [soloScores, soloBags] = await Promise.all([
+              this.getPlayerScores(gameId),
+              this.getPlayerBags(gameId)
+            ]);
+            if (Array.isArray(soloScores) && soloScores.length === 4) {
+              cachedGameState.playerScores = soloScores;
+            }
+            if (Array.isArray(soloBags) && soloBags.length === 4) {
+              cachedGameState.playerBags = soloBags;
+            }
+          } catch (error) {
+            console.error(`[GAME SERVICE] Error refreshing solo scoreboard:`, error);
+          }
+        }
         
         // CRITICAL: Ensure hands data is included from Redis (ignore [[],[],[],[]] — length 4 but no cards)
         const playerHands = await redisGameState.getPlayerHands(gameId);
@@ -1594,19 +1615,27 @@ export class GameService {
     try {
       const game = await prisma.game.findUnique({
         where: { id: gameId },
-        include: { rounds: { include: { RoundScore: true } } }
+        select: { mode: true }
       });
       
       if (!game || game.mode !== 'SOLO') return [];
       
-      // Get the latest round score which has running totals
-      const lastRound = game.rounds[game.rounds.length - 1];
-      if (lastRound && lastRound.RoundScore) {
+      // Same source as partner team totals: latest RoundScore that exists.
+      // Do NOT use rounds[rounds.length-1] — during the next hand that row has
+      // no RoundScore yet and would incorrectly return [0,0,0,0] mid-hand.
+      const latestRoundScore = await prisma.roundScore.findFirst({
+        where: {
+          Round: { gameId }
+        },
+        orderBy: { Round: { roundNumber: 'desc' } }
+      });
+
+      if (latestRoundScore) {
         return [
-          lastRound.RoundScore.player0Running || 0,
-          lastRound.RoundScore.player1Running || 0,
-          lastRound.RoundScore.player2Running || 0,
-          lastRound.RoundScore.player3Running || 0
+          latestRoundScore.player0Running || 0,
+          latestRoundScore.player1Running || 0,
+          latestRoundScore.player2Running || 0,
+          latestRoundScore.player3Running || 0
         ];
       }
       

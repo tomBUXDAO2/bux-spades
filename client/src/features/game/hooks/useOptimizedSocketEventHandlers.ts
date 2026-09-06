@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { normalizeGameState } from './useGameStateNormalization';
 import type { GameState } from "../../../types/game";
-import { applyTrickCompleteGameState } from '../utils/playCardUtils';
+import { applyTrickCompleteGameState, preserveSoloScoreboard } from '../utils/playCardUtils';
 
 interface UseOptimizedSocketEventHandlersProps {
   socket: any;
@@ -301,7 +301,7 @@ export const useOptimizedSocketEventHandlers = ({
             normalizedState.currentTrickCards = [];
           }
         }
-        setGameState(normalizedState);
+        setGameState(preserveSoloScoreboard(prevState, normalizedState));
         if (Array.isArray(normalizedState?.bidding?.bids)) {
           previousBidsRef.current = [...normalizedState.bidding.bids];
         }
@@ -360,7 +360,9 @@ export const useOptimizedSocketEventHandlers = ({
           },
           currentTrickCards: trickData.currentTrick || []
         } as any;
-        setGameState(normalizeGameState(clearedGameState));
+        setGameState((prev) =>
+          preserveSoloScoreboard(prev, normalizeGameState(clearedGameState))
+        );
       } else {
         // Fallback to partial update if gameState not provided
         const prevState = currentGameState;
