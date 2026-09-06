@@ -115,7 +115,7 @@ export const useOptimizedSocketEventHandlers = ({
           }
         }
         
-        setGameState(newState);
+        setGameState((prev) => preserveSoloScoreboard(prev, newState));
         if (Array.isArray(newState?.bidding?.bids)) {
           previousBidsRef.current = [...newState.bidding.bids];
         }
