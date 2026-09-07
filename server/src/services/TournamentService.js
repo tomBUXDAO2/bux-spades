@@ -411,27 +411,100 @@ export class TournamentService {
     return teamIdToPlayerIds;
   }
 
-  /** Create Spades tables for round-1 matches that have both teams. */
-  static async createRound1Tables(tournamentId) {
+  /** Create Spades tables for every match that already has both teams (play-in + bye-vs-bye, etc.). */
+  static async openPlayableTables(tournamentId) {
     const tournament = await this.getTournament(tournamentId);
     if (!tournament) throw new Error('Tournament not found');
 
     const teamMap = this.buildTeamMap(tournament.registrations || []);
-    const round1 = (tournament.matches || []).filter(
+    const playable = (tournament.matches || []).filter(
       (m) =>
-        m.round === 1 &&
         m.team1Id &&
         m.team2Id &&
         !m.gameId &&
-        m.status !== 'COMPLETED'
+        m.status === 'PENDING'
     );
 
     const created = [];
-    for (const match of round1) {
-      const game = await this.createMatchTable(tournament, match, teamMap);
-      created.push({ matchId: match.id, gameId: game.id });
+    for (const match of playable) {
+      try {
+        const game = await this.createMatchTable(tournament, match, teamMap);
+        await this.autostartTournamentGame(game.id);
+        created.push({ matchId: match.id, gameId: game.id, round: match.round });
+      } catch (e) {
+        console.error(`[TOURNAMENT] Failed to open match ${match.id}:`, e.message || e);
+      }
     }
     return created;
+  }
+
+  /** @deprecated use openPlayableTables */
+  static async createRound1Tables(tournamentId) {
+    return this.openPlayableTables(tournamentId);
+  }
+
+  /**
+   * Deal and kick off bot bidding for a tournament table that is already fully seated.
+   * Humans Join from the bracket to take their seats in the live game.
+   */
+  static async autostartTournamentGame(gameId) {
+    const { GameService } = await import('./GameService.js');
+    const { redisGameState } = await import('./RedisGameStateService.js');
+
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { players: { include: { user: true } } }
+    });
+    if (!game || game.status !== 'WAITING') return game;
+
+    const seated = (game.players || []).filter((p) => !p.leftAt);
+    if (seated.length < 4) {
+      console.warn(`[TOURNAMENT] Not starting ${gameId} — only ${seated.length}/4 seated`);
+      return game;
+    }
+
+    await GameService.startGame(gameId);
+    await GameService.dealInitialHands(gameId);
+
+    try {
+      const full = await GameService.getFullGameStateFromDatabase(gameId);
+      if (full) await redisGameState.setGameState(gameId, full);
+
+      try {
+        const { io } = await import('../config/server.js');
+        if (io && full) {
+          const { emitPersonalizedGameEvent } = await import('./SocketGameBroadcastService.js');
+          emitPersonalizedGameEvent(io, gameId, 'game_started', full);
+          emitPersonalizedGameEvent(io, gameId, 'game_update', full);
+        }
+      } catch (emitErr) {
+        console.warn('[TOURNAMENT] Could not emit game_started:', emitErr.message);
+      }
+
+      // Kick bot bidding if current bidder is a bot
+      const currentId = full?.currentPlayer;
+      const current = (full?.players || game.players || []).find(
+        (p) => p && (p.userId === currentId || p.id === currentId)
+      );
+      const isBot = current && current.isHuman === false;
+      if (isBot || (current && current.user && String(current.user.discordId || '').startsWith('bot_'))) {
+        try {
+          const { BiddingHandler } = await import('../modules/socket-handlers/bidding/biddingHandler.js');
+          const { io } = await import('../config/server.js');
+          const biddingHandler = new BiddingHandler(io, null);
+          // Fire and forget — bots chain their own next actions
+          biddingHandler.triggerBotBidIfNeeded(gameId).catch((e) =>
+            console.error('[TOURNAMENT] Bot bid kickoff failed:', e.message || e)
+          );
+        } catch (bidErr) {
+          console.error('[TOURNAMENT] Bot bidding import failed:', bidErr.message || bidErr);
+        }
+      }
+    } catch (e) {
+      console.error('[TOURNAMENT] autostartTournamentGame error:', e);
+    }
+
+    return prisma.game.findUnique({ where: { id: gameId } });
   }
 
   static async createMatchTable(tournament, match, teamMap) {
@@ -598,7 +671,7 @@ export class TournamentService {
 
     let tables = [];
     if (fresh.mode === 'PARTNERS') {
-      tables = await this.createRound1Tables(tournamentId);
+      tables = await this.openPlayableTables(tournamentId);
     }
 
     // Soft Discord notify (ignore failures for local/test)

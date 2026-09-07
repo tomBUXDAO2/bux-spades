@@ -767,7 +767,14 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                                   }`}
                                 >
                                   <div className="mb-1 text-[10px] text-white/45">
-                                    M{m.matchNumber} · {m.status}
+                                    M{m.matchNumber} ·{' '}
+                                    {m.status === 'IN_PROGRESS' && m.gameId
+                                      ? 'TABLE OPEN'
+                                      : m.status === 'PENDING' && m.team1Id && m.team2Id
+                                        ? 'READY TO PLAY'
+                                        : m.status === 'PENDING'
+                                          ? 'WAITING'
+                                          : m.status}
                                   </div>
                                   <div
                                     className={`mb-1 rounded px-2 py-1 ${

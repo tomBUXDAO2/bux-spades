@@ -81,6 +81,11 @@ export class TournamentTimerService {
       console.log(`[TOURNAMENT TIMER] Found ${activeMatches.length} pending matches`);
       
       for (const match of activeMatches) {
+        // League tournaments manage their own tables — never void via Discord timer path
+        if (match.tournament?.leagueId) {
+          continue;
+        }
+
         console.log(`[TOURNAMENT TIMER] Checking match ${match.id}...`);
         // Check if this match has a timer set or if it expired (timer key might be deleted by Redis TTL)
         const readyStatus = await TournamentReadyService.getReadyStatus(match.id);
@@ -93,18 +98,10 @@ export class TournamentTimerService {
         const isExpired = await TournamentReadyService.isTimerExpired(match.id);
         console.log(`[TOURNAMENT TIMER] Match ${match.id} timer expired?`, isExpired);
         
-        // If timerExpiry is null, it could mean:
-        // 1. Timer was never set (match created before timer service)
-        // 2. Timer expired and Redis deleted the key (TTL expired)
-        // We only process if timer has expired (meaning it was set and then expired)
-        if (!readyStatus.timerExpiry && !isExpired) {
-          console.log(`[TOURNAMENT TIMER] Match ${match.id} has no timer set and hasn't expired, skipping`);
-          continue; // No timer was ever set for this match
-        }
-        
+        // Never set → skip. Only process genuinely expired armed timers.
         if (!isExpired) {
-          console.log(`[TOURNAMENT TIMER] Match ${match.id} timer hasn't expired yet, skipping`);
-          continue; // Timer hasn't expired yet
+          console.log(`[TOURNAMENT TIMER] Match ${match.id} timer not expired / never armed, skipping`);
+          continue;
         }
         
         console.log(`[TOURNAMENT TIMER] Match ${match.id} timer has expired!`);

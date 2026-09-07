@@ -321,17 +321,8 @@ export class LeagueTournamentService {
       data: { status: 'IN_PROGRESS' }
     });
 
-    const pending = (fresh.matches || []).filter(
-      (m) =>
-        m.team1Id &&
-        m.team2Id &&
-        m.status === 'PENDING' &&
-        !m.gameId &&
-        (m.round === 1 || m.round === 100)
-    );
-    for (const match of pending) {
-      await this.openRollCall(match.id);
-    }
+    // Open every match that already has both teams (play-in + bye-vs-bye)
+    await TournamentService.openPlayableTables(tournamentId);
 
     return this.get(leagueId, tournamentId, adminId);
   }
@@ -368,7 +359,8 @@ export class LeagueTournamentService {
 
     const allReady = await TournamentReadyService.areAllPlayersReady(matchId, playerIds);
     if (allReady && playerIds.length >= 2) {
-      await this.createMatchTable(leagueId, tournament, match, teamMap);
+      const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
+      await TournamentService.autostartTournamentGame(game.id);
     }
 
     return this.get(leagueId, tournamentId, userId);
@@ -383,7 +375,8 @@ export class LeagueTournamentService {
     if (!match) throw httpError('Match not found', 404);
     if (match.gameId) throw httpError('Table already open');
     const teamMap = this.buildTeamMap(tournament.registrations || []);
-    await this.createMatchTable(leagueId, tournament, match, teamMap);
+    const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
+    await TournamentService.autostartTournamentGame(game.id);
     return this.get(leagueId, tournamentId, adminId);
   }
 
@@ -422,6 +415,7 @@ export class LeagueTournamentService {
   static async createMatchTable(leagueId, tournament, match, teamMap) {
     const { GameService } = await import('./GameService.js');
     const { redisGameState } = await import('./RedisGameStateService.js');
+    const { BotUserService } = await import('./BotUserService.js');
 
     const team1 = teamMap.get(match.team1Id) || [];
     const team2 = match.team2Id ? teamMap.get(match.team2Id) || [] : [];
@@ -455,6 +449,11 @@ export class LeagueTournamentService {
       return existing;
     }
 
+    const users = await prisma.user.findMany({
+      where: { id: { in: seats.map((s) => s.userId) } }
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+
     const game = await GameService.createGame({
       id: gameId,
       createdById: seats[0].userId,
@@ -463,7 +462,7 @@ export class LeagueTournamentService {
       gimmickVariant: tournament.gimmickVariant,
       leagueId,
       isLeague: false,
-      isRated: true,
+      isRated: false,
       maxPoints: tournament.maxPoints || 500,
       minPoints: tournament.minPoints || -100,
       buyIn: tournament.buyIn || 0,
@@ -472,24 +471,42 @@ export class LeagueTournamentService {
       specialRules: tournament.specialRules || {}
     });
 
-    for (let i = 1; i < seats.length; i++) {
+    for (let i = 0; i < seats.length; i++) {
       const s = seats[i];
-      await prisma.gamePlayer.create({
-        data: {
-          gameId: game.id,
-          userId: s.userId,
-          seatIndex: s.seatIndex,
-          teamIndex: s.teamIndex,
-          isHuman: true,
-          joinedAt: new Date()
-        }
+      const isHuman = !BotUserService.isBotUser(userById.get(s.userId));
+      const existingSeat = await prisma.gamePlayer.findFirst({
+        where: { gameId: game.id, seatIndex: s.seatIndex }
       });
+      if (existingSeat) {
+        await prisma.gamePlayer.update({
+          where: { id: existingSeat.id },
+          data: {
+            userId: s.userId,
+            teamIndex: s.teamIndex,
+            isHuman,
+            leftAt: null
+          }
+        });
+      } else if (i > 0) {
+        await prisma.gamePlayer.create({
+          data: {
+            gameId: game.id,
+            userId: s.userId,
+            seatIndex: s.seatIndex,
+            teamIndex: s.teamIndex,
+            isHuman,
+            joinedAt: new Date()
+          }
+        });
+      }
     }
 
-    // Ensure seat 0 teamIndex matches
     await prisma.gamePlayer.updateMany({
       where: { gameId: game.id, seatIndex: 0 },
-      data: { teamIndex: seats[0].teamIndex }
+      data: {
+        teamIndex: seats[0].teamIndex,
+        isHuman: !BotUserService.isBotUser(userById.get(seats[0].userId))
+      }
     });
 
     await prisma.tournamentMatch.update({
@@ -538,10 +555,11 @@ export class LeagueTournamentService {
       winnerTeamId
     );
 
-    // Open roll call when the next match now has both teams
-    const nextMatch = result?.advanceResult?.nextMatch;
-    if (nextMatch?.team1Id && nextMatch?.team2Id && !nextMatch.gameId) {
-      await this.openRollCall(nextMatch.id);
+    // Open any newly playable tables (both teams now known — e.g. after play-in)
+    try {
+      await TournamentService.openPlayableTables(tournamentId);
+    } catch (e) {
+      console.error('[LEAGUE TOURNAMENT] openPlayableTables after match:', e.message || e);
     }
 
     const completed = await TournamentService.getTournament(tournamentId);

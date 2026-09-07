@@ -123,6 +123,15 @@ export class TournamentReadyService {
   }
 
   /**
+   * Marker that a ready-timer was armed for this match.
+   * Survives after the short-lived timer key expires (Redis TTL),
+   * so we can tell "never set" apart from "expired".
+   */
+  static getTimerArmedKey(matchId) {
+    return `tournament:timer:armed:${matchId}`;
+  }
+
+  /**
    * Set timer expiry for a match
    */
   static async setTimer(matchId, expiryTimestamp) {
@@ -133,12 +142,15 @@ export class TournamentReadyService {
       }
       
       const key = this.getTimerKey(matchId);
+      const armedKey = this.getTimerArmedKey(matchId);
       const ttl = Math.max(0, Math.floor((expiryTimestamp - Date.now()) / 1000));
       
       console.log(`[TOURNAMENT READY] Setting timer for match ${matchId}: expiry=${expiryTimestamp}, ttl=${ttl}s, key=${key}`);
       
       if (ttl > 0) {
         await redisClient.setEx(key, ttl, expiryTimestamp.toString());
+        // Keep armed marker longer than the ready window so expiry detection works after TTL
+        await redisClient.setEx(armedKey, Math.max(ttl + 60, this.READY_TTL), '1');
         console.log(`[TOURNAMENT READY] Timer set successfully for match ${matchId}`);
       } else {
         console.warn(`[TOURNAMENT READY] Timer TTL is ${ttl}, not setting timer for match ${matchId}`);
@@ -197,9 +209,11 @@ export class TournamentReadyService {
       
       const key = this.getReadyStatusKey(matchId);
       const timerKey = this.getTimerKey(matchId);
+      const armedKey = this.getTimerArmedKey(matchId);
       
       await redisClient.del(key);
       await redisClient.del(timerKey);
+      await redisClient.del(armedKey);
       
       return true;
     } catch (error) {
@@ -209,12 +223,29 @@ export class TournamentReadyService {
   }
 
   /**
-   * Check if timer has expired for a match
+   * True only when a timer was armed and has now expired.
+   * Matches with no timer must NOT be treated as expired (that was voiding all PENDING brackets).
    */
   static async isTimerExpired(matchId) {
     try {
-      const timeRemaining = await this.getTimeRemaining(matchId);
-      return timeRemaining <= 0;
+      if (!redisClient) return false;
+
+      const armedKey = this.getTimerArmedKey(matchId);
+      const armed = await redisClient.get(armedKey);
+      if (!armed) {
+        // Timer was never set for this match
+        return false;
+      }
+
+      const timerKey = this.getTimerKey(matchId);
+      const expiry = await redisClient.get(timerKey);
+      if (!expiry) {
+        // Armed but key gone → Redis TTL fired → expired
+        return true;
+      }
+
+      const remaining = Math.max(0, Math.floor((parseInt(expiry, 10) - Date.now()) / 1000));
+      return remaining <= 0;
     } catch (error) {
       console.error('[TOURNAMENT READY] Error checking timer expiry:', error);
       return false;
