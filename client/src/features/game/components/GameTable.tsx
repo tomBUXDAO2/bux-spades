@@ -197,6 +197,7 @@ export default function GameTableModular({
   const cardsRevealedDuringBiddingRef = useRef(false);
   const dealGenerationRef = useRef(0);
   const dealPrimedKeyRef = useRef<string | null>(null);
+  const dealLayoutResetKeyRef = useRef<string | null>(null);
   const pendingPlayedCardRef = useRef<Card | null>(null);
   /** Trick pile keys that already ran entrance motion (avoids replay if a node remounts). */
   const trickEntranceCompletedRef = useRef<Set<string>>(new Set());
@@ -527,6 +528,20 @@ export default function GameTableModular({
     if (!Array.isArray(h)) return "";
     return h.map((seat: unknown) => (Array.isArray(seat) ? seat.length : 0)).join("-");
   }, [gameState, (gameState as any)?.hands]);
+
+  // Reset reveal/deal flags in layout BEFORE paint so a prior hand's cardsRevealed=true
+  // cannot flash face-up for one frame when BIDDING + hands arrive.
+  useLayoutEffect(() => {
+    if (!gameState?.id || gameState.status !== 'BIDDING') return;
+    const key = `${gameState.id}:${gameState.currentRound ?? 0}`;
+    if (dealLayoutResetKeyRef.current === key) return;
+    dealLayoutResetKeyRef.current = key;
+    cardsRevealedDuringBiddingRef.current = false;
+    setCardsRevealed(false);
+    setDealingComplete(false);
+    setDealtCardCount(0);
+    setBiddingReady(false);
+  }, [gameState?.id, gameState?.status, gameState?.currentRound]);
 
   // Single place for deal stagger: follows merged gameState (from socket + game prop), avoids duplicate game_started listeners
   useEffect(() => {
@@ -1089,7 +1104,7 @@ export default function GameTableModular({
         gameStateBlindNilAllowed: (gameState as any)?.blindNilAllowed
       });
 
-      if (cardsRevealedDuringBiddingRef.current) {
+      if (cardsRevealedDuringBiddingRef.current && dealingComplete) {
         setCardsRevealed(true);
         return;
       }
@@ -1120,10 +1135,6 @@ export default function GameTableModular({
     }
 
     if (gameState?.status === 'PLAYING' && Array.isArray(hands) && Array.isArray(myHandArr) && myHandArr.length > 0) {
-      setCardsRevealed(true);
-    }
-
-    if (cardsRevealedDuringBiddingRef.current && gameState?.status === 'BIDDING' && dealingComplete) {
       setCardsRevealed(true);
     }
   }, [

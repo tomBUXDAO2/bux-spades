@@ -408,12 +408,13 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   }
                   alt={`${card.rank}${card.suit}`}
                   faceDown={
-                    // CRITICAL: During PLAYING, hand cards should NEVER be face down
-                    // During bidding, show cards face up when cardsRevealed is true
-                    // Also keep face down if dealing is not complete or card hasn't been dealt yet
-                    gameState.status === "PLAYING" ? false :
-                    (gameState.status === "BIDDING" && !cardsRevealed) || 
-                    (!dealingComplete && index >= dealtCardCount)
+                    // PLAYING: always face up. BIDDING: face down until deal finishes AND revealed for turn.
+                    // Require dealingComplete so a stale cardsRevealed=true from the prior hand cannot flash.
+                    gameState.status === "PLAYING"
+                      ? false
+                      : gameState.status === "BIDDING"
+                        ? !cardsRevealed || !dealingComplete
+                        : !dealingComplete && index >= dealtCardCount
                   }
                 />
                 {dimUnplayable && (
