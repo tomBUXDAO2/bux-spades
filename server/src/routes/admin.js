@@ -292,6 +292,45 @@ router.post('/tournaments/:id/start', authenticateToken, isAdmin, async (req, re
   }
 });
 
+// Add bot registrations (test fill)
+router.post('/tournaments/:id/add-bots', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const count = Number(req.body?.count ?? 0);
+    const result = await TournamentService.addBots(req.params.id, count);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[ADMIN] Error adding tournament bots:', error);
+    res.status(400).json({ error: error.message || 'Failed to add bots' });
+  }
+});
+
+// Register the admin into the tournament
+router.post('/tournaments/:id/register-me', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const reg = await TournamentService.registerUser(req.params.id, req.userId);
+    res.json({ success: true, registration: reg });
+  } catch (error) {
+    console.error('[ADMIN] Error registering admin:', error);
+    res.status(400).json({ error: error.message || 'Failed to register' });
+  }
+});
+
+// Early start: bots + pair + round-1 tables (for test play without waiting for startTime)
+router.post('/tournaments/:id/start-early', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const botCount = Number(req.body?.botCount ?? 0);
+    const registerAdmin = req.body?.registerAdmin !== false;
+    const result = await TournamentService.startEarly(req.params.id, req.userId, {
+      botCount,
+      registerAdmin
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('[ADMIN] Error starting tournament early:', error);
+    res.status(400).json({ error: error.message || 'Failed to start early' });
+  }
+});
+
 // Generate bracket for tournament (closes registration and starts tournament)
 router.post('/tournaments/:tournamentId/generate-bracket', authenticateToken, isAdmin, async (req, res) => {
   try {

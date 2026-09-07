@@ -53,9 +53,10 @@ export class TournamentService {
 
     const startDate = this.parseDate(startTime, 'Tournament start time');
 
-    // Validate start time is in the future
-    if (startDate <= new Date()) {
-      throw new Error('Tournament start time must be in the future');
+    // Allow start times up to 24h in the past so admins can run immediate test events
+    const earliestAllowed = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    if (startDate < earliestAllowed) {
+      throw new Error('Tournament start time is too far in the past');
     }
 
     // Validate buy-in if provided
@@ -308,6 +309,298 @@ export class TournamentService {
     });
 
     return { success: true, message: 'Tournament started - waiting for players to ready up' };
+  }
+
+  /** Register a user into an open tournament (admin self-register / bots). */
+  static async registerUser(tournamentId, userId, { partnerId = null } = {}) {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true }
+    });
+    if (!tournament) throw new Error('Tournament not found');
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw new Error('Registration is closed');
+    }
+    const existing = tournament.registrations.find((r) => r.userId === userId);
+    if (existing) return existing;
+
+    return prisma.tournamentRegistration.create({
+      data: {
+        tournamentId,
+        userId,
+        partnerId,
+        isComplete: Boolean(partnerId),
+        isSub: false
+      },
+      include: { user: true, partner: true }
+    });
+  }
+
+  /** Add N bot registrations for test / fill. */
+  static async addBots(tournamentId, count) {
+    const n = Math.max(0, Math.min(64, Number(count) || 0));
+    if (n === 0) return { added: 0, bots: [] };
+
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true }
+    });
+    if (!tournament) throw new Error('Tournament not found');
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw new Error('Can only add bots while registration is open');
+    }
+
+    const { BotUserService } = await import('./BotUserService.js');
+    const bots = [];
+    for (let i = 0; i < n; i++) {
+      const botDiscordId = `bot_tour_${tournamentId.slice(-6)}_${Date.now()}_${i}`;
+      const botUser = await BotUserService.createBotUser(botDiscordId, tournamentId);
+      // Prefer a readable tournament bot name
+      if (!botUser.username?.startsWith('TourBot_')) {
+        try {
+          await prisma.user.update({
+            where: { id: botUser.id },
+            data: { username: `TourBot_${String(i + 1).padStart(2, '0')}` }
+          });
+        } catch {}
+      }
+      const reg = await this.registerUser(tournamentId, botUser.id);
+      bots.push({ userId: botUser.id, username: `TourBot_${String(i + 1).padStart(2, '0')}`, registrationId: reg.id });
+    }
+    return { added: bots.length, bots };
+  }
+
+  static buildTeamMap(registrations) {
+    const teamIdToPlayerIds = new Map();
+    const processed = new Set();
+
+    for (const reg of registrations) {
+      if (processed.has(reg.id)) continue;
+      if (reg.partnerId && reg.isComplete) {
+        const players = [reg.userId, reg.partnerId];
+        teamIdToPlayerIds.set(`team_${reg.userId}_${reg.partnerId}`, players);
+        teamIdToPlayerIds.set(`team_${reg.partnerId}_${reg.userId}`, players);
+        processed.add(reg.id);
+        const partner = registrations.find(
+          (r) => r.userId === reg.partnerId && r.partnerId === reg.userId
+        );
+        if (partner) processed.add(partner.id);
+      } else if (!reg.partnerId && !reg.isSub) {
+        teamIdToPlayerIds.set(`team_${reg.userId}`, [reg.userId]);
+        processed.add(reg.id);
+      }
+    }
+    return teamIdToPlayerIds;
+  }
+
+  /** Create Spades tables for round-1 matches that have both teams. */
+  static async createRound1Tables(tournamentId) {
+    const tournament = await this.getTournament(tournamentId);
+    if (!tournament) throw new Error('Tournament not found');
+
+    const teamMap = this.buildTeamMap(tournament.registrations || []);
+    const round1 = (tournament.matches || []).filter(
+      (m) =>
+        m.round === 1 &&
+        m.team1Id &&
+        m.team2Id &&
+        !m.gameId &&
+        m.status !== 'COMPLETED'
+    );
+
+    const created = [];
+    for (const match of round1) {
+      const game = await this.createMatchTable(tournament, match, teamMap);
+      created.push({ matchId: match.id, gameId: game.id });
+    }
+    return created;
+  }
+
+  static async createMatchTable(tournament, match, teamMap) {
+    const { GameService } = await import('./GameService.js');
+    const { redisGameState } = await import('./RedisGameStateService.js');
+    const { BotUserService } = await import('./BotUserService.js');
+
+    const team1 = teamMap.get(match.team1Id) || [];
+    const team2 = match.team2Id ? teamMap.get(match.team2Id) || [] : [];
+    if (tournament.mode === 'PARTNERS' && (team1.length < 2 || team2.length < 2)) {
+      throw new Error(`Match ${match.matchNumber} is missing partners for a table`);
+    }
+    if (team1.length === 0 || team2.length === 0) {
+      throw new Error(`Match ${match.matchNumber} is missing teams`);
+    }
+
+    const seats =
+      tournament.mode === 'PARTNERS'
+        ? [
+            { userId: team1[0], seatIndex: 0, teamIndex: 0 },
+            { userId: team1[1], seatIndex: 1, teamIndex: 0 },
+            { userId: team2[0], seatIndex: 2, teamIndex: 1 },
+            { userId: team2[1], seatIndex: 3, teamIndex: 1 }
+          ]
+        : [
+            { userId: team1[0], seatIndex: 0, teamIndex: 0 },
+            { userId: team2[0], seatIndex: 1, teamIndex: 1 }
+          ];
+
+    if (tournament.mode !== 'PARTNERS' && seats.length < 4) {
+      // Solo brackets are 1v1 teams — need four soloists per Spades table (not supported yet)
+      throw new Error('Solo tournament tables need four players; use PARTNERS mode for test play');
+    }
+
+    const gameId = `tournament_${tournament.id}_match_${match.id}`;
+    const existing = await prisma.game.findUnique({ where: { id: gameId } });
+    if (existing) {
+      await prisma.tournamentMatch.update({
+        where: { id: match.id },
+        data: { gameId, status: 'IN_PROGRESS' }
+      });
+      return existing;
+    }
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: seats.map((s) => s.userId) } }
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    const game = await GameService.createGame({
+      id: gameId,
+      createdById: seats[0].userId,
+      mode: tournament.mode,
+      format: tournament.format,
+      gimmickVariant: tournament.gimmickVariant,
+      leagueId: tournament.leagueId || null,
+      isLeague: false,
+      isRated: false, // test / bot-filled tournaments should not skew ratings
+      maxPoints: tournament.maxPoints || 500,
+      minPoints: tournament.minPoints || -100,
+      buyIn: tournament.buyIn || 0,
+      nilAllowed: tournament.nilAllowed !== false,
+      blindNilAllowed: tournament.blindNilAllowed || false,
+      specialRules: tournament.specialRules || {}
+    });
+
+    // Seat 0 usually created with the game — ensure remaining seats
+    for (let i = 0; i < seats.length; i++) {
+      const s = seats[i];
+      const user = userById.get(s.userId);
+      const isHuman = !BotUserService.isBotUser(user);
+      const existingSeat = await prisma.gamePlayer.findFirst({
+        where: { gameId: game.id, seatIndex: s.seatIndex }
+      });
+      if (existingSeat) {
+        await prisma.gamePlayer.update({
+          where: { id: existingSeat.id },
+          data: {
+            userId: s.userId,
+            teamIndex: s.teamIndex,
+            isHuman,
+            leftAt: null
+          }
+        });
+      } else if (i > 0) {
+        await prisma.gamePlayer.create({
+          data: {
+            gameId: game.id,
+            userId: s.userId,
+            seatIndex: s.seatIndex,
+            teamIndex: s.teamIndex,
+            isHuman,
+            joinedAt: new Date()
+          }
+        });
+      }
+    }
+
+    await prisma.gamePlayer.updateMany({
+      where: { gameId: game.id, seatIndex: 0 },
+      data: {
+        teamIndex: seats[0].teamIndex,
+        isHuman: !BotUserService.isBotUser(userById.get(seats[0].userId))
+      }
+    });
+
+    await prisma.tournamentMatch.update({
+      where: { id: match.id },
+      data: { gameId: game.id, status: 'IN_PROGRESS' }
+    });
+
+    try {
+      const full = await GameService.getFullGameStateFromDatabase(game.id);
+      if (full) await redisGameState.setGameState(game.id, full);
+    } catch (e) {
+      console.error('[TOURNAMENT] Redis cache after match table:', e);
+    }
+
+    return game;
+  }
+
+  /**
+   * Test / admin early start: optionally add bots, register admin, finalize bracket,
+   * open round-1 tables, mark tournament IN_PROGRESS.
+   */
+  static async startEarly(tournamentId, adminUserId, { botCount = 0, registerAdmin = true } = {}) {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { registrations: true, matches: true }
+    });
+    if (!tournament) throw new Error('Tournament not found');
+    if (tournament.status === 'COMPLETED' || tournament.status === 'CANCELLED') {
+      throw new Error('Tournament cannot be started');
+    }
+
+    if (registerAdmin && adminUserId && tournament.status === 'REGISTRATION_OPEN') {
+      try {
+        await this.registerUser(tournamentId, adminUserId);
+      } catch (e) {
+        if (!String(e.message || '').includes('closed')) throw e;
+      }
+    }
+
+    if (botCount > 0 && tournament.status === 'REGISTRATION_OPEN') {
+      await this.addBots(tournamentId, botCount);
+    }
+
+    // Refresh — may still be OPEN or already CLOSED
+    let fresh = await this.getTournament(tournamentId);
+    if (fresh.status === 'REGISTRATION_OPEN') {
+      const { TournamentBracketService } = await import('./TournamentBracketService.js');
+      await TournamentBracketService.generateBracket(tournamentId);
+      fresh = await this.getTournament(tournamentId);
+    }
+
+    if (!fresh.matches?.length) {
+      throw new Error('Bracket has no matches — need at least 2 teams (4 players in PARTNERS)');
+    }
+
+    await prisma.tournament.update({
+      where: { id: tournamentId },
+      data: { status: 'IN_PROGRESS' }
+    });
+
+    let tables = [];
+    if (fresh.mode === 'PARTNERS') {
+      tables = await this.createRound1Tables(tournamentId);
+    }
+
+    // Soft Discord notify (ignore failures for local/test)
+    try {
+      const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
+      const { client } = await import('../discord/bot.js');
+      if (client?.isReady?.() && !fresh.leagueId) {
+        const t = await this.getTournament(tournamentId);
+        await DiscordTournamentService.postTournamentGoodLuckEmbed(client, t);
+      }
+    } catch (e) {
+      console.warn('[TOURNAMENT] Discord notify skipped:', e.message);
+    }
+
+    return {
+      success: true,
+      tables,
+      tournament: await this.getTournament(tournamentId),
+      message: `Tournament started early with ${tables.length} round-1 table(s)`
+    };
   }
 }
 

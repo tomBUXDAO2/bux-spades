@@ -212,6 +212,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   const [tournamentError, setTournamentError] = useState<string | null>(null);
   const [tournamentSuccessMessage, setTournamentSuccessMessage] = useState<string | null>(null);
   const [creatingTournament, setCreatingTournament] = useState(false);
+  const [tournamentBotCounts, setTournamentBotCounts] = useState<Record<string, number>>({});
   const [newTournament, setNewTournament] = useState<TournamentFormState>({
     name: '',
     mode: 'PARTNERS',
@@ -447,6 +448,93 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
         },
       });
 
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to start tournament');
+      }
+
+      setTournamentSuccessMessage('Tournament started');
+      await fetchTournaments();
+    } catch (err: any) {
+      console.error('Error starting tournament:', err);
+      setTournamentError(err?.message || 'Failed to start tournament');
+    }
+  };
+
+  const handleAddTournamentBots = async (tournamentId: string) => {
+    const count = tournamentBotCounts[tournamentId] ?? 7;
+    try {
+      setTournamentError(null);
+      const token = localStorage.getItem('sessionToken');
+      const response = await fetch(`${apiBaseUrl}/api/admin/tournaments/${tournamentId}/add-bots`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ count })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to add bots');
+      setTournamentSuccessMessage(`Added ${data.added ?? count} bots`);
+      await fetchTournaments();
+    } catch (err: any) {
+      console.error(err);
+      setTournamentError(err?.message || 'Failed to add bots');
+    }
+  };
+
+  const handleRegisterMeTournament = async (tournamentId: string) => {
+    try {
+      setTournamentError(null);
+      const token = localStorage.getItem('sessionToken');
+      const response = await fetch(`${apiBaseUrl}/api/admin/tournaments/${tournamentId}/register-me`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to register');
+      setTournamentSuccessMessage('You are registered for this tournament');
+      await fetchTournaments();
+    } catch (err: any) {
+      setTournamentError(err?.message || 'Failed to register');
+    }
+  };
+
+  const handleStartTournamentEarly = async (tournamentId: string) => {
+    const botCount = tournamentBotCounts[tournamentId] ?? 7;
+    if (
+      !confirm(
+        `Start early? This will register you (if needed), add ${botCount} bots if registration is still open, pair unpartnered players, build the bracket, and open round-1 tables.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setTournamentError(null);
+      const token = localStorage.getItem('sessionToken');
+      const response = await fetch(`${apiBaseUrl}/api/admin/tournaments/${tournamentId}/start-early`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ botCount, registerAdmin: true })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Failed to start early');
+      setTournamentSuccessMessage(
+        data.message || `Started early — ${data.tables?.length ?? 0} table(s) opened`
+      );
+      await fetchTournaments();
+    } catch (err: any) {
+      console.error(err);
+      setTournamentError(err?.message || 'Failed to start early');
+    }
+  };
       if (!response.ok) {
         throw new Error('Failed to start tournament');
       }
@@ -1679,7 +1767,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                                 Status: {tournament.status} • Registrations: {tournament._count?.registrations || 0}
                               </p>
                             </div>
-                            <div className="flex flex-col gap-2 ml-4">
+                            <div className="flex flex-col gap-2 ml-4 min-w-[160px]">
                               <a
                                 href={`/tournament/${tournament.id}`}
                                 className="text-blue-400 hover:text-blue-300 text-center"
@@ -1688,25 +1776,81 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                                 View Lobby →
                               </a>
                               {tournament.status === 'REGISTRATION_OPEN' && (
-                                <button
-                                  onClick={() => handleFinalizeBracket(tournament.id)}
-                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-center"
-                                  style={{ fontSize: `${11 * textScale}px` }}
-                                >
-                                  Finalize Bracket
-                                </button>
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={64}
+                                      value={tournamentBotCounts[tournament.id] ?? 7}
+                                      onChange={(e) =>
+                                        setTournamentBotCounts((prev) => ({
+                                          ...prev,
+                                          [tournament.id]: Math.max(0, Number(e.target.value) || 0)
+                                        }))
+                                      }
+                                      className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-1 text-white text-center"
+                                      style={{ fontSize: `${11 * textScale}px` }}
+                                      title="Bot count"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddTournamentBots(tournament.id)}
+                                      className="flex-1 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded"
+                                      style={{ fontSize: `${11 * textScale}px` }}
+                                    >
+                                      Add bots
+                                    </button>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRegisterMeTournament(tournament.id)}
+                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-center"
+                                    style={{ fontSize: `${11 * textScale}px` }}
+                                  >
+                                    Register me
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartTournamentEarly(tournament.id)}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-center"
+                                    style={{ fontSize: `${11 * textScale}px` }}
+                                  >
+                                    Start early
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFinalizeBracket(tournament.id)}
+                                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-center"
+                                    style={{ fontSize: `${11 * textScale}px` }}
+                                  >
+                                    Finalize Bracket
+                                  </button>
+                                </>
                               )}
                               {tournament.status === 'REGISTRATION_CLOSED' && (
-                                <button
-                                  onClick={() => handleStartTournament(tournament.id)}
-                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-center"
-                                  style={{ fontSize: `${11 * textScale}px` }}
-                                >
-                                  Start Tournament
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartTournamentEarly(tournament.id)}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-center"
+                                    style={{ fontSize: `${11 * textScale}px` }}
+                                  >
+                                    Start early (open tables)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartTournament(tournament.id)}
+                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-center"
+                                    style={{ fontSize: `${11 * textScale}px` }}
+                                  >
+                                    Start (Discord ready)
+                                  </button>
+                                </>
                               )}
-                              {tournament.status !== 'CANCELLED' && tournament.status !== 'REGISTRATION_CLOSED' && (
+                              {tournament.status !== 'CANCELLED' && tournament.status !== 'REGISTRATION_CLOSED' && tournament.status !== 'IN_PROGRESS' && (
                                 <button
+                                  type="button"
                                   onClick={() => handleCancelTournament(tournament.id)}
                                   className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-center"
                                   style={{ fontSize: `${11 * textScale}px` }}
@@ -1715,6 +1859,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                                 </button>
                               )}
                               <button
+                                type="button"
                                 onClick={() => handleDeleteTournament(tournament.id)}
                                 className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-center"
                                 style={{ fontSize: `${11 * textScale}px` }}

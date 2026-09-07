@@ -143,11 +143,20 @@ export class TournamentBracketService {
         });
       }
       
-      // Pair them up
+      // Pair them up and persist partnerships so team maps resolve later
       for (let i = 0; i < shuffled.length; i += 2) {
         if (i + 1 < shuffled.length) {
           const player1 = shuffled[i];
           const player2 = shuffled[i + 1];
+
+          await prisma.tournamentRegistration.update({
+            where: { id: player1.id },
+            data: { partnerId: player2.userId, isComplete: true, isSub: false }
+          });
+          await prisma.tournamentRegistration.update({
+            where: { id: player2.id },
+            data: { partnerId: player1.userId, isComplete: true, isSub: false }
+          });
           
           teams.push({
             id: `team_${player1.userId}_${player2.userId}`,

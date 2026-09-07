@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/features/auth/AuthContext';
 
 interface TournamentRegistration {
   id: string;
@@ -70,12 +71,70 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isOpen || !tournamentId) return;
 
     fetchTournament();
+    const interval = setInterval(fetchTournament, 8000);
+    return () => clearInterval(interval);
   }, [isOpen, tournamentId]);
+
+  const teamPlayerMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!tournament?.registrations) return map;
+    const processed = new Set<string>();
+    for (const reg of tournament.registrations) {
+      if (processed.has(reg.id)) continue;
+      if (reg.partnerId && reg.isComplete) {
+        const players = [reg.userId, reg.partnerId];
+        map.set(`team_${reg.userId}_${reg.partnerId}`, players);
+        map.set(`team_${reg.partnerId}_${reg.userId}`, players);
+        processed.add(reg.id);
+      } else if (!reg.partnerId) {
+        map.set(`team_${reg.userId}`, [reg.userId]);
+        processed.add(reg.id);
+      }
+    }
+    return map;
+  }, [tournament?.registrations]);
+
+  const userInMatch = (match: TournamentMatch) => {
+    if (!user?.id) return false;
+    const ids = [
+      ...(teamPlayerMap.get(match.team1Id || '') || []),
+      ...(match.team2Id ? teamPlayerMap.get(match.team2Id) || [] : [])
+    ];
+    return ids.includes(user.id);
+  };
+
+  const renderMatchActions = (match: TournamentMatch) => {
+    if (!match.gameId) return null;
+    const involved = userInMatch(match);
+    return (
+      <div className="mt-1 flex justify-center">
+        <button
+          type="button"
+          onClick={() =>
+            navigate(
+              involved
+                ? `/table/${match.gameId}`
+                : `/table/${match.gameId}?spectate=1`
+            )
+          }
+          className={`rounded px-2 py-0.5 text-xs font-semibold ${
+            involved
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              : 'bg-slate-600 hover:bg-slate-500 text-white'
+          }`}
+        >
+          {involved ? 'Join' : 'Watch'}
+        </button>
+      </div>
+    );
+  };
 
   const fetchTournament = async () => {
     setLoading(true);
@@ -439,8 +498,9 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                                           ) : (
                                             <div className="text-xs text-slate-500 italic">TBD</div>
                                           )}
-                                          {match.gameId && (
-                                            <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
+                                          {renderMatchActions(match)}
+                                          {!match.gameId && match.status === 'PENDING' && (
+                                            <div className="text-xs text-slate-500 mt-1">Waiting…</div>
                                           )}
                                         </div>
                                       );
@@ -485,9 +545,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                                             <div className={`text-xs py-1 px-2 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
                                               {team2.name !== 'TBD' ? team2.name : 'TBD'}
                                             </div>
-                                            {match.gameId && (
-                                              <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
-                                            )}
+                                            {renderMatchActions(match)}
                                           </div>
                                         );
                                       })}
@@ -526,8 +584,9 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                                       <div className={`text-sm py-2 px-3 rounded ${winner && winner.name === team2.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
                                         {team2.name !== 'TBD' ? team2.name : 'TBD'}
                                       </div>
-                                      {match.gameId && (
-                                        <div className="text-xs text-blue-400 mt-2">Game: {match.gameId.slice(-8)}</div>
+                                      {renderMatchActions(match)}
+                                      {!match.gameId && match.status === 'PENDING' && (
+                                        <div className="text-xs text-slate-500 mt-2">Waiting…</div>
                                       )}
                                     </div>
                                   );
@@ -610,8 +669,9 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                                       ) : (
                                         <div className="text-xs text-slate-500 italic">TBD</div>
                                       )}
-                                      {match.gameId && (
-                                        <div className="text-xs text-blue-400 mt-1">Game: {match.gameId.slice(-8)}</div>
+                                      {renderMatchActions(match)}
+                                      {!match.gameId && match.status === 'PENDING' && (
+                                        <div className="text-xs text-slate-500 mt-1">Waiting…</div>
                                       )}
                                     </div>
                                   );
