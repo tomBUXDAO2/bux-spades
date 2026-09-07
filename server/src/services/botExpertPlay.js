@@ -433,6 +433,27 @@ export function buildExpertContext(base) {
 
   const partnerVoidSuits = voids[partnerSeat] || new Set();
 
+  const nilStillAlive = (seat, flagged) => {
+    if (!flagged) return false;
+    const si = normSeat(seat);
+    if (si == null) return false;
+    if (Number(trickWins[si] || 0) > 0) return false;
+    for (const t of game?.play?.completedTricks || []) {
+      const w = normSeat(
+        t?.winnerIndex ?? t?.winnerSeatIndex ?? t?.winningSeatIndex ?? t?.winnerSeat
+      );
+      if (w === si) return false;
+    }
+    return true;
+  };
+
+  const selfNilAlive = nilStillAlive(seatIndex, selfNil);
+  const partnerNilAlive = nilStillAlive(partnerSeat, partnerNil);
+  const oppNilSeatsAlive = oppSeats.filter((s) =>
+    nilStillAlive(s, isNilBid(bidsSafe[s]))
+  );
+  const oppNilSeatAlive = oppNilSeatsAlive[0] ?? null;
+
   return {
     ...base,
     trick,
@@ -446,7 +467,11 @@ export function buildExpertContext(base) {
     aggressiveTable,
     selfNil,
     partnerNil,
+    selfNilAlive,
+    partnerNilAlive,
     oppNilSeat,
+    oppNilSeatAlive,
+    oppNilSeatsAlive,
     doubleNil,
     weAreAhead,
     played,
@@ -472,7 +497,7 @@ function partnerWinning(trick, partnerSeat) {
 
 /** Contract already made + bag risk: dump instead of grabbing overtricks (nil paths excluded). */
 function shouldDumpForBags(ctx) {
-  if (ctx.selfNil || ctx.partnerNil) return false;
+  if (ctx.selfNilAlive || ctx.partnerNilAlive) return false;
   if (!ctx.bagPressure && !ctx.severeBagPressure) return false;
   if (!ctx.teamBid || ctx.teamBid <= 0) return false;
   return ctx.teamTricks >= ctx.teamBid;
@@ -672,11 +697,9 @@ function playCoverNil(ctx) {
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
     if (nilLed) return sortAsc(leadCards)[0];
-    // Play before partner: try to win so they can duck under us
-    const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
-    if (win) return win;
-    // Cannot win — dump LOW (save high covers), not high
-    return sortAsc(leadCards)[0];
+    // Opp/third hand before partner: play HIGHEST in suit (not cheapest winner).
+    // Cheapest (e.g. 3 under a 2) lets a later seat overtake and set partner.
+    return sortDesc(leadCards)[0];
   }
   const spades = hand.filter((c) => c.suit === 'SPADES');
   const nonSp = hand.filter((c) => c.suit !== 'SPADES');
@@ -686,11 +709,10 @@ function playCoverNil(ctx) {
     if (pick) return pick;
     return spades.length ? sortAsc(spades)[0] : sortAsc(hand)[0];
   }
-  // Before partner, void: cut cheaply to get on top for them
-  const cut = minimalWinningSpade(trick, hand);
-  if (cut) return cut;
+  // Void before partner: cut with HIGHEST spade so the book is secure for them
+  if (spades.length) return sortDesc(spades)[0];
   if (nonSp.length) return sortAsc(nonSp)[0];
-  return spades.length ? sortAsc(spades)[0] : sortAsc(hand)[0];
+  return sortAsc(hand)[0];
 }
 
 function playDefendOppNil(ctx) {
@@ -707,9 +729,9 @@ function playDefendOppNil(ctx) {
     game
   } = ctx;
 
-  // Must never run defend-nil tactics while we (or partner) are on nil — double-nil mis-routing used to do this.
-  if (ctx.selfNil) return playSelfNil(ctx);
-  if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
+  // Must never run defend-nil tactics while we (or partner) are still on a live nil.
+  if (ctx.selfNilAlive ?? ctx.selfNil) return playSelfNil(ctx);
+  if (ctx.partnerNilAlive ?? ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
 
   const needBooks = teamNeedsTricks(ctx);
   const voidsOpp = ctx.voids[oppNilSeat] || new Set();
@@ -1030,14 +1052,23 @@ function teamNeedsTricks(ctx) {
 }
 
 function playDoubleNil(ctx) {
-  // Own nil always beats “attack their nil” — behind used to call playDefendOppNil and bots would win books.
-  if (ctx.selfNil) return playSelfNil(ctx);
-  if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
+  // Own / partner nil only while still alive; once set, attack remaining opp nil.
+  if (ctx.selfNilAlive) return playSelfNil(ctx);
+  if (ctx.partnerNilAlive) return playCoverNil({ ...ctx, doubleNil: false });
+  const opp = ctx.oppNilSeatAlive ?? ctx.oppNilSeat;
+  if (opp != null) {
+    return playDefendOppNil({
+      ...ctx,
+      oppNilSeat: opp,
+      selfNil: false,
+      partnerNil: false,
+      selfNilAlive: false,
+      partnerNilAlive: false,
+      doubleNil: false
+    });
+  }
   if (ctx.weAreAhead) {
     return playCautious(ctx);
-  }
-  if (ctx.oppNilSeat != null) {
-    return playDefendOppNil({ ...ctx, doubleNil: false });
   }
   return playAggressive(ctx);
 }
@@ -1055,12 +1086,23 @@ function groupBySuit(cards) {
  */
 export function expertChooseCard(ctx) {
   const x = buildExpertContext(ctx);
-  const { doubleNil, selfNil, partnerNil, oppNilSeat } = x;
+  const selfNilAlive = x.selfNilAlive ?? x.selfNil;
+  const partnerNilAlive = x.partnerNilAlive ?? x.partnerNil;
+  const oppNilAlive = x.oppNilSeatAlive ?? null;
 
-  if (doubleNil) return playDoubleNil(x);
-  if (selfNil) return playSelfNil(x);
-  if (partnerNil) return playCoverNil(x);
-  if (oppNilSeat != null && !selfNil && !partnerNil) return playDefendOppNil(x);
+  // Live nils first; once a nil is set, stop covering and attack remaining opp nils.
+  if (selfNilAlive) return playSelfNil(x);
+  if (partnerNilAlive) return playCoverNil(x);
+  if (oppNilAlive != null) {
+    return playDefendOppNil({
+      ...x,
+      oppNilSeat: oppNilAlive,
+      selfNil: false,
+      partnerNil: false,
+      selfNilAlive: false,
+      partnerNilAlive: false
+    });
+  }
   if (x.takeAllMode) return playAggressive(x);
   return playCautious(x);
 }

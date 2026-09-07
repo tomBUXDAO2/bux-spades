@@ -339,7 +339,14 @@ export default function GameTableModular({
   // Refs
   const infoRef = useRef<HTMLDivElement>(null);
   const trickClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /** Server asked to clear before we painted all 4 cards (lag) — defer until 4 are visible. */
+  const pendingClearTableRef = useRef(false);
+  const fourthCardShownAtRef = useRef<number | null>(null);
+  const animatedTrickCardsRef = useRef<any[]>([]);
+  const lastNonEmptyTrickRef = useRef<any[]>([]);
   const showHandSummaryRef = useRef<boolean>(false);
+  const MIN_FOURTH_CARD_DWELL_MS = 280;
+  const WAIT_FOR_FOURTH_MAX_MS = 1000;
   
   // Utility functions
   const isPlayer = (p: Player | Bot | null): p is Player => {
@@ -836,12 +843,14 @@ export default function GameTableModular({
       if (resolvedTrickCards.length > 0) {
         setLastNonEmptyTrick(resolvedTrickCards);
       }
+      if (resolvedTrickCards.length >= 4 && fourthCardShownAtRef.current == null) {
+        fourthCardShownAtRef.current = Date.now();
+      }
       
       // Play win sound effect when trick completes
       playWinSound();
       
-      // CRITICAL FIX: Don't clear trick animation here - let the server clear_table_cards event handle it
-      // This prevents the 4th card from flickering due to race conditions between client and server timers
+      // Fallback clear if server clear_table_cards is lost — still gated on 4 cards below
       console.log('[TRICK ANIMATION] Trick animation started - waiting for server clear_table_cards event');
       if (trickClearTimeoutRef.current) {
         clearTimeout(trickClearTimeoutRef.current);
@@ -849,39 +858,108 @@ export default function GameTableModular({
       trickClearTimeoutRef.current = setTimeout(() => {
         console.log('[TRICK ANIMATION] Fallback clearing table cards after timeout');
         handleClearTableCards({ fallback: true });
-      }, 950);
+      }, 1200);
     } else {
       console.warn('[TRICK COMPLETE] Unable to determine winner seat index from payload', { data });
     }
   };
-  
-  const handleClearTableCards = (data?: any) => {
-    console.log('[TRICK CLEAR] Clearing table cards from server event', data);
+
+  const countVisibleTrickCards = () => {
+    const fromState = Math.max(
+      (gameState as any)?.play?.currentTrick?.length || 0,
+      (gameState as any)?.currentTrickCards?.length || 0
+    );
+    return Math.max(
+      animatedTrickCardsRef.current.length,
+      lastNonEmptyTrickRef.current.length,
+      fromState
+    );
+  };
+
+  const performClearTableCards = (data?: any) => {
+    console.log('[TRICK CLEAR] Performing table clear', data);
     if (trickClearTimeoutRef.current) {
       clearTimeout(trickClearTimeoutRef.current);
       trickClearTimeoutRef.current = null;
     }
-    
-    // CRITICAL FIX: Clear all trick-related state when server says to clear table
+    pendingClearTableRef.current = false;
+    fourthCardShownAtRef.current = null;
+
     setAnimatedTrickCards([]);
     setLastNonEmptyTrick([]);
     setTrickWinner(null);
     setAnimatingTrick(false);
     setTrickCompleted(false);
-    // Clear any pending overlay
     setPendingPlayedCard(null);
-    
-    // CRITICAL FIX: Always clear currentTrick when server emits clear_table_cards
-    // This is the authoritative signal that the table should be cleared
+
     setGameState((prevState: any) => ({
       ...prevState,
       play: {
         ...prevState.play,
-        currentTrick: [] // Clear trick cards completely
+        currentTrick: []
       },
-      currentTrickCards: [] // Also clear this field
+      currentTrickCards: []
     }));
   };
+
+  const scheduleGatedTableClear = (data?: any) => {
+    if (trickClearTimeoutRef.current) {
+      clearTimeout(trickClearTimeoutRef.current);
+      trickClearTimeoutRef.current = null;
+    }
+    const shownAt = fourthCardShownAtRef.current ?? Date.now();
+    if (fourthCardShownAtRef.current == null) {
+      fourthCardShownAtRef.current = shownAt;
+    }
+    const wait = Math.max(0, MIN_FOURTH_CARD_DWELL_MS - (Date.now() - shownAt));
+    trickClearTimeoutRef.current = setTimeout(() => {
+      performClearTableCards(data ?? { gated: true });
+    }, wait);
+  };
+  
+  const handleClearTableCards = (data?: any) => {
+    console.log('[TRICK CLEAR] clear_table_cards received', data);
+    const haveFour = countVisibleTrickCards() >= 4;
+    if (!haveFour) {
+      // Lag: 4th card not painted yet — wait for it, then dwell briefly (no extra lag when already complete)
+      pendingClearTableRef.current = true;
+      if (trickClearTimeoutRef.current) {
+        clearTimeout(trickClearTimeoutRef.current);
+      }
+      trickClearTimeoutRef.current = setTimeout(() => {
+        console.warn('[TRICK CLEAR] Timed out waiting for 4th card — clearing anyway');
+        performClearTableCards({ ...(data || {}), forcedAfterWait: true });
+      }, WAIT_FOR_FOURTH_MAX_MS);
+      return;
+    }
+    scheduleGatedTableClear(data);
+  };
+
+  useEffect(() => {
+    animatedTrickCardsRef.current = animatedTrickCards;
+    lastNonEmptyTrickRef.current = lastNonEmptyTrick;
+    const n = Math.max(
+      animatedTrickCards.length,
+      lastNonEmptyTrick.length,
+      (gameState as any)?.play?.currentTrick?.length || 0,
+      (gameState as any)?.currentTrickCards?.length || 0
+    );
+    if (n >= 4) {
+      if (fourthCardShownAtRef.current == null) {
+        fourthCardShownAtRef.current = Date.now();
+      }
+      if (pendingClearTableRef.current) {
+        scheduleGatedTableClear({ fromPendingFourVisible: true });
+      }
+    } else if (n === 0) {
+      fourthCardShownAtRef.current = null;
+    }
+  }, [
+    animatedTrickCards,
+    lastNonEmptyTrick,
+    (gameState as any)?.play?.currentTrick,
+    (gameState as any)?.currentTrickCards
+  ]);
   
   const handleSocketError = (error: { message: string }) => {
     const msg = typeof error?.message === 'string' ? error.message : '';
