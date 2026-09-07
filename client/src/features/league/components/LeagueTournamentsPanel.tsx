@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, apiFetch } from '@/services/lib/api';
 import TournamentBracketTree from './TournamentBracketTree';
+import TournamentDoubleBracket from './TournamentDoubleBracket';
 import { setTableReturnPath } from '@/pages/TablePage';
 
 type TournamentStatus =
@@ -121,8 +122,10 @@ function formatWhen(iso: string) {
 }
 
 function roundLabel(round: number) {
+  if (round === 1001) return 'GF Reset';
   if (round >= 1000) return 'Grand Final';
-  if (round >= 100) return `W${round / 100}`;
+  if (round >= 100 && round % 100 === 0) return `W${round / 100}`;
+  if (round > 100) return `L${round}`;
   return `R${round}`;
 }
 
@@ -719,16 +722,26 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
             {(detail.matches || []).length === 0 ? (
               <p className="text-xs text-white/60">No matches yet.</p>
             ) : (detail.matches || []).every((m) => m.round >= 100) ? (
-              <ul className="space-y-2">
-                {(detail.matches || []).map((m) => (
-                  <li
-                    key={m.id}
-                    className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/85"
-                  >
-                    {roundLabel(m.round)} · Match {m.matchNumber} · {m.status}
-                  </li>
-                ))}
-              </ul>
+              <TournamentDoubleBracket
+                matches={detail.matches || []}
+                getTeamName={(id) => getTeamDisplay(id).name}
+                currentUserId={currentUserId}
+                live={live}
+                isAdmin={isAdmin}
+                isTimedOut={isTimedOut}
+                saving={saving}
+                onReady={(matchId) =>
+                  post(
+                    `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${matchId}/ready`
+                  )
+                }
+                onOpenTable={openTableFromBracket}
+                onForceOpen={(matchId) =>
+                  post(
+                    `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${matchId}/open-table`
+                  )
+                }
+              />
             ) : (
               <TournamentBracketTree
                 matches={detail.matches || []}
@@ -830,6 +843,12 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                 <option value="SINGLE">Single</option>
                 <option value="DOUBLE">Double</option>
               </select>
+              {eliminationType === 'DOUBLE' && (
+                <span className="mt-1 block text-[10px] font-normal text-white/50">
+                  Needs 2 / 4 / 8 / 16 teams (power of 2). Lose in winners → losers bracket. Grand
+                  final: winners champ needs 1 win; if losers champ wins game 1, a reset is played.
+                </span>
+              )}
             </label>
             <label className={labelClass}>
               Start (local)

@@ -429,7 +429,7 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                     // Separate winners and losers brackets
                     const winnersMatches = tournament.matches.filter(m => m.round < 1000 && m.round % 100 === 0);
                     const losersMatches = tournament.matches.filter(m => m.round < 1000 && m.round % 100 !== 0);
-                    const grandFinals = tournament.matches.filter(m => m.round === 1000);
+                    const grandFinals = tournament.matches.filter(m => m.round >= 1000);
 
                     // Group by round
                     const winnersByRound = new Map<number, typeof tournament.matches>();
@@ -577,7 +577,9 @@ const TournamentLobbyModal: React.FC<TournamentLobbyModalProps> = ({ isOpen, tou
                                         'border-slate-600'
                                       }`}
                                     >
-                                      <div className="text-sm text-slate-400 mb-2">Grand Finals</div>
+                                      <div className="text-sm text-slate-400 mb-2">
+                                        {match.round === 1001 ? 'Reset (Game 2)' : match.round === 1000 ? 'Game 1' : 'Grand Finals'}
+                                      </div>
                                       <div className={`text-sm py-2 px-3 rounded mb-2 ${winner && winner.name === team1.name ? 'bg-yellow-600 text-white font-semibold' : 'bg-slate-600 text-white'}`}>
                                         {team1.name}
                                       </div>
