@@ -535,17 +535,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       setTournamentError(err?.message || 'Failed to start early');
     }
   };
-      if (!response.ok) {
-        throw new Error('Failed to start tournament');
-      }
-
-      setTournamentSuccessMessage('Tournament started successfully');
-      await fetchTournaments();
-    } catch (err) {
-      console.error('Error starting tournament:', err);
-      setTournamentError('Failed to start tournament');
-    }
-  };
 
   const handleEventInputChange = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setNewEvent(prev => ({
