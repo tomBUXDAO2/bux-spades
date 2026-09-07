@@ -196,8 +196,16 @@ export default function GameTablePlayers({
     const avatarHeight = isVerySmallScreen ? 24 : (isMobile ? 32 : 40);
     
     // Determine game mode early for color selection
-    const isPartnerGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'PARTNERS';
-    const isSoloGame = ((gameState as any).gameMode || (gameState as any).rules?.gameType) === 'SOLO';
+    // rules.gameType is often the bidding format (REGULAR/MIRROR/…), not PARTNERS —
+    // so treat anything that isn't SOLO as partners for badge logic.
+    const modeToken = String(
+      (gameState as any).gameMode ||
+        (gameState as any).mode ||
+        ((gameState as any).rules?.gameType === 'SOLO' ? 'SOLO' : '') ||
+        ''
+    ).toUpperCase();
+    const isSoloGame = modeToken === 'SOLO';
+    const isPartnerGame = !isSoloGame;
     
     // Determine player color based on game mode
     let playerGradient;
@@ -231,7 +239,15 @@ export default function GameTablePlayers({
     // Use the player's actual seatIndex to get the bid from the server
     // The server's bidding.bids array is indexed by seatIndex (0,1,2,3)
     const actualSeatIndex = player.seatIndex;
-    let rawBid = (gameState as any).bidding?.bids?.[actualSeatIndex];
+    const bidsArr = (gameState as any).bidding?.bids;
+    let rawBid =
+      actualSeatIndex !== null && actualSeatIndex !== undefined
+        ? bidsArr?.[actualSeatIndex]
+        : undefined;
+    // Fallback to player.bid when bids array slot is missing
+    if (rawBid === null || rawBid === undefined) {
+      rawBid = (player as any).bid;
+    }
     const isBlindNil = (gameState as any).players?.[actualSeatIndex]?.isBlindNil || player.isBlindNil || false;
     
     // OPTIMISTIC UI: Show pending bid immediately
@@ -241,10 +257,13 @@ export default function GameTablePlayers({
     }
     
     
-    const bidCount = rawBid !== null && rawBid !== undefined ? rawBid : 0;
     const hasBid = rawBid !== null && rawBid !== undefined;
+    const bidCount = hasBid ? Number(rawBid) : 0;
+    // Nil / blind nil: never inherit partner contract tick mid-hand
+    const isNilSeat =
+      hasBid && (isBlindNil || bidCount === 0 || bidCount === -1 || Number(rawBid) === -1);
     
-    let madeStatus = null;
+    let madeStatus: string | null = null;
     const tricksLeft = getTricksRemainingInHand(gameState);
     const formatBid = (bid: number | null, isBlindNil: boolean = false) => {
       if (bid === null || bid === undefined) return "0";
@@ -254,18 +273,16 @@ export default function GameTablePlayers({
       return bid.toString();
     };
     
-    if (isPartnerGame) {
-      // Partner game: nil/blind-nil is personal; contract tick/cross is only for non-nil bids.
+    if (isNilSeat) {
+      // Absolute rule (solo + partners): nil only shows ❌ after taking a trick.
+      // Never ✅ mid-hand — nil success is only known after all 13 tricks.
+      madeStatus = madeCount > 0 ? '❌' : null;
+    } else if (isPartnerGame) {
+      // Non-nil partners seat: team contract tick/cross on this player only
       const partnerPosition = (actualSeatIndex + 2) % 4;
       const partner = gameState.players[partnerPosition];
       const partnerRawBid = (gameState as any).bidding?.bids?.[partnerPosition];
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
-
-      const isNilTypeBid = (bid: unknown, blindNil: boolean, has: boolean) => {
-        if (!has) return false;
-        const n = Number(bid);
-        return blindNil || n === 0 || n === -1;
-      };
 
       const contribTeamBid = (b: unknown) => {
         if (b === null || b === undefined) return 0;
@@ -274,52 +291,31 @@ export default function GameTablePlayers({
         return n;
       };
 
-      const myNil = isNilTypeBid(rawBid, isBlindNil, hasBid);
       const teamBid = contribTeamBid(rawBid) + contribTeamBid(partnerRawBid);
       const teamMade = madeCount + partnerMade;
       const teamMadeContract = teamBid > 0 && teamMade >= teamBid;
       const teamCannotMakeContract = teamBid > 0 && teamMade + tricksLeft < teamBid;
 
-      if (myNil) {
-        // Nil only busts when this seat takes a trick — never inherit partner contract icons,
-        // and never tick mid-hand (nil success is only known after all 13 tricks).
-        madeStatus = madeCount > 0 ? '❌' : null;
-      } else if (hasBid && bidCount > 0) {
-        // Non-nil seat only: show team contract made/bust on this player
+      if (hasBid && bidCount > 0) {
         if (teamCannotMakeContract) {
           madeStatus = '❌';
         } else if (teamMadeContract) {
           madeStatus = '✅';
-        } else {
-          madeStatus = null;
         }
-      } else {
-        madeStatus = null;
       }
     } else if (isSoloGame) {
-      // Solo game logic (individual player)
-      if (bidCount === 0) {
-        // Nil bid - only show cross if they win a trick
-        if (madeCount > 0) {
-          madeStatus = '❌'; // Failed nil
-        } else {
-          // Nil stays blank (no tick even when successful)
-          madeStatus = null;
-        }
-      } else if (bidCount > 0) {
-        // Regular bid
+      // Solo non-nil
+      if (bidCount > 0) {
         if (madeCount >= bidCount) {
-          madeStatus = '✅'; // Made bid
+          madeStatus = '✅';
         } else if (madeCount + tricksLeft < bidCount) {
-          madeStatus = '❌'; // Cannot make bid
-        } else {
-          madeStatus = null; // Still possible
+          madeStatus = '❌';
         }
-      } else {
-        madeStatus = null; // No bid
       }
-    } else {
-      // Fallback: hide
+    }
+
+    // Final guard: nil seats must never show a tick
+    if (isNilSeat && madeStatus === '✅') {
       madeStatus = null;
     }
     
