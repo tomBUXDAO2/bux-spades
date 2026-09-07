@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bux-spades-v8';
+const CACHE_NAME = 'bux-spades-v9';
 const CARD_CACHE_NAME = 'bux-spades-cards-v1';
 
 // Cache card images aggressively

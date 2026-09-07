@@ -42,6 +42,19 @@ export default function BiddingInterface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isMyTurn = playerId === currentPlayerTurn;
 
+  const holdsAceSpades =
+    hasAceSpades ||
+    (Array.isArray(currentPlayerHand) &&
+      currentPlayerHand.some((card) => card.suit === 'SPADES' && card.rank === 'A'));
+  const canShowNil = allowNil !== false && !holdsAceSpades;
+
+  // Clear a stale Nil selection if Ace of Spades is present
+  useEffect(() => {
+    if (holdsAceSpades && selectedBid === 0) {
+      setSelectedBid(null);
+    }
+  }, [holdsAceSpades, selectedBid]);
+
   // For MIRROR games, automatically bid the number of spades
   useEffect(() => {
     
@@ -92,7 +105,7 @@ export default function BiddingInterface({
     }
 
     // First of team (or partner already niled): show UI with nil (if allowed) and bids 4-13 only
-    const canNil = allowNil !== false && !holdsAce && !(partnerHasBid && partnerBid === 0);
+    const canNil = canShowNil && !(partnerHasBid && partnerBid === 0);
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[420px] md:w-[400px] sm:w-[360px] max-sm:w-[280px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-3 max-sm:p-2 shadow-xl`}>
@@ -102,6 +115,9 @@ export default function BiddingInterface({
               <p className="text-sm max-sm:text-xs text-blue-300">Partner bid: {partnerBidValue === 0 ? 'Nil' : partnerBidValue}</p>
             )}
             <p className="text-xs max-sm:text-[10px] text-gray-300 mt-1">Non-nil bids must be at least 4</p>
+            {holdsAce && (
+              <p className="text-xs max-sm:text-[10px] text-amber-300 mt-1">Nil unavailable (holding Ace of Spades)</p>
+            )}
           </div>
 
           <div className="space-y-2 max-sm:space-y-1.5">
@@ -152,8 +168,6 @@ export default function BiddingInterface({
 
   // For WHIZ games, compact inline bidding modal
   if (gameType === "WHIZ") {
-    const hasAceSpades = currentPlayerHand ? currentPlayerHand.some(card => card.suit === "SPADES" && card.rank === "A") : false;
-    const cannotBidNil = hasAceSpades;
     const isForcedNil = numSpades === 0;
     
     return (
@@ -173,13 +187,14 @@ export default function BiddingInterface({
                   {numSpades}
                 </button>
               )}
-              <button
-                onClick={() => !cannotBidNil && setSelectedBid(0)}
-                disabled={cannotBidNil}
-                className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${cannotBidNil ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
-              >
-                Nil
-              </button>
+              {(isForcedNil || canShowNil) && (
+                <button
+                  onClick={() => setSelectedBid(0)}
+                  className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+                >
+                  Nil
+                </button>
+              )}
             </div>
             {/* Confirm button */}
             <button
@@ -197,13 +212,14 @@ export default function BiddingInterface({
 
   // For 4 OR NIL games, compact inline bidding modal
   if (gameType === "4 OR NIL" || gimmickType === "4 OR NIL" || gimmickType === "BID4NIL") {
-    const hasAceSpades = currentPlayerHand ? currentPlayerHand.some(card => card.suit === "SPADES" && card.rank === "A") : false;
-    
     return (
       <div className={`${modalContainerClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 z-[100020] pointer-events-auto`}>
         <div className={`${modalContentClass} w-[240px] md:w-[220px] sm:w-[200px] max-sm:w-[180px] backdrop-blur-md bg-gray-900/75 border border-white/20 rounded-2xl p-4 max-sm:p-3 shadow-xl`}>
           <div className="text-center mb-3 max-sm:mb-2">
             <h2 className="text-lg max-sm:text-base font-bold text-white">Make Your Bid</h2>
+            {holdsAceSpades && (
+              <p className="text-xs text-amber-300 mt-1">Nil unavailable (holding Ace of Spades)</p>
+            )}
           </div>
           <div className="space-y-3">
             {/* Inline bid buttons */}
@@ -214,13 +230,14 @@ export default function BiddingInterface({
               >
                 4
               </button>
-              <button
-                onClick={() => !hasAceSpades && setSelectedBid(0)}
-                disabled={hasAceSpades}
-                className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
-              >
-                Nil
-              </button>
+              {canShowNil && (
+                <button
+                  onClick={() => setSelectedBid(0)}
+                  className={`${numberButtonClass} w-16 h-12 md:w-14 md:h-10 sm:w-12 sm:h-9 max-sm:w-11 max-sm:h-8 rounded-md text-xl md:text-lg sm:text-base max-sm:text-sm font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+                >
+                  Nil
+                </button>
+              )}
             </div>
             {/* Confirm button */}
             <button
@@ -274,16 +291,18 @@ export default function BiddingInterface({
             {partnerBidValue !== undefined && (
               <p className="text-sm max-sm:text-xs text-blue-300">Partner bid: {partnerBidValue}</p>
             )}
+            {holdsAceSpades && (
+              <p className="text-xs max-sm:text-[10px] text-amber-300 mt-1">Nil unavailable (holding Ace of Spades)</p>
+            )}
           </div>
 
           <div className="space-y-2 max-sm:space-y-1.5">
             {/* Row 1: Nil, 1-6 */}
             <div className="flex justify-center gap-2 max-sm:gap-1">
-              {allowNil && (
+              {canShowNil && (
                 <button
-              onClick={() => !hasAceSpades && setSelectedBid(0)}
-              disabled={hasAceSpades}
-              className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${hasAceSpades ? "bg-gray-800/60 text-gray-500 cursor-not-allowed" : selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
+              onClick={() => setSelectedBid(0)}
+              className={`${numberButtonClass} w-12 h-9 md:w-11 md:h-8 sm:w-10 sm:h-7 max-sm:w-9 max-sm:h-6 rounded-md text-base md:text-sm sm:text-xs max-sm:text-xs font-bold transition-all flex items-center justify-center ${selectedBid === 0 ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white ring-2 ring-blue-300 shadow-lg" : "bg-gray-700/80 hover:bg-gray-600/90 text-white"}`}
             >
               Nil                </button>
               )}

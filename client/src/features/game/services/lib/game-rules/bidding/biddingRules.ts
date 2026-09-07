@@ -73,7 +73,7 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, gam
         return { min: hasAceSpades ? 4 : 0, max: 13 };
       }
       case 'BID4NIL':
-        return { min: 0, max: 4 }; // Can bid 0 (nil) or 4
+        return hasAceSpades ? { min: 4, max: 4 } : { min: 0, max: 4 };
       case 'BID3':
         return { min: 3, max: 3 }; // Must bid exactly 3
       case 'BIDHEARTS':
@@ -87,7 +87,7 @@ export function getValidBidRange(gameType: BiddingOption, numSpades: number, gam
 
   switch (gameType) {
     case 'REGULAR':
-      return { min: 0, max: 13 }; // Full range including nil
+      return { min: hasAceSpades ? 1 : 0, max: 13 };
     case 'WHIZ':
       return { min: numSpades, max: numSpades }; // Must bid number of spades
     case 'MIRROR':
@@ -114,7 +114,7 @@ export function isValidBid(gameType: BiddingOption, bid: number, numSpades: numb
         return bid >= 4 && bid <= 13;
       }
       case 'BID4NIL':
-        return bid === 0 || bid === 4; // Can bid 0 (nil) or 4
+        return hasAceSpades ? bid === 4 : bid === 0 || bid === 4;
       case 'BID3':
         return bid === 3; // Must bid exactly 3
       case 'BIDHEARTS':
@@ -128,9 +128,10 @@ export function isValidBid(gameType: BiddingOption, bid: number, numSpades: numb
 
   switch (gameType) {
     case 'REGULAR':
-      return bid >= 0 && bid <= 13;
+      if (bid === 0) return !hasAceSpades;
+      return bid >= 1 && bid <= 13;
     case 'WHIZ':
-      return bid === numSpades || (bid === 0 && numSpades === 0);
+      return bid === numSpades || (bid === 0 && numSpades === 0 && !hasAceSpades);
     case 'MIRROR':
       return bid === numSpades;
     case 'GIMMICK':

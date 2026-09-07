@@ -288,9 +288,10 @@ export const BiddingOverlay: React.FC<{
           playerId={currentPlayerId}
           currentPlayerTurn={gameState.currentPlayer}
           allowNil={
-            ((gameState as any).gimmickVariant === 'SUICIDE' || (gameState as any).forcedBid === 'SUICIDE')
-              ? !(hasAceSpades || partnerBid === 0)
-              : gameState.rules?.allowNil
+            !hasAceSpades &&
+            (((gameState as any).gimmickVariant === 'SUICIDE' || (gameState as any).forcedBid === 'SUICIDE')
+              ? partnerBid !== 0
+              : gameState.rules?.allowNil !== false)
           }
           hasAceSpades={hasAceSpades}
           gimmickType={(gameState as any).gimmickVariant || (gameState as any).rules?.gimmickType}
