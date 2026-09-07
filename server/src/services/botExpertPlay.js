@@ -103,6 +103,102 @@ export function inferVoidsFromTricks(game, currentTrick) {
   return voids;
 }
 
+function winningCardAmong(cards) {
+  if (!cards?.length) return null;
+  const leadSuit = cards[0].suit;
+  const spades = cards.filter((c) => c.suit === 'SPADES');
+  const pool = spades.length > 0 ? spades : cards.filter((c) => c.suit === leadSuit);
+  if (!pool.length) return cards[0];
+  return pool.reduce((best, c) => (cardValue(c.rank) > cardValue(best.rank) ? c : best));
+}
+
+/**
+ * Human-visible cover intel: partner void, or Ace-of-suit already out and partner
+ * followed under that Ace (nil highest-losing ⇒ that play is their suit max).
+ * Returns Map suit -> { void: true } | { maxRankValue: number }.
+ */
+export function inferPartnerNilSuitIntel(game, partnerSeat) {
+  const intel = new Map();
+  const voids = inferVoidsFromTricks(game, []);
+  const pVoids = voids[normSeat(partnerSeat)] || new Set();
+  for (const s of pVoids) {
+    intel.set(s, { void: true });
+  }
+
+  const aceSeenBeforeTrick = (suit, trickIndex) => {
+    const completed = game?.play?.completedTricks || [];
+    for (let i = 0; i < trickIndex; i++) {
+      for (const c of completed[i]?.cards || []) {
+        if (c.suit === suit && c.rank === 'A') return true;
+      }
+    }
+    return false;
+  };
+
+  const completed = game?.play?.completedTricks || [];
+  for (let ti = 0; ti < completed.length; ti++) {
+    const cards = completed[ti]?.cards || [];
+    if (cards.length < 2) continue;
+    const leadSuit = cards[0].suit;
+    if (intel.get(leadSuit)?.void) continue;
+
+    const pIdx = cards.findIndex((c) => normSeat(c.seatIndex) === normSeat(partnerSeat));
+    if (pIdx < 0) continue;
+    const pCard = cards[pIdx];
+    if (pCard.suit !== leadSuit) {
+      intel.set(leadSuit, { void: true });
+      continue;
+    }
+
+    const before = cards.slice(0, pIdx);
+    const aceInBefore = before.some((c) => c.suit === leadSuit && c.rank === 'A');
+    const aceAlreadyOut = aceSeenBeforeTrick(leadSuit, ti) || aceInBefore;
+    if (!aceAlreadyOut) continue;
+
+    // Only trust absolute max when the Ace of this suit is currently winning
+    // (no trump yet, or trump is the Ace of spades on a spade lead).
+    const winCard = winningCardAmong(before.length ? before : [cards[0]]);
+    if (!winCard || winCard.suit !== leadSuit || winCard.rank !== 'A') continue;
+
+    const maxRankValue = cardValue(pCard.rank);
+    const prev = intel.get(leadSuit);
+    if (!prev || prev.void) {
+      intel.set(leadSuit, { void: false, maxRankValue });
+    } else if (typeof prev.maxRankValue === 'number') {
+      intel.set(leadSuit, {
+        void: false,
+        maxRankValue: Math.min(prev.maxRankValue, maxRankValue)
+      });
+    }
+  }
+  return intel;
+}
+
+/** Cheapest card that wins the current trick (cover overtake). */
+export function cheapestWinningCover(trick, hand, seatIndex, leadSuit) {
+  const leadCards = hand.filter((c) => c.suit === leadSuit);
+  if (leadCards.length) {
+    const winners = leadCards.filter((c) => wouldWinWithCard(trick, c, seatIndex));
+    if (winners.length) return sortAsc(winners)[0];
+    return null;
+  }
+  return minimalWinningSpade(trick, hand);
+}
+
+function longestNonSpadeSuit(hand) {
+  const suits = groupBySuit(hand);
+  let best = null;
+  let bestLen = 0;
+  for (const s of ['HEARTS', 'DIAMONDS', 'CLUBS']) {
+    const len = (suits[s] || []).length;
+    if (len > bestLen) {
+      bestLen = len;
+      best = s;
+    }
+  }
+  return best;
+}
+
 export function provisionalWinnerSeat(trick) {
   if (!trick || trick.length === 0) return null;
   const leadSuit = trick[0].suit;
@@ -481,27 +577,58 @@ function playCoverNil(ctx) {
     isLeading,
     spadesBroken,
     partnerVoidSuits,
-    aggressiveTable,
-    partnerHasPlayed
+    partnerHasPlayed,
+    game
   } = ctx;
 
   const partnerPlayedInTrick = trick.some(
     (c) => normSeat(c.seatIndex) === normSeat(partnerSeat)
   );
+  const needBooks = teamNeedsTricks(ctx);
+  const suitIntel = inferPartnerNilSuitIntel(game, partnerSeat);
 
   if (isLeading) {
     const suits = groupBySuit(hand);
     const nonSp = ['HEARTS', 'DIAMONDS', 'CLUBS'];
+
+    // 1) Punch proven partner voids (side suits)
     for (const s of nonSp) {
-      if (partnerVoidSuits.has(s)) {
+      const intel = suitIntel.get(s);
+      if (partnerVoidSuits.has(s) || intel?.void) {
         const cards = sortDesc(suits[s] || []);
         if (cards.length) return cards[0];
       }
     }
+
+    // 2) After spades broken: lead highest spades until partner is void in spades
+    const partnerVoidSpades =
+      partnerVoidSuits.has('SPADES') || suitIntel.get('SPADES')?.void === true;
+    if (spadesBroken && !partnerVoidSpades && (suits.SPADES || []).length) {
+      return sortDesc(suits.SPADES)[0];
+    }
+
+    // 3) Cash a non-spade Ace
     for (const s of nonSp) {
       const ace = (suits[s] || []).find((c) => c.rank === 'A');
       if (ace) return ace;
     }
+
+    // 4) Known-safe suits: Ace seen + partner max known → lead high above their max
+    for (const s of nonSp) {
+      const intel = suitIntel.get(s);
+      if (!intel || intel.void || typeof intel.maxRankValue !== 'number') continue;
+      const safe = sortDesc(suits[s] || []).filter(
+        (c) => cardValue(c.rank) > intel.maxRankValue
+      );
+      if (safe.length) return safe[0];
+    }
+
+    // 5) No Ace / no known-safe → highest from longest non-spade
+    const longest = longestNonSpadeSuit(hand);
+    if (longest && (suits[longest] || []).length) {
+      return sortDesc(suits[longest])[0];
+    }
+
     for (const s of nonSp) {
       const cards = sortDesc(suits[s] || []);
       if (cards.length) return cards[0];
@@ -512,66 +639,44 @@ function playCoverNil(ctx) {
     return sortDesc(hand)[0];
   }
 
+  // --- Following ---
   if (partnerHasPlayed || partnerPlayedInTrick) {
     const nilWinning = partnerWinning(trick, partnerSeat);
-    if (!nilWinning) {
-      if (aggressiveTable) {
-        const w = minimalWinningInLeadSuit(trick, hand, leadSuit);
-        if (w) return w;
-        const sp = minimalWinningSpade(trick, hand);
-        if (sp) return sp;
-      }
+    if (nilWinning) {
+      // Always overtake with the cheapest card that beats partner
+      const cover = cheapestWinningCover(trick, hand, seatIndex, leadSuit);
+      if (cover) return cover;
+      // Cannot beat them — dump lowest legal
       const leadCards = hand.filter((c) => c.suit === leadSuit);
       if (leadCards.length) return sortAsc(leadCards)[0];
-      const nonSp = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
-      return (nonSp.length ? nonSp : sortAsc(hand))[0];
+      return lowestSluffNotWinning(trick, hand, seatIndex, true);
     }
-    // Nil partner is winning the trick — must take it if possible (e.g. spade lead + nil played 8♠, we have 10♠)
+
+    // Partner already played and is NOT winning — take a free book if we still need tricks
+    if (needBooks) {
+      const w =
+        minimalWinningInLeadSuit(trick, hand, leadSuit) ||
+        minimalWinningSpade(trick, hand);
+      if (w) return w;
+    }
     const leadCards = hand.filter((c) => c.suit === leadSuit);
-    if (leadCards.length) {
-      // Last to play: lowest card that wins the trick in lead suit (cover nil efficiently)
-      if (trick.length === 3) {
-        const winners = leadCards.filter((c) => wouldWinWithCard(trick, c, seatIndex));
-        if (winners.length) return sortAsc(winners)[0];
-      }
-      const q = leadCards.find((c) => c.rank === 'Q');
-      const k = leadCards.find((c) => c.rank === 'K');
-      const a = leadCards.find((c) => c.rank === 'A');
-      if (q && k && a) return q;
-      let win = minimalWinningInLeadSuit(trick, hand, leadSuit);
-      if (!win && leadSuit === 'SPADES') {
-        win = minimalWinningSpade(trick, hand);
-      }
-      if (win) return win;
-      for (const c of sortDesc(leadCards)) {
-        if (wouldWinWithCard(trick, c, seatIndex)) return c;
-      }
-      return sortAsc(leadCards)[0];
-    }
-    // Void in lead: last to play — lowest winning spade if possible, else lowest spade
-    if (trick.length === 3) {
-      const spades = sortAsc(hand.filter((c) => c.suit === 'SPADES'));
-      if (spades.length) {
-        const winSp = minimalWinningSpade(trick, hand);
-        if (winSp) return winSp;
-        return spades[0];
-      }
-    }
-    const cut = minimalWinningSpade(trick, hand);
-    if (cut) return cut;
-    const nonSp = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
-    return (nonSp.length ? nonSp : sortAsc(hand))[0];
+    if (leadCards.length) return sortAsc(leadCards)[0];
+    const nonSpDump = sortAsc(hand.filter((c) => c.suit !== 'SPADES'));
+    return (nonSpDump.length ? nonSpDump : sortAsc(hand))[0];
   }
 
+  // Partner has not yet played this trick
   const nilLed =
     trick.length > 0 &&
     normSeat(trick[0].seatIndex) === normSeat(partnerSeat);
   const leadCards = hand.filter((c) => c.suit === leadSuit);
   if (leadCards.length) {
     if (nilLed) return sortAsc(leadCards)[0];
+    // Play before partner: try to win so they can duck under us
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
-    return sortDesc(leadCards)[0];
+    // Cannot win — dump LOW (save high covers), not high
+    return sortAsc(leadCards)[0];
   }
   const spades = hand.filter((c) => c.suit === 'SPADES');
   const nonSp = hand.filter((c) => c.suit !== 'SPADES');
@@ -581,9 +686,11 @@ function playCoverNil(ctx) {
     if (pick) return pick;
     return spades.length ? sortAsc(spades)[0] : sortAsc(hand)[0];
   }
+  // Before partner, void: cut cheaply to get on top for them
   const cut = minimalWinningSpade(trick, hand);
   if (cut) return cut;
-  return spades.length ? sortAsc(spades)[0] : sortAsc(nonSp.length ? nonSp : hand)[0];
+  if (nonSp.length) return sortAsc(nonSp)[0];
+  return spades.length ? sortAsc(spades)[0] : sortAsc(hand)[0];
 }
 
 function playDefendOppNil(ctx) {
@@ -604,6 +711,28 @@ function playDefendOppNil(ctx) {
   if (ctx.selfNil) return playSelfNil(ctx);
   if (ctx.partnerNil) return playCoverNil({ ...ctx, doubleNil: false });
 
+  const needBooks = teamNeedsTricks(ctx);
+  const voidsOpp = ctx.voids[oppNilSeat] || new Set();
+
+  const midLowInSuit = (cards) => {
+    const s = sortAsc(cards);
+    if (!s.length) return null;
+    return s[Math.floor((s.length - 1) / 3)];
+  };
+
+  /** True if we play after the opp nil on this trick (sitting over them). */
+  const sitsOverOppNil = () => {
+    if (oppNilSeat == null) return false;
+    if (!trick.length) return false;
+    const leadSeat = normSeat(trick[0].seatIndex);
+    if (leadSeat == null) return false;
+    const order = [0, 1, 2, 3].map((i) => (leadSeat + i) % 4);
+    const myPos = order.indexOf(normSeat(seatIndex));
+    const nilPos = order.indexOf(normSeat(oppNilSeat));
+    if (myPos < 0 || nilPos < 0) return false;
+    return myPos > nilPos;
+  };
+
   if (isLeading) {
     const suits = groupBySuit(hand);
     const nonSp = ['HEARTS', 'DIAMONDS', 'CLUBS'];
@@ -611,18 +740,22 @@ function playDefendOppNil(ctx) {
       .map((s) => ({
         suit: s,
         score: countNilFollowsInSuit(game, oppNilSeat, s),
-        voided: (ctx.voids[oppNilSeat] || new Set()).has(s)
+        voided: voidsOpp.has(s)
       }))
       .filter((x) => !x.voided)
       .sort((a, b) => b.score - a.score);
+
+    // Need books + on lead: still prefer mid/low through (not sitting over). Cash only when over.
     for (const { suit } of scored) {
-      const ace = (suits[suit] || []).find((c) => c.rank === 'A');
-      if (ace) return ace;
+      const cards = suits[suit] || [];
+      if (!cards.length) continue;
+      const mid = midLowInSuit(cards);
+      if (mid) return mid;
     }
     for (const s of nonSp) {
-      if ((ctx.voids[oppNilSeat] || new Set()).has(s)) continue;
-      const cards = sortDesc(suits[s] || []);
-      if (cards.length) return cards[0];
+      if (voidsOpp.has(s)) continue;
+      const mid = midLowInSuit(suits[s] || []);
+      if (mid) return mid;
     }
     return sortAsc(
       hand.filter((c) => c.suit !== 'SPADES' || spadesBroken)
@@ -646,6 +779,8 @@ function playDefendOppNil(ctx) {
   }
 
   const leadCards = hand.filter((c) => c.suit === leadSuit);
+  const over = sitsOverOppNil();
+
   if (leadCards.length) {
     const duck = lowestFollowingLeadSuitWithoutStealing(trick, hand, leadSuit, seatIndex, partnerSeat);
     if (duck !== null) return duck;
@@ -653,6 +788,22 @@ function playDefendOppNil(ctx) {
       const dump = lowestLosingInLeadSuit(trick, hand, leadSuit, seatIndex);
       if (dump) return dump;
     }
+
+    // Need books and sitting over their nil → cash / take cheap winners
+    if (needBooks && over) {
+      const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
+      if (win) return win;
+      return sortDesc(leadCards)[0];
+    }
+
+    // Otherwise pressure with mid/low; don't slam Aces through them for free
+    if (!needBooks || !over) {
+      const mid = midLowInSuit(leadCards);
+      if (mid && !wouldWinWithCard(trick, mid, seatIndex)) return mid;
+      const los = leadCards.filter((c) => !wouldWinWithCard(trick, c, seatIndex));
+      if (los.length) return sortAsc(los)[0];
+    }
+
     const win = minimalWinningInLeadSuit(trick, hand, leadSuit);
     if (win) return win;
     return takeAllMode ? sortDesc(leadCards)[0] : sortAsc(leadCards)[0];
@@ -678,7 +829,7 @@ function playDefendOppNil(ctx) {
   const needBookForContract = teamNeedsTricks(ctx);
 
   // Prefer not breaking spades vs their nil — unless we still need tricks for our bid.
-  if (needBookForContract && oppTeamWinning) {
+  if (needBookForContract && oppTeamWinning && over) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
   }
@@ -689,13 +840,13 @@ function playDefendOppNil(ctx) {
       return shouldDumpForBags(ctx) ? sortAsc(nonSp)[0] : sortDesc(nonSp)[0];
     }
   }
-  if (takeAllMode || needBookForContract) {
+  if ((takeAllMode || needBookForContract) && over) {
     const cut = minimalWinningSpade(trick, hand);
     if (cut) return cut;
   }
   const sp = hand.filter((c) => c.suit === 'SPADES');
   if (sp.length && spadesBroken) {
-    const cut = minimalWinningSpade(trick, hand);
+    const cut = over ? minimalWinningSpade(trick, hand) : null;
     if (cut) return cut;
     return sortAsc(sp)[0];
   }

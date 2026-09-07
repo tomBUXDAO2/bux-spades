@@ -82,6 +82,16 @@ class BiddingHandler {
       card.suit === 'HEARTS' || card.suit === 'H' || card.suit === '♥'
     ).length;
     const numAces = playerHand.filter(card => card.rank === 'A').length;
+
+    // Hard rule: nobody (human or bot path) may bid nil while holding Ace of Spades.
+    // Suicide forced-nil seats with AS must bid 1 instead (handled in resolveSuicideBidConstraints).
+    const attemptingNil = Boolean(isNil || isBlindNil || bid === 0);
+    if (attemptingNil && this.handHasAceSpades(playerHand)) {
+      return {
+        valid: false,
+        message: 'Cannot bid nil while holding Ace of Spades'
+      };
+    }
     
     // Handle gimmick games
     if (forcedBid || this.isSuicideGame(gameState)) {

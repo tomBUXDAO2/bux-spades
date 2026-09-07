@@ -45,9 +45,9 @@ export function canBidNil(gameType: BiddingOption, numSpades: number, gameMode?:
 
   switch (gameType) {
     case 'REGULAR':
-      return true; // Regular games allow nil bids
+      return !hasAceSpades; // Cannot nil with Ace of Spades
     case 'WHIZ':
-      return numSpades === 0; // Only allow nil bid if no spades
+      return numSpades === 0 && !hasAceSpades;
     case 'MIRROR':
       return false; // Mirror games don't allow nil bids
     case 'GIMMICK':
