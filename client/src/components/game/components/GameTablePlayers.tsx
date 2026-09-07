@@ -215,27 +215,23 @@ export default function GameTablePlayers({
     // Seat/team colour: body fill + matching avatar border
     const originalPosition = player.seatIndex ?? position;
     let playerGradient: string;
-    let avatarBorderClass: string;
     if (isSoloGame) {
-      const soloStyles = [
-        { fill: 'bg-gradient-to-r from-red-700 to-red-500', border: 'border-red-500' },
-        { fill: 'bg-gradient-to-r from-blue-700 to-blue-500', border: 'border-blue-500' },
-        { fill: 'bg-gradient-to-r from-orange-600 to-orange-400', border: 'border-orange-400' },
-        { fill: 'bg-gradient-to-r from-green-700 to-green-500', border: 'border-green-500' }
+      const soloFills = [
+        'bg-gradient-to-r from-red-700 to-red-500',
+        'bg-gradient-to-r from-blue-700 to-blue-500',
+        'bg-gradient-to-r from-orange-600 to-orange-400',
+        'bg-gradient-to-r from-green-700 to-green-500'
       ];
-      const style = soloStyles[originalPosition] || soloStyles[0];
-      playerGradient = style.fill;
-      avatarBorderClass = style.border;
+      playerGradient = soloFills[originalPosition] || soloFills[0];
     } else {
       const isRedTeam = originalPosition === 0 || originalPosition === 2;
       playerGradient = isRedTeam
         ? 'bg-gradient-to-r from-red-700 to-red-500'
         : 'bg-gradient-to-r from-blue-700 to-blue-500';
-      avatarBorderClass = isRedTeam ? 'border-red-500' : 'border-blue-500';
     }
     // Shared padding for the username/bid panel (same on all seats)
-    const textPanelPad = isVerySmallScreen ? 'px-1 py-1' : 'px-1.5 py-1.5';
-    const nameToBidGap = isVerySmallScreen ? 'mt-1' : 'mt-1.5';
+    const textPanelPad = isVerySmallScreen ? 'px-1 py-1.5' : 'px-1.5 py-2';
+    const nameToBidGap = isVerySmallScreen ? 'mt-2' : 'mt-2.5';
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
     // Use the player's actual seatIndex to get the bid from the server
@@ -398,7 +394,7 @@ export default function GameTablePlayers({
 
     const avatarFrame = (
       <div
-        className={`relative h-full w-full overflow-hidden rounded-lg border-4 bg-slate-900 ${avatarBorderClass}`}
+        className={`relative h-full w-full overflow-hidden rounded-md border-[3px] border-black/25 bg-slate-900`}
         data-player-id={player.id}
       >
         <img
@@ -464,24 +460,35 @@ export default function GameTablePlayers({
       </div>
     );
 
+    // Avatar inset inside the coloured shell (same on every seat)
+    const avatarInset = isVerySmallScreen ? 3 : 4;
+    const avatarInner = avatarSize - avatarInset * 2;
+
     return (
       <div ref={seatRef} className={`absolute ${getPositionClasses(position)} z-30`}>
         <div
           className={`
-            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30 rounded-md' : ''}
+            ${playerGradient} overflow-hidden rounded-xl shadow-md
+            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : ''}
             transition-all duration-200
+            ${isSideSeat ? 'flex w-full flex-col' : 'flex flex-row items-stretch'}
           `}
-          style={isSideSeat ? { width: avatarSize } : undefined}
+          style={
+            isSideSeat
+              ? { width: avatarSize }
+              : { height: avatarSize }
+          }
         >
           <div
-            className={
-              isSideSeat
-                ? 'flex w-full flex-col items-stretch gap-0.5'
-                : 'flex flex-row items-stretch gap-0.5'
-            }
-            style={isSideSeat ? undefined : { height: avatarSize }}
+            className="relative shrink-0"
+            style={{
+              width: avatarSize,
+              height: avatarSize,
+              padding: avatarInset,
+              boxSizing: 'border-box',
+            }}
           >
-            <div className="relative shrink-0" style={{ width: avatarSize, height: avatarSize }}>
+            <div className="relative h-full w-full" style={{ width: avatarInner, height: avatarInner }}>
               {isHuman ? (
                 <PlayerProfileDropdown
                   player={player}
@@ -499,14 +506,19 @@ export default function GameTablePlayers({
                 avatarFrame
               )}
             </div>
-            <div
-              className={`
-                ${playerGradient} flex min-w-0 flex-col items-stretch justify-center rounded-md shadow-md
-                ${textPanelPad}
-                ${isSideSeat ? 'w-full' : 'h-full'}
-              `}
-              style={isSideSeat ? undefined : { width: bidChipWidth }}
-            >
+          </div>
+          <div
+            className={`
+              flex min-w-0 flex-col items-stretch justify-center
+              ${textPanelPad}
+              ${isSideSeat ? 'w-full' : 'h-full'}
+            `}
+            style={
+              isSideSeat
+                ? { minHeight: avatarSize, width: '100%' }
+                : { width: bidChipWidth, height: '100%' }
+            }
+          >
               <div
                 className="w-full truncate px-0 text-center font-semibold text-white"
                 style={{ fontSize: nameFontSize, lineHeight: 1.15 }}
@@ -575,7 +587,6 @@ export default function GameTablePlayers({
                     Request seat
                   </button>
                 )}
-            </div>
           </div>
         </div>
         
