@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -21,6 +21,7 @@ import LeagueStatsPanel from '@/features/league/components/LeagueStatsPanel';
 import LeagueEventsPanel from '@/features/league/components/LeagueEventsPanel';
 import LeagueTournamentsPanel from '@/features/league/components/LeagueTournamentsPanel';
 import type { LeagueMainSection } from '@/features/league/leagueSections';
+import { LEAGUE_SECTION_OPTIONS } from '@/features/league/leagueSections';
 
 type LeagueInfo = {
   id: string;
@@ -88,11 +89,19 @@ function formatTime(timestamp: number) {
 
 const LeaguePage: React.FC = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket, isAuthenticated } = useSocket();
   const { isLandscape } = useWindowSize();
   const isPortrait = !isLandscape;
+
+  const sectionFromUrl = searchParams.get('section');
+  const initialSection: LeagueMainSection =
+    LEAGUE_SECTION_OPTIONS.some((o) => o.id === sectionFromUrl)
+      ? (sectionFromUrl as LeagueMainSection)
+      : 'lobby';
+  const tournamentFromUrl = searchParams.get('tournament');
 
   const [league, setLeague] = useState<LeagueInfo | null>(null);
   const [games, setGames] = useState<any[]>([]);
@@ -109,7 +118,7 @@ const LeaguePage: React.FC = () => {
   const [roomOnlineIds, setRoomOnlineIds] = useState<string[]>([]);
   const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
   const [mobileTab, setMobileTab] = useState<'lobby' | 'chat'>('lobby');
-  const [mainSection, setMainSection] = useState<LeagueMainSection>('lobby');
+  const [mainSection, setMainSection] = useState<LeagueMainSection>(initialSection);
   const [announcementsUnread, setAnnouncementsUnread] = useState(0);
   const mainSectionRef = useRef<LeagueMainSection>('lobby');
   const [sideTab, setSideTab] = useState<'chat' | 'members'>('chat');
@@ -1011,6 +1020,7 @@ const LeaguePage: React.FC = () => {
               isTimedOut={isTimedOut}
               currentUserId={user.id}
               members={members}
+              initialTournamentId={tournamentFromUrl}
               onOpenTable={(gameId, opts) =>
                 navigate(opts?.spectate ? `/table/${gameId}?spectate=1` : `/table/${gameId}`)
               }

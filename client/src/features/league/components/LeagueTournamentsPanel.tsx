@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, apiFetch } from '@/services/lib/api';
 import TournamentBracketTree from './TournamentBracketTree';
+import { setTableReturnPath } from '@/pages/TablePage';
 
 type TournamentStatus =
   | 'REGISTRATION_OPEN'
@@ -64,6 +65,7 @@ type Props = {
   isTimedOut: boolean;
   currentUserId: string;
   members: Member[];
+  initialTournamentId?: string | null;
   onOpenTable: (gameId: string, opts?: { spectate?: boolean }) => void;
 };
 
@@ -135,10 +137,11 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
   isTimedOut,
   currentUserId,
   members,
+  initialTournamentId = null,
   onOpenTable
 }) => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialTournamentId);
   const [detail, setDetail] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -225,10 +228,25 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
   }, [selectedId, loadDetail]);
 
   useEffect(() => {
+    if (initialTournamentId) setSelectedId(initialTournamentId);
+  }, [initialTournamentId]);
+
+  useEffect(() => {
     return () => {
       if (bannerPreview) URL.revokeObjectURL(bannerPreview);
     };
   }, [bannerPreview]);
+
+  const openTableFromBracket = useCallback(
+    (gameId: string, opts?: { spectate?: boolean }) => {
+      const tid = selectedId || detail?.id;
+      const q = new URLSearchParams({ section: 'tournaments' });
+      if (tid) q.set('tournament', tid);
+      setTableReturnPath(`/league/${leagueId}?${q.toString()}`);
+      onOpenTable(gameId, opts);
+    },
+    [leagueId, selectedId, detail?.id, onOpenTable]
+  );
 
   const myReg = useMemo(
     () => detail?.registrations?.find((r) => r.userId === currentUserId),
@@ -725,7 +743,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                     `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${matchId}/ready`
                   )
                 }
-                onOpenTable={onOpenTable}
+                onOpenTable={openTableFromBracket}
                 onForceOpen={(matchId) =>
                   post(
                     `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${matchId}/open-table`
