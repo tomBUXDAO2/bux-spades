@@ -255,11 +255,17 @@ export default function GameTablePlayers({
     };
     
     if (isPartnerGame) {
-      // Partner game logic - use actual seat indices for partner calculation
+      // Partner game: nil/blind-nil is personal; contract tick/cross is only for non-nil bids.
       const partnerPosition = (actualSeatIndex + 2) % 4;
       const partner = gameState.players[partnerPosition];
-      const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
+      const partnerRawBid = (gameState as any).bidding?.bids?.[partnerPosition];
       const partnerMade = partner && partner.tricks ? partner.tricks : 0;
+
+      const isNilTypeBid = (bid: unknown, blindNil: boolean, has: boolean) => {
+        if (!has) return false;
+        const n = Number(bid);
+        return blindNil || n === 0 || n === -1;
+      };
 
       const contribTeamBid = (b: unknown) => {
         if (b === null || b === undefined) return 0;
@@ -267,21 +273,26 @@ export default function GameTablePlayers({
         if (!Number.isFinite(n) || n < 0) return 0;
         return n;
       };
-      const teamBid = contribTeamBid(rawBid) + contribTeamBid(partnerBid);
-      const teamMade = madeCount + partnerMade;
-      const isNilTypeBid =
-        bidCount === 0 || (isBlindNil && (bidCount === -1 || rawBid === -1));
 
+      const myNil = isNilTypeBid(rawBid, isBlindNil, hasBid);
+      const teamBid = contribTeamBid(rawBid) + contribTeamBid(partnerRawBid);
+      const teamMade = madeCount + partnerMade;
       const teamMadeContract = teamBid > 0 && teamMade >= teamBid;
       const teamCannotMakeContract = teamBid > 0 && teamMade + tricksLeft < teamBid;
 
-      if (isNilTypeBid && madeCount > 0) {
-        madeStatus = '❌'; // Failed nil — took a trick
-      } else if (teamCannotMakeContract) {
-        // Impossible for the team to make the combined bid: show ❌ on BOTH partners
-        madeStatus = '❌';
-      } else if (teamMadeContract) {
-        madeStatus = '✅'; // Team made the contract (including successful nil + partner tricks)
+      if (myNil) {
+        // Nil only busts when this seat takes a trick — never inherit partner contract icons,
+        // and never tick mid-hand (nil success is only known after all 13 tricks).
+        madeStatus = madeCount > 0 ? '❌' : null;
+      } else if (hasBid && bidCount > 0) {
+        // Non-nil seat only: show team contract made/bust on this player
+        if (teamCannotMakeContract) {
+          madeStatus = '❌';
+        } else if (teamMadeContract) {
+          madeStatus = '✅';
+        } else {
+          madeStatus = null;
+        }
       } else {
         madeStatus = null;
       }
@@ -312,18 +323,6 @@ export default function GameTablePlayers({
       madeStatus = null;
     }
     
-    // Debug logging for tick/cross logic
-    if (gameState.status === 'PLAYING' && (bidCount > 0 || madeCount > 0)) {
-      if (isPartnerGame) {
-        // Use the same actualSeatIndex calculation as above for consistency
-        const partnerPosition = (actualSeatIndex + 2) % 4;
-        const partnerBid = (gameState as any).bidding?.bids?.[partnerPosition] ?? 0;
-        const partnerMade = gameState.players?.[partnerPosition]?.tricks ?? 0;
-        const teamBid = bidCount + partnerBid;
-        const teamMade = madeCount + partnerMade;
-      } else {
-      }
-    }
     // --- END NEW LOGIC ---
 
     // Check if this is a league game
