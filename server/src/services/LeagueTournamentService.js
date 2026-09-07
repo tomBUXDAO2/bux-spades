@@ -58,6 +58,20 @@ export class LeagueTournamentService {
     return { ...tournament, matches, registrationStats: stats };
   }
 
+  static parseRuleList(value) {
+    if (value == null || value === '') return null;
+    if (Array.isArray(value)) return value.length ? value : null;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.length ? parsed : null;
+      } catch {
+        return value.trim() ? [value.trim()] : null;
+      }
+    }
+    return null;
+  }
+
   static async create(leagueId, adminId, payload) {
     await LeagueService.assertAdmin(leagueId, adminId);
     const prizes = {
@@ -68,23 +82,39 @@ export class LeagueTournamentService {
       throw httpError('Declare at least one prize amount (coins)');
     }
 
+    const format = payload.format || 'REGULAR';
+    const nilAllowed =
+      format === 'REGULAR'
+        ? payload.nilAllowed !== 'false' && payload.nilAllowed !== false
+        : false;
+    const blindNilAllowed =
+      format === 'REGULAR'
+        ? payload.blindNilAllowed === 'true' || payload.blindNilAllowed === true
+        : false;
+
     try {
       return await TournamentService.createTournament(
         {
           name: payload.name,
           mode: payload.mode || 'PARTNERS',
-          format: payload.format || 'REGULAR',
+          format,
           startTime: payload.startTime,
           eliminationType: payload.eliminationType || 'SINGLE',
-          buyIn: payload.buyIn ?? 0,
+          buyIn: payload.tableBuyIn ?? payload.buyIn ?? 0,
           tournamentBuyIn: payload.tournamentBuyIn ?? 0,
-          minPoints: payload.minPoints ?? -100,
-          maxPoints: payload.maxPoints ?? 500,
-          nilAllowed: payload.nilAllowed !== false,
-          blindNilAllowed: Boolean(payload.blindNilAllowed),
+          minPoints:
+            payload.minPoints !== undefined && payload.minPoints !== ''
+              ? Number(payload.minPoints)
+              : -100,
+          maxPoints:
+            payload.maxPoints !== undefined && payload.maxPoints !== ''
+              ? Number(payload.maxPoints)
+              : 500,
+          nilAllowed,
+          blindNilAllowed,
           gimmickVariant: payload.gimmickVariant || null,
-          specialRule1: payload.specialRule1 || null,
-          specialRule2: payload.specialRule2 || null,
+          specialRule1: this.parseRuleList(payload.specialRule1),
+          specialRule2: this.parseRuleList(payload.specialRule2),
           bannerUrl: payload.bannerUrl || null,
           prizes,
           leagueId
@@ -95,6 +125,26 @@ export class LeagueTournamentService {
       error.status = error.status || 400;
       throw error;
     }
+  }
+
+  static async addBots(leagueId, adminId, tournamentId, count) {
+    await LeagueService.assertAdmin(leagueId, adminId);
+    await this.assertLeagueTournament(leagueId, tournamentId);
+    const result = await TournamentService.addBots(tournamentId, count);
+    return { ...result, tournament: await this.get(leagueId, tournamentId, adminId) };
+  }
+
+  static async startEarly(leagueId, adminId, tournamentId, { botCount = 0, registerAdmin = true } = {}) {
+    await LeagueService.assertAdmin(leagueId, adminId);
+    await this.assertLeagueTournament(leagueId, tournamentId);
+    const result = await TournamentService.startEarly(tournamentId, adminId, {
+      botCount,
+      registerAdmin
+    });
+    return {
+      ...result,
+      tournament: await this.get(leagueId, tournamentId, adminId)
+    };
   }
 
   static async cancel(leagueId, adminId, tournamentId) {

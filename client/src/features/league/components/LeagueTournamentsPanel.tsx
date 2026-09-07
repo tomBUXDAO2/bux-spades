@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '@/services/lib/api';
+import { api, apiFetch } from '@/services/lib/api';
 
 type TournamentStatus =
   | 'REGISTRATION_OPEN'
@@ -65,6 +65,44 @@ type Props = {
   onOpenTable: (gameId: string) => void;
 };
 
+const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
+const GIMMICK_OPTIONS = ['SUICIDE', 'BID4NIL', 'BID3', 'BIDHEARTS', 'CRAZY_ACES', 'JOKER'] as const;
+const SPECIAL_RULE1_OPTIONS = ['SCREAMER', 'ASSASSIN', 'SECRET_ASSASSIN'] as const;
+const SPECIAL_RULE2_OPTIONS = ['LOWBALL', 'HIGHBALL'] as const;
+
+const generateCoinOptions = () => {
+  const values: number[] = [];
+  for (let value = 50_000; value <= 1_000_000; value += 50_000) values.push(value);
+  for (let value = 1_500_000; value <= 10_000_000; value += 500_000) values.push(value);
+  return values;
+};
+
+const generatePrizeOptions = () => {
+  const values: number[] = [];
+  for (let value = 1_000_000; value <= 100_000_000; value += 1_000_000) values.push(value);
+  return values;
+};
+
+const COIN_OPTION_VALUES = generateCoinOptions();
+const PRIZE_OPTION_VALUES = generatePrizeOptions();
+
+const formatCoins = (value?: number | null) => {
+  if (value == null) return '';
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000;
+    const formatted = Number.isInteger(millions) ? millions.toString() : millions.toFixed(1).replace(/\.0$/, '');
+    return `${formatted}mil`;
+  }
+  const thousands = value / 1_000;
+  const formatted = Number.isInteger(thousands) ? thousands.toString() : thousands.toFixed(1).replace(/\.0$/, '');
+  return `${formatted}k`;
+};
+
+const fieldClass =
+  'mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white';
+const labelClass = 'block text-xs text-white/70';
+const chipBase = 'rounded border px-2.5 py-1 text-[11px] font-semibold transition';
+
 function formatWhen(iso: string) {
   try {
     return new Date(iso).toLocaleString([], {
@@ -84,6 +122,10 @@ function roundLabel(round: number) {
   return `R${round}`;
 }
 
+function toggleSelection(array: string[], value: string) {
+  return array.includes(value) ? array.filter((item) => item !== value) : [...array, value];
+}
+
 const LeagueTournamentsPanel: React.FC<Props> = ({
   leagueId,
   theme,
@@ -101,13 +143,26 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [partnerId, setPartnerId] = useState('');
+  const [botCount, setBotCount] = useState(7);
+
   const [name, setName] = useState('');
   const [mode, setMode] = useState<'PARTNERS' | 'SOLO'>('PARTNERS');
-  const [format, setFormat] = useState('REGULAR');
-  const [eliminationType, setEliminationType] = useState('SINGLE');
+  const [format, setFormat] = useState<(typeof FORMAT_OPTIONS)[number]>('REGULAR');
+  const [eliminationType, setEliminationType] = useState<'SINGLE' | 'DOUBLE'>('SINGLE');
   const [startTime, setStartTime] = useState('');
-  const [firstPlaceCoins, setFirstPlaceCoins] = useState('5000000');
-  const [secondPlaceCoins, setSecondPlaceCoins] = useState('2000000');
+  const [firstPlaceCoins, setFirstPlaceCoins] = useState(5_000_000);
+  const [secondPlaceCoins, setSecondPlaceCoins] = useState(2_000_000);
+  const [tournamentBuyIn, setTournamentBuyIn] = useState<number | ''>('');
+  const [tableBuyIn, setTableBuyIn] = useState<number | ''>('');
+  const [minPoints, setMinPoints] = useState(-100);
+  const [maxPoints, setMaxPoints] = useState(500);
+  const [nilAllowed, setNilAllowed] = useState(true);
+  const [blindNilAllowed, setBlindNilAllowed] = useState(false);
+  const [gimmickVariant, setGimmickVariant] = useState('');
+  const [specialRule1, setSpecialRule1] = useState<string[]>([]);
+  const [specialRule2, setSpecialRule2] = useState<string[]>([]);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     const res = await api.get(`/api/leagues/${leagueId}/tournaments`);
@@ -167,6 +222,12 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     };
   }, [selectedId, loadDetail]);
 
+  useEffect(() => {
+    return () => {
+      if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    };
+  }, [bannerPreview]);
+
   const myReg = useMemo(
     () => detail?.registrations?.find((r) => r.userId === currentUserId),
     [detail, currentUserId]
@@ -184,7 +245,8 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
       const res = await api.post(path, body || {});
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Request failed');
-      setDetail(data);
+      if (data.tournament) setDetail(data.tournament);
+      else setDetail(data);
       await loadList();
       return data;
     } catch (e: any) {
@@ -195,34 +257,105 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     }
   };
 
+  const resetCreateForm = () => {
+    setName('');
+    setMode('PARTNERS');
+    setFormat('REGULAR');
+    setEliminationType('SINGLE');
+    setStartTime('');
+    setFirstPlaceCoins(5_000_000);
+    setSecondPlaceCoins(2_000_000);
+    setTournamentBuyIn('');
+    setTableBuyIn('');
+    setMinPoints(-100);
+    setMaxPoints(500);
+    setNilAllowed(true);
+    setBlindNilAllowed(false);
+    setGimmickVariant('');
+    setSpecialRule1([]);
+    setSpecialRule2([]);
+    setBannerFile(null);
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    setBannerPreview(null);
+  };
+
   const createTournament = async () => {
     if (!name.trim() || !startTime) {
       setError('Name and start time are required');
       return;
     }
+    if (!firstPlaceCoins && !secondPlaceCoins) {
+      setError('Declare at least one prize amount');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const res = await api.post(`/api/leagues/${leagueId}/tournaments`, {
-        name: name.trim(),
-        mode,
-        format,
-        eliminationType,
-        startTime: new Date(startTime).toISOString(),
-        firstPlaceCoins: Math.floor(Number(firstPlaceCoins) || 0),
-        secondPlaceCoins: Math.floor(Number(secondPlaceCoins) || 0)
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('mode', mode);
+      formData.append('format', format);
+      formData.append('eliminationType', eliminationType);
+      formData.append('startTime', new Date(startTime).toISOString());
+      formData.append('firstPlaceCoins', String(firstPlaceCoins || 0));
+      formData.append('secondPlaceCoins', String(secondPlaceCoins || 0));
+      formData.append('tournamentBuyIn', String(tournamentBuyIn === '' ? 0 : tournamentBuyIn));
+      formData.append('tableBuyIn', String(tableBuyIn === '' ? 0 : tableBuyIn));
+      formData.append('minPoints', String(minPoints));
+      formData.append('maxPoints', String(maxPoints));
+      formData.append('nilAllowed', String(format === 'REGULAR' ? nilAllowed : false));
+      formData.append('blindNilAllowed', String(format === 'REGULAR' ? blindNilAllowed : false));
+      if (format === 'GIMMICK' && gimmickVariant) {
+        formData.append('gimmickVariant', gimmickVariant);
+      }
+      formData.append('specialRule1', JSON.stringify(specialRule1));
+      formData.append('specialRule2', JSON.stringify(specialRule2));
+      if (bannerFile) formData.append('banner', bannerFile);
+
+      const res = await apiFetch(`/api/leagues/${leagueId}/tournaments`, {
+        method: 'POST',
+        headers: {},
+        body: formData
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to create');
       setShowCreate(false);
-      setName('');
-      setStartTime('');
+      resetCreateForm();
       await loadList();
       setSelectedId(data.id);
     } catch (e: any) {
       setError(e.message || 'Failed to create');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEarly = async () => {
+    if (!detail) return;
+    if (
+      !window.confirm(
+        `Start early? Registers you if needed, adds ${botCount} bots if registration is open, builds the bracket, and opens round-1 tables.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const data = await post(`/api/leagues/${leagueId}/tournaments/${detail.id}/start-early`, {
+        botCount,
+        registerAdmin: true
+      });
+      if (data.message) setError(null);
+    } catch {
+      /* error already set */
+    }
+  };
+
+  const addBots = async () => {
+    if (!detail) return;
+    try {
+      await post(`/api/leagues/${leagueId}/tournaments/${detail.id}/add-bots`, { count: botCount });
+    } catch {
+      /* error already set */
     }
   };
 
@@ -264,23 +397,64 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
               </p>
               {detail.prizes && (
                 <p className="mt-1 text-xs text-amber-200/90">
-                  Prizes: {Number(detail.prizes.firstPlaceCoins || 0).toLocaleString()} /{' '}
-                  {Number(detail.prizes.secondPlaceCoins || 0).toLocaleString()} coins
+                  Prizes: {Number(detail.prizes.firstPlaceCoins || 0).toLocaleString()}
+                  {detail.mode === 'PARTNERS' ? ' each' : ''} /{' '}
+                  {Number(detail.prizes.secondPlaceCoins || 0).toLocaleString()}
+                  {detail.mode === 'PARTNERS' ? ' each' : ''} coins
                 </p>
               )}
             </div>
             {isAdmin && (
               <div className="flex flex-wrap gap-2">
                 {open && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={64}
+                        value={botCount}
+                        onChange={(e) => setBotCount(Math.max(0, Number(e.target.value) || 0))}
+                        className="w-14 rounded border border-white/20 bg-black/40 px-1 py-1.5 text-center text-xs text-white"
+                        title="Bot count"
+                      />
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={addBots}
+                        className="rounded-lg bg-violet-600/90 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-500"
+                      >
+                        Add bots
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={startEarly}
+                      className="rounded-lg bg-emerald-600/90 px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      Start early
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() =>
+                        post(`/api/leagues/${leagueId}/tournaments/${detail.id}/close`)
+                      }
+                      className="rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold text-white hover:bg-white/25"
+                    >
+                      Close + build bracket
+                    </button>
+                  </>
+                )}
+                {closed && (
                   <button
                     type="button"
                     disabled={saving}
-                    onClick={() =>
-                      post(`/api/leagues/${leagueId}/tournaments/${detail.id}/close`)
-                    }
-                    className="rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold text-white hover:bg-white/25"
+                    onClick={startEarly}
+                    className="rounded-lg bg-emerald-600/90 px-3 py-2 text-xs font-semibold text-white"
                   >
-                    Close + build bracket
+                    Start early (open tables)
                   </button>
                 )}
                 {(open || closed) && (
@@ -354,12 +528,12 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
             ) : (
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 {detail.mode === 'PARTNERS' && (
-                  <label className="block text-xs text-white/70">
+                  <label className={labelClass}>
                     Partner (optional)
                     <select
                       value={partnerId}
                       onChange={(e) => setPartnerId(e.target.value)}
-                      className="mt-1 block w-48 rounded border border-white/20 bg-black/40 px-2 py-1.5 text-xs text-white"
+                      className={`${fieldClass} w-48`}
                     >
                       <option value="">Solo pool — claim later</option>
                       {partnerOptions.map((m) => (
@@ -469,7 +643,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                               onClick={() => onOpenTable(m.gameId!)}
                               className="rounded-lg bg-cyan-700/90 px-2.5 py-1 font-semibold text-white"
                             >
-                              Open table
+                              {inMatch ? 'Join table' : 'Watch'}
                             </button>
                           )}
                           {isAdmin && live && !m.gameId && m.team1Id && m.team2Id && (
@@ -531,97 +705,278 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
 
       {showCreate && isAdmin && (
         <div
-          className="space-y-3 rounded-xl border border-white/15 p-4 backdrop-blur"
+          className="space-y-4 rounded-xl border border-white/15 p-4 backdrop-blur"
           style={{ backgroundColor: `${theme}99` }}
         >
-          <label className="block text-xs text-white/70">
-            Name
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
-            />
-          </label>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block text-xs text-white/70">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`${labelClass} sm:col-span-2`}>
+              Name
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={fieldClass}
+                placeholder="e.g. EVO Friday Night"
+              />
+            </label>
+            <label className={labelClass}>
               Mode
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as 'PARTNERS' | 'SOLO')}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
+                className={fieldClass}
               >
                 <option value="PARTNERS">Partners</option>
                 <option value="SOLO">Solo</option>
               </select>
             </label>
-            <label className="block text-xs text-white/70">
+            <label className={labelClass}>
               Format
               <select
                 value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
+                onChange={(e) => setFormat(e.target.value as (typeof FORMAT_OPTIONS)[number])}
+                className={fieldClass}
               >
-                <option value="REGULAR">Regular</option>
-                <option value="WHIZ">Whiz</option>
-                <option value="MIRROR">Mirror</option>
-                <option value="GIMMICK">Gimmick</option>
+                {FORMAT_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="block text-xs text-white/70">
+            <label className={labelClass}>
               Elimination
               <select
                 value={eliminationType}
-                onChange={(e) => setEliminationType(e.target.value)}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
+                onChange={(e) => setEliminationType(e.target.value as 'SINGLE' | 'DOUBLE')}
+                className={fieldClass}
               >
                 <option value="SINGLE">Single</option>
                 <option value="DOUBLE">Double</option>
               </select>
             </label>
-            <label className="block text-xs text-white/70">
+            <label className={labelClass}>
               Start (local)
               <input
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
+                className={fieldClass}
               />
             </label>
-            <label className="block text-xs text-white/70">
-              1st prize coins
-              <input
-                type="number"
-                min={0}
+            <label className={labelClass}>
+              Tournament entry fee
+              <select
+                value={tournamentBuyIn}
+                onChange={(e) =>
+                  setTournamentBuyIn(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                className={fieldClass}
+              >
+                <option value="">Free entry</option>
+                {COIN_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatCoins(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={labelClass}>
+              Table buy-in
+              <select
+                value={tableBuyIn}
+                onChange={(e) => setTableBuyIn(e.target.value === '' ? '' : Number(e.target.value))}
+                className={fieldClass}
+              >
+                <option value="">Free games</option>
+                {COIN_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatCoins(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={labelClass}>
+              {mode === 'PARTNERS' ? 'Winners prize (each)' : '1st prize'}
+              <select
                 value={firstPlaceCoins}
-                onChange={(e) => setFirstPlaceCoins(e.target.value)}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
-              />
+                onChange={(e) => setFirstPlaceCoins(Number(e.target.value))}
+                className={fieldClass}
+              >
+                <option value={0}>No prize</option>
+                {PRIZE_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatCoins(value)}
+                    {mode === 'PARTNERS' ? ' each' : ''}
+                  </option>
+                ))}
+              </select>
             </label>
-            <label className="block text-xs text-white/70">
-              2nd prize coins
-              <input
-                type="number"
-                min={0}
+            <label className={labelClass}>
+              {mode === 'PARTNERS' ? 'Runners-up prize (each)' : '2nd prize'}
+              <select
                 value={secondPlaceCoins}
-                onChange={(e) => setSecondPlaceCoins(e.target.value)}
-                className="mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white"
-              />
+                onChange={(e) => setSecondPlaceCoins(Number(e.target.value))}
+                className={fieldClass}
+              >
+                <option value={0}>No prize</option>
+                {PRIZE_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatCoins(value)}
+                    {mode === 'PARTNERS' ? ' each' : ''}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
+
+          <label className={labelClass}>
+            Banner image
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              className="mt-1 block w-full text-xs text-white/80 file:mr-3 file:rounded file:border-0 file:bg-cyan-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setBannerFile(file);
+                if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+                setBannerPreview(file ? URL.createObjectURL(file) : null);
+              }}
+            />
+          </label>
+          {bannerPreview && (
+            <img
+              src={bannerPreview}
+              alt="Banner preview"
+              className="h-24 w-40 rounded object-cover"
+            />
+          )}
+
+          <div className="border-t border-white/10 pt-3">
+            <h4 className="mb-2 text-sm font-semibold text-white">Game settings</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={labelClass}>
+                Min points
+                <input
+                  type="number"
+                  value={minPoints}
+                  onChange={(e) => setMinPoints(Number(e.target.value))}
+                  className={fieldClass}
+                />
+              </label>
+              <label className={labelClass}>
+                Max points
+                <input
+                  type="number"
+                  value={maxPoints}
+                  onChange={(e) => setMaxPoints(Number(e.target.value))}
+                  className={fieldClass}
+                />
+              </label>
+              {format === 'GIMMICK' && (
+                <label className={labelClass}>
+                  Gimmick variant
+                  <select
+                    value={gimmickVariant}
+                    onChange={(e) => setGimmickVariant(e.target.value)}
+                    className={fieldClass}
+                  >
+                    <option value="">None</option>
+                    {GIMMICK_OPTIONS.map((variant) => (
+                      <option key={variant} value={variant}>
+                        {variant}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label className={labelClass}>
+                Nil allowed
+                <select
+                  disabled={format !== 'REGULAR'}
+                  value={nilAllowed ? 'true' : 'false'}
+                  onChange={(e) => setNilAllowed(e.target.value === 'true')}
+                  className={`${fieldClass} disabled:opacity-50`}
+                >
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label className={labelClass}>
+                Blind nil allowed
+                <select
+                  disabled={format !== 'REGULAR'}
+                  value={blindNilAllowed ? 'true' : 'false'}
+                  onChange={(e) => setBlindNilAllowed(e.target.value === 'true')}
+                  className={`${fieldClass} disabled:opacity-50`}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </label>
+              <div className="space-y-1.5">
+                <span className={labelClass}>Special rule #1</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPECIAL_RULE1_OPTIONS.map((rule) => (
+                    <button
+                      type="button"
+                      key={rule}
+                      onClick={() => setSpecialRule1((prev) => toggleSelection(prev, rule))}
+                      className={`${chipBase} ${
+                        specialRule1.includes(rule)
+                          ? 'border-cyan-400 bg-cyan-600 text-white'
+                          : 'border-white/20 bg-black/30 text-white/70'
+                      }`}
+                    >
+                      {rule}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <span className={labelClass}>Special rule #2</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPECIAL_RULE2_OPTIONS.map((rule) => (
+                    <button
+                      type="button"
+                      key={rule}
+                      onClick={() => setSpecialRule2((prev) => toggleSelection(prev, rule))}
+                      className={`${chipBase} ${
+                        specialRule2.includes(rule)
+                          ? 'border-cyan-400 bg-cyan-600 text-white'
+                          : 'border-white/20 bg-black/30 text-white/70'
+                      }`}
+                    >
+                      {rule}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <p className="text-[11px] text-white/55">
-            Registration auto-closes at T-10. Leftover solo entries are randomly paired; odd
-            player can be marked sub. Admin starts roll call; all Ready opens the match table.
-            Credit prizes from the league wallet.
+            League admins only. Registration auto-closes at T-10. Use Start early + bots to test
+            before human play. Credit prizes from the league wallet.
           </p>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={createTournament}
-            className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-            style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
-          >
-            {saving ? 'Creating…' : 'Create'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={createTournament}
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+              style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
+            >
+              {saving ? 'Creating…' : 'Create'}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={resetCreateForm}
+              className="rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold text-white"
+            >
+              Reset
+            </button>
+          </div>
         </div>
       )}
 

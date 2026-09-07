@@ -642,13 +642,40 @@ router.post('/:leagueId/tournaments', authenticateToken, logoUpload.single('bann
 
     const tournament = await LeagueTournamentService.create(req.params.leagueId, req.userId, {
       ...req.body,
-      bannerUrl,
-      firstPlaceCoins: req.body.firstPlaceCoins,
-      secondPlaceCoins: req.body.secondPlaceCoins,
-      nilAllowed: req.body.nilAllowed !== 'false' && req.body.nilAllowed !== false,
-      blindNilAllowed: req.body.blindNilAllowed === 'true' || req.body.blindNilAllowed === true
+      bannerUrl
     });
     res.status(201).json(tournament);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/add-bots', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueTournamentService.addBots(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId,
+      Number(req.body?.count ?? 0)
+    );
+    res.json(result);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post('/:leagueId/tournaments/:tournamentId/start-early', authenticateToken, async (req, res) => {
+  try {
+    const result = await LeagueTournamentService.startEarly(
+      req.params.leagueId,
+      req.userId,
+      req.params.tournamentId,
+      {
+        botCount: Number(req.body?.botCount ?? 0),
+        registerAdmin: req.body?.registerAdmin !== false
+      }
+    );
+    res.json(result);
   } catch (error) {
     handleError(res, error);
   }
