@@ -758,5 +758,236 @@ export class TournamentBracketService {
 
     return { completed: false };
   }
+
+  /**
+   * Parse `team_${id}` / `team_${id1}_${id2}` into user ids (cuids have no underscores).
+   */
+  static parseTeamPlayerIds(teamId) {
+    if (!teamId) return [];
+    return String(teamId).replace(/^team_/, '').split('_').filter(Boolean);
+  }
+
+  /**
+   * Ensure all WB/LB/GF shells exist for an in-progress double-elim (upgrades old stub brackets).
+   */
+  static async ensureDoubleElimStructure(tournamentId) {
+    const bracketSize = await this.inferDoubleElimBracketSize(tournamentId);
+    if (bracketSize < 2) return { bracketSize: 0, created: 0 };
+
+    const existing = await prisma.tournamentMatch.findMany({
+      where: { tournamentId },
+      select: { round: true, matchNumber: true }
+    });
+    const have = new Set(existing.map((m) => `${m.round}:${m.matchNumber}`));
+    const toCreate = [];
+
+    const wbRounds = this.wbRoundsForSize(bracketSize);
+    let teamsInRound = bracketSize;
+    for (let wr = 1; wr <= wbRounds; wr++) {
+      const matchCount = teamsInRound / 2;
+      for (let m = 1; m <= matchCount; m++) {
+        const round = wr * 100;
+        if (!have.has(`${round}:${m}`)) {
+          toCreate.push({
+            tournamentId,
+            round,
+            matchNumber: m,
+            team1Id: null,
+            team2Id: null,
+            status: 'PENDING'
+          });
+        }
+      }
+      teamsInRound /= 2;
+    }
+
+    for (const lb of this.buildDoubleElimLbMeta(bracketSize)) {
+      for (let m = 1; m <= lb.matchCount; m++) {
+        if (!have.has(`${lb.round}:${m}`)) {
+          toCreate.push({
+            tournamentId,
+            round: lb.round,
+            matchNumber: m,
+            team1Id: null,
+            team2Id: null,
+            status: 'PENDING'
+          });
+        }
+      }
+    }
+
+    if (!have.has('1000:1')) {
+      toCreate.push({
+        tournamentId,
+        round: 1000,
+        matchNumber: 1,
+        team1Id: null,
+        team2Id: null,
+        status: 'PENDING'
+      });
+    }
+
+    if (toCreate.length) {
+      await prisma.tournamentMatch.createMany({ data: toCreate });
+      console.log(
+        `[TOURNAMENT BRACKET] ensureDoubleElimStructure created ${toCreate.length} shells for ${tournamentId}`
+      );
+    }
+    return { bracketSize, created: toCreate.length };
+  }
+
+  /**
+   * Re-resolve winners from linked games (fixes wrong bracket winners) and replay
+   * advancement so losers drop into the LB and later rounds refill correctly.
+   */
+  static async repairDoubleElimination(tournamentId) {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      select: { eliminationType: true, status: true }
+    });
+    if (!tournament || tournament.eliminationType !== 'DOUBLE') {
+      return { repaired: false, reason: 'not_double' };
+    }
+    if (tournament.status === 'COMPLETED' || tournament.status === 'CANCELLED') {
+      return { repaired: false, reason: 'terminal' };
+    }
+
+    await this.ensureDoubleElimStructure(tournamentId);
+
+    const { LeagueTournamentService } = await import('./LeagueTournamentService.js');
+
+    let matches = await prisma.tournamentMatch.findMany({
+      where: { tournamentId },
+      orderBy: [{ round: 'asc' }, { matchNumber: 'asc' }]
+    });
+
+    // Correct winnerId from the Spades game when present
+    let winnersFixed = 0;
+    for (const match of matches) {
+      if (!match.gameId || !String(match.gameId).startsWith('tournament_')) continue;
+      const game = await prisma.game.findUnique({
+        where: { id: match.gameId },
+        include: { players: true, result: true }
+      });
+      if (!game?.result) continue;
+      const resolved = LeagueTournamentService.resolveWinnerTeamId(match, game);
+      if (resolved && resolved !== match.winnerId) {
+        console.warn(
+          `[TOURNAMENT BRACKET] Correcting winner for match ${match.id}: ${match.winnerId} → ${resolved}`
+        );
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: { winnerId: resolved, status: 'COMPLETED' }
+        });
+        winnersFixed++;
+      } else if (resolved && !match.winnerId) {
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: { winnerId: resolved, status: 'COMPLETED' }
+        });
+        winnersFixed++;
+      }
+    }
+
+    matches = await prisma.tournamentMatch.findMany({
+      where: { tournamentId },
+      orderBy: [{ round: 'asc' }, { matchNumber: 'asc' }]
+    });
+
+    // Snapshot results to replay (only matches that actually finished)
+    const results = matches
+      .filter((m) => m.winnerId && m.status === 'COMPLETED')
+      .map((m) => ({
+        id: m.id,
+        round: m.round,
+        matchNumber: m.matchNumber,
+        winnerId: m.winnerId,
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        gameId: m.gameId
+      }));
+
+    // Clear advancement state on every match except WB R1 seeds + recorded R1 results
+    for (const m of matches) {
+      if (m.round === 100) {
+        // Keep R1 teams + winner; clear game linkage only if needed — keep gameId
+        continue;
+      }
+      await prisma.tournamentMatch.update({
+        where: { id: m.id },
+        data: {
+          team1Id: null,
+          team2Id: null,
+          winnerId: null,
+          gameId: null,
+          status: 'PENDING'
+        }
+      });
+    }
+
+    // Replay in round order so drops and advances refill correctly
+    results.sort((a, b) => a.round - b.round || a.matchNumber - b.matchNumber);
+
+    for (const snap of results) {
+      if (snap.round === 100) {
+        const match = await prisma.tournamentMatch.findUnique({ where: { id: snap.id } });
+        if (!match?.winnerId) continue;
+        await this.advanceDoubleElimination(tournamentId, match, match.winnerId);
+        continue;
+      }
+
+      // Later rounds: teams should now be filled by prior advances
+      const match = await prisma.tournamentMatch.findFirst({
+        where: {
+          tournamentId,
+          round: snap.round,
+          matchNumber: snap.matchNumber
+        }
+      });
+      if (!match?.team1Id || !match?.team2Id) {
+        console.warn(
+          `[TOURNAMENT BRACKET] repair skip r${snap.round} m${snap.matchNumber} — teams not filled yet`
+        );
+        continue;
+      }
+      // Prefer original winner if still one of the two sides; else keep snap if it matches a side
+      const winnerStillValid =
+        snap.winnerId === match.team1Id || snap.winnerId === match.team2Id
+          ? snap.winnerId
+          : null;
+      if (!winnerStillValid) {
+        console.warn(
+          `[TOURNAMENT BRACKET] repair skip r${snap.round} m${snap.matchNumber} — winner ${snap.winnerId} not in match`
+        );
+        continue;
+      }
+      await prisma.tournamentMatch.update({
+        where: { id: match.id },
+        data: {
+          winnerId: winnerStillValid,
+          status: 'COMPLETED',
+          gameId: snap.gameId || null
+        }
+      });
+      const fresh = await prisma.tournamentMatch.findUnique({ where: { id: match.id } });
+      await this.advanceDoubleElimination(tournamentId, fresh, winnerStillValid);
+    }
+
+    // Restore gameIds on R1 (untouched) and any completed we can map
+    // R1 gameIds preserved. For later, we tried above.
+
+    try {
+      const { TournamentService } = await import('./TournamentService.js');
+      await TournamentService.openPlayableTables(tournamentId);
+    } catch (e) {
+      console.error('[TOURNAMENT BRACKET] openPlayableTables after repair:', e.message || e);
+    }
+
+    return {
+      repaired: true,
+      winnersFixed,
+      resultsReplayed: results.length
+    };
+  }
 }
 

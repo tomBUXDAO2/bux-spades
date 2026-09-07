@@ -53,6 +53,21 @@ export class LeagueTournamentService {
     }
     tournament = await TournamentService.getTournament(tournamentId);
 
+    // Upgrade stub double-elim brackets and backfill loser drops / corrected winners
+    if (
+      tournament.eliminationType === 'DOUBLE' &&
+      tournament.status === 'IN_PROGRESS' &&
+      this.doubleElimNeedsRepair(tournament)
+    ) {
+      try {
+        const fix = await TournamentBracketService.repairDoubleElimination(tournamentId);
+        console.log('[LEAGUE TOURNAMENT] double-elim repair:', fix);
+        tournament = await TournamentService.getTournament(tournamentId);
+      } catch (e) {
+        console.error('[LEAGUE TOURNAMENT] double-elim repair failed:', e.message || e);
+      }
+    }
+
     const teamMap = this.buildTeamMap(tournament.registrations || []);
     const teamLabels = await this.buildTeamLabels(tournament);
     const matches = [];
@@ -73,6 +88,29 @@ export class LeagueTournamentService {
 
     const stats = await TournamentService.getRegistrationStats(tournamentId);
     return { ...tournament, matches, registrationStats: stats, teamLabels };
+  }
+
+  static doubleElimNeedsRepair(tournament) {
+    const matches = tournament.matches || [];
+    const wbR1 = matches.filter((m) => m.round === 100);
+    if (!wbR1.length) return false;
+    const bracketSize = wbR1.length * 2;
+    const meta = TournamentBracketService.buildDoubleElimLbMeta(bracketSize);
+    const lbRounds = new Set(
+      matches
+        .filter((m) => m.round > 100 && m.round < 1000 && m.round % 100 !== 0)
+        .map((m) => m.round)
+    );
+    const missingShell = meta.some((m) => !lbRounds.has(m.round));
+    const r1Done = wbR1.every((m) => m.status === 'COMPLETED' && m.winnerId);
+    const lbFilled = matches.some(
+      (m) =>
+        m.round > 100 &&
+        m.round < 1000 &&
+        m.round % 100 !== 0 &&
+        (m.team1Id || m.team2Id)
+    );
+    return missingShell || (r1Done && !lbFilled);
   }
 
   /** Map team_* ids → "Alice + Bob" using User + registration usernames. */
@@ -615,12 +653,25 @@ export class LeagueTournamentService {
     if (winner === undefined || winner === null) return null;
 
     if (game.mode === 'PARTNERS') {
-      // ScoringService awards TEAM_0/1 by seatIndex % 2 — use that, not stored teamIndex
-      // (legacy adjacent seating could disagree with the scoreboard).
-      const team0 = players.filter((p) => p.seatIndex % 2 === 0).map((p) => p.userId);
-      const team1 = players.filter((p) => p.seatIndex % 2 === 1).map((p) => p.userId);
-      const winningIds = Number(winner) === 0 || winner === 'TEAM_0' ? team0 : team1;
-      return this.matchTeamId(match, winningIds);
+      // ScoringService awards TEAM_0/1 by seatIndex % 2
+      const winParity =
+        Number(winner) === 0 || winner === 'TEAM_0' || winner === '0' ? 0 : 1;
+      const winningUserIds = new Set(
+        players.filter((p) => p.seatIndex % 2 === winParity).map((p) => p.userId)
+      );
+
+      const scoreSide = (teamId) => {
+        if (!teamId) return 0;
+        const ids = TournamentBracketService.parseTeamPlayerIds(teamId);
+        return ids.filter((id) => winningUserIds.has(id)).length;
+      };
+
+      const s1 = scoreSide(match.team1Id);
+      const s2 = scoreSide(match.team2Id);
+      if (s1 > s2) return match.team1Id;
+      if (s2 > s1) return match.team2Id;
+
+      return this.matchTeamId(match, [...winningUserIds]);
     }
 
     // Solo: winner is team index / player
@@ -638,18 +689,16 @@ export class LeagueTournamentService {
     const candidates = [match.team1Id, match.team2Id].filter(Boolean);
     if (!set.size || !candidates.length) return null;
 
-    // Exact / full overlap first
     let best = null;
     let bestCount = -1;
     for (const c of candidates) {
-      const ids = c.replace(/^team_/, '').split('_').filter(Boolean);
+      const ids = TournamentBracketService.parseTeamPlayerIds(c);
       const overlap = ids.filter((id) => set.has(id)).length;
       if (overlap > bestCount) {
         bestCount = overlap;
         best = c;
       }
     }
-    // Require at least one winning player from the match team — never guess team1
     return bestCount > 0 ? best : null;
   }
 
