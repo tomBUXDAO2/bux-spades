@@ -341,19 +341,17 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
           const isVisible = index < visibleCount;
           const dimUnplayable =
             (!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId;
-          const playableLift = isPlayable && !isPlayingCard;
-          const stackZ = playableLift ? 800 + index : index;
           const dealingFan = gameState.status === 'BIDDING' && !dealingComplete;
 
           return (
             <motion.div
               key={`${card.suit}${card.rank}`}
-              className={`relative ${playableLift ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'pointer-events-none' : ''}`}
+              className={`relative ${isPlayable && !isPlayingCard ? 'cursor-pointer' : 'cursor-not-allowed'} ${dimUnplayable ? 'pointer-events-none' : ''}`}
               style={{
                 width: `${cardDimensions.cardUIWidth}px`,
                 height: `${isMobile ? peekHalfH : cardDimensions.cardUIHeight}px`,
                 marginLeft: index > 0 ? `${cardOverlapOffset}px` : '0',
-                zIndex: stackZ,
+                zIndex: index,
                 pointerEvents: 'auto',
               }}
               initial={false}
@@ -370,14 +368,6 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                 damping: dealingFan ? 22 : 24,
                 mass: dealingFan ? 0.85 : 1,
               }}
-              whileHover={
-                playableLift
-                  ? isMobile
-                    ? { y: -8, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
-                    : { y: -10, scale: 1.03, zIndex: 950, transition: { type: 'spring', stiffness: 400, damping: 22 } }
-                  : undefined
-              }
-              whileTap={playableLift && !isMobile ? { scale: 0.97 } : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -410,7 +400,7 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
                   card={card}
                   width={cardDimensions.cardUIWidth}
                   height={cardDimensions.cardUIHeight}
-                  className={isPlayable ? 'hover:opacity-95' : ''}
+                  className=""
                   style={
                     index > 0
                       ? { filter: 'drop-shadow(-12px 0 20px rgba(0, 0, 0, 0.22))' }
