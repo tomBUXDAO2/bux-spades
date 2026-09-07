@@ -192,8 +192,13 @@ export default function GameTablePlayers({
     // Shared variables for both bots and humans
     const isActive = gameState.status !== "WAITING" && gameState.currentPlayer === player.id;
     const isSideSeat = position === 1 || position === 3;
-    const avatarWidth = isVerySmallScreen ? 24 : (isMobile ? 32 : 40);
-    const avatarHeight = isVerySmallScreen ? 24 : (isMobile ? 32 : 40);
+    // Made/bid chip drives component width (E/W) and avatar square size (all seats)
+    const bidChipWidth = isVerySmallScreen ? 52 : isMobile ? 68 : 88;
+    const bidChipHeight = isVerySmallScreen ? 22 : isMobile ? 26 : 30;
+    const avatarSize = bidChipWidth;
+    const nameFontSize = isVerySmallScreen ? 9 : isMobile ? 11 : 13;
+    const bidFontSize = isVerySmallScreen ? 11 : isMobile ? 13 : 15;
+    const statusFontSize = isVerySmallScreen ? 12 : isMobile ? 14 : 16;
     
     // Determine game mode early for color selection
     // rules.gameType is often the bidding format (REGULAR/MIRROR/…), not PARTNERS —
@@ -207,32 +212,22 @@ export default function GameTablePlayers({
     const isSoloGame = modeToken === 'SOLO';
     const isPartnerGame = !isSoloGame;
     
-    // Determine player color based on game mode
-    let playerGradient;
+    // Border colour for square avatar (same palette as previous seat/team gradients)
+    const originalPosition = player.seatIndex ?? position;
+    let avatarBorderClass: string;
     if (isSoloGame) {
-      // Solo mode: 4 individual colors - use original position for consistent colors across all players
-      const soloColors = [
-        "bg-gradient-to-r from-red-700 to-red-500",    // Position 0: Red
-        "bg-gradient-to-r from-blue-700 to-blue-500",  // Position 1: Blue
-        "bg-gradient-to-r from-orange-600 to-orange-400", // Position 2: Orange
-        "bg-gradient-to-r from-green-700 to-green-500"  // Position 3: Green
+      const soloBorders = [
+        'border-red-500',
+        'border-blue-500',
+        'border-orange-400',
+        'border-green-500'
       ];
-      // Use original position for color assignment, not display position
-      const originalPosition = player.seatIndex ?? position;
-      playerGradient = soloColors[originalPosition];
+      avatarBorderClass = soloBorders[originalPosition] || 'border-slate-400';
     } else {
-      // Partners mode: 2 team colors
-      // Team 1 (positions 0,2) = Red Team
-      // Team 2 (positions 1,3) = Blue Team
-      const redTeamGradient = "bg-gradient-to-r from-red-700 to-red-500";
-      const blueTeamGradient = "bg-gradient-to-r from-blue-700 to-blue-500";
-      
-      // Use ORIGINAL position for team assignment, not display position
-      // Get the original position from the player object
-      const originalPosition = player.seatIndex ?? position;
-      playerGradient = (originalPosition === 0 || originalPosition === 2)
-        ? redTeamGradient
-        : blueTeamGradient;
+      avatarBorderClass =
+        originalPosition === 0 || originalPosition === 2
+          ? 'border-red-500'
+          : 'border-blue-500';
     }
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
@@ -394,15 +389,92 @@ export default function GameTablePlayers({
     const seatRef =
       position === 2 ? northPlayerSlotRef : position === 0 ? southPlayerSlotRef : undefined;
 
+    const avatarFrame = (
+      <div
+        className={`relative h-full w-full overflow-hidden rounded-sm border-2 bg-slate-900 ${avatarBorderClass}`}
+        data-player-id={player.id}
+      >
+        <img
+          src={displayAvatar}
+          alt={displayName}
+          width={avatarSize}
+          height={avatarSize}
+          className={`h-full w-full object-cover ${isHuman && isAway ? 'opacity-45' : ''}`}
+        />
+        {isHuman && isAway && (
+          <div
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/50 ring-2 ring-inset ring-amber-500/60"
+            aria-label="Away"
+          >
+            <span
+              className="font-black uppercase tracking-tight text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+              style={{
+                fontSize: Math.max(8, avatarSize * 0.18),
+                lineHeight: 1,
+              }}
+            >
+              AWAY
+            </span>
+          </div>
+        )}
+        {isHuman && emojiReactions[player.id] && (
+          <EmojiReaction
+            emoji={emojiReactions[player.id].emoji}
+            onComplete={() => handleEmojiComplete(player.id)}
+          />
+        )}
+        {canRemovePlayer && (
+          <div className="absolute -bottom-1.5 -left-1.5 z-50">
+            <button
+              className={`remove-player-button ${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border border-white shadow hover:bg-red-700 transition`}
+              style={{ minWidth: 'unset !important', minHeight: 'unset !important', padding: '0 !important' }}
+              title={isHuman ? "Remove Player" : "Remove Bot"}
+              onClick={() => handleRemoveBot(position)}
+            >
+              <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
+            </button>
+          </div>
+        )}
+        {player.isDealer && (
+          <div className="absolute -bottom-1 -right-1">
+            <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
+              <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
+                <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {shouldShowTimerOnPlayer && (
+          <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-80">
+            <span className="text-lg font-bold text-white">{countdownPlayer?.timeLeft || 0}</span>
+          </div>
+        )}
+        {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-orange-500 bg-opacity-80">
+            <span className="text-lg font-bold text-white">{countdownPlayer?.timeLeft ?? 0}</span>
+          </div>
+        )}
+      </div>
+    );
+
     return (
       <div ref={seatRef} className={`absolute ${getPositionClasses(position)} z-30`}>
-        <div className={`
-          ${playerGradient} rounded-xl
-          ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
-          transition-all duration-200
-        `}>
-          <div className={isSideSeat ? `flex flex-col items-center ${isVerySmallScreen ? 'p-1 gap-1' : 'p-1.5 gap-1.5'}` : `flex items-center ${isVerySmallScreen ? 'p-1 gap-1' : 'p-1.5 gap-1.5'}`}>
-            <div className="relative">
+        <div
+          className={`
+            rounded-md bg-slate-950/75
+            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
+            transition-all duration-200
+          `}
+          style={isSideSeat ? { width: avatarSize } : { height: avatarSize }}
+        >
+          <div
+            className={
+              isSideSeat
+                ? 'flex w-full flex-col items-stretch gap-0.5 p-0'
+                : 'flex h-full flex-row items-center gap-0.5 p-0'
+            }
+          >
+            <div className="relative shrink-0" style={{ width: avatarSize, height: avatarSize }}>
               {isHuman ? (
                 <PlayerProfileDropdown
                   player={player}
@@ -414,155 +486,60 @@ export default function GameTablePlayers({
                   onOpenAdminPanel={onOpenAdminPanel}
                   playerPosition={position}
                 >
-                  <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
-                    <div className="bg-gray-900 rounded-full p-0.5 relative">
-                      <img
-                        src={displayAvatar}
-                        alt={displayName}
-                        width={avatarWidth}
-                        height={avatarHeight}
-                        className={`rounded-full object-cover ${isAway ? 'opacity-45' : ''}`}
-                      />
-                      {isAway && (
-                        <div
-                          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-full bg-black/50 ring-2 ring-amber-500/60"
-                          aria-label="Away"
-                        >
-                          <span
-                            className="font-black uppercase tracking-tight text-amber-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
-                            style={{
-                              fontSize: isVerySmallScreen
-                                ? Math.max(8, avatarWidth * 0.22)
-                                : Math.max(10, avatarWidth * 0.2),
-                              lineHeight: 1,
-                            }}
-                          >
-                            AWAY
-                          </span>
-                        </div>
-                      )}
-                      {/* Emoji reaction overlay */}
-                      {emojiReactions[player.id] && (
-                        <EmojiReaction
-                          emoji={emojiReactions[player.id].emoji}
-                          onComplete={() => handleEmojiComplete(player.id)}
-                        />
-                      )}
-                      {/* Remove button */}
-                      {canRemovePlayer && (
-                        <div className="absolute -bottom-2 -left-2 z-50">
-                          <button
-                            className={`remove-player-button ${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border border-white shadow hover:bg-red-700 transition`}
-                            style={{ minWidth: 'unset !important', minHeight: 'unset !important', padding: '0 !important' }}
-                            title={isHuman ? "Remove Player" : "Remove Bot"}
-                            onClick={() => handleRemoveBot(position)}
-                          >
-                            <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
-                          </button>
-                        </div>
-                      )}
-                      {/* Dealer chip for bots */}
-                      {player.isDealer && (
-                        <>
-                          <div className="absolute -bottom-1 -right-1">
-                            <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
-                              <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
-                                <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                      {/* Timer overlay for last 10 seconds */}
-                      {shouldShowTimerOnPlayer && (
-                        <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                          <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
-                        </div>
-                      )}
-                      
-                      {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
-                      {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0) && (
-                        <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                          <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {avatarFrame}
                 </PlayerProfileDropdown>
               ) : (
-                <div className="rounded-full p-0.5 bg-gradient-to-r from-gray-400 to-gray-600" data-player-id={player.id}>
-                <div className="bg-gray-900 rounded-full p-0.5">
-                  <img
-                    src={displayAvatar}
-                    alt={displayName}
-                    width={avatarWidth}
-                    height={avatarHeight}
-                    className="rounded-full object-cover"
-                  />
-                    {/* Remove button */}
-                    {canRemovePlayer && (
-                      <div className="absolute -bottom-2 -left-2 z-50">
-                    <button
-                          className={`remove-player-button ${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} bg-red-600 text-white rounded-full flex items-center justify-center text-xs border border-white shadow hover:bg-red-700 transition`}
-                          title={isHuman ? "Remove Player" : "Remove Bot"}
-                          style={{ minWidth: 'unset !important', minHeight: 'unset !important', padding: '0 !important' }}
-                      onClick={() => handleRemoveBot(position)}
-                    >
-                      <FaMinus className={isVerySmallScreen ? "w-2 h-2" : "w-2.5 h-2.5"} />
-                    </button>
-                      </div>
-                  )}
-                  {/* Dealer chip for bots */}
-                  {player.isDealer && (
-                    <>
-                      <div className="absolute -bottom-1 -right-1">
-                        <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
-                          <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
-                            <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  {/* Timer overlay for last 10 seconds */}
-                  {shouldShowTimerOnPlayer && (
-                    <div className="absolute inset-0 bg-red-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft || 0}</span>
-                    </div>
-                  )}
-                  
-                  {/* Countdown overlay: only show once time has fully elapsed, on the current player's turn */}
-                  {Boolean(isPlayerOnCountdown && isCurrentPlayer && (countdownPlayer?.timeLeft ?? 0) > 0) && (
-                    <div className="absolute inset-0 bg-orange-500 bg-opacity-80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">{countdownPlayer?.timeLeft ?? 0}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                avatarFrame
               )}
             </div>
-            <div className={`flex flex-col items-center ${isVerySmallScreen ? 'gap-0.5' : 'gap-1'}`}>
-              <div className="w-full px-2 py-1 rounded-lg shadow-sm" style={{ width: isVerySmallScreen ? '40px' : (isMobile ? '50px' : '70px') }}>
-                <div className="text-white font-medium truncate text-center" style={{ fontSize: isVerySmallScreen ? '7px' : (isMobile ? '9px' : '11px') }}>
-                  {displayName}
-                </div>
+            <div
+              className={`flex min-w-0 flex-col items-stretch justify-center ${isSideSeat ? 'w-full' : 'h-full'}`}
+              style={isSideSeat ? undefined : { width: bidChipWidth }}
+            >
+              <div
+                className="w-full truncate px-0.5 text-center font-semibold text-white"
+                style={{ fontSize: nameFontSize, lineHeight: 1.15 }}
+                title={displayName}
+              >
+                {displayName}
               </div>
-              {/* Bid/Trick counter for bots, same as humans */}
-              <div className="bg-white rounded-full px-2 py-1 shadow-inner flex items-center justify-center gap-1"
-                   style={{ 
-                     width: isVerySmallScreen ? '45px' : (isMobile ? '60px' : '80px'),
-                     minWidth: isVerySmallScreen ? '45px' : (isMobile ? '60px' : '80px'),
-                     height: isVerySmallScreen ? '20px' : (isMobile ? '24px' : '28px'),
-                     minHeight: isVerySmallScreen ? '20px' : (isMobile ? '24px' : '28px')
-                   }}>
-                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
+              <div
+                className="mt-0.5 flex w-full items-center justify-center gap-0.5 rounded-full bg-white shadow-inner"
+                style={{
+                  height: bidChipHeight,
+                  minHeight: bidChipHeight,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: bidFontSize,
+                    fontWeight: 700,
+                    color: 'black',
+                    minWidth: isVerySmallScreen ? 7 : 9,
+                    textAlign: 'center',
+                  }}
+                >
                   {gameState.status === "WAITING" ? "0" : madeCount}
                 </span>
-                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), color: 'black' }}>/</span>
-                <span style={{ fontSize: isVerySmallScreen ? '9px' : (isMobile ? '11px' : '13px'), fontWeight: 600, color: 'black', minWidth: isVerySmallScreen ? '6px' : (isMobile ? '8px' : '10px'), textAlign: 'center' }}>
+                <span style={{ fontSize: bidFontSize, color: 'black' }}>/</span>
+                <span
+                  style={{
+                    fontSize: bidFontSize,
+                    fontWeight: 700,
+                    color: 'black',
+                    minWidth: isVerySmallScreen ? 7 : 9,
+                    textAlign: 'center',
+                  }}
+                >
                   {hasBid ? formatBid(bidCount, isBlindNil) : "0"}
                 </span>
-                <span style={{ fontSize: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), minWidth: isVerySmallScreen ? '10px' : (isMobile ? '12px' : '14px'), textAlign: 'center' }}>
+                <span
+                  style={{
+                    fontSize: statusFontSize,
+                    minWidth: isVerySmallScreen ? 11 : 13,
+                    textAlign: 'center',
+                  }}
+                >
                   {madeStatus}
                 </span>
               </div>
@@ -588,15 +565,6 @@ export default function GameTablePlayers({
                   </button>
                 )}
             </div>
-            {/* playedCard && (
-              <div className="flex justify-center mt-2">
-                <img
-                  src={`/optimized/cards/${getCardImage(playedCard)}`}
-                  alt={`${playedCard.rank} of ${playedCard.suit}`}
-                  style={{ width: 60, height: 90, objectFit: 'contain', borderRadius: 8, boxShadow: '0 2px 8px #0004' }}
-                />
-              </div>
-            ) */}
           </div>
         </div>
         
