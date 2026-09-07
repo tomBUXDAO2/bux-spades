@@ -212,23 +212,30 @@ export default function GameTablePlayers({
     const isSoloGame = modeToken === 'SOLO';
     const isPartnerGame = !isSoloGame;
     
-    // Border colour for square avatar (same palette as previous seat/team gradients)
+    // Seat/team colour: body fill + matching avatar border
     const originalPosition = player.seatIndex ?? position;
+    let playerGradient: string;
     let avatarBorderClass: string;
     if (isSoloGame) {
-      const soloBorders = [
-        'border-red-500',
-        'border-blue-500',
-        'border-orange-400',
-        'border-green-500'
+      const soloStyles = [
+        { fill: 'bg-gradient-to-r from-red-700 to-red-500', border: 'border-red-500' },
+        { fill: 'bg-gradient-to-r from-blue-700 to-blue-500', border: 'border-blue-500' },
+        { fill: 'bg-gradient-to-r from-orange-600 to-orange-400', border: 'border-orange-400' },
+        { fill: 'bg-gradient-to-r from-green-700 to-green-500', border: 'border-green-500' }
       ];
-      avatarBorderClass = soloBorders[originalPosition] || 'border-slate-400';
+      const style = soloStyles[originalPosition] || soloStyles[0];
+      playerGradient = style.fill;
+      avatarBorderClass = style.border;
     } else {
-      avatarBorderClass =
-        originalPosition === 0 || originalPosition === 2
-          ? 'border-red-500'
-          : 'border-blue-500';
+      const isRedTeam = originalPosition === 0 || originalPosition === 2;
+      playerGradient = isRedTeam
+        ? 'bg-gradient-to-r from-red-700 to-red-500'
+        : 'bg-gradient-to-r from-blue-700 to-blue-500';
+      avatarBorderClass = isRedTeam ? 'border-red-500' : 'border-blue-500';
     }
+    // Shared padding for the username/bid panel (same on all seats)
+    const textPanelPad = isVerySmallScreen ? 'px-1 py-1' : 'px-1.5 py-1.5';
+    const nameToBidGap = isVerySmallScreen ? 'mt-1' : 'mt-1.5';
     // Calculate bid/made/tick/cross logic for both bots and humans
     const madeCount = player.tricks || 0;
     // Use the player's actual seatIndex to get the bid from the server
@@ -391,7 +398,7 @@ export default function GameTablePlayers({
 
     const avatarFrame = (
       <div
-        className={`relative h-full w-full overflow-hidden rounded-sm border-2 bg-slate-900 ${avatarBorderClass}`}
+        className={`relative h-full w-full overflow-hidden rounded-lg border-4 bg-slate-900 ${avatarBorderClass}`}
         data-player-id={player.id}
       >
         <img
@@ -461,18 +468,18 @@ export default function GameTablePlayers({
       <div ref={seatRef} className={`absolute ${getPositionClasses(position)} z-30`}>
         <div
           className={`
-            rounded-md bg-slate-950/75
-            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30' : 'shadow-md'}
+            ${isActive ? 'ring-2 ring-yellow-400 shadow-lg shadow-yellow-400/30 rounded-md' : ''}
             transition-all duration-200
           `}
-          style={isSideSeat ? { width: avatarSize } : { height: avatarSize }}
+          style={isSideSeat ? { width: avatarSize } : undefined}
         >
           <div
             className={
               isSideSeat
-                ? 'flex w-full flex-col items-stretch gap-0.5 p-0'
-                : 'flex h-full flex-row items-center gap-0.5 p-0'
+                ? 'flex w-full flex-col items-stretch gap-0.5'
+                : 'flex flex-row items-stretch gap-0.5'
             }
+            style={isSideSeat ? undefined : { height: avatarSize }}
           >
             <div className="relative shrink-0" style={{ width: avatarSize, height: avatarSize }}>
               {isHuman ? (
@@ -493,18 +500,22 @@ export default function GameTablePlayers({
               )}
             </div>
             <div
-              className={`flex min-w-0 flex-col items-stretch justify-center ${isSideSeat ? 'w-full' : 'h-full'}`}
+              className={`
+                ${playerGradient} flex min-w-0 flex-col items-stretch justify-center rounded-md shadow-md
+                ${textPanelPad}
+                ${isSideSeat ? 'w-full' : 'h-full'}
+              `}
               style={isSideSeat ? undefined : { width: bidChipWidth }}
             >
               <div
-                className="w-full truncate px-0.5 text-center font-semibold text-white"
+                className="w-full truncate px-0 text-center font-semibold text-white"
                 style={{ fontSize: nameFontSize, lineHeight: 1.15 }}
                 title={displayName}
               >
                 {displayName}
               </div>
               <div
-                className="mt-0.5 flex w-full items-center justify-center gap-0.5 rounded-full bg-white shadow-inner"
+                className={`${nameToBidGap} flex w-full items-center justify-center gap-0.5 rounded-full bg-white shadow-inner`}
                 style={{
                   height: bidChipHeight,
                   minHeight: bidChipHeight,
@@ -547,7 +558,7 @@ export default function GameTablePlayers({
                 <button
                   type="button"
                   onClick={onImBack}
-                  className="mt-0.5 rounded bg-emerald-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-emerald-600 sm:text-[8px]"
+                  className="mt-1 rounded bg-emerald-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-emerald-600 sm:text-[8px]"
                 >
                   I&apos;m back
                 </button>
@@ -559,7 +570,7 @@ export default function GameTablePlayers({
                   <button
                     type="button"
                     onClick={() => onRequestSubSeat(actualSeatIndex)}
-                    className="mt-0.5 rounded bg-amber-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-amber-600 sm:text-[8px]"
+                    className="mt-1 rounded bg-amber-700 px-1.5 py-0.5 text-[7px] font-semibold text-white hover:bg-amber-600 sm:text-[8px]"
                   >
                     Request seat
                   </button>
