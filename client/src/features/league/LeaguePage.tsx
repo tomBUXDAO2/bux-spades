@@ -1011,7 +1011,9 @@ const LeaguePage: React.FC = () => {
               isTimedOut={isTimedOut}
               currentUserId={user.id}
               members={members}
-              onOpenTable={(gameId) => navigate(`/table/${gameId}`)}
+              onOpenTable={(gameId, opts) =>
+                navigate(opts?.spectate ? `/table/${gameId}?spectate=1` : `/table/${gameId}`)
+              }
             />
           ) : (
             <LeagueSectionPlaceholder section={mainSection} theme={theme} />

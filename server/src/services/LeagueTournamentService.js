@@ -32,12 +32,29 @@ export class LeagueTournamentService {
   static async get(leagueId, tournamentId, viewerId) {
     await LeagueService.assertMember(leagueId, viewerId);
     await this.assertLeagueTournament(leagueId, tournamentId);
-    const tournament = await TournamentService.getTournament(tournamentId);
+    let tournament = await TournamentService.getTournament(tournamentId);
     if (!tournament || tournament.leagueId !== leagueId) {
       throw httpError('Tournament not found', 404);
     }
 
+    // Clear stale gameIds when the Game row was deleted (broken Watch links)
+    for (const match of tournament.matches || []) {
+      if (!match.gameId || match.status === 'COMPLETED') continue;
+      const exists = await prisma.game.findUnique({
+        where: { id: match.gameId },
+        select: { id: true }
+      });
+      if (!exists) {
+        await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: { gameId: null, status: 'PENDING' }
+        });
+      }
+    }
+    tournament = await TournamentService.getTournament(tournamentId);
+
     const teamMap = this.buildTeamMap(tournament.registrations || []);
+    const teamLabels = await this.buildTeamLabels(tournament);
     const matches = [];
     for (const match of tournament.matches || []) {
       const players = this.playersForMatch(match, teamMap);
@@ -55,7 +72,55 @@ export class LeagueTournamentService {
     }
 
     const stats = await TournamentService.getRegistrationStats(tournamentId);
-    return { ...tournament, matches, registrationStats: stats };
+    return { ...tournament, matches, registrationStats: stats, teamLabels };
+  }
+
+  /** Map team_* ids → "Alice + Bob" using User + registration usernames. */
+  static async buildTeamLabels(tournament) {
+    const ids = new Set();
+    for (const m of tournament.matches || []) {
+      for (const tid of [m.team1Id, m.team2Id, m.winnerId]) {
+        if (!tid) continue;
+        for (const part of tid.replace(/^team_/, '').split('_')) {
+          if (part) ids.add(part);
+        }
+      }
+    }
+    for (const r of tournament.registrations || []) {
+      if (r.userId) ids.add(r.userId);
+      if (r.partnerId) ids.add(r.partnerId);
+    }
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, username: true }
+    });
+    const nameById = new Map(users.map((u) => [u.id, u.username]));
+    for (const r of tournament.registrations || []) {
+      if (r.user?.username) nameById.set(r.userId, r.user.username);
+      if (r.partner?.username && r.partnerId) nameById.set(r.partnerId, r.partner.username);
+    }
+
+    const labels = {};
+    const allTeamIds = new Set();
+    for (const m of tournament.matches || []) {
+      for (const tid of [m.team1Id, m.team2Id, m.winnerId]) {
+        if (tid) allTeamIds.add(tid);
+      }
+    }
+    for (const r of tournament.registrations || []) {
+      if (r.partnerId && r.isComplete) {
+        allTeamIds.add(`team_${r.userId}_${r.partnerId}`);
+        allTeamIds.add(`team_${r.partnerId}_${r.userId}`);
+      } else if (!r.partnerId && !r.isSub) {
+        allTeamIds.add(`team_${r.userId}`);
+      }
+    }
+    for (const tid of allTeamIds) {
+      const parts = tid.replace(/^team_/, '').split('_');
+      labels[tid] = parts.map((id) => nameById.get(id) || `${id.slice(0, 6)}…`).join(' + ');
+    }
+    return labels;
   }
 
   static parseRuleList(value) {

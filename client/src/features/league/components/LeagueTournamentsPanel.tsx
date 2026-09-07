@@ -43,6 +43,7 @@ type Tournament = {
   bannerUrl?: string | null;
   registrations?: Registration[];
   matches?: MatchRow[];
+  teamLabels?: Record<string, string>;
   registrationStats?: {
     totalRegistrations: number;
     completeTeams: number;
@@ -62,7 +63,7 @@ type Props = {
   isTimedOut: boolean;
   currentUserId: string;
   members: Member[];
-  onOpenTable: (gameId: string) => void;
+  onOpenTable: (gameId: string, opts?: { spectate?: boolean }) => void;
 };
 
 const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
@@ -280,6 +281,11 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
+    if (detail?.teamLabels) {
+      for (const [id, label] of Object.entries(detail.teamLabels)) {
+        map.set(id, label);
+      }
+    }
     if (!detail?.registrations) return map;
     for (const r of detail.registrations) {
       if (detail.mode === 'SOLO') {
@@ -301,7 +307,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
 
   const getTeamDisplay = (teamId: string | null) => {
     if (!teamId) return { name: 'TBD' };
-    return { name: teamNameById.get(teamId) || teamId.replace(/^team_/, '').replace(/_/g, ' + ') };
+    return { name: teamNameById.get(teamId) || 'Unknown team' };
   };
 
   const post = async (path: string, body?: object) => {
@@ -768,13 +774,15 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                                 >
                                   <div className="mb-1 text-[10px] text-white/45">
                                     M{m.matchNumber} ·{' '}
-                                    {m.status === 'IN_PROGRESS' && m.gameId
-                                      ? 'TABLE OPEN'
-                                      : m.status === 'PENDING' && m.team1Id && m.team2Id
-                                        ? 'READY TO PLAY'
-                                        : m.status === 'PENDING'
-                                          ? 'WAITING'
-                                          : m.status}
+                                    {m.status === 'COMPLETED' && !m.gameId
+                                      ? 'AUTO RESULT'
+                                      : m.status === 'IN_PROGRESS' && m.gameId
+                                        ? 'TABLE OPEN'
+                                        : m.status === 'PENDING' && m.team1Id && m.team2Id
+                                          ? 'READY TO PLAY'
+                                          : m.status === 'PENDING'
+                                            ? 'WAITING'
+                                            : m.status}
                                   </div>
                                   <div
                                     className={`mb-1 rounded px-2 py-1 ${
@@ -814,7 +822,9 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                                     {m.gameId && (
                                       <button
                                         type="button"
-                                        onClick={() => onOpenTable(m.gameId!)}
+                                        onClick={() =>
+                                          onOpenTable(m.gameId!, { spectate: !inMatch })
+                                        }
                                         className="rounded bg-cyan-700/90 px-2 py-0.5 font-semibold text-white"
                                       >
                                         {inMatch ? 'Join table' : 'Watch'}

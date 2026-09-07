@@ -411,31 +411,87 @@ export class TournamentService {
     return teamIdToPlayerIds;
   }
 
-  /** Create Spades tables for every match that already has both teams (play-in + bye-vs-bye, etc.). */
+  /** Create Spades tables for human matches; instantly resolve all-bot matches. */
   static async openPlayableTables(tournamentId) {
-    const tournament = await this.getTournament(tournamentId);
-    if (!tournament) throw new Error('Tournament not found');
+    const { BotUserService } = await import('./BotUserService.js');
+    const { TournamentBracketService } = await import('./TournamentBracketService.js');
 
-    const teamMap = this.buildTeamMap(tournament.registrations || []);
-    const playable = (tournament.matches || []).filter(
-      (m) =>
-        m.team1Id &&
-        m.team2Id &&
-        !m.gameId &&
-        m.status === 'PENDING'
-    );
+    const results = [];
+    // Loop: resolving all-bot matches unlocks later rounds that may also be all-bot
+    for (let guard = 0; guard < 64; guard++) {
+      const tournament = await this.getTournament(tournamentId);
+      if (!tournament) throw new Error('Tournament not found');
 
-    const created = [];
-    for (const match of playable) {
-      try {
-        const game = await this.createMatchTable(tournament, match, teamMap);
-        await this.autostartTournamentGame(game.id);
-        created.push({ matchId: match.id, gameId: game.id, round: match.round });
-      } catch (e) {
-        console.error(`[TOURNAMENT] Failed to open match ${match.id}:`, e.message || e);
+      const teamMap = this.buildTeamMap(tournament.registrations || []);
+      const playable = (tournament.matches || []).filter(
+        (m) =>
+          m.team1Id &&
+          m.team2Id &&
+          !m.gameId &&
+          m.status === 'PENDING'
+      );
+      if (!playable.length) break;
+
+      let autoResolvedThisPass = 0;
+
+      for (const match of playable) {
+        try {
+          const t1 = teamMap.get(match.team1Id) || [];
+          const t2 = teamMap.get(match.team2Id) || [];
+          const playerIds = [...t1, ...t2];
+          if (playerIds.length < 4) {
+            console.warn(
+              `[TOURNAMENT] Match ${match.id} has ${playerIds.length}/4 players — skipping`
+            );
+            continue;
+          }
+
+          const users = await prisma.user.findMany({
+            where: { id: { in: playerIds } }
+          });
+          const allBots =
+            users.length === playerIds.length &&
+            users.every((u) => BotUserService.isBotUser(u));
+
+          if (allBots) {
+            const winnerId = Math.random() < 0.5 ? match.team1Id : match.team2Id;
+            await TournamentBracketService.recordMatchResult(
+              tournamentId,
+              match.id,
+              winnerId
+            );
+            results.push({
+              matchId: match.id,
+              round: match.round,
+              autoResolved: true,
+              winnerId
+            });
+            autoResolvedThisPass++;
+            console.log(
+              `[TOURNAMENT] Auto-resolved all-bot match ${match.id} → ${winnerId}`
+            );
+            continue;
+          }
+
+          // At least one human — open a real table for Join / Watch
+          const game = await this.createMatchTable(tournament, match, teamMap);
+          await this.autostartTournamentGame(game.id);
+          results.push({
+            matchId: match.id,
+            gameId: game.id,
+            round: match.round,
+            autoResolved: false
+          });
+        } catch (e) {
+          console.error(`[TOURNAMENT] Failed to open match ${match.id}:`, e.message || e);
+        }
       }
+
+      // Only re-loop when auto-resolves may have unlocked new playable matches
+      if (autoResolvedThisPass === 0) break;
     }
-    return created;
+
+    return results;
   }
 
   /** @deprecated use openPlayableTables */

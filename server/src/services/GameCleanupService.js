@@ -3,6 +3,11 @@ import { prisma } from '../config/database.js';
 import { io } from '../config/server.js';
 
 export class GameCleanupService {
+  /** Tournament match tables must never be auto-deleted (bots play unattended). */
+  static isTournamentGame(gameId) {
+    return typeof gameId === 'string' && gameId.startsWith('tournament_');
+  }
+
   /**
    * Check if game should be cleaned up and perform cleanup if needed
    * @param {string} gameId - The game ID
@@ -12,6 +17,11 @@ export class GameCleanupService {
   static async checkAndCleanupGame(gameId, game) {
     try {
       console.log(`[GAME CLEANUP] Checking if game ${gameId} should be cleaned up`);
+
+      if (this.isTournamentGame(gameId)) {
+        console.log(`[GAME CLEANUP] Skipping tournament game ${gameId}`);
+        return false;
+      }
       
       // Always confirm rating status from DB to avoid stale in-memory state
       const dbGame = await prisma.game.findUnique({ where: { id: gameId } });
@@ -61,6 +71,11 @@ export class GameCleanupService {
    */
   static async cleanupUnratedGame(gameId, game) {
     try {
+      if (this.isTournamentGame(gameId)) {
+        console.log(`[GAME CLEANUP] Refusing to cleanup tournament game ${gameId}`);
+        return;
+      }
+
       console.log(`[GAME CLEANUP] Starting complete cleanup of unrated game ${gameId}`);
       
       // Determine bot user IDs
@@ -77,7 +92,16 @@ export class GameCleanupService {
         });
         botUserIds = botGamePlayers.map(gp => gp.userId);
       }
-      
+
+      // Never delete bots still registered in a tournament
+      if (botUserIds.length) {
+        const stillInTournament = await prisma.tournamentRegistration.findMany({
+          where: { userId: { in: botUserIds } },
+          select: { userId: true }
+        });
+        const protectedIds = new Set(stillInTournament.map((r) => r.userId));
+        botUserIds = botUserIds.filter((id) => !protectedIds.has(id));
+      }
       console.log(`[GAME CLEANUP] Found ${botUserIds.length} bot players to delete:`, botUserIds);
       
       // Start a transaction to ensure atomicity with increased timeout
@@ -210,13 +234,14 @@ export class GameCleanupService {
     try {
       console.log('[GAME CLEANUP] Starting cleanup of all abandoned unrated games');
       
-      // Find all unrated games
+      // Find all unrated games (exclude tournament match tables)
       const unratedGames = await prisma.game.findMany({
         where: {
           isRated: false,
           status: {
             in: ['WAITING', 'BIDDING', 'PLAYING']
-          }
+          },
+          NOT: { id: { startsWith: 'tournament_' } }
         }
       });
       
@@ -375,8 +400,16 @@ export class GameCleanupService {
       });
       const activeSet = new Set(activeBotRefs.map(r => r.userId));
 
-      // Determine orphan bot users (no GamePlayer rows)
-      const orphanIds = botIds.filter(id => !activeSet.has(id));
+      // Determine orphan bot users (no GamePlayer rows and not in a tournament)
+      let orphanIds = botIds.filter(id => !activeSet.has(id));
+      if (orphanIds.length) {
+        const inTournament = await prisma.tournamentRegistration.findMany({
+          where: { userId: { in: orphanIds } },
+          select: { userId: true }
+        });
+        const protectedIds = new Set(inTournament.map((r) => r.userId));
+        orphanIds = orphanIds.filter((id) => !protectedIds.has(id));
+      }
 
       if (orphanIds.length === 0) {
         console.log('[GAME CLEANUP] No orphaned bot users to delete');
@@ -404,7 +437,10 @@ export class GameCleanupService {
       const staleGames = await prisma.game.findMany({
         where: {
           status: 'WAITING',
-          createdAt: { lt: cutoff }
+          createdAt: { lt: cutoff },
+          NOT: {
+            id: { startsWith: 'tournament_' }
+          }
         },
         select: { id: true }
       });
