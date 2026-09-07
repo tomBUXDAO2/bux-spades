@@ -473,9 +473,10 @@ export class TournamentService {
             continue;
           }
 
-          // At least one human — open a real table for Join / Watch
+          // At least one human — open a real table for Join / Watch.
+          // Do not deal until a human joins (avoids bots finishing without them).
           const game = await this.createMatchTable(tournament, match, teamMap);
-          await this.autostartTournamentGame(game.id);
+          await this.maybeAutostartTournamentGame(game.id);
           results.push({
             matchId: match.id,
             gameId: game.id,
@@ -497,6 +498,98 @@ export class TournamentService {
   /** @deprecated use openPlayableTables */
   static async createRound1Tables(tournamentId) {
     return this.openPlayableTables(tournamentId);
+  }
+
+  /**
+   * Partner Spades seating must be across the table so ScoringService / bots
+   * (seatIndex % 2) match tournament teams. Adjacent 0+1 / 2+3 seating caused
+   * humans to "win" on the scoreboard while the bracket advanced the other team.
+   */
+  static partnerSeatAssignments(team1, team2) {
+    return [
+      { userId: team1[0], seatIndex: 0, teamIndex: 0 },
+      { userId: team2[0], seatIndex: 1, teamIndex: 1 },
+      { userId: team1[1], seatIndex: 2, teamIndex: 0 },
+      { userId: team2[1], seatIndex: 3, teamIndex: 1 }
+    ];
+  }
+
+  /** Upsert all four seats; throw if the table is not fully seated. */
+  static async seatTournamentPlayers(gameId, seats, userById) {
+    const { BotUserService } = await import('./BotUserService.js');
+
+    for (const s of seats) {
+      const user = userById.get(s.userId);
+      if (!user) {
+        throw new Error(`Missing user ${s.userId} for tournament seat ${s.seatIndex}`);
+      }
+      const isHuman = !BotUserService.isBotUser(user);
+      const existingSeat = await prisma.gamePlayer.findFirst({
+        where: { gameId, seatIndex: s.seatIndex, isSpectator: false }
+      });
+      if (existingSeat) {
+        await prisma.gamePlayer.update({
+          where: { id: existingSeat.id },
+          data: {
+            userId: s.userId,
+            teamIndex: s.teamIndex,
+            isHuman,
+            leftAt: null,
+            isSpectator: false
+          }
+        });
+      } else {
+        await prisma.gamePlayer.create({
+          data: {
+            gameId,
+            userId: s.userId,
+            seatIndex: s.seatIndex,
+            teamIndex: s.teamIndex,
+            isHuman,
+            joinedAt: new Date()
+          }
+        });
+      }
+    }
+
+    const seated = await prisma.gamePlayer.findMany({
+      where: {
+        gameId,
+        seatIndex: { not: null },
+        isSpectator: false,
+        leftAt: null
+      }
+    });
+    if (seated.length !== seats.length) {
+      throw new Error(
+        `Tournament table ${gameId} has ${seated.length}/${seats.length} seated after create`
+      );
+    }
+  }
+
+  /**
+   * All-bot tables deal immediately. Mixed tables stay WAITING until a human Joins
+   * (see gameJoinHandler → autostartTournamentGame).
+   */
+  static async maybeAutostartTournamentGame(gameId) {
+    const { BotUserService } = await import('./BotUserService.js');
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: { players: { include: { user: true } } }
+    });
+    if (!game || game.status !== 'WAITING') return game;
+
+    const seated = (game.players || []).filter(
+      (p) => !p.leftAt && p.seatIndex != null && !p.isSpectator
+    );
+    const hasHuman = seated.some(
+      (p) => p.isHuman === true || !BotUserService.isBotUser(p.user)
+    );
+    if (hasHuman) {
+      console.log(`[TOURNAMENT] ${gameId} waiting for human Join before deal`);
+      return game;
+    }
+    return this.autostartTournamentGame(gameId);
   }
 
   /**
@@ -566,7 +659,6 @@ export class TournamentService {
   static async createMatchTable(tournament, match, teamMap) {
     const { GameService } = await import('./GameService.js');
     const { redisGameState } = await import('./RedisGameStateService.js');
-    const { BotUserService } = await import('./BotUserService.js');
 
     const team1 = teamMap.get(match.team1Id) || [];
     const team2 = match.team2Id ? teamMap.get(match.team2Id) || [] : [];
@@ -579,12 +671,7 @@ export class TournamentService {
 
     const seats =
       tournament.mode === 'PARTNERS'
-        ? [
-            { userId: team1[0], seatIndex: 0, teamIndex: 0 },
-            { userId: team1[1], seatIndex: 1, teamIndex: 0 },
-            { userId: team2[0], seatIndex: 2, teamIndex: 1 },
-            { userId: team2[1], seatIndex: 3, teamIndex: 1 }
-          ]
+        ? this.partnerSeatAssignments(team1, team2)
         : [
             { userId: team1[0], seatIndex: 0, teamIndex: 0 },
             { userId: team2[0], seatIndex: 1, teamIndex: 1 }
@@ -596,19 +683,32 @@ export class TournamentService {
     }
 
     const gameId = `tournament_${tournament.id}_match_${match.id}`;
+    const users = await prisma.user.findMany({
+      where: { id: { in: seats.map((s) => s.userId) } }
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+    if (users.length !== seats.length) {
+      const missing = seats.map((s) => s.userId).filter((id) => !userById.has(id));
+      throw new Error(`Tournament match players missing from DB: ${missing.join(', ')}`);
+    }
+
     const existing = await prisma.game.findUnique({ where: { id: gameId } });
     if (existing) {
+      if (existing.status === 'WAITING') {
+        await this.seatTournamentPlayers(gameId, seats, userById);
+        try {
+          const full = await GameService.getFullGameStateFromDatabase(gameId);
+          if (full) await redisGameState.setGameState(gameId, full);
+        } catch (e) {
+          console.error('[TOURNAMENT] Redis cache after re-seat:', e);
+        }
+      }
       await prisma.tournamentMatch.update({
         where: { id: match.id },
         data: { gameId, status: 'IN_PROGRESS' }
       });
       return existing;
     }
-
-    const users = await prisma.user.findMany({
-      where: { id: { in: seats.map((s) => s.userId) } }
-    });
-    const userById = new Map(users.map((u) => [u.id, u]));
 
     const game = await GameService.createGame({
       id: gameId,
@@ -627,45 +727,7 @@ export class TournamentService {
       specialRules: tournament.specialRules || {}
     });
 
-    // Seat 0 usually created with the game — ensure remaining seats
-    for (let i = 0; i < seats.length; i++) {
-      const s = seats[i];
-      const user = userById.get(s.userId);
-      const isHuman = !BotUserService.isBotUser(user);
-      const existingSeat = await prisma.gamePlayer.findFirst({
-        where: { gameId: game.id, seatIndex: s.seatIndex }
-      });
-      if (existingSeat) {
-        await prisma.gamePlayer.update({
-          where: { id: existingSeat.id },
-          data: {
-            userId: s.userId,
-            teamIndex: s.teamIndex,
-            isHuman,
-            leftAt: null
-          }
-        });
-      } else if (i > 0) {
-        await prisma.gamePlayer.create({
-          data: {
-            gameId: game.id,
-            userId: s.userId,
-            seatIndex: s.seatIndex,
-            teamIndex: s.teamIndex,
-            isHuman,
-            joinedAt: new Date()
-          }
-        });
-      }
-    }
-
-    await prisma.gamePlayer.updateMany({
-      where: { gameId: game.id, seatIndex: 0 },
-      data: {
-        teamIndex: seats[0].teamIndex,
-        isHuman: !BotUserService.isBotUser(userById.get(seats[0].userId))
-      }
-    });
+    await this.seatTournamentPlayers(game.id, seats, userById);
 
     await prisma.tournamentMatch.update({
       where: { id: match.id },

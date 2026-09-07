@@ -121,7 +121,7 @@ class GameJoinHandler {
 
       // Check if player is in the game (handle null players)
       const players = Array.isArray(baseGameState.players) ? baseGameState.players : [];
-      const player = players.find(p => p && p.userId === userId && !p.isSpectator);
+      let player = players.find(p => p && p.userId === userId && !p.isSpectator);
       if (!player) {
         const seatedCount = players.filter(Boolean).length;
         const alreadySpectator =
@@ -208,6 +208,29 @@ class GameJoinHandler {
 
       // Re-read spectate after possible auto-spectate upgrade
       const isSpectating = !!(data?.spectate || spectate);
+
+      // Mixed tournament tables stay WAITING until a human Joins, then deal
+      if (
+        !isSpectating &&
+        player &&
+        String(gameId).startsWith('tournament_') &&
+        baseGameState.status === 'WAITING'
+      ) {
+        try {
+          const { TournamentService } = await import('../../../services/TournamentService.js');
+          await TournamentService.autostartTournamentGame(gameId);
+          const refreshed = await GameService.getGameStateForClient(gameId);
+          if (refreshed) {
+            baseGameState = refreshed;
+            player =
+              (Array.isArray(refreshed.players) ? refreshed.players : []).find(
+                (p) => p && p.userId === userId && !p.isSpectator
+              ) || player;
+          }
+        } catch (startErr) {
+          console.error('[GAME JOIN] Tournament autostart on join failed:', startErr);
+        }
+      }
 
       // Join the socket room
       this.socket.join(gameId);

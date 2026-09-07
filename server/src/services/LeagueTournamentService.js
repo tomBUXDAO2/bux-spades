@@ -425,7 +425,7 @@ export class LeagueTournamentService {
     const allReady = await TournamentReadyService.areAllPlayersReady(matchId, playerIds);
     if (allReady && playerIds.length >= 2) {
       const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
-      await TournamentService.autostartTournamentGame(game.id);
+      await TournamentService.maybeAutostartTournamentGame(game.id);
     }
 
     return this.get(leagueId, tournamentId, userId);
@@ -441,7 +441,7 @@ export class LeagueTournamentService {
     if (match.gameId) throw httpError('Table already open');
     const teamMap = this.buildTeamMap(tournament.registrations || []);
     const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
-    await TournamentService.autostartTournamentGame(game.id);
+    await TournamentService.maybeAutostartTournamentGame(game.id);
     return this.get(leagueId, tournamentId, adminId);
   }
 
@@ -480,7 +480,6 @@ export class LeagueTournamentService {
   static async createMatchTable(leagueId, tournament, match, teamMap) {
     const { GameService } = await import('./GameService.js');
     const { redisGameState } = await import('./RedisGameStateService.js');
-    const { BotUserService } = await import('./BotUserService.js');
 
     const team1 = teamMap.get(match.team1Id) || [];
     const team2 = match.team2Id ? teamMap.get(match.team2Id) || [] : [];
@@ -488,36 +487,45 @@ export class LeagueTournamentService {
       throw httpError('Match is missing teams');
     }
 
-    // Partners seats: team1 in 0,1 — team2 in 2,3 (matches Discord tournament seating)
     const seats =
       tournament.mode === 'PARTNERS'
-        ? [
-            { userId: team1[0], seatIndex: 0, teamIndex: 0 },
-            { userId: team1[1] || team1[0], seatIndex: 1, teamIndex: 0 },
-            { userId: team2[0], seatIndex: 2, teamIndex: 1 },
-            { userId: team2[1] || team2[0], seatIndex: 3, teamIndex: 1 }
-          ]
+        ? TournamentService.partnerSeatAssignments(
+            [team1[0], team1[1] || team1[0]],
+            [team2[0], team2[1] || team2[0]]
+          )
         : [
             { userId: team1[0], seatIndex: 0, teamIndex: 0 },
             { userId: team2[0], seatIndex: 1, teamIndex: 1 },
-            ...(team1[1] ? [{ userId: team1[1], seatIndex: 2, teamIndex: 2 }] : []),
-            ...(team2[1] ? [{ userId: team2[1], seatIndex: 3, teamIndex: 3 }] : [])
+            ...(team1[1] ? [{ userId: team1[1], seatIndex: 2, teamIndex: 0 }] : []),
+            ...(team2[1] ? [{ userId: team2[1], seatIndex: 3, teamIndex: 1 }] : [])
           ];
 
     const gameId = `tournament_${tournament.id}_match_${match.id}`;
+    const users = await prisma.user.findMany({
+      where: { id: { in: seats.map((s) => s.userId) } }
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+    if (users.length !== new Set(seats.map((s) => s.userId)).size) {
+      throw httpError('Match players missing from database', 500);
+    }
+
     const existing = await prisma.game.findUnique({ where: { id: gameId } });
     if (existing) {
+      if (existing.status === 'WAITING') {
+        await TournamentService.seatTournamentPlayers(gameId, seats, userById);
+        try {
+          const full = await GameService.getFullGameStateFromDatabase(gameId);
+          if (full) await redisGameState.setGameState(gameId, full);
+        } catch (e) {
+          console.error('[LEAGUE TOURNAMENT] Redis cache after re-seat:', e);
+        }
+      }
       await prisma.tournamentMatch.update({
         where: { id: match.id },
         data: { gameId, status: 'IN_PROGRESS' }
       });
       return existing;
     }
-
-    const users = await prisma.user.findMany({
-      where: { id: { in: seats.map((s) => s.userId) } }
-    });
-    const userById = new Map(users.map((u) => [u.id, u]));
 
     const game = await GameService.createGame({
       id: gameId,
@@ -536,43 +544,7 @@ export class LeagueTournamentService {
       specialRules: tournament.specialRules || {}
     });
 
-    for (let i = 0; i < seats.length; i++) {
-      const s = seats[i];
-      const isHuman = !BotUserService.isBotUser(userById.get(s.userId));
-      const existingSeat = await prisma.gamePlayer.findFirst({
-        where: { gameId: game.id, seatIndex: s.seatIndex }
-      });
-      if (existingSeat) {
-        await prisma.gamePlayer.update({
-          where: { id: existingSeat.id },
-          data: {
-            userId: s.userId,
-            teamIndex: s.teamIndex,
-            isHuman,
-            leftAt: null
-          }
-        });
-      } else if (i > 0) {
-        await prisma.gamePlayer.create({
-          data: {
-            gameId: game.id,
-            userId: s.userId,
-            seatIndex: s.seatIndex,
-            teamIndex: s.teamIndex,
-            isHuman,
-            joinedAt: new Date()
-          }
-        });
-      }
-    }
-
-    await prisma.gamePlayer.updateMany({
-      where: { gameId: game.id, seatIndex: 0 },
-      data: {
-        teamIndex: seats[0].teamIndex,
-        isHuman: !BotUserService.isBotUser(userById.get(seats[0].userId))
-      }
-    });
+    await TournamentService.seatTournamentPlayers(game.id, seats, userById);
 
     await prisma.tournamentMatch.update({
       where: { id: match.id },
@@ -637,19 +609,26 @@ export class LeagueTournamentService {
 
   static resolveWinnerTeamId(match, game) {
     const winner = game?.result?.winner;
-    const players = game?.players || [];
+    const players = (game?.players || []).filter(
+      (p) => p && p.seatIndex != null && !p.isSpectator
+    );
     if (winner === undefined || winner === null) return null;
 
     if (game.mode === 'PARTNERS') {
-      const team0 = players.filter((p) => p.teamIndex === 0).map((p) => p.userId);
-      const team1 = players.filter((p) => p.teamIndex === 1).map((p) => p.userId);
+      // ScoringService awards TEAM_0/1 by seatIndex % 2 — use that, not stored teamIndex
+      // (legacy adjacent seating could disagree with the scoreboard).
+      const team0 = players.filter((p) => p.seatIndex % 2 === 0).map((p) => p.userId);
+      const team1 = players.filter((p) => p.seatIndex % 2 === 1).map((p) => p.userId);
       const winningIds = Number(winner) === 0 || winner === 'TEAM_0' ? team0 : team1;
       return this.matchTeamId(match, winningIds);
     }
 
     // Solo: winner is team index / player
     const winIdx = typeof winner === 'number' ? winner : Number(String(winner).replace(/\D/g, ''));
-    const winnerPlayer = players.find((p) => p.teamIndex === winIdx) || players[winIdx];
+    const winnerPlayer =
+      players.find((p) => p.teamIndex === winIdx) ||
+      players.find((p) => p.seatIndex === winIdx) ||
+      players[winIdx];
     if (!winnerPlayer) return null;
     return this.matchTeamId(match, [winnerPlayer.userId]);
   }
@@ -657,33 +636,21 @@ export class LeagueTournamentService {
   static matchTeamId(match, playerIds) {
     const set = new Set(playerIds.filter(Boolean));
     const candidates = [match.team1Id, match.team2Id].filter(Boolean);
-    for (const id of candidates) {
-      const parts = id.replace(/^team_/, '').split('_');
-      if (parts.length === 1 && set.size === 1 && set.has(parts[0])) return id;
-      if (parts.length >= 2) {
-        const a = parts[0];
-        const b = parts.slice(1).join('_'); // ids are cuid without underscore usually
-        // cuid has no underscores — team_${id1}_${id2}
-        const ids = id.replace(/^team_/, '').split('_');
-        if (ids.length === 2 && set.has(ids[0]) && set.has(ids[1]) && set.size === 2) {
-          return id;
-        }
-        if (ids.length === 1 && set.has(ids[0])) return id;
-        void a;
-        void b;
+    if (!set.size || !candidates.length) return null;
+
+    // Exact / full overlap first
+    let best = null;
+    let bestCount = -1;
+    for (const c of candidates) {
+      const ids = c.replace(/^team_/, '').split('_').filter(Boolean);
+      const overlap = ids.filter((id) => set.has(id)).length;
+      if (overlap > bestCount) {
+        bestCount = overlap;
+        best = c;
       }
     }
-    // Fallback: reconstruct from sorted seat order
-    if (playerIds.length === 1) {
-      const tid = `team_${playerIds[0]}`;
-      if (candidates.includes(tid)) return tid;
-      return tid;
-    }
-    for (const c of candidates) {
-      const ids = c.replace(/^team_/, '').split('_');
-      if (ids.every((id) => set.has(id)) && ids.length === set.size) return c;
-    }
-    return candidates[0] || null;
+    // Require at least one winning player from the match team — never guess team1
+    return bestCount > 0 ? best : null;
   }
 
   static async postWinnersAnnouncement(tournament) {

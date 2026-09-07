@@ -287,26 +287,40 @@ export class DiscordResultsService {
       }
 
       // Determine winner team ID based on game result
-      const winnerTeam = game.result.winner; // 0 or 1
+      const winnerTeam = game.result.winner; // 0, 1, 'TEAM_0', or 'TEAM_1'
       let winnerTeamId = null;
 
       if (game.mode === 'PARTNERS') {
-        // For partners, winner is team-based
-        // Get players by team
-        const team0Players = game.players.filter(p => p.teamIndex === 0).map(p => p.userId);
-        const team1Players = game.players.filter(p => p.teamIndex === 1).map(p => p.userId);
-        
-        if (winnerTeam === 0 && team0Players.length === 2) {
-          winnerTeamId = `team_${team0Players[0]}_${team0Players[1]}`;
-        } else if (winnerTeam === 1 && team1Players.length === 2) {
-          winnerTeamId = `team_${team1Players[0]}_${team1Players[1]}`;
+        // Scoring uses seatIndex % 2 — must match that, not possibly-stale teamIndex
+        const seated = (game.players || []).filter(
+          (p) => p && p.seatIndex != null && !p.isSpectator
+        );
+        const team0Players = seated.filter((p) => p.seatIndex % 2 === 0).map((p) => p.userId);
+        const team1Players = seated.filter((p) => p.seatIndex % 2 === 1).map((p) => p.userId);
+        const winningIds =
+          winnerTeam === 0 || winnerTeam === 'TEAM_0' ? team0Players : team1Players;
+
+        const set = new Set(winningIds.filter(Boolean));
+        let best = null;
+        let bestCount = -1;
+        for (const c of [match.team1Id, match.team2Id].filter(Boolean)) {
+          const ids = c.replace(/^team_/, '').split('_').filter(Boolean);
+          const overlap = ids.filter((id) => set.has(id)).length;
+          if (overlap > bestCount) {
+            bestCount = overlap;
+            best = c;
+          }
         }
+        winnerTeamId = bestCount > 0 ? best : null;
       } else {
         // For solo, winner is single player
-        const winnerPlayer = game.players.find(p => {
-          const playerIndex = game.players.indexOf(p);
-          return winnerTeam === Math.floor(playerIndex / 2); // teamIndex
-        });
+        const winIdx =
+          typeof winnerTeam === 'number'
+            ? winnerTeam
+            : Number(String(winnerTeam).replace(/\D/g, ''));
+        const winnerPlayer =
+          game.players.find((p) => p.seatIndex === winIdx) ||
+          game.players.find((p) => p.teamIndex === winIdx);
         
         if (winnerPlayer) {
           winnerTeamId = `team_${winnerPlayer.userId}`;
