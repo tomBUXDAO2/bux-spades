@@ -150,7 +150,9 @@ export class LeagueTournamentService {
   static async cancel(leagueId, adminId, tournamentId) {
     await LeagueService.assertAdmin(leagueId, adminId);
     await this.assertLeagueTournament(leagueId, tournamentId);
-    return TournamentService.cancelTournament(tournamentId);
+    // League tournaments are removed entirely so admins can recreate cleanly
+    await TournamentService.deleteTournament(tournamentId);
+    return { deleted: true, id: tournamentId };
   }
 
   static async register(leagueId, tournamentId, userId, { partnerId = null } = {}) {

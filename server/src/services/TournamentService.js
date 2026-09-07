@@ -225,16 +225,34 @@ export class TournamentService {
       },
     });
 
-    // Count complete teams (both partners registered)
-    const completeTeams = registrations.filter(reg => reg.partnerId && reg.isComplete).length;
-    
-    // Count players without partners
-    const unpartneredPlayers = registrations.filter(reg => !reg.partnerId).length;
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      select: { mode: true }
+    });
+
+    const unpartneredPlayers = registrations.filter((reg) => !reg.partnerId && !reg.isSub).length;
+    const subCount = registrations.filter((reg) => reg.isSub).length;
+
+    let completeTeams = 0;
+    if (tournament?.mode === 'SOLO') {
+      completeTeams = registrations.filter((reg) => !reg.isSub).length;
+    } else {
+      // Each partnership has 2 registration rows — count unique pairs once
+      const seen = new Set();
+      for (const reg of registrations) {
+        if (!reg.partnerId || !reg.isComplete) continue;
+        const key = [reg.userId, reg.partnerId].sort().join(':');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        completeTeams++;
+      }
+    }
 
     return {
       totalRegistrations: registrations.length,
       completeTeams,
       unpartneredPlayers,
+      subCount,
     };
   }
 

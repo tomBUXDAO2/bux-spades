@@ -174,20 +174,22 @@ export class TournamentBracketService {
 
   /**
    * Generate single elimination bracket
-   * Ensures each round has double the games of the next round
-   * Example: 9 teams -> 7 byes, 2 play -> 8 teams next round
-   * Example: 21 teams -> 11 byes, 10 play (5 winners) -> 16 teams next round
+   * If N is a power of 2: full R1 with N/2 matches.
+   * Otherwise play-in to the next lower power of 2:
+   *   Example: 10 teams → 6 byes + 2 R1 matches → 8 in R2
+   *   Example: 5 teams → 3 byes + 1 R1 match → 4 in R2 (semis)
+   * Bye teams are seeded into R2 slots that are not fed by R1 winners
+   * (same mapping advanceBracket uses: R1 match M → R2 match ceil(M/2), slot M odd=team1 / even=team2).
    */
   static async generateSingleEliminationBracket(tournamentId, teams) {
     const numTeams = teams.length;
-    
-    // Special case: if only 2 teams, just create the Final
+
     if (numTeams === 2) {
       const seededTeams = [...teams].sort(() => Math.random() - 0.5);
       await prisma.tournamentMatch.create({
         data: {
           tournamentId,
-          round: 1, // Final (will be labeled correctly in UI)
+          round: 1,
           matchNumber: 1,
           team1Id: seededTeams[0].id,
           team2Id: seededTeams[1].id,
@@ -196,84 +198,146 @@ export class TournamentBracketService {
       });
       return;
     }
-    
-    // Calculate next round size
-    // Find largest power of 2 <= numTeams, then that's our target for next round
-    // Example: 9 teams -> next round should have 8 teams (largest power of 2 <= 9)
-    // Example: 21 teams -> next round should have 16 teams (largest power of 2 <= 21)
-    const largestPowerOf2 = Math.pow(2, Math.floor(Math.log2(numTeams)));
-    const nextRoundSize = largestPowerOf2;
-    
-    // Calculate byes: we need nextRoundSize teams in next round
-    // If numPlaying teams play, we get numPlaying/2 winners
-    // So: numPlaying/2 + numByes = nextRoundSize
-    // And: numPlaying + numByes = numTeams
-    // Solving: numByes = 2 * nextRoundSize - numTeams
-    //          numPlaying = numTeams - numByes
+
+    const seededTeams = [...teams].sort(() => Math.random() - 0.5);
+    const isPowerOfTwo = (numTeams & (numTeams - 1)) === 0;
+    const matches = [];
+
+    if (isPowerOfTwo) {
+      // Full bracket from round 1
+      let matchNumber = 1;
+      for (let i = 0; i < seededTeams.length; i += 2) {
+        matches.push({
+          tournamentId,
+          round: 1,
+          matchNumber: matchNumber++,
+          team1Id: seededTeams[i].id,
+          team2Id: seededTeams[i + 1].id,
+          status: 'PENDING',
+        });
+      }
+
+      let teamsInRound = numTeams / 2;
+      let round = 2;
+      while (teamsInRound >= 2) {
+        const matchCount = teamsInRound / 2;
+        for (let m = 1; m <= matchCount; m++) {
+          matches.push({
+            tournamentId,
+            round,
+            matchNumber: m,
+            team1Id: null,
+            team2Id: null,
+            status: 'PENDING',
+          });
+        }
+        teamsInRound /= 2;
+        round++;
+      }
+
+      await prisma.tournamentMatch.createMany({ data: matches });
+      return matches;
+    }
+
+    // Play-in to largest power of 2 strictly less than N... actually <= N but N isn't power of 2
+    // so largest power of 2 <= N is also < N
+    const nextRoundSize = Math.pow(2, Math.floor(Math.log2(numTeams)));
     const numByes = 2 * nextRoundSize - numTeams;
     const numPlaying = numTeams - numByes;
-    
-    // Seed teams (random for now, could be based on rating later)
-    const seededTeams = [...teams].sort(() => Math.random() - 0.5);
-    
-    // Create first round matches
-    let matchNumber = 1;
-    const matches = [];
-    let round = 1;
-    const hasByes = numByes > 0;
-    
-    // Assign byes first (teams that automatically advance)
-    let teamIndex = 0;
-    const teamsWithByes = [];
-    for (let i = 0; i < numByes && teamIndex < seededTeams.length; i++) {
-      teamsWithByes.push(seededTeams[teamIndex]);
-      teamIndex++;
+    const r1MatchCount = numPlaying / 2;
+    const r2MatchCount = nextRoundSize / 2;
+
+    if (numPlaying <= 0 || numPlaying % 2 !== 0 || numByes < 0) {
+      throw new Error(`Invalid bracket math for ${numTeams} teams (byes=${numByes}, playing=${numPlaying})`);
     }
-    
-    // Create matches for teams that need to play
-    const teamsPlaying = seededTeams.slice(teamIndex);
+
+    const teamsWithByes = seededTeams.slice(0, numByes);
+    const teamsPlaying = seededTeams.slice(numByes);
+
     for (let i = 0; i < teamsPlaying.length; i += 2) {
       const team1 = teamsPlaying[i];
       const team2 = teamsPlaying[i + 1] || null;
-      
       matches.push({
         tournamentId,
-        round,
-        matchNumber,
+        round: 1,
+        matchNumber: Math.floor(i / 2) + 1,
         team1Id: team1.id,
         team2Id: team2?.id || null,
-        status: team2 ? 'PENDING' : 'COMPLETED', // Odd team gets bye
+        status: team2 ? 'PENDING' : 'COMPLETED',
         winnerId: team2 ? null : team1.id,
       });
-      matchNumber++;
     }
 
-    // Create subsequent rounds
-    let currentRoundSize = nextRoundSize;
-    round = 2;
-    
-    while (currentRoundSize > 1) {
-      matchNumber = 1;
-      for (let i = 0; i < currentRoundSize; i += 2) {
+    const playInSlots = new Set();
+    for (let m = 1; m <= r1MatchCount; m++) {
+      const nextMatchNumber = Math.ceil(m / 2);
+      const slot = m % 2 === 1 ? 'team1Id' : 'team2Id';
+      playInSlots.add(`${nextMatchNumber}:${slot}`);
+    }
+
+    const r2Slots = {};
+    for (let m = 1; m <= r2MatchCount; m++) {
+      r2Slots[m] = { team1Id: null, team2Id: null };
+    }
+    let byeIdx = 0;
+    for (let m = 1; m <= r2MatchCount; m++) {
+      for (const slot of ['team1Id', 'team2Id']) {
+        if (playInSlots.has(`${m}:${slot}`)) continue;
+        if (byeIdx < teamsWithByes.length) {
+          r2Slots[m][slot] = teamsWithByes[byeIdx].id;
+          byeIdx++;
+        }
+      }
+    }
+
+    for (let m = 1; m <= r2MatchCount; m++) {
+      matches.push({
+        tournamentId,
+        round: 2,
+        matchNumber: m,
+        team1Id: r2Slots[m].team1Id,
+        team2Id: r2Slots[m].team2Id,
+        status: 'PENDING',
+      });
+    }
+
+    let teamsInRound = nextRoundSize / 2;
+    let round = 3;
+    while (teamsInRound >= 2) {
+      const matchCount = teamsInRound / 2;
+      for (let m = 1; m <= matchCount; m++) {
         matches.push({
           tournamentId,
           round,
-          matchNumber,
-          team1Id: null, // Will be filled when previous round completes
+          matchNumber: m,
+          team1Id: null,
           team2Id: null,
           status: 'PENDING',
         });
-        matchNumber++;
       }
-      currentRoundSize /= 2;
+      teamsInRound /= 2;
       round++;
     }
 
-    // Insert matches into database
-    await prisma.tournamentMatch.createMany({
-      data: matches,
-    });
+    for (const match of matches) {
+      if (match.round === 1 && match.status === 'COMPLETED' && match.winnerId) {
+        const nextMatchNumber = Math.ceil(match.matchNumber / 2);
+        const isFirstSlot = match.matchNumber % 2 === 1;
+        const r2 = matches.find((m) => m.round === 2 && m.matchNumber === nextMatchNumber);
+        if (r2) {
+          if (isFirstSlot) r2.team1Id = match.winnerId;
+          else r2.team2Id = match.winnerId;
+        }
+      }
+    }
 
+    if (byeIdx !== teamsWithByes.length) {
+      console.warn(
+        `[TOURNAMENT BRACKET] Bye placement mismatch: placed ${byeIdx}/${teamsWithByes.length} for ${numTeams} teams`
+      );
+    }
+
+    await prisma.tournamentMatch.createMany({ data: matches });
     return matches;
   }
 

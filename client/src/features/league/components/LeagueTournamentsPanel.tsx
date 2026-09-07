@@ -238,6 +238,72 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     [members, currentUserId]
   );
 
+  /** Unique teams for entrants list (partners shown once). */
+  const entrantTeams = useMemo(() => {
+    if (!detail?.registrations) return [];
+    if (detail.mode === 'SOLO') {
+      return detail.registrations
+        .filter((r) => !r.isSub)
+        .map((r) => ({
+          key: r.userId,
+          label: r.user.username,
+          isSub: false
+        }));
+    }
+    const seen = new Set<string>();
+    const teams: { key: string; label: string; isSub: boolean }[] = [];
+    for (const r of detail.registrations) {
+      if (r.isSub) {
+        teams.push({ key: `sub-${r.userId}`, label: `${r.user.username} (sub)`, isSub: true });
+        continue;
+      }
+      if (r.partnerId && r.isComplete) {
+        const key = [r.userId, r.partnerId].sort().join(':');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const partnerName = r.partner?.username || 'Partner';
+        teams.push({
+          key,
+          label: `${r.user.username} + ${partnerName}`,
+          isSub: false
+        });
+      } else if (!r.partnerId) {
+        teams.push({
+          key: r.userId,
+          label: `${r.user.username} (looking for partner)`,
+          isSub: false
+        });
+      }
+    }
+    return teams;
+  }, [detail]);
+
+  const teamNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!detail?.registrations) return map;
+    for (const r of detail.registrations) {
+      if (detail.mode === 'SOLO') {
+        map.set(`team_${r.userId}`, r.user.username);
+        continue;
+      }
+      if (r.partnerId && r.isComplete) {
+        const a = r.userId;
+        const b = r.partnerId;
+        const nameA = r.user.username;
+        const nameB = r.partner?.username || 'Partner';
+        const label = `${nameA} + ${nameB}`;
+        map.set(`team_${a}_${b}`, label);
+        map.set(`team_${b}_${a}`, label);
+      }
+    }
+    return map;
+  }, [detail]);
+
+  const getTeamDisplay = (teamId: string | null) => {
+    if (!teamId) return { name: 'TBD' };
+    return { name: teamNameById.get(teamId) || teamId.replace(/^team_/, '').replace(/_/g, ' + ') };
+  };
+
   const post = async (path: string, body?: object) => {
     setSaving(true);
     setError(null);
@@ -245,8 +311,13 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
       const res = await api.post(path, body || {});
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Request failed');
-      if (data.tournament) setDetail(data.tournament);
-      else setDetail(data);
+      if (data.deleted) {
+        setDetail(null);
+      } else if (data.tournament) {
+        setDetail(data.tournament);
+      } else if (data.id && data.name) {
+        setDetail(data);
+      }
       await loadList();
       return data;
     } catch (e: any) {
@@ -474,14 +545,25 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                   <button
                     type="button"
                     disabled={saving}
-                    onClick={() => {
-                      if (window.confirm('Cancel this tournament?')) {
-                        post(`/api/leagues/${leagueId}/tournaments/${detail.id}/cancel`);
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          'Cancel and permanently remove this tournament? This cannot be undone.'
+                        )
+                      ) {
+                        return;
+                      }
+                      try {
+                        await post(`/api/leagues/${leagueId}/tournaments/${detail.id}/cancel`);
+                        setSelectedId(null);
+                        setDetail(null);
+                      } catch {
+                        /* error set */
                       }
                     }}
                     className="rounded-lg bg-rose-700/80 px-3 py-2 text-xs font-semibold text-white"
                   >
-                    Cancel
+                    Cancel & remove
                   </button>
                 )}
               </div>
@@ -490,8 +572,8 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
 
           {detail.registrationStats && (
             <p className="mt-2 text-xs text-white/65">
-              {detail.registrationStats.totalRegistrations} registered ·{' '}
-              {detail.registrationStats.completeTeams} complete teams ·{' '}
+              {detail.registrationStats.totalRegistrations} players ·{' '}
+              {detail.registrationStats.completeTeams} teams ·{' '}
               {detail.registrationStats.unpartneredPlayers} unpartnered
             </p>
           )}
@@ -568,112 +650,227 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
         >
           <h4 className="mb-2 text-sm font-semibold text-white">Entrants</h4>
           <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-white/85">
-            {(detail.registrations || []).length === 0 && (
+            {entrantTeams.length === 0 && (
               <li className="text-white/50">No registrations yet.</li>
             )}
-            {(detail.registrations || []).map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {r.user.username}
-                  {r.partner ? ` + ${r.partner.username}` : r.isSub ? ' (sub)' : ' (solo)'}
-                </span>
-                {isAdmin && open && !r.partnerId && !r.isSub && detail.mode === 'PARTNERS' && (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    className="text-amber-200/90 hover:underline"
-                    onClick={() =>
-                      post(`/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`, {
-                        userId: r.userId,
-                        asSub: true
-                      })
-                    }
-                  >
-                    Mark sub
-                  </button>
-                )}
+            {entrantTeams.map((t) => (
+              <li key={t.key} className="flex flex-wrap items-center justify-between gap-2">
+                <span>{t.label}</span>
               </li>
             ))}
           </ul>
+          {isAdmin && open && detail.mode === 'PARTNERS' && (
+            <ul className="mt-2 space-y-1 text-xs">
+              {(detail.registrations || [])
+                .filter((r) => !r.partnerId && !r.isSub)
+                .map((r) => (
+                  <li key={`admin-${r.id}`} className="flex justify-between gap-2 text-white/70">
+                    <span>{r.user.username} needs partner</span>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      className="text-amber-200/90 hover:underline"
+                      onClick={() =>
+                        post(`/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`, {
+                          userId: r.userId,
+                          asSub: true
+                        })
+                      }
+                    >
+                      Mark sub
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
         </div>
 
-        {(closed || live || detail.status === 'COMPLETED') && (
+        {(closed || live || detail.status === 'COMPLETED' || (detail.matches || []).length > 0) && (
           <div
             className="rounded-xl border border-white/15 p-4 backdrop-blur"
             style={{ backgroundColor: `${theme}99` }}
           >
-            <h4 className="mb-2 text-sm font-semibold text-white">Bracket / matches</h4>
+            <h4 className="mb-3 text-sm font-semibold text-white">Bracket</h4>
             {(detail.matches || []).length === 0 ? (
               <p className="text-xs text-white/60">No matches yet.</p>
             ) : (
-              <ul className="space-y-2">
-                {(detail.matches || []).map((m) => {
-                  const inMatch = (m.players || []).some((p) => p.id === currentUserId);
-                  const amReady = (m.ready?.ready || []).includes(currentUserId);
-                  const readyCount = m.ready?.ready?.length || 0;
-                  const need = (m.players || []).length || 4;
+              (() => {
+                const matchesByRound = new Map<number, MatchRow[]>();
+                for (const match of detail.matches || []) {
+                  if (match.round >= 100) continue; // double-elim handled simply below
+                  if (!matchesByRound.has(match.round)) matchesByRound.set(match.round, []);
+                  matchesByRound.get(match.round)!.push(match);
+                }
+                const rounds = Array.from(matchesByRound.keys()).sort((a, b) => a - b);
+                if (rounds.length === 0) {
+                  // Fallback flat list for double-elim
                   return (
-                    <li
-                      key={m.id}
-                      className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/85"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-semibold">
+                    <ul className="space-y-2">
+                      {(detail.matches || []).map((m) => (
+                        <li
+                          key={m.id}
+                          className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/85"
+                        >
                           {roundLabel(m.round)} · Match {m.matchNumber} · {m.status}
-                          {m.gameId ? ' · table open' : ''}
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          {live && inMatch && !m.gameId && m.status === 'PENDING' && (
-                            <button
-                              type="button"
-                              disabled={saving || amReady || isTimedOut}
-                              onClick={() =>
-                                post(
-                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${m.id}/ready`
-                                )
-                              }
-                              className="rounded-lg bg-emerald-600/90 px-2.5 py-1 font-semibold text-white disabled:opacity-40"
-                            >
-                              {amReady ? 'Ready ✓' : 'Ready'}
-                            </button>
-                          )}
-                          {m.gameId && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenTable(m.gameId!)}
-                              className="rounded-lg bg-cyan-700/90 px-2.5 py-1 font-semibold text-white"
-                            >
-                              {inMatch ? 'Join table' : 'Watch'}
-                            </button>
-                          )}
-                          {isAdmin && live && !m.gameId && m.team1Id && m.team2Id && (
-                            <button
-                              type="button"
-                              disabled={saving}
-                              onClick={() =>
-                                post(
-                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${m.id}/open-table`
-                                )
-                              }
-                              className="rounded-lg bg-white/15 px-2.5 py-1 font-semibold text-white"
-                            >
-                              Force open table
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {live && !m.gameId && m.status === 'PENDING' && m.team1Id && m.team2Id && (
-                        <p className="mt-1 text-white/55">
-                          Roll call {readyCount}/{need}
-                          {typeof m.ready?.timeRemaining === 'number'
-                            ? ` · ${Math.max(0, m.ready.timeRemaining)}s left`
-                            : ''}
-                        </p>
-                      )}
-                    </li>
+                        </li>
+                      ))}
+                    </ul>
                   );
-                })}
-              </ul>
+                }
+                const totalRounds = rounds.length;
+                const getRoundName = (roundNum: number) => {
+                  const firstRound = matchesByRound.get(rounds[0]) || [];
+                  const isPlayIn =
+                    roundNum === rounds[0] &&
+                    firstRound.length < (matchesByRound.get(rounds[1])?.length || 0);
+                  if (roundNum === rounds[totalRounds - 1]) return 'Final';
+                  if (roundNum === rounds[totalRounds - 2]) return 'Semi-Finals';
+                  if (roundNum === rounds[totalRounds - 3]) return 'Quarter-Finals';
+                  if (isPlayIn) return 'Play-in';
+                  return `Round ${roundNum}`;
+                };
+
+                return (
+                  <div className="overflow-x-auto">
+                    <div className="flex min-w-max gap-3 pb-2">
+                      {rounds.map((roundNum) => {
+                        const roundMatches = (matchesByRound.get(roundNum) || []).sort(
+                          (a, b) => a.matchNumber - b.matchNumber
+                        );
+                        const isFinal = roundNum === rounds[totalRounds - 1];
+                        return (
+                          <div key={roundNum} className="flex min-w-[180px] flex-col gap-2">
+                            <div
+                              className={`mb-1 text-center text-xs font-semibold ${
+                                isFinal ? 'text-amber-300' : 'text-white/80'
+                              }`}
+                            >
+                              {getRoundName(roundNum)}
+                            </div>
+                            {roundMatches.map((m) => {
+                              const team1 = getTeamDisplay(m.team1Id || null);
+                              const team2 = getTeamDisplay(m.team2Id || null);
+                              const winner = m.winnerId ? getTeamDisplay(m.winnerId) : null;
+                              const inMatch = (m.players || []).some((p) => p.id === currentUserId);
+                              const amReady = (m.ready?.ready || []).includes(currentUserId);
+                              const readyCount = m.ready?.ready?.length || 0;
+                              const need = (m.players || []).length || 4;
+                              return (
+                                <div
+                                  key={m.id}
+                                  className={`rounded-lg border bg-black/30 p-2 text-xs ${
+                                    m.status === 'COMPLETED'
+                                      ? 'border-amber-500/50'
+                                      : m.status === 'IN_PROGRESS'
+                                        ? 'border-cyan-400/60'
+                                        : 'border-white/15'
+                                  }`}
+                                >
+                                  <div className="mb-1 text-[10px] text-white/45">
+                                    M{m.matchNumber} · {m.status}
+                                  </div>
+                                  <div
+                                    className={`mb-1 rounded px-2 py-1 ${
+                                      winner && winner.name === team1.name
+                                        ? 'bg-amber-600/80 font-semibold text-white'
+                                        : 'bg-white/10 text-white'
+                                    }`}
+                                  >
+                                    {team1.name}
+                                  </div>
+                                  <div
+                                    className={`rounded px-2 py-1 ${
+                                      !m.team2Id
+                                        ? 'italic text-white/40'
+                                        : winner && winner.name === team2.name
+                                          ? 'bg-amber-600/80 font-semibold text-white'
+                                          : 'bg-white/10 text-white'
+                                    }`}
+                                  >
+                                    {m.team2Id ? team2.name : 'BYE / TBD'}
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {live && inMatch && !m.gameId && m.status === 'PENDING' && (
+                                      <button
+                                        type="button"
+                                        disabled={saving || amReady || isTimedOut}
+                                        onClick={() =>
+                                          post(
+                                            `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${m.id}/ready`
+                                          )
+                                        }
+                                        className="rounded bg-emerald-600/90 px-2 py-0.5 font-semibold text-white disabled:opacity-40"
+                                      >
+                                        {amReady ? 'Ready ✓' : 'Ready'}
+                                      </button>
+                                    )}
+                                    {m.gameId && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenTable(m.gameId!)}
+                                        className="rounded bg-cyan-700/90 px-2 py-0.5 font-semibold text-white"
+                                      >
+                                        {inMatch ? 'Join table' : 'Watch'}
+                                      </button>
+                                    )}
+                                    {isAdmin &&
+                                      live &&
+                                      !m.gameId &&
+                                      m.team1Id &&
+                                      m.team2Id &&
+                                      m.status !== 'COMPLETED' && (
+                                        <button
+                                          type="button"
+                                          disabled={saving}
+                                          onClick={() =>
+                                            post(
+                                              `/api/leagues/${leagueId}/tournaments/${detail.id}/matches/${m.id}/open-table`
+                                            )
+                                          }
+                                          className="rounded bg-white/15 px-2 py-0.5 font-semibold text-white"
+                                        >
+                                          Force open
+                                        </button>
+                                      )}
+                                  </div>
+                                  {live &&
+                                    !m.gameId &&
+                                    m.status === 'PENDING' &&
+                                    m.team1Id &&
+                                    m.team2Id && (
+                                      <p className="mt-1 text-[10px] text-white/50">
+                                        Roll call {readyCount}/{need}
+                                        {typeof m.ready?.timeRemaining === 'number'
+                                          ? ` · ${Math.max(0, m.ready.timeRemaining)}s`
+                                          : ''}
+                                      </p>
+                                    )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                      {rounds.length > 0 && (
+                        <div className="flex min-w-[120px] flex-col justify-center">
+                          <div className="mb-1 text-center text-xs font-bold text-amber-300">
+                            Winner
+                          </div>
+                          <div className="rounded-lg border-2 border-amber-400/70 bg-gradient-to-b from-amber-700/80 to-amber-900/80 p-3 text-center text-xs font-semibold text-white">
+                            {(() => {
+                              const finalMatch = matchesByRound.get(rounds[totalRounds - 1])?.[0];
+                              if (finalMatch?.winnerId) {
+                                return getTeamDisplay(finalMatch.winnerId).name;
+                              }
+                              return 'TBD';
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
             )}
           </div>
         )}
