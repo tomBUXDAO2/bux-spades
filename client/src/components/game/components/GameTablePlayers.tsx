@@ -438,15 +438,6 @@ export default function GameTablePlayers({
             </button>
           </div>
         )}
-        {player.isDealer && (
-          <div className="absolute -bottom-1 -right-1">
-            <div className={`flex items-center justify-center ${isVerySmallScreen ? 'w-4 h-4' : 'w-5 h-5'} rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md`}>
-              <div className={`${isVerySmallScreen ? 'w-3 h-3' : 'w-4 h-4'} rounded-full bg-yellow-600 flex items-center justify-center`}>
-                <span className={`${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'} font-bold text-yellow-200`}>D</span>
-              </div>
-            </div>
-          </div>
-        )}
         {shouldShowTimerOnPlayer && (
           <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-80">
             <span className="text-lg font-bold text-white">{countdownPlayer?.timeLeft || 0}</span>
@@ -464,8 +455,13 @@ export default function GameTablePlayers({
     const avatarInset = isVerySmallScreen ? 3 : 4;
     const avatarInner = avatarSize - avatarInset * 2;
 
+    const dealerChipSize = isVerySmallScreen ? 16 : 20;
+    const dealerChipInner = isVerySmallScreen ? 12 : 16;
+
     return (
       <div ref={seatRef} className={`absolute ${getPositionClasses(position)} z-30`}>
+        {/* relative wrapper so dealer chip can overhang past overflow-hidden shell */}
+        <div className="relative">
         <div
           className={`
             ${playerGradient} overflow-hidden rounded-xl shadow-md
@@ -588,6 +584,34 @@ export default function GameTablePlayers({
                   </button>
                 )}
           </div>
+        </div>
+        {player.isDealer && (
+          <div
+            className="pointer-events-none absolute z-40"
+            style={{
+              top: avatarSize - avatarInset + 4 - dealerChipSize,
+              left: avatarSize - avatarInset + 4 - dealerChipSize,
+              width: dealerChipSize,
+              height: dealerChipSize,
+            }}
+            aria-label="Dealer"
+          >
+            <div
+              className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-r from-yellow-300 to-yellow-500 shadow-md"
+            >
+              <div
+                className="flex items-center justify-center rounded-full bg-yellow-600"
+                style={{ width: dealerChipInner, height: dealerChipInner }}
+              >
+                <span
+                  className={`font-bold text-yellow-200 ${isVerySmallScreen ? 'text-[6px]' : 'text-[8px]'}`}
+                >
+                  D
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
         
         {/* Coin debit animation */}
