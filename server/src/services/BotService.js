@@ -10,7 +10,10 @@ import {
   lowestLosingInLeadSuit,
   collectPlayedCards,
   countSpadesPlayed,
-  SPADES_SAVE_TRUMP_THRESHOLD
+  SPADES_SAVE_TRUMP_THRESHOLD,
+  nilDumpNonSpadePreferShort,
+  nilDumpHighFromShortNonSpade,
+  wouldWinWithCard
 } from './botExpertPlay.js';
 
 class BotService {
@@ -1484,18 +1487,25 @@ class BotService {
       if (pick) return pick;
       return this.sortByRankAsc(leadCards)[0];
     }
+    // Keep legacy path aligned with expert self-nil void rules
     const trickHasSpade = trick.some(c => c.suit === 'SPADES');
     const mySpades = hand.filter(c => c.suit === 'SPADES');
-    const myNonSp = hand.filter(c => c.suit !== 'SPADES');
-    if (!trickHasSpade && myNonSp.length > 0) {
-      return this.sortByRankDesc(myNonSp)[0];
+    if (!trickHasSpade) {
+      const dump = nilDumpNonSpadePreferShort(hand);
+      if (dump) return dump;
+      if (mySpades.length) return this.sortByRankAsc(mySpades)[0];
+      return this.sortByRankDesc(hand)[0];
     }
+    const shortHigh = nilDumpHighFromShortNonSpade(hand);
+    if (shortHigh) return shortHigh;
     if (mySpades.length > 0) {
       const pick = this.nilPickHighestLosing(trick, leadSuit, seatIndex, mySpades);
-      if (pick) return pick;
+      if (pick && !wouldWinWithCard(trick, pick, seatIndex)) return pick;
+      const dump = nilDumpNonSpadePreferShort(hand);
+      if (dump) return dump;
       return this.sortByRankAsc(mySpades)[0];
     }
-    return this.sortByRankDesc(hand)[0];
+    return nilDumpNonSpadePreferShort(hand) || this.sortByRankDesc(hand)[0];
   }
 
   /**

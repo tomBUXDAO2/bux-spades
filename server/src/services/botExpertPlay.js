@@ -201,6 +201,50 @@ export function nilPickHighestLosing(trick, seatIndex, legalCards) {
   return sortAsc(legalCards)[0];
 }
 
+/** Ten+ — awkward for nil to hold late; prefer dumping from short suits. */
+const NIL_HIGH_RANK_MIN = 10;
+
+function suitCountsExcludingSpades(hand) {
+  const counts = {};
+  for (const c of hand) {
+    if (c.suit === 'SPADES') continue;
+    counts[c.suit] = (counts[c.suit] || 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Self-nil void dump: highest non-spade, short suits (< 3) first.
+ * Used when the trick has no spade yet — never trump in that case.
+ */
+export function nilDumpNonSpadePreferShort(hand) {
+  const nonSp = hand.filter((c) => c.suit !== 'SPADES');
+  if (!nonSp.length) return null;
+  const counts = suitCountsExcludingSpades(hand);
+  return [...nonSp].sort((a, b) => {
+    const shortA = counts[a.suit] < 3 ? 0 : 1;
+    const shortB = counts[b.suit] < 3 ? 0 : 1;
+    if (shortA !== shortB) return shortA - shortB;
+    if (counts[a.suit] !== counts[b.suit]) return counts[a.suit] - counts[b.suit];
+    return cardValue(b.rank) - cardValue(a.rank);
+  })[0];
+}
+
+/**
+ * When trick is already cut: dump a high (T+) non-spade from a short suit if available.
+ */
+export function nilDumpHighFromShortNonSpade(hand) {
+  const counts = suitCountsExcludingSpades(hand);
+  const candidates = hand.filter(
+    (c) =>
+      c.suit !== 'SPADES' &&
+      (counts[c.suit] || 0) < 3 &&
+      cardValue(c.rank) >= NIL_HIGH_RANK_MIN
+  );
+  if (!candidates.length) return null;
+  return sortDesc(candidates)[0];
+}
+
 /** Median spade by rank (for “mid spade” cut) */
 export function pickMidSpade(spades) {
   const s = sortAsc(spades);
@@ -397,19 +441,34 @@ function playSelfNil(ctx) {
     const pick = nilPickHighestLosing(trick, seatIndex, follow);
     return pick || sortAsc(follow)[0];
   }
+
+  // Void in lead suit
   const trickHasSpade = trick.some((c) => c.suit === 'SPADES');
   const mySp = hand.filter((c) => c.suit === 'SPADES');
   const myNon = hand.filter((c) => c.suit !== 'SPADES');
-  if (!trickHasSpade && myNon.length) {
-    return sortDesc(myNon)[0];
+
+  // No spade in trick yet → NEVER cut; dump highest non-spades, short suits first
+  if (!trickHasSpade) {
+    const dump = nilDumpNonSpadePreferShort(hand);
+    if (dump) return dump;
+    // Only spades left — any play cuts; play lowest
+    if (mySp.length) return sortAsc(mySp)[0];
+    return sortDesc(hand)[0];
   }
+
+  // Trick already cut: ditch high short-suit side cards, else highest losing spade
+  // (never overcut if a side-suit dump or losing spade exists)
+  const shortHigh = nilDumpHighFromShortNonSpade(hand);
+  if (shortHigh) return shortHigh;
   if (mySp.length) {
     const pick = nilPickHighestLosing(trick, seatIndex, mySp);
-    if (pick) return pick;
-    // Forced to win with every spade: play lowest (never minimalWinning / high spades).
+    if (pick && !wouldWinWithCard(trick, pick, seatIndex)) return pick;
+    // All spades would overcut — sluff a non-spade if possible
+    const dump = nilDumpNonSpadePreferShort(hand);
+    if (dump) return dump;
     return sortAsc(mySp)[0];
   }
-  return sortDesc(hand)[0];
+  return nilDumpNonSpadePreferShort(hand) || sortDesc(myNon.length ? myNon : hand)[0];
 }
 
 function playCoverNil(ctx) {
