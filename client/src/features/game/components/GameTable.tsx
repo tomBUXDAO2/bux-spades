@@ -1149,13 +1149,45 @@ export default function GameTableModular({
     dealingComplete
   ]);
   
-  // Game action handlers
+  // Game action handlers — lock hand after first play until next turn
   const [isPlayingCard, setIsPlayingCard] = useState(false);
-  
-  // Reset playing card flag when game state changes
+  const playLockRef = useRef(false);
+
+  const alreadyPlayedToCurrentTrick = useMemo(() => {
+    const trick = (gameState as any)?.play?.currentTrick || [];
+    return (
+      mySeatIndex >= 0 &&
+      Array.isArray(trick) &&
+      trick.some((c: any) => c?.seatIndex === mySeatIndex)
+    );
+  }, [(gameState as any)?.play?.currentTrick, mySeatIndex]);
+
+  /** True from first successful play until it is our turn again with no card in the trick. */
+  const handLocked =
+    isPlayingCard || !!pendingPlayedCard || alreadyPlayedToCurrentTrick;
+
+  // Unlock only when it is our turn again and we have not yet played to this trick
   useEffect(() => {
-    setIsPlayingCard(false);
-  }, [gameState?.currentPlayer, gameState?.status]);
+    if (gameState?.status !== 'PLAYING') {
+      playLockRef.current = false;
+      setIsPlayingCard(false);
+      return;
+    }
+    const canPlayAgain =
+      gameState.currentPlayer === currentPlayerId &&
+      !pendingPlayedCard &&
+      !alreadyPlayedToCurrentTrick;
+    if (canPlayAgain) {
+      playLockRef.current = false;
+      setIsPlayingCard(false);
+    }
+  }, [
+    gameState?.currentPlayer,
+    gameState?.status,
+    currentPlayerId,
+    pendingPlayedCard,
+    alreadyPlayedToCurrentTrick
+  ]);
 
   // Reset blind nil state when game state changes
   useEffect(() => {
@@ -1167,22 +1199,22 @@ export default function GameTableModular({
   }, [gameState?.status]);
   
   const handlePlayCardWrapper = (card: Card) => {
-    // Prevent multiple rapid card plays
-    if (isPlayingCard) {
-      console.log('[GAME TABLE] Card play blocked - already playing a card');
+    if (playLockRef.current || isPlayingCard || pendingPlayedCard || alreadyPlayedToCurrentTrick) {
+      console.log('[GAME TABLE] Card play blocked - hand locked after play');
       return;
     }
-    
+
+    playLockRef.current = true;
     setIsPlayingCard(true);
-    handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
+    const played = handlePlayCard(card, currentPlayerId, currentPlayer, gameState, socket, {
       setGameState,
       setPendingPlayedCard,
       playCardSound
     });
-    
-    setTimeout(() => {
+    if (!played) {
+      playLockRef.current = false;
       setIsPlayingCard(false);
-    }, 400);
+    }
   };
   
   const handleBidWrapper = (bid: number) => {
@@ -2009,7 +2041,7 @@ export default function GameTableModular({
                     onPlayCard={handlePlayCardWrapper}
                     isPlayer={isPlayer}
                     isBot={isBot}
-                    isPlayingCard={isPlayingCard}
+                    isPlayingCard={handLocked}
                   />
                 ) : (
                   <SpectatorHandRenderer

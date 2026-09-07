@@ -340,7 +340,8 @@ export const PlayerHandRenderer: React.FC<CardRendererProps> = ({
           const isPlayable = basePlayable && !leadingSpadeBlocked;
           const isVisible = index < visibleCount;
           const dimUnplayable =
-            (!isPlayable || isPlayingCard) && gameState.currentPlayer === currentPlayerId;
+            isPlayingCard ||
+            (!isPlayable && gameState.currentPlayer === currentPlayerId);
           const dealingFan = gameState.status === 'BIDDING' && !dealingComplete;
 
           return (

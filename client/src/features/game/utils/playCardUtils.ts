@@ -254,7 +254,7 @@ export const emitPlayCardEvent = (
 };
 
 /**
- * Main play card handler
+ * Main play card handler. Returns false if the play was rejected locally.
  */
 export const handlePlayCard = (
   card: Card,
@@ -263,10 +263,11 @@ export const handlePlayCard = (
   gameState: GameState,
   socket: any,
   callbacks: PlayCardCallbacks
-) => {
-  if (!validatePlayCard(card, currentPlayerId, currentPlayer, gameState)) return;
+): boolean => {
+  if (!validatePlayCard(card, currentPlayerId, currentPlayer, gameState)) return false;
   
   callbacks.playCardSound();
   updateLocalHand(card, currentPlayerId!, callbacks);
   emitPlayCardEvent(card, gameState.id, currentPlayerId!, socket, callbacks);
+  return true;
 };
