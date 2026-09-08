@@ -476,14 +476,23 @@ export class ScoringService {
         for (let i = 0; i < playerScores.length; i++) {
           const playerScore = playerScores[i];
           if (playerScore >= maxPoints || playerScore <= minPoints) {
-            const winner = `PLAYER_${i}`;
-            const reason = playerScore >= maxPoints 
-              ? `Player ${i} reached ${maxPoints} points`
-              : `Player ${i} reached ${minPoints} points`;
-            
+            // Highest score wins (hitting min is a loss, not a win)
+            let bestIdx = 0;
+            for (let j = 1; j < playerScores.length; j++) {
+              if (playerScores[j] > playerScores[bestIdx]) bestIdx = j;
+            }
+            if (playerScores.filter((s) => s === playerScores[bestIdx]).length > 1) {
+              console.log(`[SCORING] Solo limit hit but top score tied — play on`);
+              return { isComplete: false };
+            }
+            const winner = `PLAYER_${bestIdx}`;
+            const reason =
+              playerScore >= maxPoints
+                ? `Player ${i} reached ${maxPoints}; ${winner} leads`
+                : `Player ${i} reached ${minPoints}; ${winner} leads`;
             console.log(`[SCORING] Solo game complete: ${reason}`);
-            return { 
-              isComplete: true, 
+            return {
+              isComplete: true,
               winner,
               reason
             };
@@ -500,34 +509,27 @@ export class ScoringService {
       const team0Exceeded = team0RunningTotal >= maxPoints || team0RunningTotal <= minPoints;
       const team1Exceeded = team1RunningTotal >= maxPoints || team1RunningTotal <= minPoints;
       
-      if (team0Exceeded && team1Exceeded) {
-        // Both teams exceeded - play one more round if scores are level
+      if (team0Exceeded || team1Exceeded) {
+        // Hitting max = win path, hitting min = loss path — always award the higher score.
+        // (Previously we wrongly named the team that hit the limit as winner, so bagging
+        // out at -100 crowned the losing team.)
         if (team0RunningTotal === team1RunningTotal) {
-          console.log(`[SCORING] Both teams exceeded limits with equal scores - play one more round`);
-        return { isComplete: false };
-      }
-        // Winner is whoever has most points
+          console.log(`[SCORING] Limit reached but scores tied (${team0RunningTotal}) — play on`);
+          return { isComplete: false };
+        }
         const winner = team0RunningTotal > team1RunningTotal ? 'TEAM_0' : 'TEAM_1';
-        return { 
-          isComplete: true, 
+        const limitHit = team0Exceeded && team1Exceeded
+          ? 'both teams'
+          : team0Exceeded
+            ? `Team 0 (${team0RunningTotal >= maxPoints ? 'max' : 'min'})`
+            : `Team 1 (${team1RunningTotal >= maxPoints ? 'max' : 'min'})`;
+        console.log(
+          `[SCORING] Partners complete: ${limitHit}; scores ${team0RunningTotal}-${team1RunningTotal} → ${winner}`
+        );
+        return {
+          isComplete: true,
           winner,
-          reason: `Both teams exceeded limits, ${winner} has most points`
-        };
-      }
-
-      if (team0Exceeded) {
-        return { 
-          isComplete: true, 
-          winner: 'TEAM_0',
-          reason: `Team 0 reached ${team0RunningTotal >= maxPoints ? maxPoints : minPoints} points`
-        };
-      }
-
-      if (team1Exceeded) {
-        return { 
-          isComplete: true, 
-          winner: 'TEAM_1',
-          reason: `Team 1 reached ${team1RunningTotal >= maxPoints ? maxPoints : minPoints} points`
+          reason: `Limit reached (${limitHit}); ${winner} leads ${Math.max(team0RunningTotal, team1RunningTotal)}-${Math.min(team0RunningTotal, team1RunningTotal)}`
         };
       }
 
