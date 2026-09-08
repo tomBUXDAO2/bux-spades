@@ -33,22 +33,31 @@ export class TournamentBracketService {
       });
 
       const registrations = tournament.registrations;
-      
-      // Step 1: Form teams
-      const teams = await this.formTeams(tournamentId, registrations, tournament.mode);
-      
+
+      // Plan teams in memory first — do NOT write pairings until bracket can succeed
+      const { teams, pendingWrites } = this.planTeams(registrations, tournament.mode);
+
       if (teams.length < 2) {
         throw new Error('Need at least 2 teams to start a tournament');
       }
+      if (tournament.eliminationType === 'DOUBLE') {
+        const n = teams.length;
+        if ((n & (n - 1)) !== 0) {
+          throw new Error(
+            `Double elimination needs a power of 2 teams (2, 4, 8, 16…). Got ${n}. Add bots or players to reach the next size.`
+          );
+        }
+      }
 
-      // Step 2: Generate bracket based on elimination type
+      // Persist auto-pairs / sub only after validation
+      await this.applyTeamPlan(pendingWrites);
+
       if (tournament.eliminationType === 'DOUBLE') {
         await this.generateDoubleEliminationBracket(tournamentId, teams);
       } else {
         await this.generateSingleEliminationBracket(tournamentId, teams);
       }
 
-      // Step 3: Close registration (bracket is finalized but tournament not started yet)
       const updatedTournament = await prisma.tournament.update({
         where: { id: tournamentId },
         data: { status: 'REGISTRATION_CLOSED' },
@@ -62,7 +71,6 @@ export class TournamentBracketService {
         },
       });
 
-      // Step 4: Discord embeds only for global Discord tournaments
       if (!updatedTournament.leagueId) {
         try {
           const { DiscordTournamentService } = await import('./DiscordTournamentService.js');
@@ -84,93 +92,100 @@ export class TournamentBracketService {
   }
 
   /**
-   * Form teams from registrations
-   * For PARTNERS mode: pair up players
-   * For SOLO mode: each player is their own team
+   * Plan teams from registrations without writing to the DB.
+   * Confirmed partnerships stay as-is; remaining free players are paired in memory.
    */
-  static async formTeams(tournamentId, registrations, mode) {
+  static planTeams(registrations, mode) {
     const teams = [];
+    const pendingWrites = [];
 
     if (mode === 'SOLO') {
-      // Each player is their own team
       for (const reg of registrations) {
+        if (reg.isSub) continue;
         teams.push({
           id: `team_${reg.userId}`,
           playerIds: [reg.userId],
           registrationIds: [reg.id],
         });
       }
-    } else {
-      // PARTNERS mode - need to pair players
-      const processedIds = new Set();
-      
-      // First, pair up complete teams (both partners registered)
-      for (const reg of registrations) {
-        if (processedIds.has(reg.id)) continue;
-        
-        if (reg.partnerId && reg.isComplete) {
-          const partner = registrations.find(
-            r => r.userId === reg.partnerId && r.partnerId === reg.userId && !processedIds.has(r.id)
-          );
-          
-          if (partner) {
-            teams.push({
-              id: `team_${reg.userId}_${partner.userId}`,
-              playerIds: [reg.userId, partner.userId],
-              registrationIds: [reg.id, partner.id],
-            });
-            processedIds.add(reg.id);
-            processedIds.add(partner.id);
-          }
-        }
-      }
+      return { teams, pendingWrites };
+    }
 
-      // Then, randomly pair remaining unpartnered players (incl. pending requests)
-      const unpartnered = registrations.filter(
-        (r) => !processedIds.has(r.id) && !r.isSub && !(r.partnerId && r.isComplete)
-      );
-      
-      // Shuffle for random pairing
-      const shuffled = [...unpartnered].sort(() => Math.random() - 0.5);
-      
-      // If odd number, mark the last one as a sub
-      let subRegistrationId = null;
-      if (shuffled.length % 2 === 1) {
-        const subPlayer = shuffled.pop();
-        subRegistrationId = subPlayer.id;
-        // Mark as sub in database
-        await prisma.tournamentRegistration.update({
-          where: { id: subPlayer.id },
-          data: { isSub: true },
-        });
-      }
-      
-      // Pair them up and persist partnerships so team maps resolve later
-      for (let i = 0; i < shuffled.length; i += 2) {
-        if (i + 1 < shuffled.length) {
-          const player1 = shuffled[i];
-          const player2 = shuffled[i + 1];
+    const processedIds = new Set();
 
-          await prisma.tournamentRegistration.update({
-            where: { id: player1.id },
-            data: { partnerId: player2.userId, isComplete: true, isSub: false }
-          });
-          await prisma.tournamentRegistration.update({
-            where: { id: player2.id },
-            data: { partnerId: player1.userId, isComplete: true, isSub: false }
-          });
-          
+    for (const reg of registrations) {
+      if (processedIds.has(reg.id)) continue;
+
+      if (reg.partnerId && reg.isComplete) {
+        const partner = registrations.find(
+          (r) =>
+            r.userId === reg.partnerId &&
+            r.partnerId === reg.userId &&
+            !processedIds.has(r.id)
+        );
+
+        if (partner) {
           teams.push({
-            id: `team_${player1.userId}_${player2.userId}`,
-            playerIds: [player1.userId, player2.userId],
-            registrationIds: [player1.id, player2.id],
+            id: `team_${reg.userId}_${partner.userId}`,
+            playerIds: [reg.userId, partner.userId],
+            registrationIds: [reg.id, partner.id],
           });
-          processedIds.add(player1.id);
-          processedIds.add(player2.id);
+          processedIds.add(reg.id);
+          processedIds.add(partner.id);
         }
       }
     }
 
+    const unpartnered = registrations.filter(
+      (r) => !processedIds.has(r.id) && !r.isSub && !(r.partnerId && r.isComplete)
+    );
+    const shuffled = [...unpartnered].sort(() => Math.random() - 0.5);
+
+    if (shuffled.length % 2 === 1) {
+      const subPlayer = shuffled.pop();
+      pendingWrites.push({ id: subPlayer.id, data: { isSub: true, partnerId: null, isComplete: false } });
+      processedIds.add(subPlayer.id);
+    }
+
+    for (let i = 0; i < shuffled.length; i += 2) {
+      if (i + 1 >= shuffled.length) break;
+      const player1 = shuffled[i];
+      const player2 = shuffled[i + 1];
+      pendingWrites.push({
+        id: player1.id,
+        data: { partnerId: player2.userId, isComplete: true, isSub: false }
+      });
+      pendingWrites.push({
+        id: player2.id,
+        data: { partnerId: player1.userId, isComplete: true, isSub: false }
+      });
+      teams.push({
+        id: `team_${player1.userId}_${player2.userId}`,
+        playerIds: [player1.userId, player2.userId],
+        registrationIds: [player1.id, player2.id],
+      });
+      processedIds.add(player1.id);
+      processedIds.add(player2.id);
+    }
+
+    return { teams, pendingWrites };
+  }
+
+  static async applyTeamPlan(pendingWrites) {
+    for (const w of pendingWrites) {
+      await prisma.tournamentRegistration.update({
+        where: { id: w.id },
+        data: w.data,
+      });
+    }
+  }
+
+  /**
+   * Form teams from registrations (persists auto-pairs). Prefer generateBracket which plans first.
+   */
+  static async formTeams(tournamentId, registrations, mode) {
+    const { teams, pendingWrites } = this.planTeams(registrations, mode);
+    await this.applyTeamPlan(pendingWrites);
     return teams;
   }
 

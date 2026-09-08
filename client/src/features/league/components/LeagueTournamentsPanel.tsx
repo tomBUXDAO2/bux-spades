@@ -332,6 +332,13 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     return teams;
   }, [detail]);
 
+  const substitutePlayers = useMemo(() => {
+    if (!detail?.registrations || detail.mode !== 'PARTNERS') return [];
+    return detail.registrations
+      .filter((r) => r.isSub)
+      .map((r) => ({ userId: r.userId, username: r.user.username }));
+  }, [detail]);
+
   type FreePlayerAction = 'accept' | 'pending' | 'request' | 'none';
 
   const freePlayers = useMemo(() => {
@@ -617,6 +624,27 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                     >
                       Close + build bracket
                     </button>
+                    {detail.mode === 'PARTNERS' && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              'Reset all players to looking for partner? Clears teams, pending requests, and subs.'
+                            )
+                          ) {
+                            return;
+                          }
+                          post(
+                            `/api/leagues/${leagueId}/tournaments/${detail.id}/reset-pairings`
+                          );
+                        }}
+                        className="rounded-lg bg-amber-700/80 px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        Reset pairings
+                      </button>
+                    )}
                   </>
                 )}
                 {closed && (
@@ -756,7 +784,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-white/50">
                 Looking for partner
               </p>
-              <ul className="max-h-56 space-y-1.5 overflow-y-auto text-xs text-white/85">
+              <ul className="mb-3 max-h-56 space-y-1.5 overflow-y-auto text-xs text-white/85">
                 {freePlayers.length === 0 && (
                   <li className="text-white/50">No unpartnered players.</li>
                 )}
@@ -833,36 +861,62 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                           Request
                         </button>
                       )}
+                      {isAdmin && open && !p.isSelf && (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          className="text-[11px] text-white/45 hover:text-amber-200/90 hover:underline"
+                          onClick={() =>
+                            post(`/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`, {
+                              userId: p.userId,
+                              asSub: true
+                            })
+                          }
+                        >
+                          Make sub
+                        </button>
+                      )}
                     </span>
                   </li>
                 ))}
               </ul>
-            </>
-          )}
 
-          {isAdmin && open && detail.mode === 'PARTNERS' && (
-            <ul className="mt-2 space-y-1 text-xs">
-              {freePlayers
-                .filter((p) => !p.isSelf)
-                .map((p) => (
-                  <li key={`admin-${p.userId}`} className="flex justify-between gap-2 text-white/70">
-                    <span>{p.username}</span>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      className="text-amber-200/90 hover:underline"
-                      onClick={() =>
-                        post(`/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`, {
-                          userId: p.userId,
-                          asSub: true
-                        })
-                      }
-                    >
-                      Mark sub
-                    </button>
-                  </li>
-                ))}
-            </ul>
+              {(substitutePlayers.length > 0 || isAdmin) && (
+                <>
+                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-white/50">
+                    Substitutes
+                  </p>
+                  <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-white/70">
+                    {substitutePlayers.length === 0 && (
+                      <li className="text-white/40">None</li>
+                    )}
+                    {substitutePlayers.map((p) => (
+                      <li
+                        key={`sub-${p.userId}`}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span>{p.username}</span>
+                        {isAdmin && open && (
+                          <button
+                            type="button"
+                            disabled={saving}
+                            className="text-[11px] text-cyan-200/90 hover:underline"
+                            onClick={() =>
+                              post(
+                                `/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`,
+                                { userId: p.userId, clearSub: true }
+                              )
+                            }
+                          >
+                            Return to pool
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           )}
         </div>
 

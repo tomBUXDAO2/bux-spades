@@ -907,7 +907,8 @@ router.post('/:leagueId/tournaments/:tournamentId/admin-pair', authenticateToken
       {
         userId: req.body.userId,
         partnerId: req.body.partnerId || null,
-        asSub: Boolean(req.body.asSub)
+        asSub: Boolean(req.body.asSub),
+        clearSub: Boolean(req.body.clearSub)
       }
     );
     res.json(tournament);
@@ -915,6 +916,23 @@ router.post('/:leagueId/tournaments/:tournamentId/admin-pair', authenticateToken
     handleError(res, error);
   }
 });
+
+router.post(
+  '/:leagueId/tournaments/:tournamentId/reset-pairings',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.resetOpenPairings(
+        req.params.leagueId,
+        req.userId,
+        req.params.tournamentId
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
 
 router.post(
   '/:leagueId/tournaments/:tournamentId/matches/:matchId/ready',

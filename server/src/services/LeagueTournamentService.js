@@ -572,9 +572,14 @@ export class LeagueTournamentService {
   }
 
   /**
-   * Admin pairs an unpartnered registrant with another member (or marks as sub).
+   * Admin pairs an unpartnered registrant with another member (or marks/clears sub).
    */
-  static async adminPairOrSub(leagueId, adminId, tournamentId, { userId, partnerId = null, asSub = false }) {
+  static async adminPairOrSub(
+    leagueId,
+    adminId,
+    tournamentId,
+    { userId, partnerId = null, asSub = false, clearSub = false }
+  ) {
     await LeagueService.assertAdmin(leagueId, adminId);
     const tournament = await this.assertLeagueTournament(leagueId, tournamentId);
     if (!['REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(tournament.status)) {
@@ -588,6 +593,14 @@ export class LeagueTournamentService {
       where: { tournamentId_userId: { tournamentId, userId } }
     });
     if (!reg) throw httpError('Player is not registered', 404);
+
+    if (clearSub) {
+      await prisma.tournamentRegistration.update({
+        where: { id: reg.id },
+        data: { isSub: false, partnerId: null, isComplete: false }
+      });
+      return this.get(leagueId, tournamentId, adminId);
+    }
 
     if (asSub) {
       await prisma.tournamentRegistration.update({
@@ -614,6 +627,29 @@ export class LeagueTournamentService {
       });
     }
     await this.forceCompletePartnership(tournamentId, userId, partnerId);
+    return this.get(leagueId, tournamentId, adminId);
+  }
+
+  /**
+   * While registration is open: put everyone back in the free pool
+   * (clears teams, pending requests, subs, declines). Use after a failed close/auto-pair.
+   */
+  static async resetOpenPairings(leagueId, adminId, tournamentId) {
+    await LeagueService.assertAdmin(leagueId, adminId);
+    const tournament = await this.assertLeagueTournament(leagueId, tournamentId);
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw httpError('Can only reset pairings while registration is open');
+    }
+    if (tournament.mode !== 'PARTNERS') {
+      throw httpError('Only PARTNERS tournaments have pairings to reset');
+    }
+
+    await prisma.tournamentRegistration.updateMany({
+      where: { tournamentId },
+      data: { partnerId: null, isComplete: false, isSub: false }
+    });
+    await prisma.tournamentPartnerDecline.deleteMany({ where: { tournamentId } });
+
     return this.get(leagueId, tournamentId, adminId);
   }
 
