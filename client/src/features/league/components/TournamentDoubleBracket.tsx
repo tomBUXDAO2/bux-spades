@@ -146,11 +146,16 @@ function MatchCardAbs({
   const winnerName = m.winnerId ? getTeamName(m.winnerId) : null;
   const inMatch = (m.players || []).some((p) => p.id === currentUserId);
   const amReady = (m.ready?.ready || []).includes(currentUserId);
-  const isBye = m.status === 'COMPLETED' && !m.team2Id;
-  const line1 = slotDisplay(m.team1Id, slot1, getTeamName, false);
-  const line2 = slotDisplay(m.team2Id, slot2, getTeamName, isBye);
-  const line1IsFeeder = !m.team1Id;
-  const line2IsFeeder = !m.team2Id;
+  const isVoid = m.status === 'COMPLETED' && !m.team1Id && !m.team2Id && !m.winnerId;
+  const isBye = m.status === 'COMPLETED' && !!m.winnerId && (!m.team1Id || !m.team2Id);
+  const line1 = isVoid
+    ? '—'
+    : slotDisplay(m.team1Id, slot1, getTeamName, false);
+  const line2 = isVoid
+    ? '—'
+    : slotDisplay(m.team2Id, slot2, getTeamName, isBye && !m.team2Id);
+  const line1IsFeeder = !m.team1Id && !isVoid;
+  const line2IsFeeder = !m.team2Id && !isBye && !isVoid;
 
   const teamHasUser = (teamId?: string | null) => {
     if (!teamId || !currentUserId) return false;
@@ -172,7 +177,7 @@ function MatchCardAbs({
     >
       <div className="mb-0.5 flex items-center justify-between text-[9px]">
         <span className="font-semibold tracking-wide text-white/70">{code}</span>
-        <span className="text-white/45">{statusLabel(m)}</span>
+        <span className="text-white/45">{isVoid ? 'VOID' : statusLabel(m)}</span>
       </div>
       <div
         className={`mb-0.5 truncate rounded px-1.5 py-0.5 ${

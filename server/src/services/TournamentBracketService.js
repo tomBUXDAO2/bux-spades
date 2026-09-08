@@ -40,14 +40,6 @@ export class TournamentBracketService {
       if (teams.length < 2) {
         throw new Error('Need at least 2 teams to start a tournament');
       }
-      if (tournament.eliminationType === 'DOUBLE') {
-        const n = teams.length;
-        if ((n & (n - 1)) !== 0) {
-          throw new Error(
-            `Double elimination needs a power of 2 teams (2, 4, 8, 16…). Got ${n}. Add bots or players to reach the next size.`
-          );
-        }
-      }
 
       // Persist auto-pairs / sub only after validation
       await this.applyTeamPlan(pendingWrites);
@@ -406,46 +398,219 @@ export class TournamentBracketService {
   }
 
   /**
+   * Next power of 2 ≥ n (minimum 2 for double-elim).
+   */
+  static nextPow2(n) {
+    if (n <= 2) return 2;
+    return 2 ** Math.ceil(Math.log2(n));
+  }
+
+  /**
+   * Build WB R1 slots for a padded bracket. Spreads byes across LB feeder pairs
+   * (first slot of each pair, then second) so we minimize void LB R1 matches.
+   */
+  static buildPaddedWbR1Slots(teams, bracketSize) {
+    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const wbByes = bracketSize - teams.length;
+    const matchCount = bracketSize / 2;
+    const byeIndices = [];
+    const pairCount = Math.floor(matchCount / 2);
+    for (let i = 0; i < pairCount && byeIndices.length < wbByes; i++) {
+      byeIndices.push(i * 2);
+    }
+    for (let i = 0; i < pairCount && byeIndices.length < wbByes; i++) {
+      byeIndices.push(i * 2 + 1);
+    }
+    // bracketSize === 2 edge: only one match
+    while (byeIndices.length < wbByes && byeIndices.length < matchCount) {
+      byeIndices.push(byeIndices.length);
+    }
+    const byeSet = new Set(byeIndices);
+    let ti = 0;
+    const slots = [];
+    for (let m = 0; m < matchCount; m++) {
+      if (byeSet.has(m)) {
+        slots.push({
+          team1Id: shuffled[ti++].id,
+          team2Id: null,
+          isBye: true
+        });
+      } else {
+        slots.push({
+          team1Id: shuffled[ti++].id,
+          team2Id: shuffled[ti++].id,
+          isBye: false
+        });
+      }
+    }
+    return slots;
+  }
+
+  /**
+   * True if a WB R1 match produces no loser (bye / void).
+   */
+  static wbR1HasNoLoser(wbMatch) {
+    if (!wbMatch) return true;
+    return wbMatch.status === 'COMPLETED' && !wbMatch.team2Id;
+  }
+
+  /**
+   * After WB R1 byes (or when a loser is placed into LB R1), auto-complete LB matches
+   * that will never get two teams.
+   */
+  static async resolveDoubleElimLbR1Byes(tournamentId, matchesInMemory = null) {
+    const bracketSize = matchesInMemory
+      ? matchesInMemory.filter((m) => m.round === 100).length * 2
+      : await this.inferDoubleElimBracketSize(tournamentId);
+    if (bracketSize < 4) return;
+
+    const lbMeta = this.buildDoubleElimLbMeta(bracketSize);
+    const w1 = lbMeta[0];
+    if (!w1 || w1.kind !== 'w1') return;
+
+    const loadWb = async (mn) => {
+      if (matchesInMemory) {
+        return matchesInMemory.find((m) => m.round === 100 && m.matchNumber === mn) || null;
+      }
+      return prisma.tournamentMatch.findFirst({
+        where: { tournamentId, round: 100, matchNumber: mn }
+      });
+    };
+    const loadLb = async (mn) => {
+      if (matchesInMemory) {
+        return matchesInMemory.find((m) => m.round === w1.round && m.matchNumber === mn) || null;
+      }
+      return prisma.tournamentMatch.findFirst({
+        where: { tournamentId, round: w1.round, matchNumber: mn }
+      });
+    };
+
+    for (let mn = 1; mn <= w1.matchCount; mn++) {
+      const wbA = await loadWb(mn * 2 - 1);
+      const wbB = await loadWb(mn * 2);
+      const noLoserA = this.wbR1HasNoLoser(wbA);
+      const noLoserB = this.wbR1HasNoLoser(wbB);
+      const lb = await loadLb(mn);
+      if (!lb || lb.status === 'COMPLETED') continue;
+
+      // Both feeders are byes → void (no one advances)
+      if (noLoserA && noLoserB) {
+        if (matchesInMemory) {
+          lb.status = 'COMPLETED';
+          lb.winnerId = null;
+          lb.team1Id = null;
+          lb.team2Id = null;
+        } else {
+          await prisma.tournamentMatch.update({
+            where: { id: lb.id },
+            data: {
+              status: 'COMPLETED',
+              winnerId: null,
+              team1Id: null,
+              team2Id: null
+            }
+          });
+        }
+        continue;
+      }
+
+      // One feeder is a bye: if the other loser is already placed, auto-bye
+      const team1 = lb.team1Id;
+      const team2 = lb.team2Id;
+      if (team1 && team2) continue;
+
+      const only = team1 || team2;
+      if (!only) continue;
+
+      const emptyIsTeam1 = !team1;
+      const emptyFeederIsBye = emptyIsTeam1 ? noLoserA : noLoserB;
+      if (!emptyFeederIsBye) continue;
+
+      if (matchesInMemory) {
+        lb.status = 'COMPLETED';
+        lb.winnerId = only;
+        if (!lb.team1Id) lb.team1Id = only;
+      } else {
+        const updated = await prisma.tournamentMatch.update({
+          where: { id: lb.id },
+          data: {
+            status: 'COMPLETED',
+            winnerId: only,
+            team1Id: lb.team1Id || only,
+            team2Id: lb.team2Id
+          }
+        });
+        // Advance LB bye winner into the next LB round
+        await this.advanceDoubleElimination(tournamentId, updated, only);
+      }
+    }
+  }
+
+  /**
+   * When a drop-round match gets a WB loser but the LB feeder was void, auto-bye.
+   */
+  static async resolveDoubleElimDropByes(tournamentId, dropRound, matchNumber) {
+    const match = await prisma.tournamentMatch.findFirst({
+      where: { tournamentId, round: dropRound, matchNumber }
+    });
+    if (!match || match.status === 'COMPLETED') return;
+    if (match.team1Id && match.team2Id) return;
+    if (!match.team1Id && !match.team2Id) return;
+
+    const bracketSize = await this.inferDoubleElimBracketSize(tournamentId);
+    const lbMeta = this.buildDoubleElimLbMeta(bracketSize);
+    const idx = lbMeta.findIndex((m) => m.round === dropRound);
+    if (idx <= 0) return;
+    const prev = lbMeta[idx - 1];
+    // Drop rounds take team1 from previous LB same match number
+    if (!match.team1Id && prev) {
+      const prevMatch = await prisma.tournamentMatch.findFirst({
+        where: { tournamentId, round: prev.round, matchNumber }
+      });
+      // Previous void (completed, no winner) → team1 never fills
+      if (prevMatch?.status === 'COMPLETED' && !prevMatch.winnerId && match.team2Id) {
+        const updated = await prisma.tournamentMatch.update({
+          where: { id: match.id },
+          data: {
+            status: 'COMPLETED',
+            winnerId: match.team2Id,
+            team1Id: match.team2Id
+          }
+        });
+        await this.advanceDoubleElimination(tournamentId, updated, match.team2Id);
+      }
+    }
+  }
+
+  /**
    * Generate double elimination bracket (winners + losers + grand final).
-   * Pads to next power of 2 with byes. GF reset (1001) is created only if LB wins GF1.
+   * Pads to next power of 2 with WB R1 byes; missing losers become LB R1 byes/voids.
+   * GF reset (1001) is created only if LB wins GF1.
    */
   static async generateDoubleEliminationBracket(tournamentId, teams) {
     const numTeams = teams.length;
     if (numTeams < 2) {
       throw new Error('Need at least 2 teams for double elimination');
     }
-    // Byes with padded brackets leave empty losers-bracket slots; keep DE reliable for testing.
-    if ((numTeams & (numTeams - 1)) !== 0) {
-      throw new Error(
-        `Double elimination needs a power of 2 teams (2, 4, 8, 16…). Got ${numTeams}. Add bots or players to reach the next size.`
-      );
-    }
-    const bracketSize = numTeams;
-    const seededTeams = [...teams].sort(() => Math.random() - 0.5);
-    const padded = [...seededTeams];
+
+    const bracketSize = this.nextPow2(numTeams);
+    const wbR1Slots = this.buildPaddedWbR1Slots(teams, bracketSize);
 
     const matches = [];
     const wbRounds = this.wbRoundsForSize(bracketSize);
 
-    // ——— Winners bracket ———
-    let matchNumber = 1;
-    for (let i = 0; i < bracketSize; i += 2) {
-      const team1 = padded[i];
-      const team2 = padded[i + 1];
-      if (!team1 && !team2) continue;
-      const t1 = team1?.id || null;
-      const t2 = team2?.id || null;
-      const isBye = t1 && !t2;
+    // ——— Winners bracket R1 (real games + team-vs-BYE) ———
+    wbR1Slots.forEach((slot, idx) => {
       matches.push({
         tournamentId,
         round: 100,
-        matchNumber: matchNumber++,
-        team1Id: t1,
-        team2Id: t2,
-        status: isBye ? 'COMPLETED' : 'PENDING',
-        winnerId: isBye ? t1 : null
+        matchNumber: idx + 1,
+        team1Id: slot.team1Id,
+        team2Id: slot.team2Id,
+        status: slot.isBye ? 'COMPLETED' : 'PENDING',
+        winnerId: slot.isBye ? slot.team1Id : null
       });
-    }
+    });
 
     let teamsInRound = bracketSize / 2;
     for (let wr = 2; wr <= wbRounds; wr++) {
@@ -491,6 +656,29 @@ export class TournamentBracketService {
       }
     }
 
+    // Resolve LB R1 voids / byes from WB R1 bye feeders (in memory before insert)
+    await this.resolveDoubleElimLbR1Byes(tournamentId, matches);
+
+    // In-memory LB R1 bye winners must advance into the next LB shell
+    const w1 = lbMeta[0];
+    if (w1) {
+      const next = lbMeta[1];
+      for (const lb of matches.filter((m) => m.round === w1.round)) {
+        if (lb.status !== 'COMPLETED' || !lb.winnerId || !next) continue;
+        if (next.kind === 'drop') {
+          const dest = matches.find(
+            (m) => m.round === next.round && m.matchNumber === lb.matchNumber
+          );
+          if (dest && !dest.team1Id) dest.team1Id = lb.winnerId;
+        } else if (next.kind === 'purge') {
+          const mn = Math.ceil(lb.matchNumber / 2);
+          const slot = lb.matchNumber % 2 === 1 ? 'team1Id' : 'team2Id';
+          const dest = matches.find((m) => m.round === next.round && m.matchNumber === mn);
+          if (dest && !dest[slot]) dest[slot] = lb.winnerId;
+        }
+      }
+    }
+
     // ——— Grand final (team1 = WB champ, team2 = LB champ) ———
     matches.push({
       tournamentId,
@@ -500,11 +688,6 @@ export class TournamentBracketService {
       team2Id: null,
       status: 'PENDING'
     });
-
-    // 2-team special case: no LB rounds — WB match loser goes straight to GF
-    if (bracketSize === 2) {
-      // Already have WB 100 M1 and GF 1000; nothing else
-    }
 
     await prisma.tournamentMatch.createMany({ data: matches });
     return matches;
@@ -722,11 +905,15 @@ export class TournamentBracketService {
             const mn = Math.ceil(M / 2);
             const slot = M % 2 === 1 ? 'team1Id' : 'team2Id';
             await this.placeTeamInMatch(tournamentId, lb.round, mn, slot, loserTeamId);
+            // Sibling WB R1 may have been a bye → auto-complete LB R1
+            await this.resolveDoubleElimLbR1Byes(tournamentId);
           }
         } else {
           const lb = lbMeta.find((m) => m.kind === 'drop' && m.wbSource === wr);
           if (lb) {
             await this.placeTeamInMatch(tournamentId, lb.round, M, 'team2Id', loserTeamId);
+            // Previous LB feeder may have been void → auto-bye this drop match
+            await this.resolveDoubleElimDropByes(tournamentId, lb.round, M);
           }
         }
       }
