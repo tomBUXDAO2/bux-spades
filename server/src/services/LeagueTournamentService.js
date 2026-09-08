@@ -464,6 +464,7 @@ export class LeagueTournamentService {
     if (allReady && playerIds.length >= 2) {
       const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
       await TournamentService.maybeAutostartTournamentGame(game.id);
+      await TournamentService.notifyTournamentTableReady(tournament, match, game.id, playerIds);
     }
 
     return this.get(leagueId, tournamentId, userId);
@@ -480,6 +481,9 @@ export class LeagueTournamentService {
     const teamMap = this.buildTeamMap(tournament.registrations || []);
     const game = await this.createMatchTable(leagueId, tournament, match, teamMap);
     await TournamentService.maybeAutostartTournamentGame(game.id);
+    const teamMap2 = this.buildTeamMap(tournament.registrations || []);
+    const playerIds = this.playersForMatch(match, teamMap2).map((p) => p.id);
+    await TournamentService.notifyTournamentTableReady(tournament, match, game.id, playerIds);
     return this.get(leagueId, tournamentId, adminId);
   }
 

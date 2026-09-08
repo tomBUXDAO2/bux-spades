@@ -152,9 +152,16 @@ function MatchCardAbs({
   const line1IsFeeder = !m.team1Id;
   const line2IsFeeder = !m.team2Id;
 
+  const teamHasUser = (teamId?: string | null) => {
+    if (!teamId || !currentUserId) return false;
+    return teamId.replace(/^team_/, '').split('_').includes(currentUserId);
+  };
+  const iAmPlaying =
+    inMatch || teamHasUser(m.team1Id) || teamHasUser(m.team2Id);
+
   return (
     <div
-      className={`absolute rounded-md border bg-black/55 p-1.5 text-[11px] shadow-lg backdrop-blur-sm ${
+      className={`absolute z-10 rounded-md border bg-black/55 p-1.5 text-[11px] shadow-lg backdrop-blur-sm ${
         m.status === 'COMPLETED'
           ? 'border-amber-400/55'
           : m.status === 'IN_PROGRESS'
@@ -205,10 +212,14 @@ function MatchCardAbs({
         {m.gameId && (
           <button
             type="button"
-            onClick={() => onOpenTable(m.gameId!, { spectate: !inMatch })}
-            className="rounded bg-cyan-700/90 px-1.5 py-0.5 text-[9px] font-semibold text-white"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenTable(m.gameId!, { spectate: !iAmPlaying });
+            }}
+            className="relative z-20 rounded bg-cyan-700/90 px-1.5 py-0.5 text-[9px] font-semibold text-white"
           >
-            {inMatch ? 'Join' : 'Watch'}
+            {iAmPlaying ? 'Join' : 'Watch'}
           </button>
         )}
         {isAdmin && live && !m.gameId && m.team1Id && m.team2Id && m.status === 'PENDING' && (

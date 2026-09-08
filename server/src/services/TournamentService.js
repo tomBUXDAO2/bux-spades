@@ -483,6 +483,7 @@ export class TournamentService {
             round: match.round,
             autoResolved: false
           });
+          await this.notifyTournamentTableReady(tournament, match, game.id, playerIds);
         } catch (e) {
           console.error(`[TOURNAMENT] Failed to open match ${match.id}:`, e.message || e);
         }
@@ -493,6 +494,30 @@ export class TournamentService {
     }
 
     return results;
+  }
+
+  /** Tell league clients a human match table is ready so players can auto-open it. */
+  static async notifyTournamentTableReady(tournament, match, gameId, playerIds) {
+    if (!tournament?.leagueId || !gameId) return;
+    try {
+      const { io } = await import('../config/server.js');
+      if (!io) return;
+      const payload = {
+        leagueId: tournament.leagueId,
+        tournamentId: tournament.id,
+        matchId: match.id,
+        gameId,
+        playerIds: (playerIds || []).filter(Boolean),
+        round: match.round,
+        matchNumber: match.matchNumber
+      };
+      io.to(`league_${tournament.leagueId}`).emit('tournament_table_ready', payload);
+      console.log(
+        `[TOURNAMENT] Emitted tournament_table_ready ${gameId} → ${payload.playerIds.length} players`
+      );
+    } catch (e) {
+      console.warn('[TOURNAMENT] notifyTournamentTableReady failed:', e.message || e);
+    }
   }
 
   /** @deprecated use openPlayableTables */

@@ -275,7 +275,10 @@ export const TournamentBracketTree: React.FC<Props> = ({
           const team1 = getTeamName(m.team1Id || null);
           const team2 = m.team2Id ? getTeamName(m.team2Id) : null;
           const winnerName = m.winnerId ? getTeamName(m.winnerId) : null;
-          const inMatch = (m.players || []).some((p) => p.id === currentUserId);
+          const inMatch =
+            (m.players || []).some((p) => p.id === currentUserId) ||
+            (!!m.team1Id && m.team1Id.replace(/^team_/, '').split('_').includes(currentUserId)) ||
+            (!!m.team2Id && m.team2Id.replace(/^team_/, '').split('_').includes(currentUserId));
           const amReady = (m.ready?.ready || []).includes(currentUserId);
           const readyCount = m.ready?.ready?.length || 0;
           const need = (m.players || []).length || 4;
@@ -283,7 +286,7 @@ export const TournamentBracketTree: React.FC<Props> = ({
           return (
             <div
               key={m.id}
-              className={`absolute rounded-md border bg-black/55 p-1.5 text-[11px] shadow-lg backdrop-blur-sm ${
+              className={`absolute z-10 rounded-md border bg-black/55 p-1.5 text-[11px] shadow-lg backdrop-blur-sm ${
                 m.status === 'COMPLETED'
                   ? 'border-amber-400/55'
                   : m.status === 'IN_PROGRESS'
@@ -337,8 +340,12 @@ export const TournamentBracketTree: React.FC<Props> = ({
                 {m.gameId && (
                   <button
                     type="button"
-                    onClick={() => onOpenTable(m.gameId!, { spectate: !inMatch })}
-                    className="rounded bg-cyan-700/90 px-1.5 py-0.5 text-[9px] font-semibold text-white"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onOpenTable(m.gameId!, { spectate: !inMatch });
+                    }}
+                    className="relative z-20 rounded bg-cyan-700/90 px-1.5 py-0.5 text-[9px] font-semibold text-white"
                   >
                     {inMatch ? 'Join' : 'Watch'}
                   </button>

@@ -119,6 +119,34 @@ class GameJoinHandler {
         return;
       }
 
+      // Tournament seats are pre-assigned — reclaim from DB if Redis state is stale
+      // so humans are not forced into spectate on a "full" WAITING table.
+      if (String(gameId).startsWith('tournament_') && !spectate) {
+        const seatedGp = await prisma.gamePlayer.findFirst({
+          where: {
+            gameId,
+            userId,
+            isSpectator: false,
+            seatIndex: { not: null }
+          },
+          select: { id: true, seatIndex: true }
+        });
+        if (seatedGp) {
+          try {
+            const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+            if (freshGameState) {
+              await redisGameState.setGameState(gameId, freshGameState);
+              baseGameState = freshGameState;
+              console.log(
+                `[GAME JOIN] Rehydrated tournament seat ${seatedGp.seatIndex} for ${userId} in ${gameId}`
+              );
+            }
+          } catch (rehydrateErr) {
+            console.error('[GAME JOIN] Tournament seat rehydrate failed:', rehydrateErr);
+          }
+        }
+      }
+
       // Check if player is in the game (handle null players)
       const players = Array.isArray(baseGameState.players) ? baseGameState.players : [];
       let player = players.find(p => p && p.userId === userId && !p.isSpectator);
@@ -132,14 +160,28 @@ class GameJoinHandler {
             select: { id: true }
           }));
 
+        // Assigned tournament players must never be forced to spectate
+        const tournamentSeat = String(gameId).startsWith('tournament_')
+          ? await prisma.gamePlayer.findFirst({
+              where: {
+                gameId,
+                userId,
+                isSpectator: false,
+                seatIndex: { not: null }
+              },
+              select: { id: true, seatIndex: true }
+            })
+          : null;
+
         // Watching a running/full table should always spectate — even if the client
         // forgot ?spectate=1 (e.g. league Watch button). Also allow rejoin if already a DB spectator.
         const shouldSpectate =
-          !!spectate ||
-          alreadySpectator ||
-          baseGameState.status === 'BIDDING' ||
-          baseGameState.status === 'PLAYING' ||
-          (baseGameState.status === 'WAITING' && seatedCount >= 4);
+          !tournamentSeat &&
+          (!!spectate ||
+            alreadySpectator ||
+            baseGameState.status === 'BIDDING' ||
+            baseGameState.status === 'PLAYING' ||
+            (baseGameState.status === 'WAITING' && seatedCount >= 4));
 
         // If not a seated player, allow spectating when requested / appropriate
         if (shouldSpectate) {
@@ -184,6 +226,20 @@ class GameJoinHandler {
           }
           // Treat rest of handler as spectate so we don't set activeGameId as a player
           data.spectate = true;
+        } else if (tournamentSeat) {
+          console.log(`[GAME JOIN] Tournament assignee ${userId} reclaiming seat in ${gameId}`);
+          const freshGameState = await GameService.getFullGameStateFromDatabase(gameId);
+          if (freshGameState) {
+            await redisGameState.setGameState(gameId, freshGameState);
+            baseGameState = freshGameState;
+            const refreshed = Array.isArray(freshGameState.players) ? freshGameState.players : [];
+            player = refreshed.find((p) => p && p.userId === userId && !p.isSpectator) || {
+              userId,
+              seatIndex: tournamentSeat.seatIndex
+            };
+          } else {
+            player = { userId, seatIndex: tournamentSeat.seatIndex };
+          }
         } else {
           // CRITICAL: If user is not found, check if they are the game creator
           const game = await GameService.getGame(gameId);

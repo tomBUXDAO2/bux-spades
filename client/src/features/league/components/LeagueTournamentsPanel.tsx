@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, apiFetch } from '@/services/lib/api';
 import TournamentBracketTree from './TournamentBracketTree';
 import TournamentDoubleBracket from './TournamentDoubleBracket';
 import { setTableReturnPath } from '@/pages/TablePage';
+import { useSocket } from '@/features/auth/SocketContext';
 
 type TournamentStatus =
   | 'REGISTRATION_OPEN'
@@ -152,6 +153,8 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [partnerId, setPartnerId] = useState('');
   const [botCount, setBotCount] = useState(7);
+  const { socket } = useSocket();
+  const autoOpenedTables = useRef<Set<string>>(new Set());
 
   const [name, setName] = useState('');
   const [mode, setMode] = useState<'PARTNERS' | 'SOLO'>('PARTNERS');
@@ -250,6 +253,47 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     },
     [leagueId, selectedId, detail?.id, onOpenTable]
   );
+
+  // Auto-open assigned tournament tables for the current user
+  useEffect(() => {
+    if (!socket) return;
+    const onTableReady = (payload: {
+      leagueId?: string;
+      tournamentId?: string;
+      gameId?: string;
+      playerIds?: string[];
+    }) => {
+      if (!payload?.gameId) return;
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      if (!payload.playerIds?.includes(currentUserId)) return;
+      if (autoOpenedTables.current.has(payload.gameId)) return;
+      autoOpenedTables.current.add(payload.gameId);
+      if (payload.tournamentId) setSelectedId(payload.tournamentId);
+      openTableFromBracket(payload.gameId, { spectate: false });
+    };
+    socket.on('tournament_table_ready', onTableReady);
+    return () => {
+      socket.off('tournament_table_ready', onTableReady);
+    };
+  }, [socket, leagueId, currentUserId, openTableFromBracket]);
+
+  useEffect(() => {
+    if (!detail || detail.status !== 'IN_PROGRESS') return;
+    const teamHasUser = (teamId?: string | null) =>
+      !!teamId && teamId.replace(/^team_/, '').split('_').includes(currentUserId);
+    for (const m of detail.matches || []) {
+      if (!m.gameId || m.status === 'COMPLETED') continue;
+      const mine =
+        (m.players || []).some((p) => p.id === currentUserId) ||
+        teamHasUser(m.team1Id) ||
+        teamHasUser(m.team2Id);
+      if (!mine) continue;
+      if (autoOpenedTables.current.has(m.gameId)) continue;
+      autoOpenedTables.current.add(m.gameId);
+      openTableFromBracket(m.gameId, { spectate: false });
+      break;
+    }
+  }, [detail, currentUserId, openTableFromBracket]);
 
   const myReg = useMemo(
     () => detail?.registrations?.find((r) => r.userId === currentUserId),
