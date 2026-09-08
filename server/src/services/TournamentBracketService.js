@@ -125,8 +125,10 @@ export class TournamentBracketService {
         }
       }
 
-      // Then, randomly pair up remaining unpartnered players
-      const unpartnered = registrations.filter(r => !processedIds.has(r.id) && !r.partnerId);
+      // Then, randomly pair remaining unpartnered players (incl. pending requests)
+      const unpartnered = registrations.filter(
+        (r) => !processedIds.has(r.id) && !r.isSub && !(r.partnerId && r.isComplete)
+      );
       
       // Shuffle for random pairing
       const shuffled = [...unpartnered].sort(() => Math.random() - 0.5);

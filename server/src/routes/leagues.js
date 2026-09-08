@@ -708,6 +708,62 @@ router.post('/:leagueId/tournaments/:tournamentId/register', authenticateToken, 
   }
 });
 
+router.post(
+  '/:leagueId/tournaments/:tournamentId/partner-request',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.requestPartner(
+        req.params.leagueId,
+        req.params.tournamentId,
+        req.userId,
+        req.body.toUserId || req.body.partnerId
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
+
+router.post(
+  '/:leagueId/tournaments/:tournamentId/partner-request/cancel',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.cancelPartnerRequest(
+        req.params.leagueId,
+        req.params.tournamentId,
+        req.userId
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
+
+router.post(
+  '/:leagueId/tournaments/:tournamentId/partner-request/respond',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const tournament = await LeagueTournamentService.respondPartnerRequest(
+        req.params.leagueId,
+        req.params.tournamentId,
+        req.userId,
+        {
+          fromUserId: req.body.fromUserId,
+          accept: !!req.body.accept
+        }
+      );
+      res.json(tournament);
+    } catch (error) {
+      handleError(res, error);
+    }
+  }
+);
+
 router.post('/:leagueId/tournaments/:tournamentId/unregister', authenticateToken, async (req, res) => {
   try {
     const tournament = await LeagueTournamentService.unregister(

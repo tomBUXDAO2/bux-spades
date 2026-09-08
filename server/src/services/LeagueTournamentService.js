@@ -270,56 +270,179 @@ export class LeagueTournamentService {
     });
     if (existing) throw httpError('Already registered');
 
-    if (partnerId) {
-      if (partnerId === userId) throw httpError('Cannot partner with yourself');
-      await LeagueService.assertMember(leagueId, partnerId);
-      const partnerExisting = await prisma.tournamentRegistration.findUnique({
-        where: { tournamentId_userId: { tournamentId, userId: partnerId } }
-      });
-      if (partnerExisting?.partnerId && partnerExisting.isComplete) {
-        throw httpError('That player already has a partner');
-      }
-      if (partnerExisting && partnerExisting.userId !== partnerId) {
-        throw httpError('Partner already registered');
-      }
-
-      await prisma.tournamentRegistration.deleteMany({
-        where: {
-          tournamentId,
-          userId: { in: [userId, partnerId] }
-        }
-      });
-
-      await prisma.tournamentRegistration.createMany({
-        data: [
-          {
-            tournamentId,
-            userId,
-            partnerId,
-            isComplete: true,
-            isSub: false
-          },
-          {
-            tournamentId,
-            userId: partnerId,
-            partnerId: userId,
-            isComplete: true,
-            isSub: false
-          }
-        ]
-      });
-    } else {
+    // PARTNERS: always register alone. Pair via partner-request, admin-pair, or auto-pair at close.
+    if (tournament.mode === 'PARTNERS') {
       await prisma.tournamentRegistration.create({
         data: {
           tournamentId,
           userId,
           partnerId: null,
-          isComplete: tournament.mode === 'SOLO',
+          isComplete: false,
           isSub: false
         }
       });
+      return this.get(leagueId, tournamentId, userId);
     }
 
+    await prisma.tournamentRegistration.create({
+      data: {
+        tournamentId,
+        userId,
+        partnerId: null,
+        isComplete: true,
+        isSub: false
+      }
+    });
+
+    return this.get(leagueId, tournamentId, userId);
+  }
+
+  /** Confirm a partnership both ways (admin or accepted request). */
+  static async forceCompletePartnership(tournamentId, userId, partnerId) {
+    await prisma.tournamentRegistration.deleteMany({
+      where: {
+        tournamentId,
+        userId: { in: [userId, partnerId] }
+      }
+    });
+    // Drop any pending requests involving either player
+    await prisma.tournamentRegistration.updateMany({
+      where: {
+        tournamentId,
+        isComplete: false,
+        partnerId: { in: [userId, partnerId] }
+      },
+      data: { partnerId: null }
+    });
+    await prisma.tournamentRegistration.createMany({
+      data: [
+        {
+          tournamentId,
+          userId,
+          partnerId,
+          isComplete: true,
+          isSub: false
+        },
+        {
+          tournamentId,
+          userId: partnerId,
+          partnerId: userId,
+          isComplete: true,
+          isSub: false
+        }
+      ]
+    });
+  }
+
+  /**
+   * Request to partner with another registered player (PARTNERS mode).
+   * Uses partnerId + isComplete=false as a pending outgoing request.
+   */
+  static async requestPartner(leagueId, tournamentId, userId, toUserId) {
+    await LeagueService.assertCanPlay(leagueId, userId);
+    const tournament = await this.assertLeagueTournament(leagueId, tournamentId);
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw httpError('Registration is closed');
+    }
+    if (tournament.mode !== 'PARTNERS') {
+      throw httpError('Partner requests are only for PARTNERS tournaments');
+    }
+    if (!toUserId || toUserId === userId) {
+      throw httpError('Pick another registered player');
+    }
+
+    const [mine, theirs] = await Promise.all([
+      prisma.tournamentRegistration.findUnique({
+        where: { tournamentId_userId: { tournamentId, userId } }
+      }),
+      prisma.tournamentRegistration.findUnique({
+        where: { tournamentId_userId: { tournamentId, userId: toUserId } }
+      })
+    ]);
+    if (!mine || mine.isSub) throw httpError('Register first');
+    if (!theirs || theirs.isSub) throw httpError('That player is not registered');
+    if (mine.isComplete && mine.partnerId) throw httpError('You already have a partner');
+    if (theirs.isComplete && theirs.partnerId) throw httpError('That player already has a partner');
+
+    // Mutual request → form the team immediately
+    if (theirs.partnerId === userId && !theirs.isComplete) {
+      await this.forceCompletePartnership(tournamentId, userId, toUserId);
+      return this.get(leagueId, tournamentId, userId);
+    }
+
+    await prisma.tournamentRegistration.update({
+      where: { id: mine.id },
+      data: { partnerId: toUserId, isComplete: false, isSub: false }
+    });
+
+    try {
+      const { io } = await import('../config/server.js');
+      if (io) {
+        io.to(`league_${leagueId}`).emit('tournament_partner_request', {
+          leagueId,
+          tournamentId,
+          fromUserId: userId,
+          toUserId
+        });
+      }
+    } catch (_) {
+      /* optional */
+    }
+
+    return this.get(leagueId, tournamentId, userId);
+  }
+
+  static async cancelPartnerRequest(leagueId, tournamentId, userId) {
+    await LeagueService.assertMember(leagueId, userId);
+    await this.assertLeagueTournament(leagueId, tournamentId);
+    const mine = await prisma.tournamentRegistration.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId } }
+    });
+    if (!mine) throw httpError('Not registered', 404);
+    if (mine.isComplete) throw httpError('Partnership already confirmed — unregister to leave');
+    if (!mine.partnerId) throw httpError('No pending partner request');
+
+    await prisma.tournamentRegistration.update({
+      where: { id: mine.id },
+      data: { partnerId: null }
+    });
+    return this.get(leagueId, tournamentId, userId);
+  }
+
+  static async respondPartnerRequest(leagueId, tournamentId, userId, { fromUserId, accept }) {
+    await LeagueService.assertCanPlay(leagueId, userId);
+    const tournament = await this.assertLeagueTournament(leagueId, tournamentId);
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw httpError('Registration is closed');
+    }
+    if (!fromUserId) throw httpError('fromUserId required');
+
+    const [mine, theirs] = await Promise.all([
+      prisma.tournamentRegistration.findUnique({
+        where: { tournamentId_userId: { tournamentId, userId } }
+      }),
+      prisma.tournamentRegistration.findUnique({
+        where: { tournamentId_userId: { tournamentId, userId: fromUserId } }
+      })
+    ]);
+    if (!mine || mine.isSub) throw httpError('Register first');
+    if (!theirs) throw httpError('Request not found', 404);
+    if (theirs.partnerId !== userId || theirs.isComplete) {
+      throw httpError('No pending request from that player');
+    }
+    if (mine.isComplete && mine.partnerId) {
+      throw httpError('You already have a partner');
+    }
+
+    if (!accept) {
+      await prisma.tournamentRegistration.update({
+        where: { id: theirs.id },
+        data: { partnerId: null }
+      });
+      return this.get(leagueId, tournamentId, userId);
+    }
+
+    await this.forceCompletePartnership(tournamentId, fromUserId, userId);
     return this.get(leagueId, tournamentId, userId);
   }
 
@@ -343,6 +466,15 @@ export class LeagueTournamentService {
         }
       });
     } else {
+      // Clear anyone who had a pending request to this user
+      await prisma.tournamentRegistration.updateMany({
+        where: {
+          tournamentId,
+          partnerId: userId,
+          isComplete: false
+        },
+        data: { partnerId: null }
+      });
       await prisma.tournamentRegistration.delete({ where: { id: registration.id } });
     }
 
@@ -377,21 +509,22 @@ export class LeagueTournamentService {
 
     if (!partnerId) throw httpError('partnerId required unless asSub');
     await LeagueService.assertMember(leagueId, partnerId);
-    return this.register(leagueId, tournamentId, userId, { partnerId }).catch(async (err) => {
-      // register refuses if already registered — clear and re-pair
-      if (String(err.message).includes('Already registered')) {
-        await this.unregister(leagueId, tournamentId, userId).catch(() => undefined);
-        if (reg.partnerId) {
-          await this.unregister(leagueId, tournamentId, reg.partnerId).catch(() => undefined);
-        }
-        await this.unregister(leagueId, tournamentId, partnerId).catch(() => undefined);
-        await prisma.tournamentRegistration.create({
-          data: { tournamentId, userId, isComplete: false }
-        }).catch(() => undefined);
-        return this.register(leagueId, tournamentId, userId, { partnerId });
-      }
-      throw err;
+    let partnerReg = await prisma.tournamentRegistration.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId: partnerId } }
     });
+    if (!partnerReg) {
+      await prisma.tournamentRegistration.create({
+        data: {
+          tournamentId,
+          userId: partnerId,
+          partnerId: null,
+          isComplete: false,
+          isSub: false
+        }
+      });
+    }
+    await this.forceCompletePartnership(tournamentId, userId, partnerId);
+    return this.get(leagueId, tournamentId, adminId);
   }
 
   static async closeRegistration(leagueId, adminId, tournamentId) {

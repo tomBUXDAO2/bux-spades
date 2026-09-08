@@ -230,7 +230,9 @@ export class TournamentService {
       select: { mode: true }
     });
 
-    const unpartneredPlayers = registrations.filter((reg) => !reg.partnerId && !reg.isSub).length;
+    const unpartneredPlayers = registrations.filter(
+      (reg) => !reg.isSub && !reg.isComplete
+    ).length;
     const subCount = registrations.filter((reg) => reg.isSub).length;
 
     let completeTeams = 0;

@@ -271,11 +271,21 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
       if (payload.tournamentId) setSelectedId(payload.tournamentId);
       openTableFromBracket(payload.gameId, { spectate: false });
     };
+    const onPartnerRequest = (payload: {
+      leagueId?: string;
+      tournamentId?: string;
+    }) => {
+      if (payload.leagueId && payload.leagueId !== leagueId) return;
+      const tid = payload.tournamentId || selectedId;
+      if (tid) loadDetail(tid).catch(() => undefined);
+    };
     socket.on('tournament_table_ready', onTableReady);
+    socket.on('tournament_partner_request', onPartnerRequest);
     return () => {
       socket.off('tournament_table_ready', onTableReady);
+      socket.off('tournament_partner_request', onPartnerRequest);
     };
-  }, [socket, leagueId, currentUserId, openTableFromBracket]);
+  }, [socket, leagueId, currentUserId, openTableFromBracket, selectedId, loadDetail]);
 
   useEffect(() => {
     if (!detail || detail.status !== 'IN_PROGRESS') return;
@@ -300,10 +310,23 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     [detail, currentUserId]
   );
 
-  const partnerOptions = useMemo(
-    () => members.filter((m) => m.userId !== currentUserId),
-    [members, currentUserId]
-  );
+  /** Registered players who are free to receive a partner request. */
+  const freePartnerTargets = useMemo(() => {
+    if (!detail?.registrations || detail.mode !== 'PARTNERS') return [];
+    return detail.registrations.filter(
+      (r) =>
+        !r.isSub &&
+        r.userId !== currentUserId &&
+        !(r.isComplete && r.partnerId)
+    );
+  }, [detail, currentUserId]);
+
+  const incomingPartnerRequests = useMemo(() => {
+    if (!detail?.registrations || !myReg || myReg.isComplete) return [];
+    return detail.registrations.filter(
+      (r) => !r.isComplete && !r.isSub && r.partnerId === currentUserId
+    );
+  }, [detail, myReg, currentUserId]);
 
   /** Unique teams for entrants list (partners shown once). */
   const entrantTeams = useMemo(() => {
@@ -334,10 +357,14 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
           label: `${r.user.username} + ${partnerName}`,
           isSub: false
         });
-      } else if (!r.partnerId) {
+      } else {
+        const pendingTo =
+          r.partnerId && !r.isComplete
+            ? ` → ${r.partner?.username || 'player'} (pending)`
+            : ' (looking for partner)';
         teams.push({
           key: r.userId,
-          label: `${r.user.username} (looking for partner)`,
+          label: `${r.user.username}${pendingTo}`,
           isSub: false
         });
       }
@@ -658,53 +685,148 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
           >
             <h4 className="text-sm font-semibold text-white">Registration</h4>
             {myReg ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-xs text-white/80">
-                  You are registered
-                  {myReg.partner
-                    ? ` with ${myReg.partner.username}`
-                    : detail.mode === 'PARTNERS'
-                      ? ' (looking for partner)'
-                      : ''}
-                  {myReg.isSub ? ' · SUB' : ''}
-                </p>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() =>
-                    post(`/api/leagues/${leagueId}/tournaments/${detail.id}/unregister`)
-                  }
-                  className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white"
-                >
-                  Unregister
-                </button>
+              <div className="mt-2 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-white/80">
+                    You are registered
+                    {myReg.isSub
+                      ? ' · SUB'
+                      : detail.mode === 'PARTNERS' && myReg.isComplete && myReg.partner
+                        ? ` with ${myReg.partner.username}`
+                        : detail.mode === 'PARTNERS' && myReg.partnerId && !myReg.isComplete
+                          ? ` · request sent to ${myReg.partner?.username || 'player'}`
+                          : detail.mode === 'PARTNERS'
+                            ? ' · wait for auto-pair, or request a partner below'
+                            : ''}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() =>
+                      post(`/api/leagues/${leagueId}/tournaments/${detail.id}/unregister`)
+                    }
+                    className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Unregister
+                  </button>
+                  {detail.mode === 'PARTNERS' &&
+                    myReg.partnerId &&
+                    !myReg.isComplete &&
+                    !myReg.isSub && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          post(
+                            `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/cancel`
+                          )
+                        }
+                        className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
+                      >
+                        Cancel request
+                      </button>
+                    )}
+                </div>
+
+                {detail.mode === 'PARTNERS' && !myReg.isSub && !myReg.isComplete && (
+                  <>
+                    {incomingPartnerRequests.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-amber-100/90">
+                          Partner requests
+                        </p>
+                        {incomingPartnerRequests.map((r) => (
+                          <div
+                            key={r.id}
+                            className="flex flex-wrap items-center gap-2 text-xs text-white/85"
+                          >
+                            <span>{r.user.username} wants to team up</span>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              className="rounded bg-emerald-600/80 px-2 py-1 text-[11px] font-semibold text-white"
+                              onClick={() =>
+                                post(
+                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
+                                  { fromUserId: r.userId, accept: true }
+                                )
+                              }
+                            >
+                              Accept
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              className="rounded bg-white/15 px-2 py-1 text-[11px] font-semibold text-white"
+                              onClick={() =>
+                                post(
+                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
+                                  { fromUserId: r.userId, accept: false }
+                                )
+                              }
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {!myReg.partnerId && (
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className={labelClass}>
+                          Request partner
+                          <select
+                            value={partnerId}
+                            onChange={(e) => setPartnerId(e.target.value)}
+                            className={`${fieldClass} w-48`}
+                          >
+                            <option value="">Pick a registered player</option>
+                            {freePartnerTargets.map((r) => (
+                              <option key={r.userId} value={r.userId}>
+                                {r.user.username}
+                                {r.partnerId && !r.isComplete ? ' (pending)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={saving || !partnerId}
+                          onClick={async () => {
+                            try {
+                              await post(
+                                `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request`,
+                                { toUserId: partnerId }
+                              );
+                              setPartnerId('');
+                            } catch {
+                              /* error set */
+                            }
+                          }}
+                          className="rounded-lg px-3 py-2 text-xs font-semibold text-white"
+                          style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
+                        >
+                          Send request
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
-              <div className="mt-2 flex flex-wrap items-end gap-2">
+              <div className="mt-2 space-y-2">
                 {detail.mode === 'PARTNERS' && (
-                  <label className={labelClass}>
-                    Partner (optional)
-                    <select
-                      value={partnerId}
-                      onChange={(e) => setPartnerId(e.target.value)}
-                      className={`${fieldClass} w-48`}
-                    >
-                      <option value="">Solo pool — claim later</option>
-                      {partnerOptions.map((m) => (
-                        <option key={m.userId} value={m.userId}>
-                          {m.user.username}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <p className="text-[11px] text-white/65">
+                    Register, then request a partner or wait until registration closes to be
+                    auto-paired.
+                  </p>
                 )}
                 <button
                   type="button"
                   disabled={saving}
                   onClick={() =>
-                    post(`/api/leagues/${leagueId}/tournaments/${detail.id}/register`, {
-                      partnerId: partnerId || null
-                    })
+                    post(`/api/leagues/${leagueId}/tournaments/${detail.id}/register`)
                   }
                   className="rounded-lg px-3 py-2 text-xs font-semibold text-white"
                   style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
@@ -734,10 +856,13 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
           {isAdmin && open && detail.mode === 'PARTNERS' && (
             <ul className="mt-2 space-y-1 text-xs">
               {(detail.registrations || [])
-                .filter((r) => !r.partnerId && !r.isSub)
+                .filter((r) => !r.isComplete && !r.isSub)
                 .map((r) => (
                   <li key={`admin-${r.id}`} className="flex justify-between gap-2 text-white/70">
-                    <span>{r.user.username} needs partner</span>
+                    <span>
+                      {r.user.username}
+                      {r.partnerId ? ' (pending request)' : ' needs partner'}
+                    </span>
                     <button
                       type="button"
                       disabled={saving}
