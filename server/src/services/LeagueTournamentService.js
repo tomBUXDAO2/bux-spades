@@ -650,16 +650,25 @@ export class LeagueTournamentService {
   }
 
   static resolveWinnerTeamId(match, game) {
-    const winner = game?.result?.winner;
     const players = (game?.players || []).filter(
       (p) => p && p.seatIndex != null && !p.isSpectator
     );
-    if (winner === undefined || winner === null) return null;
 
     if (game.mode === 'PARTNERS') {
-      // ScoringService awards TEAM_0/1 by seatIndex % 2
-      const winParity =
-        Number(winner) === 0 || winner === 'TEAM_0' || winner === '0' ? 0 : 1;
+      // Prefer actual final scores over result.winner (older paths wrongly crowned
+      // the team that hit minPoints).
+      const t0 = game?.result?.team0Final;
+      const t1 = game?.result?.team1Final;
+      let winParity = null;
+      if (typeof t0 === 'number' && typeof t1 === 'number' && t0 !== t1) {
+        winParity = t0 > t1 ? 0 : 1;
+      } else {
+        const winner = game?.result?.winner;
+        if (winner === undefined || winner === null) return null;
+        winParity =
+          Number(winner) === 0 || winner === 'TEAM_0' || winner === '0' ? 0 : 1;
+      }
+
       const winningUserIds = new Set(
         players.filter((p) => p.seatIndex % 2 === winParity).map((p) => p.userId)
       );
@@ -677,6 +686,9 @@ export class LeagueTournamentService {
 
       return this.matchTeamId(match, [...winningUserIds]);
     }
+
+    const winner = game?.result?.winner;
+    if (winner === undefined || winner === null) return null;
 
     // Solo: winner is team index / player
     const winIdx = typeof winner === 'number' ? winner : Number(String(winner).replace(/\D/g, ''));

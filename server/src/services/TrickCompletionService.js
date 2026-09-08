@@ -291,61 +291,14 @@ export class TrickCompletionService {
       const scores = await ScoringService.calculateRoundScores(gameId, roundId);
       console.log(`[TRICK COMPLETION] Scores calculated:`, scores);
 
-      // Check if game is complete (race-free): evaluate using the RoundScore we just created
+      // Check if game is complete — single source of truth in ScoringService
+      // (do not duplicate limit logic here; bagging out at minPoints must lose)
       let gameComplete = { isComplete: false };
       try {
-        const gameConfig = await prisma.game.findUnique({ where: { id: gameId }, select: { mode: true, minPoints: true, maxPoints: true } });
-        // CRITICAL FIX: Use the RoundScore we just created for this round (by roundId)
-        // Don't query by roundNumber desc as that might get a previous round
-        const currentRoundScore = await prisma.roundScore.findUnique({
-          where: { id: roundId } // RoundScore.id = roundId
-        });
-        
-        console.log(`[TRICK COMPLETION] Game completion check - gameConfig:`, gameConfig ? 'found' : 'null', `currentRoundScore:`, currentRoundScore ? 'found' : 'null');
-        console.log(`[TRICK COMPLETION] Scores object keys:`, Object.keys(scores || {}));
-        console.log(`[TRICK COMPLETION] Scores object:`, scores);
-        
-        if (gameConfig && currentRoundScore) {
-          if (gameConfig.mode === 'SOLO') {
-            const pts = [
-              currentRoundScore.player0Running || 0,
-              currentRoundScore.player1Running || 0,
-              currentRoundScore.player2Running || 0,
-              currentRoundScore.player3Running || 0
-            ];
-            const minP = gameConfig.minPoints ?? -100;
-            const maxP = gameConfig.maxPoints ?? 100;
-            for (let i = 0; i < pts.length; i++) {
-              const v = pts[i];
-              if (v >= maxP || v <= minP) {
-                gameComplete = { isComplete: true, winner: `PLAYER_${i}`, reason: v >= maxP ? `Player ${i} reached ${maxP} points` : `Player ${i} reached ${minP} points` };
-                break;
-              }
-            }
-          } else {
-            // CRITICAL: Use running totals from scores object (most reliable) or currentRoundScore
-            const t0 = scores?.team0RunningTotal ?? currentRoundScore?.team0RunningTotal ?? 0;
-            const t1 = scores?.team1RunningTotal ?? currentRoundScore?.team1RunningTotal ?? 0;
-            const minP = gameConfig.minPoints ?? -500;
-            const maxP = gameConfig.maxPoints ?? 500;
-            console.log(`[TRICK COMPLETION] Checking game completion - t0: ${t0}, t1: ${t1}, minP: ${minP}, maxP: ${maxP}`);
-            const t0Ex = t0 >= maxP || t0 <= minP;
-            const t1Ex = t1 >= maxP || t1 <= minP;
-            if (t0Ex && t1Ex) {
-              if (t0 !== t1) {
-                const winner = t0 > t1 ? 'TEAM_0' : 'TEAM_1';
-                gameComplete = { isComplete: true, winner, reason: `Both teams exceeded limits, ${winner} has most points` };
-              }
-            } else if (t0Ex) {
-              gameComplete = { isComplete: true, winner: 'TEAM_0', reason: `Team 0 reached ${t0 >= maxP ? maxP : minP} points` };
-            } else if (t1Ex) {
-              gameComplete = { isComplete: true, winner: 'TEAM_1', reason: `Team 1 reached ${t1 >= maxP ? maxP : minP} points` };
-            }
-            console.log(`[TRICK COMPLETION] Game completion check result: isComplete=${gameComplete.isComplete}, winner=${gameComplete.winner}`);
-          }
-        } else {
-          console.log(`[TRICK COMPLETION] Cannot check game completion - missing gameConfig or currentRoundScore`);
-        }
+        gameComplete = await ScoringService.checkGameComplete(gameId);
+        console.log(
+          `[TRICK COMPLETION] Game completion check result: isComplete=${gameComplete.isComplete}, winner=${gameComplete.winner}`
+        );
       } catch (error) {
         console.error(`[TRICK COMPLETION] Error checking game completion:`, error);
         // Don't throw - continue to emit round_complete even if check fails
