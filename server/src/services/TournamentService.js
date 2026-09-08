@@ -344,12 +344,14 @@ export class TournamentService {
     const existing = tournament.registrations.find((r) => r.userId === userId);
     if (existing) return existing;
 
+    // PARTNERS: always solo until partner-request / auto-pair at close
+    const partnersMode = tournament.mode === 'PARTNERS';
     return prisma.tournamentRegistration.create({
       data: {
         tournamentId,
         userId,
-        partnerId,
-        isComplete: Boolean(partnerId),
+        partnerId: partnersMode ? null : partnerId,
+        isComplete: partnersMode ? false : Boolean(partnerId) || tournament.mode === 'SOLO',
         isSub: false
       },
       include: { user: true, partner: true }
@@ -772,8 +774,9 @@ export class TournamentService {
   }
 
   /**
-   * Test / admin early start: optionally add bots, register admin, finalize bracket,
-   * open round-1 tables, mark tournament IN_PROGRESS.
+   * Test / admin early start: optionally add bots / register admin while open.
+   * Does NOT auto-pair or build bracket — close registration for that.
+   * If bracket already finalized (REGISTRATION_CLOSED), opens tables and goes live.
    */
   static async startEarly(tournamentId, adminUserId, { botCount = 0, registerAdmin = true } = {}) {
     const tournament = await prisma.tournament.findUnique({
@@ -797,16 +800,19 @@ export class TournamentService {
       await this.addBots(tournamentId, botCount);
     }
 
-    // Refresh — may still be OPEN or already CLOSED
     let fresh = await this.getTournament(tournamentId);
     if (fresh.status === 'REGISTRATION_OPEN') {
-      const { TournamentBracketService } = await import('./TournamentBracketService.js');
-      await TournamentBracketService.generateBracket(tournamentId);
-      fresh = await this.getTournament(tournamentId);
+      return {
+        success: true,
+        tables: [],
+        tournament: fresh,
+        message:
+          'Bots/admin registered. Close registration to auto-pair and build the bracket, then Start early again.'
+      };
     }
 
     if (!fresh.matches?.length) {
-      throw new Error('Bracket has no matches — need at least 2 teams (4 players in PARTNERS)');
+      throw new Error('Bracket has no matches — close registration first (need at least 2 teams)');
     }
 
     await prisma.tournament.update({

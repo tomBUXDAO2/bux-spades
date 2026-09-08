@@ -48,6 +48,7 @@ type Tournament = {
   registrations?: Registration[];
   matches?: MatchRow[];
   teamLabels?: Record<string, string>;
+  partnerDeclines?: { fromUserId: string; toUserId: string }[];
   registrationStats?: {
     totalRegistrations: number;
     completeTeams: number;
@@ -151,7 +152,6 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [partnerId, setPartnerId] = useState('');
   const [botCount, setBotCount] = useState(7);
   const { socket } = useSocket();
   const autoOpenedTables = useRef<Set<string>>(new Set());
@@ -310,67 +310,68 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     [detail, currentUserId]
   );
 
-  /** Registered players who are free to receive a partner request. */
-  const freePartnerTargets = useMemo(() => {
-    if (!detail?.registrations || detail.mode !== 'PARTNERS') return [];
-    return detail.registrations.filter(
-      (r) =>
-        !r.isSub &&
-        r.userId !== currentUserId &&
-        !(r.isComplete && r.partnerId)
-    );
-  }, [detail, currentUserId]);
-
-  const incomingPartnerRequests = useMemo(() => {
-    if (!detail?.registrations || !myReg || myReg.isComplete) return [];
-    return detail.registrations.filter(
-      (r) => !r.isComplete && !r.isSub && r.partnerId === currentUserId
-    );
-  }, [detail, myReg, currentUserId]);
-
-  /** Unique teams for entrants list (partners shown once). */
-  const entrantTeams = useMemo(() => {
+  const confirmedTeams = useMemo(() => {
     if (!detail?.registrations) return [];
     if (detail.mode === 'SOLO') {
       return detail.registrations
         .filter((r) => !r.isSub)
-        .map((r) => ({
-          key: r.userId,
-          label: r.user.username,
-          isSub: false
-        }));
+        .map((r) => ({ key: r.userId, label: r.user.username }));
     }
     const seen = new Set<string>();
-    const teams: { key: string; label: string; isSub: boolean }[] = [];
+    const teams: { key: string; label: string }[] = [];
     for (const r of detail.registrations) {
-      if (r.isSub) {
-        teams.push({ key: `sub-${r.userId}`, label: `${r.user.username} (sub)`, isSub: true });
-        continue;
-      }
-      if (r.partnerId && r.isComplete) {
-        const key = [r.userId, r.partnerId].sort().join(':');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const partnerName = r.partner?.username || 'Partner';
-        teams.push({
-          key,
-          label: `${r.user.username} + ${partnerName}`,
-          isSub: false
-        });
-      } else {
-        const pendingTo =
-          r.partnerId && !r.isComplete
-            ? ` → ${r.partner?.username || 'player'} (pending)`
-            : ' (looking for partner)';
-        teams.push({
-          key: r.userId,
-          label: `${r.user.username}${pendingTo}`,
-          isSub: false
-        });
-      }
+      if (!(r.partnerId && r.isComplete) || r.isSub) continue;
+      const key = [r.userId, r.partnerId].sort().join(':');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      teams.push({
+        key,
+        label: `${r.user.username} + ${r.partner?.username || 'Partner'}`
+      });
     }
     return teams;
   }, [detail]);
+
+  type FreePlayerAction = 'accept' | 'pending' | 'request' | 'none';
+
+  const freePlayers = useMemo(() => {
+    if (!detail?.registrations || detail.mode !== 'PARTNERS') return [];
+    const declines = detail.partnerDeclines || [];
+    const declinedWith = (otherId: string) =>
+      declines.some(
+        (d) =>
+          (d.fromUserId === currentUserId && d.toUserId === otherId) ||
+          (d.fromUserId === otherId && d.toUserId === currentUserId)
+      );
+
+    const canAct =
+      !!myReg && !myReg.isSub && !(myReg.isComplete && myReg.partnerId) && !isTimedOut;
+
+    return detail.registrations
+      .filter((r) => !r.isSub && !(r.isComplete && r.partnerId))
+      .map((r) => {
+        let action: FreePlayerAction = 'none';
+        if (r.userId === currentUserId) {
+          action = 'none';
+        } else if (!canAct) {
+          action = 'none';
+        } else if (!r.isComplete && r.partnerId === currentUserId) {
+          action = 'accept';
+        } else if (declinedWith(r.userId)) {
+          action = 'none';
+        } else if (myReg && !myReg.isComplete && myReg.partnerId === r.userId) {
+          action = 'pending';
+        } else {
+          action = 'request';
+        }
+        return {
+          userId: r.userId,
+          username: r.user.username,
+          isSelf: r.userId === currentUserId,
+          action
+        };
+      });
+  }, [detail, currentUserId, myReg, isTimedOut]);
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -504,17 +505,18 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
     if (!detail) return;
     if (
       !window.confirm(
-        `Start early? Registers you if needed, adds ${botCount} bots if registration is open, builds the bracket, and opens round-1 tables.`
+        detail.status === 'REGISTRATION_OPEN'
+          ? `While registration is open this only registers you and adds ${botCount} bots — it will not pair or build the bracket. Close registration for that.`
+          : `Start early? Opens round-1 tables and marks the tournament live.`
       )
     ) {
       return;
     }
     try {
-      const data = await post(`/api/leagues/${leagueId}/tournaments/${detail.id}/start-early`, {
+      await post(`/api/leagues/${leagueId}/tournaments/${detail.id}/start-early`, {
         botCount,
         registerAdmin: true
       });
-      if (data.message) setError(null);
     } catch {
       /* error already set */
     }
@@ -685,141 +687,34 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
           >
             <h4 className="text-sm font-semibold text-white">Registration</h4>
             {myReg ? (
-              <div className="mt-2 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs text-white/80">
-                    You are registered
-                    {myReg.isSub
-                      ? ' · SUB'
-                      : detail.mode === 'PARTNERS' && myReg.isComplete && myReg.partner
-                        ? ` with ${myReg.partner.username}`
-                        : detail.mode === 'PARTNERS' && myReg.partnerId && !myReg.isComplete
-                          ? ` · request sent to ${myReg.partner?.username || 'player'}`
-                          : detail.mode === 'PARTNERS'
-                            ? ' · wait for auto-pair, or request a partner below'
-                            : ''}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() =>
-                      post(`/api/leagues/${leagueId}/tournaments/${detail.id}/unregister`)
-                    }
-                    className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white"
-                  >
-                    Unregister
-                  </button>
-                  {detail.mode === 'PARTNERS' &&
-                    myReg.partnerId &&
-                    !myReg.isComplete &&
-                    !myReg.isSub && (
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() =>
-                          post(
-                            `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/cancel`
-                          )
-                        }
-                        className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
-                      >
-                        Cancel request
-                      </button>
-                    )}
-                </div>
-
-                {detail.mode === 'PARTNERS' && !myReg.isSub && !myReg.isComplete && (
-                  <>
-                    {incomingPartnerRequests.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-medium text-amber-100/90">
-                          Partner requests
-                        </p>
-                        {incomingPartnerRequests.map((r) => (
-                          <div
-                            key={r.id}
-                            className="flex flex-wrap items-center gap-2 text-xs text-white/85"
-                          >
-                            <span>{r.user.username} wants to team up</span>
-                            <button
-                              type="button"
-                              disabled={saving}
-                              className="rounded bg-emerald-600/80 px-2 py-1 text-[11px] font-semibold text-white"
-                              onClick={() =>
-                                post(
-                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
-                                  { fromUserId: r.userId, accept: true }
-                                )
-                              }
-                            >
-                              Accept
-                            </button>
-                            <button
-                              type="button"
-                              disabled={saving}
-                              className="rounded bg-white/15 px-2 py-1 text-[11px] font-semibold text-white"
-                              onClick={() =>
-                                post(
-                                  `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
-                                  { fromUserId: r.userId, accept: false }
-                                )
-                              }
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {!myReg.partnerId && (
-                      <div className="flex flex-wrap items-end gap-2">
-                        <label className={labelClass}>
-                          Request partner
-                          <select
-                            value={partnerId}
-                            onChange={(e) => setPartnerId(e.target.value)}
-                            className={`${fieldClass} w-48`}
-                          >
-                            <option value="">Pick a registered player</option>
-                            {freePartnerTargets.map((r) => (
-                              <option key={r.userId} value={r.userId}>
-                                {r.user.username}
-                                {r.partnerId && !r.isComplete ? ' (pending)' : ''}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          disabled={saving || !partnerId}
-                          onClick={async () => {
-                            try {
-                              await post(
-                                `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request`,
-                                { toUserId: partnerId }
-                              );
-                              setPartnerId('');
-                            } catch {
-                              /* error set */
-                            }
-                          }}
-                          className="rounded-lg px-3 py-2 text-xs font-semibold text-white"
-                          style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
-                        >
-                          Send request
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-white/80">
+                  You are registered
+                  {myReg.isSub
+                    ? ' · SUB'
+                    : detail.mode === 'PARTNERS' && myReg.isComplete && myReg.partner
+                      ? ` with ${myReg.partner.username}`
+                      : detail.mode === 'PARTNERS'
+                        ? ' · request a partner in Entrants, or wait for auto-pair when registration closes'
+                        : ''}
+                </p>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() =>
+                    post(`/api/leagues/${leagueId}/tournaments/${detail.id}/unregister`)
+                  }
+                  className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Unregister
+                </button>
               </div>
             ) : (
               <div className="mt-2 space-y-2">
                 {detail.mode === 'PARTNERS' && (
                   <p className="text-[11px] text-white/65">
-                    Register, then request a partner or wait until registration closes to be
-                    auto-paired.
+                    Register, then request a partner under Entrants — or wait until registration
+                    closes to be auto-paired.
                   </p>
                 )}
                 <button
@@ -843,33 +738,122 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
           style={{ backgroundColor: `${theme}99` }}
         >
           <h4 className="mb-2 text-sm font-semibold text-white">Entrants</h4>
-          <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-white/85">
-            {entrantTeams.length === 0 && (
-              <li className="text-white/50">No registrations yet.</li>
+
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-white/50">
+            Teams
+          </p>
+          <ul className="mb-3 max-h-40 space-y-1 overflow-y-auto text-xs text-white/85">
+            {confirmedTeams.length === 0 && (
+              <li className="text-white/50">No confirmed teams yet.</li>
             )}
-            {entrantTeams.map((t) => (
-              <li key={t.key} className="flex flex-wrap items-center justify-between gap-2">
-                <span>{t.label}</span>
-              </li>
+            {confirmedTeams.map((t) => (
+              <li key={t.key}>{t.label}</li>
             ))}
           </ul>
+
+          {detail.mode === 'PARTNERS' && (
+            <>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-white/50">
+                Looking for partner
+              </p>
+              <ul className="max-h-56 space-y-1.5 overflow-y-auto text-xs text-white/85">
+                {freePlayers.length === 0 && (
+                  <li className="text-white/50">No unpartnered players.</li>
+                )}
+                {freePlayers.map((p) => (
+                  <li
+                    key={p.userId}
+                    className="flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <span>
+                      {p.username}
+                      {p.isSelf ? ' (you)' : ''}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      {p.action === 'accept' && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving || isTimedOut}
+                            className="rounded bg-emerald-600/80 px-2 py-1 text-[11px] font-semibold text-white"
+                            onClick={() =>
+                              post(
+                                `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
+                                { fromUserId: p.userId, accept: true }
+                              )
+                            }
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving || isTimedOut}
+                            className="rounded bg-white/15 px-2 py-1 text-[11px] font-semibold text-white"
+                            onClick={() =>
+                              post(
+                                `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/respond`,
+                                { fromUserId: p.userId, accept: false }
+                              )
+                            }
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+                      {p.action === 'pending' && (
+                        <>
+                          <span className="text-[11px] text-amber-200/80">Pending</span>
+                          <button
+                            type="button"
+                            disabled={saving || isTimedOut}
+                            className="rounded bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/80"
+                            onClick={() =>
+                              post(
+                                `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request/cancel`
+                              )
+                            }
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {p.action === 'request' && (
+                        <button
+                          type="button"
+                          disabled={saving || isTimedOut}
+                          className="rounded px-2 py-1 text-[11px] font-semibold text-white"
+                          style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
+                          onClick={() =>
+                            post(
+                              `/api/leagues/${leagueId}/tournaments/${detail.id}/partner-request`,
+                              { toUserId: p.userId }
+                            )
+                          }
+                        >
+                          Request
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           {isAdmin && open && detail.mode === 'PARTNERS' && (
             <ul className="mt-2 space-y-1 text-xs">
-              {(detail.registrations || [])
-                .filter((r) => !r.isComplete && !r.isSub)
-                .map((r) => (
-                  <li key={`admin-${r.id}`} className="flex justify-between gap-2 text-white/70">
-                    <span>
-                      {r.user.username}
-                      {r.partnerId ? ' (pending request)' : ' needs partner'}
-                    </span>
+              {freePlayers
+                .filter((p) => !p.isSelf)
+                .map((p) => (
+                  <li key={`admin-${p.userId}`} className="flex justify-between gap-2 text-white/70">
+                    <span>{p.username}</span>
                     <button
                       type="button"
                       disabled={saving}
                       className="text-amber-200/90 hover:underline"
                       onClick={() =>
                         post(`/api/leagues/${leagueId}/tournaments/${detail.id}/admin-pair`, {
-                          userId: r.userId,
+                          userId: p.userId,
                           asSub: true
                         })
                       }

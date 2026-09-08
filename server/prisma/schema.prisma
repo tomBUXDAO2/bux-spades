@@ -555,6 +555,7 @@ model Tournament {
   updatedAt         DateTime                 @updatedAt
   registrations     TournamentRegistration[]
   matches           TournamentMatch[]
+  partnerDeclines   TournamentPartnerDecline[]
   league            League?                  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
 
   @@index([leagueId, status])
@@ -574,6 +575,19 @@ model TournamentRegistration {
   partner      User?      @relation("TournamentPartner", fields: [partnerId], references: [id], onDelete: Cascade)
 
   @@unique([tournamentId, userId])
+  @@index([tournamentId])
+}
+
+/** Sticky decline between two players for partner requests (blocks re-request both ways). */
+model TournamentPartnerDecline {
+  id           String     @id @default(cuid())
+  tournamentId String
+  fromUserId   String
+  toUserId     String
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, fromUserId, toUserId])
   @@index([tournamentId])
 }
 

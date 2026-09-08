@@ -87,7 +87,11 @@ export class LeagueTournamentService {
     }
 
     const stats = await TournamentService.getRegistrationStats(tournamentId);
-    return { ...tournament, matches, registrationStats: stats, teamLabels };
+    const partnerDeclines = await prisma.tournamentPartnerDecline.findMany({
+      where: { tournamentId },
+      select: { fromUserId: true, toUserId: true }
+    });
+    return { ...tournament, matches, registrationStats: stats, teamLabels, partnerDeclines };
   }
 
   static doubleElimNeedsRepair(tournament) {
@@ -299,20 +303,33 @@ export class LeagueTournamentService {
 
   /** Confirm a partnership both ways (admin or accepted request). */
   static async forceCompletePartnership(tournamentId, userId, partnerId) {
+    // Clear pending outgoing requests from either player (before we rewrite their rows)
+    await prisma.tournamentRegistration.updateMany({
+      where: {
+        tournamentId,
+        isComplete: false,
+        OR: [
+          { userId: { in: [userId, partnerId] } },
+          { partnerId: { in: [userId, partnerId] } }
+        ]
+      },
+      data: { partnerId: null }
+    });
+    // Clear sticky declines involving either player
+    await prisma.tournamentPartnerDecline.deleteMany({
+      where: {
+        tournamentId,
+        OR: [
+          { fromUserId: { in: [userId, partnerId] } },
+          { toUserId: { in: [userId, partnerId] } }
+        ]
+      }
+    });
     await prisma.tournamentRegistration.deleteMany({
       where: {
         tournamentId,
         userId: { in: [userId, partnerId] }
       }
-    });
-    // Drop any pending requests involving either player
-    await prisma.tournamentRegistration.updateMany({
-      where: {
-        tournamentId,
-        isComplete: false,
-        partnerId: { in: [userId, partnerId] }
-      },
-      data: { partnerId: null }
     });
     await prisma.tournamentRegistration.createMany({
       data: [
@@ -364,12 +381,24 @@ export class LeagueTournamentService {
     if (mine.isComplete && mine.partnerId) throw httpError('You already have a partner');
     if (theirs.isComplete && theirs.partnerId) throw httpError('That player already has a partner');
 
+    const blocked = await prisma.tournamentPartnerDecline.findFirst({
+      where: {
+        tournamentId,
+        OR: [
+          { fromUserId: userId, toUserId },
+          { fromUserId: toUserId, toUserId: userId }
+        ]
+      }
+    });
+    if (blocked) throw httpError('Partner request was declined');
+
     // Mutual request → form the team immediately
     if (theirs.partnerId === userId && !theirs.isComplete) {
       await this.forceCompletePartnership(tournamentId, userId, toUserId);
       return this.get(leagueId, tournamentId, userId);
     }
 
+    // New outgoing request replaces any previous pending target
     await prisma.tournamentRegistration.update({
       where: { id: mine.id },
       data: { partnerId: toUserId, isComplete: false, isSub: false }
@@ -439,10 +468,56 @@ export class LeagueTournamentService {
         where: { id: theirs.id },
         data: { partnerId: null }
       });
+      // Also clear my outgoing to them if any
+      if (mine.partnerId === fromUserId && !mine.isComplete) {
+        await prisma.tournamentRegistration.update({
+          where: { id: mine.id },
+          data: { partnerId: null }
+        });
+      }
+      await prisma.tournamentPartnerDecline.upsert({
+        where: {
+          tournamentId_fromUserId_toUserId: {
+            tournamentId,
+            fromUserId,
+            toUserId: userId
+          }
+        },
+        create: { tournamentId, fromUserId, toUserId: userId },
+        update: {}
+      });
+      try {
+        const { io } = await import('../config/server.js');
+        if (io) {
+          io.to(`league_${leagueId}`).emit('tournament_partner_request', {
+            leagueId,
+            tournamentId,
+            fromUserId,
+            toUserId: userId,
+            declined: true
+          });
+        }
+      } catch (_) {
+        /* optional */
+      }
       return this.get(leagueId, tournamentId, userId);
     }
 
     await this.forceCompletePartnership(tournamentId, fromUserId, userId);
+    try {
+      const { io } = await import('../config/server.js');
+      if (io) {
+        io.to(`league_${leagueId}`).emit('tournament_partner_request', {
+          leagueId,
+          tournamentId,
+          fromUserId,
+          toUserId: userId,
+          accepted: true
+        });
+      }
+    } catch (_) {
+      /* optional */
+    }
     return this.get(leagueId, tournamentId, userId);
   }
 
@@ -465,6 +540,15 @@ export class LeagueTournamentService {
           OR: [{ userId }, { userId: registration.partnerId }]
         }
       });
+      await prisma.tournamentPartnerDecline.deleteMany({
+        where: {
+          tournamentId,
+          OR: [
+            { fromUserId: { in: [userId, registration.partnerId] } },
+            { toUserId: { in: [userId, registration.partnerId] } }
+          ]
+        }
+      });
     } else {
       // Clear anyone who had a pending request to this user
       await prisma.tournamentRegistration.updateMany({
@@ -474,6 +558,12 @@ export class LeagueTournamentService {
           isComplete: false
         },
         data: { partnerId: null }
+      });
+      await prisma.tournamentPartnerDecline.deleteMany({
+        where: {
+          tournamentId,
+          OR: [{ fromUserId: userId }, { toUserId: userId }]
+        }
       });
       await prisma.tournamentRegistration.delete({ where: { id: registration.id } });
     }
@@ -544,7 +634,7 @@ export class LeagueTournamentService {
     const tournament = await this.assertLeagueTournament(leagueId, tournamentId);
 
     if (tournament.status === 'REGISTRATION_OPEN') {
-      await TournamentBracketService.generateBracket(tournamentId);
+      throw httpError('Close registration first to pair players and build the bracket');
     }
 
     const fresh = await TournamentService.getTournament(tournamentId);
