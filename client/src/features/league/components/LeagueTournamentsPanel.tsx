@@ -73,7 +73,14 @@ type Props = {
 };
 
 const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
-const GIMMICK_OPTIONS = ['SUICIDE', 'BID4NIL', 'BID3', 'BIDHEARTS', 'CRAZY_ACES', 'JOKER'] as const;
+const GIMMICK_OPTIONS = [
+  { value: 'SUICIDE', label: 'Suicide' },
+  { value: 'BID4NIL', label: '4 or Nil' },
+  { value: 'BID3', label: 'Bid 3' },
+  { value: 'BIDHEARTS', label: 'Bid Hearts' },
+  { value: 'CRAZY_ACES', label: 'Crazy Aces' },
+  { value: 'JOKER', label: 'Joker' }
+] as const;
 const SPECIAL_RULE1_OPTIONS = ['SCREAMER', 'ASSASSIN', 'SECRET_ASSASSIN'] as const;
 const SPECIAL_RULE2_OPTIONS = ['LOWBALL', 'HIGHBALL'] as const;
 
@@ -484,10 +491,8 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
       formData.append('nilAllowed', String(format === 'REGULAR' ? nilAllowed : true));
       formData.append('blindNilAllowed', String(format === 'REGULAR' ? blindNilAllowed : false));
       if (format === 'GIMMICK') {
-        if (!gimmickVariant) {
-          throw new Error('Pick a gimmick variant');
-        }
-        formData.append('gimmickVariant', gimmickVariant);
+        const variant = gimmickVariant || GIMMICK_OPTIONS[0].value;
+        formData.append('gimmickVariant', variant);
       }
       formData.append('specialRule1', JSON.stringify(specialRule1));
       formData.append('specialRule2', JSON.stringify(specialRule2));
@@ -1040,6 +1045,11 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                     setNilAllowed(true);
                     setBlindNilAllowed(false);
                   }
+                  if (next === 'GIMMICK') {
+                    setGimmickVariant((prev) => prev || GIMMICK_OPTIONS[0].value);
+                  } else {
+                    setGimmickVariant('');
+                  }
                 }}
                 className={fieldClass}
               >
@@ -1050,6 +1060,23 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                 ))}
               </select>
             </label>
+            {format === 'GIMMICK' && (
+              <label className={labelClass}>
+                Gimmick type
+                <select
+                  value={gimmickVariant || GIMMICK_OPTIONS[0].value}
+                  onChange={(e) => setGimmickVariant(e.target.value)}
+                  className={fieldClass}
+                  required
+                >
+                  {GIMMICK_OPTIONS.map((variant) => (
+                    <option key={variant.value} value={variant.value}>
+                      {variant.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className={labelClass}>
               Elimination
               <select
@@ -1185,23 +1212,6 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                   className={fieldClass}
                 />
               </label>
-              {format === 'GIMMICK' && (
-                <label className={labelClass}>
-                  Gimmick variant
-                  <select
-                    value={gimmickVariant}
-                    onChange={(e) => setGimmickVariant(e.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">None</option>
-                    {GIMMICK_OPTIONS.map((variant) => (
-                      <option key={variant} value={variant}>
-                        {variant}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
               <label className={labelClass}>
                 Nil allowed
                 <select
