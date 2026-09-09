@@ -47,6 +47,14 @@ export class TournamentService {
       throw new Error('Tournament format is required');
     }
 
+    if (format === 'GIMMICK' && !gimmickVariant) {
+      throw new Error('Gimmick variant is required for GIMMICK format');
+    }
+
+    // Non-REGULAR formats always allow nil; blind nil stays off (format rules control bids)
+    const resolvedNilAllowed = format === 'REGULAR' ? Boolean(nilAllowed) : true;
+    const resolvedBlindNilAllowed = format === 'REGULAR' ? Boolean(blindNilAllowed) : false;
+
     if (!eliminationType || !['SINGLE', 'DOUBLE'].includes(eliminationType)) {
       throw new Error('Elimination type must be SINGLE or DOUBLE');
     }
@@ -103,8 +111,8 @@ export class TournamentService {
         isRated: true, // Tournaments always have 4 human players, so always rated
         minPoints,
         maxPoints,
-        nilAllowed,
-        blindNilAllowed,
+        nilAllowed: resolvedNilAllowed,
+        blindNilAllowed: resolvedBlindNilAllowed,
         buyIn: buyIn !== null && buyIn !== undefined ? Number(buyIn) : null,
         tournamentBuyIn: tournamentBuyIn !== null && tournamentBuyIn !== undefined ? Number(tournamentBuyIn) : null,
         startTime: startDate,
@@ -751,8 +759,11 @@ export class TournamentService {
       maxPoints: tournament.maxPoints || 500,
       minPoints: tournament.minPoints || -100,
       buyIn: tournament.buyIn || 0,
-      nilAllowed: tournament.nilAllowed !== false,
-      blindNilAllowed: tournament.blindNilAllowed || false,
+      // WHIZ/MIRROR/GIMMICK always allow nil; BN only when tournament opted in (REGULAR)
+      nilAllowed:
+        tournament.format === 'REGULAR' ? tournament.nilAllowed !== false : true,
+      blindNilAllowed:
+        tournament.format === 'REGULAR' ? !!tournament.blindNilAllowed : false,
       specialRules: tournament.specialRules || {}
     });
 

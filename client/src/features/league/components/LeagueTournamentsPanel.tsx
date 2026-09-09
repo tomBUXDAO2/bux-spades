@@ -481,9 +481,12 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
       formData.append('tableBuyIn', String(tableBuyIn === '' ? 0 : tableBuyIn));
       formData.append('minPoints', String(minPoints));
       formData.append('maxPoints', String(maxPoints));
-      formData.append('nilAllowed', String(format === 'REGULAR' ? nilAllowed : false));
+      formData.append('nilAllowed', String(format === 'REGULAR' ? nilAllowed : true));
       formData.append('blindNilAllowed', String(format === 'REGULAR' ? blindNilAllowed : false));
-      if (format === 'GIMMICK' && gimmickVariant) {
+      if (format === 'GIMMICK') {
+        if (!gimmickVariant) {
+          throw new Error('Pick a gimmick variant');
+        }
         formData.append('gimmickVariant', gimmickVariant);
       }
       formData.append('specialRule1', JSON.stringify(specialRule1));
@@ -1030,7 +1033,14 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
               Format
               <select
                 value={format}
-                onChange={(e) => setFormat(e.target.value as (typeof FORMAT_OPTIONS)[number])}
+                onChange={(e) => {
+                  const next = e.target.value as (typeof FORMAT_OPTIONS)[number];
+                  setFormat(next);
+                  if (next !== 'REGULAR') {
+                    setNilAllowed(true);
+                    setBlindNilAllowed(false);
+                  }
+                }}
                 className={fieldClass}
               >
                 {FORMAT_OPTIONS.map((f) => (
@@ -1196,7 +1206,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                 Nil allowed
                 <select
                   disabled={format !== 'REGULAR'}
-                  value={nilAllowed ? 'true' : 'false'}
+                  value={format === 'REGULAR' ? (nilAllowed ? 'true' : 'false') : 'true'}
                   onChange={(e) => setNilAllowed(e.target.value === 'true')}
                   className={`${fieldClass} disabled:opacity-50`}
                 >
@@ -1208,7 +1218,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                 Blind nil allowed
                 <select
                   disabled={format !== 'REGULAR'}
-                  value={blindNilAllowed ? 'true' : 'false'}
+                  value={format === 'REGULAR' ? (blindNilAllowed ? 'true' : 'false') : 'false'}
                   onChange={(e) => setBlindNilAllowed(e.target.value === 'true')}
                   className={`${fieldClass} disabled:opacity-50`}
                 >

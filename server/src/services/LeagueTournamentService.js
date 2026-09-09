@@ -190,14 +190,20 @@ export class LeagueTournamentService {
     }
 
     const format = payload.format || 'REGULAR';
+    // WHIZ / MIRROR / GIMMICK always allow nil; only REGULAR can toggle. Blind nil stays off
+    // for those formats (bidding rules define what players can bid).
     const nilAllowed =
       format === 'REGULAR'
         ? payload.nilAllowed !== 'false' && payload.nilAllowed !== false
-        : false;
+        : true;
     const blindNilAllowed =
       format === 'REGULAR'
         ? payload.blindNilAllowed === 'true' || payload.blindNilAllowed === true
         : false;
+
+    if (format === 'GIMMICK' && !payload.gimmickVariant) {
+      throw httpError('Pick a gimmick variant');
+    }
 
     try {
       return await TournamentService.createTournament(

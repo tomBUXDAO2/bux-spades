@@ -1471,8 +1471,18 @@ export class GameService {
         'BID4NIL': '4 OR NIL',
         'BID3': 'BID 3',
         'BIDHEARTS': 'BID HEARTS',
-        'CRAZY_ACES': 'CRAZY ACES'
+        'CRAZY_ACES': 'CRAZY ACES',
+        'JOKER': 'JOKER',
+        'JOKER_WHIZ': 'JOKER'
       };
+
+      const mappedGimmick =
+        gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant || null;
+      // bidType drives some UI paths — use format when not a gimmick variant
+      const bidType =
+        mappedGimmick ||
+        (game.format === 'REGULAR' ? 'REGULAR' : game.format) ||
+        'REGULAR';
       
       // CRITICAL: Build players array with nulls for empty seats (client expects 4-element array)
       const playersArray = [null, null, null, null];
@@ -1524,7 +1534,7 @@ export class GameService {
         status: game.status,
         mode: game.mode,
         format: game.format,
-        gimmickVariant: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+        gimmickVariant: mappedGimmick,
         buyIn: game.buyIn,
         minPoints: game.minPoints,
         maxPoints: game.maxPoints,
@@ -1596,7 +1606,7 @@ export class GameService {
           coinAmount: game.buyIn,
           maxPoints: game.maxPoints,
           minPoints: game.minPoints,
-          bidType: gimmickVariantMapping[game.gimmickVariant] || game.gimmickVariant,
+          bidType,
           specialRules: game.specialRules || {}
         }
       };

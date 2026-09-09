@@ -544,10 +544,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   };
 
   const handleTournamentInputChange = <K extends keyof TournamentFormState>(key: K, value: TournamentFormState[K]) => {
-    setNewTournament(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+    setNewTournament((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'format' && value !== 'REGULAR') {
+        next.nilAllowed = true;
+        next.blindNilAllowed = false;
+      }
+      return next;
+    });
   };
 
   const toggleSelection = (array: string[], value: string) => {
@@ -1058,7 +1062,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       bannerUrl: newTournament.bannerUrl || null,
       minPoints: newTournament.minPoints,
       maxPoints: newTournament.maxPoints,
-      nilAllowed: newTournament.format === 'REGULAR' ? newTournament.nilAllowed : false,
+      nilAllowed: newTournament.format === 'REGULAR' ? newTournament.nilAllowed : true,
       blindNilAllowed: newTournament.format === 'REGULAR' ? newTournament.blindNilAllowed : false,
       gimmickVariant: newTournament.gimmickVariant,
       specialRule1: newTournament.specialRule1.length > 0 ? newTournament.specialRule1 : null,
@@ -1071,6 +1075,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     setTournamentError(null);
 
     try {
+      if (newTournament.format === 'GIMMICK' && !newTournament.gimmickVariant) {
+        throw new Error('Pick a gimmick variant');
+      }
       const payload = buildTournamentPayload();
 
       setCreatingTournament(true);

@@ -48,7 +48,7 @@ export default function TableDetailsModal({ isOpen, gameState }: TableDetailsMod
             else if (gimmickVariant === 'SUICIDE') label = 'SUICIDE';
             else if (gimmickVariant === 'CRAZY_ACES' || gimmickVariant === 'CRAZY ACES') label = 'CRAZY As';
             else if (gimmickVariant === 'JOKER' || gimmickVariant === 'JOKER_WHIZ') label = 'JOKER';
-            else label = 'UNKNOWN'; // Never show GIMMICK
+            else label = (gimmickVariant || 'GIMMICK').toString().replace(/_/g, ' '); // Never show bare UNKNOWN
           }
           return <span className={`inline whitespace-nowrap ${color} text-white font-bold text-xs px-2 py-0.5 rounded mr-2`}>{label}</span>;
         })()}
