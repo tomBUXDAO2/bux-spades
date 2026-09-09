@@ -289,6 +289,22 @@ export function minimalWinningSpade(trick, hand) {
   return null;
 }
 
+function isAceOfSpades(card) {
+  return card?.suit === 'SPADES' && String(card.rank).toUpperCase() === 'A';
+}
+
+/**
+ * Highest spade for leads, but keep A♠ unless bag-cashing or it's the only spade.
+ * Burning A♠ early wastes control in Suicide / high table-bid hands.
+ */
+function highestSpadePreferConserveAce(spades, allowAce = false) {
+  const desc = sortDesc(spades || []);
+  if (!desc.length) return null;
+  if (allowAce || desc.length === 1) return desc[0];
+  const nonAce = desc.find((c) => !isAceOfSpades(c));
+  return nonAce || desc[0];
+}
+
 export function nilPickHighestLosing(trick, seatIndex, legalCards) {
   if (!legalCards?.length) return null;
   for (const c of sortDesc(legalCards)) {
@@ -754,11 +770,12 @@ function playCoverNil(ctx) {
       }
     }
 
-    // 2) After spades broken: lead highest spades until partner is void in spades
+    // 2) After spades broken: lead high spades until partner is void (conserve A♠ unless bag mode)
     const partnerVoidSpades =
       partnerVoidSuits.has('SPADES') || suitIntel.get('SPADES')?.void === true;
+    const cashAceOk = ctx.avoidBagsMode || shouldDumpForBags(ctx);
     if (spadesBroken && !partnerVoidSpades && (suits.SPADES || []).length) {
-      return sortDesc(suits.SPADES)[0];
+      return highestSpadePreferConserveAce(suits.SPADES, cashAceOk);
     }
 
     // 3) Cash a non-spade Ace
@@ -788,9 +805,10 @@ function playCoverNil(ctx) {
       if (cards.length) return cards[0];
     }
     if (spadesBroken && (suits.SPADES || []).length) {
-      return sortDesc(suits.SPADES)[0];
+      return highestSpadePreferConserveAce(suits.SPADES, cashAceOk);
     }
-    return sortDesc(hand)[0];
+    const leadPool = cashAceOk ? hand : hand.filter((c) => !isAceOfSpades(c));
+    return sortDesc(leadPool.length ? leadPool : hand)[0];
   }
 
   // --- Following ---
@@ -838,8 +856,15 @@ function playCoverNil(ctx) {
     if (pick) return pick;
     return spades.length ? sortAsc(spades)[0] : sortAsc(hand)[0];
   }
-  // Void before partner: cut with HIGHEST spade so the book is secure for them
-  if (spades.length) return sortDesc(spades)[0];
+  // Void before partner: cut with cheapest winning spade — never burn A♠ when a
+  // lower trump already wins. Highest-spade cuts wasted the Ace (Suicide / table ≥12).
+  // Bag-avoidance may still cash A♠ elsewhere when both sides have made.
+  if (spades.length) {
+    const cut = minimalWinningSpade(trick, hand);
+    if (cut) return cut;
+    if (nonSp.length) return sortAsc(nonSp)[0];
+    return sortAsc(spades)[0];
+  }
   if (nonSp.length) return sortAsc(nonSp)[0];
   return sortAsc(hand)[0];
 }
