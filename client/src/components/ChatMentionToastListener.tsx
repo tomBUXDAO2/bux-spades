@@ -7,6 +7,7 @@ type MentionToast = {
   fromUserName: string;
   message: string;
   route?: string;
+  mentionEveryone?: boolean;
 };
 
 /**
@@ -27,7 +28,8 @@ export function ChatMentionToastListener() {
         id,
         fromUserName: payload?.fromUserName || 'Someone',
         message: String(payload?.message || '').slice(0, 120),
-        route: typeof payload?.route === 'string' ? payload.route : undefined
+        route: typeof payload?.route === 'string' ? payload.route : undefined,
+        mentionEveryone: Boolean(payload?.mentionEveryone)
       });
     };
 
@@ -55,7 +57,9 @@ export function ChatMentionToastListener() {
       }}
     >
       <div className="text-xs font-semibold uppercase tracking-wide text-amber-300">
-        {toast.fromUserName} mentioned you
+        {toast.mentionEveryone
+          ? `${toast.fromUserName} mentioned @everyone`
+          : `${toast.fromUserName} mentioned you`}
       </div>
       <div className="mt-1 line-clamp-2 text-sm text-slate-100">{toast.message}</div>
     </button>

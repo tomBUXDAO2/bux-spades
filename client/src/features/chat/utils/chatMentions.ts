@@ -8,6 +8,15 @@ export type MentionMatch = {
   username: string;
 };
 
+export const EVERYONE_CANDIDATE_ID = '__everyone__';
+export const EVERYONE_USERNAME = 'everyone';
+
+export function isEveryoneCandidate(c: MentionCandidate | null | undefined): boolean {
+  return Boolean(
+    c && (c.id === EVERYONE_CANDIDATE_ID || c.username.toLowerCase() === EVERYONE_USERNAME)
+  );
+}
+
 /** Active @query at cursor, if any. */
 export function getActiveMentionQuery(
   text: string,
@@ -54,7 +63,7 @@ export function insertMention(
 export function resolveMentions(text: string, candidates: MentionCandidate[]): MentionMatch[] {
   if (!text || !candidates?.length) return [];
   const normalized = [...candidates]
-    .filter((c) => c?.id && c?.username)
+    .filter((c) => c?.id && c?.username && !isEveryoneCandidate(c))
     .sort((a, b) => b.username.length - a.username.length);
 
   const found = new Map<string, MentionMatch>();
@@ -90,33 +99,27 @@ export function resolveMentions(text: string, candidates: MentionCandidate[]): M
 
 export type MentionSegment =
   | { type: 'text'; value: string }
-  | { type: 'mention'; value: string; username: string };
+  | { type: 'mention'; value: string; username: string; everyone?: boolean };
+
+function matchEveryoneToken(rest: string): boolean {
+  if (rest.length < EVERYONE_USERNAME.length) return false;
+  if (rest.slice(0, EVERYONE_USERNAME.length).toLowerCase() !== EVERYONE_USERNAME) return false;
+  const after = rest[EVERYONE_USERNAME.length];
+  return !after || !/[A-Za-z0-9_]/.test(after);
+}
 
 /** Split message into text / mention segments for rendering. */
 export function segmentMessageMentions(
   message: string,
-  mentions?: MentionMatch[] | null
+  mentions?: MentionMatch[] | null,
+  opts?: { mentionEveryone?: boolean }
 ): MentionSegment[] {
   if (!message) return [{ type: 'text', value: '' }];
+  const mentionEveryone = Boolean(opts?.mentionEveryone);
   const list =
     mentions && mentions.length
       ? [...mentions].sort((a, b) => b.username.length - a.username.length)
       : null;
-
-  if (!list?.length) {
-    // Fallback: highlight @token without spaces
-    const parts: MentionSegment[] = [];
-    const re = /@([A-Za-z0-9._-]+)/g;
-    let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(message))) {
-      if (m.index > last) parts.push({ type: 'text', value: message.slice(last, m.index) });
-      parts.push({ type: 'mention', value: m[0], username: m[1] });
-      last = m.index + m[0].length;
-    }
-    if (last < message.length) parts.push({ type: 'text', value: message.slice(last) });
-    return parts.length ? parts : [{ type: 'text', value: message }];
-  }
 
   const parts: MentionSegment[] = [];
   let i = 0;
@@ -134,15 +137,35 @@ export function segmentMessageMentions(
       continue;
     }
     const rest = message.slice(i + 1);
-    let matched: MentionMatch | null = null;
-    for (const m of list) {
-      if (rest.length < m.username.length) continue;
-      if (rest.slice(0, m.username.length).toLowerCase() !== m.username.toLowerCase()) continue;
-      const after = rest[m.username.length];
-      if (after && /[A-Za-z0-9_]/.test(after)) continue;
-      matched = m;
-      break;
+
+    if (mentionEveryone && matchEveryoneToken(rest)) {
+      parts.push({
+        type: 'mention',
+        value: '@everyone',
+        username: EVERYONE_USERNAME,
+        everyone: true
+      });
+      i += 1 + EVERYONE_USERNAME.length;
+      continue;
     }
+
+    let matched: MentionMatch | null = null;
+    if (list?.length) {
+      for (const m of list) {
+        if (rest.length < m.username.length) continue;
+        if (rest.slice(0, m.username.length).toLowerCase() !== m.username.toLowerCase()) continue;
+        const after = rest[m.username.length];
+        if (after && /[A-Za-z0-9_]/.test(after)) continue;
+        matched = m;
+        break;
+      }
+    } else {
+      const m = rest.match(/^([A-Za-z0-9._-]+)/);
+      if (m) {
+        matched = { userId: '', username: m[1] };
+      }
+    }
+
     if (matched) {
       parts.push({
         type: 'mention',

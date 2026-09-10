@@ -3,6 +3,14 @@
  * Supports multi-word usernames inserted via autocomplete.
  */
 
+export const EVERYONE_MENTION = 'everyone';
+
+/** True if text contains a standalone @everyone token. */
+export function hasEveryoneMention(text) {
+  if (!text || typeof text !== 'string') return false;
+  return /(?:^|[^A-Za-z0-9._-])@everyone(?:$|[^A-Za-z0-9_])/i.test(text);
+}
+
 /**
  * @param {string} text
  * @param {Array<{ id?: string, userId?: string, username?: string, userName?: string, name?: string }>} candidates
@@ -19,6 +27,8 @@ export function resolveMentions(text, candidates = []) {
     const userId = c?.id || c?.userId;
     const username = String(c?.username || c?.userName || c?.name || '').trim();
     if (!userId || !username || seenIds.has(userId)) continue;
+    // @everyone is admin-only and handled separately
+    if (username.toLowerCase() === EVERYONE_MENTION) continue;
     seenIds.add(userId);
     normalized.push({ userId, username });
   }

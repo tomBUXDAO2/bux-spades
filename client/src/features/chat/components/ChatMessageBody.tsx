@@ -11,6 +11,7 @@ type ChatMessageBodyProps = {
   style?: React.CSSProperties;
   textClassName?: string;
   mentions?: MentionMatch[] | null;
+  mentionEveryone?: boolean;
   /** Highlight mentions of this user */
   currentUsername?: string | null;
 };
@@ -21,6 +22,7 @@ export const ChatMessageBody: React.FC<ChatMessageBodyProps> = ({
   style,
   textClassName,
   mentions,
+  mentionEveryone,
   currentUsername
 }) => {
   const gifUrl = parseChatGifUrl(message);
@@ -36,7 +38,7 @@ export const ChatMessageBody: React.FC<ChatMessageBodyProps> = ({
     );
   }
 
-  const segments = segmentMessageMentions(message, mentions);
+  const segments = segmentMessageMentions(message, mentions, { mentionEveryone });
   const me = (currentUsername || '').trim().toLowerCase();
 
   return (
@@ -44,6 +46,16 @@ export const ChatMessageBody: React.FC<ChatMessageBodyProps> = ({
       {segments.map((seg, idx) => {
         if (seg.type === 'text') {
           return <React.Fragment key={idx}>{seg.value}</React.Fragment>;
+        }
+        if (seg.everyone) {
+          return (
+            <span
+              key={idx}
+              className="rounded bg-rose-500/30 px-0.5 font-semibold text-rose-200"
+            >
+              {seg.value}
+            </span>
+          );
         }
         const isMe = me && seg.username.toLowerCase() === me;
         return (

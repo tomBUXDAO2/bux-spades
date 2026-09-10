@@ -16,7 +16,8 @@ export async function notifyChatMentions({
   route,
   type,
   extraData = {},
-  dedupeKeyPrefix
+  dedupeKeyPrefix,
+  mentionEveryone = false
 }) {
   if (!Array.isArray(mentions) || mentions.length === 0) return;
 
@@ -26,12 +27,15 @@ export async function notifyChatMentions({
 
   if (!recipients.length) return;
 
-  const title = `${senderName || 'Someone'} mentioned you`;
+  const title = mentionEveryone
+    ? `${senderName || 'Someone'} mentioned @everyone`
+    : `${senderName || 'Someone'} mentioned you`;
   const body = String(messageText || '').slice(0, 90);
   const data = {
     type: type || 'chat_mention',
     route: route || '/',
     messageId: messageId || '',
+    mentionEveryone: mentionEveryone ? '1' : '0',
     ...extraData
   };
 
@@ -41,6 +45,7 @@ export async function notifyChatMentions({
     fromUserName: senderName,
     message: messageText,
     mentions,
+    mentionEveryone: Boolean(mentionEveryone),
     route: data.route,
     type: data.type,
     ...extraData

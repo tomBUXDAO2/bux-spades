@@ -3,7 +3,7 @@ import { LeagueService } from '../../../services/LeagueService.js';
 import { pushNotificationService } from '../../../services/PushNotificationService.js';
 import { webPushNotificationService } from '../../../services/WebPushNotificationService.js';
 import { LobbyChatHandler } from './lobbyChatHandler.js';
-import { resolveMentions } from '../../../utils/chatMentions.js';
+import { resolveMentions, hasEveryoneMention } from '../../../utils/chatMentions.js';
 import { notifyChatMentions } from '../../../utils/notifyChatMentions.js';
 
 function firstName(username) {
@@ -167,8 +167,9 @@ export class LeagueChatHandler {
 
       const chatMessage = await LeagueService.postChatMessage(leagueId, userId, message);
 
-      // Resolve @mentions against league members
+      // Resolve @mentions against league members; @everyone = admins only
       let mentions = [];
+      let mentionEveryone = false;
       try {
         const members = await LeagueService.listMembers(leagueId, userId);
         const candidates = members.map((m) => ({
@@ -178,11 +179,27 @@ export class LeagueChatHandler {
         mentions = resolveMentions(chatMessage.message, candidates).filter(
           (m) => m.userId !== userId
         );
+
+        if (hasEveryoneMention(chatMessage.message)) {
+          const self = members.find((m) => m.userId === userId);
+          const canEveryone = self?.role === 'OWNER' || self?.role === 'ADMIN';
+          if (canEveryone) {
+            mentionEveryone = true;
+            const byId = new Map(mentions.map((m) => [m.userId, m]));
+            for (const c of candidates) {
+              if (!c.id || c.id === userId) continue;
+              if (!byId.has(c.id)) {
+                byId.set(c.id, { userId: c.id, username: c.username });
+              }
+            }
+            mentions = Array.from(byId.values());
+          }
+        }
       } catch (e) {
         console.warn('[LEAGUE CHAT] mention resolve failed:', e?.message || e);
       }
 
-      const payload = { ...chatMessage, mentions };
+      const payload = { ...chatMessage, mentions, mentionEveryone };
       this.io.to(`league_${leagueId}`).emit('league_chat_message', payload);
 
       await notifyChatMentions({
@@ -195,7 +212,10 @@ export class LeagueChatHandler {
         route: `/league/${leagueId}`,
         type: 'chat_mention',
         extraData: { scope: 'league', leagueId },
-        dedupeKeyPrefix: `push:dedupe:league_mention:${leagueId}:${chatMessage.id}`
+        dedupeKeyPrefix: mentionEveryone
+          ? `push:dedupe:league_everyone:${leagueId}:${chatMessage.id}`
+          : `push:dedupe:league_mention:${leagueId}:${chatMessage.id}`,
+        mentionEveryone
       });
 
       // Push to offline league members (app closed/backgrounded => socket disconnected)

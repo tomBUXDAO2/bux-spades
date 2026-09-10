@@ -59,6 +59,7 @@ type ChatMessage = {
   timestamp: number;
   leagueId?: string;
   mentions?: { userId: string; username: string }[];
+  mentionEveryone?: boolean;
 };
 
 type JoinRequest = {
@@ -167,9 +168,14 @@ const LeaguePage: React.FC = () => {
     online: isMemberOnline(m.userId)
   }));
   const onlineCount = membersWithPresence.filter((m) => m.online).length;
-  const mentionCandidates: MentionCandidate[] = members
-    .filter((m) => m.userId && m.user?.username)
-    .map((m) => ({ id: m.userId, username: m.user.username }));
+  const mentionCandidates: MentionCandidate[] = [
+    ...(isAdmin
+      ? [{ id: '__everyone__', username: 'everyone' } as MentionCandidate]
+      : []),
+    ...members
+      .filter((m) => m.userId && m.user?.username)
+      .map((m) => ({ id: m.userId, username: m.user.username }))
+  ];
 
   const loadLeague = useCallback(async () => {
     if (!leagueId) return;
@@ -1114,6 +1120,7 @@ const LeaguePage: React.FC = () => {
                             message={msg.message}
                             textClassName="text-sm break-words"
                             mentions={msg.mentions}
+                            mentionEveryone={msg.mentionEveryone}
                             currentUsername={user?.username}
                           />
                           {isAdmin && selectedMessageId === msg.id && (
@@ -1159,7 +1166,13 @@ const LeaguePage: React.FC = () => {
                       mentionCandidates={mentionCandidates}
                       excludeUserId={user?.id}
                       disabled={isMuted}
-                      placeholder={isMuted ? 'You are muted' : 'Message this league… (@ to tag)'}
+                      placeholder={
+                        isMuted
+                          ? 'You are muted'
+                          : isAdmin
+                            ? 'Message this league… (@ to tag, @everyone)'
+                            : 'Message this league… (@ to tag)'
+                      }
                       className="min-w-0 w-full rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
                       inputRef={inputRef}
                       onSubmitKey={() => {
