@@ -24,6 +24,7 @@ type LeagueEvent = {
   startsAt: string;
   endsAt: string;
   bannerUrl?: string | null;
+  filters?: Record<string, unknown> | null;
   criteria?: { type: string; rewardCoins: number; milestoneValue?: number | null }[];
   leaderboard?: {
     rows: {
@@ -52,6 +53,51 @@ type Props = {
   onWatchGame: (gameId: string) => void;
 };
 
+const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
+const GIMMICK_OPTIONS = [
+  { value: 'SUICIDE', label: 'Suicide' },
+  { value: 'BID4NIL', label: '4 or Nil' },
+  { value: 'BID3', label: 'Bid 3' },
+  { value: 'BIDHEARTS', label: 'Bid Hearts' },
+  { value: 'CRAZY_ACES', label: 'Crazy Aces' },
+  { value: 'JOKER', label: 'Joker' }
+] as const;
+const SPECIAL_RULE1_OPTIONS = ['SCREAMER', 'ASSASSIN', 'SECRET_ASSASSIN'] as const;
+const SPECIAL_RULE2_OPTIONS = ['LOWBALL', 'HIGHBALL'] as const;
+
+const generateCoinOptions = () => {
+  const values: number[] = [];
+  for (let value = 50_000; value <= 1_000_000; value += 50_000) values.push(value);
+  for (let value = 1_500_000; value <= 10_000_000; value += 500_000) values.push(value);
+  return values;
+};
+const COIN_OPTION_VALUES = generateCoinOptions();
+
+const formatCoins = (value?: number | null) => {
+  if (value == null) return '';
+  if (value >= 1_000_000) {
+    const millions = value / 1_000_000;
+    const formatted = Number.isInteger(millions)
+      ? millions.toString()
+      : millions.toFixed(1).replace(/\.0$/, '');
+    return `${formatted}mil`;
+  }
+  const thousands = value / 1_000;
+  const formatted = Number.isInteger(thousands)
+    ? thousands.toString()
+    : thousands.toFixed(1).replace(/\.0$/, '');
+  return `${formatted}k`;
+};
+
+const fieldClass =
+  'mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white';
+const labelClass = 'block text-xs text-white/70';
+const chipBase = 'rounded border px-2.5 py-1 text-[11px] font-semibold transition';
+
+function toggleSelection(array: string[], value: string) {
+  return array.includes(value) ? array.filter((v) => v !== value) : [...array, value];
+}
+
 const CRITERION_OPTIONS: { type: CriterionType; label: string; needsMilestone?: boolean }[] = [
   { type: 'MOST_WINS', label: 'Most wins' },
   { type: 'MOST_GAMES_PLAYED', label: 'Most games played' },
@@ -72,6 +118,31 @@ function formatWhen(iso: string) {
   } catch {
     return iso;
   }
+}
+
+function summarizeFilters(filters?: Record<string, unknown> | null): string | null {
+  if (!filters || typeof filters !== 'object') return null;
+  const parts: string[] = [];
+  const modes = filters.allowedModes as string[] | undefined;
+  const formats = filters.allowedFormats as string[] | undefined;
+  const gimmicks = filters.allowedGimmickVariants as string[] | undefined;
+  if (modes?.length) parts.push(modes.join('/'));
+  if (formats?.length) parts.push(formats.join('/'));
+  if (gimmicks?.length) parts.push(gimmicks.join('/'));
+  if (filters.minPoints != null) parts.push(`min ${filters.minPoints}`);
+  if (filters.maxPoints != null) parts.push(`max ${filters.maxPoints}`);
+  if (filters.nilAllowed === true) parts.push('nil');
+  if (filters.nilAllowed === false) parts.push('no nil');
+  if (filters.blindNilAllowed === true) parts.push('blind nil');
+  const coins = filters.coins as number[] | undefined;
+  if (Array.isArray(coins) && coins.length === 1) {
+    parts.push(coins[0] === 0 ? 'free' : formatCoins(coins[0]));
+  }
+  const s1 = filters.allowedSpecialRule1 as string[] | undefined;
+  const s2 = filters.allowedSpecialRule2 as string[] | undefined;
+  if (s1?.length) parts.push(s1.join('+'));
+  if (s2?.length) parts.push(s2.join('+'));
+  return parts.length ? parts.join(' · ') : null;
 }
 
 const LeagueEventsPanel: React.FC<Props> = ({
@@ -95,10 +166,61 @@ const LeagueEventsPanel: React.FC<Props> = ({
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<'PARTNERS' | 'SOLO'>('PARTNERS');
+  const [format, setFormat] = useState<(typeof FORMAT_OPTIONS)[number]>('REGULAR');
+  const [gimmickVariant, setGimmickVariant] = useState('');
+  const [tableBuyIn, setTableBuyIn] = useState<number | ''>('');
+  const [minPoints, setMinPoints] = useState(-100);
+  const [maxPoints, setMaxPoints] = useState(500);
+  const [nilAllowed, setNilAllowed] = useState(true);
+  const [blindNilAllowed, setBlindNilAllowed] = useState(false);
+  const [specialRule1, setSpecialRule1] = useState<string[]>([]);
+  const [specialRule2, setSpecialRule2] = useState<string[]>([]);
   const [criteria, setCriteria] = useState<CriterionDraft[]>([
     { type: 'MOST_WINS', rewardCoins: '1000000', milestoneValue: '' }
   ]);
   const [saving, setSaving] = useState(false);
+
+  const resetCreateForm = () => {
+    setName('');
+    setDescription('');
+    setStartsAt('');
+    setEndsAt('');
+    setBannerFile(null);
+    setMode('PARTNERS');
+    setFormat('REGULAR');
+    setGimmickVariant('');
+    setTableBuyIn('');
+    setMinPoints(-100);
+    setMaxPoints(500);
+    setNilAllowed(true);
+    setBlindNilAllowed(false);
+    setSpecialRule1([]);
+    setSpecialRule2([]);
+    setCriteria([{ type: 'MOST_WINS', rewardCoins: '1000000', milestoneValue: '' }]);
+  };
+
+  const buildFiltersPayload = () => {
+    const filters: Record<string, unknown> = {
+      allowedModes: [mode],
+      allowedFormats: [format],
+      minPoints,
+      maxPoints,
+      nilAllowed: format === 'REGULAR' ? nilAllowed : true,
+      blindNilAllowed: format === 'REGULAR' ? blindNilAllowed : false
+    };
+    if (format === 'GIMMICK') {
+      filters.allowedGimmickVariants = [gimmickVariant || GIMMICK_OPTIONS[0].value];
+    }
+    const buyIn = tableBuyIn === '' ? 0 : Number(tableBuyIn);
+    filters.coins = [buyIn];
+    filters.minCoins = buyIn;
+    filters.maxCoins = buyIn;
+    filters.coinRange = { min: buyIn, max: buyIn };
+    if (specialRule1.length) filters.allowedSpecialRule1 = specialRule1;
+    if (specialRule2.length) filters.allowedSpecialRule2 = specialRule2;
+    return filters;
+  };
 
   const loadList = useCallback(async () => {
     const res = await api.get(`/api/leagues/${leagueId}/events`);
@@ -173,6 +295,10 @@ const LeagueEventsPanel: React.FC<Props> = ({
       setError('Name, start, and end are required');
       return;
     }
+    if (format === 'GIMMICK' && !(gimmickVariant || GIMMICK_OPTIONS[0].value)) {
+      setError('Select a gimmick type');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -182,6 +308,7 @@ const LeagueEventsPanel: React.FC<Props> = ({
       form.append('timezone', 'UTC');
       form.append('startsAt', new Date(startsAt).toISOString());
       form.append('endsAt', new Date(endsAt).toISOString());
+      form.append('filters', JSON.stringify(buildFiltersPayload()));
       form.append(
         'criteria',
         JSON.stringify(
@@ -211,12 +338,7 @@ const LeagueEventsPanel: React.FC<Props> = ({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to create event');
       setShowCreate(false);
-      setName('');
-      setDescription('');
-      setStartsAt('');
-      setEndsAt('');
-      setBannerFile(null);
-      setCriteria([{ type: 'MOST_WINS', rewardCoins: '1000000', milestoneValue: '' }]);
+      resetCreateForm();
       await loadList();
       setSelectedId(data.id);
     } catch (e: any) {
@@ -275,6 +397,11 @@ const LeagueEventsPanel: React.FC<Props> = ({
           </div>
           {detail.description && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-white/85">{detail.description}</p>
+          )}
+          {summarizeFilters(detail.filters) && (
+            <p className="mt-2 text-xs text-cyan-100/90">
+              Game settings: {summarizeFilters(detail.filters)}
+            </p>
           )}
           {!!detail.criteria?.length && (
             <ul className="mt-3 space-y-1 text-xs text-white/75">
@@ -376,58 +503,223 @@ const LeagueEventsPanel: React.FC<Props> = ({
 
       {showCreate && isAdmin && (
         <div
-          className="space-y-2 rounded-xl border border-white/15 p-3 backdrop-blur"
+          className="space-y-4 rounded-xl border border-white/15 p-4 backdrop-blur"
           style={{ backgroundColor: `${theme}99` }}
         >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Event name"
-            className="w-full rounded border border-white/15 bg-black/35 px-3 py-2 text-sm text-white"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Details / rules"
-            rows={3}
-            className="w-full rounded border border-white/15 bg-black/35 px-3 py-2 text-sm text-white"
-          />
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="text-[11px] text-white/70">
-              Starts
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={`${labelClass} sm:col-span-2`}>
+              Name
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={fieldClass}
+                placeholder="e.g. Weekend Grind"
+              />
+            </label>
+            <label className={`${labelClass} sm:col-span-2`}>
+              Description
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Details / rules"
+                rows={3}
+                className={fieldClass}
+              />
+            </label>
+            <label className={labelClass}>
+              Mode
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'PARTNERS' | 'SOLO')}
+                className={fieldClass}
+              >
+                <option value="PARTNERS">Partners</option>
+                <option value="SOLO">Solo</option>
+              </select>
+            </label>
+            <label className={labelClass}>
+              Format
+              <select
+                value={format}
+                onChange={(e) => {
+                  const next = e.target.value as (typeof FORMAT_OPTIONS)[number];
+                  setFormat(next);
+                  if (next !== 'REGULAR') {
+                    setNilAllowed(true);
+                    setBlindNilAllowed(false);
+                  }
+                  if (next === 'GIMMICK') {
+                    setGimmickVariant((prev) => prev || GIMMICK_OPTIONS[0].value);
+                  } else {
+                    setGimmickVariant('');
+                  }
+                }}
+                className={fieldClass}
+              >
+                {FORMAT_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {format === 'GIMMICK' && (
+              <label className={labelClass}>
+                Gimmick type
+                <select
+                  value={gimmickVariant || GIMMICK_OPTIONS[0].value}
+                  onChange={(e) => setGimmickVariant(e.target.value)}
+                  className={fieldClass}
+                  required
+                >
+                  {GIMMICK_OPTIONS.map((variant) => (
+                    <option key={variant.value} value={variant.value}>
+                      {variant.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className={labelClass}>
+              Starts (local)
               <input
                 type="datetime-local"
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
-                className="mt-1 w-full rounded border border-white/15 bg-black/35 px-2 py-1.5 text-xs text-white"
+                className={fieldClass}
               />
             </label>
-            <label className="text-[11px] text-white/70">
-              Ends
+            <label className={labelClass}>
+              Ends (local)
               <input
                 type="datetime-local"
                 value={endsAt}
                 onChange={(e) => setEndsAt(e.target.value)}
-                className="mt-1 w-full rounded border border-white/15 bg-black/35 px-2 py-1.5 text-xs text-white"
+                className={fieldClass}
               />
             </label>
+            <label className={labelClass}>
+              Table buy-in
+              <select
+                value={tableBuyIn}
+                onChange={(e) => setTableBuyIn(e.target.value === '' ? '' : Number(e.target.value))}
+                className={fieldClass}
+              >
+                <option value="">Free games</option>
+                {COIN_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatCoins(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <label className="block text-[11px] text-white/70">
+
+          <label className={labelClass}>
             Banner image (optional)
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
+              className="mt-1 block w-full text-xs text-white/80 file:mr-3 file:rounded file:border-0 file:bg-cyan-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
               onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
-              className="mt-1 block w-full text-xs"
             />
           </label>
 
-          <div className="space-y-2">
+          <div className="border-t border-white/10 pt-3">
+            <h4 className="mb-2 text-sm font-semibold text-white">Game settings</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={labelClass}>
+                Min points
+                <input
+                  type="number"
+                  value={minPoints}
+                  onChange={(e) => setMinPoints(Number(e.target.value))}
+                  className={fieldClass}
+                />
+              </label>
+              <label className={labelClass}>
+                Max points
+                <input
+                  type="number"
+                  value={maxPoints}
+                  onChange={(e) => setMaxPoints(Number(e.target.value))}
+                  className={fieldClass}
+                />
+              </label>
+              <label className={labelClass}>
+                Nil allowed
+                <select
+                  disabled={format !== 'REGULAR'}
+                  value={format === 'REGULAR' ? (nilAllowed ? 'true' : 'false') : 'true'}
+                  onChange={(e) => setNilAllowed(e.target.value === 'true')}
+                  className={`${fieldClass} disabled:opacity-50`}
+                >
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label className={labelClass}>
+                Blind nil allowed
+                <select
+                  disabled={format !== 'REGULAR'}
+                  value={format === 'REGULAR' ? (blindNilAllowed ? 'true' : 'false') : 'false'}
+                  onChange={(e) => setBlindNilAllowed(e.target.value === 'true')}
+                  className={`${fieldClass} disabled:opacity-50`}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </label>
+              <div className="space-y-1.5">
+                <span className={labelClass}>Special rule #1</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPECIAL_RULE1_OPTIONS.map((rule) => (
+                    <button
+                      type="button"
+                      key={rule}
+                      onClick={() => setSpecialRule1((prev) => toggleSelection(prev, rule))}
+                      className={`${chipBase} ${
+                        specialRule1.includes(rule)
+                          ? 'border-cyan-400 bg-cyan-600 text-white'
+                          : 'border-white/20 bg-black/30 text-white/70'
+                      }`}
+                    >
+                      {rule}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <span className={labelClass}>Special rule #2</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPECIAL_RULE2_OPTIONS.map((rule) => (
+                    <button
+                      type="button"
+                      key={rule}
+                      onClick={() => setSpecialRule2((prev) => toggleSelection(prev, rule))}
+                      className={`${chipBase} ${
+                        specialRule2.includes(rule)
+                          ? 'border-cyan-400 bg-cyan-600 text-white'
+                          : 'border-white/20 bg-black/30 text-white/70'
+                      }`}
+                    >
+                      {rule}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-white/10 pt-3">
             <div className="text-xs font-semibold text-white/80">Prize criteria</div>
             {criteria.map((c, idx) => {
               const meta = CRITERION_OPTIONS.find((o) => o.type === c.type);
               return (
-                <div key={idx} className="flex flex-wrap items-end gap-2 rounded border border-white/10 bg-black/20 p-2">
+                <div
+                  key={idx}
+                  className="flex flex-wrap items-end gap-2 rounded border border-white/10 bg-black/20 p-2"
+                >
                   <select
                     value={c.type}
                     onChange={(e) => {
@@ -495,11 +787,16 @@ const LeagueEventsPanel: React.FC<Props> = ({
             </button>
           </div>
 
+          <p className="text-[11px] text-white/55">
+            Event tables must match these game settings (same options as tournament create).
+          </p>
+
           <button
             type="button"
             disabled={saving}
             onClick={createEvent}
-            className="rounded-lg bg-amber-600/90 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            className="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            style={{ background: `linear-gradient(90deg, ${theme}, #0e7490)` }}
           >
             {saving ? 'Creating…' : 'Create event'}
           </button>

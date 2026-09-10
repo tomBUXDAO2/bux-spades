@@ -8,6 +8,7 @@ import { emitPersonalizedGameEvent } from '../services/SocketGameBroadcastServic
 import { authenticateToken } from '../middleware/auth.js';
 import { LeagueService } from '../services/LeagueService.js';
 import { EventService } from '../services/EventService.js';
+import EventFilterService from '../services/EventFilterService.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -151,6 +152,23 @@ router.post('/', authenticateToken, async (req, res) => {
       }
       if (leagueId && event.leagueId && event.leagueId !== leagueId) {
         return res.status(400).json({ error: 'Event does not belong to this league' });
+      }
+
+      const specialRules = req.body.specialRules || {};
+      const validation = EventFilterService.evaluate(event.filters, {
+        coins: Number(req.body.buyIn || 0),
+        format: dbFormat,
+        mode: req.body.mode || 'PARTNERS',
+        minPoints: Number(req.body.minPoints ?? -100),
+        maxPoints: Number(req.body.maxPoints ?? 200),
+        specialRule1: specialRules.specialRule1 || 'NONE',
+        specialRule2: specialRules.specialRule2 || 'NONE',
+        gimmickVariant: gimmickVariant || null,
+        nilAllowed: specialRules.allowNil !== false,
+        blindNilAllowed: Boolean(specialRules.allowBlindNil)
+      });
+      if (!validation.allowed) {
+        return res.status(400).json({ error: validation.reason || 'Game settings do not match this event' });
       }
     }
     

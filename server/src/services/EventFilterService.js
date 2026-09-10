@@ -55,27 +55,41 @@ export class EventFilterService {
     }
 
     const gimmickList = this.normalizeArray(filters.allowedGimmickVariants || filters.gimmickVariants);
-    if (gimmickList.length && normalizedGimmickVariant && !gimmickList.includes(normalizedGimmickVariant)) {
-      return {
-        allowed: false,
-        reason: `This event only allows gimmick variants: ${gimmickList.join(', ')}`,
-      };
+    if (gimmickList.length) {
+      if (!normalizedGimmickVariant || !gimmickList.includes(normalizedGimmickVariant)) {
+        return {
+          allowed: false,
+          reason: `This event only allows gimmick variants: ${gimmickList.join(', ')}`,
+        };
+      }
     }
 
     const special1List = this.normalizeArray(filters.allowedSpecialRule1 || filters.specialRule1);
-    if (special1List.length && normalizedSpecialRule1 && !special1List.includes(normalizedSpecialRule1)) {
-      return {
-        allowed: false,
-        reason: `Special rule 1 must be one of: ${special1List.join(', ')}`,
-      };
+    if (special1List.length) {
+      const rule =
+        normalizedSpecialRule1 && normalizedSpecialRule1 !== 'NONE'
+          ? normalizedSpecialRule1
+          : null;
+      if (!rule || !special1List.includes(rule)) {
+        return {
+          allowed: false,
+          reason: `Special rule 1 must be one of: ${special1List.join(', ')}`,
+        };
+      }
     }
 
     const special2List = this.normalizeArray(filters.allowedSpecialRule2 || filters.specialRule2);
-    if (special2List.length && normalizedSpecialRule2 && !special2List.includes(normalizedSpecialRule2)) {
-      return {
-        allowed: false,
-        reason: `Special rule 2 must be one of: ${special2List.join(', ')}`,
-      };
+    if (special2List.length) {
+      const rule =
+        normalizedSpecialRule2 && normalizedSpecialRule2 !== 'NONE'
+          ? normalizedSpecialRule2
+          : null;
+      if (!rule || !special2List.includes(rule)) {
+        return {
+          allowed: false,
+          reason: `Special rule 2 must be one of: ${special2List.join(', ')}`,
+        };
+      }
     }
 
     if (filters.nilAllowed !== undefined && filters.nilAllowed !== null) {
@@ -121,6 +135,23 @@ export class EventFilterService {
         return {
           allowed: false,
           reason: `Buy-in must be no more than ${Number(filters.maxCoins).toLocaleString()} coins.`,
+        };
+      }
+    }
+
+    if (filters.coinRange && typeof filters.coinRange === 'object') {
+      const min = filters.coinRange.min != null ? Number(filters.coinRange.min) : null;
+      const max = filters.coinRange.max != null ? Number(filters.coinRange.max) : null;
+      if (min != null && coins < min) {
+        return {
+          allowed: false,
+          reason: `Buy-in must be at least ${min.toLocaleString()} coins.`,
+        };
+      }
+      if (max != null && coins > max) {
+        return {
+          allowed: false,
+          reason: `Buy-in must be no more than ${max.toLocaleString()} coins.`,
         };
       }
     }
