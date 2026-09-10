@@ -113,8 +113,9 @@ const formatCoins = (value?: number | null) => {
 };
 
 const fieldClass =
-  'mt-1 w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white';
-const labelClass = 'block text-xs text-white/70';
+  'mt-1 box-border w-full min-w-0 max-w-full rounded border border-white/20 bg-black/40 px-2 py-1.5 text-sm text-white';
+const labelClass = 'block min-w-0 text-xs text-white/70';
+const datetimeFieldClass = `${fieldClass} appearance-none`;
 const chipBase = 'rounded border px-2.5 py-1 text-[11px] font-semibold transition';
 
 function formatWhen(iso: string) {
@@ -1010,10 +1011,10 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
 
       {showCreate && isAdmin && (
         <div
-          className="space-y-4 rounded-xl border border-white/15 p-4 backdrop-blur"
+          className="min-w-0 space-y-4 overflow-x-hidden rounded-xl border border-white/15 p-4 backdrop-blur"
           style={{ backgroundColor: `${theme}99` }}
         >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
             <label className={`${labelClass} sm:col-span-2`}>
               Name
               <input
@@ -1100,7 +1101,7 @@ const LeagueTournamentsPanel: React.FC<Props> = ({
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className={fieldClass}
+                className={datetimeFieldClass}
               />
             </label>
             <label className={labelClass}>
