@@ -54,6 +54,7 @@ type Props = {
 };
 
 const FORMAT_OPTIONS = ['REGULAR', 'WHIZ', 'MIRROR', 'GIMMICK'] as const;
+const MODE_OPTIONS = ['PARTNERS', 'SOLO'] as const;
 const GIMMICK_OPTIONS = [
   { value: 'SUICIDE', label: 'Suicide' },
   { value: 'BID4NIL', label: '4 or Nil' },
@@ -121,28 +122,41 @@ function formatWhen(iso: string) {
 }
 
 function summarizeFilters(filters?: Record<string, unknown> | null): string | null {
-  if (!filters || typeof filters !== 'object') return null;
+  if (!filters || typeof filters !== 'object') return 'Any game line';
   const parts: string[] = [];
   const modes = filters.allowedModes as string[] | undefined;
   const formats = filters.allowedFormats as string[] | undefined;
   const gimmicks = filters.allowedGimmickVariants as string[] | undefined;
   if (modes?.length) parts.push(modes.join('/'));
+  else parts.push('any mode');
   if (formats?.length) parts.push(formats.join('/'));
+  else parts.push('any format');
   if (gimmicks?.length) parts.push(gimmicks.join('/'));
-  if (filters.minPoints != null) parts.push(`min ${filters.minPoints}`);
-  if (filters.maxPoints != null) parts.push(`max ${filters.maxPoints}`);
-  if (filters.nilAllowed === true) parts.push('nil');
-  if (filters.nilAllowed === false) parts.push('no nil');
-  if (filters.blindNilAllowed === true) parts.push('blind nil');
+  if (filters.minPoints != null) parts.push(`min pts ${filters.minPoints}`);
+  if (filters.maxPoints != null) parts.push(`max pts ${filters.maxPoints}`);
+  if (filters.nilAllowed === true) parts.push('nil on');
+  else if (filters.nilAllowed === false) parts.push('nil off');
+  if (filters.blindNilAllowed === true) parts.push('blind nil on');
+  else if (filters.blindNilAllowed === false) parts.push('blind nil off');
   const coins = filters.coins as number[] | undefined;
-  if (Array.isArray(coins) && coins.length === 1) {
-    parts.push(coins[0] === 0 ? 'free' : formatCoins(coins[0]));
+  if (Array.isArray(coins) && coins.length) {
+    parts.push(coins.map((c) => (c === 0 ? 'free' : formatCoins(c))).join('|'));
+  } else {
+    const minC = filters.minCoins != null ? Number(filters.minCoins) : filters.coinRange && typeof filters.coinRange === 'object' ? Number((filters.coinRange as any).min) : null;
+    const maxC = filters.maxCoins != null ? Number(filters.maxCoins) : filters.coinRange && typeof filters.coinRange === 'object' ? Number((filters.coinRange as any).max) : null;
+    if (minC != null || maxC != null) {
+      const lo = minC != null ? (minC === 0 ? 'free' : formatCoins(minC)) : 'any';
+      const hi = maxC != null ? (maxC === 0 ? 'free' : formatCoins(maxC)) : 'any';
+      parts.push(`buy-in ${lo}–${hi}`);
+    } else {
+      parts.push('any buy-in');
+    }
   }
   const s1 = filters.allowedSpecialRule1 as string[] | undefined;
   const s2 = filters.allowedSpecialRule2 as string[] | undefined;
   if (s1?.length) parts.push(s1.join('+'));
   if (s2?.length) parts.push(s2.join('+'));
-  return parts.length ? parts.join(' · ') : null;
+  return parts.join(' · ');
 }
 
 const LeagueEventsPanel: React.FC<Props> = ({
@@ -166,14 +180,15 @@ const LeagueEventsPanel: React.FC<Props> = ({
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [bannerFile, setBannerFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<'PARTNERS' | 'SOLO'>('PARTNERS');
-  const [format, setFormat] = useState<(typeof FORMAT_OPTIONS)[number]>('REGULAR');
-  const [gimmickVariant, setGimmickVariant] = useState('');
-  const [tableBuyIn, setTableBuyIn] = useState<number | ''>('');
-  const [minPoints, setMinPoints] = useState(-100);
-  const [maxPoints, setMaxPoints] = useState(500);
-  const [nilAllowed, setNilAllowed] = useState(true);
-  const [blindNilAllowed, setBlindNilAllowed] = useState(false);
+  const [modes, setModes] = useState<string[]>([]);
+  const [formats, setFormats] = useState<string[]>([]);
+  const [gimmickVariants, setGimmickVariants] = useState<string[]>([]);
+  const [minCoins, setMinCoins] = useState<number | undefined>(undefined);
+  const [maxCoins, setMaxCoins] = useState<number | undefined>(undefined);
+  const [minPoints, setMinPoints] = useState<number | undefined>(undefined);
+  const [maxPoints, setMaxPoints] = useState<number | undefined>(undefined);
+  const [nilAllowed, setNilAllowed] = useState<boolean | null>(null);
+  const [blindNilAllowed, setBlindNilAllowed] = useState<boolean | null>(null);
   const [specialRule1, setSpecialRule1] = useState<string[]>([]);
   const [specialRule2, setSpecialRule2] = useState<string[]>([]);
   const [criteria, setCriteria] = useState<CriterionDraft[]>([
@@ -187,39 +202,55 @@ const LeagueEventsPanel: React.FC<Props> = ({
     setStartsAt('');
     setEndsAt('');
     setBannerFile(null);
-    setMode('PARTNERS');
-    setFormat('REGULAR');
-    setGimmickVariant('');
-    setTableBuyIn('');
-    setMinPoints(-100);
-    setMaxPoints(500);
-    setNilAllowed(true);
-    setBlindNilAllowed(false);
+    setModes([]);
+    setFormats([]);
+    setGimmickVariants([]);
+    setMinCoins(undefined);
+    setMaxCoins(undefined);
+    setMinPoints(undefined);
+    setMaxPoints(undefined);
+    setNilAllowed(null);
+    setBlindNilAllowed(null);
     setSpecialRule1([]);
     setSpecialRule2([]);
     setCriteria([{ type: 'MOST_WINS', rewardCoins: '1000000', milestoneValue: '' }]);
   };
 
   const buildFiltersPayload = () => {
-    const filters: Record<string, unknown> = {
-      allowedModes: [mode],
-      allowedFormats: [format],
-      minPoints,
-      maxPoints,
-      nilAllowed: format === 'REGULAR' ? nilAllowed : true,
-      blindNilAllowed: format === 'REGULAR' ? blindNilAllowed : false
-    };
-    if (format === 'GIMMICK') {
-      filters.allowedGimmickVariants = [gimmickVariant || GIMMICK_OPTIONS[0].value];
+    const filters: Record<string, unknown> = {};
+
+    // Empty or all selected => any (omit filter key)
+    if (modes.length > 0 && modes.length < MODE_OPTIONS.length) {
+      filters.allowedModes = modes;
     }
-    const buyIn = tableBuyIn === '' ? 0 : Number(tableBuyIn);
-    filters.coins = [buyIn];
-    filters.minCoins = buyIn;
-    filters.maxCoins = buyIn;
-    filters.coinRange = { min: buyIn, max: buyIn };
+    if (formats.length > 0 && formats.length < FORMAT_OPTIONS.length) {
+      filters.allowedFormats = formats;
+    }
+    const gimmickRelevant = formats.length === 0 || formats.includes('GIMMICK');
+    if (
+      gimmickRelevant &&
+      gimmickVariants.length > 0 &&
+      gimmickVariants.length < GIMMICK_OPTIONS.length
+    ) {
+      filters.allowedGimmickVariants = gimmickVariants;
+    }
+
+    if (minCoins !== undefined || maxCoins !== undefined) {
+      const min = minCoins ?? maxCoins ?? 0;
+      const max = maxCoins ?? minCoins ?? 0;
+      filters.minCoins = Math.min(min, max);
+      filters.maxCoins = Math.max(min, max);
+      filters.coinRange = { min: filters.minCoins, max: filters.maxCoins };
+    }
+
+    if (minPoints !== undefined) filters.minPoints = minPoints;
+    if (maxPoints !== undefined) filters.maxPoints = maxPoints;
+    if (nilAllowed !== null) filters.nilAllowed = nilAllowed;
+    if (blindNilAllowed !== null) filters.blindNilAllowed = blindNilAllowed;
     if (specialRule1.length) filters.allowedSpecialRule1 = specialRule1;
     if (specialRule2.length) filters.allowedSpecialRule2 = specialRule2;
-    return filters;
+
+    return Object.keys(filters).length ? filters : { allowAll: true };
   };
 
   const loadList = useCallback(async () => {
@@ -293,10 +324,6 @@ const LeagueEventsPanel: React.FC<Props> = ({
   const createEvent = async () => {
     if (!name.trim() || !startsAt || !endsAt) {
       setError('Name, start, and end are required');
-      return;
-    }
-    if (format === 'GIMMICK' && !(gimmickVariant || GIMMICK_OPTIONS[0].value)) {
-      setError('Select a gimmick type');
       return;
     }
     setSaving(true);
@@ -398,7 +425,7 @@ const LeagueEventsPanel: React.FC<Props> = ({
           {detail.description && (
             <p className="mt-2 whitespace-pre-wrap text-sm text-white/85">{detail.description}</p>
           )}
-          {summarizeFilters(detail.filters) && (
+          {detail.filters != null && (
             <p className="mt-2 text-xs text-cyan-100/90">
               Game settings: {summarizeFilters(detail.filters)}
             </p>
@@ -527,60 +554,6 @@ const LeagueEventsPanel: React.FC<Props> = ({
               />
             </label>
             <label className={labelClass}>
-              Mode
-              <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value as 'PARTNERS' | 'SOLO')}
-                className={fieldClass}
-              >
-                <option value="PARTNERS">Partners</option>
-                <option value="SOLO">Solo</option>
-              </select>
-            </label>
-            <label className={labelClass}>
-              Format
-              <select
-                value={format}
-                onChange={(e) => {
-                  const next = e.target.value as (typeof FORMAT_OPTIONS)[number];
-                  setFormat(next);
-                  if (next !== 'REGULAR') {
-                    setNilAllowed(true);
-                    setBlindNilAllowed(false);
-                  }
-                  if (next === 'GIMMICK') {
-                    setGimmickVariant((prev) => prev || GIMMICK_OPTIONS[0].value);
-                  } else {
-                    setGimmickVariant('');
-                  }
-                }}
-                className={fieldClass}
-              >
-                {FORMAT_OPTIONS.map((f) => (
-                  <option key={f} value={f}>
-                    {f.charAt(0) + f.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {format === 'GIMMICK' && (
-              <label className={labelClass}>
-                Gimmick type
-                <select
-                  value={gimmickVariant || GIMMICK_OPTIONS[0].value}
-                  onChange={(e) => setGimmickVariant(e.target.value)}
-                  className={fieldClass}
-                  required
-                >
-                  {GIMMICK_OPTIONS.map((variant) => (
-                    <option key={variant.value} value={variant.value}>
-                      {variant.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label className={labelClass}>
               Starts (local)
               <input
                 type="datetime-local"
@@ -598,21 +571,6 @@ const LeagueEventsPanel: React.FC<Props> = ({
                 className={fieldClass}
               />
             </label>
-            <label className={labelClass}>
-              Table buy-in
-              <select
-                value={tableBuyIn}
-                onChange={(e) => setTableBuyIn(e.target.value === '' ? '' : Number(e.target.value))}
-                className={fieldClass}
-              >
-                <option value="">Free games</option>
-                {COIN_OPTION_VALUES.map((value) => (
-                  <option key={value} value={value}>
-                    {formatCoins(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
 
           <label className={labelClass}>
@@ -625,35 +583,214 @@ const LeagueEventsPanel: React.FC<Props> = ({
             />
           </label>
 
-          <div className="border-t border-white/10 pt-3">
-            <h4 className="mb-2 text-sm font-semibold text-white">Game settings</h4>
+          <div className="border-t border-white/10 pt-3 space-y-3">
+            <h4 className="text-sm font-semibold text-white">Game settings</h4>
+            <p className="text-[11px] text-white/55">
+              Leave options on Any (nothing selected) to allow all game lines. Select one or more
+              to restrict. Buy-in can be a min–max range.
+            </p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className={labelClass}>Mode</span>
+                <button
+                  type="button"
+                  className="text-[10px] text-cyan-200 hover:underline"
+                  onClick={() => setModes([])}
+                >
+                  Any
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MODE_OPTIONS.map((m) => (
+                  <button
+                    type="button"
+                    key={m}
+                    onClick={() => setModes((prev) => toggleSelection(prev, m))}
+                    className={`${chipBase} ${
+                      modes.includes(m)
+                        ? 'border-cyan-400 bg-cyan-600 text-white'
+                        : 'border-white/20 bg-black/30 text-white/70'
+                    }`}
+                  >
+                    {m === 'PARTNERS' ? 'Partners' : 'Solo'}
+                  </button>
+                ))}
+              </div>
+              {!modes.length && <p className="text-[10px] text-white/45">Any mode</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className={labelClass}>Format</span>
+                <button
+                  type="button"
+                  className="text-[10px] text-cyan-200 hover:underline"
+                  onClick={() => {
+                    setFormats([]);
+                    setGimmickVariants([]);
+                  }}
+                >
+                  Any
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {FORMAT_OPTIONS.map((f) => (
+                  <button
+                    type="button"
+                    key={f}
+                    onClick={() =>
+                      setFormats((prev) => {
+                        const next = toggleSelection(prev, f);
+                        if (!next.includes('GIMMICK')) setGimmickVariants([]);
+                        return next;
+                      })
+                    }
+                    className={`${chipBase} ${
+                      formats.includes(f)
+                        ? 'border-cyan-400 bg-cyan-600 text-white'
+                        : 'border-white/20 bg-black/30 text-white/70'
+                    }`}
+                  >
+                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
+              {!formats.length && <p className="text-[10px] text-white/45">Any format</p>}
+            </div>
+
+            {(formats.length === 0 || formats.includes('GIMMICK')) && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={labelClass}>Gimmick type</span>
+                  <button
+                    type="button"
+                    className="text-[10px] text-cyan-200 hover:underline"
+                    onClick={() => setGimmickVariants([])}
+                  >
+                    Any
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {GIMMICK_OPTIONS.map((variant) => (
+                    <button
+                      type="button"
+                      key={variant.value}
+                      onClick={() =>
+                        setGimmickVariants((prev) => toggleSelection(prev, variant.value))
+                      }
+                      className={`${chipBase} ${
+                        gimmickVariants.includes(variant.value)
+                          ? 'border-cyan-400 bg-cyan-600 text-white'
+                          : 'border-white/20 bg-black/30 text-white/70'
+                      }`}
+                    >
+                      {variant.label}
+                    </button>
+                  ))}
+                </div>
+                {!gimmickVariants.length && (
+                  <p className="text-[10px] text-white/45">Any gimmick (when gimmick tables play)</p>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className={labelClass}>
-                Min points
-                <input
-                  type="number"
-                  value={minPoints}
-                  onChange={(e) => setMinPoints(Number(e.target.value))}
-                  className={fieldClass}
-                />
-              </label>
-              <label className={labelClass}>
-                Max points
-                <input
-                  type="number"
-                  value={maxPoints}
-                  onChange={(e) => setMaxPoints(Number(e.target.value))}
-                  className={fieldClass}
-                />
-              </label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={labelClass}>Buy-in range</span>
+                  <button
+                    type="button"
+                    className="text-[10px] text-cyan-200 hover:underline"
+                    onClick={() => {
+                      setMinCoins(undefined);
+                      setMaxCoins(undefined);
+                    }}
+                  >
+                    Any
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={minCoins !== undefined ? String(minCoins) : ''}
+                    onChange={(e) =>
+                      setMinCoins(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    className={fieldClass}
+                  >
+                    <option value="">Min (any)</option>
+                    <option value={0}>Free</option>
+                    {COIN_OPTION_VALUES.map((value) => (
+                      <option key={`min-${value}`} value={value}>
+                        {formatCoins(value)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={maxCoins !== undefined ? String(maxCoins) : ''}
+                    onChange={(e) =>
+                      setMaxCoins(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    className={fieldClass}
+                  >
+                    <option value="">Max (any)</option>
+                    <option value={0}>Free</option>
+                    {COIN_OPTION_VALUES.map((value) => (
+                      <option key={`max-${value}`} value={value}>
+                        {formatCoins(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={labelClass}>Points</span>
+                  <button
+                    type="button"
+                    className="text-[10px] text-cyan-200 hover:underline"
+                    onClick={() => {
+                      setMinPoints(undefined);
+                      setMaxPoints(undefined);
+                    }}
+                  >
+                    Any
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    value={minPoints ?? ''}
+                    onChange={(e) =>
+                      setMinPoints(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    placeholder="Min (any)"
+                    className={fieldClass}
+                  />
+                  <input
+                    type="number"
+                    value={maxPoints ?? ''}
+                    onChange={(e) =>
+                      setMaxPoints(e.target.value === '' ? undefined : Number(e.target.value))
+                    }
+                    placeholder="Max (any)"
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+
               <label className={labelClass}>
                 Nil allowed
                 <select
-                  disabled={format !== 'REGULAR'}
-                  value={format === 'REGULAR' ? (nilAllowed ? 'true' : 'false') : 'true'}
-                  onChange={(e) => setNilAllowed(e.target.value === 'true')}
-                  className={`${fieldClass} disabled:opacity-50`}
+                  value={nilAllowed === null ? 'any' : nilAllowed ? 'true' : 'false'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setNilAllowed(v === 'any' ? null : v === 'true');
+                  }}
+                  className={fieldClass}
                 >
+                  <option value="any">Any</option>
                   <option value="true">Yes</option>
                   <option value="false">No</option>
                 </select>
@@ -661,17 +798,30 @@ const LeagueEventsPanel: React.FC<Props> = ({
               <label className={labelClass}>
                 Blind nil allowed
                 <select
-                  disabled={format !== 'REGULAR'}
-                  value={format === 'REGULAR' ? (blindNilAllowed ? 'true' : 'false') : 'false'}
-                  onChange={(e) => setBlindNilAllowed(e.target.value === 'true')}
-                  className={`${fieldClass} disabled:opacity-50`}
+                  value={blindNilAllowed === null ? 'any' : blindNilAllowed ? 'true' : 'false'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setBlindNilAllowed(v === 'any' ? null : v === 'true');
+                  }}
+                  className={fieldClass}
                 >
-                  <option value="false">No</option>
+                  <option value="any">Any</option>
                   <option value="true">Yes</option>
+                  <option value="false">No</option>
                 </select>
               </label>
+
               <div className="space-y-1.5">
-                <span className={labelClass}>Special rule #1</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={labelClass}>Special rule #1</span>
+                  <button
+                    type="button"
+                    className="text-[10px] text-cyan-200 hover:underline"
+                    onClick={() => setSpecialRule1([])}
+                  >
+                    Any
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {SPECIAL_RULE1_OPTIONS.map((rule) => (
                     <button
@@ -690,7 +840,16 @@ const LeagueEventsPanel: React.FC<Props> = ({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <span className={labelClass}>Special rule #2</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={labelClass}>Special rule #2</span>
+                  <button
+                    type="button"
+                    className="text-[10px] text-cyan-200 hover:underline"
+                    onClick={() => setSpecialRule2([])}
+                  >
+                    Any
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {SPECIAL_RULE2_OPTIONS.map((rule) => (
                     <button
@@ -788,7 +947,8 @@ const LeagueEventsPanel: React.FC<Props> = ({
           </div>
 
           <p className="text-[11px] text-white/55">
-            Event tables must match these game settings (same options as tournament create).
+            Defaults allow any game line. Restrict only the options you care about; buy-in supports a
+            min–max range.
           </p>
 
           <button
