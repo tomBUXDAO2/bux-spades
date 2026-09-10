@@ -18,6 +18,9 @@ interface WinnerModalProps {
   onTimerExpire?: () => void; // Function to call when timer expires (should remove player from table)
   onLeaveTable?: () => void; // Function to call when leaving table
   players?: (Player | Bot | null)[]; // Players to display names/avatars
+  /** Tournament match — hide Play Again; show progress / elimination copy */
+  isTournament?: boolean;
+  tournamentOutcome?: { headline: string; detail: string } | null;
 }
 
 export default function WinnerModal({ 
@@ -33,7 +36,9 @@ export default function WinnerModal({
   humanPlayerCount = 1,
   onTimerExpire,
   onLeaveTable,
-  players = []
+  players = [],
+  isTournament = false,
+  tournamentOutcome = null
 }: WinnerModalProps) {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(30);
@@ -172,7 +177,36 @@ export default function WinnerModal({
           </div>
         </div>
 
-        {!showPlayAgainPrompt ? (
+        {isTournament ? (
+          <div className="mt-4 flex flex-col gap-2">
+            {(tournamentOutcome?.headline || tournamentOutcome?.detail) && (
+              <div
+                className={`rounded-lg border px-3 py-2 text-center ${
+                  userWon
+                    ? 'border-emerald-400/40 bg-emerald-950/40'
+                    : 'border-amber-400/40 bg-amber-950/35'
+                }`}
+              >
+                {tournamentOutcome.headline && (
+                  <p className="text-sm font-semibold text-white">{tournamentOutcome.headline}</p>
+                )}
+                {tournamentOutcome.detail && (
+                  <p className="mt-1 text-xs text-slate-200/90">{tournamentOutcome.detail}</p>
+                )}
+              </div>
+            )}
+            {!tournamentOutcome && (
+              <p className="text-center text-xs text-slate-400">Updating tournament bracket…</p>
+            )}
+            <p className="text-center text-[11px] text-slate-500">Leaving table in {timeRemaining}s</p>
+            <button
+              onClick={handleLeave}
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 shadow-sm transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              Leave Table
+            </button>
+          </div>
+        ) : !showPlayAgainPrompt ? (
           <div className="mt-4 flex flex-col gap-2">
             <button
               onClick={handlePlayAgain}

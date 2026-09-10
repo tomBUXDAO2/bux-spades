@@ -25,6 +25,13 @@ import GameTablePlayers from '../../../components/game/components/GameTablePlaye
 import CoinDebitAnimation from '../../../components/game/components/CoinDebitAnimation';
 import CoinCreditAnimation from '../../../components/game/components/CoinCreditAnimation';
 import EmojiTravel from '../../../components/game/components/EmojiTravel';
+import TournamentBracketModal from './TournamentBracketModal';
+import {
+  buildTournamentOutcomeMessage,
+  isTournamentGameId,
+  parseTournamentGameId
+} from '@/features/league/utils/tournamentGame';
+import { api } from '@/services/lib/api';
 
 // Utility imports
 import { getTrickCardPositions, getOrderedPlayersForTrick } from '../utils/trickUtils';
@@ -224,6 +231,11 @@ export default function GameTableModular({
   const [showTrickHistory, setShowTrickHistory] = useState(false);
   const [showGameInfo, setShowGameInfo] = useState(false);
   const [botWarningOpen, setBotWarningOpen] = useState(false);
+  const [showTournamentBracket, setShowTournamentBracket] = useState(false);
+  const [tournamentOutcome, setTournamentOutcome] = useState<{
+    headline: string;
+    detail: string;
+  } | null>(null);
   
   // Blind nil states
   const [showBlindNilModal, setShowBlindNilModal] = useState(false);
@@ -1434,7 +1446,66 @@ export default function GameTableModular({
     setShowLeaveConfirmation(false);
   };
   
+  const tournamentIds = useMemo(() => parseTournamentGameId(gameState.id), [gameState.id]);
+  const isTournamentGame = Boolean(tournamentIds);
+  const tournamentLeagueId =
+    (gameState as any).leagueId ||
+    (gameState as any).league?.id ||
+    null;
+
+  // After tournament game over, load bracket and build progress / elimination message
+  useEffect(() => {
+    if (!isTournamentGame || !(showWinner || showLoser)) return;
+    if (!tournamentIds || !tournamentLeagueId || !propUser?.id) return;
+
+    let cancelled = false;
+    const loadOutcome = async () => {
+      try {
+        // Bracket may update a beat after scores — retry briefly
+        for (let attempt = 0; attempt < 5; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
+          const res = await api.get(
+            `/api/leagues/${tournamentLeagueId}/tournaments/${tournamentIds.tournamentId}`
+          );
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) continue;
+          const msg = buildTournamentOutcomeMessage({
+            userId: propUser.id,
+            matchId: tournamentIds.matchId,
+            gameId: gameState.id,
+            eliminationType: data.eliminationType,
+            tournamentStatus: data.status,
+            matches: Array.isArray(data.matches) ? data.matches : []
+          });
+          if (msg && !cancelled) {
+            setTournamentOutcome({ headline: msg.headline, detail: msg.detail });
+            return;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    loadOutcome();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isTournamentGame,
+    showWinner,
+    showLoser,
+    tournamentIds,
+    tournamentLeagueId,
+    propUser?.id,
+    gameState.id
+  ]);
+
+  useEffect(() => {
+    if (!showWinner && !showLoser) setTournamentOutcome(null);
+  }, [showWinner, showLoser]);
+
   const handlePlayAgain = () => {
+    if (isTournamentGameId(gameState.id)) return;
     if (socket) {
       socket.emit('play_again', { gameId: gameState.id });
     }
@@ -2006,6 +2077,17 @@ export default function GameTableModular({
                 onToggleGameInfo={() => setShowGameInfo((v) => !v)}
                 onShowTrickHistory={() => setShowTrickHistory(true)}
               />
+
+              {isTournamentGame && tournamentLeagueId && tournamentIds && (
+                <button
+                  type="button"
+                  onClick={() => setShowTournamentBracket(true)}
+                  className="absolute bottom-3 left-3 z-30 rounded-lg border border-white/20 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-white shadow-md backdrop-blur hover:bg-slate-900/90"
+                  style={{ fontSize: `${Math.max(10, Math.floor(11 * scaleFactor))}px` }}
+                >
+                  Bracket
+                </button>
+              )}
               
               {/* Game Table Scoreboard */}
               <GameTableScoreboard
@@ -2272,9 +2354,22 @@ export default function GameTableModular({
           onPlayWithBots={handlePlayWithBots}
           onFillSeatWithBot={handleFillSeatWithBot}
           onTimerExpire={handleTimerExpire}
+          isTournament={isTournamentGame}
+          tournamentOutcome={tournamentOutcome}
           isPlayer={isPlayer}
           isBot={isBot}
         />
+
+      {isTournamentGame && tournamentLeagueId && tournamentIds && (
+        <TournamentBracketModal
+          isOpen={showTournamentBracket}
+          onClose={() => setShowTournamentBracket(false)}
+          leagueId={tournamentLeagueId}
+          tournamentId={tournamentIds.tournamentId}
+          currentGameId={gameState.id}
+          currentUserId={propUser?.id || ''}
+        />
+      )}
 
         {/* Emoji Travel Animations */}
         {emojiTravels.map((travel) => (

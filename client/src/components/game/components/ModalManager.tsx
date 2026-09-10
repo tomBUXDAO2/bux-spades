@@ -67,6 +67,8 @@ interface ModalManagerProps {
   onPlayWithBots: () => void;
   onFillSeatWithBot: () => void;
   onTimerExpire: () => void;
+  isTournament?: boolean;
+  tournamentOutcome?: { headline: string; detail: string } | null;
   
   // Utility functions
   isPlayer: (p: Player | Bot | null) => p is Player;
@@ -254,6 +256,8 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
     onPlayWithBots,
     onFillSeatWithBot,
     onTimerExpire,
+    isTournament = false,
+    tournamentOutcome = null,
     isPlayer,
     isBot
   } = props;
@@ -319,7 +323,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           }}
           playerScores={finalPlayerScores || gameState.playerScores || [0, 0, 0, 0]}
           winningPlayer={gameState.winningPlayer || 0}
-          onPlayAgain={onPlayAgain}
+          onPlayAgain={isTournament ? undefined : onPlayAgain}
           userPlayerIndex={gameState.players?.findIndex(p => p && (p.id === user?.id || p.userId === user?.id))}
           humanPlayerCount={(gameState.players || []).filter(p => p && !isBot(p)).length}
           onTimerExpire={onTimerExpire}
@@ -327,6 +331,8 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           onLeaveTable={onLeaveTable}
           players={gameState.players}
           isRated={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
+          isTournament={isTournament}
+          tournamentOutcome={tournamentOutcome}
         />
       )}
 
@@ -338,7 +344,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           team1Score={finalScores?.team1Score ?? gameState.team1TotalScore ?? 0}
           team2Score={finalScores?.team2Score ?? gameState.team2TotalScore ?? 0}
           winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
-          onPlayAgain={onPlayAgain}
+          onPlayAgain={isTournament ? undefined : onPlayAgain}
           userTeam={getUserTeam(gameState, user?.id || '')}
           isCoinGame={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
           coinsWon={(() => {
@@ -353,6 +359,8 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           onTimerExpire={onTimerExpire}
           onLeaveTable={onLeaveTable}
           players={gameState.players}
+          isTournament={isTournament}
+          tournamentOutcome={tournamentOutcome}
         />
       )}
 
@@ -364,7 +372,7 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           team1Score={finalScores?.team1Score ?? gameState.team1TotalScore ?? 0}
           team2Score={finalScores?.team2Score ?? gameState.team2TotalScore ?? 0}
           winningTeam={(finalScores?.team1Score ?? gameState.team1TotalScore ?? 0) > (finalScores?.team2Score ?? gameState.team2TotalScore ?? 0) ? 1 : 2}
-          onPlayAgain={onPlayAgain}
+          onPlayAgain={isTournament ? undefined : onPlayAgain}
           userTeam={getUserTeam(gameState, user?.id || '')}
           isCoinGame={(gameState.players || []).filter(p => p && !isBot(p)).length === 4}
           coinsWon={0} // Losers get 0 coins
@@ -372,6 +380,8 @@ export const ModalManager: React.FC<ModalManagerProps> = (props) => {
           onTimerExpire={onTimerExpire}
           onLeaveTable={onLeaveTable}
           players={gameState.players}
+          isTournament={isTournament}
+          tournamentOutcome={tournamentOutcome}
         />
       )}
 
