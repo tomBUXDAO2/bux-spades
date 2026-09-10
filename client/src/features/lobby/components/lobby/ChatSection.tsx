@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import type { Player, Bot } from "../../../../types/game";
@@ -6,6 +6,8 @@ import { abbreviateBotName } from "../../../../utils/botUtils";
 import RoomsTab from './RoomsTab';
 import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
 import { GifPicker } from '@/features/chat/components/GifPicker';
+import { MentionTextInput } from '@/features/chat/components/MentionTextInput';
+import type { MentionCandidate } from '@/features/chat/utils/chatMentions';
 
 interface ChatMessage {
   id?: string;
@@ -15,6 +17,7 @@ interface ChatMessage {
   userAvatar?: string;
   timestamp: number;
   isGameMessage?: boolean;
+  mentions?: { userId: string; username: string }[];
 }
 
 interface ChatSectionProps {
@@ -81,6 +84,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   getUserAvatar
 }) => {
   const [showGifPicker, setShowGifPicker] = React.useState(false);
+  const mentionCandidates: MentionCandidate[] = useMemo(() => {
+    const map = new Map<string, MentionCandidate>();
+    for (const p of onlinePlayers || []) {
+      const id = p?.id || p?.userId;
+      const username = p?.username || p?.name || p?.userName;
+      if (!id || !username) continue;
+      map.set(String(id), { id: String(id), username: String(username) });
+    }
+    return Array.from(map.values());
+  }, [onlinePlayers]);
   // Detect screen width for responsive sizing
   const [screenWidth, setScreenWidth] = React.useState(window.innerWidth);
   
@@ -203,6 +216,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                       message={msg.message}
                       style={{ fontSize: `${14 * textScale}px` }}
                       className="mt-1 max-h-40 max-w-full rounded-md"
+                      mentions={msg.mentions}
+                      currentUsername={user?.username}
                     />
                   </div>
                   {user && msg.userId === user.id && (
@@ -230,15 +245,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           </div>
           <form onSubmit={onSendMessage} className="mt-auto relative">
             <div className="flex flex-row items-center space-x-2 w-full">
-              <input
-                type="text"
+              <MentionTextInput
                 value={newMessage}
-                onChange={(e) => onSetNewMessage(e.target.value)}
-                placeholder={canSendChat ? 'Type a message...' : 'Sign in to chat'}
+                onChange={onSetNewMessage}
+                mentionCandidates={mentionCandidates}
+                excludeUserId={user?.id}
+                placeholder={canSendChat ? 'Type a message… (@ to tag)' : 'Sign in to chat'}
                 disabled={!canSendChat}
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 pr-10 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-w-0 w-full rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 pr-10 text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ fontSize: `${14 * inputScale}px` }}
-                ref={inputRef}
+                inputRef={inputRef}
+                onSubmitKey={() => {
+                  if (!canSendChat || !newMessage.trim()) return;
+                  onSendMessage({ preventDefault() {} } as React.FormEvent);
+                }}
               />
               {/* Emoji Picker Button */}
               <div className="relative flex-shrink-0">

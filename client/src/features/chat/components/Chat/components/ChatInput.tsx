@@ -1,11 +1,14 @@
 // Chat input component with emoji picker
 // Extracted from Chat.tsx
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { GifPicker } from '@/features/chat/components/GifPicker';
+import { MentionTextInput } from '@/features/chat/components/MentionTextInput';
+import type { MentionCandidate } from '@/features/chat/utils/chatMentions';
+import type { Player } from '@/types/game';
 
 interface EmojiData {
   native: string;
@@ -22,6 +25,9 @@ interface ChatInputProps {
   chatType: 'game' | 'lobby';
   isConnected: boolean;
   isAuthenticated: boolean;
+  players?: Player[];
+  spectators?: Player[];
+  currentUserId?: string;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -34,13 +40,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   scaleFactor,
   chatType,
   isConnected,
-  isAuthenticated
+  isAuthenticated,
+  players = [],
+  spectators = [],
+  currentUserId
 }) => {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const gifButtonRef = useRef<HTMLButtonElement>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isGifPickerOpen, setIsGifPickerOpen] = useState(false);
+
+  const mentionCandidates: MentionCandidate[] = useMemo(() => {
+    const map = new Map<string, MentionCandidate>();
+    for (const p of [...players, ...spectators]) {
+      const id = (p as any)?.userId || (p as any)?.id;
+      const username = (p as any)?.username || (p as any)?.name || (p as any)?.userName;
+      if (!id || !username) continue;
+      if (String(id).startsWith('bot-')) continue;
+      if (typeof username === 'string' && (username.startsWith('Bot ') || username.startsWith('Bot_'))) continue;
+      map.set(String(id), { id: String(id), username: String(username) });
+    }
+    return Array.from(map.values());
+  }, [players, spectators]);
   
   // Scale down for different screen widths
   const screenWidth = window.innerWidth;
@@ -79,18 +101,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
   const getInputStyles = () => {
     const baseSize = isMobile ? 12 : 14;
     return {
       fontSize: `${Math.floor(baseSize * scaleFactor * scale)}px`,
       padding: `${(isMobile ? 8 : 12) * scale}px`,
+      paddingRight: `${56 * scale}px`,
       height: `${(isMobile ? 36 : 44) * scale}px`
     };
   };
@@ -104,15 +120,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     >
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <div className="flex-1 relative">
-          <input
-            type="text"
+          <MentionTextInput
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={`Type a ${chatType} message...`}
+            onChange={setNewMessage}
+            mentionCandidates={mentionCandidates}
+            excludeUserId={currentUserId}
+            placeholder={`Type a ${chatType} message… (@ to tag)`}
             className="w-full rounded-lg border border-white/10 bg-slate-900/60 pr-16 text-slate-100 placeholder:text-slate-500 backdrop-blur-sm focus:border-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
             style={getInputStyles()}
             disabled={!isConnected || !isAuthenticated}
+            onSubmitKey={() => {
+              if (newMessage.trim() && isConnected && isAuthenticated) {
+                onSendMessage(newMessage.trim());
+                setNewMessage('');
+                setRetryCount(0);
+              }
+            }}
           />
           
           {/* Emoji picker button */}

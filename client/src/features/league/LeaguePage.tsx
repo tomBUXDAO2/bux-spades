@@ -14,6 +14,8 @@ import MobileToggle from '@/features/lobby/components/lobby/MobileToggle';
 import { useWindowSize } from '@/hooks/useWindowSize';
 import { ChatMessageBody } from '@/features/chat/components/ChatMessageBody';
 import { GifPicker } from '@/features/chat/components/GifPicker';
+import { MentionTextInput } from '@/features/chat/components/MentionTextInput';
+import type { MentionCandidate } from '@/features/chat/utils/chatMentions';
 import LeagueSectionSelect from '@/features/league/components/LeagueSectionSelect';
 import LeagueSectionPlaceholder from '@/features/league/components/LeagueSectionPlaceholder';
 import LeagueAnnouncementsPanel from '@/features/league/components/LeagueAnnouncementsPanel';
@@ -56,6 +58,7 @@ type ChatMessage = {
   message: string;
   timestamp: number;
   leagueId?: string;
+  mentions?: { userId: string; username: string }[];
 };
 
 type JoinRequest = {
@@ -164,6 +167,9 @@ const LeaguePage: React.FC = () => {
     online: isMemberOnline(m.userId)
   }));
   const onlineCount = membersWithPresence.filter((m) => m.online).length;
+  const mentionCandidates: MentionCandidate[] = members
+    .filter((m) => m.userId && m.user?.username)
+    .map((m) => ({ id: m.userId, username: m.user.username }));
 
   const loadLeague = useCallback(async () => {
     if (!leagueId) return;
@@ -1104,7 +1110,12 @@ const LeaguePage: React.FC = () => {
                             )}
                             <span className="text-[10px] opacity-70 ml-auto">{formatTime(msg.timestamp)}</span>
                           </div>
-                          <ChatMessageBody message={msg.message} textClassName="text-sm break-words" />
+                          <ChatMessageBody
+                            message={msg.message}
+                            textClassName="text-sm break-words"
+                            mentions={msg.mentions}
+                            currentUsername={user?.username}
+                          />
                           {isAdmin && selectedMessageId === msg.id && (
                             <span
                               role="button"
@@ -1142,13 +1153,19 @@ const LeaguePage: React.FC = () => {
                 </div>
                 <form onSubmit={sendMessage} className="mt-2 relative">
                   <div className="flex items-center gap-2">
-                    <input
-                      ref={inputRef}
+                    <MentionTextInput
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={setNewMessage}
+                      mentionCandidates={mentionCandidates}
+                      excludeUserId={user?.id}
                       disabled={isMuted}
-                      placeholder={isMuted ? 'You are muted' : 'Message this league…'}
-                      className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
+                      placeholder={isMuted ? 'You are muted' : 'Message this league… (@ to tag)'}
+                      className="min-w-0 w-full rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm placeholder:text-white/50"
+                      inputRef={inputRef}
+                      onSubmitKey={() => {
+                        if (isMuted || !newMessage.trim()) return;
+                        sendMessage({ preventDefault() {} } as React.FormEvent);
+                      }}
                     />
                     <div className="relative shrink-0">
                       <button

@@ -2,6 +2,8 @@ import { GameService } from '../../../services/GameService.js';
 // CONSOLIDATED: GameManager removed - using GameService directly
 import { prisma } from '../../../config/database.js';
 import { sanitizeChatMessage } from '../../../utils/chatGif.js';
+import { resolveMentions } from '../../../utils/chatMentions.js';
+import { notifyChatMentions } from '../../../utils/notifyChatMentions.js';
 
 class GameChatHandler {
   constructor(io, socket) {
@@ -99,6 +101,21 @@ class GameChatHandler {
       }
 
       // Create chat message object
+      const mentionCandidates = [];
+      for (const p of gameState.players || []) {
+        if (p?.userId && (p.username || p.name)) {
+          mentionCandidates.push({ id: p.userId, username: p.username || p.name });
+        }
+      }
+      for (const s of gameState.spectators || []) {
+        if (s?.userId && (s.username || s.name)) {
+          mentionCandidates.push({ id: s.userId, username: s.username || s.name });
+        }
+      }
+      const mentions = resolveMentions(messageText, mentionCandidates).filter(
+        (m) => m.userId !== userId
+      );
+
       const chatMessage = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.id,
@@ -107,7 +124,8 @@ class GameChatHandler {
         message: messageText,
         timestamp: new Date().toISOString(),
         gameId: gameId,
-        isGameMessage: true
+        isGameMessage: true,
+        mentions
       };
 
       // Chat messages are kept in-memory only (no database persistence)
@@ -117,6 +135,19 @@ class GameChatHandler {
       this.io.to(gameId).emit('game_message', {
         gameId,
         message: chatMessage
+      });
+
+      await notifyChatMentions({
+        io: this.io,
+        senderUserId: userId,
+        senderName: user.username,
+        mentions,
+        messageText,
+        messageId: chatMessage.id,
+        route: `/table/${gameId}`,
+        type: 'chat_mention',
+        extraData: { scope: 'game', gameId },
+        dedupeKeyPrefix: `push:dedupe:game_mention:${gameId}:${chatMessage.id}`
       });
 
       console.log(`[GAME CHAT] Broadcasted message to game ${gameId}`);

@@ -11,6 +11,7 @@ interface ChatMessagesProps {
   scaleFactor: number;
   userAvatar?: string;
   currentUserId?: string;
+  currentUsername?: string;
   onPlayerClick?: (player: any) => void;
   playerStatuses: Record<string, 'friend' | 'blocked' | 'not_friend'>;
   onAddFriend: (playerId: string) => void;
@@ -37,6 +38,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   scaleFactor,
   userAvatar,
   currentUserId,
+  currentUsername,
   onPlayerClick,
   playerStatuses,
   onAddFriend,
@@ -138,7 +140,12 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 )}
                 <span className="opacity-75 ml-auto" style={{ fontSize: fontSizes.timestamp }}> {formatTimestamp(message.timestamp)}</span>
               </div>
-              <ChatMessageBody message={message.message} style={{ fontSize: fontSizes.messageText }} />
+              <ChatMessageBody
+                message={message.message}
+                style={{ fontSize: fontSizes.messageText }}
+                mentions={(message as any).mentions}
+                currentUsername={currentUsername}
+              />
             </div>
             {isCurrentUser && (
               <div className={`${isMobile ? 'w-6 h-6 ml-1.5' : 'w-8 h-8 ml-2'} rounded-full overflow-hidden flex-shrink-0`}>

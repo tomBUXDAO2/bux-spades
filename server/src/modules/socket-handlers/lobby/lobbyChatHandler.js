@@ -2,6 +2,8 @@ import { prisma } from '../../../config/databaseFirst.js';
 import { sanitizeChatMessage } from '../../../utils/chatGif.js';
 import { pushNotificationService } from '../../../services/PushNotificationService.js';
 import { webPushNotificationService } from '../../../services/WebPushNotificationService.js';
+import { resolveMentions } from '../../../utils/chatMentions.js';
+import { notifyChatMentions } from '../../../utils/notifyChatMentions.js';
 
 class LobbyChatHandler {
   // CRITICAL: Static Set shared across ALL instances to track online users
@@ -41,6 +43,14 @@ class LobbyChatHandler {
         return;
       }
 
+      // Resolve @mentions against known usernames
+      const mentionCandidates = await prisma.user.findMany({
+        select: { id: true, username: true },
+        take: 500,
+        orderBy: { username: 'asc' }
+      });
+      const mentions = resolveMentions(text, mentionCandidates).filter((m) => m.userId !== userId);
+
       const chatMessage = {
         id: `lobby_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: user.id,
@@ -48,19 +58,38 @@ class LobbyChatHandler {
         userAvatar: user.avatarUrl,
         message: text,
         timestamp: Date.now(),
-        isLobbyMessage: true
+        isLobbyMessage: true,
+        mentions
       };
 
       // Broadcast to all connected users in lobby
       this.io.emit('lobby_chat_message', chatMessage);
       console.log(`[LOBBY CHAT] User ${user.username} sent message: ${message}`);
 
+      // Targeted push for @mentions
+      await notifyChatMentions({
+        io: this.io,
+        senderUserId: userId,
+        senderName: user.username,
+        mentions,
+        messageText: text,
+        messageId: chatMessage.id,
+        route: '/',
+        type: 'chat_mention',
+        extraData: { scope: 'lobby' },
+        dedupeKeyPrefix: `push:dedupe:lobby_mention:${chatMessage.id}`
+      });
+
       // Push to offline users (app closed/backgrounded => socket disconnected)
       // Requirement: notify for all lobby chat messages.
       try {
         const tokenUserIds = await pushNotificationService.getUsersWithTokens();
+        const mentionedSet = new Set(mentions.map((m) => m.userId));
         const offlineRecipients = tokenUserIds.filter(
-          (uid) => uid !== userId && !LobbyChatHandler.connectedUsers.has(uid)
+          (uid) =>
+            uid !== userId &&
+            !LobbyChatHandler.connectedUsers.has(uid) &&
+            !mentionedSet.has(uid) // already notified via mention push
         );
 
         const pushPayload = {

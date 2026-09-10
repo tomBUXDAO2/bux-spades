@@ -3,6 +3,8 @@ import { LeagueService } from '../../../services/LeagueService.js';
 import { pushNotificationService } from '../../../services/PushNotificationService.js';
 import { webPushNotificationService } from '../../../services/WebPushNotificationService.js';
 import { LobbyChatHandler } from './lobbyChatHandler.js';
+import { resolveMentions } from '../../../utils/chatMentions.js';
+import { notifyChatMentions } from '../../../utils/notifyChatMentions.js';
 
 function firstName(username) {
   const part = String(username || 'Player').trim().split(/\s+/)[0];
@@ -164,18 +166,53 @@ export class LeagueChatHandler {
       }
 
       const chatMessage = await LeagueService.postChatMessage(leagueId, userId, message);
-      this.io.to(`league_${leagueId}`).emit('league_chat_message', chatMessage);
+
+      // Resolve @mentions against league members
+      let mentions = [];
+      try {
+        const members = await LeagueService.listMembers(leagueId, userId);
+        const candidates = members.map((m) => ({
+          id: m.userId,
+          username: m.user?.username || m.username
+        }));
+        mentions = resolveMentions(chatMessage.message, candidates).filter(
+          (m) => m.userId !== userId
+        );
+      } catch (e) {
+        console.warn('[LEAGUE CHAT] mention resolve failed:', e?.message || e);
+      }
+
+      const payload = { ...chatMessage, mentions };
+      this.io.to(`league_${leagueId}`).emit('league_chat_message', payload);
+
+      await notifyChatMentions({
+        io: this.io,
+        senderUserId: userId,
+        senderName: chatMessage.userName,
+        mentions,
+        messageText: chatMessage.message,
+        messageId: chatMessage.id,
+        route: `/league/${leagueId}`,
+        type: 'chat_mention',
+        extraData: { scope: 'league', leagueId },
+        dedupeKeyPrefix: `push:dedupe:league_mention:${leagueId}:${chatMessage.id}`
+      });
 
       // Push to offline league members (app closed/backgrounded => socket disconnected)
       try {
         const tokenUserIds = await pushNotificationService.getUsersWithTokens();
         const tokenSet = new Set(tokenUserIds);
+        const mentionedSet = new Set(mentions.map((m) => m.userId));
 
         const members = await LeagueService.listMembers(leagueId, userId);
         const memberUserIds = members.map((m) => m.userId);
 
         const offlineRecipients = memberUserIds.filter(
-          (uid) => uid !== userId && tokenSet.has(uid) && !LobbyChatHandler.connectedUsers.has(uid)
+          (uid) =>
+            uid !== userId &&
+            tokenSet.has(uid) &&
+            !LobbyChatHandler.connectedUsers.has(uid) &&
+            !mentionedSet.has(uid)
         );
 
         const leagueChatPayload = {

@@ -17,6 +17,7 @@ export interface ChatMessage {
   message: string;
   timestamp: number;
   isGameMessage?: boolean;
+  mentions?: { userId: string; username: string }[];
 }
 
 interface ChatProps {
@@ -133,6 +134,7 @@ export default function Chat({
                   scaleFactor={scaleFactor}
                   userAvatar={userAvatar}
                   currentUserId={userId}
+                  currentUsername={userName}
                   onPlayerClick={handlePlayerClick}
                   playerStatuses={playerStatuses}
                   onAddFriend={addFriend}
@@ -154,6 +156,9 @@ export default function Chat({
                 chatType={chatType}
                 isConnected={isConnected}
                 isAuthenticated={isAuthenticated}
+                players={players}
+                spectators={spectators}
+                currentUserId={userId}
               />
             </>
           ) : (
